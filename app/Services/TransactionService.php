@@ -94,7 +94,7 @@ final class TransactionService
     {
         // --- Skip si tiers_id absent ---
         if ($transaction->tiers_id === null) {
-            Log::info('[PartieDouble] Step 21 — skip : tiers_id null', [
+            Log::info('[PartieDouble][TransactionService] — skip : tiers_id null', [
                 'transaction_id' => $transaction->id,
                 'association_id' => TenantContext::currentId(),
             ]);
@@ -119,7 +119,7 @@ final class TransactionService
 
             if ($sousCatId === null) {
                 // Ligne sans sous-catégorie (ex. ajout manuel) — skip total
-                Log::info('[PartieDouble] Step 21 — skip : ligne sans sous_categorie_id', [
+                Log::info('[PartieDouble][TransactionService] — skip : ligne sans sous_categorie_id', [
                     'transaction_id' => $transaction->id,
                     'transaction_ligne_id' => $ligne->id,
                 ]);
@@ -131,7 +131,7 @@ final class TransactionService
             $compte = CompteVentilationResolver::resoudre(
                 sousCategorieId: (int) $sousCatId,
                 classeAttendue: $classeAttendue,
-                contextLog: 'Step 21',
+                contextLog: 'TransactionService',
                 contextLogData: ['transaction_id' => $transaction->id],
             );
 
@@ -180,7 +180,7 @@ final class TransactionService
             $compteTresorerie = CompteTresorerieResolver::resoudre(
                 compteBancaireId: $transaction->compte_id !== null ? (int) $transaction->compte_id : null,
                 mode: $modePaiement,
-                contextLog: 'Step 21',
+                contextLog: 'TransactionService',
                 isDepense: $isDepense,
             );
 
@@ -653,7 +653,7 @@ final class TransactionService
             $compte = CompteVentilationResolver::resoudre(
                 sousCategorieId: $sousCatId,
                 classeAttendue: $classeAttendue,
-                contextLog: 'Step 31 — patcherComptesVentilationRapproLocked',
+                contextLog: 'TransactionService::patcherComptesVentilationRapproLocked',
                 contextLogData: ['transaction_id' => $transaction->id, 'ligne_id' => $id],
             );
 

@@ -732,7 +732,7 @@ XML;
         $mode = $transaction->mode_paiement;
 
         if ($mode === null) {
-            Log::warning('[PartieDouble] Step 24 — skip : mode_paiement null sur T1', [
+            Log::warning('[PartieDouble][FactureService] — skip : mode_paiement null sur T1', [
                 'transaction_id' => (int) $transaction->id,
                 'facture_id' => (int) $facture->id,
             ]);
@@ -744,7 +744,7 @@ XML;
         $compteTresorerie = CompteTresorerieResolver::resoudre(
             compteBancaireId: $transaction->compte_id !== null ? (int) $transaction->compte_id : null,
             mode: $mode,
-            contextLog: 'Step 24',
+            contextLog: 'FactureService',
             isDepense: false, // encaissement créance = côté recette (chèque reçu → 5112 OK)
         );
 
@@ -760,7 +760,7 @@ XML;
         // on skip sans exception.
         $compte411 ??= Compte::ofNumero('411');
         if ($compte411 === null) {
-            Log::warning('[PartieDouble] Step 24 — skip : compte 411 absent (tenant sans schéma PD)', [
+            Log::warning('[PartieDouble][FactureService] — skip : compte 411 absent (tenant sans schéma PD)', [
                 'transaction_id' => (int) $transaction->id,
                 'facture_id' => (int) $facture->id,
             ]);
@@ -773,7 +773,7 @@ XML;
             ->first();
 
         if ($ligne411 === null || $ligne411->tiers_id === null) {
-            Log::warning('[PartieDouble] Step 24 — skip : T1 legacy sans ligne 411 ou sans tiers', [
+            Log::warning('[PartieDouble][FactureService] — skip : T1 legacy sans ligne 411 ou sans tiers', [
                 'transaction_id' => (int) $transaction->id,
                 'facture_id' => (int) $facture->id,
             ]);
@@ -1047,7 +1047,7 @@ XML;
                 $compte = CompteVentilationResolver::resoudre(
                     sousCategorieId: $transactionLigne->sous_categorie_id !== null ? (int) $transactionLigne->sous_categorie_id : null,
                     classeAttendue: 7,
-                    contextLog: 'Step 23',
+                    contextLog: 'FactureService',
                     contextLogData: ['transaction_id' => (int) $transaction->id],
                 );
 

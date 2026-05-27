@@ -153,7 +153,7 @@ final class RapprochementBancaireService
 
                 $solde += $mouvement;
             } else {
-                Log::warning('[PartieDouble] Step 29 — skip solde : compte 512X introuvable pour IBAN', [
+                Log::warning('[PartieDouble][RapprochementBancaireService] — skip solde : compte 512X introuvable pour IBAN', [
                     'iban' => $rapprochement->compte->iban,
                     'compte_bancaire_id' => (int) $rapprochement->compte_id,
                     'rapprochement_id' => (int) $rapprochement->id,

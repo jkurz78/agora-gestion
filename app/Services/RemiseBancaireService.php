@@ -298,7 +298,7 @@ final class RemiseBancaireService
             // Mode non supporté pour la remise partie double (Virement, CB, Prélèvement)
             // EcritureGenerator::pourRemiseBancaire lèvera une exception si on tente —
             // on skip silencieusement ici (cohérence avec la garde dans EcritureGenerator)
-            Log::warning('[PartieDouble] Step 25 — skip : mode non supporté pour remise partie double', [
+            Log::warning('[PartieDouble][RemiseBancaireService] — skip : mode non supporté pour remise partie double', [
                 'remise_id' => $remise->id,
                 'mode_paiement' => $mode->value,
             ]);
@@ -310,7 +310,7 @@ final class RemiseBancaireService
         $comptePortage = Compte::ofNumero($numeroComptePortage);
 
         if ($comptePortage === null) {
-            Log::warning('[PartieDouble] Step 25 — skip : compte portage introuvable (tenant sans schéma PD)', [
+            Log::warning('[PartieDouble][RemiseBancaireService] — skip : compte portage introuvable (tenant sans schéma PD)', [
                 'remise_id' => $remise->id,
                 'numero_compte_portage' => $numeroComptePortage,
             ]);
@@ -338,7 +338,7 @@ final class RemiseBancaireService
                 ->first();
 
             if ($lignePortage === null) {
-                Log::warning('[PartieDouble] Step 25 — skip source : aucune ligne portage '.$numeroComptePortage.' trouvée sur transaction', [
+                Log::warning('[PartieDouble][RemiseBancaireService] — skip source : aucune ligne portage '.$numeroComptePortage.' trouvée sur transaction', [
                     'remise_id' => $remise->id,
                     'transaction_id' => $txId,
                     'compte_portage' => $numeroComptePortage,
@@ -352,7 +352,7 @@ final class RemiseBancaireService
         }
 
         if ($lignesSources->isEmpty()) {
-            Log::warning('[PartieDouble] Step 25 — aucune source valide : pas de T4 créée', [
+            Log::warning('[PartieDouble][RemiseBancaireService] — aucune source valide : pas de T4 créée', [
                 'remise_id' => $remise->id,
                 'transaction_ids' => $transactionIds,
             ]);

@@ -307,7 +307,7 @@ it('[E] Virement + compte_id null → skip PD silencieux, statut_reglement passe
     Log::shouldHaveReceived('warning')
         ->once()
         ->withArgs(function (string $message): bool {
-            return str_contains($message, 'Step 24') && str_contains($message, 'compte_id null');
+            return str_contains($message, 'FactureService') && str_contains($message, 'compte_id null');
         });
 });
 

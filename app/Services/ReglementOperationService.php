@@ -67,7 +67,7 @@ final class ReglementOperationService
         $sousCategorieId = $operation->typeOperation?->sous_categorie_id;
 
         if ($sousCategorieId === null) {
-            Log::warning('[PartieDouble] Step 26 — skip total : typeOperation sans sous_categorie_id', [
+            Log::warning('[PartieDouble][ReglementOperationService] — skip total : typeOperation sans sous_categorie_id', [
                 'seance_id' => (int) $seance->id,
                 'operation_id' => (int) $operation->id,
             ]);
@@ -182,7 +182,7 @@ final class ReglementOperationService
         $compte = CompteVentilationResolver::resoudre(
             sousCategorieId: $sousCategorieId,
             classeAttendue: 7,
-            contextLog: 'Step 26',
+            contextLog: 'ReglementOperationService',
             contextLogData: ['transaction_id' => (int) $tx->id],
         );
 
@@ -238,7 +238,7 @@ final class ReglementOperationService
         $mode = $transaction->mode_paiement;
 
         if ($mode === null) {
-            Log::warning('[PartieDouble] Step 26 — skip : mode_paiement null sur T1', [
+            Log::warning('[PartieDouble][ReglementOperationService] — skip : mode_paiement null sur T1', [
                 'transaction_id' => (int) $transaction->id,
             ]);
 
@@ -249,7 +249,7 @@ final class ReglementOperationService
         $compteTresorerie = CompteTresorerieResolver::resoudre(
             compteBancaireId: $transaction->compte_id !== null ? (int) $transaction->compte_id : null,
             mode: $mode,
-            contextLog: 'Step 26',
+            contextLog: 'ReglementOperationService',
             isDepense: false, // encaissement créance = côté recette
         );
 
@@ -262,7 +262,7 @@ final class ReglementOperationService
         // Compte 411 préchargé par le caller (N+1 fix — Vague 3b Item C).
         $compte411 ??= Compte::ofNumero('411');
         if ($compte411 === null) {
-            Log::warning('[PartieDouble] Step 26 — skip : compte 411 absent (tenant sans schéma PD)', [
+            Log::warning('[PartieDouble][ReglementOperationService] — skip : compte 411 absent (tenant sans schéma PD)', [
                 'transaction_id' => (int) $transaction->id,
             ]);
 
@@ -274,7 +274,7 @@ final class ReglementOperationService
             ->first();
 
         if ($ligne411 === null || $ligne411->tiers_id === null) {
-            Log::warning('[PartieDouble] Step 26 — skip : T1 legacy sans ligne 411 ou sans tiers', [
+            Log::warning('[PartieDouble][ReglementOperationService] — skip : T1 legacy sans ligne 411 ou sans tiers', [
                 'transaction_id' => (int) $transaction->id,
             ]);
 

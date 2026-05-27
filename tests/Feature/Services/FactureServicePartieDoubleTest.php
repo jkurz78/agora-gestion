@@ -374,6 +374,6 @@ it('facture ligne MontantManuel avec SC sans code_cerfa — Transaction créée,
     Log::shouldHaveReceived('warning')
         ->once()
         ->withArgs(function (string $message): bool {
-            return str_contains($message, 'Step 23') && str_contains($message, 'code_cerfa');
+            return str_contains($message, '[PartieDouble]') && str_contains($message, 'code_cerfa');
         });
 });
