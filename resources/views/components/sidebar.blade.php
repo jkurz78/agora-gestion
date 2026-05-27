@@ -621,11 +621,11 @@ $activeGroup = match(true) {
                             </li>
                             @endif
 
-                            @if (Route::has('parametres.sous-categories.index'))
+                            @if (Route::has('parametres.comptes.index'))
                             <li class="nav-item">
-                                <a href="{{ route('parametres.sous-categories.index') }}"
-                                   class="nav-link {{ request()->routeIs('parametres.sous-categories.*') ? 'active' : '' }}">
-                                    <i class="bi bi-tag me-1"></i> Sous-catégories
+                                <a href="{{ route('parametres.comptes.index') }}"
+                                   class="nav-link {{ request()->routeIs('parametres.comptes.*') ? 'active' : '' }}">
+                                    <i class="bi bi-tag me-1"></i> Comptes
                                 </a>
                             </li>
                             @endif

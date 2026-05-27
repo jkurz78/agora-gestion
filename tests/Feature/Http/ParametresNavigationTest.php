@@ -24,9 +24,15 @@ test('GET /parametres/categories retourne 200', function () {
     $response->assertStatus(200);
 });
 
-test('GET /parametres/sous-categories retourne 200', function () {
-    $response = $this->get('/parametres/sous-categories');
+test('GET /parametres/comptes retourne 200', function () {
+    $response = $this->get('/parametres/comptes');
     $response->assertStatus(200);
+});
+
+test('GET /parametres/sous-categories redirige 301 vers /parametres/comptes', function () {
+    $response = $this->get('/parametres/sous-categories');
+    $response->assertStatus(301);
+    $response->assertRedirect('/parametres/comptes');
 });
 
 test('GET /banques/comptes retourne 200', function () {

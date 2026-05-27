@@ -33,6 +33,7 @@ use App\Http\Controllers\RemiseBancairePdfController;
 use App\Http\Controllers\SeanceExportController;
 use App\Http\Controllers\SeanceFeuilleController;
 use App\Http\Controllers\SeancePdfController;
+use App\Http\Controllers\CompteParametreController;
 use App\Http\Controllers\SousCategorieController;
 use App\Http\Controllers\SuperAdmin\SupportModeController;
 use App\Http\Controllers\SwitchAssociationController;
@@ -84,6 +85,7 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class, CheckEspaceAccess
         Route::view('/reception-documents', 'parametres.reception-documents')->name('reception-documents');
         Route::view('/smtp', 'parametres.smtp')->name('smtp');
         Route::resource('categories', CategorieController::class)->except(['show']);
+        Route::get('comptes', [CompteParametreController::class, 'index'])->name('comptes.index');
         Route::get('sous-categories', [SousCategorieController::class, 'index'])->name('sous-categories.index');
         Route::get('/comptabilite/usages', UsagesComptables::class)
             ->name('comptabilite.usages');
@@ -380,8 +382,9 @@ Route::middleware('auth')->group(function (): void {
     Route::permanentRedirect('/gestion/parametres/reception-documents', '/parametres/reception-documents');
     Route::permanentRedirect('/compta/parametres/categories', '/parametres/categories');
     Route::permanentRedirect('/gestion/parametres/categories', '/parametres/categories');
-    Route::permanentRedirect('/compta/parametres/sous-categories', '/parametres/sous-categories');
-    Route::permanentRedirect('/gestion/parametres/sous-categories', '/parametres/sous-categories');
+    Route::permanentRedirect('/compta/parametres/sous-categories', '/parametres/comptes');
+    Route::permanentRedirect('/gestion/parametres/sous-categories', '/parametres/comptes');
+    Route::permanentRedirect('/parametres/sous-categories', '/parametres/comptes');
     Route::permanentRedirect('/compta/parametres/utilisateurs', '/parametres/utilisateurs');
     Route::permanentRedirect('/gestion/parametres/utilisateurs', '/parametres/utilisateurs');
     Route::permanentRedirect('/gestion/operations', '/operations');

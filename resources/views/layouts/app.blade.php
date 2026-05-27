@@ -547,11 +547,11 @@
                                 </a>
                             </li>
                             @endif
-                            @if (Route::has('parametres.sous-categories.index'))
+                            @if (Route::has('parametres.comptes.index'))
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs('parametres.sous-categories.*') ? 'active' : '' }}"
-                                   href="{{ route('parametres.sous-categories.index') }}">
-                                    <i class="bi bi-tag"></i> Sous-catégories
+                                <a class="dropdown-item {{ request()->routeIs('parametres.comptes.*') ? 'active' : '' }}"
+                                   href="{{ route('parametres.comptes.index') }}">
+                                    <i class="bi bi-tag"></i> Comptes
                                 </a>
                             </li>
                             @endif
