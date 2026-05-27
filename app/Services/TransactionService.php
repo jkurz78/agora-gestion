@@ -628,24 +628,41 @@ final class TransactionService
     {
         $classeAttendue = $transaction->type === TypeTransaction::Recette ? 7 : 6;
 
-        foreach ($lignes as $ligneData) {
-            $id = isset($ligneData['id']) && $ligneData['id'] !== null ? (int) $ligneData['id'] : null;
-            if ($id === null) {
+        // Collecter les IDs de lignes valides (avec sous_categorie_id non null dans la requête)
+        $ids = collect($lignes)
+            ->filter(fn ($l) => isset($l['id']) && $l['id'] !== null && isset($l['sous_categorie_id']) && $l['sous_categorie_id'] !== null)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        if (empty($ids)) {
+            return;
+        }
+
+        // Précharger toutes les lignes en une seule requête (N+1 fix)
+        $lignesDb = $transaction->lignes()
+            ->whereIn('id', $ids)
+            ->whereNotNull('sous_categorie_id')
+            ->get()
+            ->keyBy(fn ($l) => (int) $l->id);
+
+        // Indexer les lignesData par id pour accès O(1)
+        $lignesDataById = collect($lignes)
+            ->filter(fn ($l) => isset($l['id']) && $l['id'] !== null)
+            ->keyBy(fn ($l) => (int) $l['id']);
+
+        foreach ($lignesDb as $id => $ligne) {
+            $ligneData = $lignesDataById->get($id);
+            if ($ligneData === null) {
                 continue;
             }
 
-            // sous_categorie_id dans $lignesData = valeur mise à jour (déjà en base)
             $sousCatId = isset($ligneData['sous_categorie_id']) && $ligneData['sous_categorie_id'] !== null
                 ? (int) $ligneData['sous_categorie_id']
                 : null;
 
             if ($sousCatId === null) {
-                continue;
-            }
-
-            // Recharger la ligne depuis la DB (après la mise à jour du foreach précédent)
-            $ligne = $transaction->lignes()->where('id', $id)->first();
-            if ($ligne === null || $ligne->sous_categorie_id === null) {
                 continue;
             }
 

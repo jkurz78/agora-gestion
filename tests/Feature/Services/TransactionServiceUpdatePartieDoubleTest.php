@@ -450,6 +450,92 @@ it('[F] update libre sur recette lettrée 411 (paire interne) — auto-délettra
 });
 
 // ---------------------------------------------------------------------------
+// [G] Update Rappro-locked multi-lignes — N+1 : 2 ventilations patchées sans requête par ligne
+// ---------------------------------------------------------------------------
+
+it('[G] update Rappro-locked multi-lignes — 2 ventilations patchées, comptes mis à jour (N+1 fix)', function () {
+    // Créer une recette chèque PD avec 2 lignes de ventilation (50+50 = 100)
+    $data = [
+        'type' => TypeTransaction::Recette->value,
+        'date' => '2025-10-15',
+        'libelle' => 'Recette multi-ventilations',
+        'montant_total' => '100.00',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'tiers_id' => $this->tiers->id,
+        'compte_id' => $this->compteBancaire->id,
+    ];
+    $lignes = [
+        ['sous_categorie_id' => $this->scRecette->id,  'montant' => '50.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['sous_categorie_id' => $this->scRecette2->id, 'montant' => '50.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ];
+    $transaction = $this->service->create($data, $lignes);
+    $transaction->refresh();
+    $transaction->load('lignes');
+
+    // Créer une 3ème sous-catégorie recette → compte 701
+    $sc3 = SousCategorie::create([
+        'association_id' => $this->association->id,
+        'categorie_id' => $this->categorieRecette->id,
+        'nom' => 'Cotisations membres',
+        'code_cerfa' => '701',
+    ]);
+    Compte::firstOrCreate(
+        ['association_id' => $this->association->id, 'numero_pcg' => '701'],
+        ['intitule' => 'Ventes de produits finis', 'classe' => 7, 'lettrable' => false, 'actif' => true, 'est_systeme' => false, 'pour_inscriptions' => false]
+    );
+
+    // Placer la transaction dans un rapprochement verrouillé
+    $rapprochement = RapprochementBancaire::factory()->create([
+        'association_id' => $this->association->id,
+        'compte_id' => $this->compteBancaire->id,
+        'statut' => StatutRapprochement::Verrouille,
+        'verrouille_at' => now(),
+    ]);
+    $transaction->update(['rapprochement_id' => $rapprochement->id, 'statut_reglement' => 'pointe']);
+    $transaction->refresh();
+    $transaction->load('lignes');
+
+    // Récupérer les deux lignes de ventilation
+    $ligneVent706 = $transaction->lignes->firstWhere('sous_categorie_id', $this->scRecette->id);
+    $ligneVent708 = $transaction->lignes->firstWhere('sous_categorie_id', $this->scRecette2->id);
+    expect($ligneVent706)->not()->toBeNull('Ligne ventilation 706 doit exister');
+    expect($ligneVent708)->not()->toBeNull('Ligne ventilation 708 doit exister');
+    expect($ligneVent706->compte_id)->toBe($this->compte706->id, 'compte initial 706');
+    expect($ligneVent708->compte_id)->toBe($this->compte708->id, 'compte initial 708');
+
+    // Construire l'update : changer les deux sous_categories
+    $toutes = $transaction->lignes->map(fn ($l) => [
+        'id' => $l->id,
+        'sous_categorie_id' => match ((int) $l->id) {
+            (int) $ligneVent706->id => $this->scRecette2->id, // 706 → 708
+            (int) $ligneVent708->id => $sc3->id,              // 708 → 701
+            default => $l->sous_categorie_id,
+        },
+        'montant' => $l->montant,
+        'operation_id' => $l->operation_id,
+        'seance' => $l->seance,
+        'notes' => $l->notes,
+    ])->toArray();
+
+    $transaction = $this->service->update($transaction, $data, $toutes);
+
+    // Les deux lignes de ventilation doivent être patchées
+    $ligneApres706 = TransactionLigne::find($ligneVent706->id);
+    $ligneApres708 = TransactionLigne::find($ligneVent708->id);
+
+    expect($ligneApres706->compte_id)->toBe($this->compte708->id, 'ligne ex-706 → compte 708');
+    expect($ligneApres708->compte_id)->toBe(
+        Compte::where('association_id', $this->association->id)->where('numero_pcg', '701')->first()?->id,
+        'ligne ex-708 → compte 701'
+    );
+
+    // Lignes PD-only (411) restent intactes
+    $compte411 = Compte::where('association_id', $this->association->id)->where('numero_pcg', '411')->first();
+    $count411 = TransactionLigne::where('transaction_id', $transaction->id)->where('compte_id', $compte411->id)->count();
+    expect($count411)->toBe(2, '2 lignes 411 intactes après update Rappro-locked multi-lignes');
+});
+
+// ---------------------------------------------------------------------------
 // [E] Non-régression — update libre sans tiers : skip enrichissement PD (silencieux)
 // ---------------------------------------------------------------------------
 
