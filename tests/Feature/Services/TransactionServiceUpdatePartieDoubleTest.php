@@ -420,23 +420,23 @@ it('[F] update libre sur recette lettrée 411 (paire interne) — auto-délettra
     ]]);
 
     // 1. Auto-délettrage : une entrée action='delettre' dans lettrage_audit avec motif auto-délettrage
-    $auditAprès = \Illuminate\Support\Facades\DB::table('lettrage_audit')
+    $auditApres = \Illuminate\Support\Facades\DB::table('lettrage_audit')
         ->where('association_id', $this->association->id)
         ->where('action', 'delettre')
         ->first();
-    expect($auditAprès)->not()->toBeNull('Un audit delettre doit être créé lors de l\'update');
-    expect($auditAprès->lettrage_code)->toBe($lettrageCodeAvant, 'Le code lettrage audité est celui des 411 originales');
-    expect($auditAprès->motif)->toContain('Auto-délettrage suite à update de TX#');
+    expect($auditApres)->not()->toBeNull('Un audit delettre doit être créé lors de l\'update');
+    expect($auditApres->lettrage_code)->toBe($lettrageCodeAvant, 'Le code lettrage audité est celui des 411 originales');
+    expect($auditApres->motif)->toContain('Auto-délettrage suite à update de TX#');
 
     // 2. Les nouvelles lignes 411 existent avec un NOUVEAU code de lettrage (différent de l'ancien)
     // Note : EcritureGenerator re-lettre automatiquement la paire interne 411D+411C à la création.
     // Ce qui compte, c'est que l'ancien code a disparu et qu'un nouveau code a été généré.
-    $lignes411Après = TransactionLigne::where('transaction_id', $transaction->id)
+    $lignes411Apres = TransactionLigne::where('transaction_id', $transaction->id)
         ->where('compte_id', $compte411->id)
         ->get();
-    expect($lignes411Après)->toHaveCount(2, '2 nouvelles lignes 411 recréées');
+    expect($lignes411Apres)->toHaveCount(2, '2 nouvelles lignes 411 recréées');
 
-    foreach ($lignes411Après as $l) {
+    foreach ($lignes411Apres as $l) {
         expect($l->lettrage_code)->not()->toBe($lettrageCodeAvant, 'Les nouvelles lignes 411 portent un NOUVEAU code (l\'ancien a été déletté)');
     }
 
