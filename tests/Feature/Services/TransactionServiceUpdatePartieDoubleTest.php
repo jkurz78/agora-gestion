@@ -264,6 +264,9 @@ it('[C] update Rappro-locked — changer sous_categorie_id → compte_id patché
     expect($ligneVent->compte_id)->toBe($this->compte706->id, 'compte initial 706');
 
     // Snapshot des lignes PD-only (411, 512X) pour vérifier qu'elles restent intactes
+    // Guard : Compte 411 doit exister (créé par SystemeSeeder via setupPartieDoubleContext)
+    expect(Compte::where('association_id', $this->association->id)->where('numero_pcg', '411')->exists())
+        ->toBeTrue('Précondition : Compte 411 doit exister (SystemeSeeder)');
     $compte411 = Compte::where('association_id', $this->association->id)->where('numero_pcg', '411')->first();
     $count411Avant = TransactionLigne::where('transaction_id', $transaction->id)
         ->where('compte_id', $compte411->id)->count();
