@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\ModePaiement;
+use App\Enums\Sens;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Exceptions\Compta\LettrageDejaPresentException;
@@ -250,7 +251,7 @@ final class ReglementOperationService
             compteBancaireId: $transaction->compte_id !== null ? (int) $transaction->compte_id : null,
             mode: $mode,
             contextLog: 'ReglementOperationService',
-            isDepense: false, // encaissement créance = côté recette
+            sens: Sens::Recette, // encaissement créance = côté recette
         );
 
         if ($compteTresorerie === null) {

@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\DataTransferObjects\ExtournePayload;
 use App\Enums\ModePaiement;
+use App\Enums\Sens;
 use App\Enums\StatutFacture;
 use App\Enums\StatutReglement;
 use App\Enums\TypeLigneFacture;
@@ -745,7 +746,7 @@ XML;
             compteBancaireId: $transaction->compte_id !== null ? (int) $transaction->compte_id : null,
             mode: $mode,
             contextLog: 'FactureService',
-            isDepense: false, // encaissement créance = côté recette (chèque reçu → 5112 OK)
+            sens: Sens::Recette, // encaissement créance = côté recette (chèque reçu → 5112 OK)
         );
 
         if ($compteTresorerie === null) {

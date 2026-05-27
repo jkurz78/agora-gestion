@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\ModePaiement;
+use App\Enums\Sens;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Services\Compta\CompteTresorerieResolver;
@@ -49,7 +50,7 @@ it('[R1] compteBancaireId null + mode Especes → placeholder 5112 retourné', f
         compteBancaireId: null,
         mode: ModePaiement::Especes,
         contextLog: 'TestR1',
-        isDepense: false,
+        sens: Sens::Recette,
     );
 
     expect($result)->not->toBeNull();
@@ -63,7 +64,7 @@ it('[R2] compteBancaireId null + mode Virement → null + Log::warning', functio
         compteBancaireId: null,
         mode: ModePaiement::Virement,
         contextLog: 'TestR2',
-        isDepense: false,
+        sens: Sens::Recette,
     );
 
     expect($result)->toBeNull();
@@ -75,14 +76,14 @@ it('[R2] compteBancaireId null + mode Virement → null + Log::warning', functio
         });
 });
 
-it('[R3] compteBancaireId null + mode Cheque + isDepense=true → null + Log::warning', function () {
+it('[R3] compteBancaireId null + mode Cheque + Sens::Depense → null + Log::warning', function () {
     Log::spy();
 
     $result = CompteTresorerieResolver::resoudre(
         compteBancaireId: null,
         mode: ModePaiement::Cheque,
         contextLog: 'TestR3',
-        isDepense: true,
+        sens: Sens::Depense,
     );
 
     expect($result)->toBeNull();
@@ -94,12 +95,12 @@ it('[R3] compteBancaireId null + mode Cheque + isDepense=true → null + Log::wa
         });
 });
 
-it('[R4] compteBancaireId null + mode Cheque + isDepense=false → placeholder 5112', function () {
+it('[R4] compteBancaireId null + mode Cheque + Sens::Recette → placeholder 5112', function () {
     $result = CompteTresorerieResolver::resoudre(
         compteBancaireId: null,
         mode: ModePaiement::Cheque,
         contextLog: 'TestR4',
-        isDepense: false,
+        sens: Sens::Recette,
     );
 
     expect($result)->not->toBeNull();
@@ -115,7 +116,7 @@ it('[R5] compteBancaireId non-null + IBAN match + mode Virement → Compte 512X 
         compteBancaireId: (int) $this->compteBancaire->id,
         mode: ModePaiement::Virement,
         contextLog: 'TestR5',
-        isDepense: false,
+        sens: Sens::Recette,
     );
 
     expect($result)->not->toBeNull();
@@ -140,7 +141,7 @@ it('[R6] compteBancaireId non-null + IBAN no-match + mode Virement → null + Lo
         compteBancaireId: (int) $compteBancaireSans512X->id,
         mode: ModePaiement::Virement,
         contextLog: 'TestR6',
-        isDepense: false,
+        sens: Sens::Recette,
     );
 
     expect($result)->toBeNull();
@@ -162,14 +163,14 @@ it('[R7] compteBancaireId non-null + IBAN no-match + mode Especes → placeholde
         compteBancaireId: (int) $compteBancaireSans512X->id,
         mode: ModePaiement::Especes,
         contextLog: 'TestR7',
-        isDepense: false,
+        sens: Sens::Recette,
     );
 
     expect($result)->not->toBeNull();
     expect($result->numero_pcg)->toBe('5112');
 });
 
-it('[R8] compteBancaireId non-null + IBAN no-match + mode Cheque + isDepense=true → null + Log::warning', function () {
+it('[R8] compteBancaireId non-null + IBAN no-match + mode Cheque + Sens::Depense → null + Log::warning', function () {
     Log::spy();
 
     $compteBancaireSans512X = CompteBancaire::factory()->create([
@@ -181,7 +182,7 @@ it('[R8] compteBancaireId non-null + IBAN no-match + mode Cheque + isDepense=tru
         compteBancaireId: (int) $compteBancaireSans512X->id,
         mode: ModePaiement::Cheque,
         contextLog: 'TestR8',
-        isDepense: true,
+        sens: Sens::Depense,
     );
 
     expect($result)->toBeNull();

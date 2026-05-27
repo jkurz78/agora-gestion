@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Compta;
 
 use App\Enums\ModePaiement;
+use App\Enums\Sens;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use Illuminate\Support\Facades\Log;
@@ -14,9 +15,9 @@ use Illuminate\Support\Facades\Log;
  * et d'un mode de paiement.
  *
  * Helper extrait à partir du 3ème caller (Step 24, rule-of-three) :
- * — Step 21 : TransactionService::enrichirPartieDouble
- * — Step 24 : FactureService::marquerReglementRecu
- * — Step 25 (futur) : RemiseBancaireService::comptabiliser
+ * — TransactionService::enrichirPartieDouble
+ * — FactureService::marquerReglementRecu
+ * — RemiseBancaireService::comptabiliser
  *
  * Pattern de résolution :
  * - Virement / CB / Prélèvement (+ Chèque côté dépense) : cherche le Compte 512X via IBAN.
@@ -28,7 +29,7 @@ use Illuminate\Support\Facades\Log;
  * Asymétrie chèque (documentée en Step 21 §Décision 8) :
  * - Côté dépense : Chèque émis → 512X explicite requis (pas de 5112 miroir).
  * - Côté recette : Chèque reçu → placeholder 5112 acceptable (EcritureGenerator résout seul).
- * Pour Step 24 (encaissement créance), on est côté recette → Cheque → placeholder OK.
+ * Pour encaissement créance, on est côté recette → Cheque → placeholder OK.
  */
 final class CompteTresorerieResolver
 {
@@ -37,18 +38,18 @@ final class CompteTresorerieResolver
      *
      * @param  int|null  $compteBancaireId  La colonne compte_id de la Transaction (FK vers comptes_bancaires).
      * @param  ModePaiement  $mode  Le mode de paiement.
-     * @param  string  $contextLog  Préfixe pour les messages Log::warning (ex. 'Step 24').
-     * @param  bool  $isDepense  true pour une dépense (chèque → 512X requis).
+     * @param  string  $contextLog  Préfixe pour les messages Log::warning (ex. 'FactureService').
+     * @param  Sens  $sens  Sens::Depense pour une dépense (chèque → 512X requis) ; Sens::Recette pour une recette.
      * @return Compte|null null = skip la double écriture ; non-null = utiliser ce compte.
      */
     public static function resoudre(
         ?int $compteBancaireId,
         ModePaiement $mode,
-        string $contextLog = 'Step 24',
-        bool $isDepense = false,
+        string $contextLog = 'CompteTresorerieResolver',
+        Sens $sens = Sens::Recette,
     ): ?Compte {
-        // Modes nécessitant un 512X explicite (côté recette)
-        $modesNecessitant512X = $isDepense
+        // Modes nécessitant un 512X explicite selon le sens
+        $modesNecessitant512X = $sens === Sens::Depense
             ? [ModePaiement::Cheque, ModePaiement::Virement, ModePaiement::Cb, ModePaiement::Prelevement]
             : [ModePaiement::Virement, ModePaiement::Cb, ModePaiement::Prelevement];
 

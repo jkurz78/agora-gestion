@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\ModePaiement;
+use App\Enums\Sens;
 use App\Enums\TypeTransaction;
 use App\Enums\UsageComptable;
 use App\Models\Compte;
@@ -175,13 +176,13 @@ final class TransactionService
         // Mode comptant (paiement présent) → on a besoin d'un compteTresorerie
         $compteTresorerie = null;
         if ($modePaiement !== null) {
-            $isDepense = $transaction->type === TypeTransaction::Depense;
+            $sens = $transaction->type === TypeTransaction::Depense ? Sens::Depense : Sens::Recette;
 
             $compteTresorerie = CompteTresorerieResolver::resoudre(
                 compteBancaireId: $transaction->compte_id !== null ? (int) $transaction->compte_id : null,
                 mode: $modePaiement,
                 contextLog: 'TransactionService',
-                isDepense: $isDepense,
+                sens: $sens,
             );
 
             if ($compteTresorerie === null) {

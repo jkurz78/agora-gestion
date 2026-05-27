@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Compta;
 
+use App\Enums\Sens;
 use App\Enums\TypeTransaction;
 use App\Models\Compte;
 use App\Models\Tiers;
@@ -126,13 +127,13 @@ final class TransactionConverter
         $compteTresorerie = null;
 
         if ($modePaiement !== null) {
-            $isDepense = $tx->type === TypeTransaction::Depense;
+            $sens = $tx->type === TypeTransaction::Depense ? Sens::Depense : Sens::Recette;
 
             $compteTresorerie = CompteTresorerieResolver::resoudre(
                 compteBancaireId: $tx->compte_id !== null ? (int) $tx->compte_id : null,
                 mode: $modePaiement,
-                contextLog: '[Backfill] Step 33',
-                isDepense: $isDepense,
+                contextLog: 'TransactionConverter',
+                sens: $sens,
             );
 
             if ($compteTresorerie === null) {
