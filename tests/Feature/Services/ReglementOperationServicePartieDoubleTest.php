@@ -6,91 +6,31 @@ use App\Enums\ModePaiement;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Models\Association;
-use App\Models\Categorie;
 use App\Models\Compte;
-use App\Models\CompteBancaire;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Reglement;
 use App\Models\Seance;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\TypeOperation;
-use App\Models\User;
-use App\Services\Compta\Migrations\BancairesSeeder;
-use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\ReglementOperationService;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Tests\Support\CreatesPartieDoubleContext;
 
-uses(RefreshDatabase::class);
+uses(CreatesPartieDoubleContext::class);
 
 // ---------------------------------------------------------------------------
 // Setup partagé
 // ---------------------------------------------------------------------------
 
 beforeEach(function () {
-    $this->association = Association::factory()->create();
-    $this->user = User::factory()->create();
-    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    $this->setupPartieDoubleContext();
 
-    TenantContext::boot($this->association);
-    session(['current_association_id' => $this->association->id]);
-    $this->actingAs($this->user);
-
-    // Comptes système : 411, 401, 5112
-    SystemeSeeder::seed();
-
-    // 530 (Caisse — espèces)
-    $tenantId = (int) TenantContext::currentId();
-    $isSqlite = DB::getDriverName() === 'sqlite';
-    $insertClause = $isSqlite ? 'INSERT OR IGNORE' : 'INSERT IGNORE';
-    DB::statement(<<<SQL
-        {$insertClause} INTO comptes
-            (association_id, numero_pcg, intitule, classe, actif, est_systeme, pour_inscriptions, lettrable, created_at, updated_at)
-        VALUES
-            ({$tenantId}, '530', 'Caisse (espèces)', 5, 1, 1, 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-    SQL);
-
-    // CompteBancaire + Compte 512X correspondant (via IBAN)
-    $this->iban = 'FR7612345000012345678901234';
-    $this->compteBancaire = CompteBancaire::factory()->create([
-        'association_id' => $this->association->id,
-        'iban' => $this->iban,
-        'actif_recettes_depenses' => true,
-    ]);
-    BancairesSeeder::seed();
-    $this->compte512X = Compte::where('iban', $this->iban)
-        ->where('association_id', $this->association->id)
-        ->firstOrFail();
-
-    // Catégorie + sous-catégorie 706
-    $categorie = Categorie::factory()->recette()->create([
-        'association_id' => $this->association->id,
-        'nom' => 'Prestations',
-    ]);
-    $this->sc706 = SousCategorie::create([
-        'association_id' => $this->association->id,
-        'categorie_id' => $categorie->id,
-        'nom' => 'Cotisations',
-        'code_cerfa' => '706',
-    ]);
-    $this->compte706 = Compte::firstOrCreate(
-        ['association_id' => $this->association->id, 'numero_pcg' => '706'],
-        [
-            'intitule' => 'Cotisations et adhésions',
-            'classe' => 7,
-            'lettrable' => false,
-            'actif' => true,
-            'est_systeme' => false,
-            'pour_inscriptions' => false,
-        ]
-    );
-
-    // TypeOperation → Operation → Seance
+    // TypeOperation → Operation → Seance (spécifiques ReglementOperationService)
     $typeOp = TypeOperation::factory()->create([
         'association_id' => $this->association->id,
         'sous_categorie_id' => $this->sc706->id,
@@ -109,10 +49,6 @@ beforeEach(function () {
 
     $this->service = app(ReglementOperationService::class);
     $this->date = Carbon::parse('2025-11-15');
-});
-
-afterEach(function () {
-    TenantContext::clear();
 });
 
 // ---------------------------------------------------------------------------

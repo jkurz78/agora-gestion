@@ -4,92 +4,42 @@ declare(strict_types=1);
 
 use App\Enums\ModePaiement;
 use App\Enums\TypeTransaction;
-use App\Models\Association;
 use App\Models\Categorie;
 use App\Models\Compte;
-use App\Models\CompteBancaire;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
-use App\Models\User;
 use App\Services\Compta\EcritureGenerator;
-use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\TransactionService;
 use App\Tenant\TenantContext;
+use Tests\Support\CreatesPartieDoubleContext;
+
+uses(CreatesPartieDoubleContext::class);
 
 // ---------------------------------------------------------------------------
 // Setup partagé
 // ---------------------------------------------------------------------------
 
 beforeEach(function () {
-    $this->association = Association::factory()->create();
-    $this->user = User::factory()->create();
-    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    $this->setupPartieDoubleContext();
 
-    TenantContext::boot($this->association);
-    session(['current_association_id' => $this->association->id]);
-    $this->actingAs($this->user);
+    // Alias : sc706 → scRecette (convention locale de ce fichier)
+    $this->scRecette = $this->sc706;
+    $this->categorieRecette = Categorie::where('association_id', $this->association->id)
+        ->where('type', 'recette')->first();
 
-    // Seed des comptes système : 411, 401, 5112 (+ 530 conditionnel)
-    SystemeSeeder::seed();
-
-    // 530 est conditionnel — forcer sa création pour les tests nécessitant espèces
-    if (! Compte::where('numero_pcg', '530')->where('association_id', $this->association->id)->exists()) {
-        Compte::create([
-            'association_id' => $this->association->id,
-            'numero_pcg' => '530',
-            'intitule' => 'Caisse (espèces)',
-            'classe' => 5,
-            'lettrable' => true,
-            'actif' => true,
-            'est_systeme' => true,
-            'pour_inscriptions' => false,
-        ]);
-    }
-
-    // Catégorie de produit pour les sous-catégories
-    $this->categorieRecette = Categorie::factory()->recette()->create([
-        'association_id' => $this->association->id,
-        'nom' => 'Cotisations',
-    ]);
-
-    // Catégorie de charge pour les sous-catégories
+    // Catégorie de charge + sous-catégorie dépense 606 (spécifiques TransactionService tests)
     $this->categorieDepense = Categorie::factory()->depense()->create([
         'association_id' => $this->association->id,
         'nom' => 'Charges diverses',
     ]);
-
-    // Sous-catégorie de recette avec code_cerfa aligné sur un compte 706 existant
-    $this->scRecette = SousCategorie::create([
-        'association_id' => $this->association->id,
-        'categorie_id' => $this->categorieRecette->id,
-        'nom' => 'Cotisations membres',
-        'code_cerfa' => '706',
-    ]);
-
-    // Compte 706 correspondant dans la table comptes (créé par la migration ou manuellement ici)
-    $this->compte706 = Compte::firstOrCreate(
-        ['association_id' => $this->association->id, 'numero_pcg' => '706'],
-        [
-            'intitule' => 'Cotisations et adhésions',
-            'classe' => 7,
-            'lettrable' => false,
-            'actif' => true,
-            'est_systeme' => false,
-            'pour_inscriptions' => false,
-        ]
-    );
-
-    // Sous-catégorie de dépense avec code_cerfa aligné sur un compte 606
     $this->scDepense = SousCategorie::create([
         'association_id' => $this->association->id,
         'categorie_id' => $this->categorieDepense->id,
         'nom' => 'Achats fournitures',
         'code_cerfa' => '606',
     ]);
-
-    // Compte 606 correspondant dans la table comptes
     $this->compte606 = Compte::firstOrCreate(
         ['association_id' => $this->association->id, 'numero_pcg' => '606'],
         [
@@ -105,34 +55,10 @@ beforeEach(function () {
     // Tiers
     $this->tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
 
-    // Compte bancaire physique (CompteBancaire legacy) avec IBAN connu
-    $ibanBanque = 'FR7630006000011234567890189';
-    $this->compteBancaire = CompteBancaire::factory()->create([
-        'association_id' => $this->association->id,
-        'iban' => $ibanBanque,
-    ]);
-
-    // Compte 512X correspondant dans la table comptes (seed step 4 fait ça automatiquement
-    // mais en test il faut le créer manuellement car la migration seed est positionnelle)
-    $this->compte512 = Compte::firstOrCreate(
-        ['association_id' => $this->association->id, 'iban' => $ibanBanque],
-        [
-            'numero_pcg' => '5121',
-            'intitule' => 'Banque principale',
-            'classe' => 5,
-            'lettrable' => false,
-            'actif' => true,
-            'est_systeme' => true,
-            'pour_inscriptions' => false,
-            'iban' => $ibanBanque,
-        ]
-    );
+    // Alias : compte512X → compte512 (convention locale de ce fichier)
+    $this->compte512 = $this->compte512X;
 
     $this->service = app(TransactionService::class);
-});
-
-afterEach(function () {
-    TenantContext::clear();
 });
 
 // ---------------------------------------------------------------------------

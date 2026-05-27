@@ -7,96 +7,29 @@ use App\Enums\StatutFacture;
 use App\Enums\StatutReglement;
 use App\Enums\TypeLigneFacture;
 use App\Exceptions\Compta\LettrageDejaPresentException;
-use App\Models\Association;
-use App\Models\Categorie;
-use App\Models\Compte;
-use App\Models\CompteBancaire;
 use App\Models\Facture;
 use App\Models\FactureLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
-use App\Models\User;
-use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\FactureService;
 use App\Tenant\TenantContext;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
+use Tests\Support\CreatesPartieDoubleContext;
 
-uses(RefreshDatabase::class);
+uses(CreatesPartieDoubleContext::class);
 
 // ---------------------------------------------------------------------------
 // Setup partagé
 // ---------------------------------------------------------------------------
 
 beforeEach(function () {
-    $this->association = Association::factory()->create();
-    $this->user = User::factory()->create();
-    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    $this->setupPartieDoubleContext();
 
-    TenantContext::boot($this->association);
-    session(['current_association_id' => $this->association->id]);
-    $this->actingAs($this->user);
-
-    // Comptes système : 411, 401, 5112
-    SystemeSeeder::seed();
-
-    // Catégorie recette
-    $categorieRecette = Categorie::factory()->recette()->create([
-        'association_id' => $this->association->id,
-        'nom' => 'Prestations',
-    ]);
-
-    // Sous-catégorie 706
-    $this->sc706 = SousCategorie::create([
-        'association_id' => $this->association->id,
-        'categorie_id' => $categorieRecette->id,
-        'nom' => 'Cotisations',
-        'code_cerfa' => '706',
-    ]);
-
-    // Compte 706 correspondant
-    $this->compte706 = Compte::firstOrCreate(
-        ['association_id' => $this->association->id, 'numero_pcg' => '706'],
-        [
-            'intitule' => 'Cotisations et adhésions',
-            'classe' => 7,
-            'lettrable' => false,
-            'actif' => true,
-            'est_systeme' => false,
-            'pour_inscriptions' => false,
-        ]
-    );
-
-    // Tiers
+    // Tiers (spécifique FactureService encaissement)
     $this->tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
 
-    // CompteBancaire avec IBAN connu
-    $this->iban = 'FR7612345000012345678901234';
-    $this->compteBancaire = CompteBancaire::factory()->create([
-        'association_id' => $this->association->id,
-        'iban' => $this->iban,
-    ]);
-
-    // Compte 512X correspondant (avec le même IBAN — pattern Step 21)
-    $this->compte512X = Compte::create([
-        'association_id' => $this->association->id,
-        'numero_pcg' => '5121',
-        'intitule' => 'Banque principale',
-        'classe' => 5,
-        'lettrable' => false,
-        'actif' => true,
-        'est_systeme' => false,
-        'pour_inscriptions' => false,
-        'iban' => $this->iban,
-    ]);
-
     $this->service = app(FactureService::class);
-});
-
-afterEach(function () {
-    TenantContext::clear();
 });
 
 // ---------------------------------------------------------------------------
