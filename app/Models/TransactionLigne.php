@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -57,6 +58,26 @@ final class TransactionLigne extends Model
             'credit' => 'decimal:2',
             'tiers_id' => 'integer',
         ];
+    }
+
+    // -------------------------------------------------------------------------
+    // Scopes
+    // -------------------------------------------------------------------------
+
+    /**
+     * Lignes de ventilation métier (saisies par l'utilisateur).
+     *
+     * Filtre les lignes "PD-only" générées par EcritureGenerator (411/401/5XXX)
+     * qui sont des écritures techniques du grand livre, invisibles dans les
+     * écrans de saisie/édition côté utilisateur.
+     *
+     * Critère actuel : `sous_categorie_id NOT NULL` (les lignes legacy en ont,
+     * les PD-only n'en ont pas). Au Step 40 (drop colonne legacy), basculer
+     * sur `whereHas('compte', fn ($q) => $q->whereIn('classe', [6, 7]))`.
+     */
+    public function scopeVentilation(Builder $q): Builder
+    {
+        return $q->whereNotNull('sous_categorie_id');
     }
 
     // -------------------------------------------------------------------------

@@ -407,7 +407,13 @@ final class TransactionForm extends Component
         $this->affectations = [];
         $this->ventilationHasAffectations = false;
 
-        $transaction = Transaction::with(['lignes', 'noteDeFrais'])->findOrFail($id);
+        // Filtre `ventilation()` — exclut les lignes PD-only (411/5121/411)
+        // générées par EcritureGenerator. L'utilisateur ne saisit/n'édite que
+        // les lignes de ventilation métier (classe 6/7).
+        $transaction = Transaction::with([
+            'lignes' => fn ($q) => $q->ventilation(),
+            'noteDeFrais',
+        ])->findOrFail($id);
 
         $this->transactionId = $transaction->id;
         $this->type = $transaction->type->value;
@@ -486,8 +492,8 @@ final class TransactionForm extends Component
                 }
             }
 
-            // Montant total via somme des lignes
-            $sourceTotal = round((float) $source->lignes()->sum('montant'), 2);
+            // Montant total via somme des lignes de ventilation (exclut lignes PD-only).
+            $sourceTotal = round((float) $source->lignes()->ventilation()->sum('montant'), 2);
             $currentTotal = round(collect($this->lignes)->sum(fn ($l) => (float) ($l['montant'] ?? 0)), 2);
             if (abs($sourceTotal - $currentTotal) > 0.001) {
                 $this->addError('lignes', 'Montant verrouillé pour les transactions HelloAsso.');
@@ -590,10 +596,11 @@ final class TransactionForm extends Component
 
         $service = app(TransactionService::class);
 
-        // Capturer les anciens paths PJ par index AVANT l'update (le service forceDelete les lignes)
+        // Capturer les anciens paths PJ par index AVANT l'update (le service forceDelete les lignes).
+        // Filtre ventilation() : aligne les indices avec $this->lignes (qui n'a que les ventilations).
         $anciensPieceJointePaths = [];
         if ($this->transactionId) {
-            $existingLignes = Transaction::findOrFail($this->transactionId)->lignes()->get()->values();
+            $existingLignes = Transaction::findOrFail($this->transactionId)->lignes()->ventilation()->get()->values();
             foreach ($this->lignes as $index => $ligneData) {
                 $existingLigne = $existingLignes->get($index);
                 if ($existingLigne !== null) {
@@ -660,10 +667,11 @@ final class TransactionForm extends Component
             }
         }
 
-        // Sauvegarder les PJ de lignes
-        $tx = $createdTransaction ?? Transaction::with('lignes')->find($this->transactionId);
+        // Sauvegarder les PJ de lignes.
+        // Filtre ventilation() : aligne les indices avec $this->lignes (qui n'a que les ventilations).
+        $tx = $createdTransaction ?? Transaction::with(['lignes' => fn ($q) => $q->ventilation()])->find($this->transactionId);
         if ($tx !== null) {
-            $tx->load('lignes');
+            $tx->load(['lignes' => fn ($q) => $q->ventilation()]);
             $lignesModels = $tx->lignes->values();
             foreach ($this->lignes as $index => $ligneData) {
                 $ligneModel = $lignesModels->get($index);

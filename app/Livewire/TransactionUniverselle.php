@@ -265,7 +265,11 @@ final class TransactionUniverselle extends Component
 
     private function fetchTransactionDetail(int $id): array
     {
-        $tx = Transaction::with(['lignes.sousCategorie.categorie', 'lignes.operation', 'factures'])->find($id);
+        // Filtre ventilation() : exclut les lignes PD-only (411/5121/etc.) — UI utilisateur.
+        $tx = Transaction::with([
+            'lignes' => fn ($q) => $q->ventilation()->with(['sousCategorie.categorie', 'operation']),
+            'factures',
+        ])->find($id);
         if (! $tx) {
             return [];
         }
