@@ -10,6 +10,7 @@ use App\Enums\StatutFacture;
 use App\Enums\StatutReglement;
 use App\Enums\TypeLigneFacture;
 use App\Enums\TypeTransaction;
+use App\Models\CompteBancaire;
 use App\Models\Devis;
 use App\Models\DevisLigne;
 use App\Models\Facture;
@@ -48,6 +49,17 @@ final class FactureManuelSeeder extends Seeder
         if (Facture::whereNotNull('devis_id')->exists()) {
             return;
         }
+
+        // Compte bancaire par défaut pour les transactions seedées (mode virement).
+        // Sans cela, le backfill partie double skip les transactions (compte_id null).
+        // Fallback gracieux : si aucun CompteBancaire (cas test isolé sans dépendance),
+        // on laisse compte_id à null. Le DatabaseSeeder applicatif crée bien des
+        // CompteBancaire avant cet appel donc le cas null ne survient qu'en test isolé.
+        $compteBancaire = CompteBancaire::query()
+            ->where('saisie_automatisee', false)
+            ->orderBy('id')
+            ->first();
+        $compteBancaireId = $compteBancaire?->id;
 
         $tiers = Tiers::orderBy('id')->first();
 
@@ -160,6 +172,7 @@ final class FactureManuelSeeder extends Seeder
             'association_id' => (int) TenantContext::currentId(),
             'type' => TypeTransaction::Recette,
             'tiers_id' => $tiers->id,
+            'compte_id' => $compteBancaireId,
             'date' => Carbon::today()->subDays(1)->toDateString(),
             'libelle' => "Facture {$factureCas2->numero}",
             'montant_total' => 1400.00,
@@ -217,6 +230,7 @@ final class FactureManuelSeeder extends Seeder
             'association_id' => (int) TenantContext::currentId(),
             'type' => TypeTransaction::Recette,
             'tiers_id' => $tiers->id,
+            'compte_id' => $compteBancaireId,
             'date' => Carbon::today()->subDays(3)->toDateString(),
             'libelle' => '[Démo] Recette à refacturer (mix)',
             'montant_total' => 300.00,
