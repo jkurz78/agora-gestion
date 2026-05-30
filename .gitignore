@@ -68,3 +68,4 @@ public/proto-*.html
 /pitch_deck.md
 /agora-gestion-pitch-*.pdf
 /agora-gestion-pitch-*.pptx
+/scripts/clone-prod-to-localhost.sh
