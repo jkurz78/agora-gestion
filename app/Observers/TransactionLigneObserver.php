@@ -28,6 +28,16 @@ final class TransactionLigneObserver
      *   - XOR : debit > 0 XOR credit > 0. Les deux > 0 simultanément est interdit.
      *   - Ni-ni : debit = 0 ET credit = 0 est interdit (ligne vide non significative).
      *   Toute ligne avec compte_id doit avoir soit debit > 0, soit credit > 0.
+     *
+     * Montants négatifs — ADMIS VOLONTAIREMENT (audit #6, point levé 2026-05-30).
+     * Les conditions ci-dessus (`> 0` et `=== 0.0`) laissent passer une ligne
+     * dont debit ou credit est négatif. C'est intentionnel : la « brèche du signe »
+     * est le mécanisme retenu pour les extournes / annulations (cf. programme
+     * extourne-annulation-facture : une extourne miroir porte des montants négatifs
+     * pour contrepasser sans dupliquer une écriture positive inverse), et reste
+     * ouverte à d'autres process métier futurs. Ne PAS durcir l'observer pour
+     * rejeter les négatifs : l'équilibre comptable (∑debit = ∑credit) reste garanti
+     * en amont par EcritureGenerator::assertEquilibre, négatifs compris.
      */
     public function saving(TransactionLigne $ligne): void
     {

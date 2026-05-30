@@ -305,6 +305,121 @@ test('assertPasDeTiersSurClasse5 accepte ligne 706 avec tiers (classe 7 hors pé
 });
 
 // ---------------------------------------------------------------------------
+// Tests durcissement gardes (audit #7) : les lignes SOURCES récupérées via
+// TransactionLigne::find()/where()->get() N'ONT PAS la relation compte chargée.
+// Les gardes doivent la charger elles-mêmes (ensureComptesCharges) et ne plus
+// se neutraliser silencieusement.
+// ---------------------------------------------------------------------------
+test('assertTiersObligatoire411 rejette une ligne 411 sans tiers même si compte NON chargé (audit #7)', function () {
+    $asso = TenantContext::current();
+
+    $compte411 = Compte::create([
+        'association_id' => $asso->id,
+        'numero_pcg' => '411',
+        'intitule' => 'Clients',
+        'classe' => 4,
+        'lettrable' => true,
+        'actif' => true,
+        'est_systeme' => true,
+        'pour_inscriptions' => false,
+    ]);
+
+    $tx = Transaction::factory()->create(['association_id' => $asso->id]);
+    $ligneId = TransactionLigne::create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $compte411->id,
+        'tiers_id' => null,
+        'debit' => '100.00',
+        'credit' => '0.00',
+        'montant' => 100,
+        'sous_categorie_id' => null,
+    ])->id;
+
+    // Récupération FRAÎCHE : la relation compte n'est PAS chargée (cas source réel).
+    $ligneSource = TransactionLigne::find($ligneId);
+    expect($ligneSource->relationLoaded('compte'))->toBeFalse();
+
+    $generator = app(EcritureGenerator::class);
+
+    expect(fn () => $generator->assertTiersObligatoire411(collect([$ligneSource])))
+        ->toThrow(TiersRequisException::class);
+});
+
+test('assertPasDeTiersSurClasse5 rejette une ligne 5112 avec tiers même si compte NON chargé (audit #7)', function () {
+    $asso = TenantContext::current();
+
+    $compte5112 = Compte::create([
+        'association_id' => $asso->id,
+        'numero_pcg' => '5112',
+        'intitule' => 'Chèques à encaisser',
+        'classe' => 5,
+        'lettrable' => true,
+        'actif' => true,
+        'est_systeme' => true,
+        'pour_inscriptions' => false,
+    ]);
+
+    $tiers = Tiers::factory()->create(['association_id' => $asso->id]);
+
+    $tx = Transaction::factory()->create(['association_id' => $asso->id]);
+    $ligneId = TransactionLigne::create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $compte5112->id,
+        'tiers_id' => $tiers->id,
+        'debit' => '100.00',
+        'credit' => '0.00',
+        'montant' => 100,
+        'sous_categorie_id' => null,
+    ])->id;
+
+    $ligneSource = TransactionLigne::find($ligneId);
+    expect($ligneSource->relationLoaded('compte'))->toBeFalse();
+
+    $generator = app(EcritureGenerator::class);
+
+    expect(fn () => $generator->assertPasDeTiersSurClasse5(collect([$ligneSource])))
+        ->toThrow(TiersInterditException::class);
+});
+
+test('assertTenantCoherence rejette une ligne cross-tenant même si compte NON chargé (audit #7)', function () {
+    $associationA = TenantContext::current();
+    $associationB = Association::factory()->create();
+
+    TenantContext::boot($associationB);
+    $compteB = Compte::create([
+        'association_id' => $associationB->id,
+        'numero_pcg' => '706',
+        'intitule' => 'Cotisations B',
+        'classe' => 7,
+        'lettrable' => false,
+        'actif' => true,
+        'est_systeme' => false,
+        'pour_inscriptions' => false,
+    ]);
+    TenantContext::boot($associationA); // retour tenant A
+
+    $tx = Transaction::factory()->create(['association_id' => $associationA->id]);
+    $ligneId = TransactionLigne::create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $compteB->id, // compte d'un AUTRE tenant
+        'debit' => '100.00',
+        'credit' => '0.00',
+        'montant' => 100,
+        'sous_categorie_id' => null,
+    ])->id;
+
+    // Récupération FRAÎCHE : relation compte non chargée → la garde doit la charger
+    // SANS global scope pour détecter l'appartenance cross-tenant.
+    $ligneSource = TransactionLigne::find($ligneId);
+    expect($ligneSource->relationLoaded('compte'))->toBeFalse();
+
+    $generator = app(EcritureGenerator::class);
+
+    expect(fn () => $generator->assertTenantCoherence(collect([$ligneSource])))
+        ->toThrow(TenantBoundaryException::class);
+});
+
+// ---------------------------------------------------------------------------
 // Test 14 : generateLettrageCode retourne 20 chars unique
 // ---------------------------------------------------------------------------
 test('generateLettrageCode retourne une string de 20 caractères unique à chaque appel', function () {

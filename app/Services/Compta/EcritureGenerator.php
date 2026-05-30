@@ -83,14 +83,57 @@ final class EcritureGenerator
     }
 
     /**
-     * Vérifie que tous les comptes (via la relation compte chargée sur chaque
-     * ligne) et tous les tiers passés en argument appartiennent au tenant
-     * courant.
+     * Charge la relation compte sur les lignes qui ne l'ont pas encore (lignes
+     * sources récupérées via TransactionLigne::where(...)->get() sans eager-load),
+     * en une seule requête batchée. Sans cela, les gardes tenant/tiers seraient
+     * silencieusement neutralisées sur ces lignes (audit #7).
      *
-     * La relation compte doit être chargée sur les lignes avant l'appel
-     * (eager-load ou setRelation dans les tests). Si le compte n'est pas
-     * chargé, la vérification est ignorée pour cette ligne (défensif :
-     * les méthodes pour*() garantissent le chargement en contexte réel).
+     * Chargement SANS global scope : un compte appartenant à un AUTRE tenant doit
+     * pouvoir être résolu pour que assertTenantCoherence le détecte — le tenant
+     * scope le masquerait sinon et la garde le sauterait (le bug même qu'on corrige).
+     * Aucune donnée cross-tenant n'est exposée : on ne lit que numero_pcg / classe /
+     * association_id à des fins de validation, et la première garde appelée
+     * (assertTenantCoherence) rejette tout compte hors tenant.
+     *
+     * @param  Collection<int, TransactionLigne>  $lignes
+     */
+    private function ensureComptesCharges(Collection $lignes): void
+    {
+        $idsACharger = $lignes
+            ->filter(fn (TransactionLigne $l): bool => ! $l->relationLoaded('compte') && $l->compte_id !== null)
+            ->map(fn (TransactionLigne $l): int => (int) $l->compte_id)
+            ->unique()
+            ->values();
+
+        if ($idsACharger->isEmpty()) {
+            return;
+        }
+
+        $comptes = Compte::withoutGlobalScopes()
+            ->whereIn('id', $idsACharger->all())
+            ->get()
+            ->keyBy('id');
+
+        foreach ($lignes as $ligne) {
+            if ($ligne->relationLoaded('compte') || $ligne->compte_id === null) {
+                continue;
+            }
+
+            $compte = $comptes->get((int) $ligne->compte_id);
+
+            if ($compte !== null) {
+                $ligne->setRelation('compte', $compte);
+            }
+        }
+    }
+
+    /**
+     * Vérifie que tous les comptes (via la relation compte de chaque ligne) et
+     * tous les tiers passés en argument appartiennent au tenant courant.
+     *
+     * La relation compte est chargée automatiquement si absente (ensureComptesCharges),
+     * y compris pour un compte hors tenant — qui est alors détecté et rejeté.
+     * Une ligne sans compte_id (ligne legacy / non comptable) est ignorée.
      *
      * @param  Collection<int, TransactionLigne>  $lignes
      * @param  Collection<int, Tiers>|null  $tiers  Tiers supplémentaires à vérifier (optionnel).
@@ -99,6 +142,8 @@ final class EcritureGenerator
      */
     public function assertTenantCoherence(Collection $lignes, ?Collection $tiers = null): void
     {
+        $this->ensureComptesCharges($lignes);
+
         $currentTenantId = (int) TenantContext::currentId();
 
         foreach ($lignes as $ligne) {
@@ -130,7 +175,7 @@ final class EcritureGenerator
      * Vérifie que chaque ligne dont le compte a numero_pcg === '411' ou '401'
      * porte un tiers_id non null.
      *
-     * La relation compte doit être chargée sur les lignes avant l'appel.
+     * La relation compte est chargée automatiquement si absente (ensureComptesCharges).
      *
      * @param  Collection<int, TransactionLigne>  $lignes
      *
@@ -138,6 +183,8 @@ final class EcritureGenerator
      */
     public function assertTiersObligatoire411(Collection $lignes): void
     {
+        $this->ensureComptesCharges($lignes);
+
         $comptesAvecTiersObligatoire = ['411', '401'];
 
         foreach ($lignes as $ligne) {
@@ -172,6 +219,8 @@ final class EcritureGenerator
      */
     public function assertPasDeTiersSurClasse5(Collection $lignes): void
     {
+        $this->ensureComptesCharges($lignes);
+
         foreach ($lignes as $ligne) {
             $compte = $ligne->relationLoaded('compte') ? $ligne->compte : null;
 
