@@ -27,6 +27,11 @@ use Illuminate\Support\Facades\Schema;
  *
  * Existing columns `sous_categorie_id` and `montant` are untouched —
  * they will be dropped in Step 40 after prod stabilisation.
+ *
+ * NB (audit #9) : sur MySQL, aucun index mono-colonne dédié n'est créé pour la FK
+ * compte_id — InnoDB réutilise le préfixe gauche des index composites
+ * (compte_id, tiers_id[, lettrage_code]) comme backing-index. Le down() DOIT donc
+ * lever les contraintes FK AVANT de dropper ces index composites, sinon errno 150.
  */
 
 return new class extends Migration
@@ -72,16 +77,22 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('transaction_lignes', function (Blueprint $table): void {
-            // Drop indexes in reverse order before dropping columns
-            $table->dropIndex(['compte_id', 'tiers_id']);
-            $table->dropIndex(['lettrage_code']);
+            // Audit #9 — ordre MySQL/InnoDB sûr :
+            // 1. Lever d'abord les contraintes FK (sans toucher aux colonnes). Tant
+            //    qu'une FK existe, InnoDB exige un index qui la « back » : dropper un
+            //    index composite (compte_id, …) avant la FK peut lever errno 150.
+            //    On ne peut pas réordonner dropConstrainedForeignId (qui DROP la
+            //    colonne, cascadant ses index) → on sépare dropForeign / dropColumn.
+            $table->dropForeign(['compte_id']);
+            $table->dropForeign(['tiers_id']);
+
+            // 2. Plus aucun index n'est requis par une FK → on droppe les index secondaires.
             $table->dropIndex(['compte_id', 'tiers_id', 'lettrage_code']);
+            $table->dropIndex(['lettrage_code']);
+            $table->dropIndex(['compte_id', 'tiers_id']);
 
-            // Drop foreign key constraints then columns
-            $table->dropConstrainedForeignId('compte_id');
-            $table->dropConstrainedForeignId('tiers_id');
-
-            $table->dropColumn(['debit', 'credit', 'lettrage_code', 'libelle']);
+            // 3. Enfin les colonnes (MySQL droppe l'index mono-colonne résiduel des FK).
+            $table->dropColumn(['compte_id', 'tiers_id', 'debit', 'credit', 'lettrage_code', 'libelle']);
         });
     }
 };
