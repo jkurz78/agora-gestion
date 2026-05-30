@@ -9,6 +9,7 @@ use App\Exceptions\Compta\LettrageDejaPresentException;
 use App\Exceptions\Compta\LettrageInexistantException;
 use App\Exceptions\Compta\LettrageMultiComptesException;
 use App\Exceptions\Compta\LettrageNonEquilibreException;
+use App\Exceptions\Compta\LettrageTiersIncoherentException;
 use App\Exceptions\Compta\LigneNonLettreeException;
 use App\Exceptions\Compta\TenantBoundaryException;
 use App\Models\TransactionLigne;
@@ -42,6 +43,7 @@ final class LettrageService
      * @return string Le code de lettrage utilisé.
      *
      * @throws LettrageMultiComptesException
+     * @throws LettrageTiersIncoherentException
      * @throws CompteNonLettrableException
      * @throws LettrageNonEquilibreException
      * @throws LettrageDejaPresentException
@@ -49,10 +51,11 @@ final class LettrageService
      */
     public function lettrer(Collection $lignes, ?string $code = null, ?string $motif = null): string
     {
-        // Vérification des 5 invariants (toutes avant toute écriture)
+        // Vérification des 6 invariants (toutes avant toute écriture)
         // L'ordre est important : tenant d'abord (sécurité), puis métier.
         $this->assertTenant($lignes);
         $this->assertSameCompte($lignes);
+        $this->assertMemeTiers($lignes);
         $this->assertCompteLettrable($lignes);
         $this->assertEquilibre($lignes);
         $this->assertPasDeRelettrage($lignes);
@@ -166,6 +169,30 @@ final class LettrageService
 
         if ($compteIds->count() > 1) {
             throw LettrageMultiComptesException::detected();
+        }
+    }
+
+    /**
+     * Vérifie que toutes les lignes partagent le même tiers_id.
+     *
+     * Sur un compte de tiers (411 clients / 401 fournisseurs), lettrer des
+     * lignes appartenant à des tiers différents solderait à tort la créance de
+     * l'un avec le paiement de l'autre — corruption des comptes auxiliaires.
+     * On exige donc un tiers_id unique sur le groupe (NULL compris : les
+     * comptes non-tiers portent tous tiers_id = NULL, ce qui satisfait l'unicité).
+     *
+     * @param  Collection<int, TransactionLigne>  $lignes
+     *
+     * @throws LettrageTiersIncoherentException
+     */
+    private function assertMemeTiers(Collection $lignes): void
+    {
+        $tiersIds = $lignes
+            ->map(fn (TransactionLigne $l): ?int => $l->tiers_id === null ? null : (int) $l->tiers_id)
+            ->unique();
+
+        if ($tiersIds->count() > 1) {
+            throw LettrageTiersIncoherentException::detected();
         }
     }
 

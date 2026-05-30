@@ -38,6 +38,9 @@ use Illuminate\Support\Facades\DB;
  *  - categorie_id = NULL, parent_compte_id = NULL (hierarchy in a later step).
  *  - Bank attributes (iban, bic, domiciliation, solde_initial, date_solde_initial)
  *    are copied verbatim from comptes_bancaires.
+ *  - compte_bancaire_id = comptes_bancaires.id — clé de jointure stable utilisée
+ *    par EcritureGenerator::pourRemiseBancaire (l'IBAN, nullable et non unique,
+ *    ne peut pas servir de clé).
  *
  * Extracted out of the migration so the seed can be replayed in tests without
  * re-running the full migration (same pattern as AuditGuard).
@@ -75,6 +78,7 @@ final class BancairesSeeder
                 domiciliation,
                 solde_initial,
                 date_solde_initial,
+                compte_bancaire_id,
                 created_at,
                 updated_at
             )
@@ -107,6 +111,7 @@ final class BancairesSeeder
                 r.domiciliation,
                 r.solde_initial,
                 r.date_solde_initial,
+                r.id,
                 CURRENT_TIMESTAMP,
                 CURRENT_TIMESTAMP
             FROM ranked r

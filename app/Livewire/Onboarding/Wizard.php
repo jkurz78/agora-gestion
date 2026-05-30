@@ -10,6 +10,7 @@ use App\Models\CompteBancaire;
 use App\Models\HelloAssoParametres;
 use App\Models\IncomingMailParametres;
 use App\Models\SmtpParametres;
+use App\Services\Compta\ComptesProvisioningService;
 use App\Services\Onboarding\DefaultChartOfAccountsService;
 use App\Services\SmtpService;
 use App\Tenant\TenantContext;
@@ -534,6 +535,10 @@ final class Wizard extends Component
         if ($this->currentStep !== 8) {
             return;
         }
+
+        // Provisionne les comptes (partie double) du nouveau tenant maintenant
+        // que sous-catégories et comptes bancaires sont saisis. Idempotent.
+        app(ComptesProvisioningService::class)->provisionAll();
 
         $this->currentAssociation()->update([
             'wizard_completed_at' => now(),

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -40,12 +41,14 @@ final class Compte extends TenantModel
         'domiciliation',
         'solde_initial',
         'date_solde_initial',
+        'compte_bancaire_id',
     ];
 
     protected function casts(): array
     {
         return [
             'classe' => 'integer',
+            'compte_bancaire_id' => 'integer',
             'actif' => 'boolean',
             'est_systeme' => 'boolean',
             'pour_inscriptions' => 'boolean',
@@ -124,5 +127,14 @@ final class Compte extends TenantModel
     public function lignes(): HasMany
     {
         return $this->hasMany(TransactionLigne::class, 'compte_id');
+    }
+
+    /**
+     * The source bank account (comptes_bancaires) for a 512X physical bank
+     * compte. NULL for non-bank comptes.
+     */
+    public function compteBancaire(): BelongsTo
+    {
+        return $this->belongsTo(CompteBancaire::class, 'compte_bancaire_id');
     }
 }

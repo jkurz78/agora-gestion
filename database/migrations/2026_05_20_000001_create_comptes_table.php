@@ -54,6 +54,10 @@ return new class extends Migration
             $table->string('domiciliation', 255)->nullable();
             $table->decimal('solde_initial', 12, 2)->nullable();
             $table->date('date_solde_initial')->nullable();
+            // Clé stable vers comptes_bancaires pour les comptes 512X (rappro,
+            // remise bancaire). L'IBAN est nullable et non unique : il ne peut
+            // pas servir de clé de jointure. NULL pour les comptes non bancaires.
+            $table->foreignId('compte_bancaire_id')->nullable()->constrained('comptes_bancaires')->nullOnDelete();
             $table->softDeletes();
             $table->timestamps();
 

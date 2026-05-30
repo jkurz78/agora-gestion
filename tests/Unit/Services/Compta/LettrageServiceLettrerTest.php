@@ -6,9 +6,11 @@ use App\Exceptions\Compta\CompteNonLettrableException;
 use App\Exceptions\Compta\LettrageDejaPresentException;
 use App\Exceptions\Compta\LettrageMultiComptesException;
 use App\Exceptions\Compta\LettrageNonEquilibreException;
+use App\Exceptions\Compta\LettrageTiersIncoherentException;
 use App\Exceptions\Compta\TenantBoundaryException;
 use App\Models\Association;
 use App\Models\Compte;
+use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
@@ -467,4 +469,55 @@ test('code fourni en argument est respecté — retour et transaction_lignes coh
     expect($retour)->toBe($codeFixe);
     expect(TransactionLigne::find($ligne1->id)->lettrage_code)->toBe($codeFixe);
     expect(TransactionLigne::find($ligne2->id)->lettrage_code)->toBe($codeFixe);
+});
+
+// ---------------------------------------------------------------------------
+// Test : lettrage de 2 lignes équilibrées mais de tiers différents → refus
+// (invariant « même tiers » — sinon corruption des comptes auxiliaires 411/401)
+// ---------------------------------------------------------------------------
+test('lettrer deux lignes equilibrees mais de tiers differents → LettrageTiersIncoherentException', function () {
+    $compte = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '411',
+        'intitule' => 'Clients',
+        'classe' => 4,
+        'lettrable' => true,
+        'actif' => true,
+        'est_systeme' => true,
+        'pour_inscriptions' => false,
+    ]);
+
+    $tiersA = Tiers::factory()->create(['association_id' => TenantContext::currentId()]);
+    $tiersB = Tiers::factory()->create(['association_id' => TenantContext::currentId()]);
+
+    $tx = Transaction::factory()->create(['association_id' => TenantContext::currentId()]);
+
+    $ligneA = TransactionLigne::create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $compte->id,
+        'debit' => '100.00',
+        'credit' => '0.00',
+        'tiers_id' => $tiersA->id,
+        'montant' => 0,
+        'sous_categorie_id' => null,
+    ]);
+
+    $ligneB = TransactionLigne::create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $compte->id,
+        'debit' => '0.00',
+        'credit' => '100.00',
+        'tiers_id' => $tiersB->id,
+        'montant' => 0,
+        'sous_categorie_id' => null,
+    ]);
+
+    $service = app(LettrageService::class);
+
+    expect(fn () => $service->lettrer(collect([$ligneA, $ligneB])))
+        ->toThrow(LettrageTiersIncoherentException::class);
+
+    // Aucune des deux lignes ne doit avoir été lettrée (échec avant écriture).
+    expect(TransactionLigne::find($ligneA->id)->lettrage_code)->toBeNull();
+    expect(TransactionLigne::find($ligneB->id)->lettrage_code)->toBeNull();
 });

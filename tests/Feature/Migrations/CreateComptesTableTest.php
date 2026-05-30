@@ -53,6 +53,7 @@ it('creates comptes table with all expected columns', function () {
         'domiciliation',
         'solde_initial',
         'date_solde_initial',
+        'compte_bancaire_id',
         'deleted_at',
         'created_at',
         'updated_at',

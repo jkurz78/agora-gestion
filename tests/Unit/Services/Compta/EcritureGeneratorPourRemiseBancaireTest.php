@@ -75,8 +75,8 @@ function creerCompteBancaireAvec512(): array
     // Rejoue le seed pour créer le compte 512X correspondant
     BancairesSeeder::seed();
 
-    // Résolution : le Compte 512X correspond à ce CompteBancaire par IBAN
-    $compte512 = Compte::where('iban', $compteBancaire->iban)
+    // Résolution : le Compte 512X correspond à ce CompteBancaire par compte_bancaire_id
+    $compte512 = Compte::where('compte_bancaire_id', $compteBancaire->id)
         ->where('association_id', TenantContext::currentId())
         ->firstOrFail();
 
@@ -623,37 +623,27 @@ test('pourRemiseBancaire lève InvalidArgumentException si lignes sources sur co
 // Cas 11 : Compte cible non bancaire (ex : 530 ou 5112) → CompteIncorrectException
 // ---------------------------------------------------------------------------
 test('pourRemiseBancaire leve CompteIncorrectException si compte cible nest pas 512X', function () {
-    // On crée un CompteBancaire mais on surcharge le compte cible avec un 530 dans la remise.
-    // La résolution du compte cible depuis remise->compteCible se fait par IBAN.
-    // Pour provoquer l'erreur : on crée une RemiseBancaire dont le compte_cible_id pointe
-    // vers un CompteBancaire dont l'IBAN correspond à un compte non-bancaire.
-    // Plus simple : on crée la RemiseBancaire normalement, mais on remplace la RemiseBancaire
-    // par un faux objet. Ici on teste directement via un compte cible qui n'est pas 512X.
-
+    // La résolution du compte cible se fait par compte_bancaire_id. Pour provoquer
+    // l'erreur : on rattache un Compte NON bancaire physique (ici un 530, classe 5
+    // mais numero_pcg != 512X) à un CompteBancaire, puis on pointe la remise dessus.
     [$compteBancaire, $compte512] = creerCompteBancaireAvec512();
-    $remise = creerRemise($compteBancaire, ModePaiement::Cheque);
 
-    // Modifier l'IBAN du compte 512 pour pointer vers le compte 530 (erreur simulée)
-    // En pratique : créer un CompteBancaire avec l'IBAN du compte 530
-    $compte530 = compteSystemeRem('530');
-
-    // Créer un CompteBancaire dont l'IBAN correspond au compte 530
-    // et faire pointer la remise sur lui
     $compteBancaireFake = CompteBancaire::create([
         'association_id' => TenantContext::currentId(),
         'nom' => 'Caisse fake',
-        'iban' => $compte530->iban ?? 'FAKE-IBAN-530-'.uniqid(), // 530 n'a pas d'IBAN en général
+        'iban' => 'FAKE-IBAN-530-'.uniqid(),
         'actif_recettes_depenses' => true,
         'saisie_automatisee' => false,
     ]);
 
-    // Mettre à jour le compte 530 avec cet IBAN pour que la résolution le trouve
-    $compte530->update(['iban' => $compteBancaireFake->iban]);
+    // Le compte 530 (caisse) n'est pas un 512X bancaire physique : on le rattache
+    // au CompteBancaire fake pour que la résolution le retourne et échoue.
+    $compte530 = compteSystemeRem('530');
+    $compte530->update(['compte_bancaire_id' => $compteBancaireFake->id]);
 
     $remiseFake = creerRemise($compteBancaireFake, ModePaiement::Cheque);
 
     $pierre = tiersRem();
-    $compte5112 = compteSystemeRem('5112');
     $lignePierre = creerLigne5112Source($pierre, 50.00, $compte512);
 
     $generator = app(EcritureGenerator::class);

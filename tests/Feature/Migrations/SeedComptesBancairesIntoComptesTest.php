@@ -235,7 +235,7 @@ it('orders numbering by comptes_bancaires.id ASC (not by name)', function () {
 it('copies bank attributes verbatim (IBAN, BIC, domiciliation, solde_initial, date_solde_initial)', function () {
     $association = Association::firstOrFail();
 
-    DB::table('comptes_bancaires')->insert([
+    $bancaireId = DB::table('comptes_bancaires')->insertGetId([
         'association_id' => $association->id,
         'nom' => 'LCL Entreprises',
         'iban' => 'FR7630002123456789012345678',
@@ -262,6 +262,8 @@ it('copies bank attributes verbatim (IBAN, BIC, domiciliation, solde_initial, da
     expect($compte->domiciliation)->toBe('LCL Lyon Part-Dieu');
     expect((float) $compte->solde_initial)->toBe(4250.50);
     expect($compte->date_solde_initial)->toBe('2025-09-01');
+    // Clé de jointure stable vers comptes_bancaires (fix remise par IBAN).
+    expect((int) $compte->compte_bancaire_id)->toBe($bancaireId);
 });
 
 it('sets expected default flags on seeded bank comptes', function () {

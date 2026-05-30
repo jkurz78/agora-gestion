@@ -23,8 +23,10 @@ use RuntimeException;
  * tests/Feature/Migrations/CreateComptesTableTest.php).
  *
  * The statement is intentionally portable between MySQL (prod / staging) and
- * SQLite (test env) — both engines accept the SUBSTR / CAST / CASE syntax
- * used here.
+ * SQLite (test env). The CAST target type differs per engine: MySQL only
+ * accepts `CAST(... AS SIGNED)` (a bare `AS INTEGER` raises error 1064),
+ * whereas SQLite expects `CAST(... AS INTEGER)`. The driver is detected at
+ * runtime to emit the correct keyword.
  */
 final class AuditGuard
 {
@@ -67,7 +69,11 @@ final class AuditGuard
      */
     public static function seedFromSousCategoriesSql(): string
     {
-        return <<<'SQL'
+        // MySQL n'accepte pas `CAST(... AS INTEGER)` (erreur 1064) — il faut
+        // `AS SIGNED`. SQLite, lui, attend `AS INTEGER`. On branche sur le driver.
+        $intType = DB::getDriverName() === 'sqlite' ? 'INTEGER' : 'SIGNED';
+
+        return <<<SQL
             INSERT INTO comptes (
                 association_id, numero_pcg, intitule, classe, categorie_id,
                 actif, est_systeme, pour_inscriptions, lettrable,
@@ -77,7 +83,7 @@ final class AuditGuard
                 sc.association_id,
                 sc.code_cerfa,
                 sc.nom,
-                CAST(SUBSTR(sc.code_cerfa, 1, 1) AS INTEGER),
+                CAST(SUBSTR(sc.code_cerfa, 1, 1) AS {$intType}),
                 sc.categorie_id,
                 1,
                 0,

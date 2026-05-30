@@ -1088,15 +1088,17 @@ final class EcritureGenerator
         //        pour Especes → resoudreComptePortage retourne 530
         // Le 3e argument (compteTresorerieExplicite) n'est jamais utilisé pour ces 2 modes.
 
-        // --- Résolution du compte cible (512X) depuis RemiseBancaire → CompteBancaire → Compte par IBAN ---
+        // --- Résolution du compte cible (512X) depuis RemiseBancaire → CompteBancaire → Compte ---
+        // Jointure par compte_bancaire_id (clé stable) : l'IBAN est nullable et
+        // non unique, il ne peut pas servir de clé de résolution.
         $compteBancaire = $remise->compteCible;
-        $compteCible512 = Compte::where('iban', $compteBancaire->iban)
+        $compteCible512 = Compte::where('compte_bancaire_id', $compteBancaire->id)
             ->where('association_id', (int) TenantContext::currentId())
             ->first();
 
         if ($compteCible512 === null) {
             throw new \InvalidArgumentException(
-                "Aucun compte 512X trouvé pour le CompteBancaire #{$compteBancaire->id} (IBAN : {$compteBancaire->iban})."
+                "Aucun compte 512X trouvé pour le CompteBancaire #{$compteBancaire->id}."
             );
         }
 

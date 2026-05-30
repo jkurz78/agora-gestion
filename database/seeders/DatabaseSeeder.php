@@ -9,6 +9,7 @@ use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\Exercice;
 use App\Models\User;
+use App\Services\Compta\ComptesProvisioningService;
 use App\Services\ExerciceService;
 use App\Tenant\TenantContext;
 use Illuminate\Database\Seeder;
@@ -105,5 +106,11 @@ class DatabaseSeeder extends Seeder
             $this->call(DevisManuelSeeder::class);
             $this->call(FactureManuelSeeder::class);
         }
+
+        // Provisionne la table `comptes` (partie double). Les migrations 2026_05_20_*
+        // tournent avant que les tables source soient peuplées en migrate:fresh --seed ;
+        // on rejoue donc les seeds maintenant que sous_categories / comptes_bancaires /
+        // transactions existent. Idempotent (INSERT IGNORE / NOT EXISTS).
+        app(ComptesProvisioningService::class)->provisionAll();
     }
 }
