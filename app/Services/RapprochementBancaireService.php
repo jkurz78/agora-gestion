@@ -153,8 +153,7 @@ final class RapprochementBancaireService
 
                 $solde += $mouvement;
             } else {
-                Log::warning('[PartieDouble][RapprochementBancaireService] — skip solde : compte 512X introuvable pour IBAN', [
-                    'iban' => $rapprochement->compte->iban,
+                Log::warning('[PartieDouble][RapprochementBancaireService] — skip solde : compte 512X introuvable pour CompteBancaire', [
                     'compte_bancaire_id' => (int) $rapprochement->compte_id,
                     'rapprochement_id' => (int) $rapprochement->id,
                 ]);
@@ -454,11 +453,8 @@ final class RapprochementBancaireService
      */
     private function resoudreCompte512X(CompteBancaire $compteBancaire): ?Compte
     {
-        if ($compteBancaire->iban === null) {
-            return null;
-        }
-
-        return Compte::where('iban', $compteBancaire->iban)
+        // Résolution par compte_bancaire_id (clé stable — l'IBAN est nullable et non unique).
+        return Compte::where('compte_bancaire_id', $compteBancaire->id)
             ->bancaires()
             ->first();
     }

@@ -38,6 +38,8 @@ beforeEach(function () {
         'est_systeme' => false,
         'pour_inscriptions' => false,
         'iban' => $this->iban,
+        // Clé stable utilisée par le resolver (l'IBAN est nullable et non unique).
+        'compte_bancaire_id' => $this->compteBancaire->id,
     ]);
 });
 

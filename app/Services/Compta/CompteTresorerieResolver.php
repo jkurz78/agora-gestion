@@ -20,8 +20,9 @@ use Illuminate\Support\Facades\Log;
  * — RemiseBancaireService::comptabiliser
  *
  * Pattern de résolution :
- * - Virement / CB / Prélèvement (+ Chèque côté dépense) : cherche le Compte 512X via IBAN.
- *   Retourne null si introuvable (caller doit skip la double écriture).
+ * - Virement / CB / Prélèvement (+ Chèque côté dépense) : cherche le Compte 512X via
+ *   compte_bancaire_id (clé stable — fix code review 2026-05-30, l'IBAN est nullable et
+ *   non unique). Retourne null si introuvable (caller doit skip la double écriture).
  * - Chèque reçu (recette) / Espèces : retourne le placeholder 5112 système.
  *   EcritureGenerator mappe automatiquement vers 5112 (chèques reçus) ou 530 (espèces)
  *   via resoudreComptePortage() — le placeholder n'est jamais écrit en DB.
@@ -54,22 +55,18 @@ final class CompteTresorerieResolver
             : [ModePaiement::Virement, ModePaiement::Cb, ModePaiement::Prelevement];
 
         if ($compteBancaireId !== null) {
-            /** @var CompteBancaire|null $compteBancaire */
-            $compteBancaire = CompteBancaire::find($compteBancaireId);
+            // Résolution par compte_bancaire_id (clé stable — l'IBAN est nullable et non unique).
+            $compte512X = Compte::where('compte_bancaire_id', $compteBancaireId)
+                ->bancaires()
+                ->first();
 
-            if ($compteBancaire !== null && $compteBancaire->iban !== null) {
-                $compte512X = Compte::where('iban', $compteBancaire->iban)
-                    ->bancaires()
-                    ->first();
-
-                if ($compte512X !== null) {
-                    return $compte512X;
-                }
+            if ($compte512X !== null) {
+                return $compte512X;
             }
 
-            // IBAN non matché (CompteBancaire sans IBAN, ou pas de Compte 512X avec cet IBAN)
+            // Aucun Compte 512X trouvé pour ce CompteBancaire
             if (in_array($mode, $modesNecessitant512X, strict: true)) {
-                Log::warning("[PartieDouble] {$contextLog} — skip : compte 512X introuvable pour IBAN", [
+                Log::warning("[PartieDouble] {$contextLog} — skip : compte 512X introuvable pour CompteBancaire #{$compteBancaireId}", [
                     'compte_bancaire_id' => $compteBancaireId,
                     'mode_paiement' => $mode->value,
                 ]);
