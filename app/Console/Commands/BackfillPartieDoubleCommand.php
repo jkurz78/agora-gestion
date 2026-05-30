@@ -6,10 +6,12 @@ namespace App\Console\Commands;
 
 use App\Models\Association;
 use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Services\Compta\BackfillAuditor;
 use App\Services\Compta\TransactionConverter;
 use App\Services\ExerciceService;
 use App\Tenant\TenantContext;
+use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -22,6 +24,7 @@ use Illuminate\Support\Facades\Log;
  *
  * Options :
  *   --exercice=current|YYYY  Exercice à convertir (défaut : exercice courant)
+ *   --all                    Backfille TOUS les exercices ayant des transactions (cutover)
  *   --dry-run                Audit seulement — aucune écriture
  *   --force                  Re-conversion totale même si equilibree=TRUE (interdit en prod)
  *   --asso=ID                Limiter à une association (console interne only)
@@ -30,11 +33,13 @@ use Illuminate\Support\Facades\Log;
  * Step 32 : squelette + dry-run + rapport
  * Step 33 : conversion idempotente + invariants + rollback
  * Step 34 : --force + reset + guard prod
+ * Cutover  : --all (boucle sur tous les exercices ayant des transactions, ex. ENL de l'exercice précédent)
  */
 final class BackfillPartieDoubleCommand extends Command
 {
     protected $signature = 'compta:backfill-partie-double
                             {--exercice=current : Exercice comptable à convertir (current ou YYYY)}
+                            {--all : Backfille tous les exercices ayant des transactions (ignore --exercice)}
                             {--dry-run : Audit seulement, aucune écriture en base}
                             {--force : Re-conversion totale même si equilibree=TRUE (interdit en prod)}
                             {--asso= : Limiter à une association (ID)}';
@@ -58,7 +63,7 @@ final class BackfillPartieDoubleCommand extends Command
             return self::FAILURE;
         }
 
-        // -- Résolution de l'exercice --
+        // -- Résolution de l'exercice (mode mono ; ignoré si --all) --
         $exerciceOption = $this->option('exercice') ?: 'current';
         $annee = $exerciceOption === 'current'
             ? $this->exerciceService->current()
@@ -66,6 +71,7 @@ final class BackfillPartieDoubleCommand extends Command
 
         $isDryRun = (bool) $this->option('dry-run');
         $isForce = (bool) $this->option('force');
+        $isAll = (bool) $this->option('all');
 
         // -- Résolution des associations à traiter --
         $assoOption = $this->option('asso');
@@ -86,10 +92,16 @@ final class BackfillPartieDoubleCommand extends Command
                 TenantContext::clear();
                 TenantContext::boot($asso);
 
-                if ($isDryRun) {
-                    $this->runDryRun($annee);
-                } else {
-                    $this->runConversion($annee, $isForce);
+                // --all : tous les exercices ayant des transactions (cutover) ;
+                // sinon l'exercice unique résolu ci-dessus.
+                $annees = $isAll ? $this->exercicesAvecTransactions() : [$annee];
+
+                foreach ($annees as $anneeCourante) {
+                    if ($isDryRun) {
+                        $this->runDryRun($anneeCourante);
+                    } else {
+                        $this->runConversion($anneeCourante, $isForce);
+                    }
                 }
             }
         } finally {
@@ -100,6 +112,33 @@ final class BackfillPartieDoubleCommand extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Liste triée des exercices (années comptables) ayant au moins une transaction
+     * pour le tenant courant. Utilisé par --all lors du cutover : garantit que les
+     * écritures de l'exercice précédent (ex. ENL expliquant le solde bancaire d'ouverture)
+     * sont aussi converties, sans hardcoder les années dans le script de déploiement.
+     *
+     * Couvre toute la plage [exerciceMin .. exerciceMax] ; les exercices intermédiaires
+     * sans transaction à convertir sont traités sans effet (runConversion = 0 converti).
+     *
+     * @return array<int>
+     */
+    private function exercicesAvecTransactions(): array
+    {
+        $bornes = Transaction::query()
+            ->selectRaw('MIN(date) as min_date, MAX(date) as max_date')
+            ->first();
+
+        if ($bornes === null || $bornes->min_date === null) {
+            return [];
+        }
+
+        $anneeMin = $this->exerciceService->anneeForDate(CarbonImmutable::parse($bornes->min_date));
+        $anneeMax = $this->exerciceService->anneeForDate(CarbonImmutable::parse($bornes->max_date));
+
+        return range($anneeMin, $anneeMax);
     }
 
     // =========================================================================
@@ -176,7 +215,7 @@ final class BackfillPartieDoubleCommand extends Command
 
         DB::transaction(function () use ($dateDebut, $dateFin) {
             // Récupérer les IDs des transactions de l'exercice pour ce tenant
-            $txIds = \App\Models\Transaction::query()
+            $txIds = Transaction::query()
                 ->whereBetween('date', [$dateDebut, $dateFin])
                 ->pluck('id')
                 ->all();
@@ -186,13 +225,13 @@ final class BackfillPartieDoubleCommand extends Command
             }
 
             // 1. Supprimer les lignes PD-only (sous_categorie_id null + compte_id non null)
-            \App\Models\TransactionLigne::whereIn('transaction_id', $txIds)
+            TransactionLigne::whereIn('transaction_id', $txIds)
                 ->whereNull('sous_categorie_id')
                 ->whereNotNull('compte_id')
                 ->forceDelete();
 
             // 2. Reset colonnes PD sur les lignes de ventilation restantes
-            \App\Models\TransactionLigne::whereIn('transaction_id', $txIds)
+            TransactionLigne::whereIn('transaction_id', $txIds)
                 ->update([
                     'compte_id' => null,
                     'debit' => 0,
@@ -202,7 +241,7 @@ final class BackfillPartieDoubleCommand extends Command
                 ]);
 
             // 3. Marquer toutes les Tx equilibree=FALSE
-            \App\Models\Transaction::query()
+            Transaction::query()
                 ->whereIn('id', $txIds)
                 ->update(['equilibree' => false]);
 
@@ -288,7 +327,7 @@ final class BackfillPartieDoubleCommand extends Command
         $total = $transactions->count();
 
         if ($total === 0) {
-            $this->info("X already up to date, 0 converted.");
+            $this->info('X already up to date, 0 converted.');
 
             return;
         }
@@ -325,7 +364,7 @@ final class BackfillPartieDoubleCommand extends Command
         $this->info("Backfill terminé : {$converted} convertie(s), {$skipped} skippée(s), {$errors} erreur(s).");
 
         if ($errors > 0) {
-            $this->warn("Des erreurs sont survenues. Consulter les logs pour les détails.");
+            $this->warn('Des erreurs sont survenues. Consulter les logs pour les détails.');
         }
     }
 }

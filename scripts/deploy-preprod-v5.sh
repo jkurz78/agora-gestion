@@ -61,17 +61,31 @@ run "php artisan migrate --force"
 
 # ---------------------------------------------------------------------------
 # Step 3 : Backfill partie double — dry-run (audit pré-backfill)
+#          --all : tous les exercices ayant des transactions (y compris l'exercice
+#          précédent dont les ENL expliquent le solde bancaire d'ouverture).
 # ---------------------------------------------------------------------------
 
-echo "[$(date)] Step 3 : compta:backfill-partie-double --dry-run (audit)"
-run "php artisan compta:backfill-partie-double --dry-run"
+echo "[$(date)] Step 3 : compta:backfill-partie-double --all --dry-run (audit)"
+run "php artisan compta:backfill-partie-double --all --dry-run"
 
 # ---------------------------------------------------------------------------
-# Step 4 : Backfill partie double réel (idempotent)
+# Step 4 : Backfill partie double réel (idempotent, tous exercices)
 # ---------------------------------------------------------------------------
 
-echo "[$(date)] Step 4 : compta:backfill-partie-double (backfill réel)"
-run "php artisan compta:backfill-partie-double"
+echo "[$(date)] Step 4 : compta:backfill-partie-double --all (backfill réel)"
+run "php artisan compta:backfill-partie-double --all"
+
+# ---------------------------------------------------------------------------
+# Step 4b : Correctif OneShot — chèques de reprise déjà encaissés avant AgoraGestion.
+#           Bascule 5112 → 512X les chèques pointés sur un rappro verrouillé mais jamais
+#           passés par une remise bancaire (reprise d'historique). Idempotent.
+# ---------------------------------------------------------------------------
+
+echo "[$(date)] Step 4b : compta:corriger-cheques-reportes --dry-run (audit)"
+run "php artisan compta:corriger-cheques-reportes --dry-run"
+
+echo "[$(date)] Step 4b : compta:corriger-cheques-reportes (correctif réel)"
+run "php artisan compta:corriger-cheques-reportes"
 
 # ---------------------------------------------------------------------------
 # Step 5 : Activer le feature flag COMPTA_USE_PARTIE_DOUBLE

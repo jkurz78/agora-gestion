@@ -17,17 +17,21 @@ declare(strict_types=1);
  * Test [I] : rollback — si invariant échoue, DB::transaction rollback complet.
  */
 
+use App\Enums\ModePaiement;
+use App\Enums\StatutReglement;
+use App\Enums\TypeTransaction;
 use App\Models\Association;
 use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
+use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Models\User;
 use App\Services\Compta\Migrations\BancairesSeeder;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\TransactionService;
-use App\Enums\ModePaiement;
 use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -46,7 +50,7 @@ uses(RefreshDatabase::class);
 function setupBackfillFixtureStep32(object $ctx): void
 {
     $ctx->association = Association::factory()->create();
-    $ctx->user = \App\Models\User::factory()->create();
+    $ctx->user = User::factory()->create();
     $ctx->user->associations()->attach($ctx->association->id, ['role' => 'admin', 'joined_at' => now()]);
 
     TenantContext::clear();
@@ -153,7 +157,7 @@ test('[A] dry-run produit un rapport structuré avec nb transactions, SC sans co
     // Les 2 transactions viennent d'être créées avec PD activé (enrichirPartieDouble)
     // → elles sont déjà equilibree=TRUE. Pour tester le dry-run, on simule des Tx legacy
     // en remettant equilibree=FALSE sur l'une d'elles.
-    \App\Models\Transaction::query()
+    Transaction::query()
         ->where('association_id', $this->association->id)
         ->update(['equilibree' => false]);
 
@@ -170,7 +174,7 @@ test('[B] dry-run ne modifie aucune ligne transaction_lignes', function () {
     setupBackfillFixtureStep32($this);
 
     // Snapshot AVANT dry-run (via join transactions pour filtrer par tenant)
-    $txIds = \App\Models\Transaction::query()
+    $txIds = Transaction::query()
         ->where('association_id', $this->association->id)
         ->pluck('id')
         ->all();
@@ -182,7 +186,7 @@ test('[B] dry-run ne modifie aucune ligne transaction_lignes', function () {
         ->toArray();
 
     // Marquer les Tx comme non-équilibrées pour que le dry-run les "voit"
-    \App\Models\Transaction::query()
+    Transaction::query()
         ->where('association_id', $this->association->id)
         ->update(['equilibree' => false]);
 
@@ -205,7 +209,7 @@ test('[B] dry-run ne modifie aucune ligne transaction_lignes', function () {
 test('[C] sortie console contient les sections clés du rapport dry-run', function () {
     setupBackfillFixtureStep32($this);
 
-    \App\Models\Transaction::query()
+    Transaction::query()
         ->where('association_id', $this->association->id)
         ->update(['equilibree' => false]);
 
@@ -272,9 +276,9 @@ function setupBackfillFixtureStep33Legacy(object $ctx): void
     // Pour chaque Tx, supprimer les lignes sans montant legacy (les lignes PD sont celles
     // créées par EcritureGenerator : elles ont montant=0 ET compte_id non null ET sous_categorie_id null)
     // Et les lignes de ventilation restent (sous_categorie_id non null).
-    \App\Models\Transaction::query()
+    Transaction::query()
         ->where('association_id', $ctx->association->id)
-        ->each(function (\App\Models\Transaction $tx) {
+        ->each(function (Transaction $tx) {
             // Supprimer les lignes PD-only (411, 401, 512X) : montant=0, sous_categorie_id null
             // Note: les lignes legacy (ventilations) ont sous_categorie_id non null
             TransactionLigne::where('transaction_id', $tx->id)
@@ -305,7 +309,7 @@ test('[D] backfill sans dry-run → toutes Tx equilibree=TRUE, lignes cohérente
     ])->assertSuccessful();
 
     // Toutes les Tx de l'exercice doivent être equilibree=TRUE
-    $txNonEquilibrees = \App\Models\Transaction::query()
+    $txNonEquilibrees = Transaction::query()
         ->where('association_id', $this->association->id)
         ->whereBetween('date', ['2025-09-01', '2026-08-31'])
         ->where(function ($q) {
@@ -355,7 +359,7 @@ test('[F] invariant équilibre — SUM(debit) == SUM(credit) pour chaque Tx apr�
         '--asso' => $this->association->id,
     ])->assertSuccessful();
 
-    $txIds = \App\Models\Transaction::query()
+    $txIds = Transaction::query()
         ->where('association_id', $this->association->id)
         ->whereBetween('date', ['2025-09-01', '2026-08-31'])
         ->pluck('id');
@@ -396,7 +400,7 @@ test('[G] invariant tiers 411/401 — toute ligne 411 ou 401 porte tiers_id NOT 
     }
 
     // Filtrer par les transactions de ce tenant
-    $txIds = \App\Models\Transaction::query()
+    $txIds = Transaction::query()
         ->where('association_id', $this->association->id)
         ->pluck('id')
         ->all();
@@ -428,7 +432,7 @@ test('[H] invariant pas-tiers-sur-512X — toute ligne classe 5 a tiers_id IS NU
         $this->markTestSkipped('Aucun compte classe 5 dans cette fixture.');
     }
 
-    $txIds = \App\Models\Transaction::query()
+    $txIds = Transaction::query()
         ->where('association_id', $this->association->id)
         ->pluck('id')
         ->all();
@@ -457,7 +461,7 @@ test('[J] --force re-convertit même si equilibree=TRUE', function () {
     ])->assertSuccessful();
 
     // Snapshot après 1er run
-    $txIds = \App\Models\Transaction::query()
+    $txIds = Transaction::query()
         ->where('association_id', $this->association->id)
         ->whereBetween('date', ['2025-09-01', '2026-08-31'])
         ->pluck('id')
@@ -469,7 +473,7 @@ test('[J] --force re-convertit même si equilibree=TRUE', function () {
         ->count();
 
     // Toutes les Tx doivent être equilibree=TRUE après le 1er run
-    $txEquilibrees = \App\Models\Transaction::query()
+    $txEquilibrees = Transaction::query()
         ->where('association_id', $this->association->id)
         ->whereBetween('date', ['2025-09-01', '2026-08-31'])
         ->where('equilibree', true)
@@ -484,7 +488,7 @@ test('[J] --force re-convertit même si equilibree=TRUE', function () {
     ])->assertSuccessful();
 
     // Après --force, toutes les Tx doivent toujours être equilibree=TRUE
-    $txEquilibrees2 = \App\Models\Transaction::query()
+    $txEquilibrees2 = Transaction::query()
         ->where('association_id', $this->association->id)
         ->whereBetween('date', ['2025-09-01', '2026-08-31'])
         ->where('equilibree', true)
@@ -533,7 +537,7 @@ test('[M] --force sur asso A ne purge pas les entrées lettrage_audit de asso B'
 
     // --- Préparer asso B (tenant isolé) ---
     $assoB = Association::factory()->create();
-    $userB = \App\Models\User::factory()->create();
+    $userB = User::factory()->create();
     $userB->associations()->attach($assoB->id, ['role' => 'admin', 'joined_at' => now()]);
 
     TenantContext::clear();
@@ -622,7 +626,7 @@ test('[M] --force sur asso A ne purge pas les entrées lettrage_audit de asso B'
 test('[I] rollback — si la conversion lève une exception, état initial restauré', function () {
     setupBackfillFixtureStep33Legacy($this);
 
-    $txIds = \App\Models\Transaction::query()
+    $txIds = Transaction::query()
         ->where('association_id', $this->association->id)
         ->pluck('id')
         ->all();
@@ -649,9 +653,9 @@ test('[I] rollback — si la conversion lève une exception, état initial resta
                 ->update(['debit' => 9999.99]);
 
             // Forcer le rollback
-            throw new \RuntimeException('Rollback forcé pour test [I]');
+            throw new RuntimeException('Rollback forcé pour test [I]');
         });
-    } catch (\RuntimeException $e) {
+    } catch (RuntimeException $e) {
         // Exception attendue
     }
 
@@ -665,29 +669,83 @@ test('[I] rollback — si la conversion lève une exception, état initial resta
     expect($snapshotApres)->toEqual($snapshotAvant, 'Le rollback DB::transaction doit restaurer l\'état initial.');
 })->group('backfill');
 
+// ---------------------------------------------------------------------------
+// Test Cutover — [N] --all balaye tous les exercices (courant + précédent)
+// ---------------------------------------------------------------------------
+
+test('[N] --all convertit l\'exercice courant ET l\'exercice précédent', function () {
+    // Fixture legacy : txCheque + txVirement + txDepense sur l'exercice 2025.
+    setupBackfillFixtureStep33Legacy($this);
+
+    // Ajouter une transaction sur l'exercice PRÉCÉDENT (2024 : 01/09/2024 → 31/08/2025).
+    // Cas réel : ENL expliquant le solde bancaire d'ouverture, postée hors exercice courant.
+    $txExercice2024 = $this->txService->create([
+        'type' => 'recette',
+        'date' => '2024-10-05',
+        'libelle' => 'ENL exercice précédent',
+        'montant_total' => '500.00',
+        'mode_paiement' => ModePaiement::Virement->value,
+        'tiers_id' => $this->tiersA->id,
+        'compte_id' => $this->compteBancaire->id,
+    ], [
+        ['sous_categorie_id' => $this->sc706->id, 'montant' => '500.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+
+    // Remettre cette Tx en état legacy (les autres le sont déjà via le helper).
+    TransactionLigne::where('transaction_id', $txExercice2024->id)
+        ->whereNull('sous_categorie_id')
+        ->forceDelete();
+    TransactionLigne::where('transaction_id', $txExercice2024->id)
+        ->update(['compte_id' => null, 'debit' => 0, 'credit' => 0, 'tiers_id' => null, 'lettrage_code' => null]);
+    $txExercice2024->forceFill(['equilibree' => false])->save();
+
+    // Sanity : avant le backfill, des Tx des 2 exercices sont non-équilibrées.
+    $nonEquilibreesAvant = Transaction::query()
+        ->where('association_id', $this->association->id)
+        ->where(fn ($q) => $q->where('equilibree', false)->orWhereNull('equilibree'))
+        ->count();
+    expect($nonEquilibreesAvant)->toBeGreaterThanOrEqual(2);
+
+    // --all : doit balayer 2024 ET 2025 (range min..max des dates de transaction).
+    $this->artisan('compta:backfill-partie-double', [
+        '--all' => true,
+        '--asso' => $this->association->id,
+    ])->assertSuccessful();
+
+    // Toutes les Tx des 2 exercices doivent être equilibree=TRUE.
+    $nonEquilibreesApres = Transaction::query()
+        ->where('association_id', $this->association->id)
+        ->where(fn ($q) => $q->where('equilibree', false)->orWhereNull('equilibree'))
+        ->count();
+    expect($nonEquilibreesApres)->toBe(0);
+
+    // Spécifiquement, la Tx de l'exercice précédent est convertie.
+    expect((bool) $txExercice2024->fresh()->equilibree)->toBeTrue();
+})->group('backfill');
+
 test('[J] skip montant_total = 0 — transaction gratuite non convertie, aucune ligne PD créée', function () {
     setupBackfillFixtureStep32($this);
 
     // Transaction à 0€ (inscription gratuite HelloAsso)
-    $txZero = \App\Models\Transaction::create([
+    $txZero = Transaction::create([
         'association_id' => $this->association->id,
-        'type' => \App\Enums\TypeTransaction::Recette,
-        'tiers_id' => \App\Models\Tiers::factory()->create(['association_id' => $this->association->id])->id,
+        'type' => TypeTransaction::Recette,
+        'tiers_id' => Tiers::factory()->create(['association_id' => $this->association->id])->id,
         'compte_id' => $this->compteBancaire->id,
         'date' => now()->toDateString(),
         'libelle' => 'Inscription gratuite HelloAsso',
         'montant_total' => '0.00',
-        'mode_paiement' => \App\Enums\ModePaiement::Virement->value,
-        'statut_reglement' => \App\Enums\StatutReglement::Recu->value,
+        'mode_paiement' => ModePaiement::Virement->value,
+        'statut_reglement' => StatutReglement::Recu->value,
     ]);
 
-    \App\Models\TransactionLigne::create([
+    TransactionLigne::create([
         'transaction_id' => $txZero->id,
         'sous_categorie_id' => $this->sc706->id,
         'montant' => '0.00',
     ]);
 
-    $nbLignesAvant = \App\Models\TransactionLigne::where('transaction_id', $txZero->id)->count();
+    $nbLignesAvant = TransactionLigne::where('transaction_id', $txZero->id)->count();
 
     $this->artisan('compta:backfill-partie-double', ['--asso' => $this->association->id])
         ->assertSuccessful();
@@ -696,7 +754,7 @@ test('[J] skip montant_total = 0 — transaction gratuite non convertie, aucune 
     expect($txZero->fresh()->equilibree)->toBeFalsy();
 
     // Aucune ligne PD supplémentaire créée
-    $nbLignesApres = \App\Models\TransactionLigne::withTrashed()
+    $nbLignesApres = TransactionLigne::withTrashed()
         ->where('transaction_id', $txZero->id)
         ->count();
 
