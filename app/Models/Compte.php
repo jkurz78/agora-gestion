@@ -118,6 +118,26 @@ final class Compte extends TenantModel
     }
 
     // -------------------------------------------------------------------------
+    // Prédicats métier
+    // -------------------------------------------------------------------------
+
+    /**
+     * Returns true if this compte is a physical bank account (512X…).
+     *
+     * In-memory equivalent of scopeBancaires (LIKE '512_%') : classe 5 + numéro
+     * commençant par '512' avec au moins un caractère après (5121, 51210…).
+     * Exclut volontairement 5112 (chèques à encaisser) et 530 (caisse).
+     * Source unique de la règle « 512X bancaire physique » côté instance —
+     * évite la duplication du str_starts_with/strlen dans EcritureGenerator.
+     */
+    public function estBancaire(): bool
+    {
+        return $this->classe === 5
+            && str_starts_with((string) $this->numero_pcg, '512')
+            && strlen((string) $this->numero_pcg) > 3;
+    }
+
+    // -------------------------------------------------------------------------
     // Relations
     // -------------------------------------------------------------------------
 

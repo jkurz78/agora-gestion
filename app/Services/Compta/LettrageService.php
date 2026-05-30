@@ -177,13 +177,19 @@ final class LettrageService
         array $ids,
         ?string $motif
     ): void {
+        // Insert brut (bypass casts modèle) : MySQL prod renvoie des strings pour
+        // currentId()/Auth::id(). association_id est NOT NULL → cast (int) direct.
+        // user_id est nullable (lettrages système sans acteur, ex. auto-lettrage
+        // remise) → on préserve null, on ne caste que si présent (sinon 0 casserait la FK).
+        $userId = Auth::id();
+
         DB::table('lettrage_audit')->insert([
-            'association_id' => TenantContext::currentId(),
+            'association_id' => (int) TenantContext::currentId(),
             'action' => $action,
             'lettrage_code' => $code,
             'compte_id' => $compteId,
             'transaction_ligne_ids' => json_encode($ids),
-            'user_id' => Auth::id(),
+            'user_id' => $userId !== null ? (int) $userId : null,
             'motif' => $motif,
             'created_at' => now(),
         ]);

@@ -309,18 +309,12 @@ final class EcritureGenerator
             ModePaiement::Prelevement,
         ];
 
-        if (in_array($mode, $modesNecessitantTresorerie, strict: true)) {
-            $isBancaire = $compteTresorerie->classe === 5
-                && str_starts_with($compteTresorerie->numero_pcg, '512')
-                && strlen($compteTresorerie->numero_pcg) > 3;
-
-            if (! $isBancaire) {
-                throw CompteIncorrectException::classeAttendue(
-                    $compteTresorerie->numero_pcg,
-                    $compteTresorerie->classe,
-                    '5 (512X — bancaire physique)'
-                );
-            }
+        if (in_array($mode, $modesNecessitantTresorerie, strict: true) && ! $compteTresorerie->estBancaire()) {
+            throw CompteIncorrectException::classeAttendue(
+                $compteTresorerie->numero_pcg,
+                $compteTresorerie->classe,
+                '5 (512X — bancaire physique)'
+            );
         }
 
         // --- Résolution du compte de portage (5112 / 530 / 512X) ---
@@ -669,18 +663,12 @@ final class EcritureGenerator
             ModePaiement::Prelevement,
         ];
 
-        if (in_array($mode, $modesNecessitantTresorerie, strict: true)) {
-            $isBancaire = $compteTresorerie->classe === 5
-                && str_starts_with($compteTresorerie->numero_pcg, '512')
-                && strlen($compteTresorerie->numero_pcg) > 3;
-
-            if (! $isBancaire) {
-                throw CompteIncorrectException::classeAttendue(
-                    $compteTresorerie->numero_pcg,
-                    $compteTresorerie->classe,
-                    '5 (512X — bancaire physique)'
-                );
-            }
+        if (in_array($mode, $modesNecessitantTresorerie, strict: true) && ! $compteTresorerie->estBancaire()) {
+            throw CompteIncorrectException::classeAttendue(
+                $compteTresorerie->numero_pcg,
+                $compteTresorerie->classe,
+                '5 (512X — bancaire physique)'
+            );
         }
 
         // --- Résolution du compte de portage (helper dédié dépenses, asymétrie chèque) ---
@@ -1407,11 +1395,7 @@ final class EcritureGenerator
         }
 
         // --- Validation : compte cible doit être un 512X bancaire physique ---
-        $isBancaire512 = $compteCible512->classe === 5
-            && str_starts_with($compteCible512->numero_pcg, '512')
-            && strlen($compteCible512->numero_pcg) > 3;
-
-        if (! $isBancaire512) {
+        if (! $compteCible512->estBancaire()) {
             throw CompteIncorrectException::classeAttendue(
                 $compteCible512->numero_pcg,
                 $compteCible512->classe,
