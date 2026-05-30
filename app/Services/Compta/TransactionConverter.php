@@ -27,6 +27,7 @@ use Illuminate\Support\Facades\Log;
  *   5. Marquer la transaction equilibree=TRUE (via l'observer XOR — déclenché par save).
  *
  * Skip silencieux si :
+ *   - montant_total = 0 (inscription gratuite HelloAsso, artifact sans effet comptable)
  *   - tiers_id null (transactions sans tiers — OD-like)
  *   - sous_categorie_id null sur une ligne (ligne sans catégorie)
  *   - CompteVentilationResolver retourne null (SC sans code_cerfa ou compte introuvable)
@@ -54,6 +55,17 @@ final class TransactionConverter
      */
     public function convertir(Transaction $tx): bool
     {
+        // Guard : montant_total = 0 → skip (inscription gratuite HelloAsso ou équivalent).
+        // Une transaction à 0€ n'a aucun effet comptable — générer des écritures PD nulles
+        // polluerait le grand livre sans valeur. L'adhésion associée reste valide.
+        if (bccomp((string) $tx->montant_total, '0.00', 2) === 0) {
+            Log::info('[Backfill] Skip : montant_total = 0, aucune écriture PD générée', [
+                'transaction_id' => $tx->id,
+            ]);
+
+            return false;
+        }
+
         // Guard : tiers_id null → skip (OD-like, pas de lettrage)
         if ($tx->tiers_id === null) {
             Log::info('[Backfill] Skip : tiers_id null', ['transaction_id' => $tx->id]);

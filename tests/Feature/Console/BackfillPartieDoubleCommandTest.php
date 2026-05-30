@@ -664,3 +664,41 @@ test('[I] rollback — si la conversion lève une exception, état initial resta
 
     expect($snapshotApres)->toEqual($snapshotAvant, 'Le rollback DB::transaction doit restaurer l\'état initial.');
 })->group('backfill');
+
+test('[J] skip montant_total = 0 — transaction gratuite non convertie, aucune ligne PD créée', function () {
+    setupBackfillFixtureStep32($this);
+
+    // Transaction à 0€ (inscription gratuite HelloAsso)
+    $txZero = \App\Models\Transaction::create([
+        'association_id' => $this->association->id,
+        'type' => \App\Enums\TypeTransaction::Recette,
+        'tiers_id' => \App\Models\Tiers::factory()->create(['association_id' => $this->association->id])->id,
+        'compte_id' => $this->compteBancaire->id,
+        'date' => now()->toDateString(),
+        'libelle' => 'Inscription gratuite HelloAsso',
+        'montant_total' => '0.00',
+        'mode_paiement' => \App\Enums\ModePaiement::Virement->value,
+        'statut_reglement' => \App\Enums\StatutReglement::Recu->value,
+    ]);
+
+    \App\Models\TransactionLigne::create([
+        'transaction_id' => $txZero->id,
+        'sous_categorie_id' => $this->sc706->id,
+        'montant' => '0.00',
+    ]);
+
+    $nbLignesAvant = \App\Models\TransactionLigne::where('transaction_id', $txZero->id)->count();
+
+    $this->artisan('compta:backfill-partie-double', ['--asso' => $this->association->id])
+        ->assertSuccessful();
+
+    // Tx à 0€ reste non-équilibrée (non convertie)
+    expect($txZero->fresh()->equilibree)->toBeFalsy();
+
+    // Aucune ligne PD supplémentaire créée
+    $nbLignesApres = \App\Models\TransactionLigne::withTrashed()
+        ->where('transaction_id', $txZero->id)
+        ->count();
+
+    expect($nbLignesApres)->toBe($nbLignesAvant, 'Aucune ligne PD ne doit être créée pour une transaction à 0€.');
+})->group('backfill');
