@@ -262,9 +262,9 @@ it('[intrusion] Alice 403 GET recus.fiscal avec la ligne de Bob', function () {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Test 7 : Cross-tenant don fiscal — ligne asso B invisible depuis asso A → 403
+// Test 7 : Cross-tenant don fiscal — ligne asso B invisible depuis asso A → 404
 // ─────────────────────────────────────────────────────────────────────────────
-it('[intrusion] cross-tenant don fiscal — ligne asso B retourne 403 depuis asso A', function () {
+it('[intrusion] cross-tenant don fiscal — ligne asso B retourne 404 depuis asso A', function () {
     $assoA = makeAssoEligibleCtrl();
     $assoB = makeAssoEligibleCtrl();
 
@@ -278,8 +278,10 @@ it('[intrusion] cross-tenant don fiscal — ligne asso B retourne 403 depuis ass
     session(['portail.last_activity_at' => now()->timestamp]);
 
     $url = route('portail.recus.fiscal', ['association' => $assoA->slug, 'ligne' => $ligneB->id]);
-    // TiersDonsTimelineService ne retourne pas ligneB pour alice/assoA → 403
-    $this->get($url)->assertForbidden();
+    // Scope tenant de TransactionLigne (audit #8) : ligneB est hors tenant A,
+    // donc invisible → résolution de modèle échoue → 404 (blocage plus fort que
+    // le 403 applicatif, la ressource « n'existe pas » pour A).
+    $this->get($url)->assertNotFound();
 });
 
 // Note: Les tests mono (portail.mono.recus.*) sont dans MonoMesAdhesionsEtDonsTest.php

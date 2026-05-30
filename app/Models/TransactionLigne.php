@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Tenant\TransactionLigneTenantScope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -20,6 +21,16 @@ final class TransactionLigne extends Model
     protected $table = 'transaction_lignes';
 
     public $timestamps = false;
+
+    /**
+     * Isolation tenant fail-closed dérivée de la transaction parente (audit #8).
+     * Voir TransactionLigneTenantScope : pas de colonne association_id locale,
+     * la transaction reste source unique de vérité.
+     */
+    protected static function booted(): void
+    {
+        self::addGlobalScope(new TransactionLigneTenantScope);
+    }
 
     protected $fillable = [
         'transaction_id',

@@ -14,6 +14,7 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Tenant\TenantContext;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -110,9 +111,12 @@ it("refuse d'afficher les avertissements d'un don d'un autre tenant", function (
 
     TenantContext::boot(Association::find($tiersA->association_id));
 
-    Livewire::test(Dons::class, ['tiers' => $tiersA])
-        ->call('afficherAvertissements', $donB->id)
-        ->assertStatus(403);
+    // La ligne du tenant B est invisible sous le scope tenant de TransactionLigne
+    // (audit #8) : findOrFail lève ModelNotFound (→ 404 en HTTP), avant même le
+    // garde 403. Blocage cross-tenant plus fort (la ressource « n'existe pas » pour A).
+    expect(fn () => Livewire::test(Dons::class, ['tiers' => $tiersA])
+        ->call('afficherAvertissements', $donB->id))
+        ->toThrow(ModelNotFoundException::class);
 });
 
 it("refuse d'afficher les avertissements d'un don d'un autre tiers (même tenant)", function (): void {
