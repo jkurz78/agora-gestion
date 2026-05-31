@@ -662,6 +662,47 @@ it('[R6] remise pointée — équivalence stricte legacy ↔ PD (bug double-comp
 }); // ✅ Bug fixé Step 31 — calculerSoldePointage legacy exclut T1 sources de remise.
 
 // ---------------------------------------------------------------------------
+// [R6c] Remise pointée, sources SANS reference (données prod/backfill)
+//
+// Régression Finding 2 (cutover 2026-05-31) : calculerSoldePointage::legacy excluait
+// les T1 sources via `remise_id IS NOT NULL AND reference IS NOT NULL`. Or les chèques
+// remisés réels (prod) ont reference = NULL → l'exclusion les ratait → legacy comptait
+// les sources (330) ET la T4 (330) = double-comptage → divergence 330€ vs PD.
+//
+// Le critère correct est structurel : un T1 source de remise ne porte PAS de ligne 512X
+// (son portage est sur 5112/530) ; seule la T4 porte une ligne 512X. On exclut donc les
+// transactions de remise sans ligne 512X, indépendamment de `reference`.
+//
+// Résultat attendu après fix : legacy = PD = 2000 + 330 (T4 seule) = 2330.
+// ---------------------------------------------------------------------------
+
+it('[R6c] remise pointée, sources reference NULL (prod) — équivalence stricte legacy ↔ PD (Finding 2)', function () {
+    $fixture = creerFixtureRappro($this);
+
+    // Simuler les données prod/backfill : les chèques sources n'ont pas de reference.
+    Transaction::whereIn('id', [
+        $fixture['txRecette2Id'],
+        $fixture['txCheque1Id'],
+        $fixture['txCheque2Id'],
+    ])->update(['reference' => null]);
+
+    $rapprochement = $this->rappro->create($this->compteBnp, $this->dateFin, 2330.00);
+
+    $this->rappro->toggleTransaction($rapprochement, 'remise', $fixture['remiseId']);
+    $rapprochement = $rapprochement->fresh();
+
+    Config::set('compta.use_partie_double', false);
+    $soldeLegacy = $this->rappro->calculerSoldePointage($rapprochement);
+
+    Config::set('compta.use_partie_double', true);
+    $soldePD = $this->rappro->calculerSoldePointage($rapprochement);
+
+    expect($soldeLegacy)->toBe(2330.0, 'Legacy : sources ref NULL exclues par critère structurel, seule la T4 (330) comptée');
+    expect($soldePD)->toBe(2330.0, 'PD : 2000 + 330 (ligne 512X D T4)');
+    expect($soldeLegacy)->toEqual($soldePD, 'Équivalence stricte legacy ↔ PD malgré sources sans reference');
+});
+
+// ---------------------------------------------------------------------------
 // [R7] Équivalence solde — dépense pointée (soustrait dans les 2 modes)
 // ---------------------------------------------------------------------------
 

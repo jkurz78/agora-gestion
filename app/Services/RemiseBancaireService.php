@@ -80,7 +80,7 @@ final class RemiseBancaireService
         }
 
         // Garde idempotence : si T4 déjà créée, l'utilisateur doit passer par modifier()
-        if ($this->queryT4($remise->id)->exists()) {
+        if ($this->queryT4($remise)->exists()) {
             throw new \RuntimeException(
                 'Cette remise est déjà comptabilisée. Utilisez modifier() pour ajuster la sélection.'
             );
@@ -247,14 +247,15 @@ final class RemiseBancaireService
      */
     public function reconstruireT4Backfill(RemiseBancaire $remise): void
     {
-        // Idempotence guard : T4 déjà construite (equilibree=true) → no-op
-        if ($this->queryT4($remise->id)->exists()) {
+        // Idempotence guard : T4 déjà construite → no-op
+        if ($this->queryT4($remise)->exists()) {
             return;
         }
 
-        // Trouver les transactions sources : ont une reference (≠ T4 qui a reference=null)
+        // Aucune T4 n'existe encore (garde ci-dessus) : toutes les transactions de la
+        // remise sont donc des sources. Volontairement indépendant de `reference` car
+        // des chèques remisés réels (prod) ont reference = NULL (Finding 2, cutover 2026-05-31).
         $sourceIds = Transaction::where('remise_id', $remise->id)
-            ->whereNotNull('reference')
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
             ->all();
@@ -279,7 +280,7 @@ final class RemiseBancaireService
 
             if (count($rapprochementIds) === 1) {
                 // Exactement un rapprochement → le poser sur la T4
-                $t4 = $this->queryT4($remise->id)->first();
+                $t4 = $this->queryT4($remise)->first();
 
                 if ($t4 !== null) {
                     $t4->update(['rapprochement_id' => $rapprochementIds[0]]);
@@ -301,18 +302,48 @@ final class RemiseBancaireService
     /**
      * Identifie la T4 (transaction de dépôt partie double) d'une remise.
      *
-     * Critère : (remise_id = X, reference IS NULL, equilibree = true).
-     * Repose sur l'invariant que les T1 sources ont TOUJOURS une `reference` non-null
-     * après assignation par comptabiliser() ou modifier(). La T4 elle, n'a pas de
-     * reference (numérotation legacy non applicable aux écritures partie double).
+     * Critère structurel : la transaction de la remise qui porte une ligne 512X au
+     * débit (le dépôt en banque). Les sources portent leur portage sur 5112/530, jamais
+     * sur 512X → critère discriminant et indépendant de `reference` (des chèques remisés
+     * réels en prod ont reference = NULL — Finding 2, cutover 2026-05-31).
      *
      * @return Builder<Transaction>
      */
-    private function queryT4(int $remiseId): Builder
+    private function queryT4(RemiseBancaire $remise): Builder
     {
-        return Transaction::where('remise_id', $remiseId)
-            ->whereNull('reference')
-            ->where('equilibree', true);
+        $compte512X = $this->resoudreCompte512X($remise);
+
+        // Sans compte 512X (tenant sans schéma PD), aucune T4 ne peut exister.
+        if ($compte512X === null) {
+            return Transaction::whereRaw('1 = 0');
+        }
+
+        // La T4 est la transaction de la remise qui porte une ligne 512X au débit (le dépôt).
+        // Les sources portent leur portage sur 5112/530, jamais sur 512X → critère discriminant.
+        // Volontairement indépendant de `reference` : des chèques remisés réels (prod) ont
+        // reference = NULL, ce qui faisait matcher les sources par l'ancien critère
+        // `reference IS NULL` (Finding 2, cutover 2026-05-31).
+        return Transaction::where('remise_id', $remise->id)
+            ->whereHas('lignes', fn (Builder $q): Builder => $q
+                ->where('compte_id', $compte512X->id)
+                ->where('debit', '>', 0));
+    }
+
+    /**
+     * Résout le compte PCG 512X (bancaire physique) du CompteBancaire cible de la remise.
+     * Retourne null si le tenant n'a pas de schéma PD (compte 512X absent).
+     */
+    private function resoudreCompte512X(RemiseBancaire $remise): ?Compte
+    {
+        $compteBancaire = $remise->compteCible;
+
+        if ($compteBancaire === null) {
+            return null;
+        }
+
+        return Compte::where('compte_bancaire_id', $compteBancaire->id)
+            ->bancaires()
+            ->first();
     }
 
     // -------------------------------------------------------------------------
@@ -330,7 +361,7 @@ final class RemiseBancaireService
      */
     private function supprimerT4SiExiste(RemiseBancaire $remise): void
     {
-        $t4 = $this->queryT4($remise->id)->first();
+        $t4 = $this->queryT4($remise)->first();
 
         if ($t4 === null) {
             return;

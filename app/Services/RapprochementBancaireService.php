@@ -13,6 +13,7 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\VirementInterne;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -163,19 +164,22 @@ final class RapprochementBancaireService
         } else {
             // Mode legacy : type + montant_total à l'entête Transaction.
             //
-            // Step 31 — exclure les T1 sources de remise (remise_id IS NOT NULL AND reference IS NOT NULL).
-            // Depuis Step 25 PD, toggleRemise() pointe à la fois les T1 sources ET la T4 consolidée
-            // (equilibree=true, reference IS NULL). Les T1 sources sont des chèques individuels ; la T4
-            // est le dépôt bancaire qui les représente tous. En compter les deux = double-comptage.
-            // Décision : compter T4 seule (identique au comportement PD via ligne 512X de la T4).
-            // Les T1 sources sont identifiées par : remise_id IS NOT NULL AND reference IS NOT NULL.
+            // Step 31 — exclure les T1 sources de remise du SUM.
+            // Depuis Step 25 PD, toggleRemise() pointe à la fois les T1 sources ET la T4 consolidée.
+            // Les T1 sources sont des chèques individuels ; la T4 est le dépôt bancaire qui les
+            // représente tous. En compter les deux = double-comptage. Décision : compter la T4 seule
+            // (identique au comportement PD via la ligne 512X de la T4).
+            //
+            // Critère structurel : un T1 source de remise ne porte PAS de ligne 512X (son portage
+            // est sur 5112/530) ; seule la T4 porte une ligne 512X. On exclut donc les transactions
+            // de remise sans ligne 512X. Volontairement indépendant de `reference` : des chèques
+            // remisés réels (prod) ont reference = NULL, ce qui faisait rater l'exclusion par l'ancien
+            // critère `reference IS NOT NULL` → double-comptage T1 + T4 (Finding 2, cutover 2026-05-31).
             $solde += (float) Transaction::where('rapprochement_id', $rapprochement->id)
-                ->whereNot(function ($q) {
-                    // T1 source de remise = remise_id IS NOT NULL AND reference IS NOT NULL.
-                    // Réécriture explicite (whereNot) plutôt que De Morgan inversé pour rester
-                    // robuste à une future Tx qui aurait (remise_id NOT NULL, reference NOT NULL)
-                    // pour une raison hors remise (ex. virement externe référencé).
-                    $q->whereNotNull('remise_id')->whereNotNull('reference');
+                ->whereNot(function (Builder $q): void {
+                    $q->whereNotNull('remise_id')
+                        ->whereDoesntHave('lignes', fn (Builder $l): Builder => $l
+                            ->whereHas('compte', fn (Builder $c): Builder => $c->bancaires()));
                 })
                 ->selectRaw("SUM(CASE WHEN type = 'depense' THEN -montant_total ELSE montant_total END) as total")
                 ->value('total');

@@ -15,6 +15,7 @@ use App\Services\RemiseBancaireService;
 use App\Tenant\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -227,21 +228,33 @@ final class BackfillPartieDoubleCommand extends Command
                 return;
             }
 
-            // 1. Supprimer les lignes PD-only (sous_categorie_id null + compte_id non null)
+            // 1a. Capturer les T4 (transactions de remise portant une ligne 512X au débit)
+            //     AVANT de purger les lignes PD : le critère structurel (ligne 512X au débit)
+            //     n'est plus identifiable une fois les lignes supprimées à l'étape 1.
+            //     Critère volontairement indépendant de `reference` — des chèques remisés
+            //     réels (prod) ont reference = NULL, ce qui faisait que l'ancien critère
+            //     `reference IS NULL` supprimait les SOURCES au lieu des T4 (Finding 2,
+            //     cutover 2026-05-31).
+            $t4Ids = Transaction::whereIn('id', $txIds)
+                ->whereNotNull('remise_id')
+                ->whereHas('lignes', fn (Builder $q): Builder => $q
+                    ->where('debit', '>', 0)
+                    ->whereHas('compte', fn (Builder $c): Builder => $c->bancaires()))
+                ->pluck('id')
+                ->all();
+
+            // 1b. Supprimer les lignes PD-only (sous_categorie_id null + compte_id non null)
             TransactionLigne::whereIn('transaction_id', $txIds)
                 ->whereNull('sous_categorie_id')
                 ->whereNotNull('compte_id')
                 ->forceDelete();
 
-            // 1b. Supprimer les T4 orphelines (transaction de remise dont les lignes PD
-            //     viennent d'être supprimées ci-dessus, mais la ligne row Transaction survit).
-            //     Critère : remise_id NOT NULL + reference IS NULL.
-            //     Ces rows orphelines (equilibree=FALSE après le reset col. 3 ci-dessous)
-            //     rendraient queryT4 aveugle et causeraient des T4 en doublon au prochain run.
-            Transaction::whereIn('id', $txIds)
-                ->whereNotNull('remise_id')
-                ->whereNull('reference')
-                ->forceDelete();
+            // 1c. Supprimer les rows T4 orphelines (lignes PD purgées ci-dessus, mais la row
+            //     Transaction survit). Sans ça, queryT4 (étape Phase 2) serait aveugle et
+            //     créerait des T4 en doublon au prochain run.
+            if (! empty($t4Ids)) {
+                Transaction::whereIn('id', $t4Ids)->forceDelete();
+            }
 
             // 2. Reset colonnes PD sur les lignes de ventilation restantes
             TransactionLigne::whereIn('transaction_id', $txIds)

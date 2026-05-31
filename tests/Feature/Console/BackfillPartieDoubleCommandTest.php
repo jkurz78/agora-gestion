@@ -891,7 +891,7 @@ test('[AC1] recette en_attente avec mode → créance only — 411D/706C, aucune
     expect($ligne411D->lettrage_code)->toBeNull('Ligne 411 en_attente doit être non lettrée');
 })->group('backfill', 'bug-a');
 
-// AC #2 — chèque recu avec remise_id → portage 5112, 411 pair lettré, 5112 non lettré
+// AC #2 — chèque recu avec remise_id → portage 5112, 411 pair lettré, 5112 soldé par la T4
 test('[AC2] chèque recu avec remise_id → portage 5112, 411 pair lettré', function () {
     setupFixtureBugA($this);
 
@@ -950,7 +950,11 @@ test('[AC2] chèque recu avec remise_id → portage 5112, 411 pair lettré', fun
     expect($ligne5112D)->not->toBeNull('Ligne 5112 D (portage chèque remisé) doit exister');
     expect((float) $ligne5112D->debit)->toBe(120.0);
     expect($ligne5112D->tiers_id)->toBeNull('Ligne 5112 ne doit pas porter de tiers_id');
-    expect($ligne5112D->lettrage_code)->toBeNull('Ligne 5112 doit être non lettrée');
+    // Le backfill enchaîne la phase 2 (reconstruction T4) sur la même remise : le chèque
+    // remisé est déposé (T4 512X D / 5112 C), donc la ligne 5112 D source est soldée (lettrée).
+    // La source a reference = NULL (txService n'en pose pas) : c'est le scénario Finding 2 —
+    // l'ancien critère `reference IS NULL` empêchait à tort la construction de la T4 ici.
+    expect($ligne5112D->lettrage_code)->not->toBeNull('Ligne 5112 soldée par la T4 (chèque déposé)');
 
     // Paire 411 doit être lettrée (cycle comptant lumped)
     $lignes411 = $lignes->filter(fn ($l) => (int) $l->compte_id === (int) $compte411->id);
@@ -1116,7 +1120,7 @@ test('[AC6] chèque recu sans remise ni rapprochement → portage 5112, 411 lett
  *   txSource1, txSource2 (Transaction — avec ligne 5112 débit non lettrée après phase 1)
  *   tiersA, tiersB
  */
-function setupFixtureRemiseBackfill(object $ctx, bool $avecRapprochement = false): void
+function setupFixtureRemiseBackfill(object $ctx, bool $avecRapprochement = false, bool $sourcesSansReference = false): void
 {
     setupFixtureBugA($ctx);
     Config::set('compta.use_partie_double', true);
@@ -1175,14 +1179,16 @@ function setupFixtureRemiseBackfill(object $ctx, bool $avecRapprochement = false
         ['sous_categorie_id' => $ctx->sc706->id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 
-    // Lier les sources à la remise (avec reference — comme le ferait comptabiliser())
+    // Lier les sources à la remise. Par défaut avec reference (comme comptabiliser()).
+    // $sourcesSansReference : reproduit le cas prod où des chèques remisés n'ont pas de
+    // reference — la T4 ne doit alors PAS être identifiée par `reference IS NULL`.
     $ctx->txSource1->forceFill([
         'remise_id' => $ctx->remise->id,
-        'reference' => 'CHQ-00099-001',
+        'reference' => $sourcesSansReference ? null : 'CHQ-00099-001',
     ])->save();
     $ctx->txSource2->forceFill([
         'remise_id' => $ctx->remise->id,
-        'reference' => 'CHQ-00099-002',
+        'reference' => $sourcesSansReference ? null : 'CHQ-00099-002',
     ])->save();
 
     // Optionnel : lier les sources au rapprochement (pour AC #4)
@@ -1248,6 +1254,60 @@ test('[AC3] backfill phase 2 : T4 créée avec 512X D total / 5112 C par source,
             ->first();
         expect($ligne5112Source)->not->toBeNull("Source #{$source->id} : ligne 5112 doit être lettrée après T4");
     }
+})->group('backfill', 'remise-backfill');
+
+// AC #3b — sources prod sans reference : la T4 doit quand même être construite.
+// Régression Finding 2 (cutover 2026-05-31) : queryT4 discriminait la T4 par
+// `reference IS NULL`, mais des chèques remisés réels ont reference = NULL → la garde
+// d'idempotence matchait les sources (faux positif) → aucune T4 → mouvement 512X absent.
+// Le critère correct est structurel : « porte une ligne 512X au débit ».
+test('[AC3b] sources à reference NULL → T4 construite (discriminée par ligne 512X, pas par reference)', function () {
+    setupFixtureRemiseBackfill($this, sourcesSansReference: true);
+
+    $this->artisan('compta:backfill-partie-double', ['--asso' => $this->association->id])
+        ->assertSuccessful();
+
+    // La T4 = transaction de la remise portant une ligne 512X au débit (critère structurel)
+    $t4 = Transaction::where('remise_id', $this->remise->id)
+        ->whereHas('lignes', fn ($q) => $q->where('compte_id', $this->compte512X->id)->where('debit', '>', 0))
+        ->first();
+    expect($t4)->not->toBeNull('T4 doit être construite même quand les sources ont reference = NULL');
+    expect($t4->reference)->toBeNull('La T4 elle-même n\'a pas de reference');
+
+    // Ligne 512X D = total des sources (120 + 100)
+    $ligne512XD = TransactionLigne::where('transaction_id', $t4->id)
+        ->where('compte_id', $this->compte512X->id)
+        ->where('debit', '>', 0)
+        ->first();
+    expect((float) $ligne512XD->debit)->toBe(220.0, 'T4 512X D = 220€');
+
+    // Les sources (reference NULL) ne doivent PAS avoir été prises pour la T4 ni supprimées
+    expect(Transaction::find($this->txSource1->id))->not->toBeNull('Source 1 préservée');
+    expect(Transaction::find($this->txSource2->id))->not->toBeNull('Source 2 préservée');
+})->group('backfill', 'remise-backfill');
+
+// AC #3c — re-run --force avec sources à reference NULL : le reset ne doit pas supprimer
+// les sources (resetExercice purgeait `remise_id NOT NULL AND reference IS NULL` = la T4,
+// ce qui détruisait les sources à reference NULL). La T4 doit être reconstruite, sources intactes.
+test('[AC3c] --force × 2 avec sources reference NULL → sources préservées, exactement 1 T4', function () {
+    setupFixtureRemiseBackfill($this, sourcesSansReference: true);
+
+    foreach ([1, 2] as $run) {
+        $this->artisan('compta:backfill-partie-double', [
+            '--asso' => $this->association->id,
+            '--force' => true,
+        ])->assertSuccessful();
+    }
+
+    // Sources toujours présentes après 2 runs --force
+    expect(Transaction::find($this->txSource1->id))->not->toBeNull('Source 1 ne doit pas être supprimée par le reset --force');
+    expect(Transaction::find($this->txSource2->id))->not->toBeNull('Source 2 ne doit pas être supprimée par le reset --force');
+
+    // Exactement une T4 (pas de doublon, identifiée par ligne 512X débit)
+    $t4s = Transaction::where('remise_id', $this->remise->id)
+        ->whereHas('lignes', fn ($q) => $q->where('compte_id', $this->compte512X->id)->where('debit', '>', 0))
+        ->get();
+    expect($t4s)->toHaveCount(1, 'Exactement 1 T4 après 2 runs --force (idempotence)');
 })->group('backfill', 'remise-backfill');
 
 // AC #4 — backfill phase 3 : T4 porte rapprochement_id des sources ; calculerSoldePointage compte la 512X du T4
