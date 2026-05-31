@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\Association;
+use App\Models\RemiseBancaire;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\Compta\BackfillAuditor;
 use App\Services\Compta\TransactionConverter;
 use App\Services\ExerciceService;
+use App\Services\RemiseBancaireService;
 use App\Tenant\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
@@ -50,6 +52,7 @@ final class BackfillPartieDoubleCommand extends Command
         private readonly ExerciceService $exerciceService,
         private readonly BackfillAuditor $auditor,
         private readonly TransactionConverter $converter,
+        private readonly RemiseBancaireService $remiseBancaireService,
     ) {
         parent::__construct();
     }
@@ -230,6 +233,16 @@ final class BackfillPartieDoubleCommand extends Command
                 ->whereNotNull('compte_id')
                 ->forceDelete();
 
+            // 1b. Supprimer les T4 orphelines (transaction de remise dont les lignes PD
+            //     viennent d'être supprimées ci-dessus, mais la ligne row Transaction survit).
+            //     Critère : remise_id NOT NULL + reference IS NULL.
+            //     Ces rows orphelines (equilibree=FALSE après le reset col. 3 ci-dessous)
+            //     rendraient queryT4 aveugle et causeraient des T4 en doublon au prochain run.
+            Transaction::whereIn('id', $txIds)
+                ->whereNotNull('remise_id')
+                ->whereNull('reference')
+                ->forceDelete();
+
             // 2. Reset colonnes PD sur les lignes de ventilation restantes
             TransactionLigne::whereIn('transaction_id', $txIds)
                 ->update([
@@ -366,5 +379,27 @@ final class BackfillPartieDoubleCommand extends Command
         if ($errors > 0) {
             $this->warn('Des erreurs sont survenues. Consulter les logs pour les détails.');
         }
+
+        // --- Phase 2 : reconstruction des remises bancaires (T4 512x → 5112) ---
+        // Exécutée après la boucle de conversion (phase 1 a posé les lignes 5112 sources).
+        $remises = RemiseBancaire::whereBetween('date', [$dateDebut, $dateFin])->get();
+        $remisesReconstruites = 0;
+        $remisesErreurs = 0;
+
+        foreach ($remises as $remise) {
+            try {
+                $this->remiseBancaireService->reconstruireT4Backfill($remise);
+                $remisesReconstruites++;
+            } catch (\Throwable $e) {
+                $remisesErreurs++;
+                Log::error('[Backfill] Erreur reconstruction T4 remise', [
+                    'remise_id' => (int) $remise->id,
+                    'error' => $e->getMessage(),
+                ]);
+                $this->warn("  Erreur remise #{$remise->id} : {$e->getMessage()}");
+            }
+        }
+
+        $this->info("Phase 2 : {$remisesReconstruites} remise(s) traitée(s), {$remisesErreurs} erreur(s).");
     }
 }

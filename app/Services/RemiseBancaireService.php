@@ -211,6 +211,71 @@ final class RemiseBancaireService
     }
 
     // -------------------------------------------------------------------------
+    // Backfill — Point d'entrée public pour la reconstruction des remises (Wave 3)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Reconstruit la T4 (`512x → 5112`) d'une remise lors du backfill partie double.
+     *
+     * Phase 2 : génère l'écriture T4 à partir des lignes de portage 5112/530 non-lettrées
+     *           déposées sur les sources par la phase 1 (TransactionConverter).
+     * Phase 3 : propage le `rapprochement_id` unique des sources sur la T4 (survie rappro).
+     *
+     * Idempotent : no-op si une T4 valide (equilibree=true, reference null) existe déjà.
+     *
+     * Appelé par BackfillPartieDoubleCommand::runConversion après la boucle de conversion
+     * des transactions individuelles.
+     */
+    public function reconstruireT4Backfill(RemiseBancaire $remise): void
+    {
+        // Idempotence guard : T4 déjà construite (equilibree=true) → no-op
+        if ($this->queryT4($remise->id)->exists()) {
+            return;
+        }
+
+        // Trouver les transactions sources : ont une reference (≠ T4 qui a reference=null)
+        $sourceIds = Transaction::where('remise_id', $remise->id)
+            ->whereNotNull('reference')
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        if (empty($sourceIds)) {
+            return; // Rien à convertir
+        }
+
+        DB::transaction(function () use ($remise, $sourceIds): void {
+            // Phase 2 — construire la T4
+            $this->recreerT4($remise, $sourceIds);
+
+            // Phase 3 — propager le rapprochement_id unique des sources sur la T4
+            $rapprochementIds = Transaction::whereIn('id', $sourceIds)
+                ->whereNotNull('rapprochement_id')
+                ->distinct()
+                ->pluck('rapprochement_id')
+                ->map(fn ($id) => (int) $id)
+                ->filter()
+                ->values()
+                ->all();
+
+            if (count($rapprochementIds) === 1) {
+                // Exactement un rapprochement → le poser sur la T4
+                $t4 = $this->queryT4($remise->id)->first();
+
+                if ($t4 !== null) {
+                    $t4->update(['rapprochement_id' => $rapprochementIds[0]]);
+                }
+            } elseif (count($rapprochementIds) > 1) {
+                Log::warning('[PartieDouble][RemiseBancaireService] — rapprochement_id incohérent sur les sources de la remise (plusieurs valeurs distinctes) : propagation non effectuée', [
+                    'remise_id' => (int) $remise->id,
+                    'rapprochement_ids' => $rapprochementIds,
+                ]);
+            }
+            // Si 0 rapprochement_id → remise non rapprochée, rien à faire
+        });
+    }
+
+    // -------------------------------------------------------------------------
     // Helpers privés — Identification T4
     // -------------------------------------------------------------------------
 
