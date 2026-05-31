@@ -1032,6 +1032,10 @@ test('[AC5] chèque pointe rapprochement_id non null → portage 512X (pas 5112)
     $codes411 = $lignes411->pluck('lettrage_code')->filter()->values();
     expect($codes411)->toHaveCount(2, 'Les 2 lignes 411 doivent être lettrées');
     expect($codes411[0])->toBe($codes411[1], 'Même lettrage_code sur les 2 lignes 411');
+
+    // rapprochement_id conservé : le converter ne doit pas détacher la Tx de son rapprochement
+    // (AC #5 — la ligne 512X reste comptée au solde de pointage).
+    expect((int) $txChequePointe->rapprochement_id)->toBe((int) $rapprochement->id, 'rapprochement_id doit être conservé après backfill');
 })->group('backfill', 'bug-a');
 
 // AC #6 — chèque recu (remise_id null, rapprochement_id null) → portage 5112 (transit), 411 lettré
