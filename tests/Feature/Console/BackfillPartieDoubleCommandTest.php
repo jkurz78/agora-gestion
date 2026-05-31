@@ -24,6 +24,8 @@ use App\Models\Association;
 use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
+use App\Models\RapprochementBancaire;
+use App\Models\RemiseBancaire;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
@@ -122,12 +124,14 @@ function setupBackfillFixtureStep32(object $ctx): void
     $ctx->txService = app(TransactionService::class);
 
     // Créer 2 transactions pour l'exercice 2025
+    // statut_reglement = Recu : transactions avec mode déjà encaissées (comptant).
     $ctx->txCheque = $ctx->txService->create([
         'type' => 'recette',
         'date' => '2025-10-05',
         'libelle' => 'Adhésion chèque',
         'montant_total' => '100.00',
         'mode_paiement' => ModePaiement::Cheque->value,
+        'statut_reglement' => StatutReglement::Recu->value,
         'tiers_id' => $ctx->tiersA->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
@@ -140,6 +144,7 @@ function setupBackfillFixtureStep32(object $ctx): void
         'libelle' => 'Subvention virement',
         'montant_total' => '250.00',
         'mode_paiement' => ModePaiement::Virement->value,
+        'statut_reglement' => StatutReglement::Recu->value,
         'tiers_id' => $ctx->tiersA->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
@@ -266,6 +271,7 @@ function setupBackfillFixtureStep33Legacy(object $ctx): void
         'libelle' => 'Fournitures bureau',
         'montant_total' => '75.00',
         'mode_paiement' => ModePaiement::Virement->value,
+        'statut_reglement' => StatutReglement::Recu->value,
         'tiers_id' => $ctx->tiersA->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
@@ -685,6 +691,7 @@ test('[N] --all convertit l\'exercice courant ET l\'exercice précédent', funct
         'libelle' => 'ENL exercice précédent',
         'montant_total' => '500.00',
         'mode_paiement' => ModePaiement::Virement->value,
+        'statut_reglement' => StatutReglement::Recu->value,
         'tiers_id' => $this->tiersA->id,
         'compte_id' => $this->compteBancaire->id,
     ], [
@@ -760,3 +767,329 @@ test('[J] skip montant_total = 0 — transaction gratuite non convertie, aucune 
 
     expect($nbLignesApres)->toBe($nbLignesAvant, 'Aucune ligne PD ne doit être créée pour une transaction à 0€.');
 })->group('backfill');
+
+// ---------------------------------------------------------------------------
+// Tests Vague 2 Bug A — Cas triplet (statut_reglement, remise_id, rapprochement_id)
+// ---------------------------------------------------------------------------
+
+/**
+ * Construit la fixture minimale pour les tests Bug A (AC #1, #2, #5, #6).
+ * Étend setupBackfillFixtureStep32 (comptes système + SC 706 + tiers).
+ */
+function setupFixtureBugA(object $ctx): void
+{
+    setupBackfillFixtureStep32($ctx);
+
+    // Sous-catégorie 751B (utilisée dans les tests AC #2/#5/#6 pour distinguer des tests génériques)
+    $ctx->sc751B = SousCategorie::create([
+        'association_id' => $ctx->association->id,
+        'categorie_id' => $ctx->catRecette->id,
+        'nom' => 'Cotisations 751B',
+        'code_cerfa' => '706',
+    ]);
+}
+
+/**
+ * Simule l'état legacy sur une transaction : supprime les lignes PD-only
+ * et reset les colonnes PD sur les ventilations.
+ */
+function simulerLegacySurTx(Transaction $tx): void
+{
+    TransactionLigne::where('transaction_id', $tx->id)
+        ->whereNull('sous_categorie_id')
+        ->whereNotNull('compte_id')
+        ->forceDelete();
+
+    TransactionLigne::where('transaction_id', $tx->id)
+        ->update([
+            'compte_id' => null,
+            'debit' => 0,
+            'credit' => 0,
+            'tiers_id' => null,
+            'lettrage_code' => null,
+        ]);
+
+    $tx->forceFill(['equilibree' => false])->save();
+}
+
+// AC #1 — recette en_attente avec mode (virement) → créance only : 411D + 706C, pas de classe-5, 411 non lettré
+test('[AC1] recette en_attente avec mode → créance only — 411D/706C, aucune ligne classe-5, 411 non lettré', function () {
+    setupFixtureBugA($this);
+
+    // Créer une recette virement en_attente (statut explicite en_attente = bug #138)
+    $txEnAttente = $this->txService->create([
+        'type' => 'recette',
+        'date' => '2025-10-20',
+        'libelle' => 'Virement en attente',
+        'montant_total' => '200.00',
+        'mode_paiement' => ModePaiement::Virement->value,
+        'statut_reglement' => StatutReglement::EnAttente->value,
+        'tiers_id' => $this->tiersA->id,
+        'compte_id' => $this->compteBancaire->id,
+    ], [
+        ['sous_categorie_id' => $this->sc706->id, 'montant' => '200.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+
+    simulerLegacySurTx($txEnAttente);
+
+    // Backfill
+    $this->artisan('compta:backfill-partie-double', ['--asso' => $this->association->id])
+        ->assertSuccessful();
+
+    $txEnAttente->refresh();
+    expect((bool) $txEnAttente->equilibree)->toBeTrue('La Tx en_attente doit être equilibree=TRUE après backfill');
+
+    // Charger les lignes PD créées (compte_id non null)
+    $lignes = TransactionLigne::where('transaction_id', $txEnAttente->id)
+        ->whereNotNull('compte_id')
+        ->whereNull('deleted_at')
+        ->get();
+
+    $compte411 = Compte::where('numero_pcg', '411')
+        ->where('association_id', $this->association->id)
+        ->firstOrFail();
+
+    $compte706 = Compte::where('numero_pcg', '706')
+        ->where('association_id', $this->association->id)
+        ->firstOrFail();
+
+    // Exactement 2 lignes PD : 411D + 706C
+    $lignesAvecCompte = $lignes->filter(fn ($l) => $l->compte_id !== null);
+    expect($lignesAvecCompte)->toHaveCount(2, 'Cas en_attente → exactement 2 lignes PD (411D + 706C)');
+
+    // 411 D avec tiers
+    $ligne411D = $lignes->firstWhere('compte_id', $compte411->id);
+    expect($ligne411D)->not->toBeNull('Ligne 411 doit exister');
+    expect((float) $ligne411D->debit)->toBe(200.0);
+    expect((float) $ligne411D->credit)->toBe(0.0);
+    expect((int) $ligne411D->tiers_id)->toBe((int) $this->tiersA->id, 'Ligne 411 doit porter tiers_id');
+
+    // 706 C sans tiers
+    $ligne706C = $lignes->firstWhere('compte_id', $compte706->id);
+    expect($ligne706C)->not->toBeNull('Ligne 706 doit exister');
+    expect((float) $ligne706C->credit)->toBe(200.0);
+    expect((float) $ligne706C->debit)->toBe(0.0);
+
+    // Aucune ligne classe 5 (pas de portage trésorerie)
+    $compteClasse5Ids = Compte::where('classe', 5)
+        ->where('association_id', $this->association->id)
+        ->pluck('id')
+        ->all();
+
+    $ligneClasse5 = DB::table('transaction_lignes')
+        ->where('transaction_id', $txEnAttente->id)
+        ->whereIn('compte_id', $compteClasse5Ids)
+        ->whereNull('deleted_at')
+        ->exists();
+
+    expect($ligneClasse5)->toBeFalse('Cas en_attente → aucune ligne classe 5 (pas de portage)');
+
+    // 411 NON lettré (créance ouverte)
+    expect($ligne411D->lettrage_code)->toBeNull('Ligne 411 en_attente doit être non lettrée');
+})->group('backfill', 'bug-a');
+
+// AC #2 — chèque recu avec remise_id → portage 5112, 411 pair lettré, 5112 non lettré
+test('[AC2] chèque recu avec remise_id → portage 5112, 411 pair lettré', function () {
+    setupFixtureBugA($this);
+
+    // Créer une remise bancaire minimale (juste un ID de référence)
+    $remise = RemiseBancaire::create([
+        'association_id' => $this->association->id,
+        'numero' => 1,
+        'date' => '2025-10-25',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'compte_cible_id' => $this->compteBancaire->id,
+        'libelle' => 'Remise test AC2',
+        'saisi_par' => $this->user->id,
+    ]);
+
+    // Recette chèque recu + remise_id set (cas 2 — chèque remisé)
+    $txChequeRemise = $this->txService->create([
+        'type' => 'recette',
+        'date' => '2025-10-22',
+        'libelle' => 'Adhésion chèque remisé',
+        'montant_total' => '120.00',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'statut_reglement' => StatutReglement::Recu->value,
+        'tiers_id' => $this->tiersA->id,
+        'compte_id' => $this->compteBancaire->id,
+    ], [
+        ['sous_categorie_id' => $this->sc706->id, 'montant' => '120.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+
+    // Poser remise_id sur la transaction (cas 2)
+    $txChequeRemise->forceFill(['remise_id' => $remise->id])->save();
+
+    simulerLegacySurTx($txChequeRemise);
+
+    // Backfill
+    $this->artisan('compta:backfill-partie-double', ['--asso' => $this->association->id])
+        ->assertSuccessful();
+
+    $txChequeRemise->refresh();
+    expect((bool) $txChequeRemise->equilibree)->toBeTrue('Tx remisée doit être equilibree=TRUE après backfill');
+
+    $compte411 = Compte::where('numero_pcg', '411')
+        ->where('association_id', $this->association->id)
+        ->firstOrFail();
+
+    $compte5112 = Compte::where('numero_pcg', '5112')
+        ->where('association_id', $this->association->id)
+        ->firstOrFail();
+
+    $lignes = TransactionLigne::where('transaction_id', $txChequeRemise->id)
+        ->whereNotNull('compte_id')
+        ->whereNull('deleted_at')
+        ->get();
+
+    // Ligne 5112 D doit exister (portage chèque reçu)
+    $ligne5112D = $lignes->firstWhere(fn ($l) => (int) $l->compte_id === (int) $compte5112->id && (float) $l->debit > 0);
+    expect($ligne5112D)->not->toBeNull('Ligne 5112 D (portage chèque remisé) doit exister');
+    expect((float) $ligne5112D->debit)->toBe(120.0);
+    expect($ligne5112D->tiers_id)->toBeNull('Ligne 5112 ne doit pas porter de tiers_id');
+    expect($ligne5112D->lettrage_code)->toBeNull('Ligne 5112 doit être non lettrée');
+
+    // Paire 411 doit être lettrée (cycle comptant lumped)
+    $lignes411 = $lignes->filter(fn ($l) => (int) $l->compte_id === (int) $compte411->id);
+    expect($lignes411)->toHaveCount(2, 'Deux lignes 411 (D et C) pour le cycle comptant');
+
+    $codes411 = $lignes411->pluck('lettrage_code')->filter()->values();
+    expect($codes411)->toHaveCount(2, 'Les 2 lignes 411 doivent être lettrées (auto-lettrage interne)');
+    expect($codes411[0])->toBe($codes411[1], 'Les 2 lignes 411 doivent porter le même lettrage_code');
+})->group('backfill', 'bug-a');
+
+// AC #5 — chèque pointe (rapprochement_id non null, remise_id null) → portage 512X (pas 5112), 411 lettré
+test('[AC5] chèque pointe rapprochement_id non null → portage 512X (pas 5112), 411 lettré', function () {
+    setupFixtureBugA($this);
+
+    // Créer un rapprochement bancaire minimal (statut et type = valeurs valides des enums)
+    $rapprochement = RapprochementBancaire::create([
+        'association_id' => $this->association->id,
+        'compte_id' => $this->compteBancaire->id,
+        'date_fin' => '2025-10-31',
+        'solde_ouverture' => 1000.00,
+        'solde_fin' => 1150.00,
+        'statut' => 'en_cours',
+        'type' => 'bancaire',
+        'saisi_par' => $this->user->id,
+    ]);
+
+    // Recette chèque statut Pointe + rapprochement_id + pas de remise (cas 1)
+    $txChequePointe = $this->txService->create([
+        'type' => 'recette',
+        'date' => '2025-10-18',
+        'libelle' => 'Adhésion chèque pointé',
+        'montant_total' => '150.00',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'statut_reglement' => StatutReglement::Pointe->value,
+        'tiers_id' => $this->tiersA->id,
+        'compte_id' => $this->compteBancaire->id,
+    ], [
+        ['sous_categorie_id' => $this->sc706->id, 'montant' => '150.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+
+    // Poser rapprochement_id sur la transaction (cas 1 — pointé direct)
+    $txChequePointe->forceFill(['rapprochement_id' => $rapprochement->id])->save();
+
+    simulerLegacySurTx($txChequePointe);
+
+    // Backfill
+    $this->artisan('compta:backfill-partie-double', ['--asso' => $this->association->id])
+        ->assertSuccessful();
+
+    $txChequePointe->refresh();
+    expect((bool) $txChequePointe->equilibree)->toBeTrue('Tx pointée doit être equilibree=TRUE après backfill');
+
+    $compte411 = Compte::where('numero_pcg', '411')
+        ->where('association_id', $this->association->id)
+        ->firstOrFail();
+
+    $compte5112 = Compte::where('numero_pcg', '5112')
+        ->where('association_id', $this->association->id)
+        ->first();
+
+    $lignes = TransactionLigne::where('transaction_id', $txChequePointe->id)
+        ->whereNotNull('compte_id')
+        ->whereNull('deleted_at')
+        ->get();
+
+    // Aucune ligne 5112 (portage doit être sur le 512X bancaire, pas 5112 transit)
+    if ($compte5112 !== null) {
+        $ligne5112 = $lignes->firstWhere('compte_id', $compte5112->id);
+        expect($ligne5112)->toBeNull('Cas pointé direct → aucune ligne 5112 (portage sur 512X, pas transit)');
+    }
+
+    // Ligne 512X D doit exister (portage direct sur compte bancaire)
+    $ligne512XD = $lignes->firstWhere(fn ($l) => (int) $l->compte_id === (int) $this->compte512X->id && (float) $l->debit > 0);
+    expect($ligne512XD)->not->toBeNull('Ligne 512X D (portage direct) doit exister pour chèque pointé');
+    expect((float) $ligne512XD->debit)->toBe(150.0);
+    expect($ligne512XD->tiers_id)->toBeNull('Ligne 512X ne doit pas porter de tiers_id');
+
+    // Paire 411 doit être lettrée
+    $lignes411 = $lignes->filter(fn ($l) => (int) $l->compte_id === (int) $compte411->id);
+    expect($lignes411)->toHaveCount(2, 'Deux lignes 411 (D et C) pour le cycle comptant');
+
+    $codes411 = $lignes411->pluck('lettrage_code')->filter()->values();
+    expect($codes411)->toHaveCount(2, 'Les 2 lignes 411 doivent être lettrées');
+    expect($codes411[0])->toBe($codes411[1], 'Même lettrage_code sur les 2 lignes 411');
+})->group('backfill', 'bug-a');
+
+// AC #6 — chèque recu (remise_id null, rapprochement_id null) → portage 5112 (transit), 411 lettré
+test('[AC6] chèque recu sans remise ni rapprochement → portage 5112, 411 lettré', function () {
+    setupFixtureBugA($this);
+
+    // Recette chèque recu + ni remise ni rappro (cas 4 — reçu en transit 5112)
+    $txChequeRecu = $this->txService->create([
+        'type' => 'recette',
+        'date' => '2025-10-25',
+        'libelle' => 'Adhésion chèque reçu en transit',
+        'montant_total' => '80.00',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'statut_reglement' => StatutReglement::Recu->value,
+        'tiers_id' => $this->tiersA->id,
+        'compte_id' => $this->compteBancaire->id,
+    ], [
+        ['sous_categorie_id' => $this->sc706->id, 'montant' => '80.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+
+    // Vérification : remise_id et rapprochement_id doivent être null
+    expect($txChequeRecu->remise_id)->toBeNull();
+    expect($txChequeRecu->rapprochement_id)->toBeNull();
+
+    simulerLegacySurTx($txChequeRecu);
+
+    // Backfill
+    $this->artisan('compta:backfill-partie-double', ['--asso' => $this->association->id])
+        ->assertSuccessful();
+
+    $txChequeRecu->refresh();
+    expect((bool) $txChequeRecu->equilibree)->toBeTrue('Tx reçue en transit doit être equilibree=TRUE après backfill');
+
+    $compte411 = Compte::where('numero_pcg', '411')
+        ->where('association_id', $this->association->id)
+        ->firstOrFail();
+
+    $compte5112 = Compte::where('numero_pcg', '5112')
+        ->where('association_id', $this->association->id)
+        ->firstOrFail();
+
+    $lignes = TransactionLigne::where('transaction_id', $txChequeRecu->id)
+        ->whereNotNull('compte_id')
+        ->whereNull('deleted_at')
+        ->get();
+
+    // Ligne 5112 D doit exister (portage transit — chèque reçu pas encore remisé)
+    $ligne5112D = $lignes->firstWhere(fn ($l) => (int) $l->compte_id === (int) $compte5112->id && (float) $l->debit > 0);
+    expect($ligne5112D)->not->toBeNull('Ligne 5112 D (portage transit) doit exister pour chèque reçu sans remise/rappro');
+    expect((float) $ligne5112D->debit)->toBe(80.0);
+    expect($ligne5112D->tiers_id)->toBeNull('Ligne 5112 ne doit pas porter de tiers_id');
+    expect($ligne5112D->lettrage_code)->toBeNull('Ligne 5112 transit doit être non lettrée');
+
+    // Paire 411 doit être lettrée (auto-lettrage comptant)
+    $lignes411 = $lignes->filter(fn ($l) => (int) $l->compte_id === (int) $compte411->id);
+    expect($lignes411)->toHaveCount(2, 'Deux lignes 411 (D et C) pour le cycle comptant');
+
+    $codes411 = $lignes411->pluck('lettrage_code')->filter()->values();
+    expect($codes411)->toHaveCount(2, 'Les 2 lignes 411 doivent être lettrées (auto-lettrage interne)');
+    expect($codes411[0])->toBe($codes411[1], 'Même lettrage_code sur les 2 lignes 411');
+})->group('backfill', 'bug-a');

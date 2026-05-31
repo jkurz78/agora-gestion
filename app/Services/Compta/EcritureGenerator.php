@@ -269,6 +269,7 @@ final class EcritureGenerator
         \DateTimeInterface $date,
         ?string $libelle = null,
         ?Transaction $existingTransaction = null,
+        ?Compte $comptePortageOverride = null,
     ): Transaction {
         // --- Normalisation ventilations ---
         $ventilationsNorm = collect($ventilations);
@@ -318,7 +319,8 @@ final class EcritureGenerator
         }
 
         // --- Résolution du compte de portage (5112 / 530 / 512X) ---
-        $comptePortage = $this->resoudreComptePortage($mode, $compteTresorerie);
+        // $comptePortageOverride non-null = cas 1 (chèque pointé direct 512X) : bypass force-5112.
+        $comptePortage = $comptePortageOverride ?? $this->resoudreComptePortage($mode, $compteTresorerie);
 
         // --- Résolution compte 411 (tenant-scopé automatiquement) ---
         $compte411 = Compte::ofNumeroSysteme('411');

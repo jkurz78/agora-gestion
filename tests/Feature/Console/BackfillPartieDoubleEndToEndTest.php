@@ -32,6 +32,7 @@ declare(strict_types=1);
 use App\DataTransferObjects\ExtournePayload;
 use App\Enums\ModePaiement;
 use App\Enums\StatutFacture;
+use App\Enums\StatutReglement;
 use App\Enums\TypeLigneFacture;
 use App\Models\Association;
 use App\Models\Categorie;
@@ -55,6 +56,7 @@ use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 uses(RefreshDatabase::class);
 
@@ -177,13 +179,14 @@ function creerFixtureE2E(object $ctx): array
 {
     $txIds = [];
 
-    // R1 : Recette comptant chèque — 706 (100€)
+    // R1 : Recette comptant chèque — 706 (100€) — statut Recu (encaissé)
     $txR1 = $ctx->txService->create([
         'type' => 'recette',
         'date' => '2025-10-05',
         'libelle' => 'Adhésion chèque A',
         'montant_total' => '100.00',
         'mode_paiement' => ModePaiement::Cheque->value,
+        'statut_reglement' => StatutReglement::Recu->value,
         'tiers_id' => $ctx->tiersA->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
@@ -191,13 +194,14 @@ function creerFixtureE2E(object $ctx): array
     ]);
     $txIds[] = $txR1->id;
 
-    // R2 : Recette comptant chèque — 706 (150€)
+    // R2 : Recette comptant chèque — 706 (150€) — statut Recu (encaissé)
     $txR2 = $ctx->txService->create([
         'type' => 'recette',
         'date' => '2025-10-08',
         'libelle' => 'Adhésion chèque B',
         'montant_total' => '150.00',
         'mode_paiement' => ModePaiement::Cheque->value,
+        'statut_reglement' => StatutReglement::Recu->value,
         'tiers_id' => $ctx->tiersB->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
@@ -205,13 +209,14 @@ function creerFixtureE2E(object $ctx): array
     ]);
     $txIds[] = $txR2->id;
 
-    // R3 : Recette comptant chèque — 706 (80€)
+    // R3 : Recette comptant chèque — 706 (80€) — statut Recu (encaissé)
     $txR3 = $ctx->txService->create([
         'type' => 'recette',
         'date' => '2025-10-12',
         'libelle' => 'Adhésion chèque C',
         'montant_total' => '80.00',
         'mode_paiement' => ModePaiement::Cheque->value,
+        'statut_reglement' => StatutReglement::Recu->value,
         'tiers_id' => $ctx->tiersA->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
@@ -219,13 +224,14 @@ function creerFixtureE2E(object $ctx): array
     ]);
     $txIds[] = $txR3->id;
 
-    // R4 : Recette virement — 706 (250€)
+    // R4 : Recette virement — 706 (250€) — statut Recu (encaissé)
     $txR4 = $ctx->txService->create([
         'type' => 'recette',
         'date' => '2025-10-10',
         'libelle' => 'Subvention mairie virement',
         'montant_total' => '250.00',
         'mode_paiement' => ModePaiement::Virement->value,
+        'statut_reglement' => StatutReglement::Recu->value,
         'tiers_id' => $ctx->tiersB->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
@@ -233,13 +239,14 @@ function creerFixtureE2E(object $ctx): array
     ]);
     $txIds[] = $txR4->id;
 
-    // R5 : Recette virement — 706 (300€)
+    // R5 : Recette virement — 706 (300€) — statut Recu (encaissé)
     $txR5 = $ctx->txService->create([
         'type' => 'recette',
         'date' => '2025-10-15',
         'libelle' => 'Subvention région virement',
         'montant_total' => '300.00',
         'mode_paiement' => ModePaiement::Virement->value,
+        'statut_reglement' => StatutReglement::Recu->value,
         'tiers_id' => $ctx->tiersA->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
@@ -261,13 +268,14 @@ function creerFixtureE2E(object $ctx): array
     ]);
     $txIds[] = $txR6->id;
 
-    // Encaissement R6 (chèque)
+    // Encaissement R6 (chèque) — statut Recu (encaissé)
     $txEnc = $ctx->txService->create([
         'type' => 'recette',
         'date' => '2025-11-20',
         'libelle' => 'Encaissement formation stage',
         'montant_total' => '180.00',
         'mode_paiement' => ModePaiement::Cheque->value,
+        'statut_reglement' => StatutReglement::Recu->value,
         'tiers_id' => $ctx->tiersB->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
@@ -275,13 +283,14 @@ function creerFixtureE2E(object $ctx): array
     ]);
     $txIds[] = $txEnc->id;
 
-    // D1 : Dépense comptant virement — 606 (120€)
+    // D1 : Dépense comptant virement — 606 (120€) — statut Recu
     $txD1 = $ctx->txService->create([
         'type' => 'depense',
         'date' => '2025-10-15',
         'libelle' => 'Fournitures bureau virement',
         'montant_total' => '120.00',
         'mode_paiement' => ModePaiement::Virement->value,
+        'statut_reglement' => StatutReglement::Recu->value,
         'tiers_id' => $ctx->tiersA->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
@@ -289,13 +298,14 @@ function creerFixtureE2E(object $ctx): array
     ]);
     $txIds[] = $txD1->id;
 
-    // D2 : Dépense comptant virement — 606 (80€)
+    // D2 : Dépense comptant virement — 606 (80€) — statut Recu
     $txD2 = $ctx->txService->create([
         'type' => 'depense',
         'date' => '2025-11-05',
         'libelle' => 'Petites fournitures virement',
         'montant_total' => '80.00',
         'mode_paiement' => ModePaiement::Virement->value,
+        'statut_reglement' => StatutReglement::Recu->value,
         'tiers_id' => $ctx->tiersB->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
@@ -303,13 +313,14 @@ function creerFixtureE2E(object $ctx): array
     ]);
     $txIds[] = $txD2->id;
 
-    // D3 : Dépense comptant chèque — 606 (75€)
+    // D3 : Dépense comptant chèque — 606 (75€) — statut Recu
     $txD3 = $ctx->txService->create([
         'type' => 'depense',
         'date' => '2025-10-20',
         'libelle' => 'Fournitures chèque',
         'montant_total' => '75.00',
         'mode_paiement' => ModePaiement::Cheque->value,
+        'statut_reglement' => StatutReglement::Recu->value,
         'tiers_id' => $ctx->tiersA->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
@@ -389,7 +400,7 @@ function creerFixtureE2E(object $ctx): array
         }
     }
 
-    // RCB : Recette comptant CB — 706 (60€)
+    // RCB : Recette comptant CB — 706 (60€) — statut Recu (paiement CB immédiat)
     // Cas §8.3 HelloAsso CB : mode CB → portage direct 512X (pas 5112).
     // Sans helloasso_order_id (Tx locale CB ordinaire).
     $txRCB = $ctx->txService->create([
@@ -398,6 +409,7 @@ function creerFixtureE2E(object $ctx): array
         'libelle' => 'Paiement CB adhésion',
         'montant_total' => '60.00',
         'mode_paiement' => ModePaiement::Cb->value,
+        'statut_reglement' => StatutReglement::Recu->value,
         'tiers_id' => $ctx->tiersA->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
@@ -415,6 +427,7 @@ function creerFixtureE2E(object $ctx): array
         'libelle' => 'Adhésion annulée',
         'montant_total' => '90.00',
         'mode_paiement' => ModePaiement::Cheque->value,
+        'statut_reglement' => StatutReglement::Recu->value,
         'tiers_id' => $ctx->tiersB->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
@@ -470,6 +483,7 @@ function simulerEtatLegacyE2E(array $txIds): void
             ->exists();
         if (! $hasLegacyLines) {
             $txPDPures[] = $txId;
+
             continue;
         }
         // T2' miroir d'extourne : montant_total < 0 ET appartient à une extourne comme miroir
@@ -652,7 +666,7 @@ test('[L] backfill end-to-end exercice complet — toutes Tx equilibree=TRUE, CR
                 ->whereNull('deleted_at')
                 ->exists();
             expect($ligne5112SurCB)->toBeFalse(
-                "Recette CB ne doit PAS porter de ligne 5112 (chèques en attente)"
+                'Recette CB ne doit PAS porter de ligne 5112 (chèques en attente)'
             );
         }
 
@@ -663,7 +677,7 @@ test('[L] backfill end-to-end exercice complet — toutes Tx equilibree=TRUE, CR
             ->whereNull('deleted_at')
             ->exists();
         expect($ligne512XSurCB)->toBeTrue(
-            "Recette CB doit porter une ligne sur le compte 512X physique (portage direct)"
+            'Recette CB doit porter une ligne sur le compte 512X physique (portage direct)'
         );
     }
 
@@ -695,12 +709,12 @@ test('[L] backfill end-to-end exercice complet — toutes Tx equilibree=TRUE, CR
 
             // Aucune ligne classe 7 de T1 ne doit être lettrée (pas d'auto-lettrage produits)
             expect($lignesClasse7TxOrigine->isEmpty())->toBeTrue(
-                "Les lignes classe 7 de la Tx origine extournée ne doivent pas être lettrées"
+                'Les lignes classe 7 de la Tx origine extournée ne doivent pas être lettrées'
             );
 
             // Aucune ligne classe 7 de T2' ne doit être lettrée
             expect($lignesClasse7TxMiroir->isEmpty())->toBeTrue(
-                "Les lignes classe 7 du miroir extourne ne doivent pas être lettrées"
+                'Les lignes classe 7 du miroir extourne ne doivent pas être lettrées'
             );
         }
     }
@@ -719,18 +733,18 @@ test('[L] backfill end-to-end exercice complet — toutes Tx equilibree=TRUE, CR
     // Comparaison produits total
     expect($crApres['produits_total'])->toEqual(
         $crAvantLegacy['produits_total'],
-        "Total produits CR pré/post backfill diverge"
+        'Total produits CR pré/post backfill diverge'
     );
 
     // Comparaison charges total
     expect($crApres['charges_total'])->toEqual(
         $crAvantLegacy['charges_total'],
-        "Total charges CR pré/post backfill diverge"
+        'Total charges CR pré/post backfill diverge'
     );
 
     // Performance : log warning si > 10s, pas d'assertion stricte (< 30s)
     if ($elapsed > 10.0) {
-        \Illuminate\Support\Facades\Log::warning('[Backfill E2E] Performance dégradée', [
+        Log::warning('[Backfill E2E] Performance dégradée', [
             'elapsed_seconds' => round($elapsed, 2),
             'nb_transactions' => count($txIds),
         ]);

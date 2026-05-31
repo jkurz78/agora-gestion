@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\Compta;
 
+use App\Enums\ModePaiement;
 use App\Enums\Sens;
+use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Models\Compte;
 use App\Models\Tiers;
@@ -134,11 +136,50 @@ final class TransactionConverter
             return false;
         }
 
-        // Résolution du compte de trésorerie
-        $modePaiement = $tx->mode_paiement;
-        $compteTresorerie = null;
+        // Date de la transaction
+        $date = $tx->date instanceof \DateTimeInterface
+            ? $tx->date
+            : new \DateTimeImmutable((string) $tx->date);
 
-        if ($modePaiement !== null) {
+        // -----------------------------------------------------------------------
+        // Routage sur le TRIPLET (statut_reglement, remise_id, rapprochement_id)
+        //
+        // Discriminant #1 : en_attente → créance/dette only (jamais comptant),
+        // QUELS QUE SOIENT mode_paiement et remise_id/rapprochement_id.
+        // Note : statut null (dons, factures comptant, etc.) → chemin comptant (cas 4).
+        // -----------------------------------------------------------------------
+        if ($tx->statut_reglement === StatutReglement::EnAttente) {
+            // Cas en_attente : 411 D / 7x C seulement — pas de portage, pas de lettrage.
+            if ($tx->type === TypeTransaction::Recette) {
+                $this->ecritureGenerator->pourRecetteACredit(
+                    tiers: $tiers,
+                    ventilations: $ventilations,
+                    dateConstatation: $date,
+                    libelle: $tx->libelle,
+                    existingTransaction: $tx,
+                );
+            } else {
+                $this->ecritureGenerator->pourDepenseACredit(
+                    tiers: $tiers,
+                    ventilations: $ventilations,
+                    dateConstatation: $date,
+                    libelle: $tx->libelle,
+                    existingTransaction: $tx,
+                );
+            }
+        } else {
+            // Cas Recu / Pointe / null → comptant (cycle lumped avec 411 lettré).
+            // Résolution du compte de trésorerie (requis pour comptant).
+            $modePaiement = $tx->mode_paiement;
+
+            if ($modePaiement === null) {
+                Log::info('[Backfill] Skip : mode_paiement null hors en_attente (OD-like)', [
+                    'transaction_id' => $tx->id,
+                ]);
+
+                return false;
+            }
+
             $sens = $tx->type === TypeTransaction::Depense ? Sens::Depense : Sens::Recette;
 
             $compteTresorerie = CompteTresorerieResolver::resoudre(
@@ -156,16 +197,24 @@ final class TransactionConverter
 
                 return false;
             }
-        }
 
-        // Date de la transaction
-        $date = $tx->date instanceof \DateTimeInterface
-            ? $tx->date
-            : new \DateTimeImmutable((string) $tx->date);
+            // Calcul du portage override pour le cas 1 (chèque pointé direct) :
+            // remise_id null + rapprochement_id non null + mode Cheque (recette).
+            // Dans ce cas, EcritureGenerator::resoudreComptePortage forcerait 5112,
+            // mais le clone prod prouve que le portage doit être sur le 512X bancaire.
+            // On passe $compteTresorerie en override pour bypass le force-5112.
+            $comptePortageOverride = null;
 
-        // Appel EcritureGenerator avec existingTransaction
-        if ($tx->type === TypeTransaction::Recette) {
-            if ($modePaiement !== null) {
+            if (
+                $tx->type === TypeTransaction::Recette
+                && $modePaiement === ModePaiement::Cheque
+                && $tx->remise_id === null
+                && $tx->rapprochement_id !== null
+            ) {
+                $comptePortageOverride = $compteTresorerie;
+            }
+
+            if ($tx->type === TypeTransaction::Recette) {
                 $this->ecritureGenerator->pourRecetteComptant(
                     tiers: $tiers,
                     ventilations: $ventilations,
@@ -174,32 +223,15 @@ final class TransactionConverter
                     date: $date,
                     libelle: $tx->libelle,
                     existingTransaction: $tx,
+                    comptePortageOverride: $comptePortageOverride,
                 );
             } else {
-                $this->ecritureGenerator->pourRecetteACredit(
-                    tiers: $tiers,
-                    ventilations: $ventilations,
-                    dateConstatation: $date,
-                    libelle: $tx->libelle,
-                    existingTransaction: $tx,
-                );
-            }
-        } else {
-            if ($modePaiement !== null) {
                 $this->ecritureGenerator->pourDepenseComptant(
                     tiers: $tiers,
                     ventilations: $ventilations,
                     mode: $modePaiement,
                     compteTresorerie: $compteTresorerie,
                     date: $date,
-                    libelle: $tx->libelle,
-                    existingTransaction: $tx,
-                );
-            } else {
-                $this->ecritureGenerator->pourDepenseACredit(
-                    tiers: $tiers,
-                    ventilations: $ventilations,
-                    dateConstatation: $date,
                     libelle: $tx->libelle,
                     existingTransaction: $tx,
                 );
