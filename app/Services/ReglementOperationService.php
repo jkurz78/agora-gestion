@@ -247,6 +247,52 @@ final class ReglementOperationService
     }
 
     /**
+     * Retrouve la transaction d'encaissement T2 associée à une source T1, si elle est séparée.
+     *
+     * Principe : T1 et T2 partagent un `lettrage_code` sur leur ligne 411 respective.
+     * Cas lumped (ligne 411 source lettrée avec une autre ligne 411 sur la MÊME transaction) :
+     *   → retourne null (portage déjà sur T1, pas de T2 séparé).
+     * Cas séparé (ligne 411 lettrée sur une AUTRE transaction) :
+     *   → retourne cette autre transaction (= T2).
+     * Cas non-lettré (pas encore encaissé) :
+     *   → retourne null.
+     *
+     * Utilisé par RemiseBancaireService::recreerT4 et RapprochementBancaireService::toggleTransaction
+     * pour localiser la ligne portage (5112/512x) et propager/effacer rapprochement_id.
+     *
+     * @param  Compte|null  $compte411  Compte 411 pré-chargé (optimisation N+1). Résolu ici si null.
+     */
+    public function trouverEncaissementT2(Transaction $t1, ?Compte $compte411 = null): ?Transaction
+    {
+        $compte411 ??= Compte::ofNumero('411');
+
+        if ($compte411 === null) {
+            return null;
+        }
+
+        $ligne411T1 = TransactionLigne::where('transaction_id', (int) $t1->id)
+            ->where('compte_id', (int) $compte411->id)
+            ->whereNotNull('lettrage_code')
+            ->first();
+
+        if ($ligne411T1 === null) {
+            return null; // Pas encore lettré → pas de T2
+        }
+
+        // Chercher la ligne 411 partageant le même code sur une AUTRE transaction
+        $ligne411T2 = TransactionLigne::where('lettrage_code', $ligne411T1->lettrage_code)
+            ->where('compte_id', (int) $compte411->id)
+            ->where('transaction_id', '!=', (int) $t1->id)
+            ->first();
+
+        if ($ligne411T2 === null) {
+            return null; // Lumped : la contrepartie est sur la même transaction
+        }
+
+        return Transaction::find($ligne411T2->transaction_id);
+    }
+
+    /**
      * Enrichit la Transaction créée par comptabiliserSeance avec les écritures partie double.
      *
      * Pattern Step 23 (FactureService::genererTransactionDepuisLignesManuelles) :

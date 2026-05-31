@@ -662,3 +662,178 @@ test('[PD-H2] calculerSoldePointage avec IBAN mais sans compte 512X correspondan
     // Pas de compte 512X trouvé → skip silencieux, retourne solde_ouverture seul
     expect($solde)->toBe(800.00);
 });
+
+// ===========================================================================
+// I — AC8 : pointer un virement en_attente (Fix D)
+// toggleTransaction doit : 1) générer T2 (512X), 2) mettre statut = Pointe,
+//   3) poser rapprochement_id sur T2 aussi, 4) calculerSoldePointage bouge.
+// Dé-pointer revient proprement à l'état antérieur.
+// ===========================================================================
+
+/**
+ * Crée une T1 créance virement (411D/706C) sans encaissement — statut en_attente.
+ */
+function pdCreanceVirement(
+    CompteBancaire $compteBancaire,
+    Compte $compte706,
+    Compte $compte411,
+    Tiers $tiers,
+    float $montant,
+): Transaction {
+    $tx = Transaction::factory()->create([
+        'association_id' => TenantContext::currentId(),
+        'type' => TypeTransaction::Recette,
+        'mode_paiement' => ModePaiement::Virement,
+        'montant_total' => $montant,
+        'compte_id' => $compteBancaire->id,
+        'statut_reglement' => StatutReglement::EnAttente->value,
+        'equilibree' => true,
+        'type_ecriture' => 'normale',
+    ]);
+
+    // 411 D tiers (créance)
+    TransactionLigne::create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $compte411->id,
+        'debit' => $montant,
+        'credit' => 0,
+        'tiers_id' => $tiers->id,
+        'libelle' => 'Créance virement en attente',
+        'montant' => 0,
+        'sous_categorie_id' => null,
+    ]);
+    // 706 C
+    TransactionLigne::create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $compte706->id,
+        'debit' => 0,
+        'credit' => $montant,
+        'tiers_id' => null,
+        'libelle' => 'Créance virement en attente',
+        'montant' => 0,
+        'sous_categorie_id' => null,
+    ]);
+
+    return $tx;
+}
+
+test('[PD-I1] toggleTransaction pointe virement en_attente → T2 généré, statut Pointe, solde bouge', function () {
+    $rapprochement = $this->service->create($this->compteBancaire, '2025-10-31', 1300.00);
+
+    $compte411 = compteSysteme('411');
+    $t1 = pdCreanceVirement($this->compteBancaire, $this->compte706, $compte411, $this->tiers, 300.00);
+
+    // Vérifier : pas de T2 ni de ligne 512X avant pointage
+    expect(TransactionLigne::where('compte_id', $this->compte512X->id)->count())->toBe(0);
+    $soldeAvant = $this->service->calculerSoldePointage($rapprochement->fresh());
+    expect($soldeAvant)->toBe(1000.00, 'Solde avant pointage = ouverture');
+
+    // Action : pointer la transaction en_attente
+    $this->service->toggleTransaction($rapprochement, 'recette', $t1->id);
+
+    // 1. Statut = Pointe
+    $t1->refresh();
+    expect($t1->statut_reglement)->toBe(StatutReglement::Pointe);
+    expect((int) $t1->rapprochement_id)->toBe((int) $rapprochement->id);
+
+    // 2. T2 créé : une transaction distincte porte une ligne 512X D
+    $t2 = Transaction::where('association_id', TenantContext::currentId())
+        ->where('id', '!=', $t1->id)
+        ->whereHas('lignes', function ($q) {
+            $q->where('compte_id', $this->compte512X->id)->where('debit', '>', 0);
+        })
+        ->first();
+    expect($t2)->not->toBeNull('T2 (encaissement virement) doit être créé');
+    expect((float) $t2->montant_total)->toBe(300.00);
+
+    // 3. La paire 411 de T1 est lettrée
+    $ligne411 = TransactionLigne::where('transaction_id', $t1->id)
+        ->where('compte_id', $compte411->id)->first();
+    expect($ligne411->lettrage_code)->not->toBeNull('411 de T1 doit être lettrée');
+
+    // 4. T2 porte aussi rapprochement_id (pour que la ligne 512X soit comptée)
+    $t2->refresh();
+    expect((int) $t2->rapprochement_id)->toBe((int) $rapprochement->id);
+
+    // 5. calculerSoldePointage bouge du bon montant
+    $soldeFinal = $this->service->calculerSoldePointage($rapprochement->fresh());
+    expect($soldeFinal)->toBe(1300.00, '1000 + 300 = 1300');
+});
+
+test('[PD-I2] dé-pointer virement en_attente préalablement pointé → retour propre à l\'état antérieur', function () {
+    $rapprochement = $this->service->create($this->compteBancaire, '2025-10-31', 1300.00);
+
+    $compte411 = compteSysteme('411');
+    $t1 = pdCreanceVirement($this->compteBancaire, $this->compte706, $compte411, $this->tiers, 300.00);
+
+    // D'abord pointer
+    $this->service->toggleTransaction($rapprochement, 'recette', $t1->id);
+
+    // Récupérer T2 créé
+    $t2 = Transaction::where('association_id', TenantContext::currentId())
+        ->where('id', '!=', $t1->id)
+        ->whereHas('lignes', function ($q) {
+            $q->where('compte_id', $this->compte512X->id)->where('debit', '>', 0);
+        })
+        ->first();
+    expect($t2)->not->toBeNull();
+    expect((int) $t2->rapprochement_id)->toBe((int) $rapprochement->id);
+
+    $soldeMilieu = $this->service->calculerSoldePointage($rapprochement->fresh());
+    expect($soldeMilieu)->toBe(1300.00);
+
+    // Dé-pointer
+    $this->service->toggleTransaction($rapprochement->fresh(), 'recette', $t1->id);
+
+    // T1 : rapprochement_id = null, statut = EnAttente (créance non remisée → EnAttente)
+    $t1->refresh();
+    expect($t1->rapprochement_id)->toBeNull();
+    expect($t1->statut_reglement)->toBe(StatutReglement::EnAttente);
+
+    // T2 : rapprochement_id effacé (mais T2 CONSERVÉ — encaissement irréversible)
+    $t2->refresh();
+    expect($t2->rapprochement_id)->toBeNull('T2 rapprochement_id doit être effacé au dé-pointage');
+    // T2 doit encore exister (pas de suppression)
+    expect(Transaction::find($t2->id))->not->toBeNull('T2 ne doit pas être supprimé au dé-pointage');
+
+    // Solde revenu à l'ouverture
+    $soldeFinal = $this->service->calculerSoldePointage($rapprochement->fresh());
+    expect($soldeFinal)->toBe(1000.00, 'Solde doit revenir à ouverture après dé-pointage');
+});
+
+test('[PD-I3] pointer virement déjà-lumped (512X sur T1) → idempotent, pas de T2 dupliqué', function () {
+    // Transaction déjà enrichie (lumped : 512X sur la T1 elle-même) — cas backfill/legacy PD
+    $rapprochement = $this->service->create($this->compteBancaire, '2025-10-31', 1300.00);
+
+    $compte411 = compteSysteme('411');
+    // Créer une tx avec les 4 lignes (cycle comptant, 411 déjà lettrée)
+    $tx = pdRecette($this->compteBancaire, $this->compte512X, 300.00, $this->compte706, $compte411, $this->tiers, StatutReglement::Recu);
+
+    // Lettrer manuellement la paire 411 pour simuler un T2 déjà généré
+    // (511 déjà lettrée = idempotence guard dans encaisserSiNonEncaisse)
+    $ligne411 = TransactionLigne::where('transaction_id', $tx->id)
+        ->where('compte_id', $compte411->id)
+        ->where('debit', '>', 0)
+        ->first();
+    $ligne411->update(['lettrage_code' => 'LTR-TEST-001']);
+    $ligne411Bis = TransactionLigne::where('transaction_id', $tx->id)
+        ->where('compte_id', $compte411->id)
+        ->where('credit', '>', 0)
+        ->first();
+    $ligne411Bis->update(['lettrage_code' => 'LTR-TEST-001']);
+
+    $nbTxAvant = Transaction::where('association_id', TenantContext::currentId())->count();
+
+    // Pointer : la garde idempotente doit préserver — pas de nouveau T2
+    $this->service->toggleTransaction($rapprochement, 'recette', $tx->id);
+
+    $nbTxApres = Transaction::where('association_id', TenantContext::currentId())->count();
+    expect($nbTxApres)->toBe($nbTxAvant, 'Aucun T2 supplémentaire sur transaction déjà lettrée (lumped)');
+
+    // La ligne 512X de T1 doit être comptée car rapprochement_id est sur T1
+    $tx->refresh();
+    expect((int) $tx->rapprochement_id)->toBe((int) $rapprochement->id);
+
+    $solde = $this->service->calculerSoldePointage($rapprochement->fresh());
+    expect($solde)->toBe(1300.00, '1000 + 300 = 1300 via ligne 512X de T1 lumped');
+});

@@ -29,6 +29,7 @@ final class RapprochementBancaireService
 
     public function __construct(
         private readonly ExerciceService $exerciceService,
+        private readonly ReglementOperationService $reglementService,
     ) {}
 
     /**
@@ -248,16 +249,41 @@ final class RapprochementBancaireService
                 default => throw new \InvalidArgumentException("Type de transaction inconnu : {$type}"),
             };
 
-            if ((int) $model->rapprochement_id === $rapprochement->id) {
+            if ((int) $model->rapprochement_id === (int) $rapprochement->id) {
+                // Dé-pointage : effacer rapprochement_id sur T1 et sur T2 séparé si présent
+                $t2 = $this->reglementService->trouverEncaissementT2($model);
+
                 $model->rapprochement_id = null;
                 $model->statut_reglement = $model->remise_id !== null
                     ? StatutReglement::Recu
                     : StatutReglement::EnAttente;
+                $model->save();
+
+                if ($t2 !== null && (int) $t2->rapprochement_id === (int) $rapprochement->id) {
+                    $t2->rapprochement_id = null;
+                    $t2->save();
+                }
             } else {
+                // Pointage : générer T2 si en_attente (Fix D — idempotent)
+                if (config('compta.use_partie_double')) {
+                    $this->reglementService->encaisserSiNonEncaisse($model);
+                }
+
                 $model->rapprochement_id = $rapprochement->id;
                 $model->statut_reglement = StatutReglement::Pointe;
+                $model->save();
+
+                // Fix D : propager rapprochement_id sur T2 séparé (si généré ci-dessus)
+                // pour que sa ligne 512X soit comptée par calculerSoldePointage (mode PD).
+                if (config('compta.use_partie_double')) {
+                    $t2 = $this->reglementService->trouverEncaissementT2($model);
+
+                    if ($t2 !== null) {
+                        $t2->rapprochement_id = $rapprochement->id;
+                        $t2->save();
+                    }
+                }
             }
-            $model->save();
         });
     }
 

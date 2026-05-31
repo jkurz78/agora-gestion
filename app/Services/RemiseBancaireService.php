@@ -23,6 +23,7 @@ final class RemiseBancaireService
     public function __construct(
         private readonly EcritureGenerator $ecritureGenerator,
         private readonly LettrageService $lettrageService,
+        private readonly ReglementOperationService $reglementService,
     ) {}
 
     public function creer(array $data): RemiseBancaire
@@ -90,6 +91,9 @@ final class RemiseBancaireService
             $numeroPadded = str_pad((string) $remise->numero, 5, '0', STR_PAD_LEFT);
             $index = 0;
 
+            // Précharger le compte 411 une seule fois pour éviter N+1
+            $compte411 = Compte::ofNumero('411');
+
             foreach ($transactionIds as $txId) {
                 $tx = Transaction::findOrFail($txId);
 
@@ -112,6 +116,10 @@ final class RemiseBancaireService
                     'statut_reglement' => StatutReglement::Recu->value,
                     'reference' => $reference,
                 ]);
+
+                // Fix C : garantir que la ligne de portage 5112/530 existe avant recreerT4.
+                // Idempotent : no-op si la ligne 411 est déjà lettrée (T2 déjà générée).
+                $this->reglementService->encaisserSiNonEncaisse($tx->fresh(), $compte411);
             }
 
             // --- Partie double : générer la T4 de remise ---
@@ -164,6 +172,9 @@ final class RemiseBancaireService
             // supprimerT4SiExiste() ligne ~170.
             $index = Transaction::where('remise_id', $remise->id)->whereNotNull('reference')->count();
 
+            // Précharger le compte 411 une seule fois pour éviter N+1
+            $compte411 = Compte::ofNumero('411');
+
             foreach (Transaction::whereIn('id', $transactionIds)->whereNull('reference')->get() as $tx) {
                 $index++;
                 $tx->update([
@@ -176,6 +187,10 @@ final class RemiseBancaireService
                         str_pad((string) $index, 3, '0', STR_PAD_LEFT)
                     ),
                 ]);
+
+                // Fix C : garantir T2 (encaissement) pour les nouvelles sources en attente.
+                // Idempotent : no-op si 411 déjà lettrée.
+                $this->reglementService->encaisserSiNonEncaisse($tx->fresh(), $compte411);
             }
 
             // --- Partie double : supprimer l'ancienne T4 et en recréer une nouvelle ---
@@ -398,7 +413,12 @@ final class RemiseBancaireService
                 continue;
             }
 
-            // Chercher la ligne portage (5112 ou 530) sur cette transaction
+            // Fix C — subtilité lumped vs T2 séparé :
+            // Cas lumped (pourRecetteComptant / backfill) : la ligne portage est sur $tx.
+            // Cas séparé (encaisserSiNonEncaisse → pourEncaissementCreance) : la ligne portage
+            // est sur le T2 (autre transaction). On cherche d'abord sur $tx, puis sur T2.
+
+            // Chercher la ligne portage (5112 ou 530) sur cette transaction (cas lumped)
             $lignePortage = TransactionLigne::where('transaction_id', $tx->id)
                 ->where('compte_id', $comptePortage->id)
                 ->whereNull('lettrage_code') // Non encore lettrée
@@ -406,8 +426,22 @@ final class RemiseBancaireService
                 ->where('debit', '>', 0)     // Ligne débit (le portage reçoit en débit)
                 ->first();
 
+            // Si non trouvée sur la source, chercher sur le T2 séparé (cas en_attente)
             if ($lignePortage === null) {
-                Log::warning('[PartieDouble][RemiseBancaireService] — skip source : aucune ligne portage '.$numeroComptePortage.' trouvée sur transaction', [
+                $t2 = $this->reglementService->trouverEncaissementT2($tx);
+
+                if ($t2 !== null) {
+                    $lignePortage = TransactionLigne::where('transaction_id', $t2->id)
+                        ->where('compte_id', $comptePortage->id)
+                        ->whereNull('lettrage_code')
+                        ->whereNull('tiers_id')
+                        ->where('debit', '>', 0)
+                        ->first();
+                }
+            }
+
+            if ($lignePortage === null) {
+                Log::warning('[PartieDouble][RemiseBancaireService] — skip source : aucune ligne portage '.$numeroComptePortage.' trouvée sur transaction ni sur T2', [
                     'remise_id' => $remise->id,
                     'transaction_id' => $txId,
                     'compte_portage' => $numeroComptePortage,

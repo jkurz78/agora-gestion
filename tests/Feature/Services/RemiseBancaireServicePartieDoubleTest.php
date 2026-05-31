@@ -617,3 +617,139 @@ it('[J] comptabiliser() 2× sur la même remise → throw RuntimeException "déj
     // Deuxième appel sur la même remise : doit lever une exception "déjà comptabilisée"
     $this->service->comptabiliser($remise->fresh(), [$tx2->id]);
 })->throws(RuntimeException::class, 'déjà comptabilisée');
+
+// ---------------------------------------------------------------------------
+// Scénario K (AC7) — Remise d'un chèque en_attente (Fix C)
+// La source n'a pas eu "marquer reçu" : pas de ligne 5112 sur la T1.
+// comptabiliser() doit : 1) générer le T2 (encaissement → ligne 5112 sur T2),
+//                        2) puis créer le T4.
+// ---------------------------------------------------------------------------
+
+/**
+ * Crée une T1 créance chèque « en attente » via EcritureGenerator::pourRecetteACredit
+ * (école 411 : 411D tiers / 706C — PAS de ligne 5112).
+ * Représente le cycle séance avant marquerRecu.
+ */
+function t25creerT1EnAttente(object $ctx, float $montant = 60.00): Transaction
+{
+    $tiers = Tiers::factory()->create(['association_id' => TenantContext::currentId()]);
+    $compteProduit = Compte::firstOrCreate(
+        ['association_id' => TenantContext::currentId(), 'numero_pcg' => '706_ea_'.uniqid()],
+        [
+            'intitule' => 'Produit en attente',
+            'classe' => 7,
+            'lettrable' => false,
+            'actif' => true,
+            'est_systeme' => false,
+            'pour_inscriptions' => false,
+        ]
+    );
+
+    return $ctx->generator->pourRecetteACredit(
+        tiers: $tiers,
+        ventilations: [['compte' => $compteProduit, 'montant' => $montant]],
+        dateConstatation: new DateTimeImmutable('2026-05-20'),
+        libelle: 'Créance chèque en attente',
+    );
+}
+
+it('[K] comptabiliser chèque en_attente sans T2 préalable → génère T2 (5112) puis T4', function () {
+    $remise = t25creerRemise($this, ModePaiement::Cheque);
+
+    // T1 créance pure (411D/706C) — pas encore de ligne 5112
+    $t1 = t25creerT1EnAttente($this, 60.00);
+    $t1->update(['mode_paiement' => ModePaiement::Cheque->value, 'compte_id' => $this->compteBancaire->id]);
+
+    // Vérifier que T1 n'a pas encore de ligne 5112
+    $compte5112 = compteSysteme('5112');
+    $lignePortageAvant = TransactionLigne::where('transaction_id', $t1->id)
+        ->where('compte_id', $compte5112->id)
+        ->first();
+    expect($lignePortageAvant)->toBeNull('T1 en attente ne doit pas encore avoir de ligne 5112');
+
+    // Action
+    $this->service->comptabiliser($remise, [$t1->id]);
+
+    // 1. Un T2 a été créé : une transaction distincte de T1 qui porte la ligne 5112 D
+    // T2 n'a pas de remise_id (seule la T4 l'a après recreerT4)
+    $t2 = Transaction::where('association_id', TenantContext::currentId())
+        ->where('id', '!=', $t1->id)
+        ->whereHas('lignes', function ($q) use ($compte5112) {
+            $q->where('compte_id', $compte5112->id)->where('debit', '>', 0);
+        })
+        ->whereNull('remise_id')
+        ->first();
+    expect($t2)->not->toBeNull('T2 (encaissement chèque) doit avoir été créé sur la ligne 5112');
+
+    // 2. La paire 411 de T1 est lettrée
+    $compte411 = compteSysteme('411');
+    $ligne411T1 = TransactionLigne::where('transaction_id', $t1->id)
+        ->where('compte_id', $compte411->id)
+        ->first();
+    expect($ligne411T1)->not->toBeNull();
+    expect($ligne411T1->lettrage_code)->not->toBeNull('La ligne 411 de T1 doit être lettrée après encaissement');
+
+    // 3. La T4 a été créée (remise_id, reference IS NULL, equilibree)
+    $t4 = Transaction::where('remise_id', $remise->id)
+        ->whereNull('reference')
+        ->where('equilibree', true)
+        ->first();
+    expect($t4)->not->toBeNull('La T4 doit être créée après Fix C');
+
+    // 4. La T4 porte une ligne 512X D
+    $ligneT4_512X = TransactionLigne::where('transaction_id', $t4->id)
+        ->where('compte_id', $this->compte512X->id)
+        ->where('debit', '>', 0)
+        ->first();
+    expect($ligneT4_512X)->not->toBeNull('La T4 doit avoir une ligne 512X D');
+    expect((float) $ligneT4_512X->debit)->toBe(60.00);
+
+    // 5. T1 status = Recu (mis à jour par comptabiliser)
+    $t1->refresh();
+    expect($t1->statut_reglement)->toBe(StatutReglement::Recu);
+    expect($t1->remise_id)->toBe($remise->id);
+});
+
+it('[K2] comptabiliser chèque en_attente → idempotence via modifier() : pas de second T2', function () {
+    // Note : comptabiliser() throw si T4 déjà présente — l'idempotence de l'encaissement
+    // est testée via modifier() qui supprime T4 et en recrée une sans dupliquer T2.
+    $remise = t25creerRemise($this, ModePaiement::Cheque);
+
+    $t1a = t25creerT1EnAttente($this, 40.00);
+    $t1a->update(['mode_paiement' => ModePaiement::Cheque->value, 'compte_id' => $this->compteBancaire->id]);
+
+    $t1b = t25creerT1EnAttente($this, 35.00);
+    $t1b->update(['mode_paiement' => ModePaiement::Cheque->value, 'compte_id' => $this->compteBancaire->id]);
+
+    // Première comptabilisation avec t1a seulement
+    $this->service->comptabiliser($remise, [$t1a->id]);
+
+    // Vérifier qu'un T2 a été créé pour t1a
+    $compte411 = compteSysteme('411');
+    $ligne411a = TransactionLigne::where('transaction_id', $t1a->id)
+        ->where('compte_id', $compte411->id)->first();
+    expect($ligne411a->lettrage_code)->not->toBeNull('T1a 411 lettrée après comptabiliser');
+
+    // Ajouter t1b via modifier()
+    $this->service->modifier($remise->fresh(), [$t1a->id, $t1b->id]);
+
+    // Compter les T2 : chaque T1 doit avoir exactement 1 T2 (ligne 411 lettrée unique)
+    // T1a — sa ligne 411 doit être encore lettrée (pas de double-lettrage)
+    $ligne411aFresh = TransactionLigne::where('transaction_id', $t1a->id)
+        ->where('compte_id', $compte411->id)->first();
+    expect($ligne411aFresh->lettrage_code)->not->toBeNull('T1a 411 toujours lettrée après modifier');
+
+    // T1b — sa ligne 411 doit aussi être lettrée (T2 créé par modifier)
+    $ligne411b = TransactionLigne::where('transaction_id', $t1b->id)
+        ->where('compte_id', $compte411->id)->first();
+    expect($ligne411b->lettrage_code)->not->toBeNull('T1b 411 lettrée par modifier');
+
+    // La T4 finale doit exister avec les deux sources
+    $t4 = Transaction::where('remise_id', $remise->id)
+        ->whereNull('reference')
+        ->where('equilibree', true)
+        ->first();
+    expect($t4)->not->toBeNull('T4 doit exister après modifier');
+    $nbLignes = TransactionLigne::where('transaction_id', $t4->id)->count();
+    expect($nbLignes)->toBe(3, 'T4 : 1 ligne 512X + 2 lignes 5112 pour 2 sources');
+});
