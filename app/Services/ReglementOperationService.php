@@ -168,92 +168,15 @@ final class ReglementOperationService
      * Skip silencieux (sans exception) dans les cas suivants :
      * — mode_paiement null sur T1
      * — compte de trésorerie non résolu (IBAN non matché)
+     * — compte 411 absent du tenant (schéma partie double non posé)
      * — T1 ne porte pas de ligne 411, ou la ligne 411 n'a pas de tiers
      * — ligne 411 déjà lettrée (lettrage_code !== null) — guard principal d'idempotence
+     *
+     * Identique à FactureService::encaisserPartieDouble (Step 24) — sans attache pivot facture_transaction.
      *
      * @param  Compte|null  $compte411  Compte 411 pré-chargé (optimisation N+1). Résolu ici si null.
      */
     public function encaisserSiNonEncaisse(Transaction $transaction, ?Compte $compte411 = null): void
-    {
-        $this->encaisserPartieDouble($transaction, $compte411);
-    }
-
-    /**
-     * Enrichit la Transaction créée par comptabiliserSeance avec les écritures partie double.
-     *
-     * Pattern Step 23 (FactureService::genererTransactionDepuisLignesManuelles) :
-     * — résout la SousCategorie → Compte classe 7
-     * — enrichit la ligne legacy (compte_id / debit / credit)
-     * — délègue à EcritureGenerator::pourRecetteACredit(existingTransaction: $tx)
-     *
-     * Skippe silencieusement (Log::warning) si un prérequis est absent.
-     */
-    private function enrichirCreancePartieDouble(
-        Transaction $tx,
-        TransactionLigne $ligne,
-        Tiers $tiers,
-        Operation $operation,
-        Seance $seance,
-        int $sousCategorieId,
-    ): void {
-        // --- Résolution SousCategorie → Compte classe 7 ---
-        $compte = CompteVentilationResolver::resoudre(
-            sousCategorieId: $sousCategorieId,
-            classeAttendue: 7,
-            contextLog: 'ReglementOperationService',
-            contextLogData: ['transaction_id' => (int) $tx->id],
-        );
-
-        if ($compte === null) {
-            // Garde loggée dans CompteVentilationResolver::resoudre
-            return;
-        }
-
-        // --- Enrichir la ligne legacy avec colonnes partie double (recette → crédit) ---
-        $montant = (float) $ligne->montant;
-        $ligne->fill([
-            'compte_id' => $compte->id,
-            'debit' => 0.0,
-            'credit' => $montant,
-        ])->save();
-
-        // --- Ventilation pour EcritureGenerator ---
-        $ventilations = [
-            [
-                'compte' => $compte,
-                'montant' => $montant,
-                'operation_id' => (int) $operation->id,
-                'seance' => $seance->numero,
-                'notes' => null,
-            ],
-        ];
-
-        // --- Délègue à EcritureGenerator (ajoute ligne 411 D tiers) ---
-        // existingTransaction : skippe createTransactionHeader + création ventilations (déjà faites).
-        $this->ecritureGenerator->pourRecetteACredit(
-            tiers: $tiers,
-            ventilations: $ventilations,
-            dateConstatation: $tx->date instanceof \DateTimeInterface
-                ? $tx->date
-                : new \DateTimeImmutable((string) $tx->date),
-            libelle: $tx->libelle,
-            existingTransaction: $tx,
-        );
-    }
-
-    /**
-     * Génère T2 (encaissement créance) via EcritureGenerator::pourEncaissementCreance.
-     *
-     * Skip silencieux (best-effort) sur 5 cas :
-     * — mode_paiement null
-     * — compte de trésorerie non résolu
-     * — compte 411 absent du tenant
-     * — T1 sans ligne 411 valide (legacy)
-     * — ligne 411 déjà lettrée (lettrage_code !== null) — guard idempotence
-     *
-     * Identique à FactureService::encaisserPartieDouble (Step 24) — sans attache pivot facture_transaction.
-     */
-    private function encaisserPartieDouble(Transaction $transaction, ?Compte $compte411 = null): void
     {
         // --- 1. Résolution mode de paiement ---
         /** @var ModePaiement|null $mode */
@@ -320,6 +243,69 @@ final class ReglementOperationService
             compteTresorerie: $compteTresorerie,
             datePaiement: now(),
             libelle: 'Encaissement règlement séance',
+        );
+    }
+
+    /**
+     * Enrichit la Transaction créée par comptabiliserSeance avec les écritures partie double.
+     *
+     * Pattern Step 23 (FactureService::genererTransactionDepuisLignesManuelles) :
+     * — résout la SousCategorie → Compte classe 7
+     * — enrichit la ligne legacy (compte_id / debit / credit)
+     * — délègue à EcritureGenerator::pourRecetteACredit(existingTransaction: $tx)
+     *
+     * Skippe silencieusement (Log::warning) si un prérequis est absent.
+     */
+    private function enrichirCreancePartieDouble(
+        Transaction $tx,
+        TransactionLigne $ligne,
+        Tiers $tiers,
+        Operation $operation,
+        Seance $seance,
+        int $sousCategorieId,
+    ): void {
+        // --- Résolution SousCategorie → Compte classe 7 ---
+        $compte = CompteVentilationResolver::resoudre(
+            sousCategorieId: $sousCategorieId,
+            classeAttendue: 7,
+            contextLog: 'ReglementOperationService',
+            contextLogData: ['transaction_id' => (int) $tx->id],
+        );
+
+        if ($compte === null) {
+            // Garde loggée dans CompteVentilationResolver::resoudre
+            return;
+        }
+
+        // --- Enrichir la ligne legacy avec colonnes partie double (recette → crédit) ---
+        $montant = (float) $ligne->montant;
+        $ligne->fill([
+            'compte_id' => $compte->id,
+            'debit' => 0.0,
+            'credit' => $montant,
+        ])->save();
+
+        // --- Ventilation pour EcritureGenerator ---
+        $ventilations = [
+            [
+                'compte' => $compte,
+                'montant' => $montant,
+                'operation_id' => (int) $operation->id,
+                'seance' => $seance->numero,
+                'notes' => null,
+            ],
+        ];
+
+        // --- Délègue à EcritureGenerator (ajoute ligne 411 D tiers) ---
+        // existingTransaction : skippe createTransactionHeader + création ventilations (déjà faites).
+        $this->ecritureGenerator->pourRecetteACredit(
+            tiers: $tiers,
+            ventilations: $ventilations,
+            dateConstatation: $tx->date instanceof \DateTimeInterface
+                ? $tx->date
+                : new \DateTimeImmutable((string) $tx->date),
+            libelle: $tx->libelle,
+            existingTransaction: $tx,
         );
     }
 }
