@@ -339,45 +339,48 @@ final class BackfillPartieDoubleCommand extends Command
         $transactions = $query->get();
         $total = $transactions->count();
 
+        // Phase 1 — conversion des transactions individuelles.
+        // Note : on n'interrompt PAS la méthode quand $total === 0. Sur un re-run sans
+        // --force, toutes les Tx sont déjà equilibree=TRUE donc $total vaut 0, mais la
+        // phase 2 (reconstruction des remises) doit rester rejouable — sa propre garde
+        // queryT4 assure l'idempotence. Un return ici la court-circuiterait (audit Vague 3).
         if ($total === 0) {
-            $this->info('X already up to date, 0 converted.');
+            $this->info('Phase 1 : transactions déjà à jour, 0 convertie.');
+        } else {
+            $this->info("{$total} transaction(s) à convertir...");
 
-            return;
-        }
+            $converted = 0;
+            $skipped = 0;
+            $errors = 0;
 
-        $this->info("{$total} transaction(s) à convertir...");
+            foreach ($transactions as $tx) {
+                try {
+                    DB::transaction(function () use ($tx, &$converted, &$skipped) {
+                        $result = $this->converter->convertir($tx);
 
-        $converted = 0;
-        $skipped = 0;
-        $errors = 0;
-
-        foreach ($transactions as $tx) {
-            try {
-                DB::transaction(function () use ($tx, &$converted, &$skipped) {
-                    $result = $this->converter->convertir($tx);
-
-                    if ($result) {
-                        $converted++;
-                        Log::info('[Backfill] Transaction convertie', ['transaction_id' => $tx->id]);
-                    } else {
-                        $skipped++;
-                        Log::info('[Backfill] Transaction skippée (sans tiers ou SC sans code)', ['transaction_id' => $tx->id]);
-                    }
-                });
-            } catch (\Throwable $e) {
-                $errors++;
-                Log::error('[Backfill] Erreur lors de la conversion', [
-                    'transaction_id' => $tx->id,
-                    'error' => $e->getMessage(),
-                ]);
-                $this->warn("  Erreur Tx #{$tx->id} : {$e->getMessage()}");
+                        if ($result) {
+                            $converted++;
+                            Log::info('[Backfill] Transaction convertie', ['transaction_id' => $tx->id]);
+                        } else {
+                            $skipped++;
+                            Log::info('[Backfill] Transaction skippée (sans tiers ou SC sans code)', ['transaction_id' => $tx->id]);
+                        }
+                    });
+                } catch (\Throwable $e) {
+                    $errors++;
+                    Log::error('[Backfill] Erreur lors de la conversion', [
+                        'transaction_id' => $tx->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                    $this->warn("  Erreur Tx #{$tx->id} : {$e->getMessage()}");
+                }
             }
-        }
 
-        $this->info("Backfill terminé : {$converted} convertie(s), {$skipped} skippée(s), {$errors} erreur(s).");
+            $this->info("Backfill terminé : {$converted} convertie(s), {$skipped} skippée(s), {$errors} erreur(s).");
 
-        if ($errors > 0) {
-            $this->warn('Des erreurs sont survenues. Consulter les logs pour les détails.');
+            if ($errors > 0) {
+                $this->warn('Des erreurs sont survenues. Consulter les logs pour les détails.');
+            }
         }
 
         // --- Phase 2 : reconstruction des remises bancaires (T4 512x → 5112) ---
@@ -401,5 +404,9 @@ final class BackfillPartieDoubleCommand extends Command
         }
 
         $this->info("Phase 2 : {$remisesReconstruites} remise(s) traitée(s), {$remisesErreurs} erreur(s).");
+
+        if ($remisesErreurs > 0) {
+            $this->warn('Des erreurs sont survenues lors de la reconstruction des remises. Consulter les logs.');
+        }
     }
 }

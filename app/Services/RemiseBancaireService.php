@@ -223,6 +223,10 @@ final class RemiseBancaireService
      *
      * Idempotent : no-op si une T4 valide (equilibree=true, reference null) existe déjà.
      *
+     * La garde queryT4 est un check-then-act sans verrou : sûr car le backfill est une
+     * commande artisan mono-opérateur exécutée une fois lors du cutover (jamais en
+     * concurrence — cf. BackfillPartieDoubleCommand).
+     *
      * Appelé par BackfillPartieDoubleCommand::runConversion après la boucle de conversion
      * des transactions individuelles.
      */

@@ -33,6 +33,7 @@ use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Services\Compta\Migrations\BancairesSeeder;
 use App\Services\Compta\Migrations\SystemeSeeder;
+use App\Services\Compta\TransactionConverter;
 use App\Services\RapprochementBancaireService;
 use App\Services\TransactionService;
 use App\Tenant\TenantContext;
@@ -1373,4 +1374,40 @@ test('[AC11] multi-tenant : T4 porte association_id correct, lettrage_audit isol
         ->where('association_id', $assoB->id)
         ->count();
     expect($nbAuditAssoB)->toBe(0, 'Aucune entrée lettrage_audit ne doit exister pour asso B');
+})->group('backfill', 'remise-backfill');
+
+// Régression Vague 3 (audit code-quality #1) : la phase 2 doit rester rejouable
+// même quand toutes les Tx sont déjà converties (cas d'un backfill antérieur à la
+// phase 2). Le re-run SANS --force a $total === 0 : un return prématuré court-circuiterait
+// la reconstruction des remises. La garde queryT4 assure l'idempotence intra-phase-2.
+test('[Régression #1] re-run sans --force reconstruit la T4 même quand toutes les Tx sont déjà converties', function () {
+    setupFixtureRemiseBackfill($this);
+
+    // Simuler « phase 1 déjà jouée, phase 2 jamais jouée » : convertir les sources
+    // directement (pose les lignes 5112 D non-lettrées + equilibree=TRUE), sans créer de T4.
+    $converter = app(TransactionConverter::class);
+    foreach ([$this->txSource1, $this->txSource2] as $source) {
+        DB::transaction(fn () => $converter->convertir($source->fresh()));
+    }
+
+    // Précondition : sources converties, aucune T4 encore construite
+    foreach ([$this->txSource1, $this->txSource2] as $source) {
+        expect((bool) $source->fresh()->equilibree)->toBeTrue("Source #{$source->id} doit être convertie");
+    }
+    $nbT4Avant = Transaction::where('remise_id', $this->remise->id)
+        ->whereNull('reference')
+        ->count();
+    expect($nbT4Avant)->toBe(0, 'Aucune T4 avant le re-run (phase 2 jamais jouée)');
+
+    // Re-run SANS --force : $total === 0 (tout est déjà equilibree=TRUE) mais la phase 2 doit s'exécuter.
+    $this->artisan('compta:backfill-partie-double', [
+        '--asso' => $this->association->id,
+    ])->assertSuccessful();
+
+    // La phase 2 doit avoir reconstruit la T4 malgré $total === 0.
+    $nbT4Apres = Transaction::where('remise_id', $this->remise->id)
+        ->whereNull('reference')
+        ->where('equilibree', true)
+        ->count();
+    expect($nbT4Apres)->toBe(1, 'La phase 2 doit reconstruire la T4 sur un re-run sans --force (régression finding #1)');
 })->group('backfill', 'remise-backfill');
