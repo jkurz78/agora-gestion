@@ -290,7 +290,7 @@ final class RapprochementBancaireService
     private function toggleRemise(RapprochementBancaire $rapprochement, int $remiseId): void
     {
         $transactions = Transaction::where('remise_id', $remiseId)->get();
-        $allPointed = $transactions->every(fn (Transaction $tx) => (int) $tx->rapprochement_id === $rapprochement->id);
+        $allPointed = $transactions->every(fn (Transaction $tx) => (int) $tx->rapprochement_id === (int) $rapprochement->id);
 
         foreach ($transactions as $tx) {
             if ($allPointed) {
@@ -311,7 +311,7 @@ final class RapprochementBancaireService
         $virement = VirementInterne::findOrFail($id);
         $field = $type === 'virement_source' ? 'rapprochement_source_id' : 'rapprochement_destination_id';
 
-        if ((int) $virement->{$field} === $rapprochement->id) {
+        if ((int) $virement->{$field} === (int) $rapprochement->id) {
             $virement->{$field} = null;
         } else {
             $virement->{$field} = $rapprochement->id;
