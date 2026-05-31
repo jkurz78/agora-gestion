@@ -267,6 +267,9 @@ function creerFixtureE2E(object $ctx): array
         ['sous_categorie_id' => $ctx->sc706->id, 'montant' => '180.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
     $txIds[] = $txR6->id;
+    // R6 exposée pour l'assertion en_attente : mode null + statut par défaut (en_attente)
+    // → doit router vers la créance (411D/706C), sans ligne classe 5 ni lettrage.
+    $ctx->txR6 = $txR6;
 
     // Encaissement R6 (chèque) — statut Recu (encaissé)
     $txEnc = $ctx->txService->create([
@@ -679,6 +682,31 @@ test('[L] backfill end-to-end exercice complet — toutes Tx equilibree=TRUE, CR
         expect($ligne512XSurCB)->toBeTrue(
             'Recette CB doit porter une ligne sur le compte 512X physique (portage direct)'
         );
+    }
+
+    // --- Assertion spécifique : recette en_attente (R6) ---
+    // R6 a mode_paiement null + statut par défaut en_attente → discriminant Bug A :
+    // doit produire une créance pure (411D/706C), sans aucune ligne classe 5 (pas de
+    // portage trésorerie) et avec une ligne 411 NON lettrée (créance ouverte).
+    if (isset($this->txR6) && ! empty($compteClasse5Ids)) {
+        $ligneClasse5SurR6 = DB::table('transaction_lignes')
+            ->where('transaction_id', $this->txR6->id)
+            ->whereIn('compte_id', $compteClasse5Ids)
+            ->whereNull('deleted_at')
+            ->exists();
+        expect($ligneClasse5SurR6)->toBeFalse(
+            'Recette en_attente (R6) ne doit porter aucune ligne classe 5 (créance pure, pas de portage)'
+        );
+
+        if (! empty($compteIds411et401)) {
+            $lignes411R6NonLettrees = DB::table('transaction_lignes')
+                ->where('transaction_id', $this->txR6->id)
+                ->whereIn('compte_id', $compteIds411et401)
+                ->whereNotNull('lettrage_code')
+                ->whereNull('deleted_at')
+                ->count();
+            expect($lignes411R6NonLettrees)->toBe(0, 'La ligne 411 de R6 (créance en_attente) doit rester non lettrée');
+        }
     }
 
     // --- Assertions spécifiques : paire extourne ---

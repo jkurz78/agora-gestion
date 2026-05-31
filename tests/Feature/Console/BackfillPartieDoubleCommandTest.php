@@ -1006,7 +1006,7 @@ test('[AC5] chèque pointe rapprochement_id non null → portage 512X (pas 5112)
 
     $compte5112 = Compte::where('numero_pcg', '5112')
         ->where('association_id', $this->association->id)
-        ->first();
+        ->firstOrFail();
 
     $lignes = TransactionLigne::where('transaction_id', $txChequePointe->id)
         ->whereNotNull('compte_id')
@@ -1014,10 +1014,8 @@ test('[AC5] chèque pointe rapprochement_id non null → portage 512X (pas 5112)
         ->get();
 
     // Aucune ligne 5112 (portage doit être sur le 512X bancaire, pas 5112 transit)
-    if ($compte5112 !== null) {
-        $ligne5112 = $lignes->firstWhere('compte_id', $compte5112->id);
-        expect($ligne5112)->toBeNull('Cas pointé direct → aucune ligne 5112 (portage sur 512X, pas transit)');
-    }
+    $ligne5112 = $lignes->firstWhere('compte_id', $compte5112->id);
+    expect($ligne5112)->toBeNull('Cas pointé direct → aucune ligne 5112 (portage sur 512X, pas transit)');
 
     // Ligne 512X D doit exister (portage direct sur compte bancaire)
     $ligne512XD = $lignes->firstWhere(fn ($l) => (int) $l->compte_id === (int) $this->compte512X->id && (float) $l->debit > 0);

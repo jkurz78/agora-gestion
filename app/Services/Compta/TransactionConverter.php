@@ -203,6 +203,10 @@ final class TransactionConverter
             // Dans ce cas, EcritureGenerator::resoudreComptePortage forcerait 5112,
             // mais le clone prod prouve que le portage doit être sur le 512X bancaire.
             // On passe $compteTresorerie en override pour bypass le force-5112.
+            //
+            // Pas de symétrie côté dépense : un chèque émis passe par
+            // resoudreComptePortageDepense() qui route déjà sur le 512X (jamais 5112),
+            // donc le cas 1 n'a pas d'équivalent dépense à corriger.
             $comptePortageOverride = null;
 
             if (
