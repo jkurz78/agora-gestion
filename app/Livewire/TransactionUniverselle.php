@@ -13,6 +13,7 @@ use App\Models\NoteDeFrais;
 use App\Models\Transaction;
 use App\Models\VirementInterne;
 use App\Services\ExerciceService;
+use App\Services\ReglementOperationService;
 use App\Services\TransactionService;
 use App\Services\TransactionUniverselleService;
 use App\Services\VirementInterneService;
@@ -339,7 +340,8 @@ final class TransactionUniverselle extends Component
         if ($tx->isLockedByRapprochement() || $tx->isLockedByFacture()) {
             return;
         }
-        $tx->update(['statut_reglement' => StatutReglement::Recu->value]);
+        // Délègue au service métier : toggle statut + génère T2 partie double (Bug B fix)
+        app(ReglementOperationService::class)->marquerRecu($tx);
     }
 
     // Écouter les événements des modaux pour rafraîchir la liste

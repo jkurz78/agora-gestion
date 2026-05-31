@@ -8,7 +8,6 @@ use App\Enums\ModePaiement;
 use App\Enums\Sens;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
-use App\Exceptions\Compta\LettrageDejaPresentException;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Operation;
@@ -134,10 +133,7 @@ final class ReglementOperationService
      * — mode_paiement null sur T1
      * — mode nécessitant 512X et compte 512X introuvable (IBAN non matché)
      * — T1 ne porte pas de ligne 411 (transaction legacy sans double écriture)
-     *
-     * Garde forte propagée : LettrageDejaPresentException si ligne 411 déjà lettrée.
-     *
-     * @throws LettrageDejaPresentException Si ligne 411 déjà lettrée (double encaissement).
+     * — ligne 411 de T1 déjà lettrée (idempotence — voir encaisserSiNonEncaisse)
      */
     public function marquerRecu(Transaction $transaction): void
     {
@@ -156,9 +152,30 @@ final class ReglementOperationService
             // 1. Toggle statut (legacy — préservé dans tous les cas)
             $transaction->update(['statut_reglement' => StatutReglement::Recu->value]);
 
-            // 2. Partie double : génère T2 si T1 porte une ligne 411 valide
-            $this->encaisserPartieDouble($transaction, $compte411);
+            // 2. Partie double : génère T2 si T1 porte une ligne 411 valide et non lettrée
+            $this->encaisserSiNonEncaisse($transaction, $compte411);
         });
+    }
+
+    /**
+     * Point d'entrée idempotent pour générer T2 (encaissement créance) sur une transaction T1.
+     *
+     * Peut être appelé par n'importe quel déclencheur (marquerRecu, remise, pointage) sans risque
+     * de double-écriture : si la ligne 411 de T1 est déjà lettrée, la méthode est un no-op silencieux.
+     *
+     * Ne touche PAS à statut_reglement — c'est la responsabilité du caller.
+     *
+     * Skip silencieux (sans exception) dans les cas suivants :
+     * — mode_paiement null sur T1
+     * — compte de trésorerie non résolu (IBAN non matché)
+     * — T1 ne porte pas de ligne 411, ou la ligne 411 n'a pas de tiers
+     * — ligne 411 déjà lettrée (lettrage_code !== null) — guard principal d'idempotence
+     *
+     * @param  Compte|null  $compte411  Compte 411 pré-chargé (optimisation N+1). Résolu ici si null.
+     */
+    public function encaisserSiNonEncaisse(Transaction $transaction, ?Compte $compte411 = null): void
+    {
+        $this->encaisserPartieDouble($transaction, $compte411);
     }
 
     /**
@@ -227,10 +244,14 @@ final class ReglementOperationService
     /**
      * Génère T2 (encaissement créance) via EcritureGenerator::pourEncaissementCreance.
      *
-     * Skip silencieux (best-effort) sur 4 cas. Garde forte sur double lettrage (exception).
-     * Identique à FactureService::encaisserPartieDouble (Step 24) — sans attache pivot facture_transaction.
+     * Skip silencieux (best-effort) sur 5 cas :
+     * — mode_paiement null
+     * — compte de trésorerie non résolu
+     * — compte 411 absent du tenant
+     * — T1 sans ligne 411 valide (legacy)
+     * — ligne 411 déjà lettrée (lettrage_code !== null) — guard idempotence
      *
-     * @throws LettrageDejaPresentException Si ligne 411 déjà lettrée.
+     * Identique à FactureService::encaisserPartieDouble (Step 24) — sans attache pivot facture_transaction.
      */
     private function encaisserPartieDouble(Transaction $transaction, ?Compte $compte411 = null): void
     {
@@ -282,8 +303,17 @@ final class ReglementOperationService
             return;
         }
 
-        // --- 4. Délègue à EcritureGenerator (crée T2 + auto-lettre la paire 411) ---
-        // LettrageDejaPresentException propagée telle quelle → rollback DB::transaction englobante.
+        // --- 4. Guard idempotence : ligne 411 déjà lettrée → T2 déjà générée, skip silencieux ---
+        if ($ligne411->lettrage_code !== null) {
+            Log::info('[PartieDouble][ReglementOperationService] — skip idempotent : ligne 411 déjà lettrée', [
+                'transaction_id' => (int) $transaction->id,
+                'lettrage_code' => $ligne411->lettrage_code,
+            ]);
+
+            return;
+        }
+
+        // --- 5. Délègue à EcritureGenerator (crée T2 + auto-lettre la paire 411) ---
         $this->ecritureGenerator->pourEncaissementCreance(
             transactionCreance: $transaction,
             mode: $mode,
@@ -292,5 +322,4 @@ final class ReglementOperationService
             libelle: 'Encaissement règlement séance',
         );
     }
-
 }
