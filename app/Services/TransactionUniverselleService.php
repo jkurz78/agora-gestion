@@ -196,6 +196,7 @@ final class TransactionUniverselleService
                 EXISTS(SELECT 1 FROM facture_transaction ft JOIN factures f ON f.id = ft.facture_id WHERE ft.transaction_id = tx.id AND f.statut = 'validee') as is_locked_by_facture
             ")
             ->where('tx.type', 'depense')
+            ->whereIn('tx.journal', ['vente', 'achat'])
             ->whereNull('tx.deleted_at')
             ->when(TenantContext::hasBooted(), fn ($q) => $q->where('tx.association_id', TenantContext::currentId()))
             ->when($compteId !== null, fn ($q) => $q->where('tx.compte_id', $compteId))
@@ -260,6 +261,7 @@ final class TransactionUniverselleService
                 EXISTS(SELECT 1 FROM facture_transaction ft JOIN factures f ON f.id = ft.facture_id WHERE ft.transaction_id = tx.id AND f.statut = 'validee') as is_locked_by_facture
             ")
             ->where('tx.type', 'recette')
+            ->whereIn('tx.journal', ['vente', 'achat'])
             ->whereNull('tx.deleted_at')
             ->when(TenantContext::hasBooted(), fn ($q) => $q->where('tx.association_id', TenantContext::currentId()))
             ->when($compteId !== null, fn ($q) => $q->where('tx.compte_id', $compteId))
