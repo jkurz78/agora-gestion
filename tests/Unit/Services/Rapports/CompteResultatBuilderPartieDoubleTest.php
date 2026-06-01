@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 use App\Models\Association;
+use App\Models\BudgetLine;
 use App\Models\Categorie;
 use App\Models\Compte;
+use App\Models\Operation;
 use App\Models\Seance;
 use App\Models\SousCategorie;
 use App\Models\Transaction;
@@ -23,7 +25,7 @@ use Illuminate\Support\Facades\DB;
 beforeEach(function () {
     // GlobalBeforeEach de Pest.php a déjà booté TenantContext.
     $this->association = TenantContext::currentId()
-        ? \App\Models\Association::find(TenantContext::currentId())
+        ? Association::find(TenantContext::currentId())
         : Association::factory()->create();
 
     // Reboot avec l'association créée (le global beforeEach en crée une, on la réutilise)
@@ -246,8 +248,8 @@ it('[PD3] compteDeResultat — ligne sans compte_id (legacy pur) ignorée en mod
 it('[PD4] compteDeResultatOperations — produit filtré par operation_id en mode PD', function () {
     $tenantId = (int) TenantContext::currentId();
 
-    $op1 = \App\Models\Operation::factory()->create(['association_id' => $tenantId]);
-    $op2 = \App\Models\Operation::factory()->create(['association_id' => $tenantId]);
+    $op1 = Operation::factory()->create(['association_id' => $tenantId]);
+    $op2 = Operation::factory()->create(['association_id' => $tenantId]);
 
     // Ligne pour op1
     $tx1 = Transaction::factory()->asRecette()->create([
@@ -297,7 +299,7 @@ it('[PD4] compteDeResultatOperations — produit filtré par operation_id en mod
 it('[PD5] compteDeResultatOperations — charges filtrées par operationId en mode PD', function () {
     $tenantId = (int) TenantContext::currentId();
 
-    $op = \App\Models\Operation::factory()->create(['association_id' => $tenantId]);
+    $op = Operation::factory()->create(['association_id' => $tenantId]);
 
     $txDep = Transaction::factory()->asDepense()->create([
         'association_id' => $tenantId,
@@ -329,7 +331,7 @@ it('[PD5] compteDeResultatOperations — charges filtrées par operationId en mo
 it('[PD6] rapportSeances — agrégation par seance en mode PD', function () {
     $tenantId = (int) TenantContext::currentId();
 
-    $op = \App\Models\Operation::factory()->create(['association_id' => $tenantId]);
+    $op = Operation::factory()->create(['association_id' => $tenantId]);
 
     $tx = Transaction::factory()->asRecette()->create([
         'association_id' => $tenantId,
@@ -404,6 +406,38 @@ it('[PD7] lignes du tenant voisin ignorées en mode PD', function () {
 
     $result = $this->builder->compteDeResultat(2025);
     expect($result['produits'])->toBe([]);
+});
+
+// ---------------------------------------------------------------------------
+// [PD9] compteDeResultat — budget rattaché au compte en mode PD
+// ---------------------------------------------------------------------------
+
+it('[PD9] compteDeResultat — la colonne budget est rattachée au compte en mode PD', function () {
+    $tenantId = (int) TenantContext::currentId();
+
+    // Budget posé sur la sous-catégorie (clé legacy = sous_categorie_id).
+    // En mode PD, le rapport agrège par compte_id → le budget doit suivre la
+    // correspondance sous_categories.code_cerfa → comptes.numero_pcg.
+    BudgetLine::create([
+        'association_id' => $tenantId,
+        'sous_categorie_id' => (int) $this->scDepense->id,
+        'exercice' => 2025,
+        'montant_prevu' => 250.00,
+    ]);
+
+    // Une charge réelle pour que la ligne (compte 606) apparaisse dans le rapport.
+    creerDepensePD($tenantId, $this->user->id, (int) $this->compte606->id, (int) $this->scDepense->id, 150.0, '2025-10-01');
+
+    $result = $this->builder->compteDeResultat(2025);
+
+    $charges = $result['charges'];
+    expect($charges)->toHaveCount(1);
+
+    $cat = $charges[0];
+    expect((float) $cat['budget'])->toBe(250.00);
+
+    $sc = $cat['sous_categories'][0];
+    expect((float) $sc['budget'])->toBe(250.00);
 });
 
 // ---------------------------------------------------------------------------

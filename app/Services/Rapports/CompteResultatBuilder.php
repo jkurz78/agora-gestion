@@ -742,10 +742,20 @@ final class CompteResultatBuilder
     /**
      * Budget alloué par sous-catégorie pour un exercice.
      *
-     * @return array<int, float> [sous_categorie_id => montant_prevu]
+     * En mode partie double, le compte de résultat agrège les montants par
+     * compte_id (cf. fetchClasseRowsPD : sous_categorie_id = compte.id). La clé
+     * budget est donc re-mappée sur compte_id pour rester alignée avec les rows
+     * du rapport — sinon la colonne budget ne s'affiche jamais (clé legacy
+     * sous_categorie_id ≠ compte_id du rapport).
+     *
+     * @return array<int, float> [sous_categorie_id (legacy) | compte_id (PD) => montant_prevu]
      */
     private function fetchBudgetMap(int $exercice): array
     {
+        if (Config::get('compta.use_partie_double', false)) {
+            return $this->fetchBudgetMapPD($exercice);
+        }
+
         return DB::table('budget_lines')
             ->where('exercice', $exercice)
             ->when(TenantContext::hasBooted(), fn ($q) => $q->where('budget_lines.association_id', TenantContext::currentId()))
@@ -753,6 +763,38 @@ final class CompteResultatBuilder
             ->groupBy('sous_categorie_id')
             ->get()
             ->keyBy('sous_categorie_id')
+            ->map(fn ($row) => (float) $row->budget)
+            ->all();
+    }
+
+    /**
+     * Budget alloué par COMPTE pour un exercice (mode partie double).
+     *
+     * Suit la même correspondance que le backfill compte_id (Step 36) :
+     *   budget_lines.sous_categorie_id → sous_categories.code_cerfa → comptes.numero_pcg → comptes.id
+     *
+     * Plusieurs sous-catégories partageant un même code_cerfa se replient sur un
+     * seul compte → leurs budgets sont sommés (cohérent avec l'agrégation des
+     * montants par compte). Une sous-catégorie sans code_cerfa, ou dont le
+     * code_cerfa ne correspond à aucun compte, est silencieusement ignorée
+     * (pas de compte cible → pas de ligne dans le rapport PD non plus).
+     *
+     * @return array<int, float> [compte_id => montant_prevu]
+     */
+    private function fetchBudgetMapPD(int $exercice): array
+    {
+        return DB::table('budget_lines as bl')
+            ->join('sous_categories as sc', 'sc.id', '=', 'bl.sous_categorie_id')
+            ->join('comptes as cpt', function ($join): void {
+                $join->on('cpt.numero_pcg', '=', 'sc.code_cerfa')
+                    ->on('cpt.association_id', '=', 'bl.association_id');
+            })
+            ->where('bl.exercice', $exercice)
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('bl.association_id', TenantContext::currentId()))
+            ->select('cpt.id as compte_id', DB::raw('SUM(bl.montant_prevu) as budget'))
+            ->groupBy('cpt.id')
+            ->get()
+            ->keyBy('compte_id')
             ->map(fn ($row) => (float) $row->budget)
             ->all();
     }
