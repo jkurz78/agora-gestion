@@ -41,6 +41,7 @@ final class GestionDashboard extends Component
         // Dernières adhésions (cotisations)
         $cotSousCategorieIds = SousCategorie::forUsage(UsageComptable::Cotisation)->pluck('id');
         $dernieresAdhesions = Transaction::where('type', 'recette')
+            ->operationnel()
             ->forExercice($exercice)
             ->whereHas('lignes', fn ($q) => $q->whereIn('sous_categorie_id', $cotSousCategorieIds))
             ->with('tiers')
@@ -51,6 +52,7 @@ final class GestionDashboard extends Component
         // Derniers dons
         $donSousCategorieIds = SousCategorie::forUsage(UsageComptable::Don)->pluck('id');
         $derniersDons = Transaction::where('type', 'recette')
+            ->operationnel()
             ->forExercice($exercice)
             ->whereHas('lignes', fn ($q) => $q->whereIn('sous_categorie_id', $donSousCategorieIds))
             ->with('tiers')

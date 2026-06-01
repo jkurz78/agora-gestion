@@ -34,8 +34,8 @@ final class Dashboard extends Component
         $endDate = $range['end']->toDateString();
 
         // Solde général
-        $totalRecettes = (float) Transaction::where('type', 'recette')->forExercice($exercice)->sum('montant_total');
-        $totalDepenses = (float) Transaction::where('type', 'depense')->forExercice($exercice)->sum('montant_total');
+        $totalRecettes = (float) Transaction::where('type', 'recette')->operationnel()->forExercice($exercice)->sum('montant_total');
+        $totalDepenses = (float) Transaction::where('type', 'depense')->operationnel()->forExercice($exercice)->sum('montant_total');
         $soldeGeneral = $totalRecettes - $totalDepenses;
 
         // Budget résumé — agrégation par catégorie pour sous-totaux
@@ -70,14 +70,14 @@ final class Dashboard extends Component
         });
 
         // Dernières dépenses (avec tiers)
-        $dernieresDepenses = Transaction::where('type', 'depense')->forExercice($exercice)
+        $dernieresDepenses = Transaction::where('type', 'depense')->operationnel()->forExercice($exercice)
             ->with('tiers')
             ->latest('date')->latest('id')
             ->take(5)
             ->get();
 
         // Dernières recettes (avec tiers)
-        $dernieresRecettes = Transaction::where('type', 'recette')->forExercice($exercice)
+        $dernieresRecettes = Transaction::where('type', 'recette')->operationnel()->forExercice($exercice)
             ->with('tiers')
             ->latest('date')->latest('id')
             ->take(5)

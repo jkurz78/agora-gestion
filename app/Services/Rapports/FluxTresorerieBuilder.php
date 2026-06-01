@@ -60,8 +60,8 @@ final class FluxTresorerieBuilder
         $soldeOuverture = round($soldeOuverture, 2);
 
         // --- Totaux consolidés (virements s'annulent) ---
-        $totalRecettes = round((float) Transaction::where('type', 'recette')->forExercice($exercice)->sum('montant_total'), 2);
-        $totalDepenses = round((float) Transaction::where('type', 'depense')->forExercice($exercice)->sum('montant_total'), 2);
+        $totalRecettes = round((float) Transaction::where('type', 'recette')->operationnel()->forExercice($exercice)->sum('montant_total'), 2);
+        $totalDepenses = round((float) Transaction::where('type', 'depense')->operationnel()->forExercice($exercice)->sum('montant_total'), 2);
         $variation = round($totalRecettes - $totalDepenses, 2);
         $soldeTheorique = round($soldeOuverture + $variation, 2);
 

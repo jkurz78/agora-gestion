@@ -149,8 +149,8 @@ final class ClotureWizard extends Component
         $totalSoldeRapprochement = round($totalSoldeRapprochement, 2);
 
         // Total recettes / dépenses of the exercice (across all accounts)
-        $totalRecettes = (float) Transaction::where('type', 'recette')->forExercice($this->annee)->sum('montant_total');
-        $totalDepenses = (float) Transaction::where('type', 'depense')->forExercice($this->annee)->sum('montant_total');
+        $totalRecettes = (float) Transaction::where('type', 'recette')->operationnel()->forExercice($this->annee)->sum('montant_total');
+        $totalDepenses = (float) Transaction::where('type', 'depense')->operationnel()->forExercice($this->annee)->sum('montant_total');
         $resultat = round($totalRecettes - $totalDepenses, 2);
 
         // Écritures non pointées (transactions)
