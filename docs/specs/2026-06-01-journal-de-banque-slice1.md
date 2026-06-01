@@ -103,6 +103,16 @@ Aujourd'hui, `modifier()` identifie la T4 vs ses sources via `reference IS NULL`
 4. **`modifier()` découplé** : la suite remise existante reste verte ; + un cas où les sources ont `reference = null` (scénario Finding 2) prouve que l'identification de la T4 ne dépend plus de `reference`.
 5. **Suite complète** : 0 failed.
 
+## Cas connexes — HelloAsso & virements internes (investigué)
+
+- **Paiements HelloAsso (orders)** : chaque order crée une `Transaction` recette avec ventilation (ligne classe 7). → journal `vente`, visible, **non masqué**. Classés correctement par la règle de backfill (§3). Aucun traitement spécifique.
+- **Versement HelloAsso (cashout)** : `HelloAssoSyncService::processCashout` ne crée **pas** de transaction. Il crée un **`VirementInterne`** (`compte HelloAsso → compte de versement`, réf. `HA-CO-{id}`) + un rapprochement auto-verrouillé pointant les orders couverts. → hors table `transactions`.
+- **Virements internes (manuels)** : modèle autonome `VirementInterne` (`compte_source_id` / `compte_destination_id`, pointé dans **deux** rapprochements). Aucune `transaction_ligne` générée → **absent du ledger partie double**.
+
+**Conséquence Slice 1** : virements (manuels + cashouts HelloAsso) sont des `VirementInterne`, **pas des transactions** → ni colonne `journal`, ni masquage, ni backfill ne les concernent. Aucun impact sur le périmètre.
+
+**Dette structurelle à acter pour la Slice 3** : un virement interne `512 → 512` *devrait* être une écriture du journal de banque en partie double. Aujourd'hui il vit dans un modèle parallèle (`VirementInterne` + rapprochement), hors ledger PD (le compte de résultat n'en souffre pas — purement bilanciel). Le jour où le journal de banque devient la source de vérité, il faudra **convertir les `VirementInterne` en écritures du journal de banque**. → Slice 3.
+
 ## Hors périmètre (rappel)
 
 - Numérotation des journaux (Slice 2).
