@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Compta;
 
+use App\Enums\JournalComptable;
 use App\Enums\ModePaiement;
 use App\Enums\TypeTransaction;
 use App\Exceptions\Compta\CompteIncorrectException;
@@ -876,6 +877,7 @@ final class EcritureGenerator
                 libelle: $libelleEffectif,
                 montant: $montant,
                 modePaiement: $mode,
+                journal: JournalComptable::Banque,
             );
 
             // Ligne 1 : débit portage (5112 / 530 / 512X) SANS tiers — FEC-conformité
@@ -1272,6 +1274,7 @@ final class EcritureGenerator
         float $montant,
         ?ModePaiement $modePaiement,
         string $typeEcriture = 'normale',
+        ?JournalComptable $journal = null,
     ): Transaction {
         return Transaction::create([
             'association_id' => (int) TenantContext::currentId(),
@@ -1283,6 +1286,7 @@ final class EcritureGenerator
             'saisi_par' => Auth::id(),
             'equilibree' => true,
             'type_ecriture' => $typeEcriture,
+            'journal' => $journal,
         ]);
     }
 
@@ -1430,6 +1434,7 @@ final class EcritureGenerator
                 libelle: $libelle,
                 montant: $total,
                 modePaiement: $mode,
+                journal: JournalComptable::Banque,
             );
 
             // --- Ligne 512X D total, SANS tiers ---
