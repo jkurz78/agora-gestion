@@ -143,11 +143,16 @@ final class RemiseBancaireService
         }
 
         DB::transaction(function () use ($remise, $transactionIds): void {
-            // Exclude T4 (which has reference=null) from the transactions to remove.
-            // After comptabiliser(), all T1 sources have a non-null reference, only T4 has null.
+            // Identifier la T4 par critère structurel (ligne 512X au débit), avant toute
+            // suppression. Indépendant de `reference` : des chèques remisés réels en prod
+            // ont reference = NULL sur les sources (Finding 2, cutover 2026-05-31).
+            $t4Id = $this->queryT4($remise)->value('id');
+
+            // (a) Sources à retirer : toutes les tx de la remise hors périmètre gardé,
+            // en excluant la T4 par son id structurel (et non par reference IS NULL).
             $aRetirer = Transaction::where('remise_id', $remise->id)
                 ->whereNotIn('id', $transactionIds)
-                ->whereNotNull('reference')
+                ->when($t4Id !== null, fn ($q) => $q->where('id', '!=', $t4Id))
                 ->get();
 
             foreach ($aRetirer as $tx) {
@@ -166,16 +171,21 @@ final class RemiseBancaireService
 
             $prefix = $remise->referencePrefix();
             $numeroPadded = str_pad((string) $remise->numero, 5, '0', STR_PAD_LEFT);
-            // Fix Important-1 : exclure la T4 (reference IS NULL) du count pour éviter
-            // un décalage d'index. Les T1 sources ont toutes une reference non-null après
-            // comptabiliser() ; la T4 a reference = null et sera supprimée par
-            // supprimerT4SiExiste() ligne ~170.
-            $index = Transaction::where('remise_id', $remise->id)->whereNotNull('reference')->count();
+            // (b) Compter les sources déjà référencées pour calculer le prochain index,
+            // en excluant la T4 par son id structurel (et non par reference IS NULL).
+            $index = Transaction::where('remise_id', $remise->id)
+                ->when($t4Id !== null, fn ($q) => $q->where('id', '!=', $t4Id))
+                ->count();
 
             // Précharger le compte 411 une seule fois pour éviter N+1
             $compte411 = Compte::ofNumero('411');
 
-            foreach (Transaction::whereIn('id', $transactionIds)->whereNull('reference')->get() as $tx) {
+            // (c) Nouvelles sources à référencer : tx sans reference dans le périmètre gardé,
+            // en excluant la T4 par son id structurel (défense en profondeur).
+            foreach (Transaction::whereIn('id', $transactionIds)
+                ->when($t4Id !== null, fn ($q) => $q->where('id', '!=', $t4Id))
+                ->whereNull('reference')
+                ->get() as $tx) {
                 $index++;
                 $tx->update([
                     'remise_id' => $remise->id,
