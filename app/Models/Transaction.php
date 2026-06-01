@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\JournalComptable;
 use App\Enums\ModePaiement;
 use App\Enums\StatutFacture;
 use App\Enums\StatutReglement;
@@ -50,6 +51,8 @@ final class Transaction extends TenantModel
         // Partie double — ajoutés Step 15
         'equilibree',
         'type_ecriture',
+        // Journal de banque — ajouté Task 3
+        'journal',
     ];
 
     protected function casts(): array
@@ -72,7 +75,38 @@ final class Transaction extends TenantModel
             'extournee_at' => 'datetime',
             // Partie double — ajoutés Step 15
             'equilibree' => 'boolean',
+            // Journal de banque — ajouté Task 3
+            'journal' => JournalComptable::class,
         ];
+    }
+
+    protected static function booted(): void
+    {
+        parent::booted();
+
+        self::creating(function (Transaction $transaction): void {
+            if ($transaction->journal !== null) {
+                return;
+            }
+            $transaction->journal = $transaction->type === TypeTransaction::Recette
+                ? JournalComptable::Vente
+                : JournalComptable::Achat;
+        });
+    }
+
+    /**
+     * Restreint aux écritures opérationnelles (ventes/achats), excluant le
+     * journal de banque (T2/T4) et OD. Utilisé par les listes et agrégats
+     * recettes/dépenses.
+     *
+     * @param  Builder<Transaction>  $query
+     */
+    public function scopeOperationnel(Builder $query): Builder
+    {
+        return $query->whereIn('journal', [
+            JournalComptable::Vente->value,
+            JournalComptable::Achat->value,
+        ]);
     }
 
     public function tiers(): BelongsTo
