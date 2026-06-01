@@ -124,6 +124,19 @@ it('[BF3] recette avec uniquement des lignes classe 5 → journal=banque', funct
     expect($journal)->toBe(JournalComptable::Banque->value);
 });
 
+it('[BF-fallback] transaction sans aucune ligne → journal=banque (passe 2)', function () {
+    // Transaction sans transaction_lignes — simule un enregistrement orphelin ou en cours de création
+    $tx = Transaction::factory()->asRecette()->create();
+    // Pas de lignes créées
+
+    forceJournalNull($tx);
+
+    JournalBackfiller::run();
+
+    $journal = DB::table('transactions')->where('id', $tx->id)->value('journal');
+    expect($journal)->toBe(JournalComptable::Banque->value, 'Sans lignes, la passe 2 doit attribuer journal=banque');
+});
+
 it('[BF4] idempotence — deuxième appel ne modifie pas les journaux déjà renseignés', function () {
     $compte7 = compteClasseJournalBf(7, 'd');
     $compte6 = compteClasseJournalBf(6, 'd');

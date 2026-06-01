@@ -1147,6 +1147,7 @@ final class EcritureGenerator
                 libelle: $libelleEffectif,
                 montant: $montant,
                 modePaiement: $mode,
+                journal: JournalComptable::Banque,
             );
 
             // Ligne 1 : débit 401 (tiers — soldage de la dette)

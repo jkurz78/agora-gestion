@@ -178,8 +178,50 @@ it('T1 (recette à crédit) reçoit journal=vente et T2 (encaissement créance) 
 });
 
 // ---------------------------------------------------------------------------
-// Test 2 : T4 (remise bancaire) → journal=banque
+// Test 2b : T2 (règlement fournisseur) → journal=banque
 // ---------------------------------------------------------------------------
+
+/** Crée une dette fournisseur T1 via pourDepenseACredit. Retourne la transaction T1. */
+function creerDetteJrn(float $montant = 200.00): Transaction
+{
+    $generator = app(EcritureGenerator::class);
+    $tiers = tiersJrn();
+    $compteCharge = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '607jrn'.uniqid(),
+        'intitule' => 'Achats journal test',
+        'classe' => 6,
+        'lettrable' => false,
+        'actif' => true,
+        'est_systeme' => false,
+        'pour_inscriptions' => false,
+    ]);
+
+    return $generator->pourDepenseACredit(
+        tiers: $tiers,
+        ventilations: [['compte' => $compteCharge, 'montant' => $montant]],
+        dateConstatation: new DateTimeImmutable('2026-05-20'),
+        libelle: 'Facture fournisseur journal test',
+    );
+}
+
+it('T2 (règlement fournisseur) reçoit journal=banque', function () {
+    $t1 = creerDetteJrn(200.00);
+
+    $compteTresorerie = compte512Jrn('JRNRF');
+
+    $generator = app(EcritureGenerator::class);
+
+    $t2 = $generator->pourReglementFournisseur(
+        transactionDette: $t1,
+        mode: ModePaiement::Virement,
+        compteTresorerie: $compteTresorerie,
+        datePaiement: new DateTimeImmutable('2026-05-28'),
+        libelle: 'Règlement fournisseur journal test',
+    );
+
+    expect($t2->fresh()->journal)->toBe(JournalComptable::Banque, 'T2 (règlement fournisseur) doit avoir journal=banque');
+});
 
 it('T4 (remise bancaire) reçoit journal=banque', function () {
     [$compteBancaire, $compte512] = creerCompteBancaireJrn();

@@ -95,7 +95,7 @@ final class FluxTresorerieBuilder
         $yearExpr = $isSqlite ? "CAST(strftime('%Y', date) AS INTEGER)" : 'YEAR(date)';
         $monthExpr = $isSqlite ? "CAST(strftime('%m', date) AS INTEGER)" : 'MONTH(date)';
 
-        $mensuelRows = Transaction::forExercice($exercice)
+        $mensuelRows = Transaction::forExercice($exercice)->operationnel()
             ->selectRaw("
                 {$yearExpr} as annee, {$monthExpr} as mois_num,
                 SUM(CASE WHEN type = 'recette' THEN montant_total ELSE 0 END) as recettes,
