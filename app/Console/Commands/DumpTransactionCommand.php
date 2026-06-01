@@ -57,6 +57,7 @@ final class DumpTransactionCommand extends Command
             'lignes.compte',
             'lignes.sousCategorie',
             'lignes.tiers',
+            'lignes.operation',
             'tiers',
             'compte',
             'factures',
@@ -177,7 +178,7 @@ final class DumpTransactionCommand extends Command
         $rows = [];
         foreach ($lignes as $ligne) {
             $pcg = $ligne->compte?->numero_pcg ?? '-';
-            $intitule = mb_strimwidth($ligne->compte?->intitule ?? '-', 0, 18, '…');
+            $intitule = mb_strimwidth($ligne->compte?->intitule ?? '-', 0, 16, '…');
             $debit = $ligne->debit !== null && (float) $ligne->debit > 0
                 ? number_format((float) $ligne->debit, 2)
                 : '';
@@ -187,6 +188,13 @@ final class DumpTransactionCommand extends Command
             $sousCat = $ligne->sousCategorie
                 ? mb_strimwidth($ligne->sousCategorie->nom, 0, 12, '…').' (#'.(int) $ligne->sous_categorie_id.')'
                 : '-';
+            $tiers = $ligne->tiers
+                ? mb_strimwidth($ligne->tiers->displayName(), 0, 14, '…').' (#'.(int) $ligne->tiers_id.')'
+                : '-';
+            $operation = $ligne->operation
+                ? mb_strimwidth($ligne->operation->nom, 0, 12, '…').' (#'.(int) $ligne->operation_id.')'
+                : '-';
+            $seance = $ligne->seance !== null ? (string) (int) $ligne->seance : '-';
             $lettrage = $ligne->lettrage_code
                 ? mb_strimwidth($ligne->lettrage_code, 0, 12, '…')
                 : '-';
@@ -201,6 +209,9 @@ final class DumpTransactionCommand extends Command
                 $debit,
                 $credit,
                 $sousCat,
+                $tiers,
+                $operation,
+                $seance,
                 $lettrage,
             ];
         }
@@ -214,10 +225,13 @@ final class DumpTransactionCommand extends Command
             number_format($totalCredit, 2),
             '',
             '',
+            '',
+            '',
+            '',
         ];
 
         $this->table(
-            ['Ligne', 'PCG', 'Intitulé', 'Débit', 'Crédit', 'Sous-cat', 'Lettrage'],
+            ['Ligne', 'PCG', 'Intitulé', 'Débit', 'Crédit', 'Sous-cat', 'Tiers', 'Opération', 'Séance', 'Lettrage'],
             $rows
         );
 
