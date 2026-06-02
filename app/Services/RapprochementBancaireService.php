@@ -11,11 +11,10 @@ use App\Enums\StatutReglement;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
+use App\Models\RemiseBancaire;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\VirementInterne;
-use App\Services\Compta\EcritureGenerator;
-use App\Services\Compta\LettrageService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
@@ -547,13 +546,13 @@ final class RapprochementBancaireService
     }
 
     /**
-     * Cherche un dépôt généré au pointage pour ce chèque loose.
-     * Retourne la Transaction de dépôt (journal=banque, remise_id=null) si elle existe.
+     * Cherche le T4 généré au pointage pour ce chèque loose (remise auto_generee).
+     * Retourne la Transaction T4 (journal=banque, remise_id → remise auto) si elle existe.
      */
     private function trouverDepotChequeLoose(Transaction $cheque): ?Transaction
     {
         // La ligne portage (sur le chèque si lumpé, sinon sur la T2) est lettrée avec la
-        // ligne portage crédit du dépôt.
+        // ligne portage crédit du T4.
         $lignePortage = $this->lignePortageEncaissement($cheque, lettree: true);
         if ($lignePortage === null) {
             return null;
@@ -567,12 +566,14 @@ final class RapprochementBancaireService
         }
         $tx = Transaction::find($autre->transaction_id);
 
-        return ($tx !== null && $tx->journal === JournalComptable::Banque && $tx->remise_id === null) ? $tx : null;
+        // Le T4 est en journal=banque. On ne filtre plus sur remise_id === null :
+        // le T4 porte maintenant remise_id → la remise auto_generee.
+        return ($tx !== null && $tx->journal === JournalComptable::Banque) ? $tx : null;
     }
 
     /**
-     * Génère un dépôt 512X/5112 (ou 530) pour un chèque/espèces pointé sans remise formelle.
-     * Idempotent : ne crée rien si un dépôt existe déjà.
+     * Génère une RemiseBancaire auto_generee + son T4 propre pour un chèque/espèces
+     * pointé sans remise formelle. Idempotent : ne crée rien si un T4 existe déjà.
      */
     private function genererDepotChequeLoose(Transaction $cheque, RapprochementBancaire $rappro): void
     {
@@ -582,39 +583,27 @@ final class RapprochementBancaireService
         if ($this->trouverDepotChequeLoose($cheque) !== null) {
             return; // idempotence
         }
-        $compte512X = $this->resoudreCompte512X($cheque->compte);
-        if ($compte512X === null) {
-            return;
-        }
-        // Ligne portage non lettrée : sur le chèque (lumpé) ou sur la T2 séparée
-        $lignePortage = $this->lignePortageEncaissement($cheque, lettree: false);
-        if ($lignePortage === null) {
-            return; // pas encaissé / rien à déposer
-        }
-        $depot = app(EcritureGenerator::class)->pourDepotRapprochement(
-            ligne5112Source: $lignePortage,
-            compteCible512: $compte512X,
-            mode: $cheque->mode_paiement,
-            date: $cheque->date instanceof \DateTimeInterface ? $cheque->date : new \DateTimeImmutable((string) $cheque->date),
-            libelle: 'Dépôt au rapprochement — '.$cheque->libelle,
-        );
-        $depot->update(['rapprochement_id' => $rappro->id]);
+        // Déléguer entièrement à RemiseBancaireService (encaissement + T4 + rapprochement_id)
+        app(RemiseBancaireService::class)->remettreAutoPourRapprochement($cheque, $rappro);
     }
 
     /**
-     * Supprime le dépôt généré au pointage (Bug 4b) pour ce chèque.
+     * Supprime le dépôt (T4 via remise auto_generee) généré au pointage pour ce chèque.
      * La T2 (encaissement) subsiste après dépointage.
      */
     private function supprimerDepotChequeLoose(Transaction $cheque): void
     {
-        $depot = $this->trouverDepotChequeLoose($cheque);
-        if ($depot === null) {
+        $t4 = $this->trouverDepotChequeLoose($cheque);
+        if ($t4 === null) {
             return;
         }
-        foreach (TransactionLigne::where('transaction_id', $depot->id)->whereNotNull('lettrage_code')->get() as $ligne) {
-            app(LettrageService::class)->delettrerParLigne($ligne->fresh(), "Dépointage rapprochement — délettrage dépôt #{$depot->id}");
+        $remise = $t4->remise_id !== null
+            ? RemiseBancaire::find($t4->remise_id)
+            : null;
+
+        if ($remise !== null && $remise->auto_generee) {
+            // Délettrage + suppression T4 + suppression remise via RemiseBancaireService::supprimer
+            app(RemiseBancaireService::class)->supprimerAutoRemise($remise);
         }
-        TransactionLigne::where('transaction_id', $depot->id)->forceDelete();
-        $depot->forceDelete();
     }
 }
