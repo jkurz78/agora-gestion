@@ -640,8 +640,11 @@
                                         wire:click="marquerRecu({{ $tx->id }})"
                                         class="btn btn-sm btn-outline-success"
                                         style="padding:.15rem .3rem;font-size:.7rem"
-                                        title="{{ $tx->source_type === 'depense' ? 'Marquer comme payé' : 'Marquer comme reçu' }}">
+                                        title="{{ $tx->source_type === 'depense' ? 'Marquer comme payé' : ($tx->mode_paiement === null ? 'Enregistrer l\'encaissement (choisir le mode)' : 'Marquer comme reçu') }}">
                                     <i class="bi bi-check-lg"></i>
+                                    @if($tx->source_type === 'recette' && $tx->mode_paiement === null)
+                                        <i class="bi bi-credit-card ms-1" style="font-size:.65rem" title="Créance — mode à saisir"></i>
+                                    @endif
                                 </button>
                             @endif
                             @if (! $exerciceCloture)
@@ -745,4 +748,51 @@
 
     {{-- Modale d'annulation de transaction (Slice 1 — extourne) --}}
     <livewire:extournes.annuler-transaction-modal />
+
+    {{-- Modale « Marquer reçu » — capture du mode pour les créances (mode_paiement null) --}}
+    <div class="modal fade" id="marquerRecuModal" tabindex="-1"
+         wire:ignore.self
+         x-data
+         x-on:marquer-recu-modal-open.window="bootstrap.Modal.getOrCreateInstance($el).show()"
+         x-on:marquer-recu-modal-close.window="bootstrap.Modal.getOrCreateInstance($el).hide()">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title"><i class="bi bi-check-lg me-1"></i>Enregistrer l'encaissement</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    @error('recuMode')
+                        <div class="alert alert-danger py-1 px-2 small mb-2">{{ $message }}</div>
+                    @enderror
+                    <div class="mb-3">
+                        <label class="form-label small mb-1 fw-semibold">Mode de paiement <span class="text-danger">*</span></label>
+                        <select wire:model="recuMode" class="form-select form-select-sm @error('recuMode') is-invalid @enderror">
+                            <option value="">— Sélectionner —</option>
+                            @foreach($modesPaiement as $mode)
+                                <option value="{{ $mode->value }}">{{ ucfirst($mode->value) }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="mb-1">
+                        <label class="form-label small mb-1">Compte bancaire <span class="text-muted">(optionnel)</span></label>
+                        <select wire:model="recuCompteId" class="form-select form-select-sm">
+                            <option value="">— Conserver le compte actuel —</option>
+                            @foreach($comptesBancaires as $cb)
+                                <option value="{{ $cb->id }}">{{ $cb->nom }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button wire:click="confirmerRecu" class="btn btn-sm btn-success"
+                            wire:loading.attr="disabled">
+                        <span wire:loading.remove wire:target="confirmerRecu"><i class="bi bi-check-lg me-1"></i>Confirmer</span>
+                        <span wire:loading wire:target="confirmerRecu"><i class="bi bi-hourglass-split"></i> Enregistrement...</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>

@@ -130,12 +130,16 @@ final class ReglementOperationService
      * Pattern Step 24 (FactureService::encaisserPartieDouble) reproduit ici.
      *
      * Gardes skip silencieux (best-effort — la mise à jour statut_reglement est préservée) :
-     * — mode_paiement null sur T1
+     * — mode_paiement null sur T1 et $mode null → skip T2 (encaisserSiNonEncaisse)
      * — mode nécessitant 512X et compte 512X introuvable (IBAN non matché)
      * — T1 ne porte pas de ligne 411 (transaction legacy sans double écriture)
      * — ligne 411 de T1 déjà lettrée (idempotence — voir encaisserSiNonEncaisse)
+     *
+     * @param  ModePaiement|null  $mode  Mode d'encaissement fourni pour une créance (mode_paiement null).
+     *                                   Si null, comportement rétro-compatible inchangé.
+     * @param  int|null  $compteId  Compte bancaire cible optionnel (remplace compte_id si fourni).
      */
-    public function marquerRecu(Transaction $transaction): void
+    public function marquerRecu(Transaction $transaction, ?ModePaiement $mode = null, ?int $compteId = null): void
     {
         if ($transaction->statut_reglement !== StatutReglement::EnAttente) {
             return;
@@ -148,9 +152,20 @@ final class ReglementOperationService
         // Preload Compte 411 hors transaction (N+1 fix — Vague 3b Item C)
         $compte411 = Compte::ofNumero('411');
 
-        DB::transaction(function () use ($transaction, $compte411): void {
-            // 1. Toggle statut (legacy — préservé dans tous les cas)
-            $transaction->update(['statut_reglement' => StatutReglement::Recu->value]);
+        DB::transaction(function () use ($transaction, $compte411, $mode, $compteId): void {
+            // 1. Si la transaction est une créance (mode_paiement null) et qu'un mode est fourni,
+            //    on le pose maintenant (avant encaisserSiNonEncaisse qui en a besoin).
+            $updateData = ['statut_reglement' => StatutReglement::Recu->value];
+            if ($transaction->mode_paiement === null && $mode !== null) {
+                $updateData['mode_paiement'] = $mode->value;
+                if ($compteId !== null) {
+                    $updateData['compte_id'] = $compteId;
+                }
+            }
+
+            $transaction->update($updateData);
+            // Rafraîchir pour que encaisserSiNonEncaisse lise le nouveau mode_paiement
+            $transaction->refresh();
 
             // 2. Partie double : génère T2 si T1 porte une ligne 411 valide et non lettrée
             $this->encaisserSiNonEncaisse($transaction, $compte411);

@@ -82,6 +82,13 @@ final class TransactionUniverselle extends Component
 
     public string $sortDirection = 'desc';
 
+    // === Modale « Marquer reçu » pour créances (mode_paiement null) ===
+    public ?int $recuTxId = null;
+
+    public string $recuMode = '';
+
+    public ?int $recuCompteId = null;
+
     public function mount(
         ?int $compteId = null,
         ?int $tiersId = null,
@@ -331,6 +338,12 @@ final class TransactionUniverselle extends Component
         app(VirementInterneService::class)->delete($v);
     }
 
+    /**
+     * Point d'entrée du bouton « Marquer reçu ».
+     *
+     * — Si la transaction a déjà un mode_paiement (recette directe) : comportement actuel, un clic suffit.
+     * — Si mode_paiement est null (créance) : ouvre la modale de capture du mode.
+     */
     public function marquerRecu(int $id): void
     {
         $tx = Transaction::find($id);
@@ -340,8 +353,61 @@ final class TransactionUniverselle extends Component
         if ($tx->isLockedByRapprochement() || $tx->isLockedByFacture()) {
             return;
         }
-        // Délègue au service métier : toggle statut + génère T2 partie double (Bug B fix)
+
+        if ($tx->mode_paiement === null) {
+            // Créance : demander le mode via modale
+            $this->recuTxId = (int) $tx->id;
+            $this->recuMode = '';
+            $this->recuCompteId = null;
+            $this->dispatch('marquer-recu-modal-open');
+
+            return;
+        }
+
+        // Recette avec mode connu : comportement direct
         app(ReglementOperationService::class)->marquerRecu($tx);
+    }
+
+    /**
+     * Confirmation depuis la modale : valide le mode et appelle le service.
+     */
+    public function confirmerRecu(): void
+    {
+        $this->validate([
+            'recuMode' => 'required|in:cheque,especes,virement,cb,prelevement',
+        ], [
+            'recuMode.required' => 'Le mode de paiement est obligatoire.',
+            'recuMode.in' => 'Mode de paiement invalide.',
+        ]);
+
+        if ($this->recuTxId === null) {
+            return;
+        }
+
+        $tx = Transaction::find($this->recuTxId);
+        if (! $tx || $tx->statut_reglement !== StatutReglement::EnAttente) {
+            $this->dispatch('marquer-recu-modal-close');
+            $this->recuTxId = null;
+
+            return;
+        }
+        if ($tx->isLockedByRapprochement() || $tx->isLockedByFacture()) {
+            $this->dispatch('marquer-recu-modal-close');
+            $this->recuTxId = null;
+
+            return;
+        }
+
+        app(ReglementOperationService::class)->marquerRecu(
+            $tx,
+            ModePaiement::from($this->recuMode),
+            $this->recuCompteId !== null ? (int) $this->recuCompteId : null,
+        );
+
+        $this->dispatch('marquer-recu-modal-close');
+        $this->recuTxId = null;
+        $this->recuMode = '';
+        $this->recuCompteId = null;
     }
 
     // Écouter les événements des modaux pour rafraîchir la liste
@@ -429,11 +495,14 @@ final class TransactionUniverselle extends Component
                 });
         }
 
+        $comptesBancaires = CompteBancaire::orderBy('nom')->get();
+
         return view('livewire.transaction-universelle', [
             'rows' => $rows,
             'paginator' => $result['paginator'],
             'showSolde' => $showSolde,
-            'comptes' => $this->compteId === null ? CompteBancaire::orderBy('nom')->get() : collect(),
+            'comptes' => $this->compteId === null ? $comptesBancaires : collect(),
+            'comptesBancaires' => $comptesBancaires, // pour la modale marquer reçu (toujours disponible)
             'modesPaiement' => ModePaiement::cases(),
             'availableTypes' => $this->lockedTypes ?? ['depense', 'recette', 'virement'],
             'sousCategorieFilter' => $this->sousCategorieFilter,
