@@ -42,7 +42,7 @@ it('pointer un chèque loose (créance T2 séparée) crée une remise auto_gener
     expect(RemiseBancaire::where('auto_generee', true)->count())->toBe(1);
     $remise = RemiseBancaire::where('auto_generee', true)->first();
     expect($remise)->not->toBeNull();
-    expect($remise->numero)->toBeNull();
+    expect($remise->numero)->not->toBeNull(); // auto-remise numérotée (séquence manuelle)
     expect($remise->comptabilisee_at)->not->toBeNull();
 
     // Le T4 doit exister : journal=banque, remise_id = la remise auto, rapprochement_id = le rappro
@@ -106,7 +106,7 @@ it('pointer un chèque COMPTANT loose (lumpé) crée une remise auto_generee ave
     // Une RemiseBancaire auto_generee=true
     expect(RemiseBancaire::where('auto_generee', true)->count())->toBe(1);
     $remise = RemiseBancaire::where('auto_generee', true)->first();
-    expect($remise->numero)->toBeNull();
+    expect($remise->numero)->not->toBeNull(); // auto-remise numérotée (séquence manuelle)
     expect($remise->comptabilisee_at)->not->toBeNull();
 
     // T4 existe avec rapprochement_id posé

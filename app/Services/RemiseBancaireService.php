@@ -366,9 +366,14 @@ final class RemiseBancaireService
         }
 
         DB::transaction(function () use ($cheque, $compte, $rappro): void {
+            // Numéro dans la même séquence que les remises manuelles (auto-remise visible/numérotée).
+            // withTrashed() : un numéro de remise auto dépointée (soft-deletée) n'est pas réutilisé
+            // → trou de numéro assumé (rare ; toggle de masquage possible plus tard).
+            $numero = (int) RemiseBancaire::withTrashed()->max('numero') + 1;
+
             $remise = RemiseBancaire::create([
                 'association_id' => (int) TenantContext::currentId(),
-                'numero' => null,
+                'numero' => $numero,
                 'auto_generee' => true,
                 'date' => $cheque->date instanceof \DateTimeInterface
                     ? $cheque->date->format('Y-m-d')

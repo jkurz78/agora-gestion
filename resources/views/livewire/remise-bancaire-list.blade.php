@@ -92,6 +92,12 @@
                                 <a href="{{ route('banques.remises.show', $remise) }}" class="text-decoration-none">
                                     {{ $remise->libelle }}
                                 </a>
+                                @if ($remise->auto_generee)
+                                    <span class="badge bg-info text-dark" style="font-size:.65rem"
+                                          title="Remise générée automatiquement au pointage d'un chèque au rapprochement bancaire">
+                                        <i class="bi bi-magic"></i> Auto
+                                    </span>
+                                @endif
                             </td>
                             <td class="small text-nowrap">{{ $remise->date->format('d/m/Y') }}</td>
                             <td class="small">{{ $remise->mode_paiement->label() }}</td>
