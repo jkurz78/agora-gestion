@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\JournalComptable;
+use App\Enums\ModePaiement;
 use App\Enums\StatutRapprochement;
 use App\Enums\StatutReglement;
 use App\Models\Compte;
@@ -12,6 +14,8 @@ use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\VirementInterne;
+use App\Services\Compta\EcritureGenerator;
+use App\Services\Compta\LettrageService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
@@ -267,6 +271,11 @@ final class RapprochementBancaireService
                     $t2->rapprochement_id = null;
                     $t2->save();
                 }
+
+                // Bug 4b : retirer le dépôt généré au pointage (la T2 subsiste)
+                if (config('compta.use_partie_double') && $model->remise_id === null) {
+                    $this->supprimerDepotChequeLoose($model->fresh());
+                }
             } else {
                 // Pointage : générer T2 si en_attente (Fix D — idempotent)
                 if (config('compta.use_partie_double')) {
@@ -286,6 +295,11 @@ final class RapprochementBancaireService
                         $t2->rapprochement_id = $rapprochement->id;
                         $t2->save();
                     }
+                }
+
+                // Bug 4b : chèque/espèces loose en attente → fabriquer le dépôt 512X manquant
+                if (config('compta.use_partie_double') && $model->remise_id === null) {
+                    $this->genererDepotChequeLoose($model->fresh(), $rapprochement);
                 }
             }
         });
@@ -487,5 +501,100 @@ final class RapprochementBancaireService
         return Compte::where('compte_bancaire_id', $compteBancaire->id)
             ->bancaires()
             ->first();
+    }
+
+    // =========================================================================
+    // Helpers Bug 4b — dépôt au pointage d'un chèque/espèces loose
+    // =========================================================================
+
+    private function modeNecessiteDepot(?ModePaiement $mode): bool
+    {
+        return $mode === ModePaiement::Cheque || $mode === ModePaiement::Especes;
+    }
+
+    /**
+     * Cherche un dépôt généré au pointage pour ce chèque loose.
+     * Retourne la Transaction de dépôt (journal=banque, remise_id=null) si elle existe.
+     */
+    private function trouverDepotChequeLoose(Transaction $cheque): ?Transaction
+    {
+        $t2 = $this->reglementService->trouverEncaissementT2($cheque);
+        if ($t2 === null) {
+            return null;
+        }
+        // Chercher une ligne portage (5112/530) lettrée dans T2
+        $lignePortage = TransactionLigne::where('transaction_id', $t2->id)
+            ->whereNotNull('lettrage_code')
+            ->whereHas('compte', fn (Builder $c) => $c->where(fn (Builder $cc) => $cc->where('numero_pcg', '5112')->orWhere('numero_pcg', '530')))
+            ->first();
+        if ($lignePortage === null) {
+            return null;
+        }
+        // Trouver la ligne partenaire dans le lettrage (dans une autre transaction)
+        $autre = TransactionLigne::where('lettrage_code', $lignePortage->lettrage_code)
+            ->where('transaction_id', '!=', $t2->id)
+            ->first();
+        if ($autre === null) {
+            return null;
+        }
+        $tx = Transaction::find($autre->transaction_id);
+
+        return ($tx !== null && $tx->journal === JournalComptable::Banque && $tx->remise_id === null) ? $tx : null;
+    }
+
+    /**
+     * Génère un dépôt 512X/5112 (ou 530) pour un chèque/espèces pointé sans remise formelle.
+     * Idempotent : ne crée rien si un dépôt existe déjà.
+     */
+    private function genererDepotChequeLoose(Transaction $cheque, RapprochementBancaire $rappro): void
+    {
+        if (! $this->modeNecessiteDepot($cheque->mode_paiement)) {
+            return; // virement/CB : T2 porte déjà le 512X
+        }
+        if ($this->trouverDepotChequeLoose($cheque) !== null) {
+            return; // idempotence
+        }
+        $compte512X = $this->resoudreCompte512X($cheque->compte);
+        if ($compte512X === null) {
+            return;
+        }
+        $t2 = $this->reglementService->trouverEncaissementT2($cheque);
+        if ($t2 === null) {
+            return;
+        }
+        // Trouver la ligne portage (5112/530) non encore lettrée au débit dans T2
+        $lignePortage = TransactionLigne::where('transaction_id', $t2->id)
+            ->whereNull('lettrage_code')
+            ->where('debit', '>', 0)
+            ->whereHas('compte', fn (Builder $c) => $c->where(fn (Builder $cc) => $cc->where('numero_pcg', '5112')->orWhere('numero_pcg', '530')))
+            ->first();
+        if ($lignePortage === null) {
+            return;
+        }
+        $depot = app(EcritureGenerator::class)->pourDepotRapprochement(
+            ligne5112Source: $lignePortage,
+            compteCible512: $compte512X,
+            mode: $cheque->mode_paiement,
+            date: $cheque->date instanceof \DateTimeInterface ? $cheque->date : new \DateTimeImmutable((string) $cheque->date),
+            libelle: 'Dépôt au rapprochement — '.$cheque->libelle,
+        );
+        $depot->update(['rapprochement_id' => $rappro->id]);
+    }
+
+    /**
+     * Supprime le dépôt généré au pointage (Bug 4b) pour ce chèque.
+     * La T2 (encaissement) subsiste après dépointage.
+     */
+    private function supprimerDepotChequeLoose(Transaction $cheque): void
+    {
+        $depot = $this->trouverDepotChequeLoose($cheque);
+        if ($depot === null) {
+            return;
+        }
+        foreach (TransactionLigne::where('transaction_id', $depot->id)->whereNotNull('lettrage_code')->get() as $ligne) {
+            app(LettrageService::class)->delettrerParLigne($ligne->fresh(), "Dépointage rapprochement — délettrage dépôt #{$depot->id}");
+        }
+        TransactionLigne::where('transaction_id', $depot->id)->forceDelete();
+        $depot->forceDelete();
     }
 }

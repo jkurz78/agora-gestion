@@ -37,3 +37,40 @@ it('pourDepotRapprochement crée un dépôt 512X/5112 lettré pour une ligne 511
     expect((float) $ligne512Depot->debit)->toBe(80.00);
     expect($ligne5112->fresh()->lettrage_code)->not->toBeNull();
 });
+
+it('pointer un chèque loose en attente génère un dépôt et meut le solde ; dépointer le supprime', function () {
+    config(['compta.use_partie_double' => true]);
+    [$compteBancaire, $compte512] = creerCompteBancaireJrn();
+
+    $t1 = creerCreanceJrn(80.00);
+    $t1->update(['compte_id' => $compteBancaire->id, 'mode_paiement' => ModePaiement::Cheque->value]);
+
+    $rappro = App\Models\RapprochementBancaire::create([
+        'association_id' => App\Tenant\TenantContext::currentId(),
+        'compte_id' => $compteBancaire->id, 'date_fin' => '2026-05-31',
+        'solde_ouverture' => 0.0, 'solde_fin' => 80.0,
+        'statut' => App\Enums\StatutRapprochement::EnCours->value, 'saisi_par' => userIdJrn(),
+    ]);
+    $service = app(App\Services\RapprochementBancaireService::class);
+
+    // Pointage → dépôt généré, solde = 80
+    $service->toggleTransaction($rappro->fresh(), 'recette', (int) $t1->id);
+    expect($service->calculerSoldePointage($rappro->fresh()))->toBe(80.0);
+    // Le dépôt 4b est la transaction journal=banque, remise=null, rapprochement!=null
+    // qui possède une ligne 512X (bancaire physique) au débit
+    $depotCount = Transaction::where('journal', 'banque')->whereNull('remise_id')
+        ->whereNotNull('rapprochement_id')
+        ->whereHas('lignes', fn ($q) => $q->where('debit', '>', 0)->whereHas('compte', fn ($c) => $c->bancaires()))
+        ->count();
+    expect($depotCount)->toBe(1);
+
+    // Dépointage → dépôt supprimé, solde = 0, T2 (encaissement) subsiste
+    $service->toggleTransaction($rappro->fresh(), 'recette', (int) $t1->id);
+    expect($service->calculerSoldePointage($rappro->fresh()))->toBe(0.0);
+    $depotCountApres = Transaction::where('journal', 'banque')->whereNull('remise_id')
+        ->whereHas('lignes', fn ($q) => $q->where('debit', '>', 0)->whereHas('compte', fn ($c) => $c->bancaires()))
+        ->count();
+    expect($depotCountApres)->toBe(0);
+    $t2 = app(App\Services\ReglementOperationService::class)->trouverEncaissementT2($t1->fresh());
+    expect($t2)->not->toBeNull();
+});
