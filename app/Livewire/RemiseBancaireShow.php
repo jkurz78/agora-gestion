@@ -52,6 +52,7 @@ final class RemiseBancaireShow extends Component
         $isBrouillon = $this->estBrouillon();
 
         $transactions = $this->remise->transactions()
+            ->operationnel()
             ->with(['tiers', 'lignes.operation'])
             ->orderBy('reference')
             ->get();

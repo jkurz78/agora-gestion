@@ -71,7 +71,7 @@ final class RemiseBancaireList extends Component
 
     public function render(): View
     {
-        $remises = RemiseBancaire::with(['compteCible', 'transactions'])
+        $remises = RemiseBancaire::with(['compteCible', 'transactions' => fn ($q) => $q->operationnel()])
             ->orderByDesc('date')
             ->orderByDesc('numero')
             ->paginate(20);

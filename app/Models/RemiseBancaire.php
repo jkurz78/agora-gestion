@@ -73,6 +73,6 @@ final class RemiseBancaire extends TenantModel
 
     public function montantTotal(): float
     {
-        return (float) $this->transactions()->sum('montant_total');
+        return (float) $this->transactions()->operationnel()->sum('montant_total');
     }
 }

@@ -143,6 +143,7 @@ final class RemiseBancaireSelection extends Component
     private function buildBaseQuery(): Builder
     {
         return Transaction::where('type', TypeTransaction::Recette->value)
+            ->operationnel()
             ->where('mode_paiement', $this->remise->mode_paiement->value)
             ->whereIn('statut_reglement', [
                 StatutReglement::EnAttente->value,

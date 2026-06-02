@@ -117,6 +117,11 @@ function creerLigne5112SourceJrn(Tiers $tiers, float $montant, Compte $compte512
     return $t1->lignes->firstWhere('compte_id', $compte5112->id);
 }
 
+function userIdJrn(): int
+{
+    return (int) User::factory()->create()->id;
+}
+
 /** Crée une RemiseBancaire pointant vers le CompteBancaire donné. */
 function creerRemiseJrn(CompteBancaire $compteBancaire, ModePaiement $mode = ModePaiement::Cheque): RemiseBancaire
 {
