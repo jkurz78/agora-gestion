@@ -124,6 +124,9 @@ final class RemiseBancaireService
 
             // --- Partie double : générer la T4 de remise ---
             $this->recreerT4($remise, $transactionIds);
+
+            // État explicite : marquer la remise comme comptabilisée
+            $remise->update(['comptabilisee_at' => now()]);
         });
     }
 

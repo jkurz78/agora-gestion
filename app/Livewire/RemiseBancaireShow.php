@@ -6,7 +6,6 @@ namespace App\Livewire;
 
 use App\Enums\Espace;
 use App\Enums\RoleAssociation;
-use App\Enums\StatutReglement;
 use App\Models\RemiseBancaire;
 use App\Services\RemiseBancaireService;
 use Illuminate\Contracts\View\View;
@@ -29,12 +28,7 @@ final class RemiseBancaireShow extends Component
 
     public function estBrouillon(): bool
     {
-        return ! $this->remise->transactions()
-            ->whereIn('statut_reglement', [
-                StatutReglement::Recu->value,
-                StatutReglement::Pointe->value,
-            ])
-            ->exists();
+        return $this->remise->comptabilisee_at === null;
     }
 
     public function supprimer(): void

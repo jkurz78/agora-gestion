@@ -24,6 +24,7 @@ final class RemiseBancaire extends TenantModel
         'compte_cible_id',
         'libelle',
         'saisi_par',
+        'comptabilisee_at',
     ];
 
     protected function casts(): array
@@ -34,6 +35,7 @@ final class RemiseBancaire extends TenantModel
             'numero' => 'integer',
             'compte_cible_id' => 'integer',
             'saisi_par' => 'integer',
+            'comptabilisee_at' => 'datetime',
         ];
     }
 

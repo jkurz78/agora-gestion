@@ -99,16 +99,11 @@
                             <td class="text-end small">{{ $remise->transactions->count() }}</td>
                             <td class="text-end small text-nowrap fw-semibold">{{ number_format($remise->montantTotal(), 2, ',', ' ') }} €</td>
                             <td>
-                                @php
-                                    $hasRecu = $remise->transactions->contains(
-                                        fn ($tx) => in_array($tx->statut_reglement?->value, ['recu', 'pointe'], true)
-                                    );
-                                @endphp
                                 @if ($remise->isVerrouillee())
                                     <span class="badge bg-secondary" style="font-size:.7rem">
                                         <i class="bi bi-lock"></i> Verrouillée
                                     </span>
-                                @elseif ($hasRecu)
+                                @elseif ($remise->comptabilisee_at !== null)
                                     <span class="badge bg-success" style="font-size:.7rem">
                                         <i class="bi bi-check-circle"></i> Comptabilisée
                                     </span>
@@ -135,7 +130,7 @@
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     @endif
-                                    @if ($hasRecu)
+                                    @if ($remise->comptabilisee_at !== null)
                                         <a href="{{ route('banques.remises.pdf', $remise) }}?mode=inline"
                                            class="btn btn-sm btn-outline-dark" title="PDF" target="_blank">
                                             <i class="bi bi-file-pdf"></i>
