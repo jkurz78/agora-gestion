@@ -1421,79 +1421,81 @@ final class EcritureGenerator
         $total = (float) $lignesSourcesFraiches->sum(fn (TransactionLigne $l): float => (float) $l->debit);
 
         // --- Création dans une transaction DB ---
-        return DB::transaction(function () use (
-            $remise, $comptePortage, $compteCible512,
-            $total, $lignesSourcesFraiches, $mode
-        ): Transaction {
-            $libelle = $remise->libelle ?? "Remise bancaire #{$remise->id}";
+        $libelle = $remise->libelle ?? "Remise bancaire #{$remise->id}";
 
-            $t4 = $this->createTransactionHeader(
+        return $this->creerEcritureDepot(
+            lignesSourcesFraiches: $lignesSourcesFraiches,
+            comptePortage: $comptePortage,
+            compteCible512: $compteCible512,
+            mode: $mode,
+            date: $remise->date instanceof \DateTimeInterface
+                ? $remise->date
+                : new \DateTimeImmutable((string) $remise->date),
+            libelle: $libelle,
+            lettrageContexte: "Auto-lettrage remise bancaire #{$remise->id}",
+        );
+    }
+
+    /**
+     * Cœur de génération d'une écriture de dépôt bancaire (512X D / portage C).
+     * Mutualisé entre pourRemiseBancaire (N sources) et pourDepotRapprochement (1 source).
+     *
+     * @param Collection<int, TransactionLigne> $lignesSourcesFraiches  Lignes 5112/530 rechargées (lettrage à jour).
+     */
+    private function creerEcritureDepot(
+        Collection $lignesSourcesFraiches,
+        Compte $comptePortage,
+        Compte $compteCible512,
+        ModePaiement $mode,
+        \DateTimeInterface $date,
+        string $libelle,
+        string $lettrageContexte,
+    ): Transaction {
+        $total = (float) $lignesSourcesFraiches->sum(fn (TransactionLigne $l): float => (float) $l->debit);
+
+        return DB::transaction(function () use (
+            $comptePortage, $compteCible512, $total, $lignesSourcesFraiches, $mode, $date, $libelle, $lettrageContexte
+        ): Transaction {
+            $t = $this->createTransactionHeader(
                 type: TypeTransaction::Recette,
-                date: $remise->date instanceof \DateTimeInterface
-                    ? $remise->date
-                    : new \DateTimeImmutable((string) $remise->date),
+                date: $date,
                 libelle: $libelle,
                 montant: $total,
                 modePaiement: $mode,
                 journal: JournalComptable::Banque,
             );
 
-            // --- Ligne 512X D total, SANS tiers ---
             $ligne512 = TransactionLigne::create([
-                'transaction_id' => $t4->id,
-                'compte_id' => $compteCible512->id,
-                'debit' => $total,
-                'credit' => 0,
-                'tiers_id' => null,
-                'libelle' => $libelle,
-                'montant' => 0,
-                'sous_categorie_id' => null,
+                'transaction_id' => $t->id, 'compte_id' => $compteCible512->id,
+                'debit' => $total, 'credit' => 0, 'tiers_id' => null,
+                'libelle' => $libelle, 'montant' => 0, 'sous_categorie_id' => null,
             ]);
             $ligne512->setRelation('compte', $compteCible512);
-
-            // --- N lignes portage crédit (une par ligne source, 1↔1, SANS tiers) ---
-            $idsLignesT4 = [$ligne512->id];
+            $idsLignes = [$ligne512->id];
 
             foreach ($lignesSourcesFraiches as $ligneSource) {
                 $montantSource = (float) $ligneSource->debit;
-
                 $lignePortage = TransactionLigne::create([
-                    'transaction_id' => $t4->id,
-                    'compte_id' => $comptePortage->id,
-                    'debit' => 0,
-                    'credit' => $montantSource,
-                    'tiers_id' => null,
-                    'libelle' => $libelle,
-                    'montant' => 0,
-                    'sous_categorie_id' => null,
+                    'transaction_id' => $t->id, 'compte_id' => $comptePortage->id,
+                    'debit' => 0, 'credit' => $montantSource, 'tiers_id' => null,
+                    'libelle' => $libelle, 'montant' => 0, 'sous_categorie_id' => null,
                 ]);
-                $idsLignesT4[] = $lignePortage->id;
-
-                // --- Auto-lettrage paire : ligne source ↔ ligne T4 (1↔1) ---
+                $idsLignes[] = $lignePortage->id;
                 $this->lettrageService->lettrer(
-                    collect([$ligneSource, $lignePortage]),
-                    null,
-                    "Auto-lettrage remise bancaire #{$remise->id} ligne source #{$ligneSource->id}"
+                    collect([$ligneSource, $lignePortage]), null,
+                    $lettrageContexte." ligne source #{$ligneSource->id}"
                 );
             }
 
-            // --- Recharger toutes les lignes de T4 depuis la DB (lettrage_code à jour) ---
-            $lignesT4 = TransactionLigne::whereIn('id', $idsLignesT4)->get();
-            foreach ($lignesT4 as $l) {
-                if ((int) $l->compte_id === (int) $compteCible512->id) {
-                    $l->setRelation('compte', $compteCible512);
-                } else {
-                    $l->setRelation('compte', $comptePortage);
-                }
+            $lignes = TransactionLigne::whereIn('id', $idsLignes)->get();
+            foreach ($lignes as $l) {
+                $l->setRelation('compte', (int) $l->compte_id === (int) $compteCible512->id ? $compteCible512 : $comptePortage);
             }
+            $this->assertEquilibre($lignes);
+            $this->assertPasDeTiersSurClasse5($lignes);
+            $t->setRelation('lignes', $lignes);
 
-            // --- Vérifications post-création (paranoïa) ---
-            $this->assertEquilibre($lignesT4);
-            $this->assertPasDeTiersSurClasse5($lignesT4);
-
-            $t4->setRelation('lignes', $lignesT4);
-
-            return $t4;
+            return $t;
         });
     }
 
