@@ -211,9 +211,11 @@ final class RapprochementList extends Component
         foreach ($rapprochements as $r) {
             $credit = Transaction::where('rapprochement_id', $r->id)
                 ->where('type', TypeTransaction::Recette)
+                ->operationnel()
                 ->sum('montant_total');
             $debit = Transaction::where('rapprochement_id', $r->id)
                 ->where('type', TypeTransaction::Depense)
+                ->operationnel()
                 ->sum('montant_total');
             $creditVir = VirementInterne::where('rapprochement_destination_id', $r->id)->sum('montant');
             $debitVir = VirementInterne::where('rapprochement_source_id', $r->id)->sum('montant');
