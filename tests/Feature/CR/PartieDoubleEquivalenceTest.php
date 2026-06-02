@@ -23,6 +23,7 @@ declare(strict_types=1);
 
 use App\Enums\ModePaiement;
 use App\Enums\StatutFacture;
+use App\Enums\StatutReglement;
 use App\Enums\TypeLigneFacture;
 use App\Models\Association;
 use App\Models\Categorie;
@@ -33,7 +34,6 @@ use App\Models\FactureLigne;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Reglement;
-use App\Models\RemiseBancaire;
 use App\Models\Seance;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
@@ -450,7 +450,7 @@ function creerFixtureExerciceComplet(object $ctx): array
         'seance_id' => $ctx->seance1->id,
         'montant' => 50.00,
         'mode_paiement' => ModePaiement::Cheque->value,
-        'statut_reglement' => \App\Enums\StatutReglement::EnAttente->value,
+        'statut_reglement' => StatutReglement::EnAttente->value,
         'date' => '2025-10-15',
     ]);
 
@@ -1005,4 +1005,20 @@ it('[E7] PD — les lignes techniques (411, 401, 5112, 530, 512X) ne sont pas co
             "Une catégorie '(sans catégorie)' est présente dans les charges PD — suspect d'une fuite de comptes techniques"
         );
     }
+});
+
+it('une recette comptant saisie au formulaire est marquée équilibrée (pas de faux positif déséquilibre)', function () {
+    $tx = $this->txService->create([
+        'type' => 'recette',
+        'date' => '2025-10-05',
+        'libelle' => 'Test flag equilibree',
+        'montant_total' => '100.00',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'tiers_id' => $this->tiersA->id,
+        'compte_id' => $this->compteBancaire->id,
+    ], [
+        ['sous_categorie_id' => $this->sc706->id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+
+    expect($tx->fresh()->equilibree)->toBeTrue();
 });

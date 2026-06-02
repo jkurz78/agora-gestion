@@ -243,6 +243,12 @@ final class TransactionService
                 );
             }
         }
+
+        // L'enrichissement partie double a réussi (les générateurs assertent l'équilibre
+        // avant de retourner). On marque donc la transaction comme équilibrée — sinon elle
+        // reste à `equilibree=false` (défaut colonne) et apparaît à tort « déséquilibrée »
+        // dans SmokeTestV5Command / BackfillAuditor pour toute saisie au formulaire.
+        $transaction->forceFill(['equilibree' => true])->save();
     }
 
     public function update(Transaction $transaction, array $data, array $lignes): Transaction
