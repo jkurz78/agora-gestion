@@ -496,13 +496,14 @@ final class TransactionUniverselle extends Component
         }
 
         $comptesBancaires = CompteBancaire::orderBy('nom')->get();
+        $comptesBancairesSaisie = CompteBancaire::saisieManuelle()->orderBy('nom')->get();
 
         return view('livewire.transaction-universelle', [
             'rows' => $rows,
             'paginator' => $result['paginator'],
             'showSolde' => $showSolde,
             'comptes' => $this->compteId === null ? $comptesBancaires : collect(),
-            'comptesBancaires' => $comptesBancaires, // pour la modale marquer reçu (toujours disponible)
+            'comptesBancaires' => $comptesBancairesSaisie, // pour la modale marquer reçu (saisie manuelle uniquement)
             'modesPaiement' => ModePaiement::cases(),
             'availableTypes' => $this->lockedTypes ?? ['depense', 'recette', 'virement'],
             'sousCategorieFilter' => $this->sousCategorieFilter,
