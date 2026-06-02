@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\ModePaiement;
+use App\Livewire\RemiseBancaireSelection;
 use App\Models\RemiseBancaire;
 use App\Models\Transaction;
 use App\Services\Compta\EcritureGenerator;
@@ -38,7 +39,7 @@ it('la sélection de candidats remise exclut les écritures journal=banque (T2)'
         'libelle' => 'Remise candidats test', 'saisi_par' => userIdJrn(),
     ]);
 
-    $component = Livewire::test(App\Livewire\RemiseBancaireSelection::class, ['remise' => $remise]);
+    $component = Livewire::test(RemiseBancaireSelection::class, ['remise' => $remise]);
     // allTransactions est la variable interne — mais render() expose 'transactions' à la vue
     // La base query expose les candidats via viewData('transactions')
     $candidatIds = collect($component->viewData('transactions'))->pluck('id')->map(fn ($i) => (int) $i)->all();

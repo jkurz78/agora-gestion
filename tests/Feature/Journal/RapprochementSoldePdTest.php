@@ -6,6 +6,7 @@ use App\Enums\ModePaiement;
 use App\Enums\StatutRapprochement;
 use App\Models\RapprochementBancaire;
 use App\Models\RemiseBancaire;
+use App\Models\Transaction;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\RapprochementBancaireService;
 use App\Services\RemiseBancaireService;
@@ -25,7 +26,7 @@ it('pointer une remise comptabilisée meut le solde pointé du montant du dépô
     $sourceTxId = (int) $ligne5112->transaction_id;
     // Réalisme : un chèque de séance porte le CompteBancaire en compte_id (legacy) —
     // c'est ce qui le rend visible/rapprochable à l'écran (cf. RapprochementDetail).
-    App\Models\Transaction::where('id', $sourceTxId)->update(['compte_id' => $compteBancaire->id]);
+    Transaction::where('id', $sourceTxId)->update(['compte_id' => $compteBancaire->id]);
 
     $remise = RemiseBancaire::create([
         'association_id' => TenantContext::currentId(),

@@ -3,10 +3,14 @@
 declare(strict_types=1);
 
 use App\Enums\ModePaiement;
+use App\Enums\StatutRapprochement;
+use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
 use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\Migrations\SystemeSeeder;
+use App\Services\RapprochementBancaireService;
 use App\Services\ReglementOperationService;
+use App\Tenant\TenantContext;
 
 require_once __DIR__.'/EcritureGeneratorJournalTest.php';
 
@@ -45,13 +49,13 @@ it('pointer un chèque loose en attente génère un dépôt et meut le solde ; d
     $t1 = creerCreanceJrn(80.00);
     $t1->update(['compte_id' => $compteBancaire->id, 'mode_paiement' => ModePaiement::Cheque->value]);
 
-    $rappro = App\Models\RapprochementBancaire::create([
-        'association_id' => App\Tenant\TenantContext::currentId(),
+    $rappro = RapprochementBancaire::create([
+        'association_id' => TenantContext::currentId(),
         'compte_id' => $compteBancaire->id, 'date_fin' => '2026-05-31',
         'solde_ouverture' => 0.0, 'solde_fin' => 80.0,
-        'statut' => App\Enums\StatutRapprochement::EnCours->value, 'saisi_par' => userIdJrn(),
+        'statut' => StatutRapprochement::EnCours->value, 'saisi_par' => userIdJrn(),
     ]);
-    $service = app(App\Services\RapprochementBancaireService::class);
+    $service = app(RapprochementBancaireService::class);
 
     // Pointage → dépôt généré, solde = 80
     $service->toggleTransaction($rappro->fresh(), 'recette', (int) $t1->id);
@@ -71,6 +75,6 @@ it('pointer un chèque loose en attente génère un dépôt et meut le solde ; d
         ->whereHas('lignes', fn ($q) => $q->where('debit', '>', 0)->whereHas('compte', fn ($c) => $c->bancaires()))
         ->count();
     expect($depotCountApres)->toBe(0);
-    $t2 = app(App\Services\ReglementOperationService::class)->trouverEncaissementT2($t1->fresh());
+    $t2 = app(ReglementOperationService::class)->trouverEncaissementT2($t1->fresh());
     expect($t2)->not->toBeNull();
 });

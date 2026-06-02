@@ -1440,7 +1440,7 @@ final class EcritureGenerator
      * Cœur de génération d'une écriture de dépôt bancaire (512X D / portage C).
      * Mutualisé entre pourRemiseBancaire (N sources) et pourDepotRapprochement (1 source).
      *
-     * @param Collection<int, TransactionLigne> $lignesSourcesFraiches  Lignes 5112/530 rechargées (lettrage à jour).
+     * @param  Collection<int, TransactionLigne>  $lignesSourcesFraiches  Lignes 5112/530 rechargées (lettrage à jour).
      */
     private function creerEcritureDepot(
         Collection $lignesSourcesFraiches,
@@ -1503,7 +1503,7 @@ final class EcritureGenerator
      * Génère une écriture de dépôt (512X D / portage C) pour UNE ligne source (5112 chèque
      * ou 530 espèces), sans RemiseBancaire formelle. Utilisé par le rapprochement live (4b).
      *
-     * @param TransactionLigne $ligne5112Source  Ligne portage (5112/530) au débit, non lettrée.
+     * @param  TransactionLigne  $ligne5112Source  Ligne portage (5112/530) au débit, non lettrée.
      */
     public function pourDepotRapprochement(
         TransactionLigne $ligne5112Source,
