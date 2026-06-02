@@ -1500,6 +1500,45 @@ final class EcritureGenerator
     }
 
     /**
+     * Génère une écriture de dépôt (512X D / portage C) pour UNE ligne source (5112 chèque
+     * ou 530 espèces), sans RemiseBancaire formelle. Utilisé par le rapprochement live (4b).
+     *
+     * @param TransactionLigne $ligne5112Source  Ligne portage (5112/530) au débit, non lettrée.
+     */
+    public function pourDepotRapprochement(
+        TransactionLigne $ligne5112Source,
+        Compte $compteCible512,
+        ModePaiement $mode,
+        \DateTimeInterface $date,
+        string $libelle,
+    ): Transaction {
+        if ($mode !== ModePaiement::Cheque && $mode !== ModePaiement::Especes) {
+            throw new \InvalidArgumentException(
+                "Le mode {$mode->value} n'est pas supporté pour un dépôt de rapprochement (chèque/espèces uniquement)."
+            );
+        }
+        if (! $compteCible512->estBancaire()) {
+            throw CompteIncorrectException::classeAttendue(
+                $compteCible512->numero_pcg, $compteCible512->classe, '5 (512X — bancaire physique)'
+            );
+        }
+
+        $comptePortage = $this->resoudreComptePortage($mode, Compte::ofNumeroSysteme('5112'));
+        $this->assertTenantCoherence(collect([$ligne5112Source]));
+        $ligneFraiche = TransactionLigne::whereIn('id', [$ligne5112Source->id])->get();
+
+        return $this->creerEcritureDepot(
+            lignesSourcesFraiches: $ligneFraiche,
+            comptePortage: $comptePortage,
+            compteCible512: $compteCible512,
+            mode: $mode,
+            date: $date,
+            libelle: $libelle,
+            lettrageContexte: "Dépôt rapprochement ligne source #{$ligne5112Source->id}",
+        );
+    }
+
+    /**
      * Génère un code de lettrage unique (20 caractères aléatoires).
      *
      * Format identique à celui utilisé par LettrageService::lettrer() quand
