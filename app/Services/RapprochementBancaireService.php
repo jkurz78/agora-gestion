@@ -513,26 +513,54 @@ final class RapprochementBancaireService
     }
 
     /**
+     * Localise la ligne portage 5112/530 (au débit) de l'encaissement d'un chèque/espèces,
+     * qu'elle soit LUMPÉE sur la transaction elle-même (recette comptant : 5112 D / 411 C
+     * sur la même tx, 411 lettré intra-transaction) OU portée par une T2 d'encaissement
+     * SÉPARÉE (créance encaissée). Mire le double cas, comme RemiseBancaireService::recreerT4.
+     *
+     * @param  bool  $lettree  false → portage pas encore déposé ; true → déjà déposé (lettré).
+     */
+    private function lignePortageEncaissement(Transaction $cheque, bool $lettree): ?TransactionLigne
+    {
+        // Cas lumpé : la ligne portage est sur le chèque lui-même. Cas séparé : sur la T2.
+        $candidatsTxIds = [(int) $cheque->id];
+        $t2 = $this->reglementService->trouverEncaissementT2($cheque);
+        if ($t2 !== null) {
+            $candidatsTxIds[] = (int) $t2->id;
+        }
+
+        foreach ($candidatsTxIds as $txId) {
+            $query = TransactionLigne::where('transaction_id', $txId)
+                ->where('debit', '>', 0)
+                ->whereHas('compte', fn (Builder $c) => $c->where(fn (Builder $cc) => $cc->where('numero_pcg', '5112')->orWhere('numero_pcg', '530')));
+            $query = $lettree
+                ? $query->whereNotNull('lettrage_code')
+                : $query->whereNull('lettrage_code');
+
+            $ligne = $query->first();
+            if ($ligne !== null) {
+                return $ligne;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Cherche un dépôt généré au pointage pour ce chèque loose.
      * Retourne la Transaction de dépôt (journal=banque, remise_id=null) si elle existe.
      */
     private function trouverDepotChequeLoose(Transaction $cheque): ?Transaction
     {
-        $t2 = $this->reglementService->trouverEncaissementT2($cheque);
-        if ($t2 === null) {
-            return null;
-        }
-        // Chercher une ligne portage (5112/530) lettrée dans T2
-        $lignePortage = TransactionLigne::where('transaction_id', $t2->id)
-            ->whereNotNull('lettrage_code')
-            ->whereHas('compte', fn (Builder $c) => $c->where(fn (Builder $cc) => $cc->where('numero_pcg', '5112')->orWhere('numero_pcg', '530')))
-            ->first();
+        // La ligne portage (sur le chèque si lumpé, sinon sur la T2) est lettrée avec la
+        // ligne portage crédit du dépôt.
+        $lignePortage = $this->lignePortageEncaissement($cheque, lettree: true);
         if ($lignePortage === null) {
             return null;
         }
-        // Trouver la ligne partenaire dans le lettrage (dans une autre transaction)
+        // Trouver la ligne partenaire du lettrage (autre ligne que la ligne portage elle-même)
         $autre = TransactionLigne::where('lettrage_code', $lignePortage->lettrage_code)
-            ->where('transaction_id', '!=', $t2->id)
+            ->where('id', '!=', $lignePortage->id)
             ->first();
         if ($autre === null) {
             return null;
@@ -558,18 +586,10 @@ final class RapprochementBancaireService
         if ($compte512X === null) {
             return;
         }
-        $t2 = $this->reglementService->trouverEncaissementT2($cheque);
-        if ($t2 === null) {
-            return;
-        }
-        // Trouver la ligne portage (5112/530) non encore lettrée au débit dans T2
-        $lignePortage = TransactionLigne::where('transaction_id', $t2->id)
-            ->whereNull('lettrage_code')
-            ->where('debit', '>', 0)
-            ->whereHas('compte', fn (Builder $c) => $c->where(fn (Builder $cc) => $cc->where('numero_pcg', '5112')->orWhere('numero_pcg', '530')))
-            ->first();
+        // Ligne portage non lettrée : sur le chèque (lumpé) ou sur la T2 séparée
+        $lignePortage = $this->lignePortageEncaissement($cheque, lettree: false);
         if ($lignePortage === null) {
-            return;
+            return; // pas encaissé / rien à déposer
         }
         $depot = app(EcritureGenerator::class)->pourDepotRapprochement(
             ligne5112Source: $lignePortage,

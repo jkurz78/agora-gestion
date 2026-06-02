@@ -78,3 +78,41 @@ it('pointer un chèque loose en attente génère un dépôt et meut le solde ; d
     $t2 = app(ReglementOperationService::class)->trouverEncaissementT2($t1->fresh());
     expect($t2)->not->toBeNull();
 });
+
+it('pointer un chèque COMPTANT loose (encaissement lumpé sur la même tx) génère le dépôt et meut le solde', function () {
+    // Reproduit le cas live #183 : recette comptant chèque (pourRecetteComptant) →
+    // 411 D / 706 C + 5112 D / 411 C lumpés sur LA MÊME transaction, 411 lettré intra-tx,
+    // 5112 un-lettré. Aucune T2 séparée → trouverEncaissementT2 renvoie null.
+    config(['compta.use_partie_double' => true]);
+    [$compteBancaire, $compte512] = creerCompteBancaireJrn();
+    $tiers = tiersJrn();
+
+    $ligne5112 = creerLigne5112SourceJrn($tiers, 123.00, $compte512); // comptant lumpé
+    $cheque = Transaction::find($ligne5112->transaction_id);
+    $cheque->update(['compte_id' => $compteBancaire->id]); // visible/rapprochable
+
+    // Garde-fou : c'est bien le cas lumpé (pas de T2 séparée)
+    expect(app(ReglementOperationService::class)->trouverEncaissementT2($cheque->fresh()))->toBeNull();
+
+    $rappro = RapprochementBancaire::create([
+        'association_id' => TenantContext::currentId(),
+        'compte_id' => $compteBancaire->id, 'date_fin' => '2026-05-31',
+        'solde_ouverture' => 0.0, 'solde_fin' => 123.0,
+        'statut' => StatutRapprochement::EnCours->value, 'saisi_par' => userIdJrn(),
+    ]);
+    $service = app(RapprochementBancaireService::class);
+
+    // Pointage → dépôt généré, solde = 123
+    $service->toggleTransaction($rappro->fresh(), 'recette', (int) $cheque->id);
+    expect($service->calculerSoldePointage($rappro->fresh()))->toBe(123.0);
+    $depotCount = Transaction::where('journal', 'banque')->whereNull('remise_id')
+        ->whereNotNull('rapprochement_id')
+        ->whereHas('lignes', fn ($q) => $q->where('debit', '>', 0)->whereHas('compte', fn ($c) => $c->bancaires()))
+        ->count();
+    expect($depotCount)->toBe(1);
+
+    // Dépointage → dépôt supprimé, solde = 0, et la ligne 5112 du chèque redevient un-lettrée
+    $service->toggleTransaction($rappro->fresh(), 'recette', (int) $cheque->id);
+    expect($service->calculerSoldePointage($rappro->fresh()))->toBe(0.0);
+    expect($ligne5112->fresh()->lettrage_code)->toBeNull();
+});
