@@ -283,6 +283,13 @@ final class RemiseBancaireService
             // Phase 2 — construire la T4
             $this->recreerT4($remise, $sourceIds);
 
+            // Bug 1 — aligner comptabilisee_at : si la T4 a bien été créée, la remise est
+            // comptabilisée. Sans ça, une remise backfillée (T4 créé APRÈS la migration
+            // comptabilisee_at) reste à NULL et s'affiche à tort « brouillon ».
+            if ($this->queryT4($remise)->exists()) {
+                $remise->update(['comptabilisee_at' => $remise->date]);
+            }
+
             // Phase 3 — propager le rapprochement_id unique des sources sur la T4
             $rapprochementIds = Transaction::whereIn('id', $sourceIds)
                 ->whereNotNull('rapprochement_id')
