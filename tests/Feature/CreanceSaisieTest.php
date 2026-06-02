@@ -27,7 +27,6 @@ use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\ReglementOperationService;
-use App\Services\TransactionService;
 use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
