@@ -243,3 +243,65 @@ it('marquerRecu sans mode sur une créance reste rétro-compatible (skip T2 sile
     // Pas de T2 (skip silencieux)
     expect(app(ReglementOperationService::class)->trouverEncaissementT2($tx))->toBeNull();
 });
+
+// ============================================================
+// Réversion — éditer une recette reçue en « non reçu » supprime la T2
+// ============================================================
+
+it('éditer une recette reçue en « non reçu » supprime la T2 (pas de chèque fantôme en 5112)', function () {
+    // 1. Créance
+    Livewire::test(TransactionForm::class)
+        ->call('showNewForm', 'recette')
+        ->set('paiementRecu', false)
+        ->set('date', '2025-10-15')
+        ->set('libelle', 'Réversion encaissement')
+        ->set('tiers_id', $this->tiers->id)
+        ->set('lignes', [[
+            'id' => null,
+            'sous_categorie_id' => (string) $this->sousCategorie->id,
+            'operation_id' => '',
+            'seance' => '',
+            'montant' => '120.00',
+            'notes' => '',
+            'piece_jointe_path' => null,
+            'piece_jointe_upload' => null,
+            'piece_jointe_remove' => false,
+            'piece_jointe_existing_url' => null,
+            'piece_jointe_filename' => null,
+        ]])
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $tx = Transaction::where('libelle', 'Réversion encaissement')->first();
+
+    // 2. Marquer reçu (chèque) → T2 séparée
+    app(ReglementOperationService::class)->marquerRecu($tx, ModePaiement::Cheque);
+    $t2 = app(ReglementOperationService::class)->trouverEncaissementT2($tx->fresh());
+    expect($t2)->not->toBeNull();
+    $t2Id = (int) $t2->id;
+
+    // 3. Éditer → « non reçu » (mode null)
+    Livewire::test(TransactionForm::class)
+        ->call('edit', $tx->id)
+        ->set('paiementRecu', false)
+        ->call('save')
+        ->assertHasNoErrors();
+
+    // 4. La T2 est supprimée (pas d'orphelin)
+    expect(Transaction::find($t2Id))->toBeNull();
+
+    // Aucune ligne 5112 ne subsiste pour ce tiers (chèque fantôme évité)
+    $orphan5112 = TransactionLigne::whereHas('compte', fn ($q) => $q->where('numero_pcg', '5112'))
+        ->whereHas('transaction', fn ($q) => $q->where('tiers_id', $this->tiers->id))
+        ->exists();
+    expect($orphan5112)->toBeFalse();
+
+    // La transaction redevient une créance propre : mode null, 411 non lettré
+    $tx->refresh();
+    expect($tx->mode_paiement)->toBeNull();
+    $ligne411 = TransactionLigne::where('transaction_id', $tx->id)
+        ->whereHas('compte', fn ($q) => $q->where('numero_pcg', '411'))
+        ->first();
+    expect($ligne411)->not->toBeNull();
+    expect($ligne411->lettrage_code)->toBeNull();
+});

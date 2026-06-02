@@ -274,6 +274,11 @@ final class TransactionService
                 $this->assertLockedInvariants($transaction, $data, $lignes);
             }
 
+            // Réversion encaissement : recette « reçue » (mode présent) repassée « non reçue »
+            // (mode null) → supprimer la T2 d'encaissement séparée, sinon elle reste orpheline
+            // (chèque fantôme en 5112). Fait AVANT update + délettrage (le 411 est encore lettré).
+            $this->annulerEncaissementSiReversion($transaction, $data);
+
             $transaction->update($data);
 
             if ($transaction->isLockedByFacture()) {
@@ -360,6 +365,38 @@ final class TransactionService
 
             return $transaction->fresh();
         });
+    }
+
+    /**
+     * Si une recette « reçue » (mode_paiement présent) est repassée « non reçue » (mode null)
+     * à l'édition, supprime la T2 d'encaissement SÉPARÉE — sinon elle reste orpheline (chèque
+     * fantôme en 5112). Le cas lumpé (encaissement sur la même transaction) est nettoyé par le
+     * forceDelete des lignes dans update(). À appeler AVANT update()/délettrage (411 lettré).
+     */
+    private function annulerEncaissementSiReversion(Transaction $transaction, array $data): void
+    {
+        if ($transaction->type !== TypeTransaction::Recette) {
+            return;
+        }
+        // Réversion = avait un mode (reçue) → passe à null (non reçue)
+        if ($transaction->mode_paiement === null || ($data['mode_paiement'] ?? null) !== null) {
+            return;
+        }
+
+        $t2 = app(ReglementOperationService::class)->trouverEncaissementT2($transaction);
+        if ($t2 === null) {
+            return; // cas lumpé : nettoyé par le forceDelete des lignes dans update()
+        }
+
+        // Délettre les lignes lettrées de la T2 (411 ↔ T1) puis supprimer la T2.
+        foreach (TransactionLigne::where('transaction_id', $t2->id)->whereNotNull('lettrage_code')->get() as $ligne) {
+            $this->lettrageService->delettrerParLigne(
+                $ligne->fresh(),
+                "Annulation encaissement (recette repassée non reçue) — T2 #{$t2->id}"
+            );
+        }
+        TransactionLigne::where('transaction_id', $t2->id)->forceDelete();
+        $t2->forceDelete();
     }
 
     public function delete(Transaction $transaction): void
