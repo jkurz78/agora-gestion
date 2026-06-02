@@ -156,6 +156,26 @@
                             @endif
                             @error('tiers_id') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                         </div>
+                        @if ($type === 'recette')
+                        <div class="col-md-2">
+                            <label class="form-label">Paiement déjà reçu ?</label>
+                            <div class="d-flex gap-2 mt-1">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" wire:model.live="paiementRecu"
+                                           id="paiement_recu_oui" value="1"
+                                           {{ $exerciceCloture ? 'disabled' : '' }}>
+                                    <label class="form-check-label" for="paiement_recu_oui">Oui</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" wire:model.live="paiementRecu"
+                                           id="paiement_recu_non" value="0"
+                                           {{ $exerciceCloture ? 'disabled' : '' }}>
+                                    <label class="form-check-label" for="paiement_recu_non">Non</label>
+                                </div>
+                            </div>
+                        </div>
+                        @endif
+                        @if ($type !== 'recette' || $paiementRecu)
                         <div class="col-md-2">
                             <label for="mode_paiement" class="form-label">Mode paiement <span class="text-danger">*</span></label>
                             <select wire:model="mode_paiement" id="mode_paiement"
@@ -168,6 +188,7 @@
                             </select>
                             @error('mode_paiement') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
+                        @endif
                         <div class="col-md-3">
                             <label for="compte_id" class="form-label">
                                 Compte bancaire

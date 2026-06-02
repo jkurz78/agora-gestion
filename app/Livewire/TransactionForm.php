@@ -35,6 +35,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -54,6 +55,9 @@ final class TransactionForm extends Component
     public ?string $libelle = null;
 
     public string $mode_paiement = '';
+
+    /** Pour les recettes : true = paiement déjà reçu (comptant), false = recette attendue (créance). */
+    public bool $paiementRecu = true;
 
     public ?int $tiers_id = null;
 
@@ -128,7 +132,7 @@ final class TransactionForm extends Component
 
     public function showNewForm(string $type): void
     {
-        $this->reset(['transactionId', 'type', 'date', 'libelle', 'mode_paiement',
+        $this->reset(['transactionId', 'type', 'date', 'libelle', 'mode_paiement', 'paiementRecu',
             'tiers_id', 'reference', 'compte_id', 'notes', 'lignes',
             'ventilationLigneId', 'ventilationLigneSousCategorie', 'ventilationLigneMontant', 'affectations',
             'ventilationHasAffectations',
@@ -420,6 +424,7 @@ final class TransactionForm extends Component
         $this->date = $transaction->date->format('Y-m-d');
         $this->libelle = $transaction->libelle;
         $this->mode_paiement = $transaction->mode_paiement?->value ?? '';
+        $this->paiementRecu = $transaction->mode_paiement !== null;
         $this->tiers_id = $transaction->tiers_id;
         $this->reference = $transaction->reference;
         $this->compte_id = $transaction->compte_id;
@@ -457,7 +462,7 @@ final class TransactionForm extends Component
     public function resetForm(): void
     {
         $this->reset([
-            'transactionId', 'type', 'date', 'libelle', 'mode_paiement',
+            'transactionId', 'type', 'date', 'libelle', 'mode_paiement', 'paiementRecu',
             'tiers_id', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked', 'isLockedByFacture', 'isLockedByHelloAsso',
             'ventilationLigneId', 'ventilationLigneSousCategorie', 'ventilationLigneMontant', 'affectations',
             'ventilationHasAffectations',
@@ -521,7 +526,11 @@ final class TransactionForm extends Component
                     : ['required', 'date', 'after_or_equal:'.$dateDebut, 'before_or_equal:'.$dateFin],
                 'libelle' => ['nullable', 'string', 'max:255'],
                 'reference' => ['nullable', 'string', 'max:100'],
-                'mode_paiement' => ['required', 'in:virement,cheque,especes,cb,prelevement'],
+                'mode_paiement' => [
+                    Rule::requiredIf(fn () => $this->type !== 'recette' || $this->paiementRecu),
+                    'nullable',
+                    'in:virement,cheque,especes,cb,prelevement',
+                ],
                 'tiers_id' => ['nullable', 'exists:tiers,id'],
                 'compte_id' => ['nullable', 'exists:comptes_bancaires,id'],
                 'lignes' => ['required', 'array', 'min:1'],
@@ -563,12 +572,18 @@ final class TransactionForm extends Component
             $this->validate($lignesPjRules, $lignesPjMessages);
         }
 
+        // Pour une recette non encore reçue (créance), on force le mode à null
+        // afin que TransactionService::enrichirPartieDouble route vers pourRecetteACredit.
+        $modeEffectif = ($this->type === 'recette' && ! $this->paiementRecu)
+            ? null
+            : ($this->mode_paiement !== '' ? $this->mode_paiement : null);
+
         $data = [
             'type' => $this->type,
             'date' => $this->date,
             'libelle' => $this->libelle,
             'montant_total' => $this->montantTotal,
-            'mode_paiement' => $this->mode_paiement,
+            'mode_paiement' => $modeEffectif,
             'tiers_id' => $this->tiers_id,
             'reference' => $this->reference,
             'compte_id' => $this->compte_id,
