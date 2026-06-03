@@ -245,10 +245,7 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
         Route::get('/remises/{remise}/selection', function (RemiseBancaire $remise) {
             return view('gestion.remises-bancaires.selection', compact('remise'));
         })->name('remises.selection');
-        Route::get('/remises/{remise}/validation', function (RemiseBancaire $remise) {
-            return view('gestion.remises-bancaires.validation', compact('remise'));
-        })->name('remises.validation');
-        Route::get('/remises/{remise}/pdf', RemiseBancairePdfController::class)
+Route::get('/remises/{remise}/pdf', RemiseBancairePdfController::class)
             ->name('remises.pdf');
 
         Route::view('/helloasso-sync', 'banques.helloasso-sync')->name('helloasso-sync');

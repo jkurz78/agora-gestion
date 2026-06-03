@@ -118,6 +118,11 @@
 
     {{-- Actions --}}
     <div class="d-flex gap-2 mt-3">
+        @if ($isBrouillon && $this->canEdit && $transactions->isNotEmpty())
+            <button data-bs-toggle="modal" data-bs-target="#modalComptabiliser" class="btn btn-success">
+                <i class="bi bi-check-circle"></i> Comptabiliser
+            </button>
+        @endif
         @if (! $isBrouillon)
             <a href="{{ route('banques.remises.pdf', $remise) }}?mode=inline"
                class="btn btn-outline-dark" target="_blank">
@@ -137,6 +142,21 @@
             <i class="bi bi-arrow-left"></i> Retour
         </a>
     </div>
+
+    {{-- Modal confirmation comptabilisation --}}
+    @if ($isBrouillon && $this->canEdit && $transactions->isNotEmpty())
+    <div class="modal fade" id="modalComptabiliser" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-body text-center py-4">
+                    <p>Comptabiliser cette remise ?<br><small class="text-muted">Les transactions passeront au statut « Reçu » et l'écriture de dépôt sera générée.</small></p>
+                    <button class="btn btn-secondary me-2" data-bs-dismiss="modal">Annuler</button>
+                    <button wire:click="comptabiliser" data-bs-dismiss="modal" class="btn btn-success">Comptabiliser</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
 
     {{-- Modal confirmation suppression --}}
     <div class="modal fade" id="modalSupprimer" tabindex="-1">

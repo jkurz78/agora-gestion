@@ -7,6 +7,7 @@ namespace App\Livewire;
 use App\Enums\Espace;
 use App\Enums\RoleAssociation;
 use App\Models\RemiseBancaire;
+use App\Models\Transaction;
 use App\Services\RemiseBancaireService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
@@ -29,6 +30,28 @@ final class RemiseBancaireShow extends Component
     public function estBrouillon(): bool
     {
         return $this->remise->comptabilisee_at === null;
+    }
+
+    public function comptabiliser(): void
+    {
+        if (! $this->canEdit || ! $this->estBrouillon()) {
+            return;
+        }
+
+        try {
+            $transactionIds = Transaction::where('remise_id', $this->remise->id)
+                ->operationnel()
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            app(RemiseBancaireService::class)->comptabiliser($this->remise, $transactionIds);
+
+            $this->remise->refresh();
+            session()->flash('success', 'Remise comptabilisée avec succès.');
+        } catch (\RuntimeException $e) {
+            session()->flash('error', $e->getMessage());
+        }
     }
 
     public function supprimer(): void
