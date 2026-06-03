@@ -60,6 +60,10 @@ Virement/CB (direct 512X, pas d'étape 5112) : `attendu → remis → pointe`.
 3. **Sort de `recu`** : la valeur actuelle `recu` disparaît (scindée en `a_remettre`/`remis`). Migration de données : recalcul du statut de **toutes** les transactions via le resolver (one-shot, idempotent). OK ?
 4. **Volet A en premier ou les deux ensemble ?** A (saisie créance) est petit et livrable seul ; B (statut dérivé) est plus lourd. Slicing possible : A → B.
 
+## Preuve par l'exemple (cas réel tour de test 2026-06-03)
+
+Une recette reçue puis **éditée en « non reçu »** : la T2 d'encaissement est bien supprimée (fix `e50a5cee`), le 411 redevient non lettré → **c'est une créance**. Mais la colonne `statut_reglement` reste **`recu`** (périmée) — décision actée de **ne PAS la patcher à la main** (sinon on éparpille des resets partout). Le **statut dérivé** lira le ledger (411 non lettré → `attendu`) et affichera le bon état, **sans dépendre de la colonne**. C'est précisément ce que ce programme corrige. → **Test Volet B** : après réversion, `statut_reglement='recu'` mais l'état dérivé = `attendu`.
+
 ## Cas limites & risques
 
 - **Espèces** : chaîne `530 → 512X` (versement d'espèces). Même logique que chèque via 5112.
