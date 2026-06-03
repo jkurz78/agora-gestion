@@ -6,7 +6,6 @@ namespace App\Models;
 
 use App\Enums\ModePaiement;
 use App\Enums\StatutReglement;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -26,7 +25,6 @@ final class RemiseBancaire extends TenantModel
         'libelle',
         'saisi_par',
         'comptabilisee_at',
-        'auto_generee',
     ];
 
     protected function casts(): array
@@ -38,19 +36,7 @@ final class RemiseBancaire extends TenantModel
             'compte_cible_id' => 'integer',
             'saisi_par' => 'integer',
             'comptabilisee_at' => 'datetime',
-            'auto_generee' => 'boolean',
         ];
-    }
-
-    /**
-     * Scope : remises saisies manuellement (exclut les auto-générées par le rapprochement).
-     *
-     * @param  Builder<RemiseBancaire>  $query
-     * @return Builder<RemiseBancaire>
-     */
-    public function scopeManuelle(Builder $query): Builder
-    {
-        return $query->where('auto_generee', false);
     }
 
     public function compteCible(): BelongsTo

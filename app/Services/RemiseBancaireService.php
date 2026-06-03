@@ -8,13 +8,11 @@ use App\Enums\ModePaiement;
 use App\Enums\StatutFacture;
 use App\Enums\StatutReglement;
 use App\Models\Compte;
-use App\Models\RapprochementBancaire;
 use App\Models\RemiseBancaire;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\LettrageService;
-use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -314,91 +312,6 @@ final class RemiseBancaireService
                 ]);
             }
             // Si 0 rapprochement_id → remise non rapprochée, rien à faire
-        });
-    }
-
-    // -------------------------------------------------------------------------
-    // Remise auto-générée au pointage d'un chèque/espèces loose (Bug 4b v2)
-    // -------------------------------------------------------------------------
-
-    /**
-     * Supprime une remise auto_generee (créée par le rapprochement) sans garde de verrouillage.
-     * Délettre le T4, supprime ses lignes, supprime le T4, supprime la remise.
-     * La T2 source (encaissement) subsiste.
-     *
-     * Appelé par RapprochementBancaireService::supprimerDepotChequeLoose().
-     * Ne doit PAS être appelé sur une remise manuelle.
-     */
-    public function supprimerAutoRemise(RemiseBancaire $remise): void
-    {
-        if (! $remise->auto_generee) {
-            throw new \LogicException('supprimerAutoRemise() ne peut être appelé que sur une remise auto_generee.');
-        }
-
-        DB::transaction(function () use ($remise): void {
-            $this->supprimerT4SiExiste($remise);
-            // Réinitialiser les sources (idempotent, car Approche X : aucune source n'a remise_id)
-            Transaction::where('remise_id', $remise->id)->update([
-                'remise_id' => null,
-                'statut_reglement' => StatutReglement::EnAttente->value,
-                'reference' => null,
-            ]);
-            $remise->delete();
-        });
-    }
-
-    /**
-     * Crée une RemiseBancaire auto_generee (sans numéro RBC) + son T4 propre pour
-     * un chèque/espèces loose pointé au rapprochement.
-     *
-     * - Le chèque source reste standalone (pas de remise_id) — Approche X.
-     * - Seul le T4 porte remise_id → la remise auto.
-     * - Le T4 reçoit rapprochement_id → ce rapprochement.
-     * - La remise est marquée comptabilisee_at = now() (atome).
-     *
-     * Appelé par RapprochementBancaireService::genererDepotChequeLoose().
-     */
-    public function remettreAutoPourRapprochement(Transaction $cheque, RapprochementBancaire $rappro): void
-    {
-        $compte = $cheque->compte;
-        if ($compte === null) {
-            return;
-        }
-
-        DB::transaction(function () use ($cheque, $compte, $rappro): void {
-            // Numéro dans la même séquence que les remises manuelles (auto-remise visible/numérotée).
-            // withTrashed() : un numéro de remise auto dépointée (soft-deletée) n'est pas réutilisé
-            // → trou de numéro assumé (rare ; toggle de masquage possible plus tard).
-            $numero = (int) RemiseBancaire::withTrashed()->max('numero') + 1;
-
-            $remise = RemiseBancaire::create([
-                'association_id' => (int) TenantContext::currentId(),
-                'numero' => $numero,
-                'auto_generee' => true,
-                'date' => $cheque->date instanceof \DateTimeInterface
-                    ? $cheque->date->format('Y-m-d')
-                    : (string) $cheque->date,
-                'mode_paiement' => $cheque->mode_paiement->value,
-                'compte_cible_id' => (int) $compte->id,
-                'libelle' => 'Remise automatique (rapprochement)',
-                // Utiliser l'utilisateur connecté, ou le saisisseur du rapprochement en fallback
-                'saisi_par' => auth()->id() ?? (int) $rappro->saisi_par,
-            ]);
-
-            // Encaissement idempotent : no-op si 411 déjà lettrée (cas lumpé)
-            $this->reglementService->encaisserSiNonEncaisse($cheque->fresh());
-
-            // Génération T4 (gère lumpé / T2-séparée) + pose remise_id sur T4
-            $this->recreerT4($remise, [(int) $cheque->id]);
-
-            // Marquer la remise comme comptabilisée
-            $remise->update(['comptabilisee_at' => now()]);
-
-            // Pointer le T4 sur ce rapprochement
-            $t4 = $this->queryT4($remise)->first();
-            if ($t4 !== null) {
-                $t4->update(['rapprochement_id' => $rappro->id]);
-            }
         });
     }
 

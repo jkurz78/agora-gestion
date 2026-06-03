@@ -71,8 +71,7 @@ final class RemiseBancaireList extends Component
 
     public function render(): View
     {
-        // Affiche toutes les remises (manuelles + auto-générées au rapprochement, badgées en vue).
-        // Un futur toggle pourra masquer les auto via le scope `manuelle()`.
+        // Affiche toutes les remises, triées par date puis numéro décroissants.
         $remises = RemiseBancaire::query()
             ->with(['compteCible', 'transactions' => fn ($q) => $q->operationnel()])
             ->orderByDesc('date')
