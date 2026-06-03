@@ -352,7 +352,13 @@ function creerFixtureRappro(object $ctx): array
 
 /**
  * Construit la liste des transactions pointables pour le compte BNP au date_fin,
- * de la même façon que RapprochementDetail.render() (mode-agnostique).
+ * de la même façon que RapprochementDetail.render().
+ *
+ * En mode PD (`config('compta.use_partie_double')` = true), applique le même filtre
+ * 512X strict que render() : seules les transactions portant une ligne sur le 512X
+ * du compte (ou appartenant à une remise) sont retournées.
+ * En mode legacy (ou si le compte 512X est introuvable), aucun filtre 512X — identique
+ * au comportement de render() avant la fonctionnalité.
  *
  * Retourne une collection de rows normalisés { id, type, libelle, montant_signe, pointe }.
  *
@@ -363,6 +369,14 @@ function creerFixtureRappro(object $ctx): array
  */
 function chargerListeRapproTx(int $compteId, int $rapproId, string $dateFin, bool $verrouille): array
 {
+    // Miroir du filtre 512X de RapprochementDetail::render()
+    $compte512X = null;
+    if (config('compta.use_partie_double')) {
+        $compte512X = Compte::where('compte_bancaire_id', $compteId)
+            ->bancaires()
+            ->first();
+    }
+
     $txRows = Transaction::where('compte_id', $compteId)
         ->where(function ($q) use ($rapproId, $dateFin, $verrouille) {
             if ($verrouille) {
@@ -374,6 +388,13 @@ function chargerListeRapproTx(int $compteId, int $rapproId, string $dateFin, boo
                 })->orWhere('rapprochement_id', $rapproId);
             }
         })
+        ->when(
+            config('compta.use_partie_double') && $compte512X !== null,
+            fn ($q) => $q->where(function ($w) use ($compte512X) {
+                $w->whereNotNull('remise_id')
+                    ->orWhereHas('lignes', fn ($l) => $l->where('compte_id', $compte512X->id));
+            })
+        )
         ->with('remise')
         ->get();
 
@@ -788,15 +809,17 @@ it('[R8b] solde mix complet avec remise — équivalence stricte legacy ↔ PD (
 // ---------------------------------------------------------------------------
 // [I1] Investigation : transaction legacy (sans ligne 512X) invisible en mode PD
 //
-// Ce comportement est documenté (Step 29) : en mode mixte legacy/PD, les transactions
-// sans ligne 512X enrichie ne contribuent pas au solde PD. Le backfill (slice 1d)
-// les rendra visibles.
+// Solde PD (Step 29) : transaction sans ligne 512X = invisible au calcul PD.
+// Divergence solde legacy ↔ PD ATTENDUE et documentée (backfill slice 1d la corrigera).
 //
-// Ce test vérifie que le comportement est cohérent avec la spec §7.4 et le Step 29.
-// Le test ne fait pas xfail car la divergence est ATTENDUE (documentée).
+// Liste pointable (Chantier 1) : le helper `chargerListeRapproTx` est à parité avec
+// RapprochementDetail::render() depuis ce chantier — il applique aussi le filtre 512X
+// strict en mode PD. Conséquence : en mode PD, la transaction legacy (sans ligne 512X)
+// n'est plus visible dans la liste non plus (idem render()). En mode legacy, elle reste
+// visible. Le test vérifie les deux comportements explicitement.
 // ---------------------------------------------------------------------------
 
-it('[I1] transaction legacy (sans ligne 512X) visible dans la liste mais invisible au calcul PD (mode mixte)', function () {
+it('[I1] transaction legacy (sans ligne 512X) invisible au calcul PD et exclue de la liste PD (filtre 512X strict)', function () {
     $fixture = creerFixtureRappro($this);
 
     // Créer une transaction legacy (sans enrichissement PD — pas de ligne 512X)
@@ -820,7 +843,7 @@ it('[I1] transaction legacy (sans ligne 512X) visible dans la liste mais invisib
     Config::set('compta.use_partie_double', false);
     $soldeLegacy = $this->rappro->calculerSoldePointage($rapprochement);
 
-    // ── Mode PD : la transaction est invisible (pas de ligne 512X enrichie)
+    // ── Mode PD : la transaction est invisible au calcul (pas de ligne 512X enrichie)
     Config::set('compta.use_partie_double', true);
     $soldePD = $this->rappro->calculerSoldePointage($rapprochement);
 
@@ -831,24 +854,34 @@ it('[I1] transaction legacy (sans ligne 512X) visible dans la liste mais invisib
     expect($soldePD)->toBe(2000.0, 'PD ne voit pas la transaction legacy (pas de ligne 512X enrichie)');
 
     // La divergence est documentée — elle sera corrigée par le backfill slice 1d
-    // À ce stade, le mode PD sur données non backfillées = solde incomplet attendu.
-    // Ce test documente le comportement sans bloquer CI.
     $divergence = abs($soldePD - $soldeLegacy);
     expect($divergence)->toBeGreaterThan(0.0, 'I1 — Divergence mode mixte confirmée (transaction legacy invisible en PD)');
     expect($divergence)->toBe(250.0, 'I1 — Divergence = 250€ (montant de la transaction legacy non enrichie)');
 
-    // ── Mais dans la LISTE (Livewire, mode-agnostique) : la transaction legacy est visible
-    $liste = chargerListeRapproTx(
+    // ── LISTE en mode LEGACY : la transaction legacy est visible (pas de filtre 512X)
+    Config::set('compta.use_partie_double', false);
+    $listeLegacy = chargerListeRapproTx(
         (int) $this->compteBnp->id,
         $rapprochement->id,
         $this->dateFin,
         false
     );
-    $allIds = array_map(fn ($r) => $r['id'], $liste);
-    // Note : toContain est variadique en Pest 3 — pas de 2ème arg pour message.
-    // On utilise in_array + expect pour avoir un message explicite.
-    expect(in_array((int) $txLegacy->id, $allIds, true))->toBeTrue(
-        "La transaction legacy #{$txLegacy->id} doit apparaître dans la liste rappro (mode-agnostique)"
+    $allIdsLegacy = array_map(fn ($r) => $r['id'], $listeLegacy);
+    expect(in_array((int) $txLegacy->id, $allIdsLegacy, true))->toBeTrue(
+        "I1 [legacy] — La transaction legacy #{$txLegacy->id} doit apparaître dans la liste en mode legacy (pas de filtre 512X)"
+    );
+
+    // ── LISTE en mode PD : la transaction legacy est exclue (filtre 512X strict — Chantier 1)
+    Config::set('compta.use_partie_double', true);
+    $listePD = chargerListeRapproTx(
+        (int) $this->compteBnp->id,
+        $rapprochement->id,
+        $this->dateFin,
+        false
+    );
+    $allIdsPD = array_map(fn ($r) => $r['id'], $listePD);
+    expect(in_array((int) $txLegacy->id, $allIdsPD, true))->toBeFalse(
+        "I1 [PD] — La transaction legacy #{$txLegacy->id} ne doit PAS apparaître dans la liste en mode PD (filtre 512X strict, pas de ligne 512X enrichie)"
     );
 });
 

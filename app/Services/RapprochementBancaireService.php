@@ -480,8 +480,11 @@ final class RapprochementBancaireService
      * Retourne null si le tenant n'a pas encore de schéma PD (compte 512X manquant).
      * Dans ce cas, calculerSoldePointage retourne solde_ouverture seul (comportement
      * documenté mode mixte legacy/PD pendant la transition — Step 29).
+     *
+     * Exposé public pour être utilisé par RapprochementDetail::render() afin de
+     * filtrer la liste des écritures pointables sur le 512X strict du compte.
      */
-    private function resoudreCompte512X(CompteBancaire $compteBancaire): ?Compte
+    public function resoudreCompte512X(CompteBancaire $compteBancaire): ?Compte
     {
         // Résolution par compte_bancaire_id (clé stable — l'IBAN est nullable et non unique).
         return Compte::where('compte_bancaire_id', $compteBancaire->id)

@@ -173,6 +173,15 @@ final class RapprochementDetail extends Component
         $transactions = collect();
         $verrouille = $this->rapprochement->isVerrouille();
 
+        // En mode partie double, résoudre le compte 512X strict du compte bancaire.
+        // Utilisé pour filtrer la liste pointable : seules les écritures portant une
+        // ligne sur CE compte 512X (ou appartenant à une remise) sont affichées.
+        // Si le compte 512X est introuvable (tenant sans schéma PD), pas de filtre
+        // (dégradation gracieuse identique au comportement legacy).
+        $compte512X = config('compta.use_partie_double')
+            ? $service->resoudreCompte512X($compte)
+            : null;
+
         // Transactions (dépenses + recettes) — grouper les remises en une seule ligne
         $txRows = Transaction::where('compte_id', $compte->id)
             ->where(function ($q) use ($rid, $dateFin, $verrouille) {
@@ -185,6 +194,13 @@ final class RapprochementDetail extends Component
                     })->orWhere('rapprochement_id', $rid);
                 }
             })
+            ->when(
+                config('compta.use_partie_double') && $compte512X !== null,
+                fn ($q) => $q->where(function ($w) use ($compte512X) {
+                    $w->whereNotNull('remise_id')
+                        ->orWhereHas('lignes', fn ($l) => $l->where('compte_id', $compte512X->id));
+                })
+            )
             ->with('tiers', 'remise')
             ->get();
 
