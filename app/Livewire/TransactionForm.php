@@ -10,6 +10,7 @@ use App\Enums\ModePaiement;
 use App\Enums\RoleAssociation;
 use App\Enums\StatutFactureDeposee;
 use App\Enums\StatutOperation;
+use App\Enums\StatutReglement;
 use App\Enums\UsageComptable;
 use App\Exceptions\OcrAnalysisException;
 use App\Exceptions\OcrNotConfiguredException;
@@ -589,6 +590,16 @@ final class TransactionForm extends Component
             'compte_id' => $this->compte_id,
             'notes' => $this->notes ?: null,
         ];
+
+        // Pose statut_reglement explicitement à la création pour les recettes.
+        // À l'édition on ne touche pas le champ : un statut Pointe ne doit jamais
+        // être rétrogradé par le formulaire de saisie (stopgap avant statut dérivé
+        // du ledger — chantier 4).
+        if ($this->transactionId === null && $this->type === 'recette') {
+            $data['statut_reglement'] = $this->paiementRecu
+                ? StatutReglement::Recu->value
+                : StatutReglement::EnAttente->value;
+        }
 
         $lignes = collect($this->lignes)->map(fn ($l) => [
             'id' => isset($l['id']) ? (int) $l['id'] : null,
