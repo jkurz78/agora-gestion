@@ -1,8 +1,9 @@
 # Roadmap Compta V5 — chantiers ordonnés
 
-**Date** : 2026-06-03
+**Date** : 2026-06-03 (restructurée le 2026-06-03 après l'audit des flux métier).
 **Branche** : `feat/compta-v5` (NON mergée — `main` reste en v4.3.x).
 **Mémoire liée** : [[project-compta-v5-flux-bancaires-live-pd]] et les sous-slices 1a→1d / cutover.
+**Audit des flux** : `docs/audits/2026-06-03-audit-flux-compta-v5.md` (5 flux : dons, cotisations, NDF, NDF par abandon de créance, HelloAsso + virement).
 
 ## Principe d'exécution
 
@@ -15,30 +16,77 @@
 
 - **Fondations PD** : data layer, école 411 systématique, backfill, cutover (sous-slices 1a→1d).
 - **Slice journal de banque** : colonne `journal`, masquage T2/T4 des écrans opérationnels.
-- **Flux bancaires live** : Bug 1 (`comptabilisee_at`), Bug 2/3 (filtre `journal` sur candidats/agrégats), Bug 4a (pointage remise meut le solde), **Bug 4b (dépôt au pointage — À REVERTER, cf. chantier 1)**.
+- **Flux bancaires live** : Bug 1 (`comptabilisee_at`), Bug 2/3 (filtre `journal` sur candidats/agrégats), Bug 4a (pointage remise meut le solde), Bug 4b (dépôt au pointage — **reverté** par le chantier 1).
 - **Volet A** : saisie créance (recette « attendue », mode null → `pourRecetteACredit`), « Marquer reçu » avec capture du mode, réversion « reçu → non reçu ».
 - **Correctifs** : `equilibree` après enrichissement PD, backfill `comptabilisee_at`, exclusion HelloAsso de la modale, total crédit rappro (×N → opérationnel).
+- ✅ **Chantier 1 livré (2026-06-03)** : revert auto-remise + rapprochement sur le **512X strict du compte** ; + fix « bouton Comptabiliser » sur la page remise (régression v3 `3d7f7b32`) + suppression de l'écran `validation` orphelin. Suite verte 12 488 / 0. Commits `7a639282`, `d829e3ed`, `46fb8fb5`.
 
 ---
 
-## Chantiers (ordre d'exécution)
+## Structure : un socle horizontal, puis les flux verticaux qui s'y branchent
 
-### 1. Revert auto-remise + rapprochement sur critère 512X
-**Intention** : abandonner la génération **auto** d'une remise au pointage (marginal, générateur d'édge cases). Le rapprochement ne liste que les écritures **présentes sur le 512X (5121)** — un chèque encaissé **non remis** (5112) n'est **pas** pointable ; on le **remet d'abord** (cas général). Aligne la liste du rappro sur `calculerSoldePointage` (qui somme déjà les lignes 512X).
-**Périmètre** : revert `remettreAutoPourRapprochement` / `genererDepotChequeLoose` / helpers / colonne `auto_generee` / tests / liste remises ; filtre du rappro « porte une ligne 512X ». Vérifier le cas dépense chèque émis (512X direct, reste pointable).
-**Dépendances** : aucune. **Premier** (repart sur une base saine).
+Le moteur PD (`EcritureGenerator`, école 411, invariants d'équilibre/tiers) est **sain**. L'audit montre que les trous sont (1) dans le **cycle de vie autour** du moteur — saisie → écriture → règlement → statut — et (2) dans des **flux qui n'appellent pas le moteur**. D'où la stratégie : **durcir le socle (cycle de vie) AVANT de brancher les flux dessus** — on ne peut brancher un flux « sur du PD sain » que si le cycle de vie est sain.
 
-### 2. Cohérence « marquer reçu » ↔ toggle « reçu » de l'édition
-**Intention** : aujourd'hui le **bouton « Marquer reçu »** crée une **T2 séparée**, mais l'**édition** (toggle `paiementRecu`) crée un encaissement **lumpé** sur la même transaction. Deux chemins → deux structures. Harmoniser sur **un seul modèle** (sinon divergence en B et à l'affichage des écritures).
+> **Note de numérotation** : les numéros 2→11 sont les identifiants historiques des chantiers (référencés dans la mémoire) ; l'ordre d'exécution réel est désormais donné par les **phases** ci-dessous.
 
-### 3. Volet 1A symétrique — charges (dette fournisseur 401)
-**Intention** : miroir du Volet A côté **dépenses**. Saisir une **dette fournisseur** (`60x D / 401 C` via `pourDepenseACredit`, déjà existant), **« Marquer payé »** (`401 D / 512X C` via `pourReglementFournisseur`, déjà existant), réversion. **Le moteur existe — manque l'UI** (le formulaire force le mode pour les dépenses → toujours comptant).
+---
+
+## Phase 0 — Quick fixes (immédiat, hors file)
+
+### QF-B — Statut de règlement posé à la création (recette comptant)
+**Bug** (audit Thème B, **BLOQUANT**) : `TransactionForm::save()` ne pose jamais `statut_reglement` → un don/recette **comptant** naît `en_attente` → reçu fiscal bloqué, statut faux, « Marquer reçu » fait un skip silencieux (411 déjà lettré).
+**Fix étroit** : poser `statut_reglement = Recu` quand `paiementRecu = true`. **Stopgap** en attendant le chantier 4 (statut dérivé du ledger, qui le dissout structurellement). Réf : `TransactionForm.php:577-591`.
+
+### QF-D — Abandon de créance → montage OD sans trésorerie
+**Bug** (audit Thème D, **HAUTE**) : l'abandon de créance fabrique **2 lignes 512X fictives** non lettrées qui, depuis le chantier 1, **polluent le rapprochement** (deviennent pointables sans contrepartie au relevé).
+**Fix** : router l'abandon en **OD** `401 D / 75x C` (lettrage du 401), **sans ligne 512X** ; journal OD (pas Vente) ; `mode_paiement` null sur le don. Réf : `NoteDeFraisValidationService.php:141-223`.
+
+---
+
+## Phase 1 — Socle : le cycle de vie d'une opération en PD
+
+### 2. Règlement recette — « marquer reçu » ↔ édition (modèle unique)
+**Intention** : aujourd'hui le **bouton « Marquer reçu »** crée une **T2 séparée**, mais l'**édition** (toggle `paiementRecu`) crée un encaissement **lumpé** sur la même transaction. Deux chemins → deux structures. Harmoniser sur **un seul modèle** (sinon divergence en B et à l'affichage des écritures). Intègre proprement QF-B.
+
+### 3. Volet 1A symétrique — charges (dette fournisseur 401 → 467)
+**Intention** : miroir du Volet A côté **dépenses**. Saisir une **dette** (`60x D / 4xx C` via `pourDepenseACredit`, déjà existant), **« Marquer payé »** (`4xx D / 512X C` via `pourReglementFournisseur`, déjà existant), réversion. **Le moteur existe — manque l'UI** (le formulaire force le mode pour les dépenses → toujours comptant).
+→ **Résout l'audit Thème C** (NDF auto-soldée, pas de T2 de remboursement, `pourReglementFournisseur` orphelin). Acter au passage le compte de la dette membre bénévole (**467** plutôt que 401 — audit Thème E).
 
 ### 4. Volet B — statuts dérivés du grand livre (symétrique 411 + 401)
 **Intention** : le statut cesse d'être un **enum stocké** et devient **dérivé du ledger** (source de vérité unique). Symétrique :
 - recette : **attendu / à remettre / remis / rapproché** (411 → 5112 → 512X → pointé) ;
 - dépense : **dû / réglé / pointé** (401 → 512X → pointé).
-**Dépendances** : **APRÈS 1A** (sinon pas de cycle 401 à dériver). Spec existante `2026-06-02-cycle-vie-creance-statut-derive.md` — **à élargir au 401**.
+→ **Dissout structurellement l'audit Thème B** (le « comptant naît en_attente » disparaît : le statut se dérive du 411 lettré / 512X présent).
+**Dépendances** : **APRÈS chantier 3** (sinon pas de cycle 401 à dériver). Spec existante `2026-06-02-cycle-vie-creance-statut-derive.md` — **à élargir au 401**.
+
+### G. Garantie de non-échappement PD *(nouveau — audit Thème A)*
+**Intention** : aucune transaction ne doit exister sans écriture PD **équilibrée** en mode PD. Ferme les skips silencieux (wizard adhésion, ligne km sans usage configuré → skip de **toute** la transaction, don sans tiers).
+**Découpage** : (1) d'abord un **rapport** — étendre `compta:smoke-test-v5` pour lister les transactions sans lignes PD / non équilibrées en mode PD ; (2) puis un **garde-fou bloquant**, activé **en capstone de Phase 2** (sinon il casserait immédiatement sur wizard/HelloAsso non encore corrigés).
+
+---
+
+## Phase 2 — Brancher les flux audités sur le socle (1 flux = 1 sous-chantier)
+
+**Dépend de la Phase 1** : on branche les flux sur un cycle de vie (statut + règlement symétrique) déjà sain.
+
+### FX-Cotisation — Adhésions/cotisations via le moteur PD
+Audit Thèmes A/E/H : le **wizard d'adhésion** (`AdhesionService::creerTransactionPaiement`) crée Transaction+ligne en direct, **sans `TransactionService`** → aucune écriture PD. Le router par le moteur (`enrichirPartieDouble`), compte produit **751**, garde `ExerciceService::assertOuvert`. Brancher `tiers_payeur_id` (spec PASS `…tiers-payeur-cotisation…` : la ligne 411 doit porter le **payeur**).
+
+### FX-HelloAsso — HelloAsso en PD « live »
+Audit Thèmes A/F : `HelloAssoSyncService` crée des transactions legacy, **PD différé à un backfill manuel sans auto-trigger**. Cibler l'enrichissement PD **à la création** (ou auto-backfill post-sync) ; cash-out `512→512` (rejoint chantier 8) ; **propagation `rapprochement_id` sur la T2 déjà encaissée** dans `createVerrouilleAuto` (Thème F) ; garde `compte_versement_id` null (fallback silencieux) ; cas montant 0 (promo 100 %).
+
+### FX-NDF — Notes de frais sur le socle « charges »
+Audit Thèmes C/E/A/H : une fois le chantier 3 livré, faire produire à la NDF une **dette ouverte** (`6xx D / 467 C`) puis un **remboursement** réel (T2 `467 D / 512X C` via `pourReglementFournisseur`). Compte **467** (au lieu de 401). Garde sur la **ligne km sans usage** configuré (sinon skip de toute la transaction). Garde **exercice ouvert** à la soumission portail (sinon NDF bloquée en `soumise`).
+
+### FX-Don — Dons & reçu fiscal
+Audit Thème G : **coupler le reçu fiscal à l'écriture PD** (pas seulement à `statut_reglement.isEncaisse()`), garde « don sans tiers » (skip silencieux aujourd'hui), fiabiliser le montant du reçu sur `debit/credit` plutôt que la colonne legacy `montant` (anticipe le drop legacy).
+
+### Capstone Phase 2
+Activer le **garde-fou bloquant** de non-échappement PD (chantier **G**, volet 2) une fois tous les flux ci-dessus corrigés.
+
+---
+
+## Phase 3 — États, affichage & fin de parcours
 
 ### 5. Lettrage humainement lisible (AAAA → ZZZZ par compte)
 **Intention** : remplacer les codes random 20 caractères (`Str::random(20)`) par une **séquence lisible par compte** (convention compta : `AA`, `AB`, … par compte lettrable). Indispensable pour la phase d'**affichage des écritures**.
@@ -50,17 +98,17 @@
 **Intention** : chaque **journal × exercice** a sa séquence ; poser la **référence métier** (T4 remise = n° de bordereau `RBC-xxxxx`, T2 = n° du journal de banque). **Aujourd'hui les transactions banque n'ont pas de référence.** (= Slice 2 du journal de banque, différée.)
 
 ### 8. Virements internes en V5 — écriture `512 → 512`
-**Intention** : convertir `VirementInterne` (modèle **parallèle**, hors ledger PD) en vraies **écritures du journal de banque** (`512 → 512`). Complétude du ledger + **cohérence du rapprochement** (le critère « porte une ligne 512X » du chantier 1 ne s'applique pas aux virements tant qu'ils sont hors ledger).
+**Intention** : convertir `VirementInterne` (modèle **parallèle**, hors ledger PD) en vraies **écritures du journal de banque** (`512 → 512`). Complétude du ledger + **cohérence du rapprochement**. Déjà sollicité par **FX-HelloAsso** (cash-out HelloAsso = un `VirementInterne` sans lignes PD).
 
 ### 9. Ventilation sur pièce pointée — **brainstorm à venir**
 **Intention** : **trou de conception V5**. En **V4**, la ventilation vit dans une **table d'affectations séparée** → non bloquée par le pointage. En **V5**, elle devient un **vrai jeu d'écritures** (découper la ligne `7x/6x` en N lignes, même total, même imputation). Le **verrou de rapprochement bloque à tort** (le `4x/5x` banque est inchangé). À **brainstormer → spec** (modèle : ventiler le côté produit/charge d'une pièce déjà pointée, total + 512X gelés).
 
-### 10. Drop du legacy (SousCategorie + colonnes legacy)
-**Intention** : une fois le PD **source de vérité partout**, retirer les structures parallèles (Steps 39/40 parqués). **Fin de parcours.**
-
 ### 11. Slice 3 — affichage des écritures et des journaux
 **Intention** : l'UI qui montre le **grand livre par journal** (Ventes / Achats / Banque / OD), remplaçant la présentation recettes/dépenses, et bascule le **vocabulaire visible**.
 **Dépendances** : **APRÈS 5** (lettrage lisible) **+ 7** (numérotation) **+** idéalement **6** (états).
+
+### 10. Drop du legacy (SousCategorie + colonnes legacy)
+**Intention** : une fois le PD **source de vérité partout** (et la garantie de non-échappement active), retirer les structures parallèles (Steps 39/40 parqués). **Fin de parcours.**
 
 ---
 
