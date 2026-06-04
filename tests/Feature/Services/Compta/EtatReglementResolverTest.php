@@ -158,3 +158,41 @@ it('recette espèces comptant (530 en main, pas de 512X) → EnMain', function (
 
     expect($this->resolver->resolve($t1->fresh()))->toBe(StatutReglement::EnMain);
 });
+
+it('syncer persiste le statut dérivé quand il diffère du miroir', function () {
+    ['data' => $data, 'lignes' => $lignes] = recetteData($this, ModePaiement::Cheque->value);
+    $t1 = $this->service->create($data, $lignes);
+
+    // Forcer un miroir périmé (chèque en main mais colonne = Recu).
+    $t1->forceFill(['statut_reglement' => StatutReglement::Recu->value])->save();
+
+    $this->resolver->syncer($t1);
+
+    expect($t1->fresh()->statut_reglement)->toBe(StatutReglement::EnMain);
+});
+
+it('syncer est idempotent (deux appels = même résultat, pas de drift)', function () {
+    ['data' => $data, 'lignes' => $lignes] = recetteData($this, ModePaiement::Cheque->value);
+    $t1 = $this->service->create($data, $lignes);
+
+    $this->resolver->syncer($t1);
+    $premier = $t1->fresh()->statut_reglement;
+    $this->resolver->syncer($t1->fresh());
+    $second = $t1->fresh()->statut_reglement;
+
+    expect($second)->toBe($premier);
+});
+
+it('syncer est un no-op en mode legacy (use_partie_double=false)', function () {
+    config()->set('compta.use_partie_double', false);
+
+    $t1 = Transaction::factory()->create([
+        'association_id' => $this->association->id,
+        'type' => TypeTransaction::Recette->value,
+        'statut_reglement' => StatutReglement::Recu->value,
+    ]);
+
+    $this->resolver->syncer($t1);
+
+    expect($t1->fresh()->statut_reglement)->toBe(StatutReglement::Recu);
+});
