@@ -199,15 +199,30 @@ final class TransactionService
         // --- Appel EcritureGenerator avec la Transaction existante ---
         if ($transaction->type === TypeTransaction::Recette) {
             if ($modePaiement !== null) {
-                // Recette comptant
-                $this->ecritureGenerator->pourRecetteComptant(
+                // Recette comptant — chantier 2a (2026-06-04) :
+                // On ne passe plus par pourRecetteComptant() (écriture lumpée 1 Tx, 4 lignes).
+                // On produit à la place le chemin "créance puis encaissement" :
+                //   1. pourRecetteACredit()       → T1 enrichie (411 D / 7xx C, journal=Vente)
+                //   2. pourEncaissementCreance()   → T2 séparée créée (portage D / 411 C, journal=Banque)
+                //                                    + auto-lettrage 411 T1 ↔ T2
+                // Résultat : même structure qu'une créance + Marquer reçu. Backfill (TransactionConverter)
+                // conserve intentionnellement pourRecetteComptant() — chantier 2b différé.
+                $this->ecritureGenerator->pourRecetteACredit(
                     tiers: $tiers,
                     ventilations: $ventilations,
-                    mode: $modePaiement,
-                    compteTresorerie: $compteTresorerie,
-                    date: $date,
+                    dateConstatation: $date,
                     libelle: $transaction->libelle,
                     existingTransaction: $transaction,
+                );
+
+                // T1 est désormais enrichie (411 D / 7xx C). Générer T2 d'encaissement.
+                $libelleEncaissement = 'Encaissement '.$transaction->libelle;
+                $this->ecritureGenerator->pourEncaissementCreance(
+                    transactionCreance: $transaction,
+                    mode: $modePaiement,
+                    compteTresorerie: $compteTresorerie,
+                    datePaiement: $date,
+                    libelle: $libelleEncaissement,
                 );
             } else {
                 // Recette à crédit

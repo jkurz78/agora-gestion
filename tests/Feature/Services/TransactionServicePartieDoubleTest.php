@@ -12,7 +12,6 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\Compta\EcritureGenerator;
 use App\Services\TransactionService;
-use App\Tenant\TenantContext;
 use Tests\Support\CreatesPartieDoubleContext;
 
 uses(CreatesPartieDoubleContext::class);
@@ -69,7 +68,9 @@ beforeEach(function () {
 // Scénario 1 : Recette comptant chèque
 // ---------------------------------------------------------------------------
 
-it('recette comptant chèque — crée 4 lignes PD + enrichit la ligne legacy (lignes 411 auto-lettrées)', function () {
+it('recette comptant chèque — T1 (Vente, 411D/7xxC) + T2 séparée (Banque, 5112D/411C), 411 inter-tx lettré', function () {
+    // Chantier 2a : la saisie live d'une recette comptant produit désormais 2 transactions
+    // séparées (T1 créance Vente + T2 encaissement Banque) au lieu d'un seul lumpé.
     $data = [
         'type' => TypeTransaction::Recette->value,
         'date' => '2025-10-15',
@@ -87,59 +88,59 @@ it('recette comptant chèque — crée 4 lignes PD + enrichit la ligne legacy (l
         'notes' => null,
     ]];
 
-    $transaction = $this->service->create($data, $lignes);
-
-    // Recharger les lignes fraîches depuis la DB
-    $transaction->load('lignes');
-
-    // La Tx legacy a 1 ligne. Les 3 lignes PD-only s'ajoutent → total = 4 lignes sur cette Tx
-    $totalLignes = TransactionLigne::where('transaction_id', $transaction->id)
-        ->withTrashed()  // garde-fou SoftDeletes
-        ->count();
-
-    expect($totalLignes)->toBe(4);
+    $t1 = $this->service->create($data, $lignes);
 
     $compte411 = compteSysteme('411');
     $compte5112 = compteSysteme('5112');
 
-    // 2 lignes sur 411 (D et C)
-    $lignes411 = TransactionLigne::where('transaction_id', $transaction->id)
-        ->where('compte_id', $compte411->id)
+    // ---- T1 : 2 lignes avec compte_id (411 D + ventilation 706 C enrichie) ----
+    // La ligne legacy est enrichie en place avec compte_id 706.
+    $lignesT1 = TransactionLigne::where('transaction_id', $t1->id)
+        ->whereNotNull('compte_id')
         ->get();
-    expect($lignes411)->toHaveCount(2);
+    expect($lignesT1->count())->toBe(2, 'T1 doit avoir 2 lignes PD : 411 D + 706 C');
 
-    $ligne411D = $lignes411->firstWhere(fn ($l) => (float) $l->debit > 0);
-    $ligne411C = $lignes411->firstWhere(fn ($l) => (float) $l->credit > 0);
-    expect($ligne411D)->not()->toBeNull();
-    expect($ligne411C)->not()->toBeNull();
-    expect((float) $ligne411D->debit)->toBe(100.0);
-    expect((float) $ligne411C->credit)->toBe(100.0);
+    // 1 ligne 411 D sur T1 (créance ouverte)
+    $ligne411D_T1 = $lignesT1->first(fn ($l) => (int) $l->compte_id === (int) $compte411->id && (float) $l->debit > 0);
+    expect($ligne411D_T1)->not()->toBeNull('T1 doit avoir une ligne 411 D');
+    expect((float) $ligne411D_T1->debit)->toBe(100.0);
+    expect((int) $ligne411D_T1->tiers_id)->toBe((int) $this->tiers->id);
 
-    // tiers_id sur les lignes 411
-    expect((int) $ligne411D->tiers_id)->toBe((int) $this->tiers->id);
-    expect((int) $ligne411C->tiers_id)->toBe((int) $this->tiers->id);
+    // Pas de ligne 5112 sur T1
+    $ligne5112T1 = $lignesT1->firstWhere('compte_id', $compte5112->id);
+    expect($ligne5112T1)->toBeNull('T1 ne doit PAS avoir de ligne 5112 (portage sur T2)');
 
-    // Auto-lettrage interne : les 2 lignes 411 partagent le même lettrage_code non null
-    expect($ligne411D->lettrage_code)->not()->toBeNull();
-    expect($ligne411C->lettrage_code)->not()->toBeNull();
-    expect($ligne411D->lettrage_code)->toBe($ligne411C->lettrage_code);
-
-    // 1 ligne sur 5112 (D) sans tiers — école 411 systématique, FEC-conformité
-    $ligne5112 = TransactionLigne::where('transaction_id', $transaction->id)
-        ->where('compte_id', $compte5112->id)
-        ->first();
-    expect($ligne5112)->not()->toBeNull();
-    expect((float) $ligne5112->debit)->toBe(100.0);
-    expect($ligne5112->tiers_id)->toBeNull('Invariant : la classe 5 ne porte jamais de tiers (FEC)');
-
-    // La ligne legacy (sous_categorie_id + montant) doit être enrichie avec compte_id 706
-    $ligneVentilation = TransactionLigne::where('transaction_id', $transaction->id)
+    // La ligne legacy enrichie avec compte_id 706
+    $ligneVentilation = TransactionLigne::where('transaction_id', $t1->id)
         ->where('sous_categorie_id', $this->scRecette->id)
         ->first();
     expect($ligneVentilation)->not()->toBeNull('La ligne legacy doit exister');
     expect($ligneVentilation->compte_id)->toBe($this->compte706->id, 'La ligne legacy est enrichie avec compte_id 706');
     expect((float) $ligneVentilation->credit)->toBe(100.0, 'La ligne 706 est créditée (produit)');
     expect((float) $ligneVentilation->montant)->toBe(100.0, 'montant legacy conservé');
+
+    // ---- T2 : 2 lignes (5112 D + 411 C), lettrage 411 T1↔T2 ----
+    $ligne411D_T1->refresh();
+    expect($ligne411D_T1->lettrage_code)->not()->toBeNull('La ligne 411 D de T1 doit être lettrée');
+
+    $ligne411C_T2 = TransactionLigne::where('lettrage_code', $ligne411D_T1->lettrage_code)
+        ->where('compte_id', $compte411->id)
+        ->where('transaction_id', '!=', $t1->id)
+        ->first();
+    expect($ligne411C_T2)->not()->toBeNull('La ligne 411 C de T2 doit exister et partager le code lettrage de T1');
+
+    $t2 = Transaction::findOrFail($ligne411C_T2->transaction_id);
+
+    $lignesT2 = TransactionLigne::where('transaction_id', $t2->id)->get();
+    expect($lignesT2->count())->toBe(2, 'T2 doit avoir 2 lignes : 5112 D + 411 C');
+
+    $ligne5112T2 = $lignesT2->firstWhere('compte_id', $compte5112->id);
+    expect($ligne5112T2)->not()->toBeNull('T2 doit avoir une ligne 5112 D');
+    expect((float) $ligne5112T2->debit)->toBe(100.0);
+    expect($ligne5112T2->tiers_id)->toBeNull('Invariant FEC : classe 5 sans tiers');
+
+    expect((float) $ligne411C_T2->credit)->toBe(100.0);
+    expect((int) $ligne411C_T2->tiers_id)->toBe((int) $this->tiers->id);
 });
 
 // ---------------------------------------------------------------------------
@@ -308,8 +309,10 @@ it('dépense à crédit — crée 2 lignes symétriques, pas de lettrage', funct
 // Scénario 5 : Multi-ventilation (2 sous-catégories de recette)
 // ---------------------------------------------------------------------------
 
-it('multi-ventilation recette comptant chèque — 2 lignes 7x et 1 ligne 411 D au total agrégé', function () {
-    // Deuxième sous-catégorie de recette
+it('multi-ventilation recette comptant chèque — T1 (411D/2×7xxC) + T2 séparée (5112D/411C agrégé)', function () {
+    // Chantier 2a : multi-ventilation produit toujours T1+T2 séparées.
+    // T1 : 1 ligne 411 D (total agrégé) + 2 ventilations légacy enrichies 7xx C
+    // T2 : 1 ligne 5112 D (total agrégé) + 1 ligne 411 C (total agrégé)
     $scRecette2 = SousCategorie::create([
         'association_id' => $this->association->id,
         'categorie_id' => $this->categorieRecette->id,
@@ -353,26 +356,31 @@ it('multi-ventilation recette comptant chèque — 2 lignes 7x et 1 ligne 411 D 
         ],
     ];
 
-    $transaction = $this->service->create($data, $lignes);
-
-    // 2 lignes legacy + 3 lignes PD-only (411 D, 5112 D, 411 C) = 5 lignes total
-    $totalLignes = TransactionLigne::where('transaction_id', $transaction->id)->count();
-    expect($totalLignes)->toBe(5);
+    $t1 = $this->service->create($data, $lignes);
 
     $compte411 = compteSysteme('411');
+    $compte5112 = compteSysteme('5112');
+
+    // T1 : 3 lignes avec compte_id (411 D agrégé + 2 ventilations 7xx C)
+    $lignesT1 = TransactionLigne::where('transaction_id', $t1->id)
+        ->whereNotNull('compte_id')
+        ->get();
+    expect($lignesT1->count())->toBe(3, 'T1 doit avoir 3 lignes : 411 D + 2 ventilations 7xx C');
 
     // La ligne 411 D porte le montant total agrégé (150)
-    $ligne411D = TransactionLigne::where('transaction_id', $transaction->id)
-        ->where('compte_id', $compte411->id)
-        ->where('debit', '>', 0)
-        ->first();
+    $ligne411D = $lignesT1->first(fn ($l) => (int) $l->compte_id === (int) $compte411->id && (float) $l->debit > 0);
+    expect($ligne411D)->not()->toBeNull('T1 doit avoir une ligne 411 D');
     expect((float) $ligne411D->debit)->toBe(150.0);
 
+    // Pas de ligne 5112 sur T1
+    $ligne5112T1 = $lignesT1->firstWhere('compte_id', $compte5112->id);
+    expect($ligne5112T1)->toBeNull('T1 ne doit PAS avoir de ligne 5112 (sur T2 uniquement)');
+
     // Les 2 lignes legacy sont enrichies avec leur compte_id respectif
-    $ligneVent1 = TransactionLigne::where('transaction_id', $transaction->id)
+    $ligneVent1 = TransactionLigne::where('transaction_id', $t1->id)
         ->where('sous_categorie_id', $this->scRecette->id)
         ->first();
-    $ligneVent2 = TransactionLigne::where('transaction_id', $transaction->id)
+    $ligneVent2 = TransactionLigne::where('transaction_id', $t1->id)
         ->where('sous_categorie_id', $scRecette2->id)
         ->first();
 
@@ -380,6 +388,26 @@ it('multi-ventilation recette comptant chèque — 2 lignes 7x et 1 ligne 411 D 
     expect((float) $ligneVent1->credit)->toBe(100.0);
     expect($ligneVent2->compte_id)->toBe($compte706B->id);
     expect((float) $ligneVent2->credit)->toBe(50.0);
+
+    // T2 : 2 lignes (5112 D + 411 C), 411 lettré inter-tx
+    $ligne411D->refresh();
+    expect($ligne411D->lettrage_code)->not()->toBeNull('411 D de T1 doit être lettré vers T2');
+
+    $ligne411C_T2 = TransactionLigne::where('lettrage_code', $ligne411D->lettrage_code)
+        ->where('compte_id', $compte411->id)
+        ->where('transaction_id', '!=', $t1->id)
+        ->first();
+    expect($ligne411C_T2)->not()->toBeNull('T2 doit avoir une ligne 411 C lettrée');
+    expect((float) $ligne411C_T2->credit)->toBe(150.0, 'T2 411 C doit avoir le total agrégé 150');
+
+    $t2Id = $ligne411C_T2->transaction_id;
+    $lignesT2 = TransactionLigne::where('transaction_id', $t2Id)->get();
+    expect($lignesT2->count())->toBe(2, 'T2 doit avoir 2 lignes : 5112 D + 411 C');
+
+    $ligne5112T2 = $lignesT2->firstWhere('compte_id', $compte5112->id);
+    expect($ligne5112T2)->not()->toBeNull('T2 doit avoir une ligne 5112 D');
+    expect((float) $ligne5112T2->debit)->toBe(150.0);
+    expect($ligne5112T2->tiers_id)->toBeNull('Invariant FEC : classe 5 sans tiers');
 });
 
 // ---------------------------------------------------------------------------

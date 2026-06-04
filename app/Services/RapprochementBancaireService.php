@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\JournalComptable;
 use App\Enums\StatutRapprochement;
 use App\Enums\StatutReglement;
 use App\Models\Compte;
@@ -181,6 +182,15 @@ final class RapprochementBancaireService
                         ->whereDoesntHave('lignes', fn (Builder $l): Builder => $l
                             ->whereHas('compte', fn (Builder $c): Builder => $c->bancaires()));
                 })
+                // Chantier 2a — exclure les T2 d'encaissement séparées (journal=Banque, remise_id null).
+                // Depuis le chantier 2a, TransactionService produit une T2 (journal=Banque) distincte
+                // pour les recettes comptant. Ces T2 ont rapprochement_id propagé depuis toggleTransaction,
+                // mais leur montant_total ne doit PAS être compté en mode legacy (doublon avec T1).
+                // Les T4 de remise (journal=Banque ET remise_id NOT NULL) sont conservées dans le SUM.
+                ->whereNot(function (Builder $q): void {
+                    $q->where('journal', JournalComptable::Banque->value)
+                        ->whereNull('remise_id');
+                })
                 ->selectRaw("SUM(CASE WHEN type = 'depense' THEN -montant_total ELSE montant_total END) as total")
                 ->value('total');
         }
@@ -277,15 +287,16 @@ final class RapprochementBancaireService
                 $model->statut_reglement = StatutReglement::Pointe;
                 $model->save();
 
-                // Fix D : propager rapprochement_id sur T2 séparé (si généré ci-dessus)
-                // pour que sa ligne 512X soit comptée par calculerSoldePointage (mode PD).
-                if (config('compta.use_partie_double')) {
-                    $t2 = $this->reglementService->trouverEncaissementT2($model);
+                // Fix D (chantier 2a) : propager rapprochement_id sur T2 séparée si elle existe.
+                // Sans garde use_partie_double — depuis le chantier 2a, les recettes comptant
+                // créées via TransactionService produisent systématiquement une T2 séparée
+                // (même en dehors du mode PD). trouverEncaissementT2 retourne null si T2
+                // absente (transactions legacy, dépenses, créances non encaissées) → no-op.
+                $t2 = $this->reglementService->trouverEncaissementT2($model);
 
-                    if ($t2 !== null) {
-                        $t2->rapprochement_id = $rapprochement->id;
-                        $t2->save();
-                    }
+                if ($t2 !== null) {
+                    $t2->rapprochement_id = $rapprochement->id;
+                    $t2->save();
                 }
             }
         });
