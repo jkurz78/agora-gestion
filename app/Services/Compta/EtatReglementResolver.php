@@ -11,6 +11,7 @@ use App\Models\Compte;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\ReglementOperationService;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Dérive le statut de règlement d'une transaction depuis le grand livre PD
@@ -74,8 +75,8 @@ final class EtatReglementResolver
         // Ligne de trésorerie (classe 5) de la transaction portage.
         $ligneTresorerie = TransactionLigne::with('compte')
             ->where('transaction_id', (int) $txPortage->id)
-            ->get()
-            ->first(fn (TransactionLigne $l) => $l->compte !== null && $l->compte->classe === 5);
+            ->whereHas('compte', fn (Builder $q) => $q->where('classe', 5))
+            ->first();
 
         if ($ligneTresorerie === null) {
             return $t1->statut_reglement; // structure inattendue → fallback prudent
@@ -121,11 +122,12 @@ final class EtatReglementResolver
 
         $ligne512X = TransactionLigne::with('compte')
             ->where('transaction_id', (int) $t4->id)
-            ->get()
-            ->first(fn (TransactionLigne $l) => $l->compte !== null && $l->compte->estBancaire());
+            ->whereHas('compte', fn (Builder $q) => $q->bancaires())
+            ->first();
 
         if ($ligne512X === null) {
-            return StatutReglement::Recu; // remis mais 512X introuvable → dénoué
+            // Anomalie : 5112/530 lettré mais T4 sans 512X. Dégradation prudente vers dénoué.
+            return StatutReglement::Recu;
         }
 
         return $t4->rapprochement_id !== null

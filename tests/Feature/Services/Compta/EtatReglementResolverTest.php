@@ -5,10 +5,12 @@ declare(strict_types=1);
 use App\Enums\ModePaiement;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
+use App\Models\RapprochementBancaire;
 use App\Models\RemiseBancaire;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Services\Compta\EtatReglementResolver;
+use App\Services\ReglementOperationService;
 use App\Services\RemiseBancaireService;
 use App\Services\TransactionService;
 use Tests\Support\CreatesPartieDoubleContext;
@@ -128,4 +130,31 @@ it('recette chèque remis en banque (5112 lettré vers T4 512X non rapproché) �
     app(RemiseBancaireService::class)->comptabiliser($remise, [$t1->id]);
 
     expect($this->resolver->resolve($t1->fresh()))->toBe(StatutReglement::Recu);
+});
+
+it('recette virement rapprochée (512X portant rapprochement_id) → Pointe', function () {
+    ['data' => $data, 'lignes' => $lignes] = recetteData($this, ModePaiement::Virement->value);
+    $t1 = $this->service->create($data, $lignes);
+
+    // La T2 séparée porte le 512X ; on la marque rapprochée.
+    $compte411 = compteSysteme('411');
+    $t2 = app(ReglementOperationService::class)->trouverEncaissementT2($t1->fresh(), $compte411);
+    expect($t2)->not->toBeNull('[précondition] T2 séparée doit exister pour un virement comptant');
+
+    $rappro = RapprochementBancaire::factory()->create([
+        'association_id' => $this->association->id,
+        'compte_id' => $this->compteBancaire->id,
+        'saisi_par' => $this->user->id,
+    ]);
+    $t2->rapprochement_id = $rappro->id;
+    $t2->save();
+
+    expect($this->resolver->resolve($t1->fresh()))->toBe(StatutReglement::Pointe);
+});
+
+it('recette espèces comptant (530 en main, pas de 512X) → EnMain', function () {
+    ['data' => $data, 'lignes' => $lignes] = recetteData($this, ModePaiement::Especes->value);
+    $t1 = $this->service->create($data, $lignes);
+
+    expect($this->resolver->resolve($t1->fresh()))->toBe(StatutReglement::EnMain);
 });
