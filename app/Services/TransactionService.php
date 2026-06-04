@@ -16,6 +16,7 @@ use App\Models\TransactionLigne;
 use App\Services\Compta\CompteTresorerieResolver;
 use App\Services\Compta\CompteVentilationResolver;
 use App\Services\Compta\EcritureGenerator;
+use App\Services\Compta\EtatReglementResolver;
 use App\Services\Compta\LettrageService;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
@@ -37,6 +38,7 @@ final class TransactionService
         private readonly ExerciceService $exerciceService,
         private readonly EcritureGenerator $ecritureGenerator,
         private readonly LettrageService $lettrageService,
+        private readonly EtatReglementResolver $etatReglementResolver,
     ) {}
 
     public function create(array $data, array $lignes): Transaction
@@ -63,7 +65,12 @@ final class TransactionService
             // Step 21 — branchement systématique (pas de feature flag)
             $this->enrichirPartieDouble($transaction, $lignesCreees);
 
-            return $transaction;
+            // Chantier 4 — recalcul du statut miroir depuis le ledger (couvre les
+            // transactions comptant créées live : cheque→EnMain, virement→Recu).
+            // Doit s'exécuter APRÈS enrichirPartieDouble (lignes PD et lettrage présents).
+            $this->etatReglementResolver->syncer($transaction->fresh());
+
+            return $transaction->fresh();
         });
     }
 
@@ -397,6 +404,10 @@ final class TransactionService
                 $transaction->refresh();
                 $this->enrichirPartieDouble($transaction, $lignesCreees);
             }
+
+            // Chantier 4 — recalcul du statut miroir depuis le ledger (couvre la
+            // réversion reçu→non-reçu : le 411/401 redevient non lettré → EnAttente).
+            $this->etatReglementResolver->syncer($transaction->fresh());
 
             return $transaction->fresh();
         });
