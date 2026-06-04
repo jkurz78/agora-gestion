@@ -156,9 +156,15 @@
                             @endif
                             @error('tiers_id') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                         </div>
-                        @if ($type === 'recette')
+                        @if ($type === 'recette' || $type === 'depense')
                         <div class="col-md-2">
-                            <label class="form-label">Paiement déjà reçu ?</label>
+                            <label class="form-label">
+                                @if ($type === 'depense')
+                                    Paiement effectué ?
+                                @else
+                                    Paiement déjà reçu ?
+                                @endif
+                            </label>
                             <div class="d-flex gap-2 mt-1">
                                 <div class="form-check">
                                     <input class="form-check-input" type="radio" wire:model.live="paiementRecu"
@@ -175,7 +181,7 @@
                             </div>
                         </div>
                         @endif
-                        @if ($type !== 'recette' || $paiementRecu)
+                        @if (($type !== 'recette' && $type !== 'depense') || $paiementRecu)
                         <div class="col-md-2">
                             <label for="mode_paiement" class="form-label">Mode paiement <span class="text-danger">*</span></label>
                             <select wire:model="mode_paiement" id="mode_paiement"

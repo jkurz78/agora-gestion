@@ -89,6 +89,13 @@ final class TransactionUniverselle extends Component
 
     public ?int $recuCompteId = null;
 
+    // === Modale « Marquer payé » pour dettes fournisseurs (mode_paiement null) ===
+    public ?int $payeTxId = null;
+
+    public string $payeMode = '';
+
+    public ?int $payeCompteId = null;
+
     public function mount(
         ?int $compteId = null,
         ?int $tiersId = null,
@@ -339,10 +346,14 @@ final class TransactionUniverselle extends Component
     }
 
     /**
-     * Point d'entrée du bouton « Marquer reçu ».
+     * Point d'entrée du bouton « Marquer reçu » (recettes) ou « Marquer payé » (dépenses).
      *
-     * — Si la transaction a déjà un mode_paiement (recette directe) : comportement actuel, un clic suffit.
-     * — Si mode_paiement est null (créance) : ouvre la modale de capture du mode.
+     * Recettes :
+     * — Si mode_paiement est null (créance) : ouvre la modale « Marquer reçu » pour capturer le mode.
+     * — Si mode_paiement est déjà connu : comportement direct (un clic suffit).
+     *
+     * Dépenses :
+     * — Toujours ouvre la modale « Marquer payé » (une dette ouverte est par définition sans mode).
      */
     public function marquerRecu(int $id): void
     {
@@ -354,8 +365,18 @@ final class TransactionUniverselle extends Component
             return;
         }
 
+        // Dépense en attente → modale « Marquer payé »
+        if ($tx->type->value === 'depense') {
+            $this->payeTxId = (int) $tx->id;
+            $this->payeMode = '';
+            $this->payeCompteId = null;
+            $this->dispatch('marquer-paye-modal-open');
+
+            return;
+        }
+
         if ($tx->mode_paiement === null) {
-            // Créance : demander le mode via modale
+            // Créance recette : demander le mode via modale
             $this->recuTxId = (int) $tx->id;
             $this->recuMode = '';
             $this->recuCompteId = null;
@@ -366,6 +387,48 @@ final class TransactionUniverselle extends Component
 
         // Recette avec mode connu : comportement direct
         app(ReglementOperationService::class)->marquerRecu($tx);
+    }
+
+    /**
+     * Confirmation depuis la modale « Marquer payé » : valide le mode et appelle marquerPaye.
+     */
+    public function confirmerPaye(): void
+    {
+        $this->validate([
+            'payeMode' => 'required|in:cheque,especes,virement,cb,prelevement',
+        ], [
+            'payeMode.required' => 'Le mode de paiement est obligatoire.',
+            'payeMode.in' => 'Mode de paiement invalide.',
+        ]);
+
+        if ($this->payeTxId === null) {
+            return;
+        }
+
+        $tx = Transaction::find($this->payeTxId);
+        if (! $tx || $tx->statut_reglement !== StatutReglement::EnAttente) {
+            $this->dispatch('marquer-paye-modal-close');
+            $this->payeTxId = null;
+
+            return;
+        }
+        if ($tx->isLockedByRapprochement() || $tx->isLockedByFacture()) {
+            $this->dispatch('marquer-paye-modal-close');
+            $this->payeTxId = null;
+
+            return;
+        }
+
+        app(ReglementOperationService::class)->marquerPaye(
+            $tx,
+            ModePaiement::from($this->payeMode),
+            $this->payeCompteId !== null ? (int) $this->payeCompteId : null,
+        );
+
+        $this->dispatch('marquer-paye-modal-close');
+        $this->payeTxId = null;
+        $this->payeMode = '';
+        $this->payeCompteId = null;
     }
 
     /**

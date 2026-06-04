@@ -57,7 +57,10 @@ final class TransactionForm extends Component
 
     public string $mode_paiement = '';
 
-    /** Pour les recettes : true = paiement déjà reçu (comptant), false = recette attendue (créance). */
+    /**
+     * Pour les recettes : true = paiement déjà reçu (comptant), false = recette attendue (créance).
+     * Pour les dépenses : true = paiement déjà effectué (comptant), false = dette ouverte.
+     */
     public bool $paiementRecu = true;
 
     public ?int $tiers_id = null;
@@ -528,7 +531,12 @@ final class TransactionForm extends Component
                 'libelle' => ['nullable', 'string', 'max:255'],
                 'reference' => ['nullable', 'string', 'max:100'],
                 'mode_paiement' => [
-                    Rule::requiredIf(fn () => $this->type !== 'recette' || $this->paiementRecu),
+                    // Requis sauf : recette non reçue, ou dépense non payée
+                    Rule::requiredIf(fn () => match ($this->type) {
+                        'recette' => $this->paiementRecu,
+                        'depense' => $this->paiementRecu,
+                        default => true,
+                    }),
                     'nullable',
                     'in:virement,cheque,especes,cb,prelevement',
                 ],
@@ -573,9 +581,10 @@ final class TransactionForm extends Component
             $this->validate($lignesPjRules, $lignesPjMessages);
         }
 
-        // Pour une recette non encore reçue (créance), on force le mode à null
-        // afin que TransactionService::enrichirPartieDouble route vers pourRecetteACredit.
-        $modeEffectif = ($this->type === 'recette' && ! $this->paiementRecu)
+        // Pour une recette non encore reçue (créance) ou une dépense non encore payée (dette),
+        // on force le mode à null afin que TransactionService::enrichirPartieDouble route vers
+        // pourRecetteACredit (recette) ou pourDepenseACredit seul (dépense — dette ouverte).
+        $modeEffectif = (($this->type === 'recette' || $this->type === 'depense') && ! $this->paiementRecu)
             ? null
             : ($this->mode_paiement !== '' ? $this->mode_paiement : null);
 
@@ -601,10 +610,13 @@ final class TransactionForm extends Component
                 : StatutReglement::EnAttente->value;
         }
 
-        // Chantier 3a-i : une dépense comptant est immédiatement réglée (T1 dette + T2 règlement).
-        // Le toggle « payé ? » viendra en 3a-ii ; pour l'instant toutes les dépenses sont comptant.
+        // Chantier 3a-ii : le toggle « paiement effectué ? » pilote le statut des dépenses.
+        // Dépense payée (comptant) → statut = Recu. Dépense non payée (dette ouverte) → EnAttente.
+        // Garde create-only : ne jamais rétrograde un statut Pointe existant à l'édition.
         if ($this->transactionId === null && $this->type === 'depense') {
-            $data['statut_reglement'] = StatutReglement::Recu->value;
+            $data['statut_reglement'] = $this->paiementRecu
+                ? StatutReglement::Recu->value
+                : StatutReglement::EnAttente->value;
         }
 
         $lignes = collect($this->lignes)->map(fn ($l) => [

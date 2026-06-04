@@ -309,6 +309,11 @@ final class TransactionService
             // (chèque fantôme en 5112). Fait AVANT update + délettrage (le 411 est encore lettré).
             $this->annulerEncaissementSiReversion($transaction, $data);
 
+            // Réversion règlement : dépense « réglée » (mode présent) repassée « non payée »
+            // (mode null) → supprimer la T2 de règlement séparée, sinon elle reste orpheline
+            // (décaissement fantôme en 512X). Fait AVANT update + délettrage (le 401 est encore lettré).
+            $this->annulerReglementSiReversion($transaction, $data);
+
             $transaction->update($data);
 
             if ($transaction->isLockedByFacture()) {
@@ -423,6 +428,40 @@ final class TransactionService
             $this->lettrageService->delettrerParLigne(
                 $ligne->fresh(),
                 "Annulation encaissement (recette repassée non reçue) — T2 #{$t2->id}"
+            );
+        }
+        TransactionLigne::where('transaction_id', $t2->id)->forceDelete();
+        $t2->forceDelete();
+    }
+
+    /**
+     * Si une dépense « réglée » (mode_paiement présent) est repassée « non payée » (mode null)
+     * à l'édition, supprime la T2 de règlement SÉPARÉE — sinon elle reste orpheline (décaissement
+     * fantôme en 512X). Le cas lumpé (règlement sur la même transaction) est nettoyé par le
+     * forceDelete des lignes dans update(). À appeler AVANT update()/délettrage (401 lettré).
+     *
+     * Miroir de annulerEncaissementSiReversion() pour les dépenses (compte 401 au lieu de 411).
+     */
+    private function annulerReglementSiReversion(Transaction $transaction, array $data): void
+    {
+        if ($transaction->type !== TypeTransaction::Depense) {
+            return;
+        }
+        // Réversion = avait un mode (réglée) → passe à null (non payée)
+        if ($transaction->mode_paiement === null || ($data['mode_paiement'] ?? null) !== null) {
+            return;
+        }
+
+        $t2 = app(ReglementOperationService::class)->trouverReglementT2($transaction);
+        if ($t2 === null) {
+            return; // cas lumpé : nettoyé par le forceDelete des lignes dans update()
+        }
+
+        // Délettre les lignes lettrées de la T2 (401 ↔ T1) puis supprimer la T2.
+        foreach (TransactionLigne::where('transaction_id', $t2->id)->whereNotNull('lettrage_code')->get() as $ligne) {
+            $this->lettrageService->delettrerParLigne(
+                $ligne->fresh(),
+                "Annulation règlement (dépense repassée non payée) — T2 #{$t2->id}"
             );
         }
         TransactionLigne::where('transaction_id', $t2->id)->forceDelete();

@@ -795,4 +795,51 @@
             </div>
         </div>
     </div>
+
+    {{-- Modale « Marquer payé » — capture du mode pour les dettes fournisseurs (dépenses en attente) --}}
+    <div class="modal fade" id="marquerPayeModal" tabindex="-1"
+         wire:ignore.self
+         x-data
+         x-on:marquer-paye-modal-open.window="bootstrap.Modal.getOrCreateInstance($el).show()"
+         x-on:marquer-paye-modal-close.window="bootstrap.Modal.getOrCreateInstance($el).hide()">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title"><i class="bi bi-check-lg me-1"></i>Enregistrer le paiement</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    @error('payeMode')
+                        <div class="alert alert-danger py-1 px-2 small mb-2">{{ $message }}</div>
+                    @enderror
+                    <div class="mb-3">
+                        <label class="form-label small mb-1 fw-semibold">Mode de paiement <span class="text-danger">*</span></label>
+                        <select wire:model="payeMode" class="form-select form-select-sm @error('payeMode') is-invalid @enderror">
+                            <option value="">— Sélectionner —</option>
+                            @foreach($modesPaiement as $mode)
+                                <option value="{{ $mode->value }}">{{ ucfirst($mode->value) }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="mb-1">
+                        <label class="form-label small mb-1">Compte bancaire <span class="text-muted">(optionnel)</span></label>
+                        <select wire:model="payeCompteId" class="form-select form-select-sm">
+                            <option value="">— Conserver le compte actuel —</option>
+                            @foreach($comptesBancaires as $cb)
+                                <option value="{{ $cb->id }}">{{ $cb->nom }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button wire:click="confirmerPaye" class="btn btn-sm btn-success"
+                            wire:loading.attr="disabled">
+                        <span wire:loading.remove wire:target="confirmerPaye"><i class="bi bi-check-lg me-1"></i>Confirmer</span>
+                        <span wire:loading wire:target="confirmerPaye"><i class="bi bi-hourglass-split"></i> Enregistrement...</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
