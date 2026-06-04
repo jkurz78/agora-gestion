@@ -237,15 +237,30 @@ final class TransactionService
         } else {
             // TypeTransaction::Depense
             if ($modePaiement !== null) {
-                // Dépense comptant
-                $this->ecritureGenerator->pourDepenseComptant(
+                // Dépense comptant — chantier 3a-i (2026-06-04) :
+                // On ne passe plus par pourDepenseComptant() (écriture lumpée 1 Tx, 4 lignes).
+                // On produit à la place le chemin "dette puis règlement" :
+                //   1. pourDepenseACredit()         → T1 enrichie (60x D / 401 C, journal=Achat)
+                //   2. pourReglementFournisseur()    → T2 séparée créée (401 D / 512X C, journal=Banque)
+                //                                     + auto-lettrage 401 T1 ↔ T2
+                // Résultat : même structure qu'une dette + Marquer payé. Backfill (TransactionConverter)
+                // conserve intentionnellement pourDepenseComptant() — chantier 3b différé.
+                $this->ecritureGenerator->pourDepenseACredit(
                     tiers: $tiers,
                     ventilations: $ventilations,
-                    mode: $modePaiement,
-                    compteTresorerie: $compteTresorerie,
-                    date: $date,
+                    dateConstatation: $date,
                     libelle: $transaction->libelle,
                     existingTransaction: $transaction,
+                );
+
+                // T1 est désormais enrichie (60x D / 401 C). Générer T2 de règlement.
+                $libelleReglement = 'Règlement '.$transaction->libelle;
+                $this->ecritureGenerator->pourReglementFournisseur(
+                    transactionDette: $transaction,
+                    mode: $modePaiement,
+                    compteTresorerie: $compteTresorerie,
+                    datePaiement: $date,
+                    libelle: $libelleReglement,
                 );
             } else {
                 // Dépense à crédit

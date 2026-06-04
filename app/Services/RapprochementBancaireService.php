@@ -264,8 +264,12 @@ final class RapprochementBancaireService
             };
 
             if ((int) $model->rapprochement_id === (int) $rapprochement->id) {
-                // Dé-pointage : effacer rapprochement_id sur T1 et sur T2 séparé si présent
-                $t2 = $this->reglementService->trouverEncaissementT2($model);
+                // Dé-pointage : effacer rapprochement_id sur T1 et sur T2 séparée si présente.
+                // Chantier 2a : recette comptant → T2 via trouverEncaissementT2 (411).
+                // Chantier 3a-i : dépense comptant → T2 via trouverReglementT2 (401).
+                $t2 = $type === 'depense'
+                    ? $this->reglementService->trouverReglementT2($model)
+                    : $this->reglementService->trouverEncaissementT2($model);
 
                 $model->rapprochement_id = null;
                 $model->statut_reglement = $model->remise_id !== null
@@ -278,8 +282,8 @@ final class RapprochementBancaireService
                     $t2->save();
                 }
             } else {
-                // Pointage : générer T2 si en_attente (Fix D — idempotent)
-                if (config('compta.use_partie_double')) {
+                // Pointage : générer T2 si en_attente (Fix D — idempotent, recettes seulement)
+                if (config('compta.use_partie_double') && $type !== 'depense') {
                     $this->reglementService->encaisserSiNonEncaisse($model);
                 }
 
@@ -287,12 +291,15 @@ final class RapprochementBancaireService
                 $model->statut_reglement = StatutReglement::Pointe;
                 $model->save();
 
-                // Fix D (chantier 2a) : propager rapprochement_id sur T2 séparée si elle existe.
-                // Sans garde use_partie_double — depuis le chantier 2a, les recettes comptant
-                // créées via TransactionService produisent systématiquement une T2 séparée
-                // (même en dehors du mode PD). trouverEncaissementT2 retourne null si T2
-                // absente (transactions legacy, dépenses, créances non encaissées) → no-op.
-                $t2 = $this->reglementService->trouverEncaissementT2($model);
+                // Propager rapprochement_id sur T2 séparée si elle existe.
+                // Chantier 2a : recettes comptant → T2 via trouverEncaissementT2 (411).
+                // Chantier 3a-i : dépenses comptant → T2 via trouverReglementT2 (401).
+                // Sans garde use_partie_double — les T2 sont créées systématiquement depuis
+                // les chantiers 2a/3a-i. Les méthodes retournent null pour les transactions
+                // legacy (lumpées) ou sans T2 → no-op.
+                $t2 = $type === 'depense'
+                    ? $this->reglementService->trouverReglementT2($model)
+                    : $this->reglementService->trouverEncaissementT2($model);
 
                 if ($t2 !== null) {
                     $t2->rapprochement_id = $rapprochement->id;

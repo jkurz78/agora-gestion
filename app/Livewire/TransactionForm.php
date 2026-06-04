@@ -591,7 +591,7 @@ final class TransactionForm extends Component
             'notes' => $this->notes ?: null,
         ];
 
-        // Pose statut_reglement explicitement à la création pour les recettes.
+        // Pose statut_reglement explicitement à la création pour les recettes et dépenses.
         // À l'édition on ne touche pas le champ : un statut Pointe ne doit jamais
         // être rétrogradé par le formulaire de saisie (stopgap avant statut dérivé
         // du ledger — chantier 4).
@@ -599,6 +599,12 @@ final class TransactionForm extends Component
             $data['statut_reglement'] = $this->paiementRecu
                 ? StatutReglement::Recu->value
                 : StatutReglement::EnAttente->value;
+        }
+
+        // Chantier 3a-i : une dépense comptant est immédiatement réglée (T1 dette + T2 règlement).
+        // Le toggle « payé ? » viendra en 3a-ii ; pour l'instant toutes les dépenses sont comptant.
+        if ($this->transactionId === null && $this->type === 'depense') {
+            $data['statut_reglement'] = StatutReglement::Recu->value;
         }
 
         $lignes = collect($this->lignes)->map(fn ($l) => [

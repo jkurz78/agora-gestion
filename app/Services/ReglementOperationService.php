@@ -313,6 +313,45 @@ final class ReglementOperationService
     }
 
     /**
+     * Trouve la T2 de règlement d'une dépense T1 dette via le lettrage du 401.
+     *
+     * Symétrique de trouverEncaissementT2 (recettes, 411) pour les dépenses (401).
+     * Utilisé par RapprochementBancaireService::toggleTransaction pour propager
+     * rapprochement_id sur la T2 au pointage/dépointage d'une dépense comptant.
+     *
+     * @param  Compte|null  $compte401  Compte 401 pré-chargé (optimisation N+1). Résolu ici si null.
+     */
+    public function trouverReglementT2(Transaction $t1, ?Compte $compte401 = null): ?Transaction
+    {
+        $compte401 ??= Compte::ofNumero('401');
+
+        if ($compte401 === null) {
+            return null;
+        }
+
+        $ligne401T1 = TransactionLigne::where('transaction_id', (int) $t1->id)
+            ->where('compte_id', (int) $compte401->id)
+            ->whereNotNull('lettrage_code')
+            ->first();
+
+        if ($ligne401T1 === null) {
+            return null; // Pas encore lettré → pas de T2
+        }
+
+        // Chercher la ligne 401 partageant le même code sur une AUTRE transaction
+        $ligne401T2 = TransactionLigne::where('lettrage_code', $ligne401T1->lettrage_code)
+            ->where('compte_id', (int) $compte401->id)
+            ->where('transaction_id', '!=', (int) $t1->id)
+            ->first();
+
+        if ($ligne401T2 === null) {
+            return null; // Lumped : la contrepartie est sur la même transaction
+        }
+
+        return Transaction::find($ligne401T2->transaction_id);
+    }
+
+    /**
      * Enrichit la Transaction créée par comptabiliserSeance avec les écritures partie double.
      *
      * Pattern Step 23 (FactureService::genererTransactionDepuisLignesManuelles) :
