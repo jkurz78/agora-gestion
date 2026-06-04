@@ -57,6 +57,8 @@ Après analyse (2026-06-03), ce n'est pas un quick fix : il faut une **nouvelle 
 **Intention** : le statut cesse d'être un **enum stocké** et devient **dérivé du ledger** (source de vérité unique). Symétrique :
 - recette : **attendu / à remettre / remis / rapproché** (411 → 5112 → 512X → pointé) ;
 - dépense : **dû / réglé / pointé** (401 → 512X → pointé).
+
+**Cas concret à couvrir (trouvé en recette 2a, 2026-06-04)** : une recette « reçue » repassée en non-reçue (réversion) **garde aujourd'hui `statut_reglement = Recu` à tort** — l'enum stocké n'est jamais reposé par la réversion (`annulerEncaissementSiReversion` supprime la T2 mais ne touche pas le statut ; QF-B ne pose le statut qu'à la création). Le statut dérivé doit recalculer « en attente » (411 non lettré + pas de 512X). À couvrir symétriquement recette **et** dépense. (Décision 2026-06-04 : pas de stopgap, on laisse le chantier 4 le dissoudre.)
 → **Dissout structurellement l'audit Thème B** (le « comptant naît en_attente » disparaît : le statut se dérive du 411 lettré / 512X présent).
 **Dépendances** : **APRÈS chantier 3** (cycle 401 à dériver) **+ chantier 2b** (convergence backfill → structure T2 uniforme à dériver, sinon il faut dériver le statut sur deux structures). Spec existante `2026-06-02-cycle-vie-creance-statut-derive.md` — **à élargir au 401**.
 
