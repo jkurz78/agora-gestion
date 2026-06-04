@@ -33,20 +33,21 @@ Le moteur PD (`EcritureGenerator`, école 411, invariants d'équilibre/tiers) es
 
 ## Phase 0 — Quick fixes (immédiat, hors file)
 
-### QF-B — Statut de règlement posé à la création (recette comptant)
+### QF-B — Statut de règlement posé à la création (recette comptant) ✅ LIVRÉ 2026-06-03 (commit `97a061ee`)
 **Bug** (audit Thème B, **BLOQUANT**) : `TransactionForm::save()` ne pose jamais `statut_reglement` → un don/recette **comptant** naît `en_attente` → reçu fiscal bloqué, statut faux, « Marquer reçu » fait un skip silencieux (411 déjà lettré).
 **Fix étroit** : poser `statut_reglement = Recu` quand `paiementRecu = true`. **Stopgap** en attendant le chantier 4 (statut dérivé du ledger, qui le dissout structurellement). Réf : `TransactionForm.php:577-591`.
 
-### QF-D — Abandon de créance → montage OD sans trésorerie
-**Bug** (audit Thème D, **HAUTE**) : l'abandon de créance fabrique **2 lignes 512X fictives** non lettrées qui, depuis le chantier 1, **polluent le rapprochement** (deviennent pointables sans contrepartie au relevé).
-**Fix** : router l'abandon en **OD** `401 D / 75x C` (lettrage du 401), **sans ligne 512X** ; journal OD (pas Vente) ; `mode_paiement` null sur le don. Réf : `NoteDeFraisValidationService.php:141-223`.
+### ~~QF-D — Abandon de créance → OD~~ → **reclassé : déplacé dans FX-NDF (Phase 2)**
+Après analyse (2026-06-03), ce n'est pas un quick fix : il faut une **nouvelle méthode OD** `4xx D / 75x C` + le re-câblage de `validerAvecAbandonCreance` + la mise à jour de 4 fichiers de tests. C'est la **même refonte que FX-NDF**, avec le compte final **467**. Décision : le faire **une seule fois** dans FX-NDF. (Non bloquant recette : la pollution 512X n'apparaît que si abandon de créance **+** rapprochement.)
 
 ---
 
 ## Phase 1 — Socle : le cycle de vie d'une opération en PD
 
-### 2. Règlement recette — « marquer reçu » ↔ édition (modèle unique)
-**Intention** : aujourd'hui le **bouton « Marquer reçu »** crée une **T2 séparée**, mais l'**édition** (toggle `paiementRecu`) crée un encaissement **lumpé** sur la même transaction. Deux chemins → deux structures. Harmoniser sur **un seul modèle** (sinon divergence en B et à l'affichage des écritures). Intègre proprement QF-B.
+### 2. Règlement recette — converger sur le modèle « T2 séparée »
+**Intention** : le **bouton « Marquer reçu »** crée une **T2 séparée**, mais l'**édition** comptant (toggle `paiementRecu`) crée un encaissement **lumpé** sur la même transaction. Deux structures pour le même fait. **Cible** : recette comptant = T1 créance (`411 D / 7xx C`, Vente) + T2 encaissement (`portage D / 411 C`, Banque, 411 lettré inter-tx), identique à « créance puis Marquer reçu ».
+- **2a — chemin live** (`TransactionService::enrichirPartieDouble` : recette comptant → `pourRecetteACredit` + `pourEncaissementCreance`). Réversion uniforme via `annulerEncaissementSiReversion`. `pourRecetteComptant` conservé (bloc de tests). Intègre QF-B.
+- **2b — backfill** ⏸️ **DIFFÉRÉ — NE PAS OUBLIER** (décision 2026-06-03) : `TransactionConverter` (ligne ~222 : recette comptant → même modèle T2 séparée). **Prérequis du chantier 4** (statut dérivé : structure uniforme live+historique requise). Touche les tests backfill/smoke/équivalence. À faire **juste avant le chantier 4**. Tant que 2b n'est pas fait : divergence assumée live (T2) ↔ historique backfillé (lumpé), non visible dans les écrans opérationnels.
 
 ### 3. Volet 1A symétrique — charges (dette fournisseur 401 → 467)
 **Intention** : miroir du Volet A côté **dépenses**. Saisir une **dette** (`60x D / 4xx C` via `pourDepenseACredit`, déjà existant), **« Marquer payé »** (`4xx D / 512X C` via `pourReglementFournisseur`, déjà existant), réversion. **Le moteur existe — manque l'UI** (le formulaire force le mode pour les dépenses → toujours comptant).
@@ -57,7 +58,7 @@ Le moteur PD (`EcritureGenerator`, école 411, invariants d'équilibre/tiers) es
 - recette : **attendu / à remettre / remis / rapproché** (411 → 5112 → 512X → pointé) ;
 - dépense : **dû / réglé / pointé** (401 → 512X → pointé).
 → **Dissout structurellement l'audit Thème B** (le « comptant naît en_attente » disparaît : le statut se dérive du 411 lettré / 512X présent).
-**Dépendances** : **APRÈS chantier 3** (sinon pas de cycle 401 à dériver). Spec existante `2026-06-02-cycle-vie-creance-statut-derive.md` — **à élargir au 401**.
+**Dépendances** : **APRÈS chantier 3** (cycle 401 à dériver) **+ chantier 2b** (convergence backfill → structure T2 uniforme à dériver, sinon il faut dériver le statut sur deux structures). Spec existante `2026-06-02-cycle-vie-creance-statut-derive.md` — **à élargir au 401**.
 
 ### G. Garantie de non-échappement PD *(nouveau — audit Thème A)*
 **Intention** : aucune transaction ne doit exister sans écriture PD **équilibrée** en mode PD. Ferme les skips silencieux (wizard adhésion, ligne km sans usage configuré → skip de **toute** la transaction, don sans tiers).
@@ -77,6 +78,7 @@ Audit Thèmes A/F : `HelloAssoSyncService` crée des transactions legacy, **PD d
 
 ### FX-NDF — Notes de frais sur le socle « charges »
 Audit Thèmes C/E/A/H : une fois le chantier 3 livré, faire produire à la NDF une **dette ouverte** (`6xx D / 467 C`) puis un **remboursement** réel (T2 `467 D / 512X C` via `pourReglementFournisseur`). Compte **467** (au lieu de 401). Garde sur la **ligne km sans usage** configuré (sinon skip de toute la transaction). Garde **exercice ouvert** à la soumission portail (sinon NDF bloquée en `soumise`).
+- **Abandon de créance (ex-QF-D)** : router l'abandon en **OD** `467 D / 75x C` (lettrage du 467), **sans ligne 512X** → retire les 2 faux mouvements qui polluent le rappro du chantier 1 ; journal OD (pas Vente) ; `mode_paiement` null sur le don ; nouvelle méthode `EcritureGenerator::pourAbandonCreance`. MAJ tests `ValiderAvecAbandonCreanceTest` + E2E + `ConstaterAbandonTest` + `AbandonCreanceNonAffichageTest`.
 
 ### FX-Don — Dons & reçu fiscal
 Audit Thème G : **coupler le reçu fiscal à l'écriture PD** (pas seulement à `statut_reglement.isEncaisse()`), garde « don sans tiers » (skip silencieux aujourd'hui), fiabiliser le montant du reçu sur `debit/credit` plutôt que la colonne legacy `montant` (anticipe le drop legacy).
