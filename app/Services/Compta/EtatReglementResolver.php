@@ -1,0 +1,135 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services\Compta;
+
+use App\Enums\Sens;
+use App\Enums\StatutReglement;
+use App\Enums\TypeTransaction;
+use App\Models\Compte;
+use App\Models\Transaction;
+use App\Models\TransactionLigne;
+use App\Services\ReglementOperationService;
+
+/**
+ * Dérive le statut de règlement d'une transaction depuis le grand livre PD
+ * (chantier 4). Lecture seule, déterministe, source de vérité unique.
+ *
+ * Marche le chaînage de lettrage tiers → trésorerie (multi-hop) :
+ *   - chèque recette :   411 → 5112 (encaissement) → 512X (remise)
+ *   - espèces recette :  411 → 530  → 512X
+ *   - virement/CB :      411 → 512X (direct)
+ *   - dépense :          401 → 512X (règlement)
+ *
+ * Robuste aux deux structures (encaissement lumpé sur la T1 OU T2 séparée) et
+ * retombe sur la colonne stockée pour les tx sans lignes PD (legacy/HelloAsso).
+ */
+final class EtatReglementResolver
+{
+    public function __construct(
+        private readonly ReglementOperationService $reglementService,
+    ) {}
+
+    public function resolve(Transaction $t1): StatutReglement
+    {
+        $sens = match ($t1->type) {
+            TypeTransaction::Recette => Sens::Recette,
+            TypeTransaction::Depense => Sens::Depense,
+            default => null,
+        };
+
+        if ($sens === null) {
+            return $t1->statut_reglement; // type hors recette/dépense → inchangé
+        }
+
+        $numeroTiers = $sens === Sens::Recette ? '411' : '401';
+        $compteTiers = Compte::ofNumero($numeroTiers);
+
+        if ($compteTiers === null) {
+            return $t1->statut_reglement; // tenant sans schéma PD
+        }
+
+        $ligneTiers = TransactionLigne::where('transaction_id', (int) $t1->id)
+            ->where('compte_id', (int) $compteTiers->id)
+            ->first();
+
+        if ($ligneTiers === null) {
+            return $t1->statut_reglement; // legacy/HelloAsso : pas de ligne PD
+        }
+
+        // Étape « ouvert » : ligne de tiers non lettrée.
+        if ($ligneTiers->lettrage_code === null) {
+            return StatutReglement::EnAttente;
+        }
+
+        // Lettré → localiser la transaction qui porte la trésorerie.
+        // T2 séparée si elle existe, sinon la T1 elle-même (encaissement lumpé).
+        $t2 = $sens === Sens::Recette
+            ? $this->reglementService->trouverEncaissementT2($t1, $compteTiers)
+            : $this->reglementService->trouverReglementT2($t1, $compteTiers);
+
+        $txPortage = $t2 ?? $t1;
+
+        // Ligne de trésorerie (classe 5) de la transaction portage.
+        $ligneTresorerie = TransactionLigne::with('compte')
+            ->where('transaction_id', (int) $txPortage->id)
+            ->get()
+            ->first(fn (TransactionLigne $l) => $l->compte !== null && $l->compte->classe === 5);
+
+        if ($ligneTresorerie === null) {
+            return $t1->statut_reglement; // structure inattendue → fallback prudent
+        }
+
+        return $this->statutDepuisTresorerie($ligneTresorerie, $txPortage);
+    }
+
+    /**
+     * Statue sur le terme du chaînage à partir de la ligne de trésorerie atteinte.
+     */
+    private function statutDepuisTresorerie(TransactionLigne $ligneTresorerie, Transaction $txPortage): StatutReglement
+    {
+        $compte = $ligneTresorerie->compte;
+
+        // 512X (banque physique) atteint → dénoué, pointé si la tx porteuse est rapprochée.
+        if ($compte !== null && $compte->estBancaire()) {
+            return $txPortage->rapprochement_id !== null
+                ? StatutReglement::Pointe
+                : StatutReglement::Recu;
+        }
+
+        // 5112 / 530 (en main) — non déposé → à remettre.
+        if ($ligneTresorerie->lettrage_code === null) {
+            return StatutReglement::EnMain;
+        }
+
+        // Remis : suivre vers la T4 (autre ligne 5112/530 partageant le code).
+        $ligneT4 = TransactionLigne::where('lettrage_code', $ligneTresorerie->lettrage_code)
+            ->where('compte_id', (int) $ligneTresorerie->compte_id)
+            ->where('transaction_id', '!=', (int) $ligneTresorerie->transaction_id)
+            ->first();
+
+        if ($ligneT4 === null) {
+            return StatutReglement::EnMain; // remise introuvable → dégradation prudente
+        }
+
+        $t4 = Transaction::find($ligneT4->transaction_id);
+
+        if ($t4 === null) {
+            return StatutReglement::EnMain;
+        }
+
+        $ligne512X = TransactionLigne::with('compte')
+            ->where('transaction_id', (int) $t4->id)
+            ->get()
+            ->first(fn (TransactionLigne $l) => $l->compte !== null && $l->compte->estBancaire());
+
+        if ($ligne512X === null) {
+            return StatutReglement::Recu; // remis mais 512X introuvable → dénoué
+        }
+
+        return $t4->rapprochement_id !== null
+            ? StatutReglement::Pointe
+            : StatutReglement::Recu;
+    }
+}

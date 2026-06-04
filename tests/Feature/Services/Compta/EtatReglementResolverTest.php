@@ -1,0 +1,131 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Enums\ModePaiement;
+use App\Enums\StatutReglement;
+use App\Enums\TypeTransaction;
+use App\Models\RemiseBancaire;
+use App\Models\Tiers;
+use App\Models\Transaction;
+use App\Services\Compta\EtatReglementResolver;
+use App\Services\RemiseBancaireService;
+use App\Services\TransactionService;
+use Tests\Support\CreatesPartieDoubleContext;
+
+uses(CreatesPartieDoubleContext::class);
+
+beforeEach(function () {
+    $this->setupPartieDoubleContext();
+    $this->service = app(TransactionService::class);
+    $this->resolver = app(EtatReglementResolver::class);
+    $this->tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
+});
+
+function recetteData(object $ctx, ?string $mode): array
+{
+    return [
+        'data' => [
+            'type' => TypeTransaction::Recette->value,
+            'date' => '2025-10-15',
+            'libelle' => 'Recette test',
+            'montant_total' => '100.00',
+            'mode_paiement' => $mode,
+            'tiers_id' => $ctx->tiers->id,
+            'compte_id' => $mode === null ? null : $ctx->compteBancaire->id,
+        ],
+        'lignes' => [[
+            'sous_categorie_id' => $ctx->sc706->id,
+            'montant' => '100.00',
+            'operation_id' => null,
+            'seance' => null,
+            'notes' => null,
+        ]],
+    ];
+}
+
+it('recette créance (411 non lettré) → EnAttente (ouvert)', function () {
+    ['data' => $data, 'lignes' => $lignes] = recetteData($this, null);
+    $t1 = $this->service->create($data, $lignes);
+
+    expect($this->resolver->resolve($t1->fresh()))->toBe(StatutReglement::EnAttente);
+});
+
+it('recette chèque comptant (411 lettré, 5112 non remis) → EnMain (à remettre)', function () {
+    ['data' => $data, 'lignes' => $lignes] = recetteData($this, ModePaiement::Cheque->value);
+    $t1 = $this->service->create($data, $lignes);
+
+    expect($this->resolver->resolve($t1->fresh()))->toBe(StatutReglement::EnMain);
+});
+
+it('recette virement comptant (411 lettré, 512X direct non rapproché) → Recu (dénoué)', function () {
+    ['data' => $data, 'lignes' => $lignes] = recetteData($this, ModePaiement::Virement->value);
+    $t1 = $this->service->create($data, $lignes);
+
+    expect($this->resolver->resolve($t1->fresh()))->toBe(StatutReglement::Recu);
+});
+
+it('fallback : transaction sans ligne PD (legacy) → renvoie la colonne stockée', function () {
+    $legacy = Transaction::factory()->create([
+        'association_id' => $this->association->id,
+        'type' => TypeTransaction::Recette->value,
+        'statut_reglement' => StatutReglement::Recu->value,
+        'compte_id' => $this->compteBancaire->id,
+    ]);
+
+    expect($this->resolver->resolve($legacy))->toBe(StatutReglement::Recu);
+});
+
+function depenseData(object $ctx, ?string $mode): array
+{
+    return [
+        'data' => [
+            'type' => TypeTransaction::Depense->value,
+            'date' => '2025-10-15',
+            'libelle' => 'Dépense test',
+            'montant_total' => '50.00',
+            'mode_paiement' => $mode,
+            'tiers_id' => $ctx->tiers->id,
+            'compte_id' => $mode === null ? null : $ctx->compteBancaire->id,
+        ],
+        'lignes' => [[
+            'sous_categorie_id' => $ctx->sc606->id,
+            'montant' => '50.00',
+            'operation_id' => null,
+            'seance' => null,
+            'notes' => null,
+        ]],
+    ];
+}
+
+it('dépense dette (401 non lettré) → EnAttente (dû)', function () {
+    ['data' => $data, 'lignes' => $lignes] = depenseData($this, null);
+    $t1 = $this->service->create($data, $lignes);
+
+    expect($this->resolver->resolve($t1->fresh()))->toBe(StatutReglement::EnAttente);
+});
+
+it('dépense réglée par virement (401 lettré, 512X non rapproché) → Recu (réglé)', function () {
+    ['data' => $data, 'lignes' => $lignes] = depenseData($this, ModePaiement::Virement->value);
+    $t1 = $this->service->create($data, $lignes);
+
+    expect($this->resolver->resolve($t1->fresh()))->toBe(StatutReglement::Recu);
+});
+
+it('recette chèque remis en banque (5112 lettré vers T4 512X non rapproché) → Recu (remis)', function () {
+    ['data' => $data, 'lignes' => $lignes] = recetteData($this, ModePaiement::Cheque->value);
+    $t1 = $this->service->create($data, $lignes);
+
+    $remise = RemiseBancaire::create([
+        'association_id' => $this->association->id,
+        'numero' => 2001,
+        'date' => '2025-10-20',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'compte_cible_id' => $this->compteBancaire->id,
+        'libelle' => 'Remise resolver test',
+        'saisi_par' => $this->user->id,
+    ]);
+    app(RemiseBancaireService::class)->comptabiliser($remise, [$t1->id]);
+
+    expect($this->resolver->resolve($t1->fresh()))->toBe(StatutReglement::Recu);
+});

@@ -106,5 +106,28 @@ trait CreatesPartieDoubleContext
                 'pour_inscriptions' => false,
             ]
         );
+
+        // Catégorie dépense + sous-catégorie 606 + Compte 606
+        $categorieDep = Categorie::factory()->depense()->create([
+            'association_id' => $this->association->id,
+            'nom' => 'Charges diverses',
+        ]);
+        $this->sc606 = SousCategorie::create([
+            'association_id' => $this->association->id,
+            'categorie_id' => $categorieDep->id,
+            'nom' => 'Achats fournitures',
+            'code_cerfa' => '606',
+        ]);
+        $this->compte606 = Compte::firstOrCreate(
+            ['association_id' => $this->association->id, 'numero_pcg' => '606'],
+            [
+                'intitule' => 'Achats non stockés de matières et fournitures',
+                'classe' => 6,
+                'lettrable' => false,
+                'actif' => true,
+                'est_systeme' => false,
+                'pour_inscriptions' => false,
+            ]
+        );
     }
 }
