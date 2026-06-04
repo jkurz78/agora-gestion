@@ -17,6 +17,7 @@ declare(strict_types=1);
  * Test [I] : rollback — si invariant échoue, DB::transaction rollback complet.
  */
 
+use App\Enums\JournalComptable;
 use App\Enums\ModePaiement;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
@@ -280,6 +281,22 @@ function setupBackfillFixtureStep33Legacy(object $ctx): void
     ], [
         ['sous_categorie_id' => $ctx->sc606->id, 'montant' => '75.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
+
+    // Chantier 2a — purge des T2 d'encaissement séparées AVANT la remise en legacy.
+    // Depuis 2a, txService->create() avec statut_reglement=Recu produit une T2 séparée
+    // (journal=Banque, remise_id=NULL). Ces T2 n'existeraient pas dans des données legacy
+    // pré-partie-double. Le backfill ne sait traiter que les T1 opérationnelles (journal=Vente)
+    // → les T2 orphelines resteraient equilibree=FALSE et feraient échouer l'assertion post-backfill.
+    // Stratégie : supprimer toute transaction journal=Banque sans remise_id pour ce tenant.
+    // Les T4 de remise (journal=Banque + remise_id NOT NULL) ne sont pas concernées ici.
+    Transaction::query()
+        ->where('association_id', $ctx->association->id)
+        ->where('journal', JournalComptable::Banque->value)
+        ->whereNull('remise_id')
+        ->each(function (Transaction $t2Orpheline) {
+            TransactionLigne::where('transaction_id', $t2Orpheline->id)->forceDelete();
+            $t2Orpheline->forceDelete();
+        });
 
     // Simuler état LEGACY : supprimer les lignes PD-only (411/401/512X) et reset equilibree
     // Pour chaque Tx, supprimer les lignes sans montant legacy (les lignes PD sont celles
@@ -708,6 +725,18 @@ test('[N] --all convertit l\'exercice courant ET l\'exercice précédent', funct
     TransactionLigne::where('transaction_id', $txExercice2024->id)
         ->update(['compte_id' => null, 'debit' => 0, 'credit' => 0, 'tiers_id' => null, 'lettrage_code' => null]);
     $txExercice2024->forceFill(['equilibree' => false])->save();
+
+    // Chantier 2a — purger la T2 d'encaissement séparée créée pour txExercice2024.
+    // txService->create() avec statut_reglement=Recu produit une T2 (journal=Banque, remise_id=NULL).
+    // Cette T2 n'existerait pas en données legacy ; le backfill ne peut pas la convertir.
+    Transaction::query()
+        ->where('association_id', $this->association->id)
+        ->where('journal', JournalComptable::Banque->value)
+        ->whereNull('remise_id')
+        ->each(function (Transaction $t2Orpheline) {
+            TransactionLigne::where('transaction_id', $t2Orpheline->id)->forceDelete();
+            $t2Orpheline->forceDelete();
+        });
 
     // Sanity : avant le backfill, des Tx des 2 exercices sont non-équilibrées.
     $nonEquilibreesAvant = Transaction::query()

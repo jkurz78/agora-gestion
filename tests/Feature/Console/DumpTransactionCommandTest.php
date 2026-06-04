@@ -17,11 +17,13 @@ declare(strict_types=1);
 use App\Enums\ModePaiement;
 use App\Enums\TypeTransaction;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\RemiseBancaire;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\Compta\EcritureGenerator;
+use App\Services\ReglementOperationService;
 use App\Services\TransactionService;
 use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -145,9 +147,6 @@ test('[D] dump-transaction : Tx T4 remise → section Sources consolidées', fun
     /** @var TransactionService $service */
     $service = app(TransactionService::class);
 
-    /** @var EcritureGenerator $ecritureGenerator */
-    $ecritureGenerator = app(EcritureGenerator::class);
-
     $tiers1 = Tiers::create([
         'association_id' => $this->association->id,
         'nom' => 'Martin',
@@ -206,12 +205,41 @@ test('[D] dump-transaction : Tx T4 remise → section Sources consolidées', fun
     $tx2->remise_id = $remise->id;
     $tx2->save();
 
-    // Générer la T4
-    $lignes5112Sources = TransactionLigne::whereIn('transaction_id', [$tx1->id, $tx2->id])
-        ->whereHas('compte', fn ($q) => $q->where('numero_pcg', '5112'))
-        ->whereNull('lettrage_code')
-        ->get();
+    // Chantier 2a — depuis 2a, le portage 5112 n'est plus sur T1 mais sur leur T2 séparées.
+    // On résout les T2 via ReglementOperationService::trouverEncaissementT2, puis on :
+    //   1. Pose remise_id sur les T2 (pour que estT4Remise() puisse remonter la source).
+    //   2. Récupère la ligne 5112 D non lettrée sur chaque T2.
+    //   3. Appelle pourRemiseBancaire directement (sans passer par comptabiliser() qui poserait
+    //      remise_id sur la T4, faisant échouer le garde "si remise_id != null → T1" de estT4Remise).
+    /** @var ReglementOperationService $reglementService */
+    $reglementService = app(ReglementOperationService::class);
 
+    $compte5112 = Compte::where('numero_pcg', '5112')
+        ->where('association_id', $this->association->id)
+        ->firstOrFail();
+
+    $lignes5112Sources = collect();
+    foreach ([$tx1, $tx2] as $txSource) {
+        $t2 = $reglementService->trouverEncaissementT2($txSource);
+        if ($t2 !== null) {
+            // Rattacher la T2 à la remise : estT4Remise() remonte T4 → 5112C lettrée →
+            // contrepartie 5112D sur T2 → vérifie remise_id de T2 pour confirmer que c'est une source.
+            $t2->update(['remise_id' => $remise->id]);
+
+            $ligne = TransactionLigne::where('transaction_id', $t2->id)
+                ->where('compte_id', $compte5112->id)
+                ->whereNull('lettrage_code')
+                ->whereNull('tiers_id')
+                ->where('debit', '>', 0)
+                ->first();
+            if ($ligne !== null) {
+                $lignes5112Sources->push($ligne);
+            }
+        }
+    }
+
+    /** @var EcritureGenerator $ecritureGenerator */
+    $ecritureGenerator = app(EcritureGenerator::class);
     $t4 = $ecritureGenerator->pourRemiseBancaire($remise, $lignes5112Sources);
 
     $this->artisan('compta:dump-transaction', [
