@@ -20,6 +20,8 @@
 - **Volet A** : saisie créance (recette « attendue », mode null → `pourRecetteACredit`), « Marquer reçu » avec capture du mode, réversion « reçu → non reçu ».
 - **Correctifs** : `equilibree` après enrichissement PD, backfill `comptabilisee_at`, exclusion HelloAsso de la modale, total crédit rappro (×N → opérationnel).
 - ✅ **Chantier 1 livré (2026-06-03)** : revert auto-remise + rapprochement sur le **512X strict du compte** ; + fix « bouton Comptabiliser » sur la page remise (régression v3 `3d7f7b32`) + suppression de l'écran `validation` orphelin. Suite verte 12 488 / 0. Commits `7a639282`, `d829e3ed`, `46fb8fb5`.
+- ✅ **Chantier 2a / 3a livrés (2026-06-04)** : recette comptant + charges 401 (dette/Marquer payé/réversion) en T2 séparée live.
+- ✅ **Chantier 4 livré (2026-06-05)** : **statut de règlement dérivé du grand livre** (411/401), source de vérité unique. Enum `EnMain` ajoutée (zéro rename, migration additive), `EtatReglementResolver` (resolve multi-hop `411/401→5112/530→512X` + syncer miroir gardé par le flag PD), câblé aux transitions (create/update+réversion, marquerRecu/Payé, pointage/dépointage, toggleRemise, comptabiliser, remise modifier/supprimer/brouillon, facture encaissement), data-migration `recu→en_main`, commande `compta:reconcilier-statuts` (rempart anti-dérive), libellés direction-aware (Dû/À remettre/Remis-Réglé/Pointé) + badges `en_main`. **Dissout l'audit Thème B** + corrige le bug réversion (statut périmé). Suite verte (exit 0, 12 642 assertions). ~16 commits. Revue finale a colmaté 4 dérives miroir (remise modifier/supprimer/brouillon + facture) + 4 sites UI aveugles. **Recette localhost à faire.**
 
 ---
 
@@ -56,7 +58,8 @@ Après analyse (2026-06-03), ce n'est pas un quick fix : il faut une **nouvelle 
 - **3b (backfill)** ⏸️ **DIFFÉRÉ** (comme 2b) : `TransactionConverter` dépense comptant → T2 séparée. **Prérequis chantier 4**.
 **Dépendances** : aucune pour 3a. 3b prérequis chantier 4.
 
-### 4. Volet B — statuts dérivés du grand livre (symétrique 411 + 401)
+### 4. Volet B — statuts dérivés du grand livre (symétrique 411 + 401) — ✅ LIVRÉ 2026-06-05
+**Spec/plan** : `docs/specs/2026-06-04-statut-reglement-derive-grand-livre.md` + `plans/2026-06-04-chantier4-statut-derive-411-401.md`. **Décisions d'exécution** : 2b/3b NON prérequis (resolver robuste aux 2 structures), enum direction-neutre **sans rename** (ajout `EnMain` seul, migration additive), miroir recalculé par `syncer` (legacy fallback + override PD). Voir la mémoire `project_compta_v5_chantier4_statut_derive.md`.
 **Intention** : le statut cesse d'être un **enum stocké** et devient **dérivé du ledger** (source de vérité unique). Symétrique :
 - recette : **attendu / à remettre / remis / rapproché** (411 → 5112 → 512X → pointé) ;
 - dépense : **dû / réglé / pointé** (401 → 512X → pointé).
