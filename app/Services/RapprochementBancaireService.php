@@ -325,19 +325,23 @@ final class RapprochementBancaireService
         $transactions = Transaction::where('remise_id', $remiseId)->get();
         $allPointed = $transactions->every(fn (Transaction $tx) => (int) $tx->rapprochement_id === (int) $rapprochement->id);
 
+        // Passe 1 : poser/effacer rapprochement_id + fallback legacy sur TOUTES les tx
+        // (sources T1 + T4) AVANT toute dérivation, sinon le syncer d'une source lirait
+        // un rapprochement_id de T4 pas encore posé/effacé (bug d'ordonnancement).
         foreach ($transactions as $tx) {
             if ($allPointed) {
                 $tx->rapprochement_id = null;
-                // Legacy fallback — sert aussi d'état de base pour le syncer PD ci-dessous.
                 $tx->statut_reglement = StatutReglement::Recu;
             } else {
                 $tx->rapprochement_id = $rapprochement->id;
-                // Legacy fallback — sert aussi d'état de base pour le syncer PD ci-dessous.
                 $tx->statut_reglement = StatutReglement::Pointe;
             }
             $tx->save();
-            // Chantier 4 — statut dérivé (les T4 remise portent le 512X rapproché/dé-rapproché).
-            // En mode PD, overrides le fallback legacy ci-dessus avec la valeur dérivée.
+        }
+
+        // Passe 2 : statut dérivé (toutes les rapprochement_id posées → le resolver lit
+        // l'état complet, T4 512X rapproché compris). En mode PD, overrides le fallback.
+        foreach ($transactions as $tx) {
             $this->etatReglementResolver->syncer($tx);
         }
     }
@@ -377,17 +381,24 @@ final class RapprochementBancaireService
             // Supprimer la pièce jointe si présente
             $this->deletePieceJointe($rapprochement);
 
-            Transaction::where('rapprochement_id', $id)->each(function (Transaction $tx): void {
-                // Legacy fallback — sert aussi d'état de base pour le syncer PD ci-dessous.
+            $txs = Transaction::where('rapprochement_id', $id)->get();
+
+            // Passe 1 : effacer rapprochement_id + fallback legacy sur TOUTES les tx
+            // (T1, T2 séparées, T4 remise) AVANT toute dérivation, sinon le syncer d'une
+            // T1 lirait une T2/T4 encore rapprochée (bug d'ordonnancement) → Pointe à tort.
+            foreach ($txs as $tx) {
                 $tx->update([
                     'rapprochement_id' => null,
                     'statut_reglement' => $tx->remise_id !== null
                         ? StatutReglement::Recu->value
                         : StatutReglement::EnAttente->value,
                 ]);
-                // Chantier 4 — statut dérivé du ledger (overrides le fallback en mode PD).
+            }
+
+            // Passe 2 : statut dérivé (tous les rapprochement_id effacés). En mode PD, overrides.
+            foreach ($txs as $tx) {
                 $this->etatReglementResolver->syncer($tx);
-            });
+            }
 
             VirementInterne::where('rapprochement_source_id', $id)
                 ->update(['rapprochement_source_id' => null]);
