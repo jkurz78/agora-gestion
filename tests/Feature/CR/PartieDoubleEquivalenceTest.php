@@ -41,8 +41,10 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\TypeOperation;
 use App\Models\User;
+use App\Services\Compta\EtatReglementResolver;
 use App\Services\Compta\Migrations\BancairesSeeder;
 use App\Services\Compta\Migrations\SystemeSeeder;
+use App\Services\Compta\TransactionConverter;
 use App\Services\FactureService;
 use App\Services\Rapports\CompteResultatBuilder;
 use App\Services\ReglementOperationService;
@@ -1021,4 +1023,78 @@ it('une recette comptant saisie au formulaire est marquée équilibrée (pas de 
     ]);
 
     expect($tx->fresh()->equilibree)->toBeTrue();
+});
+
+// ---------------------------------------------------------------------------
+// [E8] Équivalence lumpé ↔ séparé — EtatReglementResolver dérive le même statut
+//
+// Chantier 4 — Task 11 : vérifie que le resolver retourne le même StatutReglement
+// pour une recette virement créée via le chemin "live" (T2 séparée produite par
+// TransactionService) et via le chemin "backfill" (encaissement lumpé sur T1,
+// produit par TransactionConverter sur une tx legacy).
+//
+// Le cas virement est choisi car il est univoque : ni chèque (portage 5112),
+// ni espèces (530), ni créance (411 non lettré). La T2 séparée porte directement
+// le 512X ; le lumpé porte aussi le 512X sur la T1. Les deux doivent résoudre
+// à StatutReglement::Recu (dénoué, non rapproché).
+// ---------------------------------------------------------------------------
+
+it('[E8] EtatReglementResolver — statut dérivé identique lumpé vs séparé (virement recette)', function () {
+    Config::set('compta.use_partie_double', true);
+
+    $resolver = app(EtatReglementResolver::class);
+    $converter = app(TransactionConverter::class);
+
+    // ── Structure "séparée" (live) : créée par TransactionService avec PD actif.
+    // TransactionService génère T1 (411D/706C lettrés) + T2 séparée (411D/512XD/411C).
+    $txLive = $this->txService->create([
+        'type' => 'recette',
+        'date' => '2025-10-05',
+        'libelle' => 'Subvention live — virement',
+        'montant_total' => '200.00',
+        'mode_paiement' => ModePaiement::Virement->value,
+        'tiers_id' => $this->tiersA->id,
+        'compte_id' => $this->compteBancaire->id,
+    ], [
+        ['sous_categorie_id' => $this->sc706->id, 'montant' => '200.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+
+    // ── Structure "lumpée" (backfill) : simuler une tx legacy (equilibree=FALSE, statut=Recu)
+    // puis convertir via TransactionConverter qui produit le cycle 411↔512X sur la T1 elle-même
+    // (encaissement lumpé — pas de T2 séparée).
+    $txLegacy = Transaction::create([
+        'association_id' => $this->association->id,
+        'type' => 'recette',
+        'date' => '2025-10-06',
+        'libelle' => 'Subvention legacy — virement',
+        'montant_total' => 200.00,
+        'mode_paiement' => ModePaiement::Virement->value,
+        'tiers_id' => $this->tiersA->id,
+        'compte_id' => $this->compteBancaire->id,
+        'statut_reglement' => StatutReglement::Recu->value,
+        'saisi_par' => $this->user->id,
+        'equilibree' => false,
+        'type_ecriture' => 'normale',
+    ]);
+    TransactionLigne::create([
+        'transaction_id' => $txLegacy->id,
+        'sous_categorie_id' => $this->sc706->id,
+        'montant' => 200.00,
+        'debit' => 0.0,
+        'credit' => 0.0,
+    ]);
+
+    DB::transaction(fn () => $converter->convertir($txLegacy->fresh()));
+    $txBackfille = $txLegacy->fresh();
+
+    // Précondition : le backfill a bien posé les écritures PD sur la tx legacy
+    expect((bool) $txBackfille->equilibree)->toBeTrue('[précondition] tx backfillée doit être équilibrée');
+
+    // ── Assertion centrale : resolver dérive le MÊME statut pour les deux structures
+    $statutLive = $resolver->resolve($txLive->fresh());
+    $statutBackfille = $resolver->resolve($txBackfille);
+
+    expect($statutLive)->toBe(StatutReglement::Recu, 'Structure séparée (live) doit résoudre à Recu');
+    expect($statutBackfille)->toBe(StatutReglement::Recu, 'Structure lumpée (backfill) doit résoudre à Recu');
+    expect($statutBackfille)->toBe($statutLive, 'Statut dérivé identique lumpé vs séparé');
 });

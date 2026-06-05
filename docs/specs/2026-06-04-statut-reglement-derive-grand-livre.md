@@ -25,15 +25,16 @@ Bénéfices :
 
 ## Section 1 — Modèle d'état
 
-L'enum nomme la **position dans le grand livre** (neutre au sens) ; les **libellés** sont rendus par direction.
+L'enum décrit la **position dans le grand livre** (neutre au sens) ; les **libellés** sont rendus par direction. **Décision finale (planning)** : on **ne renomme aucune case** (le rename toucherait ~107 fichiers dont 77 de tests) — on garde `EnAttente`/`Recu`/`Pointe` (noms + valeurs DB) et on **ajoute seulement** `EnMain`.
 
-| Valeur enum (interne) | Règle de dérivation (ledger) | Libellé recette | Libellé dépense |
-|---|---|---|---|
-| `ouvert` | ligne **411/401** de la T1 **non lettrée** | **Dû** | **Dû** |
-| `en_main` | terme du chaînage = portage **5112/530**, **aucun 512X** atteint | À remettre | *(n/a)* |
-| `denoue` | terme du chaînage = **512X présent**, sa transaction porteuse non rapprochée | Remis | Réglé |
-| `pointe` | la **transaction** porteuse du **512X** porte `rapprochement_id` | **Pointé** | **Pointé** |
+| Concept | Case PHP | Valeur DB | Règle de dérivation (ledger) | Libellé recette | Libellé dépense |
+|---|---|---|---|---|---|
+| ouvert | `EnAttente` *(gardée)* | `en_attente` | ligne **411/401** de la T1 **non lettrée** | **Dû** | **Dû** |
+| en main | `EnMain` *(ajoutée)* | `en_main` | terme du chaînage = portage **5112/530**, **aucun 512X** atteint | À remettre | *(n/a)* |
+| dénoué | `Recu` *(gardée)* | `recu` | terme du chaînage = **512X présent**, sa transaction porteuse non rapprochée | Remis | Réglé |
+| pointé | `Pointe` *(gardée)* | `pointe` | la **transaction** porteuse du **512X** porte `rapprochement_id` | **Pointé** | **Pointé** |
 
+> Noms défendables : `EnAttente` = « en attente de règlement » = dû ; `Recu` = argent bougé (déjà surchargé recette+dépense — `marquerPaye` pose déjà `Recu` pour une dépense). Le `label()` devient direction-aware.
 > Précision : `rapprochement_id` est une colonne de `transactions` (pas de `transaction_lignes`) — on lit `$tx->rapprochement_id` sur la transaction qui porte la ligne 512X.
 
 Logique : les **extrémités** (`ouvert`, `pointe`) sont le même concept des deux côtés → même mot. Le **milieu** (l'acte de bouger l'argent) reste direction-spécifique (« Remis » vs « Réglé »). Côté dépense, `en_main` **n'arrive jamais** (règlement direct depuis la banque, sans étape « en main »).
@@ -86,25 +87,13 @@ La colonne reste un **miroir dénormalisé**, le **resolver est l'autorité**, r
 
 ## Section 4 — Migration & rétro-compat
 
-**Schéma** : `statut_reglement` est un **`enum()` MySQL natif** (`['en_attente','recu','pointe']`, migration `2026_04_13_100001`). Migration en **3 temps** :
-- (a) `MODIFY` → union temporaire `{en_attente, recu, pointe, ouvert, en_main, denoue}` ;
-- (b) data-migration qui recalcule ;
-- (c) `MODIFY` → jeu cible `{ouvert, en_main, denoue, pointe}`.
+**Schéma** : `statut_reglement` est un **`enum()` MySQL natif** (`['en_attente','recu','pointe']`, migration `2026_04_13_100001`). **Raffinement léger (planning)** : migration **additive en 1 pas** — `ALTER TABLE … MODIFY … ENUM('en_attente','recu','pointe','en_main')` (down : retour à 3 valeurs après reclassement des `en_main`). Valeurs existantes **inchangées** → **aucun SQL brut ni filtre à réécrire** (`= 'pointe'`, `= 'en_attente'` restent valides).
 
 Compatible sqlite (tests `:memory:`) qui ignore les contraintes enum.
 
-**Data-migration one-shot** (idempotente, rejouable) :
-- tx **avec** lignes PD → resolver (précis) ;
-- tx **sans** lignes PD (legacy/HelloAsso) → traduction minimale `en_attente→ouvert`, `recu→denoue`, `pointe→pointe`.
+**Data-migration one-shot** (idempotente, rejouable) : reclasser via le resolver les tx PD aujourd'hui `recu` dont l'argent est **encore en main** (portage 5112/530 non lettré, pas de 512X) → `en_main`. Le reste ne bouge pas. Tx sans lignes PD (legacy/HelloAsso) → inchangées (fallback du resolver).
 
-**Sites de filtrage** : faire passer un maximum par les **helpers d'enum** plutôt que par des comparaisons brutes. Helpers à étendre : `isEncaisse()` (`!== ouvert`), `estPointee()` (`=== pointe`), nouveaux `estOuvert()` / `estEnMain()` / `estDenoue()`, + `label(Sens)` direction-aware.
-
-**Points durs (recensement exhaustif requis dans le plan)** — SQL brut / valeurs en dur qui cassent en silence :
-- `app/Services/TransactionCompteService.php:90` — `(tx.statut_reglement = 'pointe') as pointe`
-- `app/Services/TransactionUniverselleService.php:185,250` — `(tx.statut_reglement = 'pointe') as pointe`
-- `app/Services/TransactionUniverselleService.php:62` — `=== 'en_attente'`
-- `app/Livewire/TransactionUniverselle.php:70` — filtre UI `'' | 'en_attente' | 'recu' | 'pointe'`
-- Recensement complet des ~18 sites listant `statut_reglement` à dresser dans le plan (modèles, Livewire, services, resources portail).
+**Sites de filtrage** : aucun rename de valeur → les ~18 sites continuent de fonctionner. Le **seul** point d'attention est la nouvelle valeur `en_main` là où un filtre « reçu/encaissé » doit l'inclure — couvert par `isEncaisse()` (`!== EnAttente`, donc `EnMain` compte comme encaissé). Helpers à ajouter : `estOuvert()` (`=== EnAttente`), `estEnMain()`, `estDenoue()` (`=== Recu`) ; `isEncaisse()`/`estPointee()` **inchangés** ; `label(?Sens)` direction-aware.
 
 ## Section 5 — Cas limites & stratégie de test
 
