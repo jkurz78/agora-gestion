@@ -19,6 +19,7 @@ use App\Models\TransactionLigne;
 use App\Services\Compta\CompteTresorerieResolver;
 use App\Services\Compta\CompteVentilationResolver;
 use App\Services\Compta\EcritureGenerator;
+use App\Services\Compta\EtatReglementResolver;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -153,8 +154,7 @@ final class ReglementOperationService
         $compte411 = Compte::ofNumero('411');
 
         DB::transaction(function () use ($transaction, $compte411, $mode, $compteId): void {
-            // 1. Si la transaction est une créance (mode_paiement null) et qu'un mode est fourni,
-            //    on le pose maintenant (avant encaisserSiNonEncaisse qui en a besoin).
+            // Si la transaction est une créance (mode null) et qu'un mode est fourni, on le pose.
             $updateData = ['statut_reglement' => StatutReglement::Recu->value];
             if ($transaction->mode_paiement === null && $mode !== null) {
                 $updateData['mode_paiement'] = $mode->value;
@@ -167,8 +167,14 @@ final class ReglementOperationService
             // Rafraîchir pour que encaisserSiNonEncaisse lise le nouveau mode_paiement
             $transaction->refresh();
 
-            // 2. Partie double : génère T2 si T1 porte une ligne 411 valide et non lettrée
+            // Partie double : génère T2 si T1 porte une ligne 411 valide et non lettrée.
             $this->encaisserSiNonEncaisse($transaction, $compte411);
+
+            // Chantier 4 — statut dérivé du ledger (remplace le hard-set Recu :
+            // un chèque reçu non remis devient EnMain, un virement Recu).
+            // Résolu via app() pour éviter la dépendance circulaire constructeur
+            // (EtatReglementResolver → ReglementOperationService → EtatReglementResolver).
+            app(EtatReglementResolver::class)->syncer($transaction->fresh());
         });
     }
 
@@ -295,8 +301,7 @@ final class ReglementOperationService
         $compte401 = Compte::ofNumero('401');
 
         DB::transaction(function () use ($transaction, $compte401, $mode, $compteId): void {
-            // 1. Si la transaction est une dette (mode_paiement null) et qu'un mode est fourni,
-            //    on le pose maintenant (avant reglerSiNonRegle qui en a besoin).
+            // Si la transaction est une dette (mode null) et qu'un mode est fourni, on le pose.
             $updateData = ['statut_reglement' => StatutReglement::Recu->value];
             if ($transaction->mode_paiement === null && $mode !== null) {
                 $updateData['mode_paiement'] = $mode->value;
@@ -309,8 +314,13 @@ final class ReglementOperationService
             // Rafraîchir pour que reglerSiNonRegle lise le nouveau mode_paiement
             $transaction->refresh();
 
-            // 2. Partie double : génère T2 si T1 porte une ligne 401 valide et non lettrée
+            // Partie double : génère T2 si T1 porte une ligne 401 valide et non lettrée.
             $this->reglerSiNonRegle($transaction, $compte401);
+
+            // Chantier 4 — statut dérivé du ledger (remplace le hard-set Recu :
+            // un virement réglé devient Recu, une dépense comptant avec 512X direct Recu).
+            // Résolu via app() pour éviter la dépendance circulaire constructeur.
+            app(EtatReglementResolver::class)->syncer($transaction->fresh());
         });
     }
 

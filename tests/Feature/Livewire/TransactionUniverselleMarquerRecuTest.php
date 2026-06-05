@@ -81,9 +81,9 @@ it('[AC9] TransactionUniverselle::marquerRecu génère T2 (portage D + 411 C) et
     Livewire::test(TransactionUniverselle::class)
         ->call('marquerRecu', $t1->id);
 
-    // Assert : statut_reglement basculé
+    // Assert : statut_reglement dérivé — chèque reçu non remis = EnMain (chantier 4)
     $t1->refresh();
-    expect($t1->statut_reglement)->toBe(StatutReglement::Recu);
+    expect($t1->statut_reglement)->toBe(StatutReglement::EnMain);
 
     // Assert : T2 générée (on a maintenant 2 transactions)
     expect(Transaction::count())->toBe(2);

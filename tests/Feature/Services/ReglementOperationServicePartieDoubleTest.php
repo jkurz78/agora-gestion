@@ -150,8 +150,8 @@ it('[B] marquerRecu sur tx créance → T2 créée (5112 D / 411 C), auto-lettra
     $this->service->marquerRecu($t1);
     $t1->refresh();
 
-    // statut_reglement basculé sur T1
-    expect($t1->statut_reglement)->toBe(StatutReglement::Recu);
+    // statut_reglement dérivé sur T1 — chèque reçu non remis = EnMain (chantier 4)
+    expect($t1->statut_reglement)->toBe(StatutReglement::EnMain);
 
     // T2 créée
     $countTxAfter = Transaction::count();
