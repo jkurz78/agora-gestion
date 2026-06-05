@@ -12,6 +12,7 @@ use App\Models\RemiseBancaire;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\Compta\EcritureGenerator;
+use App\Services\Compta\EtatReglementResolver;
 use App\Services\Compta\LettrageService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -24,6 +25,7 @@ final class RemiseBancaireService
         private readonly EcritureGenerator $ecritureGenerator,
         private readonly LettrageService $lettrageService,
         private readonly ReglementOperationService $reglementService,
+        private readonly EtatReglementResolver $etatReglementResolver,
     ) {}
 
     public function creer(array $data): RemiseBancaire
@@ -94,6 +96,9 @@ final class RemiseBancaireService
             // Précharger le compte 411 une seule fois pour éviter N+1
             $compte411 = Compte::ofNumero('411');
 
+            /** @var list<int> $processedIds */
+            $processedIds = [];
+
             foreach ($transactionIds as $txId) {
                 $tx = Transaction::findOrFail($txId);
 
@@ -120,6 +125,8 @@ final class RemiseBancaireService
                 // Fix C : garantir que la ligne de portage 5112/530 existe avant recreerT4.
                 // Idempotent : no-op si la ligne 411 est déjà lettrée (T2 déjà générée).
                 $this->reglementService->encaisserSiNonEncaisse($tx->fresh(), $compte411);
+
+                $processedIds[] = (int) $txId;
             }
 
             // --- Partie double : générer la T4 de remise ---
@@ -127,6 +134,15 @@ final class RemiseBancaireService
 
             // État explicite : marquer la remise comme comptabilisée
             $remise->update(['comptabilisee_at' => now()]);
+
+            // Chantier 4 — statut dérivé : syncer chaque source après création T4 et lettrage
+            // (le resolver voit maintenant la ligne 5112/530 lettrée + T4 avec 512X).
+            foreach ($processedIds as $txId) {
+                $source = Transaction::find($txId);
+                if ($source !== null) {
+                    $this->etatReglementResolver->syncer($source);
+                }
+            }
         });
     }
 

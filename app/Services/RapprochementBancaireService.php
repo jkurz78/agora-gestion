@@ -13,6 +13,7 @@ use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\VirementInterne;
+use App\Services\Compta\EtatReglementResolver;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
@@ -32,6 +33,7 @@ final class RapprochementBancaireService
     public function __construct(
         private readonly ExerciceService $exerciceService,
         private readonly ReglementOperationService $reglementService,
+        private readonly EtatReglementResolver $etatReglementResolver,
     ) {}
 
     /**
@@ -272,6 +274,7 @@ final class RapprochementBancaireService
                     : $this->reglementService->trouverEncaissementT2($model);
 
                 $model->rapprochement_id = null;
+                // Legacy fallback — sert aussi d'état de base pour le syncer PD ci-dessous.
                 $model->statut_reglement = $model->remise_id !== null
                     ? StatutReglement::Recu
                     : StatutReglement::EnAttente;
@@ -281,6 +284,10 @@ final class RapprochementBancaireService
                     $t2->rapprochement_id = null;
                     $t2->save();
                 }
+
+                // Chantier 4 — statut dérivé du ledger (après effacement du rapprochement_id sur T1 et T2).
+                // En mode PD, overrides le fallback legacy ci-dessus avec la valeur dérivée.
+                $this->etatReglementResolver->syncer($model);
             } else {
                 // Pointage : générer T2 si en_attente (Fix D — idempotent, recettes seulement)
                 if (config('compta.use_partie_double') && $type !== 'depense') {
@@ -288,6 +295,7 @@ final class RapprochementBancaireService
                 }
 
                 $model->rapprochement_id = $rapprochement->id;
+                // Legacy fallback — sert aussi d'état de base pour le syncer PD ci-dessous.
                 $model->statut_reglement = StatutReglement::Pointe;
                 $model->save();
 
@@ -305,6 +313,9 @@ final class RapprochementBancaireService
                     $t2->rapprochement_id = $rapprochement->id;
                     $t2->save();
                 }
+
+                // Chantier 4 — statut dérivé du ledger (après propagation du rapprochement_id sur T2).
+                $this->etatReglementResolver->syncer($model);
             }
         });
     }
@@ -317,12 +328,17 @@ final class RapprochementBancaireService
         foreach ($transactions as $tx) {
             if ($allPointed) {
                 $tx->rapprochement_id = null;
+                // Legacy fallback — sert aussi d'état de base pour le syncer PD ci-dessous.
                 $tx->statut_reglement = StatutReglement::Recu;
             } else {
                 $tx->rapprochement_id = $rapprochement->id;
+                // Legacy fallback — sert aussi d'état de base pour le syncer PD ci-dessous.
                 $tx->statut_reglement = StatutReglement::Pointe;
             }
             $tx->save();
+            // Chantier 4 — statut dérivé (les T4 remise portent le 512X rapproché/dé-rapproché).
+            // En mode PD, overrides le fallback legacy ci-dessus avec la valeur dérivée.
+            $this->etatReglementResolver->syncer($tx);
         }
     }
 
@@ -362,12 +378,15 @@ final class RapprochementBancaireService
             $this->deletePieceJointe($rapprochement);
 
             Transaction::where('rapprochement_id', $id)->each(function (Transaction $tx): void {
+                // Legacy fallback — sert aussi d'état de base pour le syncer PD ci-dessous.
                 $tx->update([
                     'rapprochement_id' => null,
                     'statut_reglement' => $tx->remise_id !== null
                         ? StatutReglement::Recu->value
                         : StatutReglement::EnAttente->value,
                 ]);
+                // Chantier 4 — statut dérivé du ledger (overrides le fallback en mode PD).
+                $this->etatReglementResolver->syncer($tx);
             });
 
             VirementInterne::where('rapprochement_source_id', $id)
