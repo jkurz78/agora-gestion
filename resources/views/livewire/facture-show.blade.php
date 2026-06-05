@@ -274,7 +274,7 @@
                                         <strong>{{ number_format((float) $tx->montant_total, 2, ',', ' ') }} €</strong>
                                     </div>
                                     <small class="text-muted">
-                                        Statut : {{ $tx->statut_reglement?->label() ?? $tx->statut_reglement }}
+                                        Statut : {{ $tx->statut_reglement?->label(\App\Enums\Sens::Recette) ?? $tx->statut_reglement }}
                                         — une transaction miroir négative sera créée.
                                     </small>
                                 </li>

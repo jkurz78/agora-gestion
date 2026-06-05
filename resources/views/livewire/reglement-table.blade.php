@@ -198,7 +198,7 @@
                                         <br>
                                         <span class="badge mt-1"
                                               style="font-size:9px;background:{{ $tx->statut_reglement === \App\Enums\StatutReglement::Pointe ? '#6c757d' : '#198754' }}">
-                                            {{ $tx->statut_reglement->label() }}
+                                            {{ $tx->statut_reglement->label(\App\Enums\Sens::Recette) }}
                                         </span>
                                     @endif
                                 </td>

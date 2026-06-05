@@ -98,9 +98,9 @@
                             <td class="small">{{ $tx->lignes->first()?->operation?->nom ?? '—' }}</td>
                             <td class="small">
                                 @if ($tx->statut_reglement === \App\Enums\StatutReglement::Recu)
-                                    <span class="badge bg-success">{{ $tx->statut_reglement->label() }}</span>
+                                    <span class="badge bg-success">{{ $tx->statut_reglement->label(\App\Enums\Sens::Recette) }}</span>
                                 @else
-                                    <span class="badge bg-warning text-dark">{{ $tx->statut_reglement->label() }}</span>
+                                    <span class="badge bg-warning text-dark">{{ $tx->statut_reglement->label(\App\Enums\Sens::Recette) }}</span>
                                 @endif
                             </td>
                             <td class="text-end small fw-semibold text-nowrap" data-sort="{{ $tx->montant_total }}">

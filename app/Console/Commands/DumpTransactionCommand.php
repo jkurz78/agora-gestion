@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Enums\Sens;
+use App\Enums\TypeTransaction;
 use App\Models\Association;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -144,7 +146,8 @@ final class DumpTransactionCommand extends Command
         $date = $tx->date?->format('d/m/Y') ?? '-';
         $this->line("  Mode: {$mode}  |  Montant: {$montant}€  |  Date: {$date}");
 
-        $statut = $tx->statut_reglement?->label() ?? '-';
+        $sens = $tx->type === TypeTransaction::Depense ? Sens::Depense : Sens::Recette;
+        $statut = $tx->statut_reglement?->label($sens) ?? '-';
         $this->line("  Type: {$tx->type->value}  |  Statut: {$statut}");
 
         $tiersLabel = $tx->tiers ? $tx->tiers->displayName().' (#'.(int) $tx->tiers->id.')' : '-';
