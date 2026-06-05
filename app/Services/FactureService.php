@@ -23,6 +23,7 @@ use App\Models\TransactionLigne;
 use App\Services\Compta\CompteTresorerieResolver;
 use App\Services\Compta\CompteVentilationResolver;
 use App\Services\Compta\EcritureGenerator;
+use App\Services\Compta\EtatReglementResolver;
 use App\Support\CurrentAssociation;
 use App\Support\PdfFooterRenderer;
 use App\Tenant\TenantContext;
@@ -707,12 +708,18 @@ XML;
             foreach ($transactionIds as $transactionId) {
                 $transaction = $facture->transactions()->findOrFail($transactionId);
 
+                // Legacy fallback : Recu. PD : le syncer dérive EnMain (5112 non remisé = chèque en main).
                 $transaction->update([
                     'statut_reglement' => StatutReglement::Recu->value,
                 ]);
 
                 // --- Partie double : génère T2 (encaissement) si T1 porte une ligne 411 valide ---
                 $this->encaisserPartieDouble($facture, $transaction, $compte411);
+
+                // --- Chantier 4 : syncer le miroir depuis le ledger (écrase le Recu legacy si PD) ---
+                // Lazy app() pour éviter la dépendance circulaire
+                // (EtatReglementResolver → ReglementOperationService → FactureService).
+                app(EtatReglementResolver::class)->syncer($transaction->fresh());
             }
         });
     }
@@ -1168,5 +1175,4 @@ XML;
 
         return implode(' — ', $parts);
     }
-
 }

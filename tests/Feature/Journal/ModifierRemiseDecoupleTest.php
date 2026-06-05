@@ -130,10 +130,11 @@ it('[découplage] modifier() identifie la T4 par ligne 512X même quand les sour
     expect($ligneT4_512X)->not->toBeNull('T4 doit avoir une ligne 512X D');
     expect((float) $ligneT4_512X->debit)->toBe(80.00, 'T4 montant = somme des sources gardées (50+30)');
 
-    // 6. La source retirée (tx3) doit être détachée et repasser en en_attente
+    // 6. La source retirée (tx3) doit être détachée — en mode PD, le syncer dérive EnMain
+    //    (5112 délettré = chèque en main, non remisé). Legacy fallback était EnAttente.
     $tx3->refresh();
     expect($tx3->remise_id)->toBeNull('tx3 doit être détachée de la remise');
-    expect($tx3->statut_reglement)->toBe(StatutReglement::EnAttente, 'tx3 doit repasser en en_attente');
+    expect($tx3->statut_reglement)->toBe(StatutReglement::EnMain, 'tx3 retirée : chèque en main → EnMain (mode PD)');
 
     // 7. Les sources gardées (tx1, tx2) sont toujours liées à la remise
     $tx1->refresh();

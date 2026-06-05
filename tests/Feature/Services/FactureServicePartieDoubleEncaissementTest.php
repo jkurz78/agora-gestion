@@ -13,7 +13,6 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\FactureService;
-use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Log;
 use Tests\Support\CreatesPartieDoubleContext;
 
@@ -94,8 +93,9 @@ it('[A] marquerReglementRecu Cheque → T2 créée (5112 D / 411 C tiers), 411 a
     $facture->refresh();
     $t1->refresh();
 
-    // statut_reglement = Recu sur T1
-    expect($t1->statut_reglement->value)->toBe(StatutReglement::Recu->value);
+    // statut_reglement = EnMain sur T1 : chèque reçu (T2 / 5112 D créée) mais non encore remisé.
+    // En mode PD, le syncer dérive EnMain (5112 non lettré = en main). Legacy fallback = Recu.
+    expect($t1->statut_reglement->value)->toBe(StatutReglement::EnMain->value);
 
     // La facture a maintenant 2 transactions : T1 + T2
     expect($facture->transactions()->count())->toBe(2);
@@ -271,9 +271,9 @@ it('[D] double encaissement → LettrageDejaPresentException, pas de T3 créée'
     $facture->refresh();
     expect($facture->transactions()->count())->toBe($countAvant2eAppel);
 
-    // T1a reste Recu (statut non régressé par le rollback)
+    // T1a : statut non régressé par le rollback. En mode PD : EnMain (5112 non remisé).
     $t1a->refresh();
-    expect($t1a->statut_reglement->value)->toBe(StatutReglement::Recu->value);
+    expect($t1a->statut_reglement->value)->toBe(StatutReglement::EnMain->value);
 
     // T1b reste EnAttente (intacte, rollback n'affecte que T1a)
     $t1b->refresh();
@@ -296,8 +296,10 @@ it('[E] Virement + compte_id null → skip PD silencieux, statut_reglement passe
     $this->service->marquerReglementRecu($facture, [$t1->id]);
 
     $t1->refresh();
-    // statut_reglement passe à Recu malgré le skip PD
-    expect($t1->statut_reglement->value)->toBe(StatutReglement::Recu->value);
+    // En mode PD, le syncer annule le legacy Recu : T2 non créée (skip) → 411 non lettrée
+    // → resolver retourne EnAttente (créance toujours ouverte). Pas de regression dans les
+    // vrais cas PD : un Virement sans compte_id ne produit aucune T2, donc c'est bien EnAttente.
+    expect($t1->statut_reglement->value)->toBe(StatutReglement::EnAttente->value);
 
     // Aucune T2 créée (skip PD)
     $facture->refresh();

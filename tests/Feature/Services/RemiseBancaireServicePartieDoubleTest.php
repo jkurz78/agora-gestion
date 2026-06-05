@@ -340,13 +340,13 @@ it('[D] supprimer remise → T4 supprimée, lignes 5112 sources délettrées', f
     expect($ligne1->lettrage_code)->toBeNull('Ligne source 1 doit être délettrée');
     expect($ligne2->lettrage_code)->toBeNull('Ligne source 2 doit être délettrée');
 
-    // T1/T2 sources resetées (legacy)
+    // T1/T2 sources resetées — en mode PD, le syncer dérive EnMain (5112 délettré = chèque en main).
     $tx1->refresh();
     $tx2->refresh();
     expect($tx1->remise_id)->toBeNull();
-    expect($tx1->statut_reglement)->toBe(StatutReglement::EnAttente);
+    expect($tx1->statut_reglement)->toBe(StatutReglement::EnMain);
     expect($tx2->remise_id)->toBeNull();
-    expect($tx2->statut_reglement)->toBe(StatutReglement::EnAttente);
+    expect($tx2->statut_reglement)->toBe(StatutReglement::EnMain);
 });
 
 // ---------------------------------------------------------------------------
@@ -450,10 +450,10 @@ it('[F] modifier remise (retrait tx) → T4 recréée, ligne source retirée red
     expect($t4Nouvelle)->not->toBeNull('Nouvelle T4 doit être créée');
     expect(TransactionLigne::where('transaction_id', $t4Nouvelle->id)->count())->toBe(3);
 
-    // tx3 détachée + délettrée
+    // tx3 détachée + délettrée — en mode PD, le syncer dérive EnMain (5112 délettré = chèque en main).
     $tx3->refresh();
     expect($tx3->remise_id)->toBeNull();
-    expect($tx3->statut_reglement)->toBe(StatutReglement::EnAttente);
+    expect($tx3->statut_reglement)->toBe(StatutReglement::EnMain);
 
     $ligne3->refresh();
     expect($ligne3->lettrage_code)->toBeNull('Ligne source retirée doit être délettrée');

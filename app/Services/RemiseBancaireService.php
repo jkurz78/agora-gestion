@@ -62,12 +62,19 @@ final class RemiseBancaireService
                 ]);
 
             // Ajouter les transactions sélectionnées → reçues (prêtes pour dépôt)
+            // Legacy : Recu. PD : le syncer dérive EnMain (5112 non lettré = chèque en main).
             if (! empty($transactionIds)) {
-                Transaction::whereIn('id', $transactionIds)
-                    ->update([
+                foreach ($transactionIds as $txId) {
+                    Transaction::where('id', $txId)->update([
                         'remise_id' => $remise->id,
                         'statut_reglement' => StatutReglement::Recu->value,
                     ]);
+
+                    $tx = Transaction::find($txId);
+                    if ($tx !== null) {
+                        app(EtatReglementResolver::class)->syncer($tx->fresh());
+                    }
+                }
             }
         });
     }
@@ -174,6 +181,10 @@ final class RemiseBancaireService
                 ->when($t4Id !== null, fn ($q) => $q->where('id', '!=', $t4Id))
                 ->get();
 
+            // Collecter les IDs retirés pour le passage syncer (passe 2 après recreerT4)
+            /** @var list<int> $retiresIds */
+            $retiresIds = [];
+
             foreach ($aRetirer as $tx) {
                 if ($tx->factures()->where('statut', '!=', StatutFacture::Brouillon->value)->exists()) {
                     throw new \RuntimeException(
@@ -186,6 +197,8 @@ final class RemiseBancaireService
                     'statut_reglement' => StatutReglement::EnAttente->value,
                     'reference' => null,
                 ]);
+
+                $retiresIds[] = (int) $tx->id;
             }
 
             $prefix = $remise->referencePrefix();
@@ -225,6 +238,17 @@ final class RemiseBancaireService
             // --- Partie double : supprimer l'ancienne T4 et en recréer une nouvelle ---
             $this->supprimerT4SiExiste($remise);
             $this->recreerT4($remise, $transactionIds);
+
+            // --- PD : syncer toutes les tx touchées (retirées + gardées) après recreerT4 ---
+            // Les retirées obtiennent EnMain (5112 délettré), les gardées obtiennent Recu
+            // (5112 lettrée via nouvelle T4). Legacy : no-op (use_partie_double=false).
+            $tousIds = array_unique(array_merge($retiresIds, array_map('intval', $transactionIds)));
+            foreach ($tousIds as $id) {
+                $s = Transaction::find($id);
+                if ($s !== null) {
+                    app(EtatReglementResolver::class)->syncer($s->fresh());
+                }
+            }
         });
     }
 
@@ -244,12 +268,23 @@ final class RemiseBancaireService
             // --- Partie double : supprimer T4 + délettrer sources ---
             $this->supprimerT4SiExiste($remise);
 
-            // --- Legacy : réinitialiser les tx sources ---
-            Transaction::where('remise_id', $remise->id)->update([
-                'remise_id' => null,
-                'statut_reglement' => StatutReglement::EnAttente->value,
-                'reference' => null,
-            ]);
+            // --- Legacy : réinitialiser les tx sources (passe 1 : mise à jour) ---
+            // En legacy : EnAttente. En PD : le syncer dérive EnMain (5112 délettré = chèque en main).
+            $sources = Transaction::where('remise_id', $remise->id)->get();
+
+            foreach ($sources as $source) {
+                $source->update([
+                    'remise_id' => null,
+                    'statut_reglement' => StatutReglement::EnAttente->value,
+                    'reference' => null,
+                ]);
+            }
+
+            // --- PD : syncer chaque source après T4 supprimée et EnAttente posé (passe 2) ---
+            foreach ($sources as $source) {
+                app(EtatReglementResolver::class)->syncer($source->fresh());
+            }
+
             $remise->delete();
         });
     }
