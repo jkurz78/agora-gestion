@@ -444,6 +444,7 @@
                                     <select wire:model.live="filterStatut" class="form-select form-select-sm">
                                         <option value="">Tous</option>
                                         <option value="en_attente">En attente / À payer</option>
+                                        <option value="en_main">À remettre</option>
                                         <option value="recu">Reçu / Payé</option>
                                         <option value="pointe">Pointé</option>
                                     </select>
@@ -454,6 +455,7 @@
                             @php
                                 $filterStatutLabel = match($filterStatut) {
                                     'en_attente' => 'En attente',
+                                    'en_main'    => 'À remettre',
                                     'recu'       => 'Reçu / Payé',
                                     'pointe'     => 'Pointé',
                                     default      => $filterStatut,
@@ -582,6 +584,7 @@
                                 $isDepense = $tx->source_type === 'depense';
                                 [$sBadge, $sLabel] = match($statutReglement) {
                                     'en_attente' => ['warning text-dark', $isDepense ? 'À payer'     : 'En attente'],
+                                    'en_main'    => ['warning text-dark', 'À remettre'],
                                     'recu'       => ['success',           $isDepense ? 'Payé'         : 'Reçu'],
                                     'pointe'     => ['secondary',         'Pointé'],
                                     default      => ['light text-muted',  $statutReglement],

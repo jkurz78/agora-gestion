@@ -197,7 +197,7 @@
                                     @elseif($tx && $tx->statut_reglement !== \App\Enums\StatutReglement::EnAttente)
                                         <br>
                                         <span class="badge mt-1"
-                                              style="font-size:9px;background:{{ $tx->statut_reglement === \App\Enums\StatutReglement::Pointe ? '#6c757d' : '#198754' }}">
+                                              style="font-size:9px;background:{{ $tx->statut_reglement === \App\Enums\StatutReglement::Pointe ? '#6c757d' : ($tx->statut_reglement === \App\Enums\StatutReglement::EnMain ? '#ffc107' : '#198754') }};color:{{ $tx->statut_reglement === \App\Enums\StatutReglement::EnMain ? '#000' : '#fff' }}">
                                             {{ $tx->statut_reglement->label(\App\Enums\Sens::Recette) }}
                                         </span>
                                     @endif

@@ -94,6 +94,8 @@
                             <td class="small">
                                 @if ($transaction->statut_reglement?->value === 'en_attente')
                                     <span class="badge bg-warning text-dark">En attente</span>
+                                @elseif ($transaction->statut_reglement?->value === 'en_main')
+                                    <span class="badge bg-warning text-dark">À remettre</span>
                                 @elseif ($transaction->statut_reglement?->value === 'recu')
                                     <span class="badge bg-success">Reçu</span>
                                 @elseif ($transaction->statut_reglement?->value === 'pointe')
