@@ -824,6 +824,7 @@ final class EcritureGenerator
         Compte $compteTresorerie,
         \DateTimeInterface $datePaiement,
         ?string $libelle = null,
+        ?Compte $comptePortageOverride = null,
     ): Transaction {
         // --- Résolution compte 411 (tenant-scopé automatiquement) ---
         $compte411 = Compte::ofNumeroSysteme('411');
@@ -853,7 +854,7 @@ final class EcritureGenerator
         /** @var Tiers $tiers */
         $tiers = Tiers::findOrFail($ligne411Source->tiers_id);
 
-        $comptePortage = $this->resoudreComptePortage($mode, $compteTresorerie);
+        $comptePortage = $comptePortageOverride ?? $this->resoudreComptePortage($mode, $compteTresorerie);
 
         // --- Invariant tenant (fail-fast avant DB::transaction) ---
         $this->assertTenantCoherence(

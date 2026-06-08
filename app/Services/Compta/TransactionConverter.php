@@ -168,8 +168,10 @@ final class TransactionConverter
                 );
             }
         } else {
-            // Cas Recu / Pointe / null → comptant (cycle lumped avec 411 lettré).
-            // Résolution du compte de trésorerie (requis pour comptant).
+            // Cas Recu / Pointe / null → T2 séparée (chantier 2b/3b convergence).
+            // Même pattern que TransactionService::enrichirPartieDouble :
+            //   Recette : pourRecetteACredit() → T1 enrichie, pourEncaissementCreance() → T2
+            //   Dépense : pourDepenseACredit() → T1 enrichie, pourReglementFournisseur() → T2
             $modePaiement = $tx->mode_paiement;
 
             if ($modePaiement === null) {
@@ -198,15 +200,10 @@ final class TransactionConverter
                 return false;
             }
 
-            // Calcul du portage override pour le cas 1 (chèque pointé direct) :
-            // remise_id null + rapprochement_id non null + mode Cheque (recette).
-            // Dans ce cas, EcritureGenerator::resoudreComptePortage forcerait 5112,
-            // mais le clone prod prouve que le portage doit être sur le 512X bancaire.
-            // On passe $compteTresorerie en override pour bypass le force-5112.
-            //
-            // Pas de symétrie côté dépense : un chèque émis passe par
-            // resoudreComptePortageDepense() qui route déjà sur le 512X (jamais 5112),
-            // donc le cas 1 n'a pas d'équivalent dépense à corriger.
+            // Override portage pour le cas « chèque pointé direct » (recette uniquement) :
+            // remise_id null + rapprochement_id non null + mode Cheque.
+            // Sans override, resoudreComptePortage forcerait 5112 ; le clone prod prouve
+            // que le portage doit être sur le 512X bancaire.
             $comptePortageOverride = null;
 
             if (
@@ -219,26 +216,56 @@ final class TransactionConverter
             }
 
             if ($tx->type === TypeTransaction::Recette) {
-                $this->ecritureGenerator->pourRecetteComptant(
+                // Step 1 : T1 créance (411 D / 7xx C, journal=Vente)
+                $this->ecritureGenerator->pourRecetteACredit(
                     tiers: $tiers,
                     ventilations: $ventilations,
-                    mode: $modePaiement,
-                    compteTresorerie: $compteTresorerie,
-                    date: $date,
+                    dateConstatation: $date,
                     libelle: $tx->libelle,
                     existingTransaction: $tx,
+                );
+
+                // Step 2 : T2 encaissement séparée (portage D / 411 C, journal=Banque)
+                $libelleEncaissement = 'Encaissement '.$tx->libelle;
+                $t2 = $this->ecritureGenerator->pourEncaissementCreance(
+                    transactionCreance: $tx,
+                    mode: $modePaiement,
+                    compteTresorerie: $compteTresorerie,
+                    datePaiement: $date,
+                    libelle: $libelleEncaissement,
                     comptePortageOverride: $comptePortageOverride,
                 );
+
+                // Propager rapprochement_id sur la T2 pour rapprochement direct
+                // (virement/CB/chèque pointé : c'est la T2 qui porte le mouvement 512X).
+                // Si remise_id est présent, le rapprochement va sur la T4 (Phase 2 du backfill).
+                if ($tx->rapprochement_id !== null && $tx->remise_id === null) {
+                    $t2->forceFill(['rapprochement_id' => $tx->rapprochement_id])->save();
+                }
             } else {
-                $this->ecritureGenerator->pourDepenseComptant(
+                // Step 1 : T1 dette (6xx D / 401 C, journal=Achat)
+                $this->ecritureGenerator->pourDepenseACredit(
                     tiers: $tiers,
                     ventilations: $ventilations,
-                    mode: $modePaiement,
-                    compteTresorerie: $compteTresorerie,
-                    date: $date,
+                    dateConstatation: $date,
                     libelle: $tx->libelle,
                     existingTransaction: $tx,
                 );
+
+                // Step 2 : T2 règlement séparée (401 D / portage C, journal=Banque)
+                $libelleReglement = 'Règlement '.$tx->libelle;
+                $t2 = $this->ecritureGenerator->pourReglementFournisseur(
+                    transactionDette: $tx,
+                    mode: $modePaiement,
+                    compteTresorerie: $compteTresorerie,
+                    datePaiement: $date,
+                    libelle: $libelleReglement,
+                );
+
+                // Propager rapprochement_id sur la T2 pour rapprochement direct
+                if ($tx->rapprochement_id !== null && $tx->remise_id === null) {
+                    $t2->forceFill(['rapprochement_id' => $tx->rapprochement_id])->save();
+                }
             }
         }
 

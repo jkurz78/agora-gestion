@@ -504,13 +504,44 @@ function simulerEtatLegacyE2E(array $txIds): void
         return;
     }
 
-    // Supprimer les lignes PD-only (sous_categorie_id null + compte_id non null)
+    // Étape 0 : supprimer les T2 séparées liées aux T1 legacy via lettrage (chantier T2-séparée).
+    // La T2 encaissement/règlement est une transaction PD-pure liée à la T1 via le lettrage
+    // du compte tiers (411 ou 401). Elle n'est pas dans $txIdsLegacy (pas de sous_cat),
+    // mais elle doit être purgée pour éviter les doublons au re-backfill.
+    $lettrageCodesT1 = DB::table('transaction_lignes')
+        ->whereIn('transaction_id', $txIdsLegacy)
+        ->whereNull('sous_categorie_id')
+        ->whereNotNull('compte_id')
+        ->whereNotNull('lettrage_code')
+        ->pluck('lettrage_code')
+        ->unique()
+        ->filter()
+        ->values()
+        ->all();
+
+    if (! empty($lettrageCodesT1)) {
+        $t2Ids = DB::table('transaction_lignes')
+            ->whereIn('lettrage_code', $lettrageCodesT1)
+            ->whereNotIn('transaction_id', $txIdsLegacy)
+            ->pluck('transaction_id')
+            ->unique()
+            ->filter()
+            ->values()
+            ->all();
+
+        if (! empty($t2Ids)) {
+            TransactionLigne::whereIn('transaction_id', $t2Ids)->forceDelete();
+            Transaction::whereIn('id', $t2Ids)->forceDelete();
+        }
+    }
+
+    // Étape 1 : supprimer les lignes PD-only (sous_categorie_id null + compte_id non null) de T1
     TransactionLigne::whereIn('transaction_id', $txIdsLegacy)
         ->whereNull('sous_categorie_id')
         ->whereNotNull('compte_id')
         ->forceDelete();
 
-    // Reset colonnes PD sur les lignes de ventilation
+    // Étape 2 : reset colonnes PD sur les lignes de ventilation
     TransactionLigne::whereIn('transaction_id', $txIdsLegacy)
         ->update([
             'compte_id' => null,
@@ -520,7 +551,7 @@ function simulerEtatLegacyE2E(array $txIds): void
             'lettrage_code' => null,
         ]);
 
-    // Marquer toutes les Tx legacy equilibree=FALSE
+    // Étape 3 : marquer toutes les Tx legacy equilibree=FALSE
     Transaction::whereIn('id', $txIdsLegacy)->update(['equilibree' => false]);
 }
 
@@ -673,14 +704,37 @@ test('[L] backfill end-to-end exercice complet — toutes Tx equilibree=TRUE, CR
             );
         }
 
-        // La ligne 512X (bancaire physique) doit exister pour la recette CB
+        // La ligne 512X (bancaire physique) doit exister pour la recette CB.
+        // Structure T2-séparée : le portage 512X est sur la T2 (encaissement séparé),
+        // liée à T1 via le lettrage 411. On cherche donc sur T1 + T2.
+        $compte411End = Compte::where('numero_pcg', '411')
+            ->where('association_id', $this->association->id)
+            ->first();
+
+        $txIdsT1etT2CB = [$this->txRCB->id];
+        if ($compte411End !== null) {
+            $lettrageT1CB = TransactionLigne::where('transaction_id', $this->txRCB->id)
+                ->where('compte_id', $compte411End->id)
+                ->whereNotNull('lettrage_code')
+                ->value('lettrage_code');
+            if ($lettrageT1CB !== null) {
+                $t2CBId = TransactionLigne::where('lettrage_code', $lettrageT1CB)
+                    ->where('compte_id', $compte411End->id)
+                    ->where('transaction_id', '!=', $this->txRCB->id)
+                    ->value('transaction_id');
+                if ($t2CBId !== null) {
+                    $txIdsT1etT2CB[] = $t2CBId;
+                }
+            }
+        }
+
         $ligne512XSurCB = DB::table('transaction_lignes')
-            ->where('transaction_id', $this->txRCB->id)
+            ->whereIn('transaction_id', $txIdsT1etT2CB)
             ->where('compte_id', $this->compte512X->id)
             ->whereNull('deleted_at')
             ->exists();
         expect($ligne512XSurCB)->toBeTrue(
-            'Recette CB doit porter une ligne sur le compte 512X physique (portage direct)'
+            'Recette CB doit porter une ligne sur le compte 512X physique (portage direct, sur T1 ou T2)'
         );
     }
 

@@ -1026,20 +1026,19 @@ it('une recette comptant saisie au formulaire est marquée équilibrée (pas de 
 });
 
 // ---------------------------------------------------------------------------
-// [E8] Équivalence lumpé ↔ séparé — EtatReglementResolver dérive le même statut
+// [E8] Équivalence live ↔ backfill — EtatReglementResolver dérive le même statut
 //
-// Chantier 4 — Task 11 : vérifie que le resolver retourne le même StatutReglement
-// pour une recette virement créée via le chemin "live" (T2 séparée produite par
-// TransactionService) et via le chemin "backfill" (encaissement lumpé sur T1,
-// produit par TransactionConverter sur une tx legacy).
+// Chantier 4 — Task 11 (mis à jour chantier 2b/3b) : vérifie que le resolver
+// retourne le même StatutReglement pour une recette virement créée via le chemin
+// "live" (T2 séparée produite par TransactionService) et via le chemin "backfill"
+// (T2 séparée produite par TransactionConverter — convergé depuis le chantier 2b).
 //
-// Le cas virement est choisi car il est univoque : ni chèque (portage 5112),
-// ni espèces (530), ni créance (411 non lettré). La T2 séparée porte directement
-// le 512X ; le lumpé porte aussi le 512X sur la T1. Les deux doivent résoudre
-// à StatutReglement::Recu (dénoué, non rapproché).
+// Les deux chemins produisent désormais la même structure T2 séparée (411 lettré
+// inter-tx, portage sur T2). Le test garantit que le resolver dérive le même
+// statut dans les deux cas : StatutReglement::Recu (dénoué, non rapproché).
 // ---------------------------------------------------------------------------
 
-it('[E8] EtatReglementResolver — statut dérivé identique lumpé vs séparé (virement recette)', function () {
+it('[E8] EtatReglementResolver — statut dérivé identique live vs backfill (virement recette)', function () {
     Config::set('compta.use_partie_double', true);
 
     $resolver = app(EtatReglementResolver::class);
@@ -1059,9 +1058,8 @@ it('[E8] EtatReglementResolver — statut dérivé identique lumpé vs séparé 
         ['sous_categorie_id' => $this->sc706->id, 'montant' => '200.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 
-    // ── Structure "lumpée" (backfill) : simuler une tx legacy (equilibree=FALSE, statut=Recu)
-    // puis convertir via TransactionConverter qui produit le cycle 411↔512X sur la T1 elle-même
-    // (encaissement lumpé — pas de T2 séparée).
+    // ── Structure "backfill" : simuler une tx legacy (equilibree=FALSE, statut=Recu)
+    // puis convertir via TransactionConverter qui produit T1 + T2 séparée (chantier 2b/3b).
     $txLegacy = Transaction::create([
         'association_id' => $this->association->id,
         'type' => 'recette',
@@ -1095,6 +1093,6 @@ it('[E8] EtatReglementResolver — statut dérivé identique lumpé vs séparé 
     $statutBackfille = $resolver->resolve($txBackfille);
 
     expect($statutLive)->toBe(StatutReglement::Recu, 'Structure séparée (live) doit résoudre à Recu');
-    expect($statutBackfille)->toBe(StatutReglement::Recu, 'Structure lumpée (backfill) doit résoudre à Recu');
-    expect($statutBackfille)->toBe($statutLive, 'Statut dérivé identique lumpé vs séparé');
+    expect($statutBackfille)->toBe(StatutReglement::Recu, 'Structure backfill (T2 séparée) doit résoudre à Recu');
+    expect($statutBackfille)->toBe($statutLive, 'Statut dérivé identique live vs backfill');
 });

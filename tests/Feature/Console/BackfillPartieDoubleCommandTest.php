@@ -822,16 +822,52 @@ function setupFixtureBugA(object $ctx): void
 }
 
 /**
- * Simule l'état legacy sur une transaction : supprime les lignes PD-only
- * et reset les colonnes PD sur les ventilations.
+ * Simule l'état legacy sur une transaction : supprime les lignes PD-only,
+ * supprime les T2 séparées liées via lettrage, et reset les colonnes PD.
+ *
+ * Mis à jour pour le chantier T2-séparée : le convertisseur crée maintenant
+ * une T2 distincte pour le portage/encaissement. On doit la supprimer avant
+ * de re-simuler l'état legacy pour les tests de re-backfill.
  */
 function simulerLegacySurTx(Transaction $tx): void
 {
+    // Étape 0 : trouver et supprimer les T2 liées (T2-séparée = journal Banque,
+    // liée à T1 via le lettrage du compte tiers 411 ou 401).
+    // On repère les T2 par les lignes PD-only lettrées sur T1 qui pointent sur
+    // une transaction différente via le même lettrage_code.
+    $lettrageCodesT1 = TransactionLigne::where('transaction_id', $tx->id)
+        ->whereNull('sous_categorie_id')
+        ->whereNotNull('compte_id')
+        ->whereNotNull('lettrage_code')
+        ->pluck('lettrage_code')
+        ->unique()
+        ->filter()
+        ->values()
+        ->all();
+
+    if (! empty($lettrageCodesT1)) {
+        $t2Ids = TransactionLigne::whereIn('lettrage_code', $lettrageCodesT1)
+            ->where('transaction_id', '!=', $tx->id)
+            ->pluck('transaction_id')
+            ->unique()
+            ->filter()
+            ->values()
+            ->all();
+
+        if (! empty($t2Ids)) {
+            // Supprimer les lignes de T2, puis les headers T2
+            TransactionLigne::whereIn('transaction_id', $t2Ids)->forceDelete();
+            Transaction::whereIn('id', $t2Ids)->forceDelete();
+        }
+    }
+
+    // Étape 1 : supprimer les lignes PD-only de T1 (411/401, sous_cat=null, compte_id not null)
     TransactionLigne::where('transaction_id', $tx->id)
         ->whereNull('sous_categorie_id')
         ->whereNotNull('compte_id')
         ->forceDelete();
 
+    // Étape 2 : reset colonnes PD sur les lignes de ventilation
     TransactionLigne::where('transaction_id', $tx->id)
         ->update([
             'compte_id' => null,
@@ -969,29 +1005,38 @@ test('[AC2] chèque recu avec remise_id → portage 5112, 411 pair lettré', fun
         ->where('association_id', $this->association->id)
         ->firstOrFail();
 
-    $lignes = TransactionLigne::where('transaction_id', $txChequeRemise->id)
+    $lignesT1 = TransactionLigne::where('transaction_id', $txChequeRemise->id)
         ->whereNotNull('compte_id')
         ->whereNull('deleted_at')
         ->get();
 
-    // Ligne 5112 D doit exister (portage chèque reçu)
-    $ligne5112D = $lignes->firstWhere(fn ($l) => (int) $l->compte_id === (int) $compte5112->id && (float) $l->debit > 0);
-    expect($ligne5112D)->not->toBeNull('Ligne 5112 D (portage chèque remisé) doit exister');
+    // T1 : 411 D + 706 C (structure T2-séparée)
+    $ligne411D = $lignesT1->firstWhere(fn ($l) => (int) $l->compte_id === (int) $compte411->id && (float) $l->debit > 0);
+    expect($ligne411D)->not->toBeNull('T1 doit avoir une ligne 411 D');
+    expect($ligne411D->lettrage_code)->not->toBeNull('Ligne 411 T1 doit être lettrée (inter-Tx avec T2)');
+
+    // T2 : trouvée via le lettrage_code de la ligne 411 T1
+    $ligne411T2 = TransactionLigne::where('lettrage_code', $ligne411D->lettrage_code)
+        ->where('compte_id', $compte411->id)
+        ->where('transaction_id', '!=', $txChequeRemise->id)
+        ->whereNull('deleted_at')
+        ->first();
+    expect($ligne411T2)->not->toBeNull('T2 doit avoir une ligne 411 C lettrée avec T1');
+
+    $t2Id = $ligne411T2->transaction_id;
+
+    // Sur T2 : ligne 5112 D (portage chèque reçu)
+    $ligne5112D = TransactionLigne::where('transaction_id', $t2Id)
+        ->where('compte_id', $compte5112->id)
+        ->where('debit', '>', 0)
+        ->whereNull('deleted_at')
+        ->first();
+    expect($ligne5112D)->not->toBeNull('T2 doit avoir une ligne 5112 D (portage chèque remisé)');
     expect((float) $ligne5112D->debit)->toBe(120.0);
     expect($ligne5112D->tiers_id)->toBeNull('Ligne 5112 ne doit pas porter de tiers_id');
-    // Le backfill enchaîne la phase 2 (reconstruction T4) sur la même remise : le chèque
-    // remisé est déposé (T4 512X D / 5112 C), donc la ligne 5112 D source est soldée (lettrée).
     // La source a reference = NULL (txService n'en pose pas) : c'est le scénario Finding 2 —
-    // l'ancien critère `reference IS NULL` empêchait à tort la construction de la T4 ici.
-    expect($ligne5112D->lettrage_code)->not->toBeNull('Ligne 5112 soldée par la T4 (chèque déposé)');
-
-    // Paire 411 doit être lettrée (cycle comptant lumped)
-    $lignes411 = $lignes->filter(fn ($l) => (int) $l->compte_id === (int) $compte411->id);
-    expect($lignes411)->toHaveCount(2, 'Deux lignes 411 (D et C) pour le cycle comptant');
-
-    $codes411 = $lignes411->pluck('lettrage_code')->filter()->values();
-    expect($codes411)->toHaveCount(2, 'Les 2 lignes 411 doivent être lettrées (auto-lettrage interne)');
-    expect($codes411[0])->toBe($codes411[1], 'Les 2 lignes 411 doivent porter le même lettrage_code');
+    // le backfill phase 2 enchaîne la reconstruction T4 → 5112 lettrée (soldée).
+    expect($ligne5112D->lettrage_code)->not->toBeNull('Ligne 5112 T2 soldée par la T4 (chèque déposé)');
 })->group('backfill', 'bug-a');
 
 // AC #5 — chèque pointe (rapprochement_id non null, remise_id null) → portage 512X (pas 5112), 411 lettré
@@ -1044,32 +1089,45 @@ test('[AC5] chèque pointe rapprochement_id non null → portage 512X (pas 5112)
         ->where('association_id', $this->association->id)
         ->firstOrFail();
 
-    $lignes = TransactionLigne::where('transaction_id', $txChequePointe->id)
+    $lignesT1 = TransactionLigne::where('transaction_id', $txChequePointe->id)
         ->whereNotNull('compte_id')
         ->whereNull('deleted_at')
         ->get();
 
-    // Aucune ligne 5112 (portage doit être sur le 512X bancaire, pas 5112 transit)
-    $ligne5112 = $lignes->firstWhere('compte_id', $compte5112->id);
-    expect($ligne5112)->toBeNull('Cas pointé direct → aucune ligne 5112 (portage sur 512X, pas transit)');
+    // T1 : 411 D + 706 C (structure T2-séparée)
+    $ligne411D = $lignesT1->firstWhere(fn ($l) => (int) $l->compte_id === (int) $compte411->id && (float) $l->debit > 0);
+    expect($ligne411D)->not->toBeNull('T1 doit avoir une ligne 411 D');
+    expect($ligne411D->lettrage_code)->not->toBeNull('Ligne 411 T1 doit être lettrée (inter-Tx avec T2)');
 
-    // Ligne 512X D doit exister (portage direct sur compte bancaire)
-    $ligne512XD = $lignes->firstWhere(fn ($l) => (int) $l->compte_id === (int) $this->compte512X->id && (float) $l->debit > 0);
-    expect($ligne512XD)->not->toBeNull('Ligne 512X D (portage direct) doit exister pour chèque pointé');
+    // T2 : trouvée via le lettrage_code de la ligne 411 T1
+    $ligne411T2 = TransactionLigne::where('lettrage_code', $ligne411D->lettrage_code)
+        ->where('compte_id', $compte411->id)
+        ->where('transaction_id', '!=', $txChequePointe->id)
+        ->whereNull('deleted_at')
+        ->first();
+    expect($ligne411T2)->not->toBeNull('T2 doit avoir une ligne 411 C lettrée avec T1');
+
+    $t2Id = $ligne411T2->transaction_id;
+    $lignesT2 = TransactionLigne::where('transaction_id', $t2Id)
+        ->whereNotNull('compte_id')
+        ->whereNull('deleted_at')
+        ->get();
+
+    // Aucune ligne 5112 sur T2 (portage doit être sur le 512X bancaire, pas 5112 transit)
+    $ligne5112 = $lignesT2->firstWhere('compte_id', $compte5112->id);
+    expect($ligne5112)->toBeNull('Cas pointé direct → aucune ligne 5112 sur T2 (portage sur 512X, pas transit)');
+
+    // Ligne 512X D sur T2 (portage direct via override)
+    $ligne512XD = $lignesT2->firstWhere(fn ($l) => (int) $l->compte_id === (int) $this->compte512X->id && (float) $l->debit > 0);
+    expect($ligne512XD)->not->toBeNull('T2 doit avoir une ligne 512X D (portage direct) pour chèque pointé');
     expect((float) $ligne512XD->debit)->toBe(150.0);
     expect($ligne512XD->tiers_id)->toBeNull('Ligne 512X ne doit pas porter de tiers_id');
 
-    // Paire 411 doit être lettrée
-    $lignes411 = $lignes->filter(fn ($l) => (int) $l->compte_id === (int) $compte411->id);
-    expect($lignes411)->toHaveCount(2, 'Deux lignes 411 (D et C) pour le cycle comptant');
-
-    $codes411 = $lignes411->pluck('lettrage_code')->filter()->values();
-    expect($codes411)->toHaveCount(2, 'Les 2 lignes 411 doivent être lettrées');
-    expect($codes411[0])->toBe($codes411[1], 'Même lettrage_code sur les 2 lignes 411');
-
-    // rapprochement_id conservé : le converter ne doit pas détacher la Tx de son rapprochement
-    // (AC #5 — la ligne 512X reste comptée au solde de pointage).
-    expect((int) $txChequePointe->rapprochement_id)->toBe((int) $rapprochement->id, 'rapprochement_id doit être conservé après backfill');
+    // rapprochement_id propagé sur la T2 (AC #5 — la ligne 512X reste comptée au solde de pointage)
+    $t2 = Transaction::find($t2Id);
+    expect((int) $t2->rapprochement_id)->toBe((int) $rapprochement->id, 'T2 doit porter le rapprochement_id propagé');
+    // rapprochement_id conservé sur T1 aussi
+    expect((int) $txChequePointe->rapprochement_id)->toBe((int) $rapprochement->id, 'rapprochement_id conservé sur T1 après backfill');
 })->group('backfill', 'bug-a');
 
 // AC #6 — chèque recu (remise_id null, rapprochement_id null) → portage 5112 (transit), 411 lettré
@@ -1111,25 +1169,36 @@ test('[AC6] chèque recu sans remise ni rapprochement → portage 5112, 411 lett
         ->where('association_id', $this->association->id)
         ->firstOrFail();
 
-    $lignes = TransactionLigne::where('transaction_id', $txChequeRecu->id)
+    $lignesT1 = TransactionLigne::where('transaction_id', $txChequeRecu->id)
         ->whereNotNull('compte_id')
         ->whereNull('deleted_at')
         ->get();
 
-    // Ligne 5112 D doit exister (portage transit — chèque reçu pas encore remisé)
-    $ligne5112D = $lignes->firstWhere(fn ($l) => (int) $l->compte_id === (int) $compte5112->id && (float) $l->debit > 0);
-    expect($ligne5112D)->not->toBeNull('Ligne 5112 D (portage transit) doit exister pour chèque reçu sans remise/rappro');
+    // T1 : 411 D + 706 C (structure T2-séparée)
+    $ligne411D = $lignesT1->firstWhere(fn ($l) => (int) $l->compte_id === (int) $compte411->id && (float) $l->debit > 0);
+    expect($ligne411D)->not->toBeNull('T1 doit avoir une ligne 411 D');
+    expect($ligne411D->lettrage_code)->not->toBeNull('Ligne 411 T1 doit être lettrée (inter-Tx avec T2)');
+
+    // T2 : trouvée via le lettrage_code de la ligne 411 T1
+    $ligne411T2 = TransactionLigne::where('lettrage_code', $ligne411D->lettrage_code)
+        ->where('compte_id', $compte411->id)
+        ->where('transaction_id', '!=', $txChequeRecu->id)
+        ->whereNull('deleted_at')
+        ->first();
+    expect($ligne411T2)->not->toBeNull('T2 doit avoir une ligne 411 C lettrée avec T1');
+
+    $t2Id = $ligne411T2->transaction_id;
+    $lignesT2 = TransactionLigne::where('transaction_id', $t2Id)
+        ->whereNotNull('compte_id')
+        ->whereNull('deleted_at')
+        ->get();
+
+    // Sur T2 : ligne 5112 D (portage transit — chèque reçu pas encore remisé)
+    $ligne5112D = $lignesT2->firstWhere(fn ($l) => (int) $l->compte_id === (int) $compte5112->id && (float) $l->debit > 0);
+    expect($ligne5112D)->not->toBeNull('T2 doit avoir une ligne 5112 D (portage transit) pour chèque reçu sans remise/rappro');
     expect((float) $ligne5112D->debit)->toBe(80.0);
     expect($ligne5112D->tiers_id)->toBeNull('Ligne 5112 ne doit pas porter de tiers_id');
     expect($ligne5112D->lettrage_code)->toBeNull('Ligne 5112 transit doit être non lettrée');
-
-    // Paire 411 doit être lettrée (auto-lettrage comptant)
-    $lignes411 = $lignes->filter(fn ($l) => (int) $l->compte_id === (int) $compte411->id);
-    expect($lignes411)->toHaveCount(2, 'Deux lignes 411 (D et C) pour le cycle comptant');
-
-    $codes411 = $lignes411->pluck('lettrage_code')->filter()->values();
-    expect($codes411)->toHaveCount(2, 'Les 2 lignes 411 doivent être lettrées (auto-lettrage interne)');
-    expect($codes411[0])->toBe($codes411[1], 'Même lettrage_code sur les 2 lignes 411');
 })->group('backfill', 'bug-a');
 
 // ---------------------------------------------------------------------------
@@ -1274,14 +1343,35 @@ test('[AC3] backfill phase 2 : T4 créée avec 512X D total / 5112 C par source,
     $totalCredit = (float) $lignesT4->sum('credit');
     expect(round($totalDebit, 2))->toBe(round($totalCredit, 2), 'T4 équilibrée');
 
-    // Les lignes 5112 des sources sont maintenant lettrées (soldées)
+    // Les lignes 5112 des sources sont maintenant lettrées (soldées).
+    // Structure T2-séparée : la ligne 5112 est sur T2 (encaissement séparé),
+    // trouvée via le lettrage 411 entre T1 et T2.
+    $compte411 = Compte::where('numero_pcg', '411')
+        ->where('association_id', $this->association->id)
+        ->firstOrFail();
+
     foreach ([$this->txSource1, $this->txSource2] as $source) {
-        $ligne5112Source = TransactionLigne::where('transaction_id', $source->id)
+        // Trouver T2 via le lettrage 411 de T1
+        $ligne411T1 = TransactionLigne::where('transaction_id', $source->id)
+            ->where('compte_id', $compte411->id)
+            ->whereNotNull('lettrage_code')
+            ->whereNull('deleted_at')
+            ->first();
+        expect($ligne411T1)->not->toBeNull("Source #{$source->id} : T1 doit avoir une ligne 411 lettrée");
+
+        $t2SourceId = TransactionLigne::where('lettrage_code', $ligne411T1->lettrage_code)
+            ->where('compte_id', $compte411->id)
+            ->where('transaction_id', '!=', $source->id)
+            ->whereNull('deleted_at')
+            ->value('transaction_id');
+        expect($t2SourceId)->not->toBeNull("Source #{$source->id} : T2 doit exister (liée via lettrage 411)");
+
+        $ligne5112Source = TransactionLigne::where('transaction_id', $t2SourceId)
             ->where('compte_id', $compte5112->id)
             ->whereNotNull('lettrage_code')
             ->whereNull('deleted_at')
             ->first();
-        expect($ligne5112Source)->not->toBeNull("Source #{$source->id} : ligne 5112 doit être lettrée après T4");
+        expect($ligne5112Source)->not->toBeNull("Source #{$source->id} : ligne 5112 sur T2 doit être lettrée après T4");
     }
 })->group('backfill', 'remise-backfill');
 
@@ -1403,14 +1493,34 @@ test('[AC10] idempotence backfill --force × 2 → exactement 1 T4 par remise, p
         ->count();
     expect($nbT4Apres2)->toBe(1, 'Exactement 1 T4 après le 2ème run --force (pas de doublon)');
 
-    // Une seule ligne 5112 lettrée par source (pas de double-lettrage)
+    // Une seule ligne 5112 lettrée par source (pas de double-lettrage).
+    // Structure T2-séparée : la ligne 5112 est sur T2 de la source.
+    $compte411 = Compte::where('numero_pcg', '411')
+        ->where('association_id', $this->association->id)
+        ->firstOrFail();
+
     foreach ([$this->txSource1, $this->txSource2] as $source) {
-        $nb5112Lettrees = TransactionLigne::where('transaction_id', $source->id)
+        // Trouver T2 via le lettrage 411 de T1
+        $ligne411T1 = TransactionLigne::where('transaction_id', $source->id)
+            ->where('compte_id', $compte411->id)
+            ->whereNotNull('lettrage_code')
+            ->whereNull('deleted_at')
+            ->first();
+        expect($ligne411T1)->not->toBeNull("Source #{$source->id} : T1 doit avoir une ligne 411 lettrée");
+
+        $t2SourceId = TransactionLigne::where('lettrage_code', $ligne411T1->lettrage_code)
+            ->where('compte_id', $compte411->id)
+            ->where('transaction_id', '!=', $source->id)
+            ->whereNull('deleted_at')
+            ->value('transaction_id');
+        expect($t2SourceId)->not->toBeNull("Source #{$source->id} : T2 doit exister");
+
+        $nb5112Lettrees = TransactionLigne::where('transaction_id', $t2SourceId)
             ->where('compte_id', $compte5112->id)
             ->whereNotNull('lettrage_code')
             ->whereNull('deleted_at')
             ->count();
-        expect($nb5112Lettrees)->toBe(1, "Source #{$source->id} : exactement 1 ligne 5112 lettrée (pas de double-lettrage)");
+        expect($nb5112Lettrees)->toBe(1, "Source #{$source->id} : exactement 1 ligne 5112 lettrée sur T2 (pas de double-lettrage)");
     }
 })->group('backfill', 'remise-backfill');
 
