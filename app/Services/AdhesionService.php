@@ -12,6 +12,7 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Observers\AdhesionTransactionLigneObserver;
 use App\Services\Adhesion\NouvelleAdhesionDTO;
 use App\Services\Adhesion\SousCategorieFormuleResolver;
 use App\Tenant\TenantContext;
@@ -25,6 +26,7 @@ final class AdhesionService
     public function __construct(
         private readonly ExerciceService $exerciceService,
         private readonly SousCategorieFormuleResolver $formuleResolver,
+        private readonly TransactionService $transactionService,
     ) {}
 
     public function creerDepuisTransaction(Transaction $tx): ?Adhesion
@@ -364,33 +366,46 @@ final class AdhesionService
         }
     }
 
+    /**
+     * Crée la transaction de paiement via TransactionService::create() pour
+     * bénéficier de l'enrichissement PD (411 D / 7xx C + T2 encaissement),
+     * de la garde exercice ouvert et du syncer statut dérivé.
+     *
+     * L'observer AdhesionTransactionLigneObserver est supprimé le temps de la
+     * création pour éviter une double création d'adhésion (le wizard la gère).
+     */
     private function creerTransactionPaiement(NouvelleAdhesionDTO $dto, FormuleAdhesion $formule, User $createur): int
     {
         if ($dto->datePaiement === null) {
             throw new \InvalidArgumentException('datePaiement est requis lorsque le montant est positif.');
         }
 
-        $tx = Transaction::create([
-            'type' => TypeTransaction::Recette->value,
-            'date' => $dto->datePaiement,
-            'libelle' => "Cotisation — {$formule->nom}",
-            'montant_total' => $dto->montant,
-            'mode_paiement' => $dto->modePaiement?->value,
-            'tiers_id' => $dto->tiersId,
-            'compte_id' => $dto->compteId,
-            'reference' => $dto->reference,
-            'saisi_par' => (int) $createur->id,
-            'numero_piece' => app(NumeroPieceService::class)->assign(Carbon::parse($dto->datePaiement)),
-        ]);
+        // Supprimer l'observer adhésion le temps de la création — le wizard
+        // gère lui-même la création de l'adhésion après la transaction.
+        AdhesionTransactionLigneObserver::$suppress = true;
 
-        // Suppress AdhesionTransactionLigneObserver: the wizard manages adhesion creation itself.
-        TransactionLigne::withoutEvents(function () use ($tx, $formule, $dto): void {
-            TransactionLigne::create([
-                'transaction_id' => $tx->id,
-                'sous_categorie_id' => $formule->sous_categorie_id,
-                'montant' => $dto->montant,
-            ]);
-        });
+        try {
+            $tx = $this->transactionService->create(
+                data: [
+                    'type' => TypeTransaction::Recette->value,
+                    'date' => $dto->datePaiement,
+                    'libelle' => "Cotisation — {$formule->nom}",
+                    'montant_total' => $dto->montant,
+                    'mode_paiement' => $dto->modePaiement?->value,
+                    'tiers_id' => $dto->tiersId,
+                    'compte_id' => $dto->compteId,
+                    'reference' => $dto->reference,
+                ],
+                lignes: [
+                    [
+                        'sous_categorie_id' => $formule->sous_categorie_id,
+                        'montant' => $dto->montant,
+                    ],
+                ],
+            );
+        } finally {
+            AdhesionTransactionLigneObserver::$suppress = false;
+        }
 
         return (int) $tx->id;
     }

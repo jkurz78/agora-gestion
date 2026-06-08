@@ -10,6 +10,15 @@ use App\Services\AdhesionService;
 
 final class AdhesionTransactionLigneObserver
 {
+    /**
+     * Flag de suppression temporaire.
+     *
+     * Activé par AdhesionService::creerTransactionPaiement() qui route la création
+     * via TransactionService::create() — l'observer adhésion doit être inhibé car
+     * le wizard gère lui-même la création de l'adhésion (sinon double création).
+     */
+    public static bool $suppress = false;
+
     public function __construct(
         private readonly AdhesionService $service,
     ) {}
@@ -20,6 +29,10 @@ final class AdhesionTransactionLigneObserver
      */
     public function saved(TransactionLigne $ligne): void
     {
+        if (self::$suppress) {
+            return;
+        }
+
         $tx = $ligne->transaction;
 
         if ($tx === null) {

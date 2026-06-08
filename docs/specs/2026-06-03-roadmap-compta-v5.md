@@ -79,8 +79,8 @@ Après analyse (2026-06-03), ce n'est pas un quick fix : il faut une **nouvelle 
 
 **Dépend de la Phase 1** : on branche les flux sur un cycle de vie (statut + règlement symétrique) déjà sain.
 
-### FX-Cotisation — Adhésions/cotisations via le moteur PD
-Audit Thèmes A/E/H : le **wizard d'adhésion** (`AdhesionService::creerTransactionPaiement`) crée Transaction+ligne en direct, **sans `TransactionService`** → aucune écriture PD. Le router par le moteur (`enrichirPartieDouble`), compte produit **751**, garde `ExerciceService::assertOuvert`. Brancher `tiers_payeur_id` (spec PASS `…tiers-payeur-cotisation…` : la ligne 411 doit porter le **payeur**).
+### ✅ FX-Cotisation — Adhésions/cotisations via le moteur PD — LIVRÉ 2026-06-08
+Audit Thèmes A/E/H : le **wizard d'adhésion** (`AdhesionService::creerTransactionPaiement`) routé via `TransactionService::create()` → enrichissement PD complet (411 D / 7xx C + T2 encaissement + syncer statut dérivé + garde exercice ouvert). Flag `AdhesionTransactionLigneObserver::$suppress` inhibe les 2 observers adhésion (TransactionLigne + Transaction) pour éviter la double création. 6 tests TDD [A]-[F], 195 tests adhésion verts (523 assertions). Reste à brancher `tiers_payeur_id` (spec PASS `…tiers-payeur-cotisation…`).
 
 ### FX-HelloAsso — HelloAsso en PD « live »
 Audit Thèmes A/F : `HelloAssoSyncService` crée des transactions legacy, **PD différé à un backfill manuel sans auto-trigger**. Cibler l'enrichissement PD **à la création** (ou auto-backfill post-sync) ; cash-out `512→512` (rejoint chantier 8) ; **propagation `rapprochement_id` sur la T2 déjà encaissée** dans `createVerrouilleAuto` (Thème F) ; garde `compte_versement_id` null (fallback silencieux) ; cas montant 0 (promo 100 %).
