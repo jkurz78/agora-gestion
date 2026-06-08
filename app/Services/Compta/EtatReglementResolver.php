@@ -79,7 +79,29 @@ final class EtatReglementResolver
             ->first();
 
         if ($ligneTresorerie === null) {
-            return $t1->statut_reglement; // structure inattendue → fallback prudent
+            // Pas de classe 5 sur $txPortage. Deux cas possibles :
+            //
+            // a) Navigation « en arrière » (T2 → T1) : le resolver traite un T2
+            //    et a navigué vers le T1 qui n'a pas de classe 5. La classe 5 est
+            //    sur le T2 lui-même → retourner la valeur stockée (T2 n'a pas de
+            //    statut dérivé indépendant — c'est une transaction de règlement).
+            //
+            // b) Abandon de créance (OD) : la dette tiers est lettrée sans aucun
+            //    mouvement bancaire (ex: 401 D / 7xx C). Aucune classe 5 nulle part
+            //    → la dette est soldée → Recu.
+            if ((int) $txPortage->id !== (int) $t1->id) {
+                $aClasseCinqPropre = TransactionLigne::where('transaction_id', (int) $t1->id)
+                    ->whereHas('compte', fn (Builder $q) => $q->where('classe', 5))
+                    ->exists();
+
+                if ($aClasseCinqPropre) {
+                    // $t1 est un T2 (encaissement/règlement) — pas de statut dérivé.
+                    return $t1->statut_reglement;
+                }
+            }
+
+            // Tiers lettré sans trésorerie → abandon de créance → dette soldée.
+            return StatutReglement::Recu;
         }
 
         return $this->statutDepuisTresorerie($ligneTresorerie, $txPortage);

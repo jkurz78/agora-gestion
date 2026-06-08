@@ -1197,6 +1197,130 @@ final class EcritureGenerator
         });
     }
 
+    /**
+     * Génère l'OD d'abandon de créance : solde la dette fournisseur 401 par un produit 7xx.
+     *
+     * Matrice :
+     *   OD : 401 D X (tiers) / $compteAbandon C X (sans tiers)
+     *   + auto-lettrage de la paire 401 (ligne T1 + ligne OD)
+     *
+     * Prérequis : $transactionDette est une T1 créée par pourDepenseACredit().
+     * Elle doit contenir une ligne 401 C avec tiers_id non null et non lettrée.
+     *
+     * Pas de ligne 512X — l'abandon de créance n'entraîne aucun mouvement bancaire.
+     *
+     * @param  Transaction  $transactionDette  T1 dépense avec dette 401 C ouverte
+     * @param  Compte  $compteAbandon  Compte 7xx (ex: 754 Abandon de créance)
+     * @param  \DateTimeInterface  $dateAbandon  Date du don constaté
+     * @param  string|null  $libelle  Libellé de l'OD
+     * @return Transaction L'OD créée
+     *
+     * @throws \InvalidArgumentException Si T1 ne contient pas de ligne 401 valide.
+     * @throws LettrageDejaPresentException Si la ligne 401 source est déjà lettrée.
+     * @throws EcritureNonEquilibreeException Sécurité paranoïaque post-création.
+     */
+    public function pourAbandonCreance(
+        Transaction $transactionDette,
+        Compte $compteAbandon,
+        \DateTimeInterface $dateAbandon,
+        ?string $libelle = null,
+    ): Transaction {
+        // --- Résolution compte 401 (tenant-scopé automatiquement) ---
+        $compte401 = Compte::ofNumeroSysteme('401');
+
+        // --- Résolution ligne 401 source dans T1 (DB fraîche pour lettrage_code à jour) ---
+        $ligne401Source = TransactionLigne::where('transaction_id', $transactionDette->id)
+            ->where('compte_id', $compte401->id)
+            ->where('credit', '>', 0)
+            ->first();
+
+        if ($ligne401Source === null || $ligne401Source->tiers_id === null) {
+            throw new \InvalidArgumentException(
+                "La transaction #{$transactionDette->id} ne contient pas de ligne 401 C avec un tiers — ce n'est pas une dette fournisseur valide."
+            );
+        }
+
+        // --- Refus si ligne 401 source déjà lettrée (dette déjà soldée) ---
+        if ($ligne401Source->lettrage_code !== null) {
+            throw LettrageDejaPresentException::forLigne(
+                (int) $ligne401Source->id,
+                $ligne401Source->lettrage_code
+            );
+        }
+
+        // --- Résolution tiers ---
+        /** @var Tiers $tiers */
+        $tiers = Tiers::findOrFail($ligne401Source->tiers_id);
+
+        // --- Invariant tenant ---
+        $this->assertTenantCoherence(
+            collect(),
+            collect([$tiers])
+        );
+
+        // --- Montant = crédit de la ligne 401 source (dette ouverte) ---
+        $montant = (float) $ligne401Source->credit;
+
+        // --- Création dans une transaction DB ---
+        return DB::transaction(function () use (
+            $transactionDette, $tiers, $compte401, $compteAbandon, $montant,
+            $dateAbandon, $libelle, $ligne401Source
+        ): Transaction {
+            $libelleEffectif = $libelle ?? "Abandon de créance — dette #{$transactionDette->id}";
+
+            $od = $this->createTransactionHeader(
+                type: TypeTransaction::Recette,
+                date: $dateAbandon,
+                libelle: $libelleEffectif,
+                montant: $montant,
+                modePaiement: null,
+                journal: JournalComptable::Od,
+            );
+
+            // Ligne 1 : débit 401 (tiers — soldage de la dette)
+            $ligne401D = TransactionLigne::create([
+                'transaction_id' => $od->id,
+                'compte_id' => $compte401->id,
+                'debit' => $montant,
+                'credit' => 0,
+                'tiers_id' => $tiers->id,
+                'libelle' => $libelleEffectif,
+                'montant' => 0,
+                'sous_categorie_id' => null,
+            ]);
+            $ligne401D->setRelation('compte', $compte401);
+
+            // Ligne 2 : crédit produit 7xx (don reconnu — sans tiers)
+            $ligne7xx = TransactionLigne::create([
+                'transaction_id' => $od->id,
+                'compte_id' => $compteAbandon->id,
+                'debit' => 0,
+                'credit' => $montant,
+                'tiers_id' => null,
+                'libelle' => $libelleEffectif,
+                'montant' => 0,
+                'sous_categorie_id' => null,
+            ]);
+            $ligne7xx->setRelation('compte', $compteAbandon);
+
+            // --- Vérifications post-création ---
+            $lignes = collect([$ligne401D, $ligne7xx]);
+            $this->assertEquilibre($lignes);
+            $this->assertTiersObligatoire411($lignes);
+
+            // --- Auto-lettrage paire 401 : T1-ligne401C ↔ OD-ligne401D ---
+            $this->lettrageService->lettrer(
+                collect([$ligne401Source, $ligne401D]),
+                null,
+                "Auto-lettrage abandon de créance dette T#{$transactionDette->id} → OD#{$od->id}"
+            );
+
+            $od->setRelation('lignes', $lignes);
+
+            return $od;
+        });
+    }
+
     // =========================================================================
     // Méthodes privées
     // =========================================================================
