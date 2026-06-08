@@ -40,7 +40,7 @@ final class RecuFiscalService
 
         // Garde montant > 0 : un don ou une cotisation à 0€ (palier HelloAsso "offert"
         // par exemple) ne peut pas donner droit à un reçu fiscal — pas de versement.
-        if ((float) $ligne->montant <= 0) {
+        if ($this->montantRecu($ligne) <= 0) {
             throw RecuFiscalException::montantNul();
         }
 
@@ -48,6 +48,10 @@ final class RecuFiscalService
 
         if (! $transaction->statut_reglement->isEncaisse()) {
             throw RecuFiscalException::transactionNonEncaissee();
+        }
+
+        if ($transaction->tiers_id === null) {
+            throw RecuFiscalException::donateurManquant();
         }
 
         $tiers = $transaction->tiers;
@@ -104,7 +108,7 @@ final class RecuFiscalService
                 'annee_civile' => $anneeCivile,
                 'tiers_id' => $tiers->id,
                 'transaction_ligne_id' => $ligne->id,
-                'montant_centimes' => (int) round((float) $ligne->montant * 100),
+                'montant_centimes' => (int) round($this->montantRecu($ligne) * 100),
                 'date_versement' => $dateVersement,
                 'mode_versement' => $modeVersement,
                 'forme_don' => $formeDon,
@@ -284,7 +288,7 @@ final class RecuFiscalService
         string $modeVersement,
         string $objet = 'don',
     ): string {
-        $montantFloat = (float) $ligne->montant;
+        $montantFloat = $this->montantRecu($ligne);
         $montantFormate = number_format($montantFloat, 2, ',', ' ').' €';
         $montantEnLettres = app(MontantEnLettresService::class)->convertir($montantFloat);
 
@@ -392,5 +396,14 @@ final class RecuFiscalService
         ])->setPaper('a4', 'portrait');
 
         return $pdf->output();
+    }
+
+    /**
+     * Montant du reçu fiscal : privilégie credit PD (colonne pérenne) ;
+     * fallback sur montant legacy tant que le backfill n'a pas enrichi toutes les lignes.
+     */
+    private function montantRecu(TransactionLigne $ligne): float
+    {
+        return (float) $ligne->credit > 0 ? (float) $ligne->credit : (float) $ligne->montant;
     }
 }

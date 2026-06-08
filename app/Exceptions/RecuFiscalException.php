@@ -47,4 +47,9 @@ final class RecuFiscalException extends RuntimeException
     {
         return new self('Le montant doit être strictement positif pour donner droit à un reçu fiscal.');
     }
+
+    public static function donateurManquant(): self
+    {
+        return new self('La transaction n\'a pas de tiers associé — impossible d\'émettre un reçu fiscal sans donateur.');
+    }
 }

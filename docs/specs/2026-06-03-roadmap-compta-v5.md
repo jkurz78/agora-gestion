@@ -89,8 +89,8 @@ Audit Thèmes A/F : `HelloAssoSyncService` crée des transactions legacy, **PD d
 Audit Thèmes C/E/A/H : une fois le chantier 3 livré, faire produire à la NDF une **dette ouverte** (`6xx D / 467 C`) puis un **remboursement** réel (T2 `467 D / 512X C` via `pourReglementFournisseur`). Compte **467** (au lieu de 401). Garde sur la **ligne km sans usage** configuré (sinon skip de toute la transaction). Garde **exercice ouvert** à la soumission portail (sinon NDF bloquée en `soumise`).
 - **Abandon de créance (ex-QF-D)** : router l'abandon en **OD** `467 D / 75x C` (lettrage du 467), **sans ligne 512X** → retire les 2 faux mouvements qui polluent le rappro du chantier 1 ; journal OD (pas Vente) ; `mode_paiement` null sur le don ; nouvelle méthode `EcritureGenerator::pourAbandonCreance`. MAJ tests `ValiderAvecAbandonCreanceTest` + E2E + `ConstaterAbandonTest` + `AbandonCreanceNonAffichageTest`.
 
-### FX-Don — Dons & reçu fiscal
-Audit Thème G : **coupler le reçu fiscal à l'écriture PD** (pas seulement à `statut_reglement.isEncaisse()`), garde « don sans tiers » (skip silencieux aujourd'hui), fiabiliser le montant du reçu sur `debit/credit` plutôt que la colonne legacy `montant` (anticipe le drop legacy).
+### ✅ FX-Don — Dons & reçu fiscal — LIVRÉ 2026-06-08
+Audit Thème G : le flux don passe déjà par `TransactionService::create()` (PD natif). Corrections reçu fiscal : garde explicite « don sans tiers » (`RecuFiscalException::donateurManquant()`), montant basculé sur `credit` PD (fallback `montant` legacy) via helper `montantRecu()` — anticipe le drop legacy. Le couplage PD du reçu est résolu par le chantier 4 (statut dérivé du grand livre). 3 tests TDD [A]-[C], 85 tests RecuFiscal verts.
 
 ### Capstone Phase 2
 Activer le **garde-fou bloquant** de non-échappement PD (chantier **G**, volet 2) une fois tous les flux ci-dessus corrigés.
