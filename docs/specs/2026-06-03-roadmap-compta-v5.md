@@ -71,6 +71,7 @@ Après analyse (2026-06-03), ce n'est pas un quick fix : il faut une **nouvelle 
 ### G. Garantie de non-échappement PD *(nouveau — audit Thème A)*
 **Intention** : aucune transaction ne doit exister sans écriture PD **équilibrée** en mode PD. Ferme les skips silencieux (wizard adhésion, ligne km sans usage configuré → skip de **toute** la transaction, don sans tiers).
 **Découpage** : (1) d'abord un **rapport** — étendre `compta:smoke-test-v5` pour lister les transactions sans lignes PD / non équilibrées en mode PD ; (2) puis un **garde-fou bloquant**, activé **en capstone de Phase 2** (sinon il casserait immédiatement sur wizard/HelloAsso non encore corrigés).
+- **G volet 1 (rapport)** ✅ **LIVRÉ 2026-06-08** : `compta:smoke-test-v5` étendu — nouvelle colonne « Tx sans PD » dans le tableau récapitulatif, résumé par source (HelloAsso / Adhésion wizard / NDF / Saisie manuelle) avec raison probable du skip (tiers_id null / ligne sans sous-catégorie / usage comptable non configuré / bypass TransactionService), option `--detail` pour le tableau ligne par ligne. 6 tests Pest ajoutés. Exit code 1 si des Tx sans PD détectées.
 
 ---
 
