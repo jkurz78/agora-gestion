@@ -51,7 +51,7 @@ it('shows transactions matching mode_paiement and statut_reglement', function ()
         'compte_id' => $this->compteCible->id,
         'mode_paiement' => ModePaiement::Cheque,
         'montant_total' => 30.00,
-        'statut_reglement' => StatutReglement::EnAttente,
+        'statut_reglement' => StatutReglement::EnMain,
         'tiers_id' => $tiers->id,
         'remise_id' => null,
     ]);
@@ -77,6 +77,22 @@ it('does not show transactions with different mode_paiement', function () {
         ->assertDontSee('Jean DUPONT');
 });
 
+it('does not show transactions with statut_reglement=en_attente (chèque non reçu)', function () {
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Durand', 'prenom' => 'Luc']);
+    Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
+        'compte_id' => $this->compteCible->id,
+        'mode_paiement' => ModePaiement::Cheque,
+        'montant_total' => 25.00,
+        'statut_reglement' => StatutReglement::EnAttente,
+        'tiers_id' => $tiers->id,
+        'remise_id' => null,
+    ]);
+
+    Livewire::test(RemiseBancaireSelection::class, ['remise' => $this->remise])
+        ->assertDontSee('Luc DURAND');
+});
+
 it('does not show transactions with statut_reglement=pointe', function () {
     $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Dupont', 'prenom' => 'Jean']);
     Transaction::factory()->asRecette()->create([
@@ -99,7 +115,7 @@ it('toggleTransaction sélectionne et désélectionne une transaction', function
         'compte_id' => $this->compteCible->id,
         'mode_paiement' => ModePaiement::Cheque,
         'montant_total' => 45.00,
-        'statut_reglement' => StatutReglement::EnAttente,
+        'statut_reglement' => StatutReglement::EnMain,
         'remise_id' => null,
     ]);
 
@@ -130,7 +146,7 @@ it('valider enregistre le brouillon et redirige vers show', function () {
         'compte_id' => $this->compteCible->id,
         'mode_paiement' => ModePaiement::Cheque,
         'montant_total' => 45.00,
-        'statut_reglement' => StatutReglement::EnAttente,
+        'statut_reglement' => StatutReglement::EnMain,
         'remise_id' => null,
     ]);
 

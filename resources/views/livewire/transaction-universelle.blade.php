@@ -443,9 +443,9 @@
                                      style="z-index:200;min-width:140px;top:1.2rem;right:0">
                                     <select wire:model.live="filterStatut" class="form-select form-select-sm">
                                         <option value="">Tous</option>
-                                        <option value="en_attente">En attente / À payer</option>
+                                        <option value="en_attente">Dû</option>
                                         <option value="en_main">À remettre</option>
-                                        <option value="recu">Reçu / Payé</option>
+                                        <option value="recu">Remis / Réglé</option>
                                         <option value="pointe">Pointé</option>
                                     </select>
                                 </div>
@@ -454,9 +454,9 @@
                         @if($filterStatut !== '')
                             @php
                                 $filterStatutLabel = match($filterStatut) {
-                                    'en_attente' => 'En attente',
+                                    'en_attente' => 'Dû',
                                     'en_main'    => 'À remettre',
-                                    'recu'       => 'Reçu / Payé',
+                                    'recu'       => 'Remis / Réglé',
                                     'pointe'     => 'Pointé',
                                     default      => $filterStatut,
                                 };
@@ -583,9 +583,9 @@
                             @php
                                 $isDepense = $tx->source_type === 'depense';
                                 [$sBadge, $sLabel] = match($statutReglement) {
-                                    'en_attente' => ['warning text-dark', $isDepense ? 'À payer'     : 'En attente'],
+                                    'en_attente' => ['warning text-dark', 'Dû'],
                                     'en_main'    => ['warning text-dark', 'À remettre'],
-                                    'recu'       => ['success',           $isDepense ? 'Payé'         : 'Reçu'],
+                                    'recu'       => ['success',           $isDepense ? 'Réglé'        : 'Remis'],
                                     'pointe'     => ['secondary',         'Pointé'],
                                     default      => ['light text-muted',  $statutReglement],
                                 };

@@ -93,11 +93,11 @@
                             </td>
                             <td class="small">
                                 @if ($transaction->statut_reglement?->value === 'en_attente')
-                                    <span class="badge bg-warning text-dark">En attente</span>
+                                    <span class="badge bg-warning text-dark">Dû</span>
                                 @elseif ($transaction->statut_reglement?->value === 'en_main')
                                     <span class="badge bg-warning text-dark">À remettre</span>
                                 @elseif ($transaction->statut_reglement?->value === 'recu')
-                                    <span class="badge bg-success">Reçu</span>
+                                    <span class="badge bg-success">Remis</span>
                                 @elseif ($transaction->statut_reglement?->value === 'pointe')
                                     <span class="badge bg-secondary">Pointé</span>
                                 @else
@@ -151,7 +151,7 @@
         <div class="modal-dialog modal-sm">
             <div class="modal-content">
                 <div class="modal-body text-center py-4">
-                    <p>Comptabiliser cette remise ?<br><small class="text-muted">Les transactions passeront au statut « Reçu » et l'écriture de dépôt sera générée.</small></p>
+                    <p>Comptabiliser cette remise ?<br><small class="text-muted">Les transactions passeront au statut « Remis » et l'écriture de dépôt sera générée.</small></p>
                     <button class="btn btn-secondary me-2" data-bs-dismiss="modal">Annuler</button>
                     <button wire:click="comptabiliser" data-bs-dismiss="modal" class="btn btn-success">Comptabiliser</button>
                 </div>

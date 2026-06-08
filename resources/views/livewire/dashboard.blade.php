@@ -142,9 +142,9 @@
                                         if ($statut === null) {
                                             $statutBadge = null;
                                         } elseif ($statut->isEncaisse()) {
-                                            $statutBadge = ['Payé', 'bg-success'];
+                                            $statutBadge = ['Réglé', 'bg-success'];
                                         } else {
-                                            $statutBadge = ['À payer', 'bg-warning text-dark'];
+                                            $statutBadge = ['Dû', 'bg-warning text-dark'];
                                         }
                                     @endphp
                                     <tr>
@@ -193,9 +193,9 @@
                                         if ($statut === null) {
                                             $statutBadge = null;
                                         } elseif ($statut->isEncaisse()) {
-                                            $statutBadge = ['Reçu', 'bg-success'];
+                                            $statutBadge = ['Remis', 'bg-success'];
                                         } else {
-                                            $statutBadge = ['En attente', 'bg-warning text-dark'];
+                                            $statutBadge = ['Dû', 'bg-warning text-dark'];
                                         }
                                     @endphp
                                     <tr>

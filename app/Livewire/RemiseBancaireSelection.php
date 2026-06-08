@@ -146,7 +146,7 @@ final class RemiseBancaireSelection extends Component
             ->operationnel()
             ->where('mode_paiement', $this->remise->mode_paiement->value)
             ->whereIn('statut_reglement', [
-                StatutReglement::EnAttente->value,
+                StatutReglement::EnMain->value,
                 StatutReglement::Recu->value,
             ])
             ->where(function ($q): void {
