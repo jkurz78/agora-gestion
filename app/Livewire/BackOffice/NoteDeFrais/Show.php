@@ -69,7 +69,13 @@ final class Show extends Component
         $isAbandon = $this->ndf->abandon_creance_propose && $this->choixValidation === 'abandon';
 
         $rules = [
-            'compteId' => [
+            'dateComptabilisation' => ['required', 'date'],
+        ];
+
+        // Compte bancaire et mode de paiement ne sont requis qu'en validation
+        // normale — l'abandon de créance n'implique pas de mouvement bancaire.
+        if (! $isAbandon) {
+            $rules['compteId'] = [
                 'required',
                 'integer',
                 'exists:comptes_bancaires,id',
@@ -81,14 +87,13 @@ final class Show extends Component
                         $fail('Le compte bancaire sélectionné est invalide.');
                     }
                 },
-            ],
-            'modePaiement' => [
+            ];
+            $rules['modePaiement'] = [
                 'required',
                 'string',
                 'in:'.implode(',', array_column(ModePaiement::cases(), 'value')),
-            ],
-            'dateComptabilisation' => ['required', 'date'],
-        ];
+            ];
+        }
 
         $messages = [
             'compteId.required' => 'Veuillez sélectionner un compte bancaire.',
@@ -110,8 +115,8 @@ final class Show extends Component
 
         try {
             $data = new ValidationData(
-                compte_id: (int) $this->compteId,
-                mode_paiement: ModePaiement::from($this->modePaiement),
+                compte_id: $isAbandon ? null : (int) $this->compteId,
+                mode_paiement: $isAbandon ? null : ModePaiement::from($this->modePaiement),
                 date: $this->dateComptabilisation,
             );
 

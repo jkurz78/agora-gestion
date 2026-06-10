@@ -266,7 +266,8 @@
                     @endif
 
                     <div class="row g-3">
-                        {{-- Compte bancaire --}}
+                        @if ($choixValidation !== 'abandon')
+                        {{-- Compte bancaire (masqué en abandon — pas de mouvement bancaire) --}}
                         <div class="col-md-4">
                             <label for="compteId" class="form-label">Compte bancaire <span class="text-danger">*</span></label>
                             <select id="compteId"
@@ -282,7 +283,7 @@
                             @enderror
                         </div>
 
-                        {{-- Mode de règlement --}}
+                        {{-- Mode de règlement (masqué en abandon — pas de paiement réel) --}}
                         <div class="col-md-4">
                             <label for="modePaiement" class="form-label">Mode de règlement <span class="text-danger">*</span></label>
                             <select id="modePaiement"
@@ -296,6 +297,7 @@
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
+                        @endif
 
                         {{-- Date de comptabilisation --}}
                         <div class="col-md-4">

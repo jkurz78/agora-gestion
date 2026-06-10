@@ -405,7 +405,7 @@ final class NoteDeFraisValidationService
             'libelle' => sprintf('Don par abandon de créance — NDF #%d', (int) $ndf->id),
             'reference' => sprintf('NDF #%d — %s', (int) $ndf->id, $ndf->date->format('d/m/Y')),
             'montant_total' => $montantTotal,
-            'mode_paiement' => $data->mode_paiement->value,
+            'mode_paiement' => $data->mode_paiement?->value,
             'tiers_id' => $ndf->tiers_id,
             'compte_id' => $data->compte_id,
             'statut_reglement' => StatutReglement::Recu->value,
