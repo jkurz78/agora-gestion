@@ -129,23 +129,38 @@ it('[A] extourne recette comptant chèque — auto-délettre la paire 411 intern
     // Action : extourner T1
     $extourne = $this->service->extourner($t1->fresh(), ExtournePayload::fromOrigine($t1->fresh()));
 
-    // Lignes 411 de T1 doivent être délettrées
-    $lignes411->map->fresh();
-    $lignes411RefreshedA = $lignes411[0]->fresh();
-    $lignes411RefreshedB = $lignes411[1]->fresh();
-
-    expect($lignes411RefreshedA->lettrage_code)->toBeNull();
-    expect($lignes411RefreshedB->lettrage_code)->toBeNull();
-
     // Miroir créé
     $miroir = $extourne->extourne;
     expect($miroir)->not->toBeNull();
     expect((float) $miroir->montant_total)->toBe(-150.0);
 
-    // Lignes du miroir n'ont pas de lettrage_code
-    $lignesMiroir = TransactionLigne::where('transaction_id', $miroir->id)->get();
-    foreach ($lignesMiroir as $l) {
-        expect($l->lettrage_code)->toBeNull("La ligne miroir #{$l->id} ne doit pas avoir de lettrage_code");
+    // Lignes 411 de T1 : d'abord délettrées (auto-délettrage), puis re-lettrées par cross-lettrage
+    // avec les lignes 411 symétriques du miroir. Le code de lettrage est nouveau (différent de $codeOrigine).
+    $lignes411RefreshedA = $lignes411[0]->fresh();
+    $lignes411RefreshedB = $lignes411[1]->fresh();
+
+    expect($lignes411RefreshedA->lettrage_code)->not->toBeNull('T1.411D doit être re-lettrée avec miroir');
+    expect($lignes411RefreshedB->lettrage_code)->not->toBeNull('T1.411C doit être re-lettrée avec miroir');
+    // Les deux lignes 411 de T1 sont cross-lettrées avec des lignes miroir différentes
+    // (T1.411D↔Miroir.411C et T1.411C↔Miroir.411D — paires distinctes)
+    // Note : les codes sont distincts entre eux mais pas nécessairement différents de $codeOrigine
+    // (l'auto-délettrage a vidé les lignes donc le compteur peut réutiliser le même code alphanumérique)
+
+    // Lignes 411 du miroir sont aussi lettrées (cross-lettrées avec T1)
+    $lignes411Miroir = TransactionLigne::where('transaction_id', $miroir->id)
+        ->where('compte_id', $compte411->id)
+        ->get();
+    foreach ($lignes411Miroir as $l) {
+        expect($l->lettrage_code)->not->toBeNull("La ligne 411 miroir #{$l->id} doit être cross-lettrée");
+    }
+
+    // Lignes non-tiers du miroir (706, 512X) n'ont pas de lettrage_code
+    $lignesMiroirNonTiers = TransactionLigne::where('transaction_id', $miroir->id)
+        ->where('compte_id', '!=', (int) $compte411->id)
+        ->whereNotNull('compte_id')
+        ->get();
+    foreach ($lignesMiroirNonTiers as $l) {
+        expect($l->lettrage_code)->toBeNull("La ligne non-tiers miroir #{$l->id} ne doit pas avoir de lettrage_code");
     }
 
     // Audit : une entrée delettre doit exister pour le code original
@@ -203,38 +218,34 @@ it('[B] extourne encaissement créance (T2) — délettre la paire 411 T1-T2, so
     // Action : extourner T2 (l'encaissement)
     $extourne = $this->service->extourner($t2->fresh(), ExtournePayload::fromOrigine($t2->fresh()));
 
-    // Lignes 411 de T2 doivent être délettrées
+    // Recharger toutes les lignes
     $ligne411T2->refresh();
     $ligne411T1->refresh();
 
-    expect($ligne411T2->lettrage_code)->toBeNull('La ligne 411 de T2 doit être délettrée');
-    expect($ligne411T1->lettrage_code)->toBeNull('La ligne 411 de T1 doit aussi être délettrée (même groupe)');
-
-    // Miroir T2' créé sans lettrage
+    // Miroir T2' créé
     $miroir = $extourne->extourne;
     expect($miroir)->not->toBeNull();
     expect((float) $miroir->montant_total)->toBe(-200.0);
 
-    $lignesMiroir = TransactionLigne::where('transaction_id', $miroir->id)->get();
-    foreach ($lignesMiroir as $l) {
-        expect($l->lettrage_code)->toBeNull("La ligne miroir #{$l->id} ne doit pas avoir de lettrage_code");
-    }
-
-    // Solde ouvert 411 tiers remonte : T1 ligne 411 D est de nouveau ouverte (non lettrée)
-    // Le solde = débit - crédit des lignes non lettrées pour ce tiers sur le compte 411
-    $soldeTiers = DB::table('transaction_lignes')
+    // T2.411C : cross-lettrée avec Miroir.411D (inversion de l'encaissement)
+    $ligne411Miroir = TransactionLigne::where('transaction_id', $miroir->id)
         ->where('compte_id', $compte411->id)
-        ->where('tiers_id', $this->tiers->id)
-        ->whereNull('lettrage_code')
-        ->whereNull('deleted_at')
-        ->selectRaw('COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) as solde')
-        ->value('solde');
+        ->firstOrFail();
+    expect($ligne411T2->lettrage_code)->not->toBeNull('T2.411C doit être cross-lettrée avec le miroir');
+    expect($ligne411Miroir->lettrage_code)->not->toBeNull('Miroir.411D doit être cross-lettré avec T2');
+    expect($ligne411T2->lettrage_code)->toBe($ligne411Miroir->lettrage_code);
 
-    // Après extourne : T1 ligne 411 D=200 ouverte + miroir T2' ligne 411 C=200 non lettrée
-    // Solde net = 200 - 200 = 0 (les 2 lignes du miroir se compensent avec T1 au niveau du compte)
-    // En réalité le solde ouvert du tiers = montant de la créance T1 = 200 (les lignes du miroir
-    // vont vers la trésorerie, non lettrées ici). Vérifier uniquement que la ligne T1 est de nouveau ouverte.
+    // T1.411D : reste ouverte (la créance est libérée — remonte au solde tiers)
     expect($ligne411T1->lettrage_code)->toBeNull('La créance T1 doit être de nouveau ouverte (solde remonte)');
+
+    // Lignes non-tiers du miroir (512X) n'ont pas de lettrage_code
+    $lignesMiroirNonTiers = TransactionLigne::where('transaction_id', $miroir->id)
+        ->where('compte_id', '!=', (int) $compte411->id)
+        ->whereNotNull('compte_id')
+        ->get();
+    foreach ($lignesMiroirNonTiers as $l) {
+        expect($l->lettrage_code)->toBeNull("La ligne non-tiers miroir #{$l->id} ne doit pas avoir de lettrage_code");
+    }
 
     // Audit delettre existe
     $audit = DB::table('lettrage_audit')
@@ -305,7 +316,7 @@ it('[D] extourne créance ouverte (lignes 411 non lettrées) — pas de délettr
         ->firstOrFail();
     expect($ligne411->lettrage_code)->toBeNull();
 
-    $auditCountBefore = DB::table('lettrage_audit')->count();
+    $deletetrCountBefore = DB::table('lettrage_audit')->where('action', 'delettre')->count();
 
     // Action : extourner (override mode_paiement car T1 créance a mode_paiement=null)
     $extourne = $this->service->extourner(
@@ -314,16 +325,21 @@ it('[D] extourne créance ouverte (lignes 411 non lettrées) — pas de délettr
     );
 
     // Miroir créé
-    expect($extourne->extourne)->not->toBeNull();
-    expect((float) $extourne->extourne->montant_total)->toBe(-300.0);
+    $miroir = $extourne->extourne;
+    expect($miroir)->not->toBeNull();
+    expect((float) $miroir->montant_total)->toBe(-300.0);
 
-    // Aucun délettrage tenté (aucune ligne lettrée)
-    $auditCountAfter = DB::table('lettrage_audit')->count();
-    expect($auditCountAfter)->toBe($auditCountBefore, 'Aucun délettrage ne doit être tenté si aucune ligne lettrée');
+    // Aucun auto-délettrage tenté (aucune ligne préalablement lettrée)
+    $deletetrCountAfter = DB::table('lettrage_audit')->where('action', 'delettre')->count();
+    expect($deletetrCountAfter)->toBe($deletetrCountBefore, 'Aucun auto-délettrage ne doit être tenté si aucune ligne était lettrée');
 
-    // La ligne 411 d'origine reste intacte (non lettrée)
+    // La ligne 411 d'origine est maintenant cross-lettrée avec la ligne 411 du miroir
     $ligne411->refresh();
-    expect($ligne411->lettrage_code)->toBeNull();
+    $ligne411Miroir = TransactionLigne::where('transaction_id', $miroir->id)
+        ->where('compte_id', $compte411->id)
+        ->firstOrFail();
+    expect($ligne411->lettrage_code)->not->toBeNull('T1.411D doit être cross-lettrée avec le miroir');
+    expect($ligne411->lettrage_code)->toBe($ligne411Miroir->lettrage_code);
 });
 
 // ---------------------------------------------------------------------------
@@ -464,4 +480,164 @@ it('[G2] lignes PD du miroir sont équilibrées (sum D = sum C)', function () {
     $totalCredit = $lignesPD->sum(fn ($l) => (float) $l->credit);
 
     expect(bccomp((string) $totalDebit, (string) $totalCredit, 2))->toBe(0);
+});
+
+// ---------------------------------------------------------------------------
+// Scénario H — Cross-lettrage tiers après extourne
+// ---------------------------------------------------------------------------
+
+it('[H] extourne recette à crédit — cross-lettrage 411 origine ↔ miroir', function () {
+    // T1 : 411 D=200 (tiers, non lettrée — créance ouverte) + 706 C=200
+    $t1 = $this->ecritureGen->pourRecetteACredit(
+        tiers: $this->tiers,
+        ventilations: [['compte' => $this->compte706, 'montant' => 200.0]],
+        dateConstatation: new DateTimeImmutable('2025-10-01'),
+        libelle: 'Créance ouverte',
+    );
+    $t1->update(['statut_reglement' => StatutReglement::Recu]);
+
+    $compte411 = compteSysteme('411');
+
+    // Précondition : ligne 411 T1 ouverte
+    $ligne411T1 = TransactionLigne::where('transaction_id', $t1->id)
+        ->where('compte_id', $compte411->id)
+        ->firstOrFail();
+    expect($ligne411T1->lettrage_code)->toBeNull();
+
+    // Action
+    $extourne = $this->service->extourner(
+        $t1->fresh(),
+        ExtournePayload::fromOrigine($t1->fresh(), ['mode_paiement' => ModePaiement::Cheque])
+    );
+    $miroir = $extourne->extourne;
+
+    // Lignes 411 : T1 D=200 et Miroir C=200 doivent être lettrées ensemble
+    $ligne411T1->refresh();
+    $ligne411Miroir = TransactionLigne::where('transaction_id', $miroir->id)
+        ->where('compte_id', $compte411->id)
+        ->firstOrFail();
+
+    expect($ligne411T1->lettrage_code)->not->toBeNull('Ligne 411 T1 doit être lettrée');
+    expect($ligne411Miroir->lettrage_code)->not->toBeNull('Ligne 411 miroir doit être lettrée');
+    expect($ligne411T1->lettrage_code)->toBe($ligne411Miroir->lettrage_code);
+
+    // Solde 411 pour ce tiers = 0 (D=200, C=200, tout lettré)
+    $solde = TransactionLigne::where('compte_id', $compte411->id)
+        ->where('tiers_id', $this->tiers->id)
+        ->whereNull('lettrage_code')
+        ->selectRaw('COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) as solde')
+        ->value('solde');
+    expect((float) $solde)->toBe(0.0, 'Solde 411 tiers = 0 après extourne d\'une créance ouverte');
+});
+
+it('[H2] extourne recette comptant (T1+T2) — cross-lettrage 411 T1↔miroir, T2.411C reste ouverte', function () {
+    // T1 : créance → 411 D=200 (tiers) + 706 C=200
+    $t1 = $this->ecritureGen->pourRecetteACredit(
+        tiers: $this->tiers,
+        ventilations: [['compte' => $this->compte706, 'montant' => 200.0]],
+        dateConstatation: new DateTimeImmutable('2025-10-01'),
+        libelle: 'Facture T1',
+    );
+
+    // T2 : encaissement → portage D=200 + 411 C=200 (tiers), auto-lettrage T1.411D↔T2.411C
+    $t2 = $this->ecritureGen->pourEncaissementCreance(
+        transactionCreance: $t1,
+        mode: ModePaiement::Cheque,
+        compteTresorerie: $this->compte512X,
+        datePaiement: new DateTimeImmutable('2025-10-15'),
+        libelle: 'Encaissement T2',
+    );
+    $t1->update(['statut_reglement' => StatutReglement::Recu]);
+
+    $compte411 = compteSysteme('411');
+
+    // Précondition : T1.411D et T2.411C sont lettrées
+    $ligne411T1 = TransactionLigne::where('transaction_id', $t1->id)
+        ->where('compte_id', $compte411->id)->firstOrFail();
+    $ligne411T2 = TransactionLigne::where('transaction_id', $t2->id)
+        ->where('compte_id', $compte411->id)->firstOrFail();
+    expect($ligne411T1->lettrage_code)->toBe($ligne411T2->lettrage_code);
+
+    // Action : extourner T1
+    $extourne = $this->service->extourner(
+        $t1->fresh(),
+        ExtournePayload::fromOrigine($t1->fresh(), ['mode_paiement' => ModePaiement::Cheque])
+    );
+    $miroir = $extourne->extourne;
+
+    // Recharger
+    $ligne411T1->refresh();
+    $ligne411T2->refresh();
+    $ligne411Miroir = TransactionLigne::where('transaction_id', $miroir->id)
+        ->where('compte_id', $compte411->id)->firstOrFail();
+
+    // T1.411D ↔ Miroir.411C : cross-lettrées
+    expect($ligne411T1->lettrage_code)->not->toBeNull('T1.411D doit être lettrée avec miroir');
+    expect($ligne411Miroir->lettrage_code)->not->toBeNull('Miroir.411C doit être lettrée');
+    expect($ligne411T1->lettrage_code)->toBe($ligne411Miroir->lettrage_code);
+
+    // T2.411C : ouverte (le remboursement est en attente → obligation envers le tiers)
+    expect($ligne411T2->lettrage_code)->toBeNull('T2.411C doit rester ouverte (refund pending)');
+
+    // Solde 411 ouvert pour ce tiers = -200 (T2.411C non lettrée = on doit rembourser)
+    $soldeOuvert = (float) TransactionLigne::where('compte_id', $compte411->id)
+        ->where('tiers_id', $this->tiers->id)
+        ->whereNull('lettrage_code')
+        ->selectRaw('COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) as solde')
+        ->value('solde');
+    expect($soldeOuvert)->toBe(-200.0, 'Solde ouvert 411 = -200 (on doit rembourser le tiers)');
+});
+
+it('[H3] extourne recette comptant OLD pattern (4 lignes T1) — double cross-lettrage 411', function () {
+    // T1 OLD pattern : 411 D=150 + 706 C=150 + 5112 D=150 + 411 C=150
+    // Paire 411 interne auto-lettrée
+    $t1 = $this->ecritureGen->pourRecetteComptant(
+        tiers: $this->tiers,
+        ventilations: [['compte' => $this->compte706, 'montant' => 150.0]],
+        mode: ModePaiement::Cheque,
+        compteTresorerie: $this->compte512X,
+        date: new DateTimeImmutable('2025-11-01'),
+        libelle: 'Recette comptant OLD',
+    );
+    $t1->update(['statut_reglement' => StatutReglement::Recu]);
+
+    $compte411 = compteSysteme('411');
+
+    // Précondition : 2 lignes 411 internes lettrées
+    $lignes411T1 = TransactionLigne::where('transaction_id', $t1->id)
+        ->where('compte_id', $compte411->id)
+        ->orderBy('id')
+        ->get();
+    expect($lignes411T1)->toHaveCount(2);
+    expect($lignes411T1[0]->lettrage_code)->toBe($lignes411T1[1]->lettrage_code);
+
+    // Action
+    $extourne = $this->service->extourner(
+        $t1->fresh(),
+        ExtournePayload::fromOrigine($t1->fresh())
+    );
+    $miroir = $extourne->extourne;
+
+    // Recharger
+    $lignes411T1->each->refresh();
+
+    $lignes411Miroir = TransactionLigne::where('transaction_id', $miroir->id)
+        ->where('compte_id', $compte411->id)
+        ->orderBy('id')
+        ->get();
+    expect($lignes411Miroir)->toHaveCount(2);
+
+    // Toutes les 4 lignes 411 doivent être lettrées (en paires D↔C)
+    $toutesLignes411 = $lignes411T1->merge($lignes411Miroir);
+    foreach ($toutesLignes411 as $l) {
+        expect($l->fresh()->lettrage_code)->not->toBeNull("Ligne 411 #{$l->id} doit être lettrée");
+    }
+
+    // Solde 411 ouvert = 0 (tout lettré, pas de dette)
+    $solde = (float) TransactionLigne::where('compte_id', $compte411->id)
+        ->where('tiers_id', $this->tiers->id)
+        ->whereNull('lettrage_code')
+        ->selectRaw('COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) as solde')
+        ->value('solde');
+    expect($solde)->toBe(0.0);
 });

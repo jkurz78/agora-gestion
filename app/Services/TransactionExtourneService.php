@@ -49,6 +49,9 @@ final class TransactionExtourneService
             $miroir = $this->creerTransactionMiroir($origine, $payload);
             $this->copierLignesInversees($origine, $miroir);
 
+            // Cross-lettrage PD des lignes tiers (411/401) entre origine et miroir
+            $this->crossLettrerLignesTiers($origine, $miroir);
+
             $lettrageId = null;
             if ($origine->statut_reglement === StatutReglement::EnAttente) {
                 $lettrage = $this->creerLettrage($origine, $miroir, $payload);
@@ -140,6 +143,59 @@ final class TransactionExtourneService
                 'tiers_id' => $ligne->tiers_id,
                 'libelle' => $ligne->libelle,
             ]);
+        }
+    }
+
+    /**
+     * Apparie, par lettrage PD, les lignes tiers (compte lettrable, tiers_id non nul)
+     * entre l'origine (auto-délettrée) et le miroir (lignes D↔C inversées).
+     *
+     * Pour chaque ligne de l'origine (non lettrée, avec tiers_id), on cherche dans le
+     * miroir la ligne symétrique : même compte_id, même tiers_id, et sens inversé
+     * (debit_origine == credit_miroir && credit_origine == debit_miroir).
+     * Chaque paire est lettrée indépendamment (code distinct par paire).
+     */
+    private function crossLettrerLignesTiers(Transaction $origine, Transaction $miroir): void
+    {
+        $lignesOrigine = TransactionLigne::where('transaction_id', (int) $origine->id)
+            ->whereNotNull('compte_id')
+            ->whereNotNull('tiers_id')
+            ->whereNull('lettrage_code')
+            ->get();
+
+        if ($lignesOrigine->isEmpty()) {
+            return;
+        }
+
+        $lignesMiroir = TransactionLigne::where('transaction_id', (int) $miroir->id)
+            ->whereNotNull('compte_id')
+            ->whereNotNull('tiers_id')
+            ->whereNull('lettrage_code')
+            ->get();
+
+        if ($lignesMiroir->isEmpty()) {
+            return;
+        }
+
+        $miroirRestantes = $lignesMiroir->values()->all();
+
+        foreach ($lignesOrigine as $lo) {
+            foreach ($miroirRestantes as $idx => $lm) {
+                if (
+                    (int) $lo->compte_id === (int) $lm->compte_id
+                    && (int) $lo->tiers_id === (int) $lm->tiers_id
+                    && bccomp((string) $lo->debit, (string) $lm->credit, 2) === 0
+                    && bccomp((string) $lo->credit, (string) $lm->debit, 2) === 0
+                ) {
+                    $this->lettrageService->lettrer(
+                        collect([$lo, $lm]),
+                        null,
+                        "Cross-lettrage extourne T#{$origine->id} → miroir T#{$miroir->id}"
+                    );
+                    unset($miroirRestantes[$idx]);
+                    break;
+                }
+            }
         }
     }
 
