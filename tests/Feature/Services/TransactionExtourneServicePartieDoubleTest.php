@@ -395,3 +395,73 @@ it('[F] miroir porte equilibree=true, type_ecriture=extourne, journal=origine', 
     expect($miroir->type_ecriture)->toBe('extourne');
     expect($miroir->journal)->toBe($t1->fresh()->journal);
 });
+
+// ---------------------------------------------------------------------------
+// Scénario G — Lignes PD inversées D↔C sur le miroir
+// ---------------------------------------------------------------------------
+
+it('[G] miroir d\'une recette à crédit porte les lignes PD avec D↔C inversé', function () {
+    // T1 : 411 D=120 (tiers) + 706 C=120
+    $t1 = $this->ecritureGen->pourRecetteACredit(
+        tiers: $this->tiers,
+        ventilations: [['compte' => $this->compte706, 'montant' => 120.0]],
+        dateConstatation: new DateTimeImmutable('2025-10-01'),
+        libelle: 'Test inversion D/C',
+    );
+    $t1->update(['statut_reglement' => StatutReglement::Recu]);
+
+    $extourne = $this->service->extourner(
+        $t1->fresh(),
+        ExtournePayload::fromOrigine($t1->fresh(), ['mode_paiement' => ModePaiement::Cheque])
+    );
+    $miroir = $extourne->extourne;
+
+    $compte411 = compteSysteme('411');
+
+    // Lignes PD du miroir (compte_id IS NOT NULL)
+    $lignesPD = TransactionLigne::where('transaction_id', $miroir->id)
+        ->whereNotNull('compte_id')
+        ->get();
+
+    // 2 lignes PD : 411 et 706 (inversées)
+    expect($lignesPD)->toHaveCount(2);
+
+    // Ligne 411 inversée : debit=0, credit=120 (swap de l'original 411 D=120)
+    $ligne411 = $lignesPD->firstWhere('compte_id', (int) $compte411->id);
+    expect($ligne411)->not->toBeNull('Miroir doit avoir une ligne 411');
+    expect((float) $ligne411->debit)->toBe(0.0);
+    expect((float) $ligne411->credit)->toBe(120.0);
+    expect((int) $ligne411->tiers_id)->toBe((int) $this->tiers->id);
+
+    // Ligne 706 inversée : debit=120, credit=0 (swap de l'original 706 C=120)
+    $ligne706 = $lignesPD->firstWhere('compte_id', (int) $this->compte706->id);
+    expect($ligne706)->not->toBeNull('Miroir doit avoir une ligne 706');
+    expect((float) $ligne706->debit)->toBe(120.0);
+    expect((float) $ligne706->credit)->toBe(0.0);
+    expect($ligne706->tiers_id)->toBeNull();
+});
+
+it('[G2] lignes PD du miroir sont équilibrées (sum D = sum C)', function () {
+    $t1 = $this->ecritureGen->pourRecetteACredit(
+        tiers: $this->tiers,
+        ventilations: [['compte' => $this->compte706, 'montant' => 250.0]],
+        dateConstatation: new DateTimeImmutable('2025-10-01'),
+        libelle: 'Test équilibre miroir',
+    );
+    $t1->update(['statut_reglement' => StatutReglement::Recu]);
+
+    $extourne = $this->service->extourner(
+        $t1->fresh(),
+        ExtournePayload::fromOrigine($t1->fresh(), ['mode_paiement' => ModePaiement::Cheque])
+    );
+    $miroir = $extourne->extourne;
+
+    $lignesPD = TransactionLigne::where('transaction_id', $miroir->id)
+        ->whereNotNull('compte_id')
+        ->get();
+
+    $totalDebit = $lignesPD->sum(fn ($l) => (float) $l->debit);
+    $totalCredit = $lignesPD->sum(fn ($l) => (float) $l->credit);
+
+    expect(bccomp((string) $totalDebit, (string) $totalCredit, 2))->toBe(0);
+});

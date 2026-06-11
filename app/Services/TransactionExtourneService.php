@@ -125,6 +125,7 @@ final class TransactionExtourneService
         foreach ($origine->lignes()->get() as $ligne) {
             TransactionLigne::create([
                 'transaction_id' => $miroir->id,
+                // Legacy fields
                 'sous_categorie_id' => $ligne->sous_categorie_id,
                 'operation_id' => $ligne->operation_id,
                 'seance' => $ligne->seance,
@@ -132,6 +133,12 @@ final class TransactionExtourneService
                 'notes' => $ligne->notes,
                 'piece_jointe_path' => null,
                 'helloasso_item_id' => null,
+                // PD fields — D↔C swap (montants positifs, sens inversé)
+                'compte_id' => $ligne->compte_id,
+                'debit' => (float) $ligne->credit,
+                'credit' => (float) $ligne->debit,
+                'tiers_id' => $ligne->tiers_id,
+                'libelle' => $ligne->libelle,
             ]);
         }
     }
