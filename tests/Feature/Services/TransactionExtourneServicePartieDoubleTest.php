@@ -87,6 +87,31 @@ beforeEach(function () {
     // Tiers
     $this->tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
 
+    // Catégorie de dépense + sous-catégorie 601
+    $categorieDepense = Categorie::factory()->depense()->create([
+        'association_id' => $this->association->id,
+        'nom' => 'Achats',
+    ]);
+
+    $this->sc601 = SousCategorie::create([
+        'association_id' => $this->association->id,
+        'categorie_id' => $categorieDepense->id,
+        'nom' => 'Achats fournitures',
+        'code_cerfa' => '601',
+    ]);
+
+    $this->compte601 = Compte::firstOrCreate(
+        ['association_id' => $this->association->id, 'numero_pcg' => '601'],
+        [
+            'intitule' => 'Achats fournitures',
+            'classe' => 6,
+            'lettrable' => false,
+            'actif' => true,
+            'est_systeme' => false,
+            'pour_inscriptions' => false,
+        ]
+    );
+
     // Services
     $this->ecritureGen = app(EcritureGenerator::class);
     $this->service = app(TransactionExtourneService::class);
@@ -635,6 +660,65 @@ it('[H3] extourne recette comptant OLD pattern (4 lignes T1) — double cross-le
 
     // Solde 411 ouvert = 0 (tout lettré, pas de dette)
     $solde = (float) TransactionLigne::where('compte_id', $compte411->id)
+        ->where('tiers_id', $this->tiers->id)
+        ->whereNull('lettrage_code')
+        ->selectRaw('COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) as solde')
+        ->value('solde');
+    expect($solde)->toBe(0.0);
+});
+
+// ---------------------------------------------------------------------------
+// Scénario I — Dépense : symétrie 401
+// ---------------------------------------------------------------------------
+
+it('[I] extourne dépense à crédit — lignes PD inversées + cross-lettrage 401', function () {
+    // T1 : 601 D=300 + 401 C=300 (tiers, dette ouverte)
+    $t1 = $this->ecritureGen->pourDepenseACredit(
+        tiers: $this->tiers,
+        ventilations: [['compte' => $this->compte601, 'montant' => 300.0]],
+        dateConstatation: new DateTimeImmutable('2025-10-01'),
+        libelle: 'Facture fournisseur',
+    );
+    $t1->update(['statut_reglement' => StatutReglement::Recu]);
+
+    $compte401 = compteSysteme('401');
+
+    // Précondition : 401 C=300 ouverte
+    $ligne401T1 = TransactionLigne::where('transaction_id', $t1->id)
+        ->where('compte_id', $compte401->id)->firstOrFail();
+    expect($ligne401T1->lettrage_code)->toBeNull();
+    expect((float) $ligne401T1->credit)->toBe(300.0);
+
+    // Action
+    $extourne = $this->service->extourner(
+        $t1->fresh(),
+        ExtournePayload::fromOrigine($t1->fresh(), ['mode_paiement' => ModePaiement::Cheque])
+    );
+    $miroir = $extourne->extourne;
+
+    // Header PD
+    expect($miroir->equilibree)->toBeTrue();
+    expect($miroir->type_ecriture)->toBe('extourne');
+
+    // Miroir : 601 C=300 + 401 D=300
+    $ligne401Miroir = TransactionLigne::where('transaction_id', $miroir->id)
+        ->where('compte_id', $compte401->id)->firstOrFail();
+    expect((float) $ligne401Miroir->debit)->toBe(300.0);
+    expect((float) $ligne401Miroir->credit)->toBe(0.0);
+    expect((int) $ligne401Miroir->tiers_id)->toBe((int) $this->tiers->id);
+
+    $ligne601Miroir = TransactionLigne::where('transaction_id', $miroir->id)
+        ->where('compte_id', $this->compte601->id)->firstOrFail();
+    expect((float) $ligne601Miroir->debit)->toBe(0.0);
+    expect((float) $ligne601Miroir->credit)->toBe(300.0);
+
+    // Cross-lettrage 401 : T1.401C ↔ miroir.401D
+    $ligne401T1->refresh();
+    expect($ligne401T1->lettrage_code)->not->toBeNull('T1.401C doit être lettrée');
+    expect($ligne401T1->lettrage_code)->toBe($ligne401Miroir->fresh()->lettrage_code);
+
+    // Solde 401 ouvert = 0
+    $solde = (float) TransactionLigne::where('compte_id', $compte401->id)
         ->where('tiers_id', $this->tiers->id)
         ->whereNull('lettrage_code')
         ->selectRaw('COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) as solde')
