@@ -13,3 +13,8 @@ Schedule::command('incoming-mail:fetch')
     ->withoutOverlapping(10)
     ->runInBackground()
     ->appendOutputTo(storage_path('logs/incoming-mail-fetch.log'));
+
+Schedule::command('compta:check-integrity --quiet-ok')
+    ->daily()
+    ->at('06:00')
+    ->appendOutputTo(storage_path('logs/compta-integrity.log'));
