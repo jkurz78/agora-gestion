@@ -369,3 +369,29 @@ it('[E] extourne Tx lettrée — audit lettrage_audit complet (action, motif, us
     $auditIds = collect(json_decode($audit->transaction_ligne_ids))->sort()->values()->all();
     expect($auditIds)->toEqual($idsLignes411);
 });
+
+// ---------------------------------------------------------------------------
+// Scénario F — Header PD sur le miroir
+// ---------------------------------------------------------------------------
+
+it('[F] miroir porte equilibree=true, type_ecriture=extourne, journal=origine', function () {
+    $t1 = $this->ecritureGen->pourRecetteACredit(
+        tiers: $this->tiers,
+        ventilations: [['compte' => $this->compte706, 'montant' => 100.0]],
+        dateConstatation: new DateTimeImmutable('2025-10-01'),
+        libelle: 'Test header PD',
+    );
+
+    $t1->update(['statut_reglement' => StatutReglement::Recu]);
+
+    // Override mode_paiement car T1 créance a mode_paiement=null
+    $extourne = $this->service->extourner(
+        $t1->fresh(),
+        ExtournePayload::fromOrigine($t1->fresh(), ['mode_paiement' => ModePaiement::Cheque])
+    );
+
+    $miroir = $extourne->extourne;
+    expect($miroir->equilibree)->toBeTrue();
+    expect($miroir->type_ecriture)->toBe('extourne');
+    expect($miroir->journal)->toBe($t1->fresh()->journal);
+});

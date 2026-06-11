@@ -113,6 +113,10 @@ final class TransactionExtourneService
             'helloasso_cashout_id' => null,
             'helloasso_payment_id' => null,
             'statut_reglement' => StatutReglement::EnAttente,
+            // PD
+            'equilibree' => true,
+            'type_ecriture' => 'extourne',
+            'journal' => $origine->journal,
         ]);
     }
 
