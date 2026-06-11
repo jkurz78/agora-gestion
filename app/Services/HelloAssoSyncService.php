@@ -16,6 +16,7 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\VirementInterne;
+use App\Services\Compta\TransactionConverter;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -294,6 +295,20 @@ final class HelloAssoSyncService
                 $tx->update([
                     'montant_total' => round((float) $tx->lignes()->sum('montant'), 2),
                 ]);
+
+                // Enrichissement partie double via le converter (même chemin que le backfill).
+                // Idempotent : skip si déjà equilibree=true (re-sync HA).
+                if (! $tx->equilibree) {
+                    try {
+                        $tx->refresh();
+                        app(TransactionConverter::class)->convertir($tx);
+                    } catch (\Throwable $e) {
+                        Log::warning('[HelloAsso] Enrichissement PD échoué — la transaction reste legacy', [
+                            'transaction_id' => $tx->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
 
                 // Poser imported_at à la 1re importation réussie
                 if ($formMapping !== null && $formMapping->imported_at === null && $result['tx_created'] > 0) {
