@@ -325,6 +325,7 @@
 
             {{-- Bandeau HelloAsso (sous le header, pleine largeur) --}}
             <livewire:helloasso-notification-banner />
+            @include('partials.integrity-alert')
 
             {{-- Contenu --}}
             <div class="container-fluid px-4 py-3 pb-5">

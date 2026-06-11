@@ -52,14 +52,14 @@ final class DevisFactory extends Factory
 
     public function valide(): static
     {
-        $numero = 'D-'.date('Y').'-'.str_pad((string) fake()->numberBetween(1, 999), 3, '0', STR_PAD_LEFT);
+        $numero = 'D-'.date('Y').'-'.str_pad((string) fake()->unique()->numberBetween(1, 999), 3, '0', STR_PAD_LEFT);
 
         return $this->state(['statut' => StatutDevis::Valide, 'numero' => $numero]);
     }
 
     public function accepte(): static
     {
-        $numero = 'D-'.date('Y').'-'.str_pad((string) fake()->numberBetween(1, 999), 3, '0', STR_PAD_LEFT);
+        $numero = 'D-'.date('Y').'-'.str_pad((string) fake()->unique()->numberBetween(1, 999), 3, '0', STR_PAD_LEFT);
 
         return $this->state(fn (array $attributes) => [
             'statut' => StatutDevis::Accepte,
@@ -71,7 +71,7 @@ final class DevisFactory extends Factory
 
     public function refuse(): static
     {
-        $numero = 'D-'.date('Y').'-'.str_pad((string) fake()->numberBetween(1, 999), 3, '0', STR_PAD_LEFT);
+        $numero = 'D-'.date('Y').'-'.str_pad((string) fake()->unique()->numberBetween(1, 999), 3, '0', STR_PAD_LEFT);
 
         return $this->state(fn (array $attributes) => [
             'statut' => StatutDevis::Refuse,
