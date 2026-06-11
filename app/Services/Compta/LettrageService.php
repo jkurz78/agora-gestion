@@ -18,7 +18,6 @@ use App\Tenant\TenantContext;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 /**
  * Service de lettrage des écritures comptables (spec §5 de la spec slice 1).
@@ -61,9 +60,9 @@ final class LettrageService
         $this->assertEquilibre($lignes);
         $this->assertPasDeRelettrage($lignes);
 
-        $code ??= Str::random(20);
         $ids = $lignes->pluck('id')->all();
         $compteId = (int) $lignes->first()->compte_id;
+        $code ??= self::nextCodeForCompte($compteId);
 
         DB::transaction(function () use ($ids, $compteId, $code, $motif): void {
             // 1. Insérer ligne audit (append-only)
@@ -326,5 +325,53 @@ final class LettrageService
                 );
             }
         }
+    }
+
+    // =========================================================================
+    // Génération séquentielle des codes de lettrage
+    // =========================================================================
+
+    /**
+     * Génère le prochain code de lettrage séquentiel pour un compte donné.
+     *
+     * Séquence : AAAA, AAAB, AAAC, … AAAZ, AABA, … ZZZZ (456 976 combinaisons).
+     * Scopé par compte_id → chaque compte a sa propre séquence.
+     */
+    private static function nextCodeForCompte(int $compteId): string
+    {
+        $maxCode = TransactionLigne::where('compte_id', $compteId)
+            ->whereNotNull('lettrage_code')
+            ->max('lettrage_code');
+
+        if ($maxCode === null) {
+            return 'AAAA';
+        }
+
+        return self::incrementCode($maxCode);
+    }
+
+    /**
+     * Incrémente un code alphabétique (base 26, A-Z).
+     *
+     * AAA → AAB, AAZ → ABA, AZZ → BAA, ZZZ → AAAA.
+     */
+    private static function incrementCode(string $code): string
+    {
+        $chars = str_split($code);
+        $i = count($chars) - 1;
+
+        while ($i >= 0) {
+            if ($chars[$i] === 'Z') {
+                $chars[$i] = 'A';
+                $i--;
+            } else {
+                $chars[$i] = chr(ord($chars[$i]) + 1);
+
+                return implode('', $chars);
+            }
+        }
+
+        // Overflow (ZZZ → AAAA) — ajoute une lettre
+        return 'A'.implode('', $chars);
     }
 }

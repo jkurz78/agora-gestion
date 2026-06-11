@@ -111,7 +111,7 @@ test('lettrer deux lignes equilibrees sans code → code généré de 20 caract�
     $service = app(LettrageService::class);
     $code = $service->lettrer(collect([$ligne1, $ligne2]));
 
-    expect($code)->toBeString()->toHaveLength(20);
+    expect($code)->toBeString()->toBe('AAAA');
     expect(TransactionLigne::find($ligne1->id)->lettrage_code)->toBe($code);
     expect(TransactionLigne::find($ligne2->id)->lettrage_code)->toBe($code);
 });
