@@ -18,7 +18,9 @@ use App\Models\RemiseBancaire;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Services\NumeroPieceService;
 use App\Tenant\TenantContext;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -1468,6 +1470,7 @@ final class EcritureGenerator
             'equilibree' => true,
             'type_ecriture' => $typeEcriture,
             'journal' => $journal,
+            'numero_piece' => app(NumeroPieceService::class)->assign(Carbon::parse($date->format('Y-m-d'))),
         ]);
     }
 
