@@ -121,6 +121,58 @@
                     @endif
                 </div>
             </div>
+
+            {{-- Détail des règlements --}}
+            @if ($facture->transactions->isNotEmpty())
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-list-check"></i> Règlements</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-striped align-middle mb-0">
+                            <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
+                                <tr>
+                                    <th>Date</th>
+                                    <th>N° pièce</th>
+                                    <th>Libellé</th>
+                                    <th>Mode</th>
+                                    <th class="text-end">Montant</th>
+                                    <th class="text-center">Statut</th>
+                                </tr>
+                            </thead>
+                            <tbody style="color:#555">
+                                @foreach ($facture->transactions->sortBy('date') as $tx)
+                                    <tr wire:key="reglement-{{ $tx->id }}">
+                                        <td class="text-nowrap">{{ \Carbon\Carbon::parse($tx->date)->format('d/m/Y') }}</td>
+                                        <td class="small text-muted text-nowrap">{{ $tx->numero_piece ?? '—' }}</td>
+                                        <td>{{ $tx->libelle }}</td>
+                                        <td class="text-nowrap">{{ $tx->mode_paiement?->label() ?? '—' }}</td>
+                                        <td class="text-end fw-semibold text-nowrap">{{ number_format((float) $tx->montant_total, 2, ',', "\u{202f}") }}&nbsp;&euro;</td>
+                                        <td class="text-center">
+                                            @php $sens = $tx->type === \App\Enums\TypeTransaction::Depense ? \App\Enums\Sens::Depense : \App\Enums\Sens::Recette; @endphp
+                                            @switch($tx->statut_reglement)
+                                                @case(\App\Enums\StatutReglement::Pointe)
+                                                    <span class="badge bg-success">{{ $tx->statut_reglement->label($sens) }}</span>
+                                                    @break
+                                                @case(\App\Enums\StatutReglement::Recu)
+                                                    <span class="badge bg-primary">{{ $tx->statut_reglement->label($sens) }}</span>
+                                                    @break
+                                                @case(\App\Enums\StatutReglement::EnMain)
+                                                    <span class="badge bg-info text-dark">{{ $tx->statut_reglement->label($sens) }}</span>
+                                                    @break
+                                                @default
+                                                    <span class="badge bg-secondary">{{ $tx->statut_reglement?->label($sens) ?? 'Inconnu' }}</span>
+                                            @endswitch
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            @endif
             @endif
 
         </div>
