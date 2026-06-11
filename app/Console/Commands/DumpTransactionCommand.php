@@ -257,16 +257,23 @@ final class DumpTransactionCommand extends Command
             return;
         }
 
-        // Grouper par code de lettrage — inclure les lignes d'autres transactions
-        $codes = $lignesLettrées->pluck('lettrage_code')->unique()->values();
+        // Grouper par (compte_id, lettrage_code) — le code est séquentiel par compte
+        $groupes = $lignesLettrées
+            ->map(fn (TransactionLigne $l) => ['compte_id' => (int) $l->compte_id, 'code' => $l->lettrage_code])
+            ->unique(fn (array $g) => $g['compte_id'].':'.$g['code'])
+            ->values();
 
-        $totalGroupes = $codes->count();
+        $totalGroupes = $groupes->count();
         $this->line("Lettrages actifs ({$totalGroupes}):");
 
-        foreach ($codes as $code) {
-            // Charger toutes les lignes portant ce code (toutes transactions confondues)
+        foreach ($groupes as $groupe) {
+            $code = $groupe['code'];
+            $compteId = $groupe['compte_id'];
+
+            // Charger toutes les lignes portant ce code SUR LE MÊME COMPTE
             $toutesLignes = TransactionLigne::withoutGlobalScope(SoftDeletingScope::class)
                 ->where('lettrage_code', $code)
+                ->where('compte_id', $compteId)
                 ->with('compte')
                 ->get();
 
@@ -327,6 +334,7 @@ final class DumpTransactionCommand extends Command
 
             foreach ($lignes5112T1 as $ligne) {
                 $t4ligne = TransactionLigne::where('lettrage_code', $ligne->lettrage_code)
+                    ->where('compte_id', (int) $ligne->compte_id)
                     ->where('transaction_id', '!=', $tx->id)
                     ->first();
 
@@ -345,8 +353,9 @@ final class DumpTransactionCommand extends Command
         );
 
         foreach ($lignes411 as $ligne) {
-            // Chercher la contrepartie dans une autre transaction
+            // Chercher la contrepartie dans une autre transaction (même compte)
             $contrepartie = TransactionLigne::where('lettrage_code', $ligne->lettrage_code)
+                ->where('compte_id', (int) $ligne->compte_id)
                 ->where('transaction_id', '!=', $tx->id)
                 ->first();
 
@@ -420,6 +429,7 @@ final class DumpTransactionCommand extends Command
         // Vérifier qu'au moins une contrepartie est dans une T1 avec remise_id
         foreach ($lignesPortageCredit as $ligne) {
             $contrepartie = TransactionLigne::where('lettrage_code', $ligne->lettrage_code)
+                ->where('compte_id', (int) $ligne->compte_id)
                 ->where('transaction_id', '!=', $tx->id)
                 ->first();
 
@@ -455,6 +465,7 @@ final class DumpTransactionCommand extends Command
 
         foreach ($lignesPortageCredit as $ligne) {
             $contrepartie = TransactionLigne::where('lettrage_code', $ligne->lettrage_code)
+                ->where('compte_id', (int) $ligne->compte_id)
                 ->where('transaction_id', '!=', $tx->id)
                 ->first();
 
