@@ -662,7 +662,9 @@ final class TransactionService
         if ((int) round((float) $transaction->montant_total * 100) !== (int) round((float) $data['montant_total'] * 100)) {
             throw new \RuntimeException('Le montant total ne peut pas être modifié sur une transaction facturée.');
         }
-        $existingLignes = $transaction->lignes()->get()->keyBy('id');
+        // ventilation() : exclut les lignes PD-only (411/401/512X) ajoutées par EcritureGenerator.
+        // Le form n'envoie que les lignes métier (classe 6/7).
+        $existingLignes = $transaction->lignes()->ventilation()->get()->keyBy('id');
         if (count($lignes) !== $existingLignes->count()) {
             throw new \RuntimeException('Le nombre de lignes ne peut pas être modifié sur une transaction facturée.');
         }
@@ -702,7 +704,9 @@ final class TransactionService
         if ((int) round((float) $transaction->montant_total * 100) !== (int) round((float) $data['montant_total'] * 100)) {
             throw new \RuntimeException('Le montant total ne peut pas être modifié sur une transaction rapprochée.');
         }
-        $existingLignes = $transaction->lignes()->get()->keyBy('id');
+        // ventilation() : exclut les lignes PD-only (411/401/512X) ajoutées par EcritureGenerator.
+        // Le form n'envoie que les lignes métier (classe 6/7).
+        $existingLignes = $transaction->lignes()->ventilation()->get()->keyBy('id');
         if (count($lignes) !== $existingLignes->count()) {
             throw new \RuntimeException('Le nombre de lignes ne peut pas être modifié sur une transaction rapprochée.');
         }

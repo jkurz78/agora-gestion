@@ -298,9 +298,10 @@ it('[C] update Rappro-locked — changer sous_categorie_id → compte_id patché
     $ligne411D_id = TransactionLigne::where('transaction_id', $transaction->id)
         ->where('compte_id', $compte411->id)->value('id');
 
-    // Construire le tableau complet des lignes (toutes les lignes existantes, IDs requis)
-    // assertLockedInvariants vérifie count($lignes) == $existingLignes->count()
-    $toutes = $transaction->lignes->map(fn ($l) => [
+    // Le form n'envoie que les lignes ventilation (pas les lignes PD-only 411/512X).
+    // assertLockedInvariants compare avec lignes()->ventilation().
+    $ventilations = $transaction->lignes->filter(fn ($l) => $l->sous_categorie_id !== null)->values();
+    $toutes = $ventilations->map(fn ($l) => [
         'id' => $l->id,
         'sous_categorie_id' => $l->id === $ligneVent->id ? $this->scRecette2->id : $l->sous_categorie_id,
         'montant' => $l->montant,
@@ -367,16 +368,16 @@ it('[D] update Facture-locked — modifier notes uniquement → aucune ligne PD 
     expect($lettrageAvant)->not()->toBeNull('Lettrage 411 D doit être présent (lettré vers T2)');
     $idAvant = (int) $lignes411T1Avant->first()->id;
 
-    // Construire le tableau complet des lignes avec les IDs corrects
-    // assertLockedByFactureInvariants vérifie : count($lignes) == existingLignes->count(),
-    // même sous_categorie_id, même montant, seul notes peut changer
-    $toutes = $transaction->lignes->map(fn ($l) => [
+    // Le form n'envoie que les lignes ventilation (pas les lignes PD-only 411/512X).
+    // assertLockedByFactureInvariants compare avec lignes()->ventilation().
+    $ventilations = $transaction->lignes->filter(fn ($l) => $l->sous_categorie_id !== null)->values();
+    $toutes = $ventilations->map(fn ($l) => [
         'id' => $l->id,
         'sous_categorie_id' => $l->sous_categorie_id,
         'montant' => $l->montant,
         'operation_id' => $l->operation_id,
         'seance' => $l->seance,
-        'notes' => $l->sous_categorie_id !== null ? 'Note ajoutée après validation' : $l->notes,
+        'notes' => 'Note ajoutée après validation',
     ])->toArray();
 
     $transaction = $this->service->update($transaction, [
@@ -535,8 +536,10 @@ it('[G] update Rappro-locked multi-lignes — 2 ventilations patchées, comptes 
     expect($ligneVent706->compte_id)->toBe($this->compte706->id, 'compte initial 706');
     expect($ligneVent708->compte_id)->toBe($this->compte708->id, 'compte initial 708');
 
-    // Construire l'update : changer les deux sous_categories
-    $toutes = $transaction->lignes->map(fn ($l) => [
+    // Le form n'envoie que les lignes ventilation (pas les lignes PD-only 411/512X).
+    // assertLockedInvariants compare avec lignes()->ventilation().
+    $ventilations = $transaction->lignes->filter(fn ($l) => $l->sous_categorie_id !== null)->values();
+    $toutes = $ventilations->map(fn ($l) => [
         'id' => $l->id,
         'sous_categorie_id' => match ((int) $l->id) {
             (int) $ligneVent706->id => $this->scRecette2->id, // 706 → 708

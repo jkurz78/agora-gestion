@@ -121,12 +121,19 @@ final class LettrageService
      *
      * @throws LettrageInexistantException si aucune ligne trouvée pour ce code (et ce tenant).
      */
-    public function delettrer(string $code, ?string $motif = null): void
+    public function delettrer(string $code, ?string $motif = null, ?int $compteId = null): void
     {
-        // Charge les lignes du code, filtrées au tenant courant via relation compte
-        $lignes = TransactionLigne::where('lettrage_code', $code)
-            ->whereHas('compte')   // TenantScope sur Compte → filtrage tenant fail-closed
-            ->get();
+        // Charge les lignes du code, filtrées au tenant courant via relation compte.
+        // Depuis les codes séquentiels (AAAA, AAAB…), un même code peut exister sur
+        // des comptes différents → $compteId optionnel pour cibler le bon groupe.
+        $query = TransactionLigne::where('lettrage_code', $code)
+            ->whereHas('compte');   // TenantScope sur Compte → filtrage tenant fail-closed
+
+        if ($compteId !== null) {
+            $query->where('compte_id', $compteId);
+        }
+
+        $lignes = $query->get();
 
         if ($lignes->isEmpty()) {
             throw LettrageInexistantException::forCode($code);
@@ -155,7 +162,7 @@ final class LettrageService
             throw LigneNonLettreeException::forLigne($ligne->id);
         }
 
-        $this->delettrer($ligne->lettrage_code, $motif);
+        $this->delettrer($ligne->lettrage_code, $motif, (int) $ligne->compte_id);
     }
 
     // -------------------------------------------------------------------------
