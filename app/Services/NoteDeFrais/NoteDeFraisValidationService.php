@@ -8,11 +8,9 @@ use App\Enums\StatutNoteDeFrais;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Enums\UsageComptable;
-use App\Models\Compte;
 use App\Models\NoteDeFrais;
 use App\Models\SousCategorie;
 use App\Models\Transaction;
-use App\Services\Compta\CompteVentilationResolver;
 use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\EtatReglementResolver;
 use App\Services\NoteDeFrais\LigneTypes\LigneTypeRegistry;
@@ -330,8 +328,12 @@ final class NoteDeFraisValidationService
     }
 
     /**
-     * Abandon de créance en mode PD : T1 à crédit + OD (401 D / 7xx C).
-     * Pas de ligne 512X — aucun mouvement bancaire.
+     * Abandon de créance en mode PD :
+     *   T1 Dépense (6xx D / 401 C) + T1 Don (411 D / 7xx C)
+     *   + 2 OD compensation via 467 (401→467, 467→411)
+     *
+     * Le don est une vraie transaction recette (tiers, sous-cat, n° pièce)
+     * → visible dans Comptabilité/Dons et historique tiers.
      *
      * @return array{Transaction, Transaction} [$txDepense, $txDon]
      */
@@ -341,42 +343,50 @@ final class NoteDeFraisValidationService
         string $dateDon,
         SousCategorie $sousCatAbandon,
     ): array {
-        // 1. Créer la Transaction Dépense à crédit (T1 : 6xx D / 401 C)
+        // 1. Créer la Transaction Dépense (T1 : 6xx D / 401 C, pas de T2)
         $txDepense = $this->createTransactionDepenseFromNdf($ndf, $data, StatutReglement::EnAttente);
 
-        // 2. Résoudre le compte d'abandon (SousCategorie → Compte 7xx via code_cerfa)
-        $compteAbandon = CompteVentilationResolver::resoudre(
-            sousCategorieId: (int) $sousCatAbandon->id,
-            classeAttendue: 7,
-            contextLog: 'NoteDeFraisValidationService::validerAvecAbandonCreance',
-            contextLogData: ['ndf_id' => $ndf->id],
+        // 2. Créer la Transaction Don (T1 : 411 D / 7xx C, pas de T2)
+        //    Transaction recette standard avec toutes les métadonnées métier.
+        $montantTotal = (float) $txDepense->montant_total;
+
+        $txDonData = [
+            'type' => TypeTransaction::Recette->value,
+            'date' => $dateDon,
+            'libelle' => sprintf('Don par abandon de créance — NDF #%d', (int) $ndf->id),
+            'reference' => sprintf('NDF #%d — %s', (int) $ndf->id, $ndf->date->format('d/m/Y')),
+            'montant_total' => $montantTotal,
+            'mode_paiement' => null,
+            'tiers_id' => $ndf->tiers_id,
+            'compte_id' => null,
+            'statut_reglement' => StatutReglement::EnAttente->value,
+            'association_id' => TenantContext::currentId(),
+        ];
+
+        // Filtrer les lignes métier (exclure les lignes PD pures : 401C, 6xxD)
+        $txDonLignes = $txDepense->lignes
+            ->filter(fn ($l) => $l->sous_categorie_id !== null && (float) $l->montant > 0)
+            ->map(fn ($ligne) => [
+                'sous_categorie_id' => (int) $sousCatAbandon->id,
+                'operation_id' => $ligne->operation_id,
+                'seance' => $ligne->seance,
+                'notes' => $ligne->notes,
+                'montant' => (float) $ligne->montant,
+            ])->all();
+
+        $txDon = $this->transactionService->create($txDonData, $txDonLignes);
+
+        // 3. Créer les 2 OD de compensation (401→467, 467→411 + 3 lettrages)
+        $this->ecritureGenerator->pourCompensationAbandon(
+            t1Depense: $txDepense,
+            t1Don: $txDon,
+            dateCompensation: new \DateTimeImmutable($dateDon),
+            libelle: sprintf('NDF #%d', (int) $ndf->id),
         );
 
-        if ($compteAbandon === null) {
-            // Fallback : chercher un compte 75x directement si pas de code_cerfa
-            $compteAbandon = Compte::where('association_id', (int) TenantContext::currentId())
-                ->where('numero_pcg', 'LIKE', '75%')
-                ->where('actif', true)
-                ->first();
-        }
-
-        if ($compteAbandon === null) {
-            throw new DomainException(
-                "Aucun compte de produit (classe 7) trouvé pour la sous-catégorie d'abandon de créance. "
-                .'Configurez un code_cerfa sur la sous-catégorie dans Paramètres → Comptabilité.'
-            );
-        }
-
-        // 3. Créer l'OD d'abandon (401 D / 7xx C + lettrage 401)
-        $txDon = $this->ecritureGenerator->pourAbandonCreance(
-            transactionDette: $txDepense,
-            compteAbandon: $compteAbandon,
-            dateAbandon: new \DateTimeImmutable($dateDon),
-            libelle: sprintf('Don par abandon de créance — NDF #%d', (int) $ndf->id),
-        );
-
-        // 4. Synchroniser le statut dérivé de la dépense (lettrage 401 → Recu)
+        // 4. Synchroniser les statuts dérivés (lettrage → Recu)
         $this->etatReglementResolver->syncer($txDepense->fresh());
+        $this->etatReglementResolver->syncer($txDon->fresh());
 
         return [$txDepense, $txDon];
     }

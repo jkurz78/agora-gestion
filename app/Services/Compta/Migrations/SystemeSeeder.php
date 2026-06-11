@@ -174,6 +174,9 @@ final class SystemeSeeder
         // Unconditional: 401 Fournisseurs (classe 4)
         DB::statement(self::unconditionalSql('401', 'Fournisseurs', 4));
 
+        // Unconditional: 467 Autres comptes débiteurs ou créditeurs (classe 4, compensation interne)
+        DB::statement(self::unconditionalSql('467', 'Autres comptes débiteurs ou créditeurs', 4));
+
         // Unconditional: 5112 Chèques à encaisser (classe 5)
         DB::statement(self::unconditionalSql('5112', 'Chèques à encaisser', 5));
 
