@@ -14,6 +14,7 @@ use App\Models\Extourne;
 use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\LettrageService;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\DB;
@@ -51,6 +52,7 @@ final class TransactionExtourneService
 
             // Cross-lettrage PD des lignes tiers (411/401) entre origine et miroir
             $this->crossLettrerLignesTiers($origine, $miroir);
+            $this->assertEquilibreMiroir($miroir);
 
             $lettrageId = null;
             if ($origine->statut_reglement === StatutReglement::EnAttente) {
@@ -197,6 +199,25 @@ final class TransactionExtourneService
                 }
             }
         }
+    }
+
+    /**
+     * Vérifie paranoïaquement que les lignes PD du miroir sont équilibrées (∑D = ∑C).
+     * Un miroir issu d'une origine équilibrée après D↔C swap doit toujours l'être —
+     * ce guard attrape les bugs de copierLignesInversees avant qu'ils atteignent la DB.
+     * Pas d'action si le miroir n'a aucune ligne PD (Tx legacy pure).
+     */
+    private function assertEquilibreMiroir(Transaction $miroir): void
+    {
+        $lignesPD = TransactionLigne::where('transaction_id', (int) $miroir->id)
+            ->whereNotNull('compte_id')
+            ->get();
+
+        if ($lignesPD->isEmpty()) {
+            return;
+        }
+
+        app(EcritureGenerator::class)->assertEquilibre($lignesPD);
     }
 
     /**

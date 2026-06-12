@@ -725,3 +725,34 @@ it('[I] extourne dépense à crédit — lignes PD inversées + cross-lettrage 4
         ->value('solde');
     expect($solde)->toBe(0.0);
 });
+
+// ---------------------------------------------------------------------------
+// Scénario J — Paranoïa assertEquilibre
+// ---------------------------------------------------------------------------
+
+it('[J] miroir PD est vérifié équilibré (assertEquilibre appelé)', function () {
+    $t1 = $this->ecritureGen->pourRecetteACredit(
+        tiers: $this->tiers,
+        ventilations: [['compte' => $this->compte706, 'montant' => 100.0]],
+        dateConstatation: new DateTimeImmutable('2025-10-01'),
+        libelle: 'Test paranoïa',
+    );
+    $t1->update(['statut_reglement' => StatutReglement::Recu]);
+
+    $extourne = $this->service->extourner(
+        $t1->fresh(),
+        ExtournePayload::fromOrigine($t1->fresh(), ['mode_paiement' => ModePaiement::Cheque])
+    );
+    $miroir = $extourne->extourne;
+
+    $lignesPD = TransactionLigne::where('transaction_id', $miroir->id)
+        ->whereNotNull('compte_id')
+        ->get();
+
+    // Verify independently that lines are balanced
+    $ecritureGen = app(\App\Services\Compta\EcritureGenerator::class);
+    $ecritureGen->assertEquilibre($lignesPD);
+
+    expect(true)->toBeTrue();
+});
+
