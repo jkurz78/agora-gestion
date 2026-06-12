@@ -162,7 +162,8 @@ test('BDD scénario 3 — extourne recette encaissée pointable dans rapprocheme
         ->extourner($origine->fresh(), ExtournePayload::fromOrigine($origine->fresh()));
 
     expect($extourne->rapprochement_lettrage_id)->toBeNull();
-    expect($extourne->extourne->statut_reglement)->toBe(StatutReglement::Pointe);
+    // Origine était Pointe → miroir EnAttente (dette de remboursement à pointer en banque)
+    expect($extourne->extourne->statut_reglement)->toBe(StatutReglement::EnAttente);
 
     // R2 EnCours bancaire, pointer l'extourne et verrouiller
     $r2 = app(RapprochementBancaireService::class)->create($compte, now()->toDateString(), 420);

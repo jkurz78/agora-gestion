@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\DataTransferObjects\ExtournePayload;
 use App\Enums\ModePaiement;
 use App\Enums\RoleAssociation;
-use App\Enums\StatutRapprochement;
 use App\Enums\StatutReglement;
 use App\Enums\TypeRapprochement;
 use App\Enums\TypeTransaction;
@@ -62,7 +61,7 @@ test('extourner dépense Recu — crée extourne EnAttente sans lettrage', funct
     $miroir = $extourne->extourne;
     expect($miroir->type)->toBe(TypeTransaction::Depense);
     expect((float) $miroir->montant_total)->toBe(-80.0);
-    expect($miroir->statut_reglement)->toBe(StatutReglement::Pointe);
+    expect($miroir->statut_reglement)->toBe(StatutReglement::EnAttente);
     expect($miroir->libelle)->toBe('Annulation - Achat fournitures Mr Fournisseur');
 
     $origine->refresh();
@@ -105,7 +104,7 @@ test('extourner dépense Pointe verrouillée — crée extourne EnAttente sans l
         ->extourner($origine->fresh(), ExtournePayload::fromOrigine($origine->fresh()));
 
     expect($extourne->rapprochement_lettrage_id)->toBeNull();
-    expect($extourne->extourne->statut_reglement)->toBe(StatutReglement::Pointe);
+    expect($extourne->extourne->statut_reglement)->toBe(StatutReglement::EnAttente);
 
     $origine->refresh();
     expect($origine->statut_reglement)->toBe(StatutReglement::Pointe);

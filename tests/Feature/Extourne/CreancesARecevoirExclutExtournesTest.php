@@ -48,17 +48,18 @@ function creancesCreateRecette(StatutReglement $statut, CompteBancaire $compte, 
     return $tx;
 }
 
-test('extourne EnAttente cas Recu — n apparaît pas dans Créances à recevoir', function (): void {
+test('extourne cas Recu — miroir EnAttente (dette de remboursement) exclu des Créances (montant négatif)', function (): void {
     creancesActAsComptable();
     $compte = CompteBancaire::factory()->create();
     $origine = creancesCreateRecette(StatutReglement::Recu, $compte);
 
-    // Crée l'extourne — statut terminal Pointe
+    // Crée l'extourne — origine Recu → miroir EnAttente (remboursement à effectuer)
     $extourne = app(TransactionExtourneService::class)
         ->extourner($origine, ExtournePayload::fromOrigine($origine));
 
     $miroir = $extourne->extourne;
-    expect($miroir->statut_reglement)->toBe(StatutReglement::Pointe);
+    // Origine Recu → miroir reste EnAttente (dette de remboursement)
+    expect($miroir->statut_reglement)->toBe(StatutReglement::EnAttente);
     expect((float) $miroir->montant_total)->toBe(-80.0);
 
     $service = app(TransactionUniverselleService::class);
@@ -76,6 +77,8 @@ test('extourne EnAttente cas Recu — n apparaît pas dans Créances à recevoir
         statutReglement: 'en_attente',
     );
 
+    // Le miroir est EnAttente mais montant_total < 0 → exclu du filtre Créances à recevoir
+    // (recettes négatives ne sont pas des créances à encaisser — règle TransactionUniverselleService)
     $ids = collect($result['paginator']->items())->pluck('id')->all();
     expect($ids)->not->toContain($miroir->id);
 });

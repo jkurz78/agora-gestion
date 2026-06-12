@@ -137,7 +137,7 @@ test('il n\'echoue plus quand une transaction MontantManuel est pointée banque 
 
     expect($tm)->not->toBeNull();
     expect((float) $tm->montant_total)->toBe(-150.0);
-    expect($tm->statut_reglement)->toBe(StatutReglement::Pointe);
+    expect($tm->statut_reglement)->toBe(StatutReglement::EnAttente);
     expect($tm->rapprochement_id)->toBeNull();
 
     // ── Tg reste Pointée, rattachée à R1, inchangée ───────────────────────────

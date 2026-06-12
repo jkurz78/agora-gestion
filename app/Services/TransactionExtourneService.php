@@ -65,13 +65,23 @@ final class TransactionExtourneService
                 'created_by' => (int) auth()->id(),
             ]);
 
-            // Statuts terminaux : origine + miroir → Pointe.
+            // Capturer le statut d'origine AVANT de l'écraser.
+            $statutOriginal = $origine->statut_reglement;
+
+            // Origine → terminal (extournée, toujours Pointé).
             $origine->forceFill([
                 'extournee_at' => now(),
                 'statut_reglement' => StatutReglement::Pointe,
             ])->save();
 
-            $miroir->forceFill(['statut_reglement' => StatutReglement::Pointe])->save();
+            // Miroir : conditionnel selon le statut d'origine.
+            // - EnAttente → annulation comptable pure, pas de flux de tréso → miroir Pointé
+            // - Recu/EnMain/Pointe → remboursement à effectuer → miroir EnAttente (déjà la valeur
+            //   par défaut de creerTransactionMiroir, on ne l'écrase pas)
+            if ($statutOriginal === StatutReglement::EnAttente) {
+                $miroir->forceFill(['statut_reglement' => StatutReglement::Pointe])->save();
+            }
+            // else: le miroir garde EnAttente (posé par creerTransactionMiroir)
 
             Log::info('Extourne — transaction extournée', [
                 'association_id' => TenantContext::currentId(),
@@ -198,5 +208,4 @@ final class TransactionExtourneService
             );
         }
     }
-
 }
