@@ -498,6 +498,35 @@ final class ReglementOperationService
     }
 
     /**
+     * Trouve la T2 (encaissement ou règlement) liée à une T1, via la ligne tiers lettrée.
+     *
+     * Unifie trouverEncaissementT2 (411) et trouverReglementT2 (401). Agnostique au type :
+     * cherche la ligne tiers (411 ou 401) lettrée sur T1, puis la ligne partageant le même
+     * lettrage_code sur une AUTRE transaction.
+     *
+     * Retourne null si : pas de ligne tiers lettrée, cas lumpé (contrepartie sur même tx),
+     * ou pas de T2 séparée.
+     */
+    public function trouverT2(Transaction $t1): ?Transaction
+    {
+        $ligneTiers = TransactionLigne::where('transaction_id', (int) $t1->id)
+            ->whereNotNull('lettrage_code')
+            ->whereHas('compte', fn ($q) => $q->whereIn('numero_pcg', ['411', '401']))
+            ->first();
+
+        if ($ligneTiers === null) {
+            return null;
+        }
+
+        $ligneT2 = TransactionLigne::where('lettrage_code', $ligneTiers->lettrage_code)
+            ->where('compte_id', (int) $ligneTiers->compte_id)
+            ->where('transaction_id', '!=', (int) $t1->id)
+            ->first();
+
+        return $ligneT2 !== null ? Transaction::find($ligneT2->transaction_id) : null;
+    }
+
+    /**
      * Enrichit la Transaction créée par comptabiliserSeance avec les écritures partie double.
      *
      * Pattern Step 23 (FactureService::genererTransactionDepuisLignesManuelles) :

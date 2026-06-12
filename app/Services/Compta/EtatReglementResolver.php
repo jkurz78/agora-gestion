@@ -72,9 +72,7 @@ final class EtatReglementResolver
 
         // Lettré → localiser la transaction qui porte la trésorerie.
         // T2 séparée si elle existe, sinon la T1 elle-même (encaissement lumpé).
-        $t2 = $sens === Sens::Recette
-            ? $this->reglementService->trouverEncaissementT2($t1, $compteTiers)
-            : $this->reglementService->trouverReglementT2($t1, $compteTiers);
+        $t2 = $this->reglementService->trouverT2($t1);
 
         $txPortage = $t2 ?? $t1;
 

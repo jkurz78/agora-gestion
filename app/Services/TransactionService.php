@@ -586,11 +586,7 @@ final class TransactionService
     {
         $reglementService = app(ReglementOperationService::class);
 
-        $t2 = match ($transaction->type) {
-            TypeTransaction::Recette => $reglementService->trouverEncaissementT2($transaction),
-            TypeTransaction::Depense => $reglementService->trouverReglementT2($transaction),
-            default => null,
-        };
+        $t2 = $reglementService->trouverT2($transaction);
 
         if ($t2 === null) {
             return;

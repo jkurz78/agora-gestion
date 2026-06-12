@@ -267,11 +267,9 @@ final class RapprochementBancaireService
 
             if ((int) $model->rapprochement_id === (int) $rapprochement->id) {
                 // Dé-pointage : effacer rapprochement_id sur T1 et sur T2 séparée si présente.
-                // Chantier 2a : recette comptant → T2 via trouverEncaissementT2 (411).
-                // Chantier 3a-i : dépense comptant → T2 via trouverReglementT2 (401).
-                $t2 = $type === 'depense'
-                    ? $this->reglementService->trouverReglementT2($model)
-                    : $this->reglementService->trouverEncaissementT2($model);
+                // Chantier 2a : recette comptant → T2 via lettrage 411.
+                // Chantier 3a-i : dépense comptant → T2 via lettrage 401.
+                $t2 = $this->reglementService->trouverT2($model);
 
                 $model->rapprochement_id = null;
                 // Legacy fallback — sert aussi d'état de base pour le syncer PD ci-dessous.
@@ -300,14 +298,12 @@ final class RapprochementBancaireService
                 $model->save();
 
                 // Propager rapprochement_id sur T2 séparée si elle existe.
-                // Chantier 2a : recettes comptant → T2 via trouverEncaissementT2 (411).
-                // Chantier 3a-i : dépenses comptant → T2 via trouverReglementT2 (401).
+                // Chantier 2a : recettes comptant → T2 via lettrage 411.
+                // Chantier 3a-i : dépenses comptant → T2 via lettrage 401.
                 // Sans garde use_partie_double — les T2 sont créées systématiquement depuis
                 // les chantiers 2a/3a-i. Les méthodes retournent null pour les transactions
                 // legacy (lumpées) ou sans T2 → no-op.
-                $t2 = $type === 'depense'
-                    ? $this->reglementService->trouverReglementT2($model)
-                    : $this->reglementService->trouverEncaissementT2($model);
+                $t2 = $this->reglementService->trouverT2($model);
 
                 if ($t2 !== null) {
                     $t2->rapprochement_id = $rapprochement->id;
