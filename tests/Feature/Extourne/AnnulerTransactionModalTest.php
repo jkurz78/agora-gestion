@@ -149,6 +149,104 @@ test('close réinitialise l état et ne soumet rien', function (): void {
     expect(Extourne::query()->count())->toBe(0);
 });
 
+// ─── Chemin suppression (Dû / En main) ────────────────────────────
+
+test('open avec EnAttente → mode suppression', function (): void {
+    modalActAs(RoleAssociation::Comptable);
+    $origine = modalCreateRecette(StatutReglement::EnAttente);
+
+    Livewire::test(AnnulerTransactionModal::class)
+        ->call('open', $origine->id)
+        ->assertSet('isOpen', true)
+        ->assertSet('mode', 'suppression')
+        ->assertSet('motif', '');
+});
+
+test('open avec EnMain → mode suppression', function (): void {
+    modalActAs(RoleAssociation::Comptable);
+    $origine = modalCreateRecette(StatutReglement::EnMain);
+
+    Livewire::test(AnnulerTransactionModal::class)
+        ->call('open', $origine->id)
+        ->assertSet('isOpen', true)
+        ->assertSet('mode', 'suppression');
+});
+
+test('open avec Recu → mode extourne', function (): void {
+    modalActAs(RoleAssociation::Comptable);
+    $origine = modalCreateRecette(StatutReglement::Recu);
+
+    Livewire::test(AnnulerTransactionModal::class)
+        ->call('open', $origine->id)
+        ->assertSet('isOpen', true)
+        ->assertSet('mode', 'extourne')
+        ->assertSet('libelle', 'Annulation - Cotisation Mr Dupont');
+});
+
+test('submit suppression avec motif → soft-delete la transaction', function (): void {
+    modalActAs(RoleAssociation::Comptable);
+    $origine = modalCreateRecette(StatutReglement::EnAttente);
+
+    Livewire::test(AnnulerTransactionModal::class)
+        ->call('open', $origine->id)
+        ->set('motif', 'Inscription annulée par le participant')
+        ->call('submit')
+        ->assertDispatched('extourne:success')
+        ->assertSet('isOpen', false);
+
+    // La TX est soft-deleted
+    expect(Transaction::find($origine->id))->toBeNull();
+
+    // La TX existe encore en withTrashed
+    $tx = Transaction::withTrashed()->find($origine->id);
+    expect($tx)->not->toBeNull();
+    expect($tx->motif_suppression)->toBe('Inscription annulée par le participant');
+    expect($tx->supprime_par)->not->toBeNull();
+    expect($tx->deleted_at)->not->toBeNull();
+});
+
+test('submit suppression sans motif → erreur validation', function (): void {
+    modalActAs(RoleAssociation::Comptable);
+    $origine = modalCreateRecette(StatutReglement::EnAttente);
+
+    Livewire::test(AnnulerTransactionModal::class)
+        ->call('open', $origine->id)
+        ->set('motif', '')
+        ->call('submit')
+        ->assertHasErrors(['motif' => 'required']);
+
+    // TX toujours là
+    expect(Transaction::find($origine->id))->not->toBeNull();
+});
+
+test('suppression affiche le bon wording dans la modale', function (): void {
+    modalActAs(RoleAssociation::Comptable);
+    $origine = modalCreateRecette(StatutReglement::EnAttente);
+
+    $html = Livewire::test(AnnulerTransactionModal::class)
+        ->call('open', $origine->id)
+        ->html();
+
+    expect($html)->toContain('pas encore atteint la banque');
+    expect($html)->toContain('annulation');
+    expect($html)->not->toContain('extourne-libelle');
+});
+
+test('extourne affiche le bon wording dans la modale', function (): void {
+    modalActAs(RoleAssociation::Comptable);
+    $origine = modalCreateRecette(StatutReglement::Recu);
+
+    $html = Livewire::test(AnnulerTransactionModal::class)
+        ->call('open', $origine->id)
+        ->html();
+
+    expect($html)->toContain('en banque');
+    expect($html)->toContain('extourne');
+    expect($html)->not->toContain('pas encore atteint la banque');
+});
+
+// ─── Guards existants ──────────────────────────────────────────────
+
 test('open avec transaction non extournable affiche message d erreur', function (): void {
     modalActAs(RoleAssociation::Comptable);
     $origine = modalCreateRecette();

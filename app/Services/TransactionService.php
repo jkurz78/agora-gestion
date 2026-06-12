@@ -508,6 +508,100 @@ final class TransactionService
         });
     }
 
+    /**
+     * Annule une transaction Dû ou En main (soft-delete avec motif).
+     *
+     * Délettrage PD des lignes de la T1, nettoyage de la T2 si elle existe,
+     * puis soft-delete avec traçabilité (motif + user). La transaction disparaît
+     * de tous les rapports et listings via le scope global SoftDeletes.
+     *
+     * Pour les transactions Remis/Pointé → utiliser TransactionExtourneService::extourner().
+     */
+    public function annuler(Transaction $transaction, string $motif): void
+    {
+        $this->exerciceService->assertOuvert(
+            $this->exerciceService->anneeForDate(CarbonImmutable::parse($transaction->date))
+        );
+
+        if ($transaction->rapprochement_id !== null) {
+            throw new \RuntimeException('Cette transaction est pointée dans un rapprochement et ne peut pas être annulée.');
+        }
+        if ($transaction->isLockedByRemise()) {
+            throw new \RuntimeException('Cette transaction est liée à une remise bancaire et ne peut pas être annulée.');
+        }
+        if ($transaction->isLockedByFacture()) {
+            throw new \RuntimeException('Cette transaction est liée à une facture validée et ne peut pas être annulée.');
+        }
+        if ($transaction->extournee_at !== null) {
+            throw new \RuntimeException('Cette transaction a déjà été extournée.');
+        }
+
+        DB::transaction(function () use ($transaction, $motif) {
+            // 1. Nettoyage T2 (encaissement/règlement séparé) si elle existe
+            $this->supprimerT2SiExiste($transaction);
+
+            // 2. Délettrage PD des lignes de la T1
+            $this->lettrageService->autoDelettrerLignesDe(
+                $transaction,
+                "Annulation TX#{$transaction->id} — {$motif}"
+            );
+
+            // 3. Supprimer la pièce jointe si présente
+            if ($transaction->hasPieceJointe()) {
+                $this->deletePieceJointe($transaction);
+            }
+
+            // 4. Soft-delete lignes
+            $transaction->lignes()->each(function (TransactionLigne $ligne) {
+                $ligne->affectations()->delete();
+                $ligne->delete();
+            });
+
+            // 5. Soft-delete TX avec traçabilité
+            $transaction->forceFill([
+                'motif_suppression' => $motif,
+                'supprime_par' => auth()->id(),
+            ])->save();
+            $transaction->delete();
+
+            Log::info('Transaction annulée (soft-delete)', [
+                'association_id' => TenantContext::currentId(),
+                'user_id' => (int) auth()->id(),
+                'transaction_id' => $transaction->id,
+                'motif' => $motif,
+            ]);
+        });
+    }
+
+    /**
+     * Supprime la T2 (encaissement ou règlement séparé) liée à cette T1,
+     * avec délettrage PD préalable. No-op si pas de T2 ou encaissement lumpé.
+     */
+    private function supprimerT2SiExiste(Transaction $transaction): void
+    {
+        $reglementService = app(ReglementOperationService::class);
+
+        $t2 = match ($transaction->type) {
+            TypeTransaction::Recette => $reglementService->trouverEncaissementT2($transaction),
+            TypeTransaction::Depense => $reglementService->trouverReglementT2($transaction),
+            default => null,
+        };
+
+        if ($t2 === null) {
+            return;
+        }
+
+        // Délettrer les lignes PD de la T2
+        foreach (TransactionLigne::where('transaction_id', (int) $t2->id)->whereNotNull('lettrage_code')->get() as $ligne) {
+            $this->lettrageService->delettrerParLigne(
+                $ligne->fresh(),
+                "Suppression T2 #{$t2->id} suite à annulation T1 #{$transaction->id}"
+            );
+        }
+        TransactionLigne::where('transaction_id', (int) $t2->id)->forceDelete();
+        $t2->forceDelete();
+    }
+
     public function affecterLigne(TransactionLigne $ligne, array $affectations): void
     {
         $transaction = $ligne->transaction;
