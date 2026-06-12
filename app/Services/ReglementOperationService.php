@@ -128,6 +128,8 @@ final class ReglementOperationService
     /**
      * Marque une transaction de règlement comme reçue + génère T2 (encaissement) partie double.
      *
+     * @deprecated Utiliser marquerRegle() à la place (unifié 411/401, agnostique au type).
+     *
      * Pattern Step 24 (FactureService::encaisserPartieDouble) reproduit ici.
      *
      * Gardes skip silencieux (best-effort — la mise à jour statut_reglement est préservée) :
@@ -142,44 +144,13 @@ final class ReglementOperationService
      */
     public function marquerRecu(Transaction $transaction, ?ModePaiement $mode = null, ?int $compteId = null): void
     {
-        if ($transaction->statut_reglement !== StatutReglement::EnAttente) {
-            return;
-        }
-
-        if ($transaction->isLockedByRapprochement() || $transaction->isLockedByFacture()) {
-            return;
-        }
-
-        // Preload Compte 411 hors transaction (N+1 fix — Vague 3b Item C)
-        $compte411 = Compte::ofNumero('411');
-
-        DB::transaction(function () use ($transaction, $compte411, $mode, $compteId): void {
-            // Si la transaction est une créance (mode null) et qu'un mode est fourni, on le pose.
-            $updateData = ['statut_reglement' => StatutReglement::Recu->value];
-            if ($transaction->mode_paiement === null && $mode !== null) {
-                $updateData['mode_paiement'] = $mode->value;
-                if ($compteId !== null) {
-                    $updateData['compte_id'] = $compteId;
-                }
-            }
-
-            $transaction->update($updateData);
-            // Rafraîchir pour que encaisserSiNonEncaisse lise le nouveau mode_paiement
-            $transaction->refresh();
-
-            // Partie double : génère T2 si T1 porte une ligne 411 valide et non lettrée.
-            $this->encaisserSiNonEncaisse($transaction, $compte411);
-
-            // Chantier 4 — statut dérivé du ledger (remplace le hard-set Recu :
-            // un chèque reçu non remis devient EnMain, un virement Recu).
-            // Résolu via app() pour éviter la dépendance circulaire constructeur
-            // (EtatReglementResolver → ReglementOperationService → EtatReglementResolver).
-            app(EtatReglementResolver::class)->syncer($transaction->fresh());
-        });
+        $this->marquerRegle($transaction, $mode, $compteId);
     }
 
     /**
      * Point d'entrée idempotent pour générer T2 (encaissement créance) sur une transaction T1.
+     *
+     * @deprecated Utiliser reglerOuEncaisser() à la place (unifié 411/401, agnostique au type).
      *
      * Peut être appelé par n'importe quel déclencheur (marquerRecu, remise, pointage) sans risque
      * de double-écriture : si la ligne 411 de T1 est déjà lettrée, la méthode est un no-op silencieux.
@@ -204,76 +175,13 @@ final class ReglementOperationService
      */
     public function encaisserSiNonEncaisse(Transaction $transaction, ?Compte $compte411 = null): void
     {
-        // --- 1. Résolution mode de paiement ---
-        /** @var ModePaiement|null $mode */
-        $mode = $transaction->mode_paiement;
-
-        if ($mode === null) {
-            Log::warning('[PartieDouble][ReglementOperationService] — skip : mode_paiement null sur T1', [
-                'transaction_id' => (int) $transaction->id,
-            ]);
-
-            return;
-        }
-
-        // --- 2. Résolution compte de trésorerie (CompteBancaire → 512X via IBAN, ou placeholder 5112) ---
-        $compteTresorerie = CompteTresorerieResolver::resoudre(
-            compteBancaireId: $transaction->compte_id !== null ? (int) $transaction->compte_id : null,
-            mode: $mode,
-            contextLog: 'ReglementOperationService',
-            sens: Sens::Recette, // encaissement créance = côté recette
-        );
-
-        if ($compteTresorerie === null) {
-            // Skip silencieux déjà loggué par CompteTresorerieResolver
-            return;
-        }
-
-        // --- 3. Vérifie que T1 porte une ligne 411 ---
-        // Compte 411 préchargé par le caller (N+1 fix — Vague 3b Item C).
-        $compte411 ??= Compte::ofNumero('411');
-        if ($compte411 === null) {
-            Log::warning('[PartieDouble][ReglementOperationService] — skip : compte 411 absent (tenant sans schéma PD)', [
-                'transaction_id' => (int) $transaction->id,
-            ]);
-
-            return;
-        }
-
-        $ligne411 = TransactionLigne::where('transaction_id', (int) $transaction->id)
-            ->where('compte_id', (int) $compte411->id)
-            ->first();
-
-        if ($ligne411 === null || $ligne411->tiers_id === null) {
-            Log::warning('[PartieDouble][ReglementOperationService] — skip : T1 legacy sans ligne 411 ou sans tiers', [
-                'transaction_id' => (int) $transaction->id,
-            ]);
-
-            return;
-        }
-
-        // --- 4. Guard idempotence : ligne 411 déjà lettrée → T2 déjà générée, skip silencieux ---
-        if ($ligne411->lettrage_code !== null) {
-            Log::info('[PartieDouble][ReglementOperationService] — skip idempotent : ligne 411 déjà lettrée', [
-                'transaction_id' => (int) $transaction->id,
-                'lettrage_code' => $ligne411->lettrage_code,
-            ]);
-
-            return;
-        }
-
-        // --- 5. Délègue à EcritureGenerator (crée T2 + auto-lettre la paire 411) ---
-        $this->ecritureGenerator->pourEncaissementCreance(
-            transactionCreance: $transaction,
-            mode: $mode,
-            compteTresorerie: $compteTresorerie,
-            datePaiement: now(),
-            libelle: 'Encaissement règlement séance',
-        );
+        $this->reglerOuEncaisser($transaction);
     }
 
     /**
      * Marque une transaction de dépense comme payée + génère T2 (règlement) partie double.
+     *
+     * @deprecated Utiliser marquerRegle() à la place (unifié 411/401, agnostique au type).
      *
      * Miroir de marquerRecu() pour les dépenses (compte 401 au lieu de 411).
      *
@@ -289,43 +197,13 @@ final class ReglementOperationService
      */
     public function marquerPaye(Transaction $transaction, ?ModePaiement $mode = null, ?int $compteId = null): void
     {
-        if ($transaction->statut_reglement !== StatutReglement::EnAttente) {
-            return;
-        }
-
-        if ($transaction->isLockedByRapprochement() || $transaction->isLockedByFacture()) {
-            return;
-        }
-
-        // Preload Compte 401 hors transaction (N+1 fix — symétrique marquerRecu)
-        $compte401 = Compte::ofNumero('401');
-
-        DB::transaction(function () use ($transaction, $compte401, $mode, $compteId): void {
-            // Si la transaction est une dette (mode null) et qu'un mode est fourni, on le pose.
-            $updateData = ['statut_reglement' => StatutReglement::Recu->value];
-            if ($transaction->mode_paiement === null && $mode !== null) {
-                $updateData['mode_paiement'] = $mode->value;
-                if ($compteId !== null) {
-                    $updateData['compte_id'] = $compteId;
-                }
-            }
-
-            $transaction->update($updateData);
-            // Rafraîchir pour que reglerSiNonRegle lise le nouveau mode_paiement
-            $transaction->refresh();
-
-            // Partie double : génère T2 si T1 porte une ligne 401 valide et non lettrée.
-            $this->reglerSiNonRegle($transaction, $compte401);
-
-            // Chantier 4 — statut dérivé du ledger (remplace le hard-set Recu :
-            // un virement réglé devient Recu, une dépense comptant avec 512X direct Recu).
-            // Résolu via app() pour éviter la dépendance circulaire constructeur.
-            app(EtatReglementResolver::class)->syncer($transaction->fresh());
-        });
+        $this->marquerRegle($transaction, $mode, $compteId);
     }
 
     /**
      * Point d'entrée idempotent pour générer T2 (règlement dette fournisseur) sur une transaction T1.
+     *
+     * @deprecated Utiliser reglerOuEncaisser() à la place (unifié 411/401, agnostique au type).
      *
      * Miroir de encaisserSiNonEncaisse() pour les dépenses (compte 401 au lieu de 411).
      *
@@ -345,71 +223,104 @@ final class ReglementOperationService
      */
     public function reglerSiNonRegle(Transaction $transaction, ?Compte $compte401 = null): void
     {
-        // --- 1. Résolution mode de paiement ---
-        /** @var ModePaiement|null $mode */
+        $this->reglerOuEncaisser($transaction);
+    }
+
+    /**
+     * Point d'entrée idempotent unifié pour générer T2 sur une T1.
+     *
+     * Remplace encaisserSiNonEncaisse (411) et reglerSiNonRegle (401).
+     * Lit la ligne tiers ouverte (411 ou 401, non lettrée) sans brancher sur le type.
+     *
+     * Skip silencieux si :
+     * — mode_paiement null sur T1
+     * — ligne tiers ouverte introuvable (legacy sans PD, ou déjà lettrée)
+     * — compte de trésorerie non résolu
+     */
+    public function reglerOuEncaisser(Transaction $transaction): void
+    {
         $mode = $transaction->mode_paiement;
 
         if ($mode === null) {
-            Log::warning('[PartieDouble][ReglementOperationService] — skip reglerSiNonRegle : mode_paiement null sur T1', [
+            Log::warning('[PartieDouble][ReglementOperationService] — skip reglerOuEncaisser : mode_paiement null sur T1', [
                 'transaction_id' => (int) $transaction->id,
             ]);
 
             return;
         }
 
-        // --- 2. Résolution compte de trésorerie (CompteBancaire → 512X via IBAN, ou placeholder 5112) ---
+        // Trouver la ligne tiers ouverte (411 ou 401, non lettrée, avec tiers)
+        $ligneTiers = TransactionLigne::where('transaction_id', (int) $transaction->id)
+            ->whereNull('lettrage_code')
+            ->whereNotNull('tiers_id')
+            ->whereHas('compte', fn ($q) => $q->whereIn('numero_pcg', ['411', '401']))
+            ->first();
+
+        if ($ligneTiers === null) {
+            Log::info('[PartieDouble][ReglementOperationService] — skip reglerOuEncaisser : pas de ligne tiers ouverte (legacy ou déjà lettrée)', [
+                'transaction_id' => (int) $transaction->id,
+            ]);
+
+            return;
+        }
+
+        // Direction D/C → Sens pour CompteTresorerieResolver
+        $sens = (float) $ligneTiers->debit > 0 ? Sens::Recette : Sens::Depense;
+
         $compteTresorerie = CompteTresorerieResolver::resoudre(
             compteBancaireId: $transaction->compte_id !== null ? (int) $transaction->compte_id : null,
             mode: $mode,
-            contextLog: 'ReglementOperationService::reglerSiNonRegle',
-            sens: Sens::Depense, // règlement dette = côté dépense
+            contextLog: 'ReglementOperationService::reglerOuEncaisser',
+            sens: $sens,
         );
 
         if ($compteTresorerie === null) {
-            // Skip silencieux déjà loggué par CompteTresorerieResolver
             return;
         }
 
-        // --- 3. Vérifie que T1 porte une ligne 401 ---
-        $compte401 ??= Compte::ofNumero('401');
-        if ($compte401 === null) {
-            Log::warning('[PartieDouble][ReglementOperationService] — skip reglerSiNonRegle : compte 401 absent (tenant sans schéma PD)', [
-                'transaction_id' => (int) $transaction->id,
-            ]);
-
-            return;
-        }
-
-        $ligne401 = TransactionLigne::where('transaction_id', (int) $transaction->id)
-            ->where('compte_id', (int) $compte401->id)
-            ->first();
-
-        if ($ligne401 === null || $ligne401->tiers_id === null) {
-            Log::warning('[PartieDouble][ReglementOperationService] — skip reglerSiNonRegle : T1 legacy sans ligne 401 ou sans tiers', [
-                'transaction_id' => (int) $transaction->id,
-            ]);
-
-            return;
-        }
-
-        // --- 4. Guard idempotence : ligne 401 déjà lettrée → T2 déjà générée, skip silencieux ---
-        if ($ligne401->lettrage_code !== null) {
-            Log::info('[PartieDouble][ReglementOperationService] — skip idempotent reglerSiNonRegle : ligne 401 déjà lettrée', [
-                'transaction_id' => (int) $transaction->id,
-                'lettrage_code' => $ligne401->lettrage_code,
-            ]);
-
-            return;
-        }
-
-        // --- 5. Délègue à EcritureGenerator (crée T2 + auto-lettre la paire 401) ---
-        $this->ecritureGenerator->pourReglementFournisseur(
-            transactionDette: $transaction,
+        $this->ecritureGenerator->pourReglement(
+            t1: $transaction,
             mode: $mode,
             compteTresorerie: $compteTresorerie,
             datePaiement: now(),
-            libelle: 'Règlement fournisseur',
         );
+    }
+
+    /**
+     * Marque une transaction comme réglée + génère T2 partie double.
+     *
+     * Unifie marquerRecu (411) et marquerPaye (401). Agnostique au type.
+     * Opère via reglerOuEncaisser qui lit la ligne tiers ouverte.
+     *
+     * @param  ModePaiement|null  $mode  Mode fourni pour une créance/dette sans mode.
+     * @param  int|null  $compteId  Compte bancaire cible optionnel.
+     */
+    public function marquerRegle(Transaction $transaction, ?ModePaiement $mode = null, ?int $compteId = null): void
+    {
+        if ($transaction->statut_reglement !== StatutReglement::EnAttente) {
+            return;
+        }
+
+        if ($transaction->isLockedByRapprochement() || $transaction->isLockedByFacture()) {
+            return;
+        }
+
+        DB::transaction(function () use ($transaction, $mode, $compteId): void {
+            $updateData = ['statut_reglement' => StatutReglement::Recu->value];
+            if ($transaction->mode_paiement === null && $mode !== null) {
+                $updateData['mode_paiement'] = $mode->value;
+                if ($compteId !== null) {
+                    $updateData['compte_id'] = $compteId;
+                }
+            }
+
+            $transaction->update($updateData);
+            $transaction->refresh();
+
+            $this->reglerOuEncaisser($transaction);
+
+            app(EtatReglementResolver::class)->syncer($transaction->fresh());
+        });
     }
 
     /**

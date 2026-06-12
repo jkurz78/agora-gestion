@@ -287,9 +287,9 @@ final class RapprochementBancaireService
                 // En mode PD, overrides le fallback legacy ci-dessus avec la valeur dérivée.
                 $this->etatReglementResolver->syncer($model);
             } else {
-                // Pointage : générer T2 si en_attente (Fix D — idempotent, recettes seulement)
-                if (config('compta.use_partie_double') && $type !== 'depense') {
-                    $this->reglementService->encaisserSiNonEncaisse($model);
+                // Pointage : générer T2 si en_attente (Fix D — idempotent, recettes et dépenses)
+                if (config('compta.use_partie_double')) {
+                    $this->reglementService->reglerOuEncaisser($model);
                 }
 
                 $model->rapprochement_id = $rapprochement->id;

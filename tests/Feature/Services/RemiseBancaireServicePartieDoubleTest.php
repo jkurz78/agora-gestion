@@ -469,17 +469,21 @@ it('[F] modifier remise (retrait tx) → T4 recréée, ligne source retirée red
 // Scénario G — Tx legacy sans ligne 5112 portage → skip silencieux + Log::warning
 // ---------------------------------------------------------------------------
 
-it('[G] tx legacy sans ligne 5112 → skip + Log::warning, remise_id posé legacy, pas de T4 créée', function () {
+it('[G] tx legacy sans ligne 5112 → skip + Log::warning ou Log::info, remise_id posé legacy, pas de T4 créée', function () {
     $remise = t25creerRemise($this, ModePaiement::Cheque);
 
     // Transaction legacy : pas de lignes partie double (pas de 5112)
     $txLegacy = t25creerTransactionLegacy($this, ModePaiement::Cheque, 75.00);
 
+    // Task 5 — reglerOuEncaisser() émet Log::info (pas warning) pour "pas de ligne tiers ouverte".
+    // On accepte warning et info pour couvrir les deux niveaux de log émis sur ce chemin.
     Log::shouldReceive('warning')
         ->atLeast()->once()
         ->withArgs(function (string $msg) {
             return str_contains($msg, '[PartieDouble]') || str_contains($msg, 'Step 25') || str_contains($msg, 'ligne') || str_contains($msg, '5112');
         });
+    Log::shouldReceive('info')
+        ->zeroOrMoreTimes();
 
     $this->service->comptabiliser($remise, [$txLegacy->id]);
 

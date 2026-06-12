@@ -409,10 +409,10 @@ test('[PD-C3] toggleTransaction pointe une dépense PD', function () {
 
     $txFresh = $tx->fresh();
     expect((int) $txFresh->rapprochement_id)->toBe($rapprochement->id)
-        // Chantier 4 — le helper pdDepense crée 401D+401C sans lettrage (structure test synthétique).
-        // Le resolver ne peut pas prouver le paiement (401 non lettré) → EnAttente.
-        // En prod, TransactionService génère la structure correcte (401 lettré via T2).
-        ->and($txFresh->statut_reglement)->toBe(StatutReglement::EnAttente);
+        // Task 5 — reglerOuEncaisser() est maintenant appelé pour les dépenses aussi.
+        // Le helper pdDepense crée 401C non lettrée avec tiers → reglerOuEncaisser génère T2,
+        // lettre le 401, puis le resolver détecte 401 lettré + rapprochement_id → Pointe.
+        ->and($txFresh->statut_reglement)->toBe(StatutReglement::Pointe);
 });
 
 // ===========================================================================
