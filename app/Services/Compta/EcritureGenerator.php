@@ -1200,6 +1200,157 @@ final class EcritureGenerator
     }
 
     /**
+     * Crée la T2 (encaissement ou règlement) pour une T1 quelconque — agnostique au type.
+     *
+     * Unifie pourEncaissementCreance (411) et pourReglementFournisseur (401).
+     * Lit la ligne tiers ouverte (411 D ou 401 C, ou inversé pour miroirs extourne)
+     * pour déterminer la direction du flux.
+     *
+     * - Ligne tiers au Débit → argent entrant (encaissement) : portage D / tiers C + lettrage
+     * - Ligne tiers au Crédit → argent sortant (règlement) : tiers D / portage C + lettrage
+     *
+     * Le type de la T2 hérite de la T1. Le journal est toujours Banque.
+     */
+    public function pourReglement(
+        Transaction $t1,
+        ModePaiement $mode,
+        Compte $compteTresorerie,
+        \DateTimeInterface $datePaiement,
+        ?string $libelle = null,
+    ): Transaction {
+        // --- Trouver la ligne tiers ouverte (411 ou 401, non lettrée, avec tiers) ---
+        $ligneTiersSource = TransactionLigne::where('transaction_id', (int) $t1->id)
+            ->whereNull('lettrage_code')
+            ->whereNotNull('tiers_id')
+            ->whereHas('compte', fn ($q) => $q->whereIn('numero_pcg', ['411', '401']))
+            ->first();
+
+        if ($ligneTiersSource === null) {
+            throw new \InvalidArgumentException(
+                "La transaction #{$t1->id} ne contient pas de ligne tiers (411/401) ouverte — pas de règlement possible."
+            );
+        }
+
+        // --- Direction D/C → sens du flux ---
+        $tiersAuDebit = (float) $ligneTiersSource->debit > 0;
+        // Debit = argent entrant (encaissement créance), Credit = argent sortant (règlement dette)
+
+        /** @var Tiers $tiers */
+        $tiers = Tiers::findOrFail($ligneTiersSource->tiers_id);
+        $compteTiers = $ligneTiersSource->compte; // 411 ou 401, déjà chargé via lazy-load
+
+        if ($compteTiers === null) {
+            $compteTiers = Compte::find($ligneTiersSource->compte_id);
+        }
+
+        // --- Résolution compte de portage selon direction ---
+        $comptePortage = $tiersAuDebit
+            ? $this->resoudreComptePortage($mode, $compteTresorerie)        // encaissement : chèque→5112
+            : $this->resoudreComptePortageDepense($mode, $compteTresorerie); // règlement : chèque→512X
+
+        // --- Montant = valeur absolue de la ligne tiers ---
+        $montant = $tiersAuDebit
+            ? (float) $ligneTiersSource->debit
+            : (float) $ligneTiersSource->credit;
+
+        // --- Invariant tenant (fail-fast avant DB::transaction) ---
+        $this->assertTenantCoherence(
+            collect(),
+            collect([$tiers])
+        );
+
+        return DB::transaction(function () use (
+            $t1, $tiers, $compteTiers, $comptePortage, $montant,
+            $mode, $datePaiement, $libelle, $ligneTiersSource, $tiersAuDebit
+        ): Transaction {
+            $libelleEffectif = $libelle ?? ($tiersAuDebit
+                ? "Encaissement créance #{$t1->id}"
+                : "Règlement fournisseur #{$t1->id}");
+
+            $t2 = $this->createTransactionHeader(
+                type: $t1->type,
+                date: $datePaiement,
+                libelle: $libelleEffectif,
+                montant: $montant,
+                modePaiement: $mode,
+                journal: JournalComptable::Banque,
+            );
+
+            if ($tiersAuDebit) {
+                // Encaissement : portage D / tiers C
+                $lignePortage = TransactionLigne::create([
+                    'transaction_id' => (int) $t2->id,
+                    'compte_id' => (int) $comptePortage->id,
+                    'debit' => $montant,
+                    'credit' => 0,
+                    'tiers_id' => null,
+                    'libelle' => $libelleEffectif,
+                    'montant' => 0,
+                    'sous_categorie_id' => null,
+                ]);
+                $lignePortage->setRelation('compte', $comptePortage);
+
+                $ligneTiersT2 = TransactionLigne::create([
+                    'transaction_id' => (int) $t2->id,
+                    'compte_id' => (int) $compteTiers->id,
+                    'debit' => 0,
+                    'credit' => $montant,
+                    'tiers_id' => (int) $tiers->id,
+                    'libelle' => $libelleEffectif,
+                    'montant' => 0,
+                    'sous_categorie_id' => null,
+                ]);
+                $ligneTiersT2->setRelation('compte', $compteTiers);
+
+                $lignes = collect([$lignePortage, $ligneTiersT2]);
+            } else {
+                // Règlement : tiers D / portage C
+                $ligneTiersT2 = TransactionLigne::create([
+                    'transaction_id' => (int) $t2->id,
+                    'compte_id' => (int) $compteTiers->id,
+                    'debit' => $montant,
+                    'credit' => 0,
+                    'tiers_id' => (int) $tiers->id,
+                    'libelle' => $libelleEffectif,
+                    'montant' => 0,
+                    'sous_categorie_id' => null,
+                ]);
+                $ligneTiersT2->setRelation('compte', $compteTiers);
+
+                $lignePortage = TransactionLigne::create([
+                    'transaction_id' => (int) $t2->id,
+                    'compte_id' => (int) $comptePortage->id,
+                    'debit' => 0,
+                    'credit' => $montant,
+                    'tiers_id' => null,
+                    'libelle' => $libelleEffectif,
+                    'montant' => 0,
+                    'sous_categorie_id' => null,
+                ]);
+                $lignePortage->setRelation('compte', $comptePortage);
+
+                $lignes = collect([$ligneTiersT2, $lignePortage]);
+            }
+
+            // --- Vérifications post-création (paranoïa) ---
+            $this->assertEquilibre($lignes);
+            $this->assertTiersObligatoire411($lignes);
+            $this->assertPasDeTiersSurClasse5($lignes);
+
+            // --- Auto-lettrage paire tiers : T1-ligneTiers ↔ T2-ligneTiers ---
+            $this->lettrageService->lettrer(
+                collect([$ligneTiersSource, $ligneTiersT2]),
+                null,
+                "Auto-lettrage règlement T1#{$t1->id} → T2#{$t2->id}"
+            );
+
+            $t2->setRelation('lignes', $lignes);
+
+            return $t2;
+        });
+    }
+
+    /**
      * Génère l'OD d'abandon de créance : solde la dette fournisseur 401 par un produit 7xx.
      *
      * Matrice :
