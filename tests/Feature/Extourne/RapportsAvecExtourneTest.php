@@ -150,11 +150,11 @@ test('flux trésorerie cas encaissé — solde compte = ouverture - 80€ après
     expect((float) $dernier->solde_fin)->toBe(420.0);
 });
 
-test('flux trésorerie cas non-encaissé — lettrage automatique laisse le solde inchangé', function (): void {
+test('flux trésorerie cas non-encaissé — pas de lettrage, solde rapprochement inchangé', function (): void {
     rapportsActAsComptable();
     $compte = CompteBancaire::factory()->create();
 
-    // Rapprochement préalable verrouille fixant solde 500 €
+    // Rapprochement préalable verrouillé fixant solde 500 €
     RapprochementBancaire::factory()->create([
         'compte_id' => $compte->id,
         'type' => TypeRapprochement::Bancaire,
@@ -165,7 +165,7 @@ test('flux trésorerie cas non-encaissé — lettrage automatique laisse le sold
         'solde_fin' => 500,
     ]);
 
-    // Origine EnAttente — extourne crée un lettrage automatique
+    // Origine EnAttente
     $cat = Categorie::create(['nom' => 'Cotisations', 'type' => 'recette']);
     $sc = SousCategorie::create(['categorie_id' => $cat->id, 'nom' => 'Cotisations séance', 'libelle_article' => 'des cotisations séance']);
     $origine = rapportsCreateRecetteWithSousCategorie($sc, $compte, 80.0, now()->toDateString());
@@ -174,14 +174,11 @@ test('flux trésorerie cas non-encaissé — lettrage automatique laisse le sold
     $extourne = app(TransactionExtourneService::class)
         ->extourner($origine->fresh(), ExtournePayload::fromOrigine($origine->fresh()));
 
-    expect($extourne->rapprochement_lettrage_id)->not->toBeNull();
-    $lettrage = $extourne->lettrage;
+    // Pas de lettrage automatique
+    expect($extourne->rapprochement_lettrage_id)->toBeNull();
+    expect(RapprochementBancaire::where('type', TypeRapprochement::Lettrage)->count())->toBe(0);
 
-    // Le lettrage a solde_ouverture = solde_fin = 500 (inchangé)
-    expect((float) $lettrage->solde_ouverture)->toBe(500.0);
-    expect((float) $lettrage->solde_fin)->toBe(500.0);
-
-    // Le solde le plus récent reste 500 puisque le lettrage a solde_fin = 500
+    // Le solde le plus récent reste 500 (aucun nouveau rapprochement créé)
     $dernier = RapprochementBancaire::where('compte_id', $compte->id)
         ->orderByDesc('date_fin')
         ->orderByDesc('id')

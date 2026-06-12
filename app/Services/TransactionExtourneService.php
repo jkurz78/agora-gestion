@@ -6,16 +6,12 @@ namespace App\Services;
 
 use App\DataTransferObjects\ExtournePayload;
 use App\Enums\StatutFacture;
-use App\Enums\StatutRapprochement;
 use App\Enums\StatutReglement;
-use App\Enums\TypeRapprochement;
 use App\Events\TransactionExtournee;
 use App\Models\Extourne;
-use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\Compta\EcritureGenerator;
-use App\Services\Compta\LettrageService;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -35,15 +31,14 @@ final class TransactionExtourneService
 {
     public function __construct(
         private readonly NumeroPieceService $numeroPiece,
-        private readonly LettrageService $lettrageService,
     ) {}
 
     /**
      * Extourne (contre-passation) d'une transaction déjà dénouée.
      *
      * Crée une transaction miroir à montant négatif avec D↔C swap sur les lignes PD.
-     * Cross-lettre les lignes tiers (411/401) entre origine et miroir.
-     * Si l'origine était EnAttente, un lettrage automatique apparie les deux.
+     * Les lettrages existants (T1↔T2, T2↔T4) restent intacts — le 411C du miroir
+     * reste ouvert et sera soldé lors du remboursement effectif.
      */
     public function extourner(Transaction $origine, ExtournePayload $payload): Extourne
     {
@@ -52,47 +47,21 @@ final class TransactionExtourneService
         $this->assertExtournable($origine);
 
         return DB::transaction(function () use ($origine, $payload): Extourne {
-            $isCreanceOuverte = $origine->statut_reglement === StatutReglement::EnAttente;
-
-            if ($isCreanceOuverte) {
-                // Créance non encaissée : délettrer pour permettre le lettrage rapprochement.
-                $this->autoDelettrerLignes($origine);
-            }
-            // Remis/Pointé : ne PAS toucher aux lettrages existants.
-            // L'encaissement (T1↔T2) et la remise (T2↔T4) sont réels et doivent rester intacts.
-            // Le 411 du miroir reste ouvert = dette de remboursement envers le tiers.
+            // Pas de délettrage ni de cross-lettrage :
+            //   - Remis/Pointé : les lettrages existants (T1↔T2, T2↔T4) sont réels
+            //     et doivent rester intacts. Le 411C du miroir reste ouvert = dette
+            //     de remboursement, soldée quand le remboursement sera émis.
+            //   - EnAttente : la modale route vers soft-delete (TransactionService::annuler),
+            //     pas ici. Si on arrive ici malgré tout, le miroir est créé sans lettrage.
 
             $miroir = $this->creerTransactionMiroir($origine, $payload);
             $this->copierLignesInversees($origine, $miroir);
             $this->assertEquilibreMiroir($miroir);
 
-            if ($isCreanceOuverte) {
-                // Créance : cross-lettrage 411 entre origine et miroir (∑=0).
-                $this->crossLettrerLignesTiers($origine, $miroir);
-            }
-            // Remis/Pointé : pas de cross-lettrage. Le 411C du miroir reste ouvert
-            // jusqu'au remboursement effectif (virement/chèque → 411D lettré avec le 411C miroir).
-
-            $lettrageId = null;
-            if ($origine->statut_reglement === StatutReglement::EnAttente) {
-                $lettrage = $this->creerLettrage($origine, $miroir, $payload);
-                $lettrageId = $lettrage->id;
-
-                $origine->forceFill([
-                    'rapprochement_id' => $lettrage->id,
-                    'statut_reglement' => StatutReglement::Pointe,
-                ])->save();
-
-                $miroir->forceFill([
-                    'rapprochement_id' => $lettrage->id,
-                    'statut_reglement' => StatutReglement::Pointe,
-                ])->save();
-            }
-
             $extourne = Extourne::create([
                 'transaction_origine_id' => $origine->id,
                 'transaction_extourne_id' => $miroir->id,
-                'rapprochement_lettrage_id' => $lettrageId,
+                'rapprochement_lettrage_id' => null,
                 'created_by' => (int) auth()->id(),
             ]);
 
@@ -174,59 +143,6 @@ final class TransactionExtourneService
     }
 
     /**
-     * Apparie, par lettrage PD, les lignes tiers (compte lettrable, tiers_id non nul)
-     * entre l'origine (auto-délettrée) et le miroir (lignes D↔C inversées).
-     *
-     * Pour chaque ligne de l'origine (non lettrée, avec tiers_id), on cherche dans le
-     * miroir la ligne symétrique : même compte_id, même tiers_id, et sens inversé
-     * (debit_origine == credit_miroir && credit_origine == debit_miroir).
-     * Chaque paire est lettrée indépendamment (code distinct par paire).
-     */
-    private function crossLettrerLignesTiers(Transaction $origine, Transaction $miroir): void
-    {
-        $lignesOrigine = TransactionLigne::where('transaction_id', (int) $origine->id)
-            ->whereNotNull('compte_id')
-            ->whereNotNull('tiers_id')
-            ->whereNull('lettrage_code')
-            ->get();
-
-        if ($lignesOrigine->isEmpty()) {
-            return;
-        }
-
-        $lignesMiroir = TransactionLigne::where('transaction_id', (int) $miroir->id)
-            ->whereNotNull('compte_id')
-            ->whereNotNull('tiers_id')
-            ->whereNull('lettrage_code')
-            ->get();
-
-        if ($lignesMiroir->isEmpty()) {
-            return;
-        }
-
-        $miroirRestantes = $lignesMiroir->values()->all();
-
-        foreach ($lignesOrigine as $lo) {
-            foreach ($miroirRestantes as $idx => $lm) {
-                if (
-                    (int) $lo->compte_id === (int) $lm->compte_id
-                    && (int) $lo->tiers_id === (int) $lm->tiers_id
-                    && bccomp((string) $lo->debit, (string) $lm->credit, 2) === 0
-                    && bccomp((string) $lo->credit, (string) $lm->debit, 2) === 0
-                ) {
-                    $this->lettrageService->lettrer(
-                        collect([$lo, $lm]),
-                        null,
-                        "Cross-lettrage extourne T#{$origine->id} → miroir T#{$miroir->id}"
-                    );
-                    unset($miroirRestantes[$idx]);
-                    break;
-                }
-            }
-        }
-    }
-
-    /**
      * Vérifie paranoïaquement que les lignes PD du miroir sont équilibrées (∑D = ∑C).
      */
     private function assertEquilibreMiroir(Transaction $miroir): void
@@ -240,26 +156,6 @@ final class TransactionExtourneService
         }
 
         app(EcritureGenerator::class)->assertEquilibre($lignesPD);
-    }
-
-    /**
-     * Crée le lettrage automatique : un RapprochementBancaire de type Lettrage
-     * directement Verrouillé (∑=0, solde inchangé).
-     */
-    private function creerLettrage(Transaction $origine, Transaction $miroir, ExtournePayload $payload): RapprochementBancaire
-    {
-        $solde = $this->soldeActuelCompte((int) $origine->compte_id);
-
-        return RapprochementBancaire::create([
-            'compte_id' => $origine->compte_id,
-            'date_fin' => $payload->date->toDateString(),
-            'solde_ouverture' => $solde,
-            'solde_fin' => $solde,
-            'statut' => StatutRapprochement::Verrouille,
-            'type' => TypeRapprochement::Lettrage,
-            'saisi_par' => (int) auth()->id(),
-            'verrouille_at' => now(),
-        ]);
     }
 
     /**
@@ -303,29 +199,4 @@ final class TransactionExtourneService
         }
     }
 
-    /**
-     * Délettre toutes les lignes de l'origine qui portent un lettrage_code non null.
-     */
-    private function autoDelettrerLignes(Transaction $origine): void
-    {
-        $motif = "Auto-délettrage suite à extourne de TX#{$origine->id}";
-        $this->lettrageService->autoDelettrerLignesDe($origine, $motif);
-    }
-
-    /**
-     * Solde courant du compte = solde_fin du dernier rapprochement bancaire
-     * verrouillé (type Bancaire), ou 0 si aucun.
-     */
-    private function soldeActuelCompte(int $compteId): float
-    {
-        $dernier = RapprochementBancaire::query()
-            ->where('compte_id', $compteId)
-            ->where('type', TypeRapprochement::Bancaire)
-            ->where('statut', StatutRapprochement::Verrouille)
-            ->orderByDesc('date_fin')
-            ->orderByDesc('id')
-            ->first();
-
-        return $dernier ? (float) $dernier->solde_fin : 0.0;
-    }
 }

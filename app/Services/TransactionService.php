@@ -540,24 +540,18 @@ final class TransactionService
             // 1. Nettoyage T2 (encaissement/règlement séparé) si elle existe
             $this->supprimerT2SiExiste($transaction);
 
-            // 2. Délettrage PD des lignes de la T1
-            $this->lettrageService->autoDelettrerLignesDe(
-                $transaction,
-                "Annulation TX#{$transaction->id} — {$motif}"
-            );
-
-            // 3. Supprimer la pièce jointe si présente
+            // 2. Supprimer la pièce jointe si présente
             if ($transaction->hasPieceJointe()) {
                 $this->deletePieceJointe($transaction);
             }
 
-            // 4. Soft-delete lignes
+            // 3. Soft-delete lignes
             $transaction->lignes()->each(function (TransactionLigne $ligne) {
                 $ligne->affectations()->delete();
                 $ligne->delete();
             });
 
-            // 5. Soft-delete TX avec traçabilité
+            // 4. Soft-delete TX avec traçabilité
             $transaction->forceFill([
                 'motif_suppression' => $motif,
                 'supprime_par' => auth()->id(),
@@ -574,8 +568,12 @@ final class TransactionService
     }
 
     /**
-     * Supprime la T2 (encaissement ou règlement séparé) liée à cette T1,
-     * avec délettrage PD préalable. No-op si pas de T2 ou encaissement lumpé.
+     * Supprime la T2 (encaissement ou règlement séparé) liée à cette T1.
+     * No-op si pas de T2 ou encaissement lumpé.
+     *
+     * Pas de délettrage : la T1 est soft-deleted et la T2 force-deleted,
+     * les deux disparaissent des rapports. Les lettrage_code orphelins
+     * sur les lignes supprimées sont inoffensifs.
      */
     private function supprimerT2SiExiste(Transaction $transaction): void
     {
@@ -591,13 +589,6 @@ final class TransactionService
             return;
         }
 
-        // Délettrer les lignes PD de la T2
-        foreach (TransactionLigne::where('transaction_id', (int) $t2->id)->whereNotNull('lettrage_code')->get() as $ligne) {
-            $this->lettrageService->delettrerParLigne(
-                $ligne->fresh(),
-                "Suppression T2 #{$t2->id} suite à annulation T1 #{$transaction->id}"
-            );
-        }
         TransactionLigne::where('transaction_id', (int) $t2->id)->forceDelete();
         $t2->forceDelete();
     }

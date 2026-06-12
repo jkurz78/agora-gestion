@@ -78,8 +78,8 @@ final class LettrageService
     /**
      * Délettre automatiquement toutes les lignes lettrées d'une transaction.
      *
-     * Pattern mutualisé (rule-of-three callers : TransactionExtourneService,
-     * TransactionService, TransactionConverter). Charge les lignes portant un
+     * Pattern mutualisé (callers : TransactionService update,
+     * TransactionConverter). Charge les lignes portant un
      * lettrage_code non null sur la transaction donnée, déduplique les codes,
      * et appelle delettrerParLigne pour chaque groupe distinct.
      *

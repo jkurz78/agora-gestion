@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\DataTransferObjects\ExtournePayload;
 use App\Enums\ModePaiement;
 use App\Enums\RoleAssociation;
-use App\Enums\StatutRapprochement;
 use App\Enums\StatutReglement;
 use App\Enums\TypeRapprochement;
 use App\Enums\TypeTransaction;
@@ -50,7 +49,7 @@ function enAttenteCreateRecette(CompteBancaire $compte, float $montant = 80.0): 
     return $tx;
 }
 
-test('extourner recette EnAttente — crée extourne + lettrage automatique', function (): void {
+test('extourner recette EnAttente — crée extourne sans lettrage automatique', function (): void {
     enAttenteActAsComptable();
     $compte = CompteBancaire::factory()->create();
     $origine = enAttenteCreateRecette($compte);
@@ -58,17 +57,14 @@ test('extourner recette EnAttente — crée extourne + lettrage automatique', fu
     $extourne = app(TransactionExtourneService::class)
         ->extourner($origine, ExtournePayload::fromOrigine($origine));
 
-    expect($extourne->rapprochement_lettrage_id)->not->toBeNull();
-    $lettrage = $extourne->lettrage;
+    // Pas de lettrage automatique (rapprochement_lettrage_id = null)
+    expect($extourne->rapprochement_lettrage_id)->toBeNull();
 
-    expect($lettrage)->toBeInstanceOf(RapprochementBancaire::class);
-    expect($lettrage->type)->toBe(TypeRapprochement::Lettrage);
-    expect($lettrage->statut)->toBe(StatutRapprochement::Verrouille);
-    expect($lettrage->compte_id)->toBe($compte->id);
-    expect((float) $lettrage->solde_ouverture)->toBe((float) $lettrage->solde_fin);
+    // Aucun rapprochement de type Lettrage créé
+    expect(RapprochementBancaire::where('type', TypeRapprochement::Lettrage)->count())->toBe(0);
 });
 
-test('lettrage met origine et extourne au statut Pointe', function (): void {
+test('origine et extourne passent au statut Pointe', function (): void {
     enAttenteActAsComptable();
     $compte = CompteBancaire::factory()->create();
     $origine = enAttenteCreateRecette($compte);
@@ -77,18 +73,15 @@ test('lettrage met origine et extourne au statut Pointe', function (): void {
         ->extourner($origine, ExtournePayload::fromOrigine($origine));
 
     $miroir = $extourne->extourne;
-    $lettrage = $extourne->lettrage;
 
     $origine->refresh();
     $miroir->refresh();
 
     expect($origine->statut_reglement)->toBe(StatutReglement::Pointe);
     expect($miroir->statut_reglement)->toBe(StatutReglement::Pointe);
-    expect($origine->rapprochement_id)->toBe($lettrage->id);
-    expect($miroir->rapprochement_id)->toBe($lettrage->id);
 });
 
-test('lettrage contient exactement 2 transactions appariées', function (): void {
+test('miroir est créé avec montant négatif et type_ecriture extourne', function (): void {
     enAttenteActAsComptable();
     $compte = CompteBancaire::factory()->create();
     $origine = enAttenteCreateRecette($compte);
@@ -96,40 +89,25 @@ test('lettrage contient exactement 2 transactions appariées', function (): void
     $extourne = app(TransactionExtourneService::class)
         ->extourner($origine, ExtournePayload::fromOrigine($origine));
 
-    $lettrage = $extourne->lettrage;
-    $txDansLettrage = $lettrage->transactions()->get();
-
-    expect($txDansLettrage)->toHaveCount(2);
-    $ids = $txDansLettrage->pluck('id')->all();
-    expect($ids)->toContain($origine->id);
-    expect($ids)->toContain($extourne->extourne->id);
+    $miroir = $extourne->extourne;
+    expect($miroir)->not->toBeNull();
+    expect((float) $miroir->montant_total)->toBe(-80.0);
+    expect($miroir->type_ecriture)->toBe('extourne');
 });
 
-test('solde_ouverture du lettrage est égal au solde du dernier rapprochement bancaire verrouillé', function (): void {
+test('origine porte extournee_at après extourne', function (): void {
     enAttenteActAsComptable();
     $compte = CompteBancaire::factory()->create();
-
-    // Rapprochement bancaire préalable verrouillé fixant solde 500 €
-    RapprochementBancaire::factory()->create([
-        'compte_id' => $compte->id,
-        'type' => TypeRapprochement::Bancaire,
-        'statut' => StatutRapprochement::Verrouille,
-        'verrouille_at' => now()->subDay(),
-        'solde_ouverture' => 0,
-        'solde_fin' => 500,
-        'date_fin' => now()->subDay()->toDateString(),
-    ]);
-
     $origine = enAttenteCreateRecette($compte);
 
-    $extourne = app(TransactionExtourneService::class)
+    app(TransactionExtourneService::class)
         ->extourner($origine, ExtournePayload::fromOrigine($origine));
 
-    expect((float) $extourne->lettrage->solde_ouverture)->toBe(500.0);
-    expect((float) $extourne->lettrage->solde_fin)->toBe(500.0);
+    $origine->refresh();
+    expect($origine->extournee_at)->not->toBeNull();
 });
 
-test('solde_ouverture du lettrage est 0 si aucun rapprochement bancaire préalable', function (): void {
+test('rapprochement_id reste null sur les deux transactions (pas de lettrage)', function (): void {
     enAttenteActAsComptable();
     $compte = CompteBancaire::factory()->create();
     $origine = enAttenteCreateRecette($compte);
@@ -137,18 +115,9 @@ test('solde_ouverture du lettrage est 0 si aucun rapprochement bancaire préalab
     $extourne = app(TransactionExtourneService::class)
         ->extourner($origine, ExtournePayload::fromOrigine($origine));
 
-    expect((float) $extourne->lettrage->solde_ouverture)->toBe(0.0);
-    expect((float) $extourne->lettrage->solde_fin)->toBe(0.0);
-});
+    $miroir = $extourne->extourne;
+    $origine->refresh();
 
-test('lettrage est créé directement Verrouille (pas de phase EnCours pour ce type)', function (): void {
-    enAttenteActAsComptable();
-    $compte = CompteBancaire::factory()->create();
-    $origine = enAttenteCreateRecette($compte);
-
-    $extourne = app(TransactionExtourneService::class)
-        ->extourner($origine, ExtournePayload::fromOrigine($origine));
-
-    expect($extourne->lettrage->statut)->toBe(StatutRapprochement::Verrouille);
-    expect($extourne->lettrage->verrouille_at)->not->toBeNull();
+    expect($origine->rapprochement_id)->toBeNull();
+    expect($miroir->rapprochement_id)->toBeNull();
 });

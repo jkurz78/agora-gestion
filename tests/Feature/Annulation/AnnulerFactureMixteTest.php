@@ -168,10 +168,9 @@ test('annulation facture mixte extourne MM uniquement et detache pivot ref', fun
     expect(Extourne::where('transaction_origine_id', $tg->id)->exists())->toBeTrue();
     expect(Extourne::where('transaction_origine_id', $tref->id)->exists())->toBeFalse();
 
-    // ── Lettrage automatique créé pour Tg (EnAttente → Pointe) ───────────────
+    // ── Pas de lettrage automatique (EnAttente → Pointe sans lettrage) ─────────
 
-    $lettrage = RapprochementBancaire::where('type', TypeRapprochement::Lettrage)->first();
-    expect($lettrage)->not->toBeNull();
+    expect(RapprochementBancaire::where('type', TypeRapprochement::Lettrage)->count())->toBe(0);
 
     $tgFrais = $tg->fresh();
     expect($tgFrais->extournee_at)->not->toBeNull();
