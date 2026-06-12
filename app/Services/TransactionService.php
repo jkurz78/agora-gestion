@@ -373,6 +373,13 @@ final class TransactionService
                         }
                     }
                 }
+                // Suppression T2 AVANT délettrage : trouverEncaissementT2/trouverReglementT2
+                // s'appuient sur le lettrage_code présent pour identifier la T2 associée.
+                // Si on délettre d'abord, la T2 devient introuvable et survive comme zombie.
+                // Fait ici pour les cas où mode_paiement reste non-null (montant ou mode change)
+                // — les cas mode→null sont gérés par annulerEncaissementSiReversion (ci-dessus).
+                $this->supprimerT2SiExiste($transaction);
+
                 // Auto-délettrage des lignes lettrées AVANT forceDelete (pattern Step 31 extourne).
                 // forceDelete() détruirait silencieusement toutes les lignes — y compris les 411
                 // lettrées — laissant le code de lettrage orphelin sur la ligne paire d'une autre
