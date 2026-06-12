@@ -750,9 +750,74 @@ it('[J] miroir PD est vérifié équilibré (assertEquilibre appelé)', function
         ->get();
 
     // Verify independently that lines are balanced
-    $ecritureGen = app(\App\Services\Compta\EcritureGenerator::class);
+    $ecritureGen = app(EcritureGenerator::class);
     $ecritureGen->assertEquilibre($lignesPD);
 
     expect(true)->toBeTrue();
 });
 
+// ---------------------------------------------------------------------------
+// Scénario L — Ventilation multi-lignes
+// ---------------------------------------------------------------------------
+
+it('[L] extourne recette multi-ventilation — N lignes PD inversées correctement', function () {
+    $compte707 = Compte::firstOrCreate(
+        ['association_id' => $this->association->id, 'numero_pcg' => '707'],
+        [
+            'intitule' => 'Ventes de marchandises',
+            'classe' => 7,
+            'lettrable' => false,
+            'actif' => true,
+            'est_systeme' => false,
+            'pour_inscriptions' => false,
+        ]
+    );
+
+    // T1 : 411 D=350 + 706 C=200 + 707 C=150
+    $t1 = $this->ecritureGen->pourRecetteACredit(
+        tiers: $this->tiers,
+        ventilations: [
+            ['compte' => $this->compte706, 'montant' => 200.0],
+            ['compte' => $compte707, 'montant' => 150.0],
+        ],
+        dateConstatation: new DateTimeImmutable('2025-10-01'),
+        libelle: 'Multi-ventilation',
+    );
+    $t1->update(['statut_reglement' => StatutReglement::Recu]);
+
+    $extourne = $this->service->extourner(
+        $t1->fresh(),
+        ExtournePayload::fromOrigine($t1->fresh(), ['mode_paiement' => ModePaiement::Cheque])
+    );
+    $miroir = $extourne->extourne;
+
+    $lignesPD = TransactionLigne::where('transaction_id', $miroir->id)
+        ->whereNotNull('compte_id')
+        ->get();
+
+    // 3 lignes PD : 411 C=350 + 706 D=200 + 707 D=150
+    expect($lignesPD)->toHaveCount(3);
+
+    $totalDebit = $lignesPD->sum(fn ($l) => (float) $l->debit);
+    $totalCredit = $lignesPD->sum(fn ($l) => (float) $l->credit);
+    expect(bccomp((string) $totalDebit, (string) $totalCredit, 2))->toBe(0);
+
+    // 706 inversée
+    $l706 = $lignesPD->firstWhere('compte_id', (int) $this->compte706->id);
+    expect((float) $l706->debit)->toBe(200.0);
+    expect((float) $l706->credit)->toBe(0.0);
+
+    // 707 inversée
+    $l707 = $lignesPD->firstWhere('compte_id', (int) $compte707->id);
+    expect((float) $l707->debit)->toBe(150.0);
+    expect((float) $l707->credit)->toBe(0.0);
+
+    // 411 inversée
+    $compte411 = compteSysteme('411');
+    $l411 = $lignesPD->firstWhere('compte_id', (int) $compte411->id);
+    expect((float) $l411->debit)->toBe(0.0);
+    expect((float) $l411->credit)->toBe(350.0);
+
+    // Cross-lettrage 411
+    expect($l411->lettrage_code)->not->toBeNull('Miroir 411 doit être cross-lettré');
+});
