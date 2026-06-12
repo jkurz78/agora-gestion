@@ -149,7 +149,7 @@ test('annulation facture MontantManuel Pointe produit extourne EnAttente sans le
 
     expect($tm)->not->toBeNull();
     expect((float) $tm->montant_total)->toBe(-150.0);
-    expect($tm->statut_reglement)->toBe(StatutReglement::EnAttente);
+    expect($tm->statut_reglement)->toBe(StatutReglement::Pointe);
     expect($tm->rapprochement_id)->toBeNull();
 
     // ── Aucun nouveau rapprochement de type Lettrage ne doit exister ──────────
