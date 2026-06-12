@@ -4,10 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Compta;
 
-use App\Enums\Sens;
 use App\Enums\StatutReglement;
-use App\Enums\TypeTransaction;
-use App\Models\Compte;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\ReglementOperationService;
@@ -34,31 +31,18 @@ final class EtatReglementResolver
 
     public function resolve(Transaction $t1): StatutReglement
     {
-        // Short-circuit : transaction extournée ou extourne (contra-entry) → terminal.
-        // Empêche le syncer() de ré-écraser le statut avec un état dérivé incohérent.
-        if ($t1->extournee_at !== null || $t1->type_ecriture === 'extourne') {
+        // Short-circuit : transaction extournée (origine marquée) → terminal.
+        // Les miroirs extourne (type_ecriture='extourne') ne sont plus court-circuités :
+        // ceux qui sont EnAttente (dette de remboursement) doivent être dérivés normalement.
+        if ($t1->extournee_at !== null) {
             return StatutReglement::Pointe;
         }
 
-        $sens = match ($t1->type) {
-            TypeTransaction::Recette => Sens::Recette,
-            TypeTransaction::Depense => Sens::Depense,
-            default => null,
-        };
-
-        if ($sens === null) {
-            return $t1->statut_reglement; // type hors recette/dépense → inchangé
-        }
-
-        $numeroTiers = $sens === Sens::Recette ? '411' : '401';
-        $compteTiers = Compte::ofNumero($numeroTiers);
-
-        if ($compteTiers === null) {
-            return $t1->statut_reglement; // tenant sans schéma PD
-        }
-
+        // Recherche directe de la ligne tiers (411 ou 401) — agnostique au type.
+        // Fonctionne pour recettes normales (411 D), dépenses normales (401 C),
+        // et miroirs extourne (411 C ou 401 D — inversés).
         $ligneTiers = TransactionLigne::where('transaction_id', (int) $t1->id)
-            ->where('compte_id', (int) $compteTiers->id)
+            ->whereHas('compte', fn ($q) => $q->whereIn('numero_pcg', ['411', '401']))
             ->first();
 
         if ($ligneTiers === null) {
@@ -73,6 +57,14 @@ final class EtatReglementResolver
         // Lettré → localiser la transaction qui porte la trésorerie.
         // T2 séparée si elle existe, sinon la T1 elle-même (encaissement lumpé).
         $t2 = $this->reglementService->trouverT2($t1);
+
+        // Guard cancellation pair : si le « T2 » trouvé est en fait l'origine extournée
+        // (tiers cross-lettré par ExtourneService), c'est une annulation comptable pure → Pointé.
+        // Sans cette garde, le resolver suivrait la chaîne vers l'origine qui n'a pas de classe 5
+        // et conclurait incorrectement « Recu » (abandon de créance).
+        if ($t2 !== null && $t2->extournee_at !== null) {
+            return StatutReglement::Pointe;
+        }
 
         $txPortage = $t2 ?? $t1;
 
