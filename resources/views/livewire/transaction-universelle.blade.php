@@ -579,11 +579,15 @@
                         {{ number_format(abs((float)$tx->montant), 2, ',', ' ') }} €
                     </td>
                     <td>
-                        @if($isExtourneOrigine || $isExtourneMiroir)
-                            {{-- TX annulée ou contra-entry : pas de badge statut (le badge "annulée" suffit) --}}
+                        @if($isExtourneOrigine || ($isExtourneMiroir && $statutReglement === 'pointe'))
+                            {{-- TX annulée ou miroir extourne terminal (pointé) : pas de badge statut --}}
                         @elseif($statutReglement !== null)
                             @php
-                                $isDepense = $tx->source_type === 'depense';
+                                // sensTresorerie: les miroirs d'extourne inversent la direction naturelle
+                                $sensTresorerie = $isExtourneMiroir
+                                    ? ($tx->source_type === 'recette' ? 'depense' : 'recette')
+                                    : $tx->source_type;
+                                $isDepense = $sensTresorerie === 'depense';
                                 [$sBadge, $sLabel] = match($statutReglement) {
                                     'en_attente' => ['warning text-dark', 'Dû'],
                                     'en_main'    => ['warning text-dark', 'À remettre'],
@@ -641,13 +645,20 @@
                             @endif
                             {{-- Bouton Marquer reçu / payé (en_attente non verrouillé) --}}
                             @if(! $exerciceCloture && $statutReglement === 'en_attente' && in_array($tx->source_type, ['recette', 'depense'], true))
+                                @php
+                                    // $sensTresorerie est déjà calculé dans le bloc badge ci-dessus (même scope @foreach).
+                                    // Si le badge a été sauté (isExtourneOrigine), on recalcule ici pour sécurité.
+                                    $sensTreso = $isExtourneMiroir
+                                        ? ($tx->source_type === 'recette' ? 'depense' : 'recette')
+                                        : $tx->source_type;
+                                @endphp
                                 <button type="button"
                                         wire:click="marquerRecu({{ $tx->id }})"
                                         class="btn btn-sm btn-outline-success"
                                         style="padding:.15rem .3rem;font-size:.7rem"
-                                        title="{{ $tx->source_type === 'depense' ? 'Marquer comme payé' : ($tx->mode_paiement === null ? 'Enregistrer l\'encaissement (choisir le mode)' : 'Marquer comme reçu') }}">
+                                        title="{{ $sensTreso === 'depense' ? 'Marquer comme payé' : ($tx->mode_paiement === null ? 'Enregistrer l\'encaissement (choisir le mode)' : 'Marquer comme reçu') }}">
                                     <i class="bi bi-check-lg"></i>
-                                    @if($tx->source_type === 'recette' && $tx->mode_paiement === null)
+                                    @if($sensTreso === 'recette' && $tx->mode_paiement === null)
                                         <i class="bi bi-credit-card ms-1" style="font-size:.65rem" title="Créance — mode à saisir"></i>
                                     @endif
                                 </button>

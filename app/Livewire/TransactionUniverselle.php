@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\ModePaiement;
+use App\Enums\Sens;
 use App\Enums\StatutReglement;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Livewire\Concerns\WithPerPage;
@@ -366,7 +367,8 @@ final class TransactionUniverselle extends Component
         }
 
         // Dépense en attente → modale « Marquer payé »
-        if ($tx->type->value === 'depense') {
+        // (utiliser sensTresorerie() pour les miroirs d'extourne qui ont sens inversé)
+        if ($tx->sensTresorerie() === Sens::Depense) {
             $this->payeTxId = (int) $tx->id;
             $this->payeMode = '';
             $this->payeCompteId = null;
