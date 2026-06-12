@@ -52,15 +52,26 @@ final class TransactionExtourneService
         $this->assertExtournable($origine);
 
         return DB::transaction(function () use ($origine, $payload): Extourne {
-            // Auto-délettrage des lignes lettrées de l'origine AVANT création du miroir.
-            $this->autoDelettrerLignes($origine);
+            $isCreanceOuverte = $origine->statut_reglement === StatutReglement::EnAttente;
+
+            if ($isCreanceOuverte) {
+                // Créance non encaissée : délettrer pour permettre le lettrage rapprochement.
+                $this->autoDelettrerLignes($origine);
+            }
+            // Remis/Pointé : ne PAS toucher aux lettrages existants.
+            // L'encaissement (T1↔T2) et la remise (T2↔T4) sont réels et doivent rester intacts.
+            // Le 411 du miroir reste ouvert = dette de remboursement envers le tiers.
 
             $miroir = $this->creerTransactionMiroir($origine, $payload);
             $this->copierLignesInversees($origine, $miroir);
             $this->assertEquilibreMiroir($miroir);
 
-            // Cross-lettrage PD des lignes tiers (411/401) entre origine et miroir
-            $this->crossLettrerLignesTiers($origine, $miroir);
+            if ($isCreanceOuverte) {
+                // Créance : cross-lettrage 411 entre origine et miroir (∑=0).
+                $this->crossLettrerLignesTiers($origine, $miroir);
+            }
+            // Remis/Pointé : pas de cross-lettrage. Le 411C du miroir reste ouvert
+            // jusqu'au remboursement effectif (virement/chèque → 411D lettré avec le 411C miroir).
 
             $lettrageId = null;
             if ($origine->statut_reglement === StatutReglement::EnAttente) {
