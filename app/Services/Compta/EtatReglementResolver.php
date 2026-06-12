@@ -34,6 +34,12 @@ final class EtatReglementResolver
 
     public function resolve(Transaction $t1): StatutReglement
     {
+        // Short-circuit : transaction extournée ou extourne (contra-entry) → terminal.
+        // Empêche le syncer() de ré-écraser le statut avec un état dérivé incohérent.
+        if ($t1->extournee_at !== null || $t1->type_ecriture === 'extourne') {
+            return StatutReglement::Pointe;
+        }
+
         $sens = match ($t1->type) {
             TypeTransaction::Recette => Sens::Recette,
             TypeTransaction::Depense => Sens::Depense,

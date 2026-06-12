@@ -118,7 +118,7 @@ test('Gestionnaire — submit ne crée pas d extourne (AuthorizationException re
     Livewire::test(AnnulerTransactionModal::class)
         ->call('open', $origine->id)
         ->call('submit')
-        ->assertDispatched('extourne:error');
+        ->assertSet('errorMessage', fn ($v) => $v !== null);
 
     expect(Extourne::query()->count())->toBe(0);
 });
@@ -157,5 +157,5 @@ test('open avec transaction non extournable affiche message d erreur', function 
     Livewire::test(AnnulerTransactionModal::class)
         ->call('open', $origine->id)
         ->assertSet('isOpen', false)
-        ->assertDispatched('extourne:error');
+        ->assertSet('errorMessage', 'Cette transaction ne peut pas être annulée.');
 });

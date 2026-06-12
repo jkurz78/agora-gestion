@@ -28,6 +28,8 @@ final class AnnulerTransactionModal extends Component
 
     public ?string $notes = null;
 
+    public ?string $errorMessage = null;
+
     /**
      * Cas d'usage :
      *   $wire.dispatch('extourne:open', { id: 42 })
@@ -36,15 +38,17 @@ final class AnnulerTransactionModal extends Component
     #[On('extourne:open')]
     public function open(int $id): void
     {
+        $this->errorMessage = null;
+
         $tx = Transaction::find($id);
         if ($tx === null) {
-            $this->dispatch('extourne:error', message: 'Transaction introuvable.');
+            $this->errorMessage = 'Transaction introuvable.';
 
             return;
         }
 
         if (! $tx->isExtournable()) {
-            $this->dispatch('extourne:error', message: 'Cette transaction ne peut pas être annulée.');
+            $this->errorMessage = 'Cette transaction ne peut pas être annulée.';
 
             return;
         }
@@ -70,9 +74,11 @@ final class AnnulerTransactionModal extends Component
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
 
+        $this->errorMessage = null;
+
         $tx = Transaction::find($this->transactionId);
         if ($tx === null) {
-            $this->dispatch('extourne:error', message: 'Transaction introuvable.');
+            $this->errorMessage = 'Transaction introuvable.';
             $this->reset(['isOpen', 'transactionId']);
 
             return;
@@ -85,8 +91,8 @@ final class AnnulerTransactionModal extends Component
                 'mode_paiement' => ModePaiement::from($this->modePaiement),
                 'notes' => $this->notes,
             ]));
-        } catch (AuthorizationException|RuntimeException $e) {
-            $this->dispatch('extourne:error', message: $e->getMessage());
+        } catch (AuthorizationException|RuntimeException|\DomainException $e) {
+            $this->errorMessage = $e->getMessage();
 
             return;
         }
@@ -97,7 +103,7 @@ final class AnnulerTransactionModal extends Component
 
     public function close(): void
     {
-        $this->reset(['isOpen', 'transactionId', 'libelle', 'date', 'modePaiement', 'notes']);
+        $this->reset(['isOpen', 'transactionId', 'libelle', 'date', 'modePaiement', 'notes', 'errorMessage']);
     }
 
     public function render(): View

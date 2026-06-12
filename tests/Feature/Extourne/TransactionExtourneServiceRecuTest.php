@@ -63,14 +63,14 @@ test('extourner recette Recu — crée une extourne EnAttente sans lettrage', fu
     $miroir = $extourne->extourne;
     expect($miroir->type)->toBe(TypeTransaction::Recette);
     expect((float) $miroir->montant_total)->toBe(-80.0);
-    expect($miroir->statut_reglement)->toBe(StatutReglement::EnAttente);
+    expect($miroir->statut_reglement)->toBe(StatutReglement::Pointe);
     expect($miroir->date->isToday())->toBeTrue();
     expect($miroir->libelle)->toBe('Annulation - Cotisation Mr Dupont mars');
     expect($miroir->mode_paiement)->toBe(ModePaiement::Cheque);
     expect($miroir->rapprochement_id)->toBeNull();
 
     $origine->refresh();
-    expect($origine->statut_reglement)->toBe(StatutReglement::Recu);
+    expect($origine->statut_reglement)->toBe(StatutReglement::Pointe);
     expect($origine->extournee_at)->not->toBeNull();
 });
 
@@ -86,7 +86,7 @@ test('extourner recette Pointe verrouillée — crée une extourne EnAttente san
     $extourne = app(TransactionExtourneService::class)->extourner($origine, $payload);
 
     expect($extourne->rapprochement_lettrage_id)->toBeNull();
-    expect($extourne->extourne->statut_reglement)->toBe(StatutReglement::EnAttente);
+    expect($extourne->extourne->statut_reglement)->toBe(StatutReglement::Pointe);
 
     $origine->refresh();
     expect($origine->statut_reglement)->toBe(StatutReglement::Pointe);

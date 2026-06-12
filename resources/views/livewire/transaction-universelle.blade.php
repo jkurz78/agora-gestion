@@ -579,7 +579,9 @@
                         {{ number_format(abs((float)$tx->montant), 2, ',', ' ') }} €
                     </td>
                     <td>
-                        @if($statutReglement !== null)
+                        @if($isExtourneOrigine || $isExtourneMiroir)
+                            {{-- TX annulée ou contra-entry : pas de badge statut (le badge "annulée" suffit) --}}
+                        @elseif($statutReglement !== null)
                             @php
                                 $isDepense = $tx->source_type === 'depense';
                                 [$sBadge, $sLabel] = match($statutReglement) {

@@ -12,6 +12,13 @@
                                 wire:click="close"></button>
                     </div>
                     <div class="modal-body">
+                        @if($errorMessage)
+                            <div class="alert alert-danger mb-3" role="alert">
+                                <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                                {{ $errorMessage }}
+                            </div>
+                        @endif
+
                         <div class="alert alert-warning mb-3" role="alert">
                             Cette opération crée une transaction d'extourne (montant négatif) qui annule comptablement la transaction
                             d'origine. La transaction d'origine est conservée intacte. Action réservée aux comptables et administrateurs.

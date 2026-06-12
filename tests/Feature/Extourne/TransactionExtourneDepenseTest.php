@@ -62,11 +62,11 @@ test('extourner dépense Recu — crée extourne EnAttente sans lettrage', funct
     $miroir = $extourne->extourne;
     expect($miroir->type)->toBe(TypeTransaction::Depense);
     expect((float) $miroir->montant_total)->toBe(-80.0);
-    expect($miroir->statut_reglement)->toBe(StatutReglement::EnAttente);
+    expect($miroir->statut_reglement)->toBe(StatutReglement::Pointe);
     expect($miroir->libelle)->toBe('Annulation - Achat fournitures Mr Fournisseur');
 
     $origine->refresh();
-    expect($origine->statut_reglement)->toBe(StatutReglement::Recu);
+    expect($origine->statut_reglement)->toBe(StatutReglement::Pointe);
     expect($origine->extournee_at)->not->toBeNull();
 });
 
@@ -106,7 +106,7 @@ test('extourner dépense Pointe verrouillée — crée extourne EnAttente sans l
         ->extourner($origine->fresh(), ExtournePayload::fromOrigine($origine->fresh()));
 
     expect($extourne->rapprochement_lettrage_id)->toBeNull();
-    expect($extourne->extourne->statut_reglement)->toBe(StatutReglement::EnAttente);
+    expect($extourne->extourne->statut_reglement)->toBe(StatutReglement::Pointe);
 
     $origine->refresh();
     expect($origine->statut_reglement)->toBe(StatutReglement::Pointe);

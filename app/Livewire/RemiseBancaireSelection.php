@@ -145,6 +145,8 @@ final class RemiseBancaireSelection extends Component
         return Transaction::where('type', TypeTransaction::Recette->value)
             ->operationnel()
             ->where('mode_paiement', $this->remise->mode_paiement->value)
+            ->whereNull('extournee_at')
+            ->where('type_ecriture', '!=', 'extourne')
             ->whereIn('statut_reglement', [
                 StatutReglement::EnMain->value,
                 StatutReglement::Recu->value,

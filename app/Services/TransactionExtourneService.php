@@ -93,7 +93,23 @@ final class TransactionExtourneService
                 'created_by' => (int) auth()->id(),
             ]);
 
-            $origine->forceFill(['extournee_at' => now()])->save();
+            // Statuts terminaux : toutes les transactions impliquées → Pointe.
+            // Ceci empêche les TX extournées d'apparaître dans les listes de candidats
+            // (remise, encaissement, rapprochement) et reste cohérent avec le short-circuit
+            // du EtatReglementResolver qui renvoie Pointe pour extournee_at/type_ecriture=extourne.
+            $origine->forceFill([
+                'extournee_at' => now(),
+                'statut_reglement' => StatutReglement::Pointe,
+            ])->save();
+
+            $miroir->forceFill(['statut_reglement' => StatutReglement::Pointe])->save();
+
+            foreach ($t2sCascadables as $t2) {
+                $t2->forceFill(['statut_reglement' => StatutReglement::Pointe])->save();
+            }
+            foreach ($miroirsT2 as $miroirT2) {
+                $miroirT2->forceFill(['statut_reglement' => StatutReglement::Pointe])->save();
+            }
 
             Log::info('Extourne — transaction extournée', [
                 'association_id' => TenantContext::currentId(),

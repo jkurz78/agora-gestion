@@ -53,12 +53,12 @@ test('extourne EnAttente cas Recu — n apparaît pas dans Créances à recevoir
     $compte = CompteBancaire::factory()->create();
     $origine = creancesCreateRecette(StatutReglement::Recu, $compte);
 
-    // Crée l'extourne — naît EnAttente sans lettrage
+    // Crée l'extourne — statut terminal Pointe
     $extourne = app(TransactionExtourneService::class)
         ->extourner($origine, ExtournePayload::fromOrigine($origine));
 
     $miroir = $extourne->extourne;
-    expect($miroir->statut_reglement)->toBe(StatutReglement::EnAttente);
+    expect($miroir->statut_reglement)->toBe(StatutReglement::Pointe);
     expect((float) $miroir->montant_total)->toBe(-80.0);
 
     $service = app(TransactionUniverselleService::class);
