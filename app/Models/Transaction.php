@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\JournalComptable;
 use App\Enums\ModePaiement;
+use App\Enums\Sens;
 use App\Enums\StatutFacture;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
@@ -164,6 +165,27 @@ final class Transaction extends TenantModel
         $montant = (float) $this->montant_total;
 
         return $this->type === TypeTransaction::Depense ? -$montant : $montant;
+    }
+
+    /**
+     * Retourne le sens de trésorerie réel de la transaction.
+     *
+     * Pour les transactions normales, le sens suit le type :
+     *   Recette → Sens::Recette, Dépense → Sens::Depense.
+     *
+     * Pour les miroirs d'extourne (type_ecriture = 'extourne'), le sens est inversé :
+     *   une recette extournée est un remboursement (argent sort) → Sens::Depense
+     *   une dépense extournée est un remboursement (argent entre) → Sens::Recette
+     */
+    public function sensTresorerie(): Sens
+    {
+        $sensNaturel = $this->type === TypeTransaction::Recette
+            ? Sens::Recette
+            : Sens::Depense;
+
+        return $this->type_ecriture === 'extourne'
+            ? ($sensNaturel === Sens::Recette ? Sens::Depense : Sens::Recette)
+            : $sensNaturel;
     }
 
     public function isLockedByRapprochement(): bool
