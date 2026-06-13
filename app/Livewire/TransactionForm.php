@@ -7,6 +7,7 @@ namespace App\Livewire;
 use App\DTOs\InvoiceOcrResult;
 use App\Enums\Espace;
 use App\Enums\ModePaiement;
+use App\Enums\Sens;
 use App\Enums\RoleAssociation;
 use App\Enums\StatutFactureDeposee;
 use App\Enums\StatutOperation;
@@ -82,6 +83,16 @@ final class TransactionForm extends Component
 
     public bool $isLockedByHelloAsso = false;
 
+    /** Transaction miroir d'extourne — verrouille les champs comptables. */
+    public bool $isExtourneMiroir = false;
+
+    /**
+     * Sens de trésorerie pour l'affichage IHM (« depense » ou « recette »).
+     * Différent de $type pour les miroirs d'extourne (recette → depense et vice-versa).
+     * La logique comptable (filtre sous-catégories, save, validation) reste sur $type.
+     */
+    public string $sensLabel = '';
+
     public ?string $sousCategorieFilter = null;
 
     /** @var TemporaryUploadedFile|null */
@@ -144,6 +155,8 @@ final class TransactionForm extends Component
             'ocrMode', 'ocrWaitingForFile', 'ocrAnalyzing', 'ocrError', 'ocrWarnings', 'ocrTiersNom',
             'incomingDocumentId', 'factureDeposeeId', 'incomingDocumentPreviewUrl', 'linkedNdf']);
         $this->type = $type;
+        $this->sensLabel = $type;
+        $this->isExtourneMiroir = false;
         $this->isLocked = false;
         $this->isLockedByHelloAsso = false;
         $this->resetValidation();
@@ -460,6 +473,15 @@ final class TransactionForm extends Component
         $this->isLocked = $transaction->isLockedByRapprochement() || $transaction->isLockedByRemise();
         $this->isLockedByFacture = $transaction->isLockedByFacture();
         $this->isLockedByHelloAsso = $transaction->helloasso_order_id !== null;
+
+        // Miroir d'extourne : le sens de trésorerie est inversé par rapport au type comptable.
+        // $type reste le type réel (recette/depense) pour le filtrage sous-catégories 6xx/7xx.
+        // $sensLabel reflète le sens du flux d'argent pour l'IHM.
+        $this->isExtourneMiroir = $transaction->type_ecriture === 'extourne';
+        $this->sensLabel = $this->isExtourneMiroir
+            ? ($transaction->sensTresorerie() === Sens::Depense ? 'depense' : 'recette')
+            : $this->type;
+
         $this->showForm = true;
     }
 
@@ -467,7 +489,7 @@ final class TransactionForm extends Component
     {
         $this->reset([
             'transactionId', 'type', 'date', 'libelle', 'mode_paiement', 'paiementRecu',
-            'tiers_id', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked', 'isLockedByFacture', 'isLockedByHelloAsso',
+            'tiers_id', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked', 'isLockedByFacture', 'isLockedByHelloAsso', 'isExtourneMiroir', 'sensLabel',
             'ventilationLigneId', 'ventilationLigneSousCategorie', 'ventilationLigneMontant', 'affectations',
             'ventilationHasAffectations',
             'pieceJointe', 'existingPieceJointeNom', 'existingPieceJointeUrl',

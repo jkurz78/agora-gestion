@@ -16,11 +16,11 @@
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
                     @if($exerciceCloture)
-                        Visualiser {{ $formEntityLabel ? ($formEntityLabel === 'cotisation' || $formEntityLabel === 'inscription' ? 'la ' : 'le ') . $formEntityLabel : ($type === 'depense' ? 'la dépense' : 'la recette') }}
+                        Visualiser {{ $formEntityLabel ? ($formEntityLabel === 'cotisation' || $formEntityLabel === 'inscription' ? 'la ' : 'le ') . $formEntityLabel : ($sensLabel === 'depense' ? 'la dépense' : 'la recette') }}
                     @elseif($formEntityLabel)
                         {{ $transactionId ? 'Modifier le ' : ($formEntityLabel === 'cotisation' || $formEntityLabel === 'inscription' ? 'Nouvelle ' : 'Nouveau ') }}{{ $formEntityLabel }}
                     @else
-                        {{ $transactionId ? 'Modifier la ' : 'Nouvelle ' }}{{ $type === 'depense' ? 'dépense' : 'recette' }}
+                        {{ $transactionId ? 'Modifier la ' : 'Nouvelle ' }}{{ $sensLabel === 'depense' ? 'dépense' : 'recette' }}
                     @endif
                 </h5>
                 <button wire:click="resetForm" class="btn btn-sm btn-outline-secondary">
@@ -94,15 +94,26 @@
 
                 @if(!$sousCategorieFilter)
                 <div class="mb-3">
-                    @if ($type === 'depense')
+                    @if ($sensLabel === 'depense')
                         <span class="badge bg-danger fs-6">Dépense</span>
+                        @if ($isExtourneMiroir)
+                            <span class="badge bg-secondary fs-6 ms-1">Remboursement (extourne)</span>
+                        @endif
                     @else
                         <span class="badge bg-success fs-6">Recette</span>
+                        @if ($isExtourneMiroir)
+                            <span class="badge bg-secondary fs-6 ms-1">Remboursement (extourne)</span>
+                        @endif
                     @endif
                 </div>
                 @endif
 
                 <form wire:submit="save">
+                    @if ($isExtourneMiroir)
+                        <div class="alert alert-info small py-2 mb-3">
+                            <i class="bi bi-arrow-repeat"></i> Transaction de remboursement — les montants et catégories sont figés. Vous pouvez renseigner le mode de paiement, le compte bancaire et la date.
+                        </div>
+                    @endif
                     @if ($isLocked && $isLockedByFacture)
                         <div class="alert alert-warning small py-2 mb-3">
                             <i class="bi bi-lock"></i> Cette transaction est verrouillée (rapprochement/remise + facture). Seuls le libellé et les notes peuvent être modifiés.
@@ -146,9 +157,9 @@
                         <div class="col-md-2">
                             <label class="form-label">
                                 Tiers
-                                @if ($isLockedByHelloAsso) <i class="bi bi-lock text-warning" title="Champ verrouillé"></i> @endif
+                                @if ($isLockedByHelloAsso || $isExtourneMiroir) <i class="bi bi-lock text-warning" title="Champ verrouillé"></i> @endif
                             </label>
-                            @if ($isLockedByHelloAsso)
+                            @if ($isLockedByHelloAsso || $isExtourneMiroir)
                                 <input type="text" value="{{ \App\Models\Tiers::find($tiers_id)?->displayName() ?? '—' }}"
                                        class="form-control bg-light" disabled>
                             @else
@@ -159,7 +170,7 @@
                         @if ($type === 'recette' || $type === 'depense')
                         <div class="col-md-2">
                             <label class="form-label">
-                                @if ($type === 'depense')
+                                @if ($sensLabel === 'depense')
                                     Paiement effectué ?
                                 @else
                                     Paiement déjà reçu ?
@@ -284,7 +295,7 @@
                     </div>
 
                     {{-- Lignes section --}}
-                    <h6 class="mb-2">Lignes de {{ $formEntityLabel ?? ($type === 'depense' ? 'dépense' : 'recette') }}</h6>
+                    <h6 class="mb-2">Lignes de {{ $formEntityLabel ?? ($sensLabel === 'depense' ? 'dépense' : 'recette') }}</h6>
                     @error('lignes')
                         <div class="alert alert-danger py-2">{{ $message }}</div>
                     @enderror
@@ -305,7 +316,7 @@
                                 @forelse ($lignes as $index => $ligne)
                                     <tr wire:key="ligne-{{ $index }}">
                                         <td style="min-width:220px">
-                                            @if ($isLockedByFacture)
+                                            @if ($isLockedByFacture || $isExtourneMiroir)
                                                 @php $sc = \App\Models\SousCategorie::find($ligne['sous_categorie_id']); @endphp
                                                 <span class="form-control-plaintext">{{ $sc?->nom ?? '—' }}</span>
                                             @else
@@ -323,7 +334,7 @@
                                         <td>
                                             <select wire:model.live="lignes.{{ $index }}.operation_id"
                                                     class="form-select form-select-sm"
-                                                    {{ $exerciceCloture || $isLockedByFacture ? 'disabled' : '' }}>
+                                                    {{ $exerciceCloture || $isLockedByFacture || $isExtourneMiroir ? 'disabled' : '' }}>
                                                 <option value="">-- Aucune --</option>
                                                 @foreach ($operations->groupBy(fn ($op) => $op->typeOperation?->nom ?? 'Sans type') as $typeName => $ops)
                                                     <optgroup label="{{ $typeName }}">
@@ -342,7 +353,7 @@
                                             @if ($nbSeances)
                                                 <select wire:model="lignes.{{ $index }}.seance"
                                                         class="form-select form-select-sm"
-                                                        {{ $exerciceCloture || $isLockedByFacture ? 'disabled' : '' }}>
+                                                        {{ $exerciceCloture || $isLockedByFacture || $isExtourneMiroir ? 'disabled' : '' }}>
                                                     <option value="">--</option>
                                                     @for ($s = 1; $s <= $nbSeances; $s++)
                                                         <option value="{{ $s }}">{{ $s }}</option>
@@ -351,7 +362,7 @@
                                             @endif
                                         </td>
                                         <td>
-                                            @if ($isLocked || $isLockedByFacture || $isLockedByHelloAsso)
+                                            @if ($isLocked || $isLockedByFacture || $isLockedByHelloAsso || $isExtourneMiroir)
                                                 <span class="form-control-plaintext">{{ number_format((float) ($ligne['montant'] ?? 0), 2, ',', ' ') }} €</span>
                                             @else
                                                 <input type="number" wire:model.live="lignes.{{ $index }}.montant"
@@ -438,7 +449,7 @@
                                             @error("lignes.{$index}.piece_jointe_upload") <div class="text-danger small">{{ $message }}</div> @enderror
                                         </td>
                                         <td class="text-center">
-                                            @if (! $isLocked && ! $isLockedByFacture && ! $isLockedByHelloAsso && ! $exerciceCloture)
+                                            @if (! $isLocked && ! $isLockedByFacture && ! $isLockedByHelloAsso && ! $isExtourneMiroir && ! $exerciceCloture)
                                                 <button type="button" wire:click="removeLigne({{ $index }})"
                                                         class="btn btn-sm btn-outline-danger">
                                                     <i class="bi bi-trash"></i>
@@ -568,7 +579,7 @@
                     @endif
 
                     <div class="d-flex gap-2">
-                        @if (! $isLocked && ! $isLockedByFacture && ! $isLockedByHelloAsso && ! $exerciceCloture && $this->canEdit)
+                        @if (! $isLocked && ! $isLockedByFacture && ! $isLockedByHelloAsso && ! $isExtourneMiroir && ! $exerciceCloture && $this->canEdit)
                             <button type="button" wire:click="addLigne" class="btn btn-sm btn-outline-secondary">
                                 <i class="bi bi-plus-lg"></i> Ajouter une ligne
                             </button>
