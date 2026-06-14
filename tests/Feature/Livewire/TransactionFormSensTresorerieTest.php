@@ -1,0 +1,85 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Enums\Sens;
+use App\Livewire\TransactionForm;
+use App\Models\Association;
+use App\Models\CompteBancaire;
+use App\Models\Transaction;
+use App\Models\User;
+use App\Tenant\TenantContext;
+use Livewire\Livewire;
+
+uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+beforeEach(function () {
+    $this->association = Association::factory()->create();
+    $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
+    $this->actingAs($this->user);
+
+    $this->compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
+});
+
+afterEach(fn () => TenantContext::clear());
+
+test('showNewForm recette pose sensTresorerie = recette', function () {
+    $component = Livewire::test(TransactionForm::class)
+        ->call('showNewForm', 'recette');
+
+    expect($component->get('sensTresorerie'))->toBe('recette');
+});
+
+test('showNewForm depense pose sensTresorerie = depense', function () {
+    $component = Livewire::test(TransactionForm::class)
+        ->call('showNewForm', 'depense');
+
+    expect($component->get('sensTresorerie'))->toBe('depense');
+});
+
+test('edit recette normale pose sensTresorerie = recette', function () {
+    $tx = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
+        'type_ecriture' => 'normale',
+        'compte_id' => $this->compte->id,
+    ]);
+
+    $component = Livewire::test(TransactionForm::class)
+        ->call('edit', $tx->id);
+
+    expect($component->get('sensTresorerie'))->toBe('recette');
+    expect($component->get('type'))->toBe('recette');
+});
+
+test('edit miroir extourne de recette pose sensTresorerie = depense', function () {
+    $tx = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
+        'type_ecriture' => 'extourne',
+        'compte_id' => $this->compte->id,
+    ]);
+
+    $component = Livewire::test(TransactionForm::class)
+        ->call('edit', $tx->id);
+
+    expect($component->get('sensTresorerie'))->toBe('depense');
+    expect($component->get('type'))->toBe('recette');
+    expect($component->get('isExtourneMiroir'))->toBeTrue();
+});
+
+test('edit miroir extourne de depense pose sensTresorerie = recette', function () {
+    $tx = Transaction::factory()->asDepense()->create([
+        'association_id' => $this->association->id,
+        'type_ecriture' => 'extourne',
+        'compte_id' => $this->compte->id,
+    ]);
+
+    $component = Livewire::test(TransactionForm::class)
+        ->call('edit', $tx->id);
+
+    expect($component->get('sensTresorerie'))->toBe('recette');
+    expect($component->get('type'))->toBe('depense');
+    expect($component->get('isExtourneMiroir'))->toBeTrue();
+});

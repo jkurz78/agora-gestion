@@ -91,7 +91,7 @@ final class TransactionForm extends Component
      * Différent de $type pour les miroirs d'extourne (recette → depense et vice-versa).
      * La logique comptable (filtre sous-catégories, save, validation) reste sur $type.
      */
-    public string $sensLabel = '';
+    public string $sensTresorerie = '';
 
     public ?string $sousCategorieFilter = null;
 
@@ -155,7 +155,7 @@ final class TransactionForm extends Component
             'ocrMode', 'ocrWaitingForFile', 'ocrAnalyzing', 'ocrError', 'ocrWarnings', 'ocrTiersNom',
             'incomingDocumentId', 'factureDeposeeId', 'incomingDocumentPreviewUrl', 'linkedNdf']);
         $this->type = $type;
-        $this->sensLabel = $type;
+        $this->sensTresorerie = $type;
         $this->isExtourneMiroir = false;
         $this->isLocked = false;
         $this->isLockedByHelloAsso = false;
@@ -476,9 +476,9 @@ final class TransactionForm extends Component
 
         // Miroir d'extourne : le sens de trésorerie est inversé par rapport au type comptable.
         // $type reste le type réel (recette/depense) pour le filtrage sous-catégories 6xx/7xx.
-        // $sensLabel reflète le sens du flux d'argent pour l'IHM.
+        // $sensTresorerie reflète le sens du flux d'argent pour l'IHM.
         $this->isExtourneMiroir = $transaction->type_ecriture === 'extourne';
-        $this->sensLabel = $this->isExtourneMiroir
+        $this->sensTresorerie = $this->isExtourneMiroir
             ? ($transaction->sensTresorerie() === Sens::Depense ? 'depense' : 'recette')
             : $this->type;
 
@@ -489,7 +489,7 @@ final class TransactionForm extends Component
     {
         $this->reset([
             'transactionId', 'type', 'date', 'libelle', 'mode_paiement', 'paiementRecu',
-            'tiers_id', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked', 'isLockedByFacture', 'isLockedByHelloAsso', 'isExtourneMiroir', 'sensLabel',
+            'tiers_id', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked', 'isLockedByFacture', 'isLockedByHelloAsso', 'isExtourneMiroir', 'sensTresorerie',
             'ventilationLigneId', 'ventilationLigneSousCategorie', 'ventilationLigneMontant', 'affectations',
             'ventilationHasAffectations',
             'pieceJointe', 'existingPieceJointeNom', 'existingPieceJointeUrl',

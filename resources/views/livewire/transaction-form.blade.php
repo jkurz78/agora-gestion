@@ -16,11 +16,11 @@
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
                     @if($exerciceCloture)
-                        Visualiser {{ $formEntityLabel ? ($formEntityLabel === 'cotisation' || $formEntityLabel === 'inscription' ? 'la ' : 'le ') . $formEntityLabel : ($sensLabel === 'depense' ? 'la dépense' : 'la recette') }}
+                        Visualiser {{ $formEntityLabel ? ($formEntityLabel === 'cotisation' || $formEntityLabel === 'inscription' ? 'la ' : 'le ') . $formEntityLabel : ($sensTresorerie === 'depense' ? 'la dépense' : 'la recette') }}
                     @elseif($formEntityLabel)
                         {{ $transactionId ? 'Modifier le ' : ($formEntityLabel === 'cotisation' || $formEntityLabel === 'inscription' ? 'Nouvelle ' : 'Nouveau ') }}{{ $formEntityLabel }}
                     @else
-                        {{ $transactionId ? 'Modifier la ' : 'Nouvelle ' }}{{ $sensLabel === 'depense' ? 'dépense' : 'recette' }}
+                        {{ $transactionId ? 'Modifier la ' : 'Nouvelle ' }}{{ $sensTresorerie === 'depense' ? 'dépense' : 'recette' }}
                     @endif
                 </h5>
                 <button wire:click="resetForm" class="btn btn-sm btn-outline-secondary">
@@ -94,7 +94,7 @@
 
                 @if(!$sousCategorieFilter)
                 <div class="mb-3">
-                    @if ($sensLabel === 'depense')
+                    @if ($sensTresorerie === 'depense')
                         <span class="badge bg-danger fs-6">Dépense</span>
                         @if ($isExtourneMiroir)
                             <span class="badge bg-secondary fs-6 ms-1">Remboursement (extourne)</span>
@@ -170,7 +170,7 @@
                         @if ($type === 'recette' || $type === 'depense')
                         <div class="col-md-2">
                             <label class="form-label">
-                                @if ($sensLabel === 'depense')
+                                @if ($sensTresorerie === 'depense')
                                     Paiement effectué ?
                                 @else
                                     Paiement déjà reçu ?
@@ -295,7 +295,7 @@
                     </div>
 
                     {{-- Lignes section --}}
-                    <h6 class="mb-2">Lignes de {{ $formEntityLabel ?? ($sensLabel === 'depense' ? 'dépense' : 'recette') }}</h6>
+                    <h6 class="mb-2">Lignes de {{ $formEntityLabel ?? ($sensTresorerie === 'depense' ? 'dépense' : 'recette') }}</h6>
                     @error('lignes')
                         <div class="alert alert-danger py-2">{{ $message }}</div>
                     @enderror
