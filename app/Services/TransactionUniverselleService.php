@@ -141,7 +141,8 @@ final class TransactionUniverselleService
                  NULL as mode_paiement, 0 as montant, NULL as pointe,
                  NULL as statut_reglement, NULL as remise_id, NULL as rapprochement_id,
                  NULL as notes, NULL as piece_jointe_path, NULL as piece_jointe_nom, 0 as is_helloasso,
-                 NULL as extournee_at, 0 as is_extourne_miroir, NULL as reglement_id, 0 as is_locked_by_facture"
+                 NULL as extournee_at, 0 as is_extourne_miroir, NULL as reglement_id, 0 as is_locked_by_facture,
+                 'depense' as sens_tresorerie"
             );
         }
 
@@ -193,7 +194,8 @@ final class TransactionUniverselleService
                 tx.extournee_at,
                 EXISTS(SELECT 1 FROM extournes e WHERE e.transaction_extourne_id = tx.id AND e.deleted_at IS NULL) as is_extourne_miroir,
                 tx.reglement_id,
-                EXISTS(SELECT 1 FROM facture_transaction ft JOIN factures f ON f.id = ft.facture_id WHERE ft.transaction_id = tx.id AND f.statut = 'validee') as is_locked_by_facture
+                EXISTS(SELECT 1 FROM facture_transaction ft JOIN factures f ON f.id = ft.facture_id WHERE ft.transaction_id = tx.id AND f.statut = 'validee') as is_locked_by_facture,
+                CASE WHEN tx.type_ecriture = 'extourne' THEN 'recette' ELSE 'depense' END AS sens_tresorerie
             ")
             ->where('tx.type', 'depense')
             ->whereIn('tx.journal', ['vente', 'achat'])
@@ -258,7 +260,8 @@ final class TransactionUniverselleService
                 tx.extournee_at,
                 EXISTS(SELECT 1 FROM extournes e WHERE e.transaction_extourne_id = tx.id AND e.deleted_at IS NULL) as is_extourne_miroir,
                 tx.reglement_id,
-                EXISTS(SELECT 1 FROM facture_transaction ft JOIN factures f ON f.id = ft.facture_id WHERE ft.transaction_id = tx.id AND f.statut = 'validee') as is_locked_by_facture
+                EXISTS(SELECT 1 FROM facture_transaction ft JOIN factures f ON f.id = ft.facture_id WHERE ft.transaction_id = tx.id AND f.statut = 'validee') as is_locked_by_facture,
+                CASE WHEN tx.type_ecriture = 'extourne' THEN 'depense' ELSE 'recette' END AS sens_tresorerie
             ")
             ->where('tx.type', 'recette')
             ->whereIn('tx.journal', ['vente', 'achat', 'od'])
@@ -319,7 +322,8 @@ final class TransactionUniverselleService
                 NULL as extournee_at,
                 0 as is_extourne_miroir,
                 NULL as reglement_id,
-                0 as is_locked_by_facture
+                0 as is_locked_by_facture,
+                'virement' AS sens_tresorerie
             ")
             ->whereNull('vi.deleted_at')
             ->when(TenantContext::hasBooted(), fn ($q) => $q->where('vi.association_id', TenantContext::currentId()))
@@ -365,7 +369,8 @@ final class TransactionUniverselleService
                 NULL as extournee_at,
                 0 as is_extourne_miroir,
                 NULL as reglement_id,
-                0 as is_locked_by_facture
+                0 as is_locked_by_facture,
+                'virement' AS sens_tresorerie
             ")
             ->whereNull('vi.deleted_at')
             ->when(TenantContext::hasBooted(), fn ($q) => $q->where('vi.association_id', TenantContext::currentId()))

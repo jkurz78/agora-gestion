@@ -486,9 +486,10 @@
                     $key = $tx->source_type . ':' . $tx->id;
                     $isExpanded = isset($expandedDetails[$key]);
                     $detail = $expandedDetails[$key] ?? null;
-                    [$badgeClass, $badgeLabel] = match($tx->source_type) {
+                    [$badgeClass, $badgeLabel] = match($tx->sens_tresorerie ?? $tx->source_type) {
                         'depense'              => ['danger',    'DÉP'],
                         'recette'              => ['success',   'REC'],
+                        'virement',
                         'virement_sortant',
                         'virement_entrant'     => ['warning',   'VIR'],
                         default                => ['secondary', '?'],
