@@ -10,7 +10,6 @@ use App\Models\User;
 use App\Services\IncomingDocuments\IncomingDocumentFile;
 use App\Services\IncomingDocuments\IncomingDocumentIngester;
 use App\Tenant\TenantContext;
-use DateTimeImmutable;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
@@ -43,7 +42,7 @@ it('ingest() place le fichier sous associations/{aid}/incoming-documents/{filena
         senderEmail: 'sender@test.fr',
         recipientEmail: 'recipient@assoc.fr',
         subject: 'Facture mars',
-        receivedAt: new DateTimeImmutable,
+        receivedAt: new \DateTimeImmutable,
         sourceMessageId: null,
     );
 
@@ -74,7 +73,7 @@ it('storage_path en DB contient uniquement le nom court (pas de préfixe de chem
         senderEmail: 'a@b.fr',
         recipientEmail: null,
         subject: null,
-        receivedAt: new DateTimeImmutable,
+        receivedAt: new \DateTimeImmutable,
         sourceMessageId: null,
     );
 

@@ -530,7 +530,7 @@ final class RemiseBancaireService
 
             // Si non trouvée sur la source, chercher sur le T2 séparé (cas en_attente)
             if ($lignePortage === null) {
-                $t2 = $this->reglementService->trouverEncaissementT2($tx);
+                $t2 = $this->reglementService->trouverT2($tx);
 
                 if ($t2 !== null) {
                     $lignePortage = TransactionLigne::where('transaction_id', $t2->id)

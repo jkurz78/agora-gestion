@@ -606,15 +606,13 @@
                     @endif
                     <td>
                         <div class="d-flex gap-1 align-items-center" @click.stop>
-                            @if(! $isExtourneMiroir)
                             <button type="button"
                                     wire:click="openEdit('{{ e($tx->source_type) }}', {{ $tx->id }})"
                                     class="btn btn-sm btn-outline-primary"
                                     style="padding:.15rem .3rem;font-size:.7rem"
-                                    title="{{ $exerciceCloture ? 'Visualiser' : 'Modifier' }}">
-                                <i class="bi bi-{{ $exerciceCloture ? 'eye' : 'pencil' }}"></i>
+                                    title="{{ $isExtourneMiroir || $exerciceCloture ? 'Visualiser' : 'Modifier' }}">
+                                <i class="bi bi-{{ $isExtourneMiroir || $exerciceCloture ? 'eye' : 'pencil' }}"></i>
                             </button>
-                            @endif
                             @php
                                 // Mutex poubelle/annuler — Slice 1 amendement :
                                 //   - Tx supprimable « safely » : EnAttente sans aucun attachement banque/règlement/remise/facture
