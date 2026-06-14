@@ -13,6 +13,7 @@ use App\Enums\TypeTransaction;
 use App\Traits\TenantStorage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -108,6 +109,33 @@ final class Transaction extends TenantModel
             JournalComptable::Vente->value,
             JournalComptable::Achat->value,
         ]);
+    }
+
+    /**
+     * Ajoute une colonne virtuelle `sens_tresorerie_sql` dérivée des lignes D/C
+     * sur les comptes de trésorerie (classe 5, numero_pcg LIKE '512_*').
+     * Si D > C → recette ; si C > D → depense. Fallback sur `transactions.type`
+     * pour les écritures sans lignes partie double.
+     *
+     * @param  Builder<Transaction>  $query
+     */
+    public function scopeSensTresorerieSql(Builder $query): Builder
+    {
+        return $query->addSelect(DB::raw("
+            COALESCE(
+                (SELECT CASE
+                    WHEN SUM(tl_st.debit) > SUM(tl_st.credit) THEN 'recette'
+                    WHEN SUM(tl_st.credit) > SUM(tl_st.debit) THEN 'depense'
+                    ELSE NULL
+                END
+                FROM transaction_lignes tl_st
+                INNER JOIN comptes c_st ON c_st.id = tl_st.compte_id
+                WHERE tl_st.transaction_id = transactions.id
+                  AND c_st.classe = 5
+                  AND c_st.numero_pcg LIKE '512!_%' ESCAPE '!'),
+                transactions.type
+            ) AS sens_tresorerie_sql
+        "));
     }
 
     public function tiers(): BelongsTo
