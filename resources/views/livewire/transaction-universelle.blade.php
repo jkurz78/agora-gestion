@@ -584,11 +584,7 @@
                             {{-- TX annulée ou miroir extourne terminal (pointé) : pas de badge statut --}}
                         @elseif($statutReglement !== null)
                             @php
-                                // sensTresorerie: les miroirs d'extourne inversent la direction naturelle
-                                $sensTresorerie = $isExtourneMiroir
-                                    ? ($tx->source_type === 'recette' ? 'depense' : 'recette')
-                                    : $tx->source_type;
-                                $isDepense = $sensTresorerie === 'depense';
+                                $isDepense = ($tx->sens_tresorerie ?? $tx->source_type) === 'depense';
                                 [$sBadge, $sLabel] = match($statutReglement) {
                                     'en_attente' => ['warning text-dark', 'Dû'],
                                     'en_main'    => ['warning text-dark', 'À remettre'],
@@ -649,11 +645,7 @@
                             {{-- Bouton Marquer reçu / payé (en_attente non verrouillé) --}}
                             @if(! $exerciceCloture && $statutReglement === 'en_attente' && in_array($tx->source_type, ['recette', 'depense'], true))
                                 @php
-                                    // $sensTresorerie est déjà calculé dans le bloc badge ci-dessus (même scope @foreach).
-                                    // Si le badge a été sauté (isExtourneOrigine), on recalcule ici pour sécurité.
-                                    $sensTreso = $isExtourneMiroir
-                                        ? ($tx->source_type === 'recette' ? 'depense' : 'recette')
-                                        : $tx->source_type;
+                                    $sensTreso = $tx->sens_tresorerie ?? $tx->source_type;
                                 @endphp
                                 <button type="button"
                                         wire:click="marquerRecu({{ $tx->id }})"
