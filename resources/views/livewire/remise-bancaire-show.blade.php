@@ -104,7 +104,7 @@
                                     —
                                 @endif
                             </td>
-                            <td class="text-end small fw-semibold text-nowrap">{{ number_format((float) $transaction->montant_total, 2, ',', "\u{00A0}") }}&nbsp;€</td>
+                            <td class="text-end small fw-semibold text-nowrap">{{ number_format(abs((float) $transaction->montant_total), 2, ',', "\u{00A0}") }}&nbsp;€</td>
                         </tr>
                     @endforeach
                 </tbody>

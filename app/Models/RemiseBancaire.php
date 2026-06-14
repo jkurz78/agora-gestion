@@ -9,6 +9,7 @@ use App\Enums\StatutReglement;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 
 final class RemiseBancaire extends TenantModel
 {
@@ -73,6 +74,6 @@ final class RemiseBancaire extends TenantModel
 
     public function montantTotal(): float
     {
-        return (float) $this->transactions()->operationnel()->sum('montant_total');
+        return (float) $this->transactions()->operationnel()->sum(DB::raw('ABS(montant_total)'));
     }
 }

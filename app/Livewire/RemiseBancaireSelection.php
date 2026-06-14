@@ -125,7 +125,7 @@ final class RemiseBancaireSelection extends Component
 
         $totalSelected = (float) $allTransactions
             ->whereIn('id', $this->selectedTransactionIds)
-            ->sum('montant_total');
+            ->sum(fn ($tx) => abs((float) $tx->montant_total));
 
         $countSelected = count($this->selectedTransactionIds);
 

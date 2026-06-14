@@ -103,8 +103,8 @@
                                     <span class="badge bg-warning text-dark">{{ $tx->statut_reglement->label(\App\Enums\Sens::Recette) }}</span>
                                 @endif
                             </td>
-                            <td class="text-end small fw-semibold text-nowrap" data-sort="{{ $tx->montant_total }}">
-                                {{ number_format((float) $tx->montant_total, 2, ',', "\u{00A0}") }}&nbsp;€
+                            <td class="text-end small fw-semibold text-nowrap" data-sort="{{ abs((float) $tx->montant_total) }}">
+                                {{ number_format(abs((float) $tx->montant_total), 2, ',', "\u{00A0}") }}&nbsp;€
                             </td>
                         </tr>
                     @endforeach

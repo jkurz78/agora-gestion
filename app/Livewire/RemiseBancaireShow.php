@@ -80,7 +80,7 @@ final class RemiseBancaireShow extends Component
             ->orderBy('reference')
             ->get();
 
-        $totalMontant = $transactions->sum('montant_total');
+        $totalMontant = $transactions->sum(fn (Transaction $tx): float => abs((float) $tx->montant_total));
 
         return view('livewire.remise-bancaire-show', [
             'transactions' => $transactions,
