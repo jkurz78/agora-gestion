@@ -234,7 +234,7 @@
                             </div>
                         </div>
                         {{-- En mode OCR : PJ sur la même ligne que Montant total --}}
-                        @if ($ocrMode && $type === 'depense' && ! $exerciceCloture)
+                        @if ($ocrMode && ! $exerciceCloture)
                         <div class="col-md-3">
                             <label class="form-label"><i class="bi bi-paperclip"></i> Justificatif</label>
                             @if ($pieceJointe)
@@ -251,7 +251,7 @@
                         </div>
 
                         {{-- Pièce jointe (dépenses uniquement, hors OCR mode qui l'affiche au-dessus) --}}
-                        @if ($type === 'depense' && ! $exerciceCloture && ! $ocrMode)
+                        @if (! $exerciceCloture && ! $ocrMode)
                         <div class="col-12">
                             <label class="form-label"><i class="bi bi-paperclip"></i> Justificatif</label>
 

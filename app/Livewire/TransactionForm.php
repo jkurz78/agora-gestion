@@ -580,7 +580,7 @@ final class TransactionForm extends Component
             )
         );
 
-        if ($this->pieceJointe !== null && $this->type === 'depense') {
+        if ($this->pieceJointe !== null) {
             $this->validate([
                 'pieceJointe' => ['file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
             ], [
@@ -690,7 +690,7 @@ final class TransactionForm extends Component
         }
 
         // Sauvegarder la pièce jointe si uploadée
-        if ($this->pieceJointe !== null && $this->type === 'depense') {
+        if ($this->pieceJointe !== null) {
             $tx = $createdTransaction ?? Transaction::find($this->transactionId);
             if ($tx) {
                 $service->storePieceJointe($tx, $this->pieceJointe);
@@ -698,7 +698,7 @@ final class TransactionForm extends Component
         }
 
         // Sauvegarder depuis un IncomingDocument (flux inbox)
-        if ($this->incomingDocumentId !== null && $this->type === 'depense') {
+        if ($this->incomingDocumentId !== null) {
             $tx = $createdTransaction ?? Transaction::find($this->transactionId);
             if ($tx !== null) {
                 $this->finalizeIncomingDocumentCleanup($tx, $service);
@@ -706,7 +706,7 @@ final class TransactionForm extends Component
         }
 
         // Sauvegarder depuis un FacturePartenaireDeposee (flux portail back-office)
-        if ($this->factureDeposeeId !== null && $this->type === 'depense') {
+        if ($this->factureDeposeeId !== null) {
             $tx = $createdTransaction ?? Transaction::find($this->transactionId);
             if ($tx !== null) {
                 try {
