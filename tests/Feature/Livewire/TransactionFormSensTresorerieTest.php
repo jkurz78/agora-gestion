@@ -83,3 +83,57 @@ test('edit miroir extourne de depense pose sensTresorerie = recette', function (
     expect($component->get('type'))->toBe('depense');
     expect($component->get('isExtourneMiroir'))->toBeTrue();
 });
+
+test('blade affiche badge Dépense pour miroir extourne de recette', function () {
+    $tx = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
+        'type_ecriture' => 'extourne',
+        'compte_id' => $this->compte->id,
+    ]);
+
+    $component = Livewire::test(TransactionForm::class)
+        ->call('edit', $tx->id);
+
+    $component->assertSee('Dépense')
+        ->assertSee('Remboursement (extourne)')
+        ->assertSeeHtml('badge bg-danger');
+});
+
+test('blade affiche badge Recette pour miroir extourne de dépense', function () {
+    $tx = Transaction::factory()->asDepense()->create([
+        'association_id' => $this->association->id,
+        'type_ecriture' => 'extourne',
+        'compte_id' => $this->compte->id,
+    ]);
+
+    $component = Livewire::test(TransactionForm::class)
+        ->call('edit', $tx->id);
+
+    $component->assertSee('Recette')
+        ->assertSee('Remboursement (extourne)')
+        ->assertSeeHtml('badge bg-success');
+});
+
+test('blade affiche "Paiement effectué ?" pour miroir extourne de recette (sens=depense)', function () {
+    $tx = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
+        'type_ecriture' => 'extourne',
+        'compte_id' => $this->compte->id,
+    ]);
+
+    Livewire::test(TransactionForm::class)
+        ->call('edit', $tx->id)
+        ->assertSee('Paiement effectué');
+});
+
+test('blade affiche "Paiement déjà reçu ?" pour miroir extourne de dépense (sens=recette)', function () {
+    $tx = Transaction::factory()->asDepense()->create([
+        'association_id' => $this->association->id,
+        'type_ecriture' => 'extourne',
+        'compte_id' => $this->compte->id,
+    ]);
+
+    Livewire::test(TransactionForm::class)
+        ->call('edit', $tx->id)
+        ->assertSee('Paiement déjà reçu');
+});
