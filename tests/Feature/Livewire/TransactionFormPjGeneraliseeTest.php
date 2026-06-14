@@ -53,3 +53,19 @@ test('une recette accepte une PJ header au save', function () {
     $tx = Transaction::latest()->first();
     expect($tx->piece_jointe_path)->not->toBeNull();
 });
+
+test('le filtre tiers ne restreint plus par type — un tiers depenses-only est proposé en saisie recette', function () {
+    $tiers = \App\Models\Tiers::factory()->create([
+        'association_id' => $this->association->id,
+        'nom' => 'Fournisseur Unique',
+        'pour_depenses' => true,
+        'pour_recettes' => false,
+    ]);
+
+    $component = Livewire::test(TransactionForm::class)
+        ->call('showNewForm', 'recette');
+
+    $html = $component->html();
+    expect($html)->not->toContain('filtre="recettes"');
+    expect($html)->not->toContain('filtre="depenses"');
+});

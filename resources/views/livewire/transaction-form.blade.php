@@ -163,7 +163,7 @@
                                 <input type="text" value="{{ \App\Models\Tiers::find($tiers_id)?->displayName() ?? '—' }}"
                                        class="form-control bg-light" disabled>
                             @else
-                                <livewire:tiers-autocomplete wire:model="tiers_id" filtre="{{ $type === 'depense' ? 'depenses' : 'recettes' }}" :defaultSearch="$ocrTiersNom ?? ''" :key="'transaction-tiers-'.($transactionId ?? 'new').'-'.($tiers_id ?? '0').'-'.($ocrTiersNom ?? '')" />
+                                <livewire:tiers-autocomplete wire:model="tiers_id" filtre="tous" :defaultSearch="$ocrTiersNom ?? ''" :key="'transaction-tiers-'.($transactionId ?? 'new').'-'.($tiers_id ?? '0').'-'.($ocrTiersNom ?? '')" />
                             @endif
                             @error('tiers_id') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                         </div>
