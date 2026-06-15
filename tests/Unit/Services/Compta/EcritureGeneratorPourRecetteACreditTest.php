@@ -30,12 +30,12 @@ function compte706Credit(string $suffix = ''): Compte
 {
     return Compte::create([
         'association_id' => TenantContext::currentId(),
-        'numero_pcg'     => '706c'.$suffix,
-        'intitule'       => 'Cotisations et adhésions (crédit) '.$suffix,
-        'classe'         => 7,
-        'lettrable'      => false,
-        'actif'          => true,
-        'est_systeme'    => false,
+        'numero_pcg' => '706c'.$suffix,
+        'intitule' => 'Cotisations et adhésions (crédit) '.$suffix,
+        'classe' => 7,
+        'lettrable' => false,
+        'actif' => true,
+        'est_systeme' => false,
         'pour_inscriptions' => false,
     ]);
 }
@@ -202,12 +202,12 @@ test('pourRecetteACredit lève CompteIncorrectException si compte ventilation cl
 
     $compteClasse6 = Compte::create([
         'association_id' => TenantContext::currentId(),
-        'numero_pcg'     => '606c',
-        'intitule'       => 'Achats (classe 6)',
-        'classe'         => 6,
-        'lettrable'      => false,
-        'actif'          => true,
-        'est_systeme'    => false,
+        'numero_pcg' => '606c',
+        'intitule' => 'Achats (classe 6)',
+        'classe' => 6,
+        'lettrable' => false,
+        'actif' => true,
+        'est_systeme' => false,
         'pour_inscriptions' => false,
     ]);
 

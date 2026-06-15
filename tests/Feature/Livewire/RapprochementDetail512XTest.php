@@ -18,6 +18,7 @@ declare(strict_types=1);
 
 use App\Enums\ModePaiement;
 use App\Enums\StatutRapprochement;
+use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Livewire\RapprochementDetail;
 use App\Models\Association;
@@ -436,4 +437,207 @@ it('[512X-5] écriture portant 512X-B (autre compte) est exclue de la liste rapp
 
     $found = $rows->contains(fn ($r) => (int) $r['id'] === (int) $txCrossCompte->id);
     expect($found)->toBeFalse('Une écriture portant uniquement une ligne sur 512X-B ne doit PAS apparaître dans le rappro du compte A (mode PD) — le filtre doit utiliser le 512X strict du compte');
+});
+
+// ---------------------------------------------------------------------------
+// Cas 6 — T2 de règlement (sans compte_id header, avec ligne 512X) : doit apparaître
+// ---------------------------------------------------------------------------
+
+it('[512X-6] T2 règlement sans compte_id header mais avec ligne 512X-A est listée (mode PD)', function () {
+    $compte401 = Compte::where('numero_pcg', '401')
+        ->where('association_id', TenantContext::currentId())
+        ->firstOrFail();
+
+    // T2 de règlement : pas de compte_id header (comme créée par pourReglement historique)
+    $t2 = Transaction::factory()->create([
+        'association_id' => TenantContext::currentId(),
+        'type' => TypeTransaction::Depense,
+        'mode_paiement' => ModePaiement::Virement,
+        'montant_total' => 500.00,
+        'compte_id' => null,
+        'equilibree' => true,
+        'date' => '2026-07-18',
+        'libelle' => 'Règlement fournisseur #99',
+        'saisi_par' => $this->user->id,
+        'journal' => 'banque',
+    ]);
+    // 401 D (solde dette)
+    TransactionLigne::create([
+        'transaction_id' => $t2->id,
+        'compte_id' => $compte401->id,
+        'debit' => 500.00,
+        'credit' => 0,
+        'tiers_id' => $this->tiers->id,
+        'libelle' => 'Règlement',
+        'montant' => 0,
+        'sous_categorie_id' => null,
+    ]);
+    // 512X C (décaissement bancaire)
+    TransactionLigne::create([
+        'transaction_id' => $t2->id,
+        'compte_id' => $this->compte512X->id,
+        'debit' => 0,
+        'credit' => 500.00,
+        'libelle' => 'Règlement',
+        'montant' => 0,
+        'tiers_id' => null,
+        'sous_categorie_id' => null,
+    ]);
+
+    $component = Livewire::test(RapprochementDetail::class, ['rapprochement' => $this->rapprochement]);
+    $rows = collect($component->viewData('transactions'));
+
+    $found = $rows->contains(fn ($r) => (int) $r['id'] === (int) $t2->id);
+    expect($found)->toBeTrue('Une T2 de règlement portant une ligne 512X-A doit apparaître même sans compte_id header (mode PD)');
+});
+
+// ---------------------------------------------------------------------------
+// Cas 7 — Virement en attente (pas de 512X) : doit apparaître via compte_id
+// ---------------------------------------------------------------------------
+
+it('[512X-7] recette virement en_attente sans 512X est listée via compte_id (mode PD)', function () {
+    $compte411 = Compte::where('numero_pcg', '411')
+        ->where('association_id', TenantContext::currentId())
+        ->firstOrFail();
+
+    $txVirementEnAttente = Transaction::factory()->create([
+        'association_id' => TenantContext::currentId(),
+        'type' => TypeTransaction::Recette,
+        'mode_paiement' => ModePaiement::Virement,
+        'montant_total' => 250.00,
+        'compte_id' => $this->compteBancaire->id,
+        'equilibree' => true,
+        'date' => '2026-07-14',
+        'libelle' => 'Virement en attente',
+        'saisi_par' => $this->user->id,
+        'statut_reglement' => StatutReglement::EnAttente,
+    ]);
+    // 411 D (créance ouverte — pas de 512X)
+    TransactionLigne::create([
+        'transaction_id' => $txVirementEnAttente->id,
+        'compte_id' => $compte411->id,
+        'debit' => 250.00,
+        'credit' => 0,
+        'tiers_id' => $this->tiers->id,
+        'libelle' => 'Virement en attente',
+        'montant' => 0,
+        'sous_categorie_id' => null,
+    ]);
+    // 706 C (produit)
+    TransactionLigne::create([
+        'transaction_id' => $txVirementEnAttente->id,
+        'compte_id' => $this->compte706->id,
+        'debit' => 0,
+        'credit' => 250.00,
+        'libelle' => 'Virement en attente',
+        'montant' => 0,
+        'tiers_id' => null,
+        'sous_categorie_id' => null,
+    ]);
+
+    $component = Livewire::test(RapprochementDetail::class, ['rapprochement' => $this->rapprochement]);
+    $rows = collect($component->viewData('transactions'));
+
+    $found = $rows->contains(fn ($r) => (int) $r['id'] === (int) $txVirementEnAttente->id);
+    expect($found)->toBeTrue('Un virement en attente (sans 512X, statut=en_attente) doit apparaître dans le rappro via compte_id');
+});
+
+// ---------------------------------------------------------------------------
+// Cas 8 — Chèque en attente (pas de 512X) : NE doit PAS apparaître (besoin remise)
+// ---------------------------------------------------------------------------
+
+it('[512X-8] chèque en_attente sans 512X reste exclu du rappro (mode PD)', function () {
+    $compte411 = Compte::where('numero_pcg', '411')
+        ->where('association_id', TenantContext::currentId())
+        ->firstOrFail();
+
+    $txChequeEnAttente = Transaction::factory()->create([
+        'association_id' => TenantContext::currentId(),
+        'type' => TypeTransaction::Recette,
+        'mode_paiement' => ModePaiement::Cheque,
+        'montant_total' => 175.00,
+        'compte_id' => $this->compteBancaire->id,
+        'equilibree' => true,
+        'date' => '2026-07-11',
+        'libelle' => 'Chèque en attente de remise',
+        'saisi_par' => $this->user->id,
+        'statut_reglement' => StatutReglement::EnAttente,
+    ]);
+    TransactionLigne::create([
+        'transaction_id' => $txChequeEnAttente->id,
+        'compte_id' => $compte411->id,
+        'debit' => 175.00,
+        'credit' => 0,
+        'tiers_id' => $this->tiers->id,
+        'libelle' => 'Chèque en attente',
+        'montant' => 0,
+        'sous_categorie_id' => null,
+    ]);
+    TransactionLigne::create([
+        'transaction_id' => $txChequeEnAttente->id,
+        'compte_id' => $this->compte706->id,
+        'debit' => 0,
+        'credit' => 175.00,
+        'libelle' => 'Chèque en attente',
+        'montant' => 0,
+        'tiers_id' => null,
+        'sous_categorie_id' => null,
+    ]);
+
+    $component = Livewire::test(RapprochementDetail::class, ['rapprochement' => $this->rapprochement]);
+    $rows = collect($component->viewData('transactions'));
+
+    $found = $rows->contains(fn ($r) => (int) $r['id'] === (int) $txChequeEnAttente->id);
+    expect($found)->toBeFalse('Un chèque en attente (sans remise) ne doit PAS apparaître — il doit passer par une remise bancaire');
+});
+
+// ---------------------------------------------------------------------------
+// Cas 9 — Dépense virement en attente (pas de 512X) : doit apparaître
+// ---------------------------------------------------------------------------
+
+it('[512X-9] dépense virement en_attente sans 512X est listée via compte_id (mode PD)', function () {
+    $compte401 = Compte::where('numero_pcg', '401')
+        ->where('association_id', TenantContext::currentId())
+        ->firstOrFail();
+
+    $txDepEnAttente = Transaction::factory()->create([
+        'association_id' => TenantContext::currentId(),
+        'type' => TypeTransaction::Depense,
+        'mode_paiement' => ModePaiement::Virement,
+        'montant_total' => 320.00,
+        'compte_id' => $this->compteBancaire->id,
+        'equilibree' => true,
+        'date' => '2026-07-16',
+        'libelle' => 'Facture fournisseur virement',
+        'saisi_par' => $this->user->id,
+        'statut_reglement' => StatutReglement::EnAttente,
+    ]);
+    // 601 D (charge)
+    TransactionLigne::create([
+        'transaction_id' => $txDepEnAttente->id,
+        'compte_id' => $this->compte601->id,
+        'debit' => 320.00,
+        'credit' => 0,
+        'libelle' => 'Dépense virement en attente',
+        'montant' => 0,
+        'tiers_id' => null,
+        'sous_categorie_id' => null,
+    ]);
+    // 401 C (dette ouverte)
+    TransactionLigne::create([
+        'transaction_id' => $txDepEnAttente->id,
+        'compte_id' => $compte401->id,
+        'debit' => 0,
+        'credit' => 320.00,
+        'tiers_id' => $this->tiers->id,
+        'libelle' => 'Dépense virement en attente',
+        'montant' => 0,
+        'sous_categorie_id' => null,
+    ]);
+
+    $component = Livewire::test(RapprochementDetail::class, ['rapprochement' => $this->rapprochement]);
+    $rows = collect($component->viewData('transactions'));
+
+    $found = $rows->contains(fn ($r) => (int) $r['id'] === (int) $txDepEnAttente->id);
+    expect($found)->toBeTrue('Une dépense virement en attente (sans 512X) doit apparaître dans le rappro via compte_id');
 });

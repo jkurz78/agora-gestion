@@ -242,7 +242,15 @@ final class RapprochementBancaireService
                 'depense', 'recette' => Transaction::findOrFail($id),
                 default => throw new \InvalidArgumentException("Type de transaction inconnu : {$type}"),
             };
-            if ((int) $model->compte_id !== (int) $rapprochement->compte_id) {
+            $appartientAuCompte = (int) $model->compte_id === (int) $rapprochement->compte_id;
+
+            if (! $appartientAuCompte && config('compta.use_partie_double')) {
+                $compte512X = $this->resoudreCompte512X($rapprochement->compte);
+                $appartientAuCompte = $compte512X !== null
+                    && $model->lignes()->where('compte_id', $compte512X->id)->exists();
+            }
+
+            if (! $appartientAuCompte) {
                 throw new \InvalidArgumentException("La transaction n'appartient pas au compte de ce rapprochement.");
             }
         }

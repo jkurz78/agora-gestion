@@ -14,10 +14,12 @@ declare(strict_types=1);
 
 use App\Enums\ModePaiement;
 use App\Enums\StatutReglement;
+use App\Exceptions\ExerciceCloturedException;
 use App\Models\Adhesion;
 use App\Models\Association;
-use App\Models\CompteBancaire;
 use App\Models\Compte;
+use App\Models\CompteBancaire;
+use App\Models\Exercice;
 use App\Models\FormuleAdhesion;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
@@ -219,7 +221,7 @@ test('[C] wizard adhésion payée virement : T2 encaissement séparée créée (
 test('[D] wizard adhésion refuse si exercice cloturé', function (): void {
     // Cloturer l'exercice 2025
     $exerciceService = app(ExerciceService::class);
-    $exercice = \App\Models\Exercice::create([
+    $exercice = Exercice::create([
         'association_id' => (int) $this->asso->id,
         'annee' => 2025,
         'statut' => 'cloture',
@@ -241,7 +243,7 @@ test('[D] wizard adhésion refuse si exercice cloturé', function (): void {
     );
 
     expect(fn () => app(AdhesionService::class)->creerDepuisWizard($dto, $this->user))
-        ->toThrow(\App\Exceptions\ExerciceCloturedException::class);
+        ->toThrow(ExerciceCloturedException::class);
 
     expect(Adhesion::count())->toBe(0);
     expect(Transaction::count())->toBe(0);

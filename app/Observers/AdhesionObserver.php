@@ -6,7 +6,6 @@ namespace App\Observers;
 
 use App\Models\Adhesion;
 use App\Models\Transaction;
-use App\Observers\AdhesionTransactionLigneObserver;
 use App\Services\AdhesionService;
 
 final class AdhesionObserver

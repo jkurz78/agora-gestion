@@ -7,6 +7,7 @@ use App\Http\Controllers\BackOffice\NoteDeFraisPieceJointeController;
 use App\Http\Controllers\BudgetExportController;
 use App\Http\Controllers\CategorieController;
 use App\Http\Controllers\CompteBancaireController;
+use App\Http\Controllers\CompteParametreController;
 use App\Http\Controllers\CsvImportController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DevisManuelPdfController;
@@ -33,7 +34,6 @@ use App\Http\Controllers\RemiseBancairePdfController;
 use App\Http\Controllers\SeanceExportController;
 use App\Http\Controllers\SeanceFeuilleController;
 use App\Http\Controllers\SeancePdfController;
-use App\Http\Controllers\CompteParametreController;
 use App\Http\Controllers\SousCategorieController;
 use App\Http\Controllers\SuperAdmin\SupportModeController;
 use App\Http\Controllers\SwitchAssociationController;
@@ -245,7 +245,7 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
         Route::get('/remises/{remise}/selection', function (RemiseBancaire $remise) {
             return view('gestion.remises-bancaires.selection', compact('remise'));
         })->name('remises.selection');
-Route::get('/remises/{remise}/pdf', RemiseBancairePdfController::class)
+        Route::get('/remises/{remise}/pdf', RemiseBancairePdfController::class)
             ->name('remises.pdf');
 
         Route::view('/helloasso-sync', 'banques.helloasso-sync')->name('helloasso-sync');

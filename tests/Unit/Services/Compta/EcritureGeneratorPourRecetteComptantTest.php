@@ -26,12 +26,12 @@ function compte706(string $suffix = ''): Compte
 {
     return Compte::create([
         'association_id' => TenantContext::currentId(),
-        'numero_pcg'     => '706'.$suffix,
-        'intitule'       => 'Cotisations et adhésions'.$suffix,
-        'classe'         => 7,
-        'lettrable'      => false,
-        'actif'          => true,
-        'est_systeme'    => false,
+        'numero_pcg' => '706'.$suffix,
+        'intitule' => 'Cotisations et adhésions'.$suffix,
+        'classe' => 7,
+        'lettrable' => false,
+        'actif' => true,
+        'est_systeme' => false,
         'pour_inscriptions' => false,
     ]);
 }
@@ -43,14 +43,14 @@ function compte512BNP(string $suffix = 'BNP'): Compte
 {
     return Compte::create([
         'association_id' => TenantContext::currentId(),
-        'numero_pcg'     => '5121',
-        'intitule'       => 'Banque '.$suffix,
-        'classe'         => 5,
-        'lettrable'      => false,
-        'actif'          => true,
-        'est_systeme'    => false,
+        'numero_pcg' => '5121',
+        'intitule' => 'Banque '.$suffix,
+        'classe' => 5,
+        'lettrable' => false,
+        'actif' => true,
+        'est_systeme' => false,
         'pour_inscriptions' => false,
-        'iban'           => 'FR76000000000000000000001',
+        'iban' => 'FR76000000000000000000001',
     ]);
 }
 
@@ -78,12 +78,12 @@ beforeEach(function () {
     if (! $has530) {
         Compte::create([
             'association_id' => TenantContext::currentId(),
-            'numero_pcg'     => '530',
-            'intitule'       => 'Caisse (espèces)',
-            'classe'         => 5,
-            'lettrable'      => true,
-            'actif'          => true,
-            'est_systeme'    => true,
+            'numero_pcg' => '530',
+            'intitule' => 'Caisse (espèces)',
+            'classe' => 5,
+            'lettrable' => true,
+            'actif' => true,
+            'est_systeme' => true,
             'pour_inscriptions' => false,
         ]);
     }
@@ -411,12 +411,12 @@ test('pourRecetteComptant lève CompteIncorrectException si compte ventilation c
 
     $compteClasse6 = Compte::create([
         'association_id' => TenantContext::currentId(),
-        'numero_pcg'     => '606',
-        'intitule'       => 'Achats (classe 6)',
-        'classe'         => 6,
-        'lettrable'      => false,
-        'actif'          => true,
-        'est_systeme'    => false,
+        'numero_pcg' => '606',
+        'intitule' => 'Achats (classe 6)',
+        'classe' => 6,
+        'lettrable' => false,
+        'actif' => true,
+        'est_systeme' => false,
         'pour_inscriptions' => false,
     ]);
 
@@ -440,12 +440,12 @@ test('pourRecetteComptant lève CompteIncorrectException si compteTresorerie non
 
     $compteNonBancaire = Compte::create([
         'association_id' => TenantContext::currentId(),
-        'numero_pcg'     => '411X',
-        'intitule'       => 'Clients divers',
-        'classe'         => 4,
-        'lettrable'      => true,
-        'actif'          => true,
-        'est_systeme'    => false,
+        'numero_pcg' => '411X',
+        'intitule' => 'Clients divers',
+        'classe' => 4,
+        'lettrable' => true,
+        'actif' => true,
+        'est_systeme' => false,
         'pour_inscriptions' => false,
     ]);
 

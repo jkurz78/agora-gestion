@@ -2,16 +2,21 @@
 
 declare(strict_types=1);
 
-use App\Enums\Sens;
+use App\Enums\ModePaiement;
+use App\Enums\StatutReglement;
+use App\Enums\TypeTransaction;
 use App\Livewire\TransactionForm;
 use App\Models\Association;
 use App\Models\CompteBancaire;
+use App\Models\SousCategorie;
 use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Tenant\TenantContext;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->association = Association::factory()->create();
@@ -136,4 +141,73 @@ test('blade affiche "Paiement déjà reçu ?" pour miroir extourne de dépense (
     Livewire::test(TransactionForm::class)
         ->call('edit', $tx->id)
         ->assertSee('Paiement déjà reçu');
+});
+
+test('save miroir extourne de recette met à jour mode_paiement et notes sans blocage gt:0', function () {
+    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id]);
+    $compte2 = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
+
+    $miroir = Transaction::factory()->create([
+        'association_id' => $this->association->id,
+        'type' => TypeTransaction::Recette,
+        'type_ecriture' => 'extourne',
+        'montant_total' => -150.00,
+        'mode_paiement' => ModePaiement::Cheque,
+        'compte_id' => $this->compte->id,
+        'statut_reglement' => StatutReglement::EnAttente,
+    ]);
+    $miroir->lignes()->forceDelete();
+    TransactionLigne::create([
+        'transaction_id' => $miroir->id,
+        'sous_categorie_id' => $sc->id,
+        'montant' => -150.00,
+    ]);
+
+    Livewire::test(TransactionForm::class)
+        ->call('edit', $miroir->id)
+        ->set('mode_paiement', ModePaiement::Virement->value)
+        ->set('compte_id', $compte2->id)
+        ->set('notes', 'Remboursement par virement')
+        ->set('paiementRecu', true)
+        ->call('save')
+        ->assertHasNoErrors()
+        ->assertDispatched('transaction-saved');
+
+    $miroir->refresh();
+    expect($miroir->mode_paiement)->toBe(ModePaiement::Virement);
+    expect((int) $miroir->compte_id)->toBe((int) $compte2->id);
+    expect($miroir->notes)->toBe('Remboursement par virement');
+    expect((float) $miroir->montant_total)->toBe(-150.00);
+});
+
+test('save miroir extourne de dépense met à jour mode_paiement sans blocage gt:0', function () {
+    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id]);
+
+    $miroir = Transaction::factory()->create([
+        'association_id' => $this->association->id,
+        'type' => TypeTransaction::Depense,
+        'type_ecriture' => 'extourne',
+        'montant_total' => -200.00,
+        'mode_paiement' => ModePaiement::Especes,
+        'compte_id' => $this->compte->id,
+        'statut_reglement' => StatutReglement::EnAttente,
+    ]);
+    $miroir->lignes()->forceDelete();
+    TransactionLigne::create([
+        'transaction_id' => $miroir->id,
+        'sous_categorie_id' => $sc->id,
+        'montant' => -200.00,
+    ]);
+
+    Livewire::test(TransactionForm::class)
+        ->call('edit', $miroir->id)
+        ->set('mode_paiement', ModePaiement::Cheque->value)
+        ->set('paiementRecu', true)
+        ->call('save')
+        ->assertHasNoErrors()
+        ->assertDispatched('transaction-saved');
+
+    $miroir->refresh();
+    expect($miroir->mode_paiement)->toBe(ModePaiement::Cheque);
+    expect((float) $miroir->montant_total)->toBe(-200.00);
 });

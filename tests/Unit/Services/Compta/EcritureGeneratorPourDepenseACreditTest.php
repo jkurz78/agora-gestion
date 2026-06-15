@@ -30,12 +30,12 @@ function compte607DAC(string $suffix = ''): Compte
 {
     return Compte::create([
         'association_id' => TenantContext::currentId(),
-        'numero_pcg'     => '607dac'.$suffix,
-        'intitule'       => 'Achats matières '.$suffix,
-        'classe'         => 6,
-        'lettrable'      => false,
-        'actif'          => true,
-        'est_systeme'    => false,
+        'numero_pcg' => '607dac'.$suffix,
+        'intitule' => 'Achats matières '.$suffix,
+        'classe' => 6,
+        'lettrable' => false,
+        'actif' => true,
+        'est_systeme' => false,
         'pour_inscriptions' => false,
     ]);
 }
@@ -150,12 +150,12 @@ test('pourDepenseACredit lève CompteIncorrectException si compte ventilation �
 
     $compteProduit = Compte::create([
         'association_id' => TenantContext::currentId(),
-        'numero_pcg'     => '706dac_err',
-        'intitule'       => 'Cotisations (erreur)',
-        'classe'         => 7,
-        'lettrable'      => false,
-        'actif'          => true,
-        'est_systeme'    => false,
+        'numero_pcg' => '706dac_err',
+        'intitule' => 'Cotisations (erreur)',
+        'classe' => 7,
+        'lettrable' => false,
+        'actif' => true,
+        'est_systeme' => false,
         'pour_inscriptions' => false,
     ]);
 

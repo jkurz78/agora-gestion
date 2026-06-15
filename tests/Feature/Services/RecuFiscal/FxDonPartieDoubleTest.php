@@ -13,7 +13,6 @@ declare(strict_types=1);
 use App\Enums\ModePaiement;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
-use App\Enums\UsageComptable;
 use App\Exceptions\RecuFiscalException;
 use App\Models\Association;
 use App\Models\SousCategorie;

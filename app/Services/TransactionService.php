@@ -486,6 +486,78 @@ final class TransactionService
         $t2->forceDelete();
     }
 
+    /**
+     * Met à jour les champs bancaires/opérationnels d'un miroir extourne.
+     *
+     * Les lignes comptables (écritures PD) sont figées — pas de forceDelete/recreate.
+     * Seuls date, mode_paiement, compte_id, notes, reference, libelle sont modifiables.
+     * Si le mode/compte change et qu'un T2 existe, il est recréé avec les nouveaux paramètres.
+     */
+    public function updateExtourneMiroir(Transaction $transaction, array $data): Transaction
+    {
+        $this->exerciceService->assertOuvert(
+            $this->exerciceService->anneeForDate(CarbonImmutable::parse($data['date']))
+        );
+
+        return DB::transaction(function () use ($transaction, $data): Transaction {
+            if ($transaction->isLockedByRemise()) {
+                throw new \RuntimeException('Cette transaction est liée à une remise bancaire et ne peut pas être modifiée.');
+            }
+
+            if ($transaction->isLockedByRapprochement()) {
+                throw new \RuntimeException('Cette transaction est pointée dans un rapprochement et ne peut pas être modifiée.');
+            }
+
+            $ancienMode = $transaction->mode_paiement;
+            $nouveauMode = $data['mode_paiement'] ?? null;
+            $ancienCompteId = $transaction->compte_id;
+            $nouveauCompteId = $data['compte_id'] ?? null;
+
+            $modeChange = ($ancienMode?->value ?? null) !== ($nouveauMode instanceof ModePaiement ? $nouveauMode->value : $nouveauMode);
+            $compteChange = (string) $ancienCompteId !== (string) $nouveauCompteId;
+
+            $avaitT2 = $ancienMode !== null;
+            $doitAvoirT2 = $nouveauMode !== null;
+
+            // Suppression T2 existant si le mode/compte change ou si passage à non-payé.
+            // Délettrage explicite des lignes T2 AVANT suppression (supprimerT2SiExiste
+            // ne délettre pas — dans le chemin normal, autoDelettrerLignesAvantUpdate s'en charge).
+            if ($avaitT2 && ($modeChange || $compteChange || ! $doitAvoirT2)) {
+                $reglementService = app(ReglementOperationService::class);
+                $t2 = $reglementService->trouverT2($transaction);
+
+                if ($t2 !== null) {
+                    foreach (TransactionLigne::where('transaction_id', (int) $t2->id)->whereNotNull('lettrage_code')->get() as $ligne) {
+                        $this->lettrageService->delettrerParLigne(
+                            $ligne->fresh(),
+                            "Suppression T2 miroir extourne — mode/compte changé sur T1 #{$transaction->id}"
+                        );
+                    }
+                    TransactionLigne::where('transaction_id', (int) $t2->id)->forceDelete();
+                    $t2->forceDelete();
+                }
+            }
+
+            $transaction->update([
+                'date' => $data['date'],
+                'libelle' => $data['libelle'] ?? $transaction->libelle,
+                'mode_paiement' => $nouveauMode,
+                'compte_id' => $nouveauCompteId,
+                'notes' => $data['notes'] ?? null,
+                'reference' => $data['reference'] ?? null,
+            ]);
+
+            // Recréation T2 si nécessaire (nouveau mode ou mode/compte changé)
+            if ($doitAvoirT2 && ($modeChange || $compteChange || ! $avaitT2)) {
+                app(ReglementOperationService::class)->reglerOuEncaisser($transaction->fresh());
+            }
+
+            $this->etatReglementResolver->syncer($transaction->fresh());
+
+            return $transaction->fresh();
+        });
+    }
+
     public function delete(Transaction $transaction): void
     {
         $this->exerciceService->assertOuvert(

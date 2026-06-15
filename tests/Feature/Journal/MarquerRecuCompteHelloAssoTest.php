@@ -27,18 +27,18 @@ beforeEach(function () {
 it('[BugA] la modale marquer-recu n\'expose pas le compte HelloAsso (saisie_automatisee=true)', function () {
     // Compte normal : saisie manuelle autorisée (valeurs factory par défaut)
     $compteNormal = CompteBancaire::factory()->create([
-        'association_id'         => $this->association->id,
-        'nom'                    => 'Compte courant test',
+        'association_id' => $this->association->id,
+        'nom' => 'Compte courant test',
         'actif_recettes_depenses' => true,
-        'saisie_automatisee'     => false,
+        'saisie_automatisee' => false,
     ]);
 
     // Compte HelloAsso : saisie automatisée → exclu de saisieManuelle()
     $compteHelloAsso = CompteBancaire::factory()->create([
-        'association_id'         => $this->association->id,
-        'nom'                    => 'HelloAsso',
+        'association_id' => $this->association->id,
+        'nom' => 'HelloAsso',
         'actif_recettes_depenses' => true,
-        'saisie_automatisee'     => true,
+        'saisie_automatisee' => true,
     ]);
 
     $component = Livewire::test(TransactionUniverselle::class);

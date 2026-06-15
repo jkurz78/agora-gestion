@@ -7,8 +7,8 @@ namespace App\Livewire;
 use App\DTOs\InvoiceOcrResult;
 use App\Enums\Espace;
 use App\Enums\ModePaiement;
-use App\Enums\Sens;
 use App\Enums\RoleAssociation;
+use App\Enums\Sens;
 use App\Enums\StatutFactureDeposee;
 use App\Enums\StatutOperation;
 use App\Enums\StatutReglement;
@@ -536,6 +536,13 @@ final class TransactionForm extends Component
             }
         }
 
+        // --- Chemin dédié miroir extourne : seuls les champs bancaires/opérationnels ---
+        if ($this->isExtourneMiroir && $this->transactionId !== null) {
+            $this->saveExtourneMiroir();
+
+            return;
+        }
+
         $exerciceService = app(ExerciceService::class);
         $range = $exerciceService->dateRange($exerciceService->current());
         $dateDebut = $range['start']->toDateString();
@@ -778,6 +785,40 @@ final class TransactionForm extends Component
                     $ligneModel->update(['piece_jointe_path' => $ancienPath]);
                 }
             }
+        }
+
+        $this->dispatch('transaction-saved');
+        $this->resetForm();
+    }
+
+    private function saveExtourneMiroir(): void
+    {
+        $this->validate([
+            'mode_paiement' => ['nullable', 'in:virement,cheque,especes,cb,prelevement'],
+            'compte_id' => ['nullable', 'exists:comptes_bancaires,id'],
+        ]);
+
+        $modeEffectif = ! $this->paiementRecu
+            ? null
+            : ($this->mode_paiement !== '' ? $this->mode_paiement : null);
+
+        $transaction = Transaction::findOrFail($this->transactionId);
+
+        $data = [
+            'date' => $transaction->date->toDateString(),
+            'libelle' => $transaction->libelle,
+            'mode_paiement' => $modeEffectif,
+            'compte_id' => $this->compte_id ?: null,
+            'notes' => $this->notes ?: null,
+            'reference' => $this->reference,
+        ];
+
+        try {
+            app(TransactionService::class)->updateExtourneMiroir($transaction, $data);
+        } catch (\RuntimeException $e) {
+            $this->addError('lignes', $e->getMessage());
+
+            return;
         }
 
         $this->dispatch('transaction-saved');

@@ -15,7 +15,6 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\FactureService;
-use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Log;
 use Tests\Support\CreatesPartieDoubleContext;
 

@@ -143,7 +143,7 @@ it('[B] laisse compte_id à null pour les lignes orphelines sans correspondance'
     ]);
 
     // Le backfill ne doit pas lever d'exception
-    expect(fn () => CompteIdBackfiller::up())->not->toThrow(\Throwable::class);
+    expect(fn () => CompteIdBackfiller::up())->not->toThrow(Throwable::class);
 
     // Les lignes orphelines restent à null
     $apres1 = DB::table('transaction_lignes')->where('id', $ligneOrpheline1)->value('compte_id');

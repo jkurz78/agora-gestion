@@ -46,24 +46,24 @@ it('[BugC] RapprochementList affiche le total credit exact (pas multiple) apres 
 
     // Remise manuelle comptabilisée : crée la T4 (512X D / 5112 C, journal=banque)
     $remise = RemiseBancaire::create([
-        'association_id'  => TenantContext::currentId(),
-        'numero'          => 7001,
-        'date'            => '2026-05-26',
-        'mode_paiement'   => ModePaiement::Cheque,
+        'association_id' => TenantContext::currentId(),
+        'numero' => 7001,
+        'date' => '2026-05-26',
+        'mode_paiement' => ModePaiement::Cheque,
         'compte_cible_id' => $compteBancaire->id,
-        'libelle'         => 'Remise BugC',
-        'saisi_par'       => userIdJrn(),
+        'libelle' => 'Remise BugC',
+        'saisi_par' => userIdJrn(),
     ]);
     app(RemiseBancaireService::class)->comptabiliser($remise, [(int) $cheque->id]);
 
     $rappro = RapprochementBancaire::create([
-        'association_id'  => TenantContext::currentId(),
-        'compte_id'       => $compteBancaire->id,
-        'date_fin'        => '2026-05-31',
+        'association_id' => TenantContext::currentId(),
+        'compte_id' => $compteBancaire->id,
+        'date_fin' => '2026-05-31',
         'solde_ouverture' => 0.0,
-        'solde_fin'       => 125.0,
-        'statut'          => StatutRapprochement::EnCours->value,
-        'saisi_par'       => userIdJrn(),
+        'solde_fin' => 125.0,
+        'statut' => StatutRapprochement::EnCours->value,
+        'saisi_par' => userIdJrn(),
     ]);
 
     // Pointer la remise : T1 (journal=vente) + T4 dépôt (journal=banque) reçoivent rapprochement_id

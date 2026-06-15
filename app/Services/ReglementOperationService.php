@@ -282,7 +282,7 @@ final class ReglementOperationService
             t1: $transaction,
             mode: $mode,
             compteTresorerie: $compteTresorerie,
-            datePaiement: now(),
+            datePaiement: $transaction->date,
         );
     }
 

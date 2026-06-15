@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Enums\ModePaiement;
 use App\Enums\RoleAssociation;
 use App\Enums\StatutFacture;
-use App\Enums\StatutRapprochement;
 use App\Enums\StatutReglement;
 use App\Enums\TypeLigneFacture;
 use App\Enums\TypeRapprochement;

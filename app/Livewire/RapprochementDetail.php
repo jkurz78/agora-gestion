@@ -5,13 +5,17 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\Espace;
+use App\Enums\JournalComptable;
+use App\Enums\ModePaiement;
 use App\Enums\RoleAssociation;
 use App\Enums\StatutRapprochement;
+use App\Enums\StatutReglement;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
 use App\Models\VirementInterne;
 use App\Services\RapprochementBancaireService;
+use App\Services\ReglementOperationService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\View\View;
@@ -183,7 +187,39 @@ final class RapprochementDetail extends Component
             : null;
 
         // Transactions (dépenses + recettes) — grouper les remises en une seule ligne
-        $txRows = Transaction::where('compte_id', $compte->id)
+        //
+        // Mode PD : le filtre par lignes 512X REMPLACE le filtre legacy header compte_id.
+        // La T2 de règlement (créée par pourReglement) n'a pas de compte_id header
+        // mais porte une ligne 512X — sans ce fallback elle serait invisible.
+        $usePdFilter = config('compta.use_partie_double') && $compte512X !== null;
+
+        $txRows = Transaction::query()
+            ->when(
+                $usePdFilter,
+                fn ($q) => $q->where(function ($w) use ($compte512X, $compte) {
+                    $w->whereNotNull('remise_id')
+                        ->orWhereHas('lignes', fn ($l) => $l->where('compte_id', $compte512X->id))
+                        ->orWhere(function ($en) use ($compte) {
+                            $en->where('compte_id', $compte->id)
+                                ->where('statut_reglement', StatutReglement::EnAttente)
+                                ->whereNotNull('mode_paiement')
+                                ->whereNotIn('mode_paiement', [
+                                    ModePaiement::Cheque->value,
+                                    ModePaiement::Especes->value,
+                                ])
+                                ->whereDoesntHave('lignes', fn ($l) => $l
+                                    ->whereHas('compte', fn ($c) => $c->bancaires()));
+                        });
+                }),
+                fn ($q) => $q->where('compte_id', $compte->id)
+            )
+            ->when(
+                $usePdFilter,
+                fn ($q) => $q->whereNot(function ($w) {
+                    $w->where('journal', JournalComptable::Banque->value)
+                        ->whereNotNull('remise_id');
+                })
+            )
             ->where(function ($q) use ($rid, $dateFin, $verrouille) {
                 if ($verrouille) {
                     $q->where('rapprochement_id', $rid);
@@ -194,13 +230,6 @@ final class RapprochementDetail extends Component
                     })->orWhere('rapprochement_id', $rid);
                 }
             })
-            ->when(
-                config('compta.use_partie_double') && $compte512X !== null,
-                fn ($q) => $q->where(function ($w) use ($compte512X) {
-                    $w->whereNotNull('remise_id')
-                        ->orWhereHas('lignes', fn ($l) => $l->where('compte_id', $compte512X->id));
-                })
-            )
             ->with('tiers', 'remise')
             ->get();
 
@@ -234,18 +263,33 @@ final class RapprochementDetail extends Component
             ]);
         }
 
-        // Lignes standalone
-        $standalone->each(function (Transaction $tx) use (&$transactions, $rid) {
+        // Lignes standalone — en mode PD, si la transaction est une T2 (journal=Banque),
+        // on affiche les infos de la T1 source (tiers, libellé, date) car l'utilisateur
+        // raisonne sur la transaction métier, pas sur l'écriture technique de règlement.
+        // Le toggle reçoit l'id T1 → pointage/dépointage symétriques via le code existant.
+        $reglementSvc = $usePdFilter ? app(ReglementOperationService::class) : null;
+
+        $standalone->each(function (Transaction $tx) use (&$transactions, $rid, $usePdFilter, $reglementSvc) {
+            $displayTx = $tx;
+
+            if ($usePdFilter && $tx->journal === JournalComptable::Banque) {
+                $t1 = $reglementSvc->trouverT2($tx);
+                if ($t1 !== null) {
+                    $t1->load('tiers');
+                    $displayTx = $t1;
+                }
+            }
+
             $transactions->push([
-                'id' => $tx->id,
-                'type' => $tx->type->value,
-                'date' => $tx->date,
-                'label' => $tx->libelle,
-                'tiers' => $tx->tiers?->displayName() ?? $tx->libelle,
-                'reference' => $tx->reference,
-                'mode_paiement' => $tx->mode_paiement?->trigramme(),
-                'montant_signe' => $tx->montantSigne(),
-                'pointe' => (int) $tx->rapprochement_id === $rid,
+                'id' => $displayTx->id,
+                'type' => $displayTx->type->value,
+                'date' => $displayTx->date,
+                'label' => $displayTx->libelle,
+                'tiers' => $displayTx->tiers?->displayName() ?? $displayTx->libelle,
+                'reference' => $displayTx->reference,
+                'mode_paiement' => $displayTx->mode_paiement?->trigramme(),
+                'montant_signe' => $displayTx->montantSigne(),
+                'pointe' => (int) $displayTx->rapprochement_id === $rid,
                 'sub_transactions' => [],
             ]);
         });

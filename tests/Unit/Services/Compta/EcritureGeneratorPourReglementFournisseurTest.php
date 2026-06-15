@@ -30,12 +30,12 @@ function compte607RF(string $suffix = ''): Compte
 {
     return Compte::create([
         'association_id' => TenantContext::currentId(),
-        'numero_pcg'     => '607rf'.$suffix,
-        'intitule'       => 'Achats RF '.$suffix,
-        'classe'         => 6,
-        'lettrable'      => false,
-        'actif'          => true,
-        'est_systeme'    => false,
+        'numero_pcg' => '607rf'.$suffix,
+        'intitule' => 'Achats RF '.$suffix,
+        'classe' => 6,
+        'lettrable' => false,
+        'actif' => true,
+        'est_systeme' => false,
         'pour_inscriptions' => false,
     ]);
 }
@@ -45,14 +45,14 @@ function compte512RF(string $suffix = 'BNP'): Compte
     return Compte::firstOrCreate(
         [
             'association_id' => TenantContext::currentId(),
-            'numero_pcg'     => '512'.$suffix,
+            'numero_pcg' => '512'.$suffix,
         ],
         [
-            'intitule'          => 'Banque RF '.$suffix,
-            'classe'            => 5,
-            'lettrable'         => false,
-            'actif'             => true,
-            'est_systeme'       => false,
+            'intitule' => 'Banque RF '.$suffix,
+            'classe' => 5,
+            'lettrable' => false,
+            'actif' => true,
+            'est_systeme' => false,
             'pour_inscriptions' => false,
         ]
     );

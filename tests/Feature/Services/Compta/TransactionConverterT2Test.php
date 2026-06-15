@@ -19,14 +19,12 @@ declare(strict_types=1);
 
 use App\Enums\ModePaiement;
 use App\Enums\StatutReglement;
-use App\Enums\TypeTransaction;
 use App\Models\Compte;
 use App\Models\RapprochementBancaire;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\Compta\TransactionConverter;
-use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;

@@ -1276,6 +1276,10 @@ final class EcritureGenerator
                 journal: JournalComptable::Banque,
             );
 
+            if ($t1->compte_id !== null) {
+                $t2->update(['compte_id' => $t1->compte_id]);
+            }
+
             if ($tiersAuDebit) {
                 // Encaissement : portage D / tiers C
                 $lignePortage = TransactionLigne::create([

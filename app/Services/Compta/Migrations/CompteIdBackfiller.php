@@ -151,8 +151,8 @@ final class CompteIdBackfiller
             ->count();
 
         if ($count > 0) {
-            Log::warning('[Step 36] Backfill compte_id: ' . $count . ' ligne(s) orpheline(s) ' .
-                '(sous_categorie_id non null, compte_id toujours null). ' .
+            Log::warning('[Step 36] Backfill compte_id: '.$count.' ligne(s) orpheline(s) '.
+                '(sous_categorie_id non null, compte_id toujours null). '.
                 'Vérifier que toutes les sous-catégories ont un code_cerfa mappé sur un compte PCG.');
         }
     }
