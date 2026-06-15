@@ -15,6 +15,7 @@ use App\Support\PdfFooterRenderer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\Response;
@@ -295,28 +296,42 @@ final class RapportExportController extends Controller
         $operationIds = array_map('intval', (array) $request->query('ops', []));
         $parSeances = $request->boolean('seances');
         $parTiers = $request->boolean('tiers');
-        $previsionnel = $request->boolean('prev');
+        $mode = $request->query('mode', 'realise');
+        $previsionnel = $mode !== 'realise';
+        $parOperations = $request->boolean('parops');
 
-        $data = $rapportService->compteDeResultatOperations($exercice, $operationIds, $parSeances, $parTiers, $previsionnel);
+        $data = $rapportService->compteDeResultatOperations($exercice, $operationIds, $parSeances, $parTiers, $previsionnel, $parOperations);
 
         $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
-        $sheet->setTitle('CR par opérations');
+
+        $modeLabel = match ($mode) {
+            'comparaison' => ' (Comparaison)',
+            'projection' => ' (Projection)',
+            default => '',
+        };
+        $sheet->setTitle('CR par opérations'.$modeLabel);
 
         $seances = $data['seances'] ?? [];
+        $operationNames = $data['operation_names'] ?? [];
         $row = 1;
 
-        // Build flat previsions lookup: sc_id => { montant, seances: {num => float} }
+        // Build flat previsions lookup: sc_id => { montant, seances: {num => float}, operations?: {op_id => float} }
         // Only populated when $previsionnel is true.
-        $buildPrevIdx = function (array $hierarchy): array {
+        $buildPrevIdx = function (array $hierarchy) use ($parOperations): array {
             $idx = [];
             foreach ($hierarchy as $cat) {
                 foreach ($cat['sous_categories'] as $sc) {
-                    $scId = (int) $sc['id'];
-                    $idx[$scId] = [
+                    // previsions nodes use 'sous_categorie_id' as the key field name
+                    $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
+                    $entry = [
                         'montant' => (float) ($sc['montant'] ?? $sc['total'] ?? 0),
                         'seances' => $sc['seances'] ?? [],
                     ];
+                    if ($parOperations) {
+                        $entry['operations'] = $sc['operations'] ?? [];
+                    }
+                    $idx[$scId] = $entry;
                 }
             }
 
@@ -326,7 +341,168 @@ final class RapportExportController extends Controller
         $prevChargesIdx = $previsionnel ? $buildPrevIdx($data['previsions_charges'] ?? []) : [];
         $prevProduitsIdx = $previsionnel ? $buildPrevIdx($data['previsions_produits'] ?? []) : [];
 
-        // Header row
+        // Projection helper: use réel if > 0, else use prévu
+        $projeter = fn (float $realise, float $prevu): float => $realise > 0 ? $realise : $prevu;
+
+        // ── parOperations: header and data rows ──────────────────────────────────
+        if ($parOperations) {
+            if ($mode === 'comparaison') {
+                // Two header rows: row 1 has op names (merged 3 cols each) + Total; row 2 has Prévu/Réel/Écart per op
+                $headerRow1 = ['Type', 'Catégorie', 'Sous-catégorie'];
+                $headerRow2 = ['', '', ''];
+                $colIndex = 4; // 1-based column index, A=1
+                foreach ($operationNames as $opId => $opName) {
+                    $colLetter = Coordinate::stringFromColumnIndex($colIndex);
+                    $colLetterEnd = Coordinate::stringFromColumnIndex($colIndex + 2);
+                    $headerRow1[] = $opName;
+                    $headerRow1[] = '';
+                    $headerRow1[] = '';
+                    $headerRow2[] = 'Prévu';
+                    $headerRow2[] = 'Réel';
+                    $headerRow2[] = 'Écart';
+                    $sheet->mergeCells($colLetter.'1:'.$colLetterEnd.'1');
+                    $colIndex += 3;
+                }
+                // Total (3 sub-columns)
+                $totalColLetter = Coordinate::stringFromColumnIndex($colIndex);
+                $totalColLetterEnd = Coordinate::stringFromColumnIndex($colIndex + 2);
+                $headerRow1[] = 'Total';
+                $headerRow1[] = '';
+                $headerRow1[] = '';
+                $headerRow2[] = 'Prévu';
+                $headerRow2[] = 'Réel';
+                $headerRow2[] = 'Écart';
+                $sheet->mergeCells($totalColLetter.'1:'.$totalColLetterEnd.'1');
+
+                $sheet->fromArray([$headerRow1], null, 'A1');
+                $sheet->fromArray([$headerRow2], null, 'A2');
+                $sheet->getStyle('A1:'.chr(64 + count($headerRow1)).'1')->getFont()->setBold(true);
+                $sheet->getStyle('A2:'.chr(64 + count($headerRow2)).'2')->getFont()->setBold(true);
+                $headers = $headerRow2; // for column count reference
+                $row = 3;
+            } else {
+                // Single header row: op names + Total
+                $headers = ['Type', 'Catégorie', 'Sous-catégorie'];
+                foreach ($operationNames as $opName) {
+                    $headers[] = $opName;
+                }
+                $headers[] = 'Total';
+                $sheet->fromArray([$headers], null, 'A1');
+                $sheet->getStyle('A1:'.chr(64 + count($headers)).'1')->getFont()->setBold(true);
+                $row = 2;
+            }
+
+            foreach ([['Charge', $data['charges'], $prevChargesIdx], ['Produit', $data['produits'], $prevProduitsIdx]] as [$type, $sections, $prevIdx]) {
+                foreach ($sections as $cat) {
+                    foreach ($cat['sous_categories'] as $sc) {
+                        $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
+                        $prevSc = $prevIdx[$scId] ?? ['montant' => 0.0, 'operations' => []];
+
+                        $values = [$type, $cat['label'], $sc['label']];
+
+                        if ($mode === 'comparaison') {
+                            $totalPrevu = 0.0;
+                            $totalRealise = 0.0;
+                            foreach ($operationNames as $opId => $opName) {
+                                $realise = (float) ($sc['operations'][$opId] ?? 0);
+                                $prevu = (float) ($prevSc['operations'][$opId] ?? 0);
+                                $values[] = $prevu;
+                                $values[] = $realise;
+                                $values[] = $realise - $prevu;
+                                $totalPrevu += $prevu;
+                                $totalRealise += $realise;
+                            }
+                            $values[] = $totalPrevu;
+                            $values[] = $totalRealise;
+                            $values[] = $totalRealise - $totalPrevu;
+                        } elseif ($mode === 'projection') {
+                            $projectedTotal = 0.0;
+                            foreach ($operationNames as $opId => $opName) {
+                                $realise = (float) ($sc['operations'][$opId] ?? 0);
+                                $prevu = (float) ($prevSc['operations'][$opId] ?? 0);
+                                $projected = $projeter($realise, $prevu);
+                                $values[] = $projected;
+                                $projectedTotal += $projected;
+                            }
+                            $values[] = $projectedTotal;
+                        } else {
+                            // realise
+                            $total = 0.0;
+                            foreach ($operationNames as $opId => $opName) {
+                                $val = (float) ($sc['operations'][$opId] ?? 0);
+                                $values[] = $val;
+                                $total += $val;
+                            }
+                            $values[] = $total;
+                        }
+
+                        $sheet->fromArray([$values], null, 'A'.$row);
+                        $row++;
+                    }
+
+                    // Category total row
+                    $catValues = [$type, $cat['label'], 'TOTAL'];
+
+                    if ($mode === 'comparaison') {
+                        $catTotalPrevu = 0.0;
+                        $catTotalRealise = 0.0;
+                        foreach ($operationNames as $opId => $opName) {
+                            $catRealise = (float) ($cat['operations'][$opId] ?? 0);
+                            $catPrevu = 0.0;
+                            foreach ($cat['sous_categories'] as $sc) {
+                                $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
+                                $catPrevu += (float) ($prevIdx[$scId]['operations'][$opId] ?? 0);
+                            }
+                            $catValues[] = $catPrevu;
+                            $catValues[] = $catRealise;
+                            $catValues[] = $catRealise - $catPrevu;
+                            $catTotalPrevu += $catPrevu;
+                            $catTotalRealise += $catRealise;
+                        }
+                        $catValues[] = $catTotalPrevu;
+                        $catValues[] = $catTotalRealise;
+                        $catValues[] = $catTotalRealise - $catTotalPrevu;
+                    } elseif ($mode === 'projection') {
+                        $catProjectedTotal = 0.0;
+                        foreach ($operationNames as $opId => $opName) {
+                            $catProjected = 0.0;
+                            foreach ($cat['sous_categories'] as $sc) {
+                                $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
+                                $realise = (float) ($sc['operations'][$opId] ?? 0);
+                                $prevu = (float) ($prevIdx[$scId]['operations'][$opId] ?? 0);
+                                $catProjected += $projeter($realise, $prevu);
+                            }
+                            $catValues[] = $catProjected;
+                            $catProjectedTotal += $catProjected;
+                        }
+                        $catValues[] = $catProjectedTotal;
+                    } else {
+                        $catTotal = 0.0;
+                        foreach ($operationNames as $opId => $opName) {
+                            $val = (float) ($cat['operations'][$opId] ?? 0);
+                            $catValues[] = $val;
+                            $catTotal += $val;
+                        }
+                        $catValues[] = $catTotal;
+                    }
+
+                    $sheet->fromArray([$catValues], null, 'A'.$row);
+                    $sheet->getStyle('A'.$row.':'.chr(64 + count($catValues)).$row)->getFont()->setBold(true);
+                    $row++;
+                }
+            }
+
+            // Format number columns (D onwards)
+            $lastCol = chr(64 + count($mode === 'comparaison' ? $headers : (array_merge(['', '', ''], array_values($operationNames), ['']))));
+            if ($row > ($mode === 'comparaison' ? 4 : 3)) {
+                $startRow = $mode === 'comparaison' ? 3 : 2;
+                $sheet->getStyle('D'.$startRow.':'.$lastCol.($row - 1))->getNumberFormat()->setFormatCode('#,##0.00');
+            }
+
+            return $spreadsheet;
+        }
+
+        // ── Standard (non-parOperations) header ──────────────────────────────────
         if ($parSeances) {
             $headers = ['Type', 'Catégorie', 'Sous-catégorie'];
             if ($parTiers) {
@@ -341,9 +517,13 @@ final class RapportExportController extends Controller
             if ($parTiers) {
                 $headers[] = 'Tiers';
             }
-            $headers[] = 'Montant';
+            if ($mode === 'projection') {
+                $headers[] = 'Projeté';
+            } else {
+                $headers[] = 'Montant';
+            }
         }
-        if ($previsionnel) {
+        if ($mode === 'comparaison') {
             $headers[] = 'Prévu';
             $headers[] = 'Écart';
         }
@@ -371,7 +551,7 @@ final class RapportExportController extends Controller
                             // Previsionnel: les tiers individuels ne sont pas restitués ici par choix de design ;
                             // la granularité affichée s'arrête à la sous-catégorie. Les prévisions par tiers
                             // existent en DB (encadrement_previsions.tiers_id) mais sont agrégées au niveau sc.
-                            if ($previsionnel) {
+                            if ($mode === 'comparaison') {
                                 $values[] = '';
                                 $values[] = '';
                             }
@@ -385,16 +565,37 @@ final class RapportExportController extends Controller
                         $values[] = 'TOTAL';
                     }
                     if ($parSeances) {
-                        foreach ($seances as $s) {
-                            $values[] = (float) ($sc['seances'][$s] ?? 0);
+                        if ($mode === 'projection') {
+                            foreach ($seances as $s) {
+                                $realise = (float) ($sc['seances'][$s] ?? 0);
+                                $prevu = (float) ($prevSc['seances'][$s] ?? 0);
+                                $values[] = $projeter($realise, $prevu);
+                            }
+                            $projectedTotal = 0.0;
+                            foreach ($seances as $s) {
+                                $projectedTotal += $projeter((float) ($sc['seances'][$s] ?? 0), (float) ($prevSc['seances'][$s] ?? 0));
+                            }
+                            $values[] = $projectedTotal;
+                            $realise = $projectedTotal; // for cat total accumulation reference (not used below)
+                        } else {
+                            foreach ($seances as $s) {
+                                $values[] = (float) ($sc['seances'][$s] ?? 0);
+                            }
+                            $realise = (float) ($sc['total'] ?? 0);
+                            $values[] = $realise;
                         }
-                        $realise = (float) ($sc['total'] ?? 0);
-                        $values[] = $realise;
                     } else {
-                        $realise = (float) ($sc['montant'] ?? 0);
-                        $values[] = $realise;
+                        if ($mode === 'projection') {
+                            $realise = (float) ($sc['total'] ?? $sc['montant'] ?? 0);
+                            $prevu = (float) $prevSc['montant'];
+                            $values[] = $projeter($realise, $prevu);
+                            $realise = $projeter($realise, $prevu);
+                        } else {
+                            $realise = (float) ($sc['montant'] ?? 0);
+                            $values[] = $realise;
+                        }
                     }
-                    if ($previsionnel) {
+                    if ($mode === 'comparaison') {
                         $prevu = (float) $prevSc['montant'];
                         $values[] = $prevu;
                         $values[] = $realise - $prevu;
@@ -411,16 +612,51 @@ final class RapportExportController extends Controller
                     $values[] = '';
                 }
                 if ($parSeances) {
-                    foreach ($seances as $s) {
-                        $values[] = (float) ($cat['seances'][$s] ?? 0);
+                    if ($mode === 'projection') {
+                        foreach ($seances as $s) {
+                            $catSeanceProjected = 0.0;
+                            foreach ($cat['sous_categories'] as $sc) {
+                                $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
+                                $prevSc = $prevIdx[$scId] ?? ['montant' => 0.0, 'seances' => []];
+                                $catSeanceProjected += $projeter((float) ($sc['seances'][$s] ?? 0), (float) ($prevSc['seances'][$s] ?? 0));
+                            }
+                            $values[] = $catSeanceProjected;
+                        }
+                        $catProjected = 0.0;
+                        foreach ($seances as $s) {
+                            foreach ($cat['sous_categories'] as $sc) {
+                                $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
+                                $prevSc = $prevIdx[$scId] ?? ['montant' => 0.0, 'seances' => []];
+                                $catProjected += $projeter((float) ($sc['seances'][$s] ?? 0), (float) ($prevSc['seances'][$s] ?? 0));
+                            }
+                        }
+                        $catRealise = $catProjected;
+                        $values[] = $catRealise;
+                    } else {
+                        foreach ($seances as $s) {
+                            $values[] = (float) ($cat['seances'][$s] ?? 0);
+                        }
+                        $catRealise = (float) ($cat['total'] ?? 0);
+                        $values[] = $catRealise;
                     }
-                    $catRealise = (float) ($cat['total'] ?? 0);
-                    $values[] = $catRealise;
                 } else {
-                    $catRealise = (float) ($cat['montant'] ?? 0);
-                    $values[] = $catRealise;
+                    if ($mode === 'projection') {
+                        $catProjected = 0.0;
+                        foreach ($cat['sous_categories'] as $sc) {
+                            $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
+                            $prevSc = $prevIdx[$scId] ?? ['montant' => 0.0, 'seances' => []];
+                            $scRealise = (float) ($sc['total'] ?? $sc['montant'] ?? 0);
+                            $scPrevu = (float) $prevSc['montant'];
+                            $catProjected += $projeter($scRealise, $scPrevu);
+                        }
+                        $catRealise = $catProjected;
+                        $values[] = $catRealise;
+                    } else {
+                        $catRealise = (float) ($cat['montant'] ?? 0);
+                        $values[] = $catRealise;
+                    }
                 }
-                if ($previsionnel) {
+                if ($mode === 'comparaison') {
                     // Compute cat prevu by summing sc previsions for sous_categories of this cat
                     $catPrevu = 0.0;
                     foreach ($cat['sous_categories'] as $sc) {

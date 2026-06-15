@@ -97,6 +97,13 @@
                     </div>
                 </div>
 
+                {{-- Dropdown Mode --}}
+                <select wire:model.live="mode" class="form-select form-select-sm" style="width:auto;">
+                    <option value="realise">Réalisé</option>
+                    <option value="comparaison">Comparaison</option>
+                    <option value="projection">Projection</option>
+                </select>
+
                 {{-- Toggles --}}
                 <div class="form-check form-switch mb-0">
                     <input type="checkbox" wire:model.live="parSeances" class="form-check-input" id="toggleSeances">
@@ -106,10 +113,13 @@
                     <input type="checkbox" wire:model.live="parTiers" class="form-check-input" id="toggleTiers">
                     <label class="form-check-label small" for="toggleTiers">Tiers en lignes</label>
                 </div>
+                @if (count($selectedOperationIds) > 1)
                 <div class="form-check form-switch mb-0">
-                    <input type="checkbox" wire:model.live="previsionnel" class="form-check-input" id="togglePrevisionnel">
-                    <label class="form-check-label small" for="togglePrevisionnel">Montants pr&eacute;visionnels</label>
+                    <input type="checkbox" wire:model.live="parOperations" class="form-check-input" id="toggleOperations">
+                    <label class="form-check-label small" for="toggleOperations">Op&eacute;rations en colonnes</label>
                 </div>
+                @endif
+
                 {{-- Export dropdown --}}
                 @if (! empty($selectedOperationIds))
                 <div class="ms-auto">
@@ -134,16 +144,18 @@
     @else
         @php
             // ---------------------------------------------------------------
-            // Helpers prévisionnel
+            // Helpers prévisionnel / projection
             // ---------------------------------------------------------------
 
             // Indexe une hiérarchie de prévisions en sous-dictionnaires plats
-            $indexPrevisions = function (array $hierarchy): array {
+            $indexPrevisions = function (array $hierarchy) use ($parOperations): array {
                 $idx = [
                     'cat'         => [],  // cat_id => montant
                     'cat_seance'  => [],  // cat_id => [seance => montant]
+                    'cat_ops'     => [],  // cat_id => [op_id => montant]
                     'sc'          => [],  // sc_id  => montant
                     'sc_seance'   => [],  // sc_id  => [seance => montant]
+                    'sc_ops'      => [],  // sc_id  => [op_id => montant]
                     'tiers'       => [],  // sc_id  => [tiers_id => montant]
                     'tiers_seance'=> [],  // sc_id  => [tiers_id => [seance => montant]]
                 ];
@@ -153,11 +165,17 @@
                     foreach (($cat['seances'] ?? []) as $s => $m) {
                         $idx['cat_seance'][$cId][$s] = (float) $m;
                     }
+                    foreach (($cat['operations'] ?? []) as $opId => $m) {
+                        $idx['cat_ops'][$cId][$opId] = (float) $m;
+                    }
                     foreach ($cat['sous_categories'] as $sc) {
                         $scId = $sc['sous_categorie_id'];
                         $idx['sc'][$scId] = (float) ($sc['montant'] ?? $sc['total'] ?? 0);
                         foreach (($sc['seances'] ?? []) as $s => $m) {
                             $idx['sc_seance'][$scId][$s] = (float) $m;
+                        }
+                        foreach (($sc['operations'] ?? []) as $opId => $m) {
+                            $idx['sc_ops'][$scId][$opId] = (float) $m;
                         }
                         foreach (($sc['tiers'] ?? []) as $t) {
                             $tId = $t['tiers_id'];
@@ -174,7 +192,7 @@
             $idxPrevCharges  = $indexPrevisions($previsionsCharges);
             $idxPrevProduits = $indexPrevisions($previsionsProduits);
 
-            // Rend une cellule "stack" Prévu / Réalisé / Écart
+            // Rend une cellule "stack" Prévu / Réalisé / Écart (mode comparaison)
             $renderCellule = function (float $realise, float $prevu, bool $isDepenses = false): string {
                 $r = number_format($realise, 2, ',', ' ');
                 $p = number_format($prevu,   2, ',', ' ');
@@ -210,6 +228,7 @@
                             'label' => $prevCat['label'],
                             'sous_categories' => [],
                             'seances' => [],
+                            'operations' => [],
                             'total' => 0.0,
                             'montant' => 0.0,
                         ];
@@ -226,6 +245,7 @@
                                 'label' => $prevSc['label'],
                                 'tiers' => [],
                                 'seances' => [],
+                                'operations' => [],
                                 'total' => 0.0,
                                 'montant' => 0.0,
                             ];
@@ -254,10 +274,20 @@
                 return array_values($byCatId);
             };
 
-            $chargesDisplay  = $previsionnel ? $mergeForDisplay($charges, $previsionsCharges)   : $charges;
-            $produitsDisplay = $previsionnel ? $mergeForDisplay($produits, $previsionsProduits) : $produits;
+            $chargesDisplay  = $mode !== 'realise' ? $mergeForDisplay($charges, $previsionsCharges)   : $charges;
+            $produitsDisplay = $mode !== 'realise' ? $mergeForDisplay($produits, $previsionsProduits) : $produits;
 
-            // Triplet formaté pour le mode parSeances=OFF + previsionnel=ON
+            // Helper projection : retourne réel si > 0, sinon prévu
+            $projeter = function (float $realise, float $prevu): float {
+                return $realise > 0 ? $realise : $prevu;
+            };
+
+            // True si la valeur affichée provient du prévisionnel (réel = 0)
+            $isProjectionPrevu = function (float $realise): bool {
+                return $realise <= 0;
+            };
+
+            // Triplet formaté pour le mode parSeances=OFF + comparaison=ON
             // (utilisé pour rendre 3 <td> distincts au lieu d'une cellule empilée)
             $formatTriad = function (float $realise, float $prevu, bool $isDepenses = false): array {
                 $ecart = $realise - $prevu;
@@ -271,11 +301,31 @@
                     'ecartColor' => $ecartColor,
                 ];
             };
+
+            // ---------------------------------------------------------------
+            // Calcul du colspan total pour les lignes pleine-largeur
+            // ---------------------------------------------------------------
+            $nbDataCols = 1; // défaut : 1 colonne "Montant"
+            if ($parSeances) {
+                $nbDataCols = count($seances) + 1; // séances + Total
+            } elseif ($parOperations) {
+                $nbOps = count($operationNames);
+                if ($mode === 'comparaison') {
+                    $nbDataCols = ($nbOps + 1) * 3; // (ops + total) × 3 sous-colonnes
+                } else {
+                    $nbDataCols = $nbOps + 1; // ops + Total
+                }
+            } elseif ($mode === 'comparaison') {
+                $nbDataCols = 3; // Prévu / Réalisé / Écart
+            } elseif ($mode === 'projection') {
+                $nbDataCols = 1; // 1 colonne "Projeté"
+            }
+            $totalColspan = 2 + $nbDataCols;
         @endphp
 
         @foreach ([
-            ['data' => $chargesDisplay, 'label' => 'DÉPENSES', 'totalMontant' => $totalCharges],
-            ['data' => $produitsDisplay, 'label' => 'RECETTES', 'totalMontant' => $totalProduits],
+            ['data' => $chargesDisplay, 'prevDisplay' => $previsionsCharges, 'label' => 'DÉPENSES', 'totalMontant' => $totalCharges],
+            ['data' => $produitsDisplay, 'prevDisplay' => $previsionsProduits, 'label' => 'RECETTES', 'totalMontant' => $totalProduits],
         ] as $section)
         <div class="card mb-3 border-0 shadow-sm">
             <div class="card-body p-0">
@@ -293,38 +343,79 @@
                                 @endforeach
                                 <td class="text-end" style="width:90px;font-size:11px;opacity:.85;padding:4px 8px;">Total</td>
                             </tr>
+                        @elseif ($parOperations)
+                            {{-- En-tête niveau 1 : noms des opérations --}}
+                            <tr style="background:#3d5473;color:#fff;">
+                                <td style="width:20px;"></td>
+                                <td></td>
+                                @foreach ($operationNames as $opId => $opNom)
+                                    @if ($mode === 'comparaison')
+                                        <td class="text-end" style="font-size:11px;opacity:.85;padding:4px 4px;" colspan="3">
+                                            {{ \Illuminate\Support\Str::limit($opNom, 20) }}
+                                        </td>
+                                    @else
+                                        <td class="text-end" style="width:100px;font-size:11px;opacity:.85;padding:4px 8px;" title="{{ $opNom }}">
+                                            {{ \Illuminate\Support\Str::limit($opNom, 20) }}
+                                        </td>
+                                    @endif
+                                @endforeach
+                                @if ($mode === 'comparaison')
+                                    <td class="text-end" style="font-size:11px;opacity:.85;padding:4px 4px;" colspan="3">Total</td>
+                                @else
+                                    <td class="text-end" style="width:100px;font-size:11px;opacity:.85;padding:4px 8px;">Total</td>
+                                @endif
+                            </tr>
+                            {{-- En-tête niveau 2 : Prévu/Réel/Éc. (mode comparaison uniquement) --}}
+                            @if ($mode === 'comparaison')
+                            <tr style="background:#3d5473;color:#fff;">
+                                <td style="width:20px;"></td>
+                                <td></td>
+                                @foreach ($operationNames as $opId => $opNom)
+                                    <td class="text-end" style="width:70px;font-size:10px;opacity:.7;padding:2px 4px;">Prévu</td>
+                                    <td class="text-end" style="width:70px;font-size:10px;opacity:.7;padding:2px 4px;">Réel</td>
+                                    <td class="text-end" style="width:70px;font-size:10px;opacity:.7;padding:2px 4px;">Éc.</td>
+                                @endforeach
+                                <td class="text-end" style="width:70px;font-size:10px;opacity:.7;padding:2px 4px;">Prévu</td>
+                                <td class="text-end" style="width:70px;font-size:10px;opacity:.7;padding:2px 4px;">Réel</td>
+                                <td class="text-end" style="width:70px;font-size:10px;opacity:.7;padding:2px 4px;">Éc.</td>
+                            </tr>
+                            @endif
                         @else
                             <tr style="background:#3d5473;color:#fff;">
                                 <td style="width:20px;"></td>
                                 <td></td>
-                                @if ($previsionnel)
+                                @if ($mode === 'comparaison')
                                     <td class="text-end" style="width:110px;font-size:12px;opacity:.85;padding:4px 8px;">Prévu</td>
                                     <td class="text-end" style="width:110px;font-size:12px;opacity:.85;padding:4px 8px;">Réalisé</td>
                                     <td class="text-end" style="width:110px;font-size:12px;opacity:.85;padding:4px 8px;">Écart</td>
+                                @elseif ($mode === 'projection')
+                                    <td class="text-end" style="width:130px;font-size:12px;opacity:.85;">Projeté</td>
                                 @else
                                     <td class="text-end" style="width:130px;font-size:12px;opacity:.85;">Montant</td>
                                 @endif
                             </tr>
                         @endif
+
                         {{-- Titre section --}}
                         <tr style="background:#3d5473;color:#fff;font-weight:700;font-size:14px;">
-                            <td colspan="{{ $parSeances ? count($seances) + 3 : ($previsionnel ? 5 : 3) }}" style="padding:4px 12px 10px;">
+                            <td colspan="{{ $totalColspan }}" style="padding:4px 12px 10px;">
                                 {{ $section['label'] }}
                             </td>
                         </tr>
 
                         @php
                             $sectionIdx = $section['label'] === 'DÉPENSES' ? $idxPrevCharges : $idxPrevProduits;
+                            $isDepenses = $section['label'] === 'DÉPENSES';
                         @endphp
 
                         @foreach ($section['data'] as $cat)
                             @php
-                                $scVisibles = collect($cat['sous_categories'])->filter(function ($sc) use ($parSeances, $previsionnel, $sectionIdx) {
+                                $scVisibles = collect($cat['sous_categories'])->filter(function ($sc) use ($parSeances, $parOperations, $mode, $sectionIdx) {
                                     $realise = $parSeances ? ($sc['total'] ?? 0) : ($sc['montant'] ?? 0);
                                     if ($realise > 0) {
                                         return true;
                                     }
-                                    if (! $previsionnel) {
+                                    if ($mode === 'realise') {
                                         return false;
                                     }
                                     return ((float) ($sectionIdx['sc'][$sc['sous_categorie_id']] ?? 0)) > 0;
@@ -337,13 +428,27 @@
                                     <td style="font-weight:600;color:#1e3a5f;padding:7px 12px;">{{ $cat['label'] }}</td>
                                     @if ($parSeances)
                                         @foreach ($seances as $s)
-                                            @if ($previsionnel)
+                                            @if ($mode === 'comparaison')
                                                 <td class="text-end" style="padding:7px 8px;">
                                                     {!! $renderCellule(
                                                         (float) ($cat['seances'][$s] ?? 0),
                                                         (float) ($sectionIdx['cat_seance'][$cat['categorie_id']][$s] ?? 0),
-                                                        $section['label'] === 'DÉPENSES'
+                                                        $isDepenses
                                                     ) !!}
+                                                </td>
+                                            @elseif ($mode === 'projection')
+                                                @php
+                                                    $rVal = (float) ($cat['seances'][$s] ?? 0);
+                                                    $pVal = (float) ($sectionIdx['cat_seance'][$cat['categorie_id']][$s] ?? 0);
+                                                    $projVal = $projeter($rVal, $pVal);
+                                                    $projColor = $isProjectionPrevu($rVal) && $projVal > 0 ? '#1565C0' : 'inherit';
+                                                @endphp
+                                                <td class="text-end fw-bold" style="padding:7px 8px;color:{{ $projColor }};">
+                                                    @if ($projVal > 0)
+                                                        {{ number_format($projVal, 2, ',', ' ') }} &euro;
+                                                    @else
+                                                        &mdash;
+                                                    @endif
                                                 </td>
                                             @else
                                                 <td class="text-end fw-bold" style="padding:7px 8px;">
@@ -355,23 +460,93 @@
                                                 </td>
                                             @endif
                                         @endforeach
-                                        @if ($previsionnel)
+                                        {{-- Colonne Total séances --}}
+                                        @if ($mode === 'comparaison')
                                             <td class="text-end" style="padding:7px 8px;">
                                                 {!! $renderCellule(
                                                     (float) ($cat['total'] ?? 0),
                                                     (float) ($sectionIdx['cat'][$cat['categorie_id']] ?? 0),
-                                                    $section['label'] === 'DÉPENSES'
+                                                    $isDepenses
                                                 ) !!}
+                                            </td>
+                                        @elseif ($mode === 'projection')
+                                            @php
+                                                $rTotal = (float) ($cat['total'] ?? 0);
+                                                $pTotal = (float) ($sectionIdx['cat'][$cat['categorie_id']] ?? 0);
+                                                // Total projeté = somme des projections par séance
+                                                $projTotal = 0.0;
+                                                foreach ($seances as $_s) {
+                                                    $projTotal += $projeter(
+                                                        (float) ($cat['seances'][$_s] ?? 0),
+                                                        (float) ($sectionIdx['cat_seance'][$cat['categorie_id']][$_s] ?? 0)
+                                                    );
+                                                }
+                                            @endphp
+                                            <td class="text-end fw-bold" style="padding:7px 8px;">
+                                                {{ number_format($projTotal, 2, ',', ' ') }} &euro;
                                             </td>
                                         @else
                                             <td class="text-end fw-bold" style="padding:7px 8px;">{{ number_format($cat['total'], 2, ',', ' ') }} &euro;</td>
                                         @endif
+                                    @elseif ($parOperations)
+                                        @foreach ($operationNames as $opId => $opNom)
+                                            @php
+                                                $opRealise = (float) ($cat['operations'][$opId] ?? 0);
+                                                $opPrevu   = (float) ($sectionIdx['cat_ops'][$cat['categorie_id']][$opId] ?? 0);
+                                            @endphp
+                                            @if ($mode === 'comparaison')
+                                                @php $tri = $formatTriad($opRealise, $opPrevu, $isDepenses); @endphp
+                                                <td class="text-end" style="padding:7px 4px;color:#6c757d;font-size:12px;">{{ $tri['prevu'] }} &euro;</td>
+                                                <td class="text-end fw-bold" style="padding:7px 4px;font-size:12px;">{{ $tri['realise'] }} &euro;</td>
+                                                <td class="text-end" style="padding:7px 4px;color:{{ $tri['ecartColor'] }};font-size:12px;">{{ $tri['ecart'] }} &euro;</td>
+                                            @elseif ($mode === 'projection')
+                                                @php $projVal = $projeter($opRealise, $opPrevu); @endphp
+                                                <td class="text-end fw-bold" style="padding:7px 8px;font-size:12px;">
+                                                    {{ $projVal > 0 ? number_format($projVal, 2, ',', ' ').' €' : '—' }}
+                                                </td>
+                                            @else
+                                                <td class="text-end fw-bold" style="padding:7px 8px;font-size:12px;">
+                                                    {{ $opRealise > 0 ? number_format($opRealise, 2, ',', ' ').' €' : '—' }}
+                                                </td>
+                                            @endif
+                                        @endforeach
+                                        {{-- Colonne Total opérations --}}
+                                        @php
+                                            $catTotalRealise = (float) ($cat['montant'] ?? 0);
+                                            $catTotalPrevu   = (float) ($sectionIdx['cat'][$cat['categorie_id']] ?? 0);
+                                        @endphp
+                                        @if ($mode === 'comparaison')
+                                            @php $tri = $formatTriad($catTotalRealise, $catTotalPrevu, $isDepenses); @endphp
+                                            <td class="text-end" style="padding:7px 4px;color:#6c757d;font-weight:600;">{{ $tri['prevu'] }} &euro;</td>
+                                            <td class="text-end fw-bold" style="padding:7px 4px;">{{ $tri['realise'] }} &euro;</td>
+                                            <td class="text-end" style="padding:7px 4px;color:{{ $tri['ecartColor'] }};">{{ $tri['ecart'] }} &euro;</td>
+                                        @elseif ($mode === 'projection')
+                                            @php
+                                                $projCatTotal = 0.0;
+                                                foreach ($operationNames as $_opId => $_opNom) {
+                                                    $projCatTotal += $projeter(
+                                                        (float) ($cat['operations'][$_opId] ?? 0),
+                                                        (float) ($sectionIdx['cat_ops'][$cat['categorie_id']][$_opId] ?? 0)
+                                                    );
+                                                }
+                                            @endphp
+                                            <td class="text-end fw-bold" style="padding:7px 8px;">{{ number_format($projCatTotal, 2, ',', ' ') }} &euro;</td>
+                                        @else
+                                            <td class="text-end fw-bold" style="padding:7px 8px;">{{ number_format($catTotalRealise, 2, ',', ' ') }} &euro;</td>
+                                        @endif
                                     @else
-                                        @if ($previsionnel)
-                                            @php $tri = $formatTriad((float) ($cat['montant'] ?? 0), (float) ($sectionIdx['cat'][$cat['categorie_id']] ?? 0), $section['label'] === 'DÉPENSES'); @endphp
+                                        @if ($mode === 'comparaison')
+                                            @php $tri = $formatTriad((float) ($cat['montant'] ?? 0), (float) ($sectionIdx['cat'][$cat['categorie_id']] ?? 0), $isDepenses); @endphp
                                             <td class="text-end" style="padding:7px 12px;color:#6c757d;">{{ $tri['prevu'] }} &euro;</td>
                                             <td class="text-end fw-bold" style="padding:7px 12px;">{{ $tri['realise'] }} &euro;</td>
                                             <td class="text-end" style="padding:7px 12px;color:{{ $tri['ecartColor'] }};">{{ $tri['ecart'] }} &euro;</td>
+                                        @elseif ($mode === 'projection')
+                                            @php
+                                                $rCat = (float) ($cat['montant'] ?? 0);
+                                                $pCat = (float) ($sectionIdx['cat'][$cat['categorie_id']] ?? 0);
+                                                $projCat = $projeter($rCat, $pCat);
+                                            @endphp
+                                            <td class="text-end fw-bold" style="padding:7px 12px;">{{ number_format($projCat, 2, ',', ' ') }} &euro;</td>
                                         @else
                                             <td class="text-end fw-bold" style="padding:7px 12px;">{{ number_format($cat['montant'], 2, ',', ' ') }} &euro;</td>
                                         @endif
@@ -385,13 +560,27 @@
                                         <td style="padding:5px 12px 5px 32px;color:#444;">{{ $sc['label'] }}</td>
                                         @if ($parSeances)
                                             @foreach ($seances as $s)
-                                                @if ($previsionnel)
+                                                @if ($mode === 'comparaison')
                                                     <td class="text-end" style="padding:5px 8px;color:#444;">
                                                         {!! $renderCellule(
                                                             (float) ($sc['seances'][$s] ?? 0),
                                                             (float) ($sectionIdx['sc_seance'][$sc['sous_categorie_id']][$s] ?? 0),
-                                                            $section['label'] === 'DÉPENSES'
+                                                            $isDepenses
                                                         ) !!}
+                                                    </td>
+                                                @elseif ($mode === 'projection')
+                                                    @php
+                                                        $rVal = (float) ($sc['seances'][$s] ?? 0);
+                                                        $pVal = (float) ($sectionIdx['sc_seance'][$sc['sous_categorie_id']][$s] ?? 0);
+                                                        $projVal = $projeter($rVal, $pVal);
+                                                        $projColor = $isProjectionPrevu($rVal) && $projVal > 0 ? '#1565C0' : 'inherit';
+                                                    @endphp
+                                                    <td class="text-end" style="padding:5px 8px;color:{{ $projColor }};">
+                                                        @if ($projVal > 0)
+                                                            {{ number_format($projVal, 2, ',', ' ') }} &euro;
+                                                        @else
+                                                            &mdash;
+                                                        @endif
                                                     </td>
                                                 @else
                                                     <td class="text-end" style="padding:5px 8px;color:#444;">
@@ -403,36 +592,101 @@
                                                     </td>
                                                 @endif
                                             @endforeach
-                                            @if ($previsionnel)
+                                            {{-- Colonne Total sc séances --}}
+                                            @if ($mode === 'comparaison')
                                                 <td class="text-end" style="padding:5px 8px;">
                                                     {!! $renderCellule(
                                                         (float) ($sc['total'] ?? 0),
                                                         (float) ($sectionIdx['sc'][$sc['sous_categorie_id']] ?? 0),
-                                                        $section['label'] === 'DÉPENSES'
+                                                        $isDepenses
                                                     ) !!}
                                                 </td>
+                                            @elseif ($mode === 'projection')
+                                                @php
+                                                    $projScTotal = 0.0;
+                                                    foreach ($seances as $_s) {
+                                                        $projScTotal += $projeter(
+                                                            (float) ($sc['seances'][$_s] ?? 0),
+                                                            (float) ($sectionIdx['sc_seance'][$sc['sous_categorie_id']][$_s] ?? 0)
+                                                        );
+                                                    }
+                                                @endphp
+                                                <td class="text-end fw-bold" style="padding:5px 8px;">{{ number_format($projScTotal, 2, ',', ' ') }} &euro;</td>
                                             @else
                                                 <td class="text-end fw-bold" style="padding:5px 8px;">{{ number_format($sc['total'], 2, ',', ' ') }} &euro;</td>
                                             @endif
+                                        @elseif ($parOperations)
+                                            @foreach ($operationNames as $opId => $opNom)
+                                                @php
+                                                    $opRealise = (float) ($sc['operations'][$opId] ?? 0);
+                                                    $opPrevu   = (float) ($sectionIdx['sc_ops'][$sc['sous_categorie_id']][$opId] ?? 0);
+                                                @endphp
+                                                @if ($mode === 'comparaison')
+                                                    @php $tri = $formatTriad($opRealise, $opPrevu, $isDepenses); @endphp
+                                                    <td class="text-end" style="padding:5px 4px;color:#6c757d;font-size:12px;">{{ $tri['prevu'] }} &euro;</td>
+                                                    <td class="text-end" style="padding:5px 4px;font-size:12px;color:#444;">{{ $tri['realise'] }} &euro;</td>
+                                                    <td class="text-end" style="padding:5px 4px;color:{{ $tri['ecartColor'] }};font-size:12px;">{{ $tri['ecart'] }} &euro;</td>
+                                                @elseif ($mode === 'projection')
+                                                    @php $projVal = $projeter($opRealise, $opPrevu); @endphp
+                                                    <td class="text-end" style="padding:5px 8px;font-size:12px;color:#444;">
+                                                        {{ $projVal > 0 ? number_format($projVal, 2, ',', ' ').' €' : '—' }}
+                                                    </td>
+                                                @else
+                                                    <td class="text-end" style="padding:5px 8px;font-size:12px;color:#444;">
+                                                        {{ $opRealise > 0 ? number_format($opRealise, 2, ',', ' ').' €' : '—' }}
+                                                    </td>
+                                                @endif
+                                            @endforeach
+                                            {{-- Colonne Total sc opérations --}}
+                                            @php
+                                                $scTotalRealise = (float) ($sc['montant'] ?? 0);
+                                                $scTotalPrevu   = (float) ($sectionIdx['sc'][$sc['sous_categorie_id']] ?? 0);
+                                            @endphp
+                                            @if ($mode === 'comparaison')
+                                                @php $tri = $formatTriad($scTotalRealise, $scTotalPrevu, $isDepenses); @endphp
+                                                <td class="text-end" style="padding:5px 4px;color:#6c757d;">{{ $tri['prevu'] }} &euro;</td>
+                                                <td class="text-end fw-bold" style="padding:5px 4px;color:#444;">{{ $tri['realise'] }} &euro;</td>
+                                                <td class="text-end" style="padding:5px 4px;color:{{ $tri['ecartColor'] }};">{{ $tri['ecart'] }} &euro;</td>
+                                            @elseif ($mode === 'projection')
+                                                @php
+                                                    $projScOpsTotal = 0.0;
+                                                    foreach ($operationNames as $_opId => $_opNom) {
+                                                        $projScOpsTotal += $projeter(
+                                                            (float) ($sc['operations'][$_opId] ?? 0),
+                                                            (float) ($sectionIdx['sc_ops'][$sc['sous_categorie_id']][$_opId] ?? 0)
+                                                        );
+                                                    }
+                                                @endphp
+                                                <td class="text-end fw-bold" style="padding:5px 8px;color:#444;">{{ number_format($projScOpsTotal, 2, ',', ' ') }} &euro;</td>
+                                            @else
+                                                <td class="text-end fw-bold" style="padding:5px 8px;color:#444;">{{ number_format($scTotalRealise, 2, ',', ' ') }} &euro;</td>
+                                            @endif
                                         @else
-                                            @if ($previsionnel)
-                                                @php $tri = $formatTriad((float) ($sc['montant'] ?? 0), (float) ($sectionIdx['sc'][$sc['sous_categorie_id']] ?? 0), $section['label'] === 'DÉPENSES'); @endphp
+                                            @if ($mode === 'comparaison')
+                                                @php $tri = $formatTriad((float) ($sc['montant'] ?? 0), (float) ($sectionIdx['sc'][$sc['sous_categorie_id']] ?? 0), $isDepenses); @endphp
                                                 <td class="text-end" style="padding:5px 12px;color:#6c757d;">{{ $tri['prevu'] }} &euro;</td>
                                                 <td class="text-end fw-bold" style="padding:5px 12px;color:#444;">{{ $tri['realise'] }} &euro;</td>
                                                 <td class="text-end" style="padding:5px 12px;color:{{ $tri['ecartColor'] }};">{{ $tri['ecart'] }} &euro;</td>
+                                            @elseif ($mode === 'projection')
+                                                @php
+                                                    $rSc = (float) ($sc['montant'] ?? 0);
+                                                    $pSc = (float) ($sectionIdx['sc'][$sc['sous_categorie_id']] ?? 0);
+                                                    $projSc = $projeter($rSc, $pSc);
+                                                @endphp
+                                                <td class="text-end" style="padding:5px 12px;color:#444;">{{ number_format($projSc, 2, ',', ' ') }} &euro;</td>
                                             @else
                                                 <td class="text-end" style="padding:5px 12px;color:#444;">{{ number_format($sc['montant'], 2, ',', ' ') }} &euro;</td>
                                             @endif
                                         @endif
                                     </tr>
 
-                                    {{-- Lignes tiers (si activé) --}}
-                                    @if ($parTiers && ! empty($sc['tiers']))
+                                    {{-- Lignes tiers (si activé, compatible séances uniquement — pas parOperations) --}}
+                                    @if ($parTiers && ! $parOperations && ! empty($sc['tiers']))
                                         @foreach ($sc['tiers'] as $t)
                                             @php
                                                 $tRealise = $parSeances ? ($t['total'] ?? 0) : ($t['montant'] ?? 0);
                                                 $tPrev = (float) ($sectionIdx['tiers'][$sc['sous_categorie_id']][$t['tiers_id']] ?? 0);
-                                                $tVisible = $tRealise > 0 || ($previsionnel && $tPrev > 0);
+                                                $tVisible = $tRealise > 0 || ($mode !== 'realise' && $tPrev > 0);
                                             @endphp
                                             @if ($tVisible)
                                             <tr style="background:#fff;">
@@ -451,13 +705,27 @@
                                                 </td>
                                                 @if ($parSeances)
                                                     @foreach ($seances as $s)
-                                                        @if ($previsionnel)
+                                                        @if ($mode === 'comparaison')
                                                             <td class="text-end" style="padding:4px 8px;font-size:12px;">
                                                                 {!! $renderCellule(
                                                                     (float) ($t['seances'][$s] ?? 0),
                                                                     (float) ($sectionIdx['tiers_seance'][$sc['sous_categorie_id']][$t['tiers_id']][$s] ?? 0),
-                                                                    $section['label'] === 'DÉPENSES'
+                                                                    $isDepenses
                                                                 ) !!}
+                                                            </td>
+                                                        @elseif ($mode === 'projection')
+                                                            @php
+                                                                $rVal = (float) ($t['seances'][$s] ?? 0);
+                                                                $pVal = (float) ($sectionIdx['tiers_seance'][$sc['sous_categorie_id']][$t['tiers_id']][$s] ?? 0);
+                                                                $projVal = $projeter($rVal, $pVal);
+                                                                $projColor = $isProjectionPrevu($rVal) && $projVal > 0 ? '#1565C0' : '#888';
+                                                            @endphp
+                                                            <td class="text-end" style="padding:4px 8px;color:{{ $projColor }};font-size:12px;">
+                                                                @if ($projVal > 0)
+                                                                    {{ number_format($projVal, 2, ',', ' ') }} &euro;
+                                                                @else
+                                                                    &mdash;
+                                                                @endif
                                                             </td>
                                                         @else
                                                             <td class="text-end" style="padding:4px 8px;color:#888;font-size:12px;">
@@ -469,23 +737,42 @@
                                                             </td>
                                                         @endif
                                                     @endforeach
-                                                    @if ($previsionnel)
+                                                    {{-- Colonne Total tiers séances --}}
+                                                    @if ($mode === 'comparaison')
                                                         <td class="text-end" style="padding:4px 8px;font-size:12px;">
                                                             {!! $renderCellule(
                                                                 (float) ($t['total'] ?? 0),
                                                                 (float) ($sectionIdx['tiers'][$sc['sous_categorie_id']][$t['tiers_id']] ?? 0),
-                                                                $section['label'] === 'DÉPENSES'
+                                                                $isDepenses
                                                             ) !!}
                                                         </td>
+                                                    @elseif ($mode === 'projection')
+                                                        @php
+                                                            $projTTotal = 0.0;
+                                                            foreach ($seances as $_s) {
+                                                                $projTTotal += $projeter(
+                                                                    (float) ($t['seances'][$_s] ?? 0),
+                                                                    (float) ($sectionIdx['tiers_seance'][$sc['sous_categorie_id']][$t['tiers_id']][$_s] ?? 0)
+                                                                );
+                                                            }
+                                                        @endphp
+                                                        <td class="text-end" style="padding:4px 8px;color:#666;font-size:12px;">{{ number_format($projTTotal, 2, ',', ' ') }} &euro;</td>
                                                     @else
                                                         <td class="text-end" style="padding:4px 8px;color:#666;font-size:12px;">{{ number_format($t['total'], 2, ',', ' ') }} &euro;</td>
                                                     @endif
                                                 @else
-                                                    @if ($previsionnel)
-                                                        @php $tri = $formatTriad((float) ($t['montant'] ?? 0), (float) ($sectionIdx['tiers'][$sc['sous_categorie_id']][$t['tiers_id']] ?? 0), $section['label'] === 'DÉPENSES'); @endphp
+                                                    @if ($mode === 'comparaison')
+                                                        @php $tri = $formatTriad((float) ($t['montant'] ?? 0), (float) ($sectionIdx['tiers'][$sc['sous_categorie_id']][$t['tiers_id']] ?? 0), $isDepenses); @endphp
                                                         <td class="text-end" style="padding:4px 12px;color:#6c757d;font-size:12px;">{{ $tri['prevu'] }} &euro;</td>
                                                         <td class="text-end" style="padding:4px 12px;color:#666;font-size:12px;font-weight:600;">{{ $tri['realise'] }} &euro;</td>
                                                         <td class="text-end" style="padding:4px 12px;color:{{ $tri['ecartColor'] }};font-size:12px;">{{ $tri['ecart'] }} &euro;</td>
+                                                    @elseif ($mode === 'projection')
+                                                        @php
+                                                            $rT = (float) ($t['montant'] ?? 0);
+                                                            $pT = (float) ($sectionIdx['tiers'][$sc['sous_categorie_id']][$t['tiers_id']] ?? 0);
+                                                            $projT = $projeter($rT, $pT);
+                                                        @endphp
+                                                        <td class="text-end" style="padding:4px 12px;color:#666;font-size:12px;">{{ number_format($projT, 2, ',', ' ') }} &euro;</td>
                                                     @else
                                                         <td class="text-end" style="padding:4px 12px;color:#666;font-size:12px;">{{ number_format($t['montant'], 2, ',', ' ') }} &euro;</td>
                                                     @endif
@@ -511,7 +798,7 @@
                             }
                             // Sommes prévues par séance pour le total section
                             $totalPrevuSeances = [];
-                            if ($previsionnel && $parSeances) {
+                            if ($mode !== 'realise' && $parSeances) {
                                 $totalPrevuSeances = array_fill_keys($seances, 0.0);
                                 foreach ($sectionIdx['cat_seance'] as $catSeances) {
                                     foreach ($seances as $s) {
@@ -519,41 +806,111 @@
                                     }
                                 }
                             }
-                            $totalPrevuSection = $previsionnel ? array_sum($sectionIdx['cat']) : 0.0;
+                            $totalPrevuSection = $mode !== 'realise' ? array_sum($sectionIdx['cat']) : 0.0;
+
+                            // Totaux par opération pour le total section
+                            $totalSectionOps = [];
+                            $totalPrevuSectionOps = [];
+                            if ($parOperations) {
+                                foreach ($operationNames as $opId => $opNom) {
+                                    $totalSectionOps[$opId] = 0.0;
+                                    $totalPrevuSectionOps[$opId] = 0.0;
+                                    foreach ($section['data'] as $cat) {
+                                        $totalSectionOps[$opId] += (float) ($cat['operations'][$opId] ?? 0);
+                                        $totalPrevuSectionOps[$opId] += (float) ($sectionIdx['cat_ops'][$cat['categorie_id']][$opId] ?? 0);
+                                    }
+                                }
+                            }
                         @endphp
                         <tr style="background:#5a7fa8;color:#fff;font-weight:700;font-size:14px;">
                             <td colspan="2" style="padding:9px 12px;">TOTAL {{ $section['label'] }}</td>
                             @if ($parSeances)
                                 @foreach ($seances as $s)
-                                    @if ($previsionnel)
+                                    @if ($mode === 'comparaison')
                                         <td class="text-end" style="padding:9px 8px;">
                                             {!! $renderCellule(
                                                 (float) ($totalSectionSeances[$s] ?? 0),
                                                 (float) ($totalPrevuSeances[$s] ?? 0),
-                                                $section['label'] === 'DÉPENSES'
+                                                $isDepenses
                                             ) !!}
                                         </td>
+                                    @elseif ($mode === 'projection')
+                                        @php
+                                            $projTotSeance = $projeter(
+                                                (float) ($totalSectionSeances[$s] ?? 0),
+                                                (float) ($totalPrevuSeances[$s] ?? 0)
+                                            );
+                                        @endphp
+                                        <td class="text-end" style="padding:9px 8px;">{{ number_format($projTotSeance, 2, ',', ' ') }} &euro;</td>
                                     @else
                                         <td class="text-end" style="padding:9px 8px;">{{ number_format($totalSectionSeances[$s], 2, ',', ' ') }} &euro;</td>
                                     @endif
                                 @endforeach
-                                @if ($previsionnel)
+                                {{-- Grand total de section (séances) --}}
+                                @if ($mode === 'comparaison')
                                     <td class="text-end" style="padding:9px 8px;">
                                         {!! $renderCellule(
                                             (float) $section['totalMontant'],
                                             $totalPrevuSection,
-                                            $section['label'] === 'DÉPENSES'
+                                            $isDepenses
                                         ) !!}
                                     </td>
+                                @elseif ($mode === 'projection')
+                                    @php
+                                        $projGrandTotal = 0.0;
+                                        foreach ($seances as $_s) {
+                                            $projGrandTotal += $projeter(
+                                                (float) ($totalSectionSeances[$_s] ?? 0),
+                                                (float) ($totalPrevuSeances[$_s] ?? 0)
+                                            );
+                                        }
+                                    @endphp
+                                    <td class="text-end" style="padding:9px 8px;">{{ number_format($projGrandTotal, 2, ',', ' ') }} &euro;</td>
+                                @else
+                                    <td class="text-end" style="padding:9px 8px;">{{ number_format($section['totalMontant'], 2, ',', ' ') }} &euro;</td>
+                                @endif
+                            @elseif ($parOperations)
+                                @foreach ($operationNames as $opId => $opNom)
+                                    @if ($mode === 'comparaison')
+                                        @php $tri = $formatTriad($totalSectionOps[$opId], $totalPrevuSectionOps[$opId], $isDepenses); @endphp
+                                        <td class="text-end" style="padding:9px 4px;opacity:.85;font-size:12px;">{{ $tri['prevu'] }} &euro;</td>
+                                        <td class="text-end" style="padding:9px 4px;font-size:12px;">{{ $tri['realise'] }} &euro;</td>
+                                        <td class="text-end" style="padding:9px 4px;color:{{ $tri['ecartColor'] }};font-size:12px;">{{ $tri['ecart'] }} &euro;</td>
+                                    @elseif ($mode === 'projection')
+                                        @php $projOpTotal = $projeter($totalSectionOps[$opId], $totalPrevuSectionOps[$opId]); @endphp
+                                        <td class="text-end" style="padding:9px 8px;font-size:12px;">{{ number_format($projOpTotal, 2, ',', ' ') }} &euro;</td>
+                                    @else
+                                        <td class="text-end" style="padding:9px 8px;font-size:12px;">{{ number_format($totalSectionOps[$opId], 2, ',', ' ') }} &euro;</td>
+                                    @endif
+                                @endforeach
+                                {{-- Grand total de section (opérations) --}}
+                                @if ($mode === 'comparaison')
+                                    @php $tri = $formatTriad((float) $section['totalMontant'], $totalPrevuSection, $isDepenses); @endphp
+                                    <td class="text-end" style="padding:9px 4px;opacity:.85;">{{ $tri['prevu'] }} &euro;</td>
+                                    <td class="text-end" style="padding:9px 4px;">{{ $tri['realise'] }} &euro;</td>
+                                    <td class="text-end" style="padding:9px 4px;color:{{ $tri['ecartColor'] }};">{{ $tri['ecart'] }} &euro;</td>
+                                @elseif ($mode === 'projection')
+                                    @php
+                                        $projSectionTotal = 0.0;
+                                        foreach ($operationNames as $_opId => $_opNom) {
+                                            $projSectionTotal += $projeter($totalSectionOps[$_opId], $totalPrevuSectionOps[$_opId]);
+                                        }
+                                    @endphp
+                                    <td class="text-end" style="padding:9px 8px;">{{ number_format($projSectionTotal, 2, ',', ' ') }} &euro;</td>
                                 @else
                                     <td class="text-end" style="padding:9px 8px;">{{ number_format($section['totalMontant'], 2, ',', ' ') }} &euro;</td>
                                 @endif
                             @else
-                                @if ($previsionnel)
-                                    @php $tri = $formatTriad((float) $section['totalMontant'], (float) $totalPrevuSection, $section['label'] === 'DÉPENSES'); @endphp
+                                @if ($mode === 'comparaison')
+                                    @php $tri = $formatTriad((float) $section['totalMontant'], (float) $totalPrevuSection, $isDepenses); @endphp
                                     <td class="text-end" style="padding:9px 12px;opacity:.85;">{{ $tri['prevu'] }} &euro;</td>
                                     <td class="text-end" style="padding:9px 12px;">{{ $tri['realise'] }} &euro;</td>
                                     <td class="text-end" style="padding:9px 12px;color:{{ $tri['ecartColor'] }};">{{ $tri['ecart'] }} &euro;</td>
+                                @elseif ($mode === 'projection')
+                                    @php
+                                        $projSecTotal = $projeter((float) $section['totalMontant'], (float) $totalPrevuSection);
+                                    @endphp
+                                    <td class="text-end" style="padding:9px 12px;">{{ number_format($projSecTotal, 2, ',', ' ') }} &euro;</td>
                                 @else
                                     <td class="text-end" style="padding:9px 12px;">{{ number_format($section['totalMontant'], 2, ',', ' ') }} &euro;</td>
                                 @endif

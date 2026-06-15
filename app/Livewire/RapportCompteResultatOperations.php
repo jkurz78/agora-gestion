@@ -22,8 +22,33 @@ final class RapportCompteResultatOperations extends Component
     #[Url(as: 'tiers')]
     public bool $parTiers = true;
 
-    #[Url(as: 'prev')]
-    public bool $previsionnel = false;
+    #[Url(as: 'mode')]
+    public string $mode = 'realise';  // 'realise' | 'comparaison' | 'projection'
+
+    #[Url(as: 'parops')]
+    public bool $parOperations = false;
+
+    public function updatedParOperations(bool $value): void
+    {
+        if ($value) {
+            $this->parSeances = false;
+            $this->parTiers = false;
+        }
+    }
+
+    public function updatedParSeances(bool $value): void
+    {
+        if ($value) {
+            $this->parOperations = false;
+        }
+    }
+
+    public function updatedParTiers(bool $value): void
+    {
+        if ($value) {
+            $this->parOperations = false;
+        }
+    }
 
     public function exportUrl(string $format): string
     {
@@ -36,7 +61,8 @@ final class RapportCompteResultatOperations extends Component
             'ops' => $this->selectedOperationIds,
             'seances' => $this->parSeances ? '1' : '0',
             'tiers' => $this->parTiers ? '1' : '0',
-            'prev' => $this->previsionnel ? '1' : '0',
+            'mode' => $this->mode,
+            'parops' => $this->parOperations ? '1' : '0',
         ]);
     }
 
@@ -51,9 +77,12 @@ final class RapportCompteResultatOperations extends Component
         $previsionsCharges = [];
         $previsionsProduits = [];
         $seances = [];
+        $operationNames = [];
         $totalCharges = 0.0;
         $totalProduits = 0.0;
         $hasSelection = ! empty($this->selectedOperationIds);
+
+        $previsionnel = $this->mode !== 'realise';
 
         if ($hasSelection) {
             $data = app(RapportService::class)->compteDeResultatOperations(
@@ -61,13 +90,15 @@ final class RapportCompteResultatOperations extends Component
                 $this->selectedOperationIds,
                 $this->parSeances,
                 $this->parTiers,
-                $this->previsionnel,
+                $previsionnel,
+                $this->parOperations,
             );
             $charges = $data['charges'];
             $produits = $data['produits'];
             $seances = $data['seances'] ?? [];
             $previsionsCharges = $data['previsions_charges'] ?? [];
             $previsionsProduits = $data['previsions_produits'] ?? [];
+            $operationNames = $data['operation_names'] ?? [];
             $totalCharges = $this->parSeances
                 ? collect($charges)->sum('total')
                 : collect($charges)->sum('montant');
@@ -83,10 +114,13 @@ final class RapportCompteResultatOperations extends Component
             'previsionsCharges' => $previsionsCharges,
             'previsionsProduits' => $previsionsProduits,
             'seances' => $seances,
+            'operationNames' => $operationNames,
             'totalCharges' => $totalCharges,
             'totalProduits' => $totalProduits,
             'resultatNet' => $totalProduits - $totalCharges,
             'hasSelection' => $hasSelection,
+            'mode' => $this->mode,
+            'parOperations' => $this->parOperations,
         ]);
     }
 

@@ -45,8 +45,9 @@ final class RapportService
         bool $parSeances = false,
         bool $parTiers = false,
         bool $previsionnel = false,
+        bool $parOperations = false,
     ): array {
-        return $this->compteResultat->compteDeResultatOperations($exercice, $operationIds, $parSeances, $parTiers, $previsionnel);
+        return $this->compteResultat->compteDeResultatOperations($exercice, $operationIds, $parSeances, $parTiers, $previsionnel, $parOperations);
     }
 
     /**
