@@ -1418,10 +1418,12 @@ final class CompteResultatBuilder
             );
 
             $reelBySc = [];
+            $reelSeances = [];
             foreach ($reelMap as $row) {
                 $scId = (int) $row['sous_categorie_id'];
                 $seance = (int) $row['seance'];
                 $reelBySc[$scId][$seance] = (float) $row['montant'];
+                $reelSeances[$seance] = true;
             }
 
             $prevHierarchy = $type === 'depense'
@@ -1434,15 +1436,14 @@ final class CompteResultatBuilder
                 foreach ($cat['sous_categories'] ?? [] as $sc) {
                     $scId = (int) $sc['sous_categorie_id'];
                     $scToCat[$scId] = (int) $cat['categorie_id'];
-                    foreach ($allSeances as $s) {
-                        $prevBySc[$scId][$s] = (float) ($sc['seances'][$s] ?? 0);
+                    foreach ($sc['seances'] as $s => $montant) {
+                        $prevBySc[$scId][$s] = (float) $montant;
                     }
                 }
             }
 
-            foreach ($reelBySc as $scId => $seances) {
+            foreach ($reelBySc as $scId => $seanceData) {
                 if (! isset($scToCat[$scId])) {
-                    $first = reset($reelMap);
                     foreach ($reelMap as $row) {
                         if ((int) $row['sous_categorie_id'] === $scId) {
                             $scToCat[$scId] = (int) $row['categorie_id'];
@@ -1452,6 +1453,12 @@ final class CompteResultatBuilder
                 }
             }
 
+            $effectiveSeances = collect(array_merge($allSeances, array_keys($reelSeances)))
+                ->unique()
+                ->sort()
+                ->values()
+                ->all();
+
             $allScIds = array_unique(array_merge(array_keys($reelBySc), array_keys($prevBySc)));
             $scTotals = [];
             $catTotals = [];
@@ -1459,7 +1466,7 @@ final class CompteResultatBuilder
 
             foreach ($allScIds as $scId) {
                 $scTotal = 0.0;
-                foreach ($allSeances as $s) {
+                foreach ($effectiveSeances as $s) {
                     $reel = (float) ($reelBySc[$scId][$s] ?? 0);
                     $prevu = (float) ($prevBySc[$scId][$s] ?? 0);
                     $scTotal += $reel > 0 ? $reel : $prevu;
