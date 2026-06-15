@@ -1433,7 +1433,7 @@ final class CompteResultatBuilder
             foreach ($prevHierarchy as $cat) {
                 foreach ($cat['sous_categories'] ?? [] as $sc) {
                     $scId = (int) $sc['sous_categorie_id'];
-                    $scToCat[$scId] = (int) $cat['id'];
+                    $scToCat[$scId] = (int) $cat['categorie_id'];
                     foreach ($allSeances as $s) {
                         $prevBySc[$scId][$s] = (float) ($sc['seances'][$s] ?? 0);
                     }
