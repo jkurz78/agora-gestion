@@ -110,6 +110,22 @@ final class CompteResultatBuilder
                 ->sort()
                 ->values()
                 ->all();
+
+            if ($previsionnel) {
+                $prevSeances = DB::table('seances')
+                    ->whereIn('operation_id', $operationIds)
+                    ->when(TenantContext::hasBooted(), fn ($q) => $q->where('association_id', TenantContext::currentId()))
+                    ->pluck('numero')
+                    ->unique()
+                    ->map(fn ($s) => (int) $s)
+                    ->all();
+
+                $allSeances = collect(array_merge($allSeances, $prevSeances))
+                    ->unique()
+                    ->sort()
+                    ->values()
+                    ->all();
+            }
         }
 
         $result = [
