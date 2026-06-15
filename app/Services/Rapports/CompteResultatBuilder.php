@@ -56,6 +56,8 @@ final class CompteResultatBuilder
     ): array {
         [$start, $end] = $this->exerciceDates($exercice);
 
+        $projections = $previsionnel ? $this->computeProjections($start, $end, $operationIds) : null;
+
         // ── Branche parOperations ─────────────────────────────────────────────
         if ($parOperations) {
             $chargesRows = $this->fetchDepenseParOperationRows($start, $end, $operationIds);
@@ -74,6 +76,7 @@ final class CompteResultatBuilder
             if ($previsionnel) {
                 $result['previsions_charges'] = $this->buildPrevisionsCharges($operationIds, false, false, true);
                 $result['previsions_produits'] = $this->buildPrevisionsProduits($operationIds, false, false, true);
+                $result['projections'] = $projections;
             }
 
             return $result;
@@ -92,6 +95,7 @@ final class CompteResultatBuilder
             if ($previsionnel) {
                 $result['previsions_charges'] = $this->buildPrevisionsCharges($operationIds, $parSeances, $parTiers);
                 $result['previsions_produits'] = $this->buildPrevisionsProduits($operationIds, $parSeances, $parTiers);
+                $result['projections'] = $projections;
             }
 
             return $result;
@@ -140,6 +144,7 @@ final class CompteResultatBuilder
         if ($previsionnel) {
             $result['previsions_charges'] = $this->buildPrevisionsCharges($operationIds, $parSeances, $parTiers);
             $result['previsions_produits'] = $this->buildPrevisionsProduits($operationIds, $parSeances, $parTiers);
+            $result['projections'] = $projections;
         }
 
         return $result;
@@ -1385,5 +1390,90 @@ final class CompteResultatBuilder
         }
 
         return array_values($tree);
+    }
+
+    /**
+     * Calcule les montants projetés par sous-catégorie en appliquant la logique
+     * de projection (réel > 0 → réel, sinon prévu) **par séance**, puis en sommant.
+     *
+     * @param  array<int>  $operationIds
+     * @return array{charges: array{sc: array<int, float>, cat: array<int, float>, total: float}, produits: array{sc: array<int, float>, cat: array<int, float>, total: float}}
+     */
+    private function computeProjections(string $start, string $end, array $operationIds): array
+    {
+        $allSeances = DB::table('seances')
+            ->whereIn('operation_id', $operationIds)
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('association_id', TenantContext::currentId()))
+            ->pluck('numero', 'id')
+            ->unique()
+            ->values()
+            ->map(fn ($s) => (int) $s)
+            ->all();
+
+        $projections = [];
+        foreach (['depense', 'produits'] as $type) {
+            $reelMap = $this->fetchOperationRows(
+                $type === 'produits' ? 'recette' : $type,
+                $start, $end, $operationIds, true, false,
+            );
+
+            $reelBySc = [];
+            foreach ($reelMap as $row) {
+                $scId = (int) $row['sous_categorie_id'];
+                $seance = (int) $row['seance'];
+                $reelBySc[$scId][$seance] = (float) $row['montant'];
+            }
+
+            $prevHierarchy = $type === 'depense'
+                ? $this->buildPrevisionsCharges($operationIds, true, false)
+                : $this->buildPrevisionsProduits($operationIds, true, false);
+
+            $prevBySc = [];
+            $scToCat = [];
+            foreach ($prevHierarchy as $cat) {
+                foreach ($cat['sous_categories'] ?? [] as $sc) {
+                    $scId = (int) $sc['sous_categorie_id'];
+                    $scToCat[$scId] = (int) $cat['id'];
+                    foreach ($allSeances as $s) {
+                        $prevBySc[$scId][$s] = (float) ($sc['seances'][$s] ?? 0);
+                    }
+                }
+            }
+
+            foreach ($reelBySc as $scId => $seances) {
+                if (! isset($scToCat[$scId])) {
+                    $first = reset($reelMap);
+                    foreach ($reelMap as $row) {
+                        if ((int) $row['sous_categorie_id'] === $scId) {
+                            $scToCat[$scId] = (int) $row['categorie_id'];
+                            break;
+                        }
+                    }
+                }
+            }
+
+            $allScIds = array_unique(array_merge(array_keys($reelBySc), array_keys($prevBySc)));
+            $scTotals = [];
+            $catTotals = [];
+            $grandTotal = 0.0;
+
+            foreach ($allScIds as $scId) {
+                $scTotal = 0.0;
+                foreach ($allSeances as $s) {
+                    $reel = (float) ($reelBySc[$scId][$s] ?? 0);
+                    $prevu = (float) ($prevBySc[$scId][$s] ?? 0);
+                    $scTotal += $reel > 0 ? $reel : $prevu;
+                }
+                $scTotals[$scId] = $scTotal;
+                $grandTotal += $scTotal;
+                $catId = $scToCat[$scId] ?? 0;
+                $catTotals[$catId] = ($catTotals[$catId] ?? 0) + $scTotal;
+            }
+
+            $key = $type === 'depense' ? 'charges' : 'produits';
+            $projections[$key] = ['sc' => $scTotals, 'cat' => $catTotals, 'total' => $grandTotal];
+        }
+
+        return $projections;
     }
 }

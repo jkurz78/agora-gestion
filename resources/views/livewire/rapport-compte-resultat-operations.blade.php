@@ -277,6 +277,10 @@
             $chargesDisplay  = $mode !== 'realise' ? $mergeForDisplay($charges, $previsionsCharges)   : $charges;
             $produitsDisplay = $mode !== 'realise' ? $mergeForDisplay($produits, $previsionsProduits) : $produits;
 
+            // Projections par séance (calculées côté Builder)
+            $projCharges = $projections['charges'] ?? null;
+            $projProduits = $projections['produits'] ?? null;
+
             // Helper projection : retourne réel si > 0, sinon prévu
             $projeter = function (float $realise, float $prevu): float {
                 return $realise > 0 ? $realise : $prevu;
@@ -325,8 +329,8 @@
 
         @php $projectedSectionTotals = []; @endphp
         @foreach ([
-            ['data' => $chargesDisplay, 'prevDisplay' => $previsionsCharges, 'label' => 'DÉPENSES', 'totalMontant' => $totalCharges],
-            ['data' => $produitsDisplay, 'prevDisplay' => $previsionsProduits, 'label' => 'RECETTES', 'totalMontant' => $totalProduits],
+            ['data' => $chargesDisplay, 'prevDisplay' => $previsionsCharges, 'label' => 'DÉPENSES', 'totalMontant' => $totalCharges, 'proj' => $projCharges],
+            ['data' => $produitsDisplay, 'prevDisplay' => $previsionsProduits, 'label' => 'RECETTES', 'totalMontant' => $totalProduits, 'proj' => $projProduits],
         ] as $section)
         <div class="card mb-3 border-0 shadow-sm">
             <div class="card-body p-0">
@@ -523,13 +527,7 @@
                                             <td class="text-end" style="padding:7px 4px;color:{{ $tri['ecartColor'] }};">{{ $tri['ecart'] }} &euro;</td>
                                         @elseif ($mode === 'projection')
                                             @php
-                                                $projCatTotal = 0.0;
-                                                foreach ($operationNames as $_opId => $_opNom) {
-                                                    $projCatTotal += $projeter(
-                                                        (float) ($cat['operations'][$_opId] ?? 0),
-                                                        (float) ($sectionIdx['cat_ops'][$cat['categorie_id']][$_opId] ?? 0)
-                                                    );
-                                                }
+                                                $projCatTotal = (float) ($section['proj']['cat'][$cat['categorie_id']] ?? 0);
                                             @endphp
                                             <td class="text-end fw-bold" style="padding:7px 8px;">{{ number_format($projCatTotal, 2, ',', ' ') }} &euro;</td>
                                         @else
@@ -542,11 +540,7 @@
                                             <td class="text-end fw-bold" style="padding:7px 12px;">{{ $tri['realise'] }} &euro;</td>
                                             <td class="text-end" style="padding:7px 12px;color:{{ $tri['ecartColor'] }};">{{ $tri['ecart'] }} &euro;</td>
                                         @elseif ($mode === 'projection')
-                                            @php
-                                                $rCat = (float) ($cat['montant'] ?? 0);
-                                                $pCat = (float) ($sectionIdx['cat'][$cat['categorie_id']] ?? 0);
-                                                $projCat = $projeter($rCat, $pCat);
-                                            @endphp
+                                            @php $projCat = (float) ($section['proj']['cat'][$cat['categorie_id']] ?? 0); @endphp
                                             <td class="text-end fw-bold" style="padding:7px 12px;">{{ number_format($projCat, 2, ',', ' ') }} &euro;</td>
                                         @else
                                             <td class="text-end fw-bold" style="padding:7px 12px;">{{ number_format($cat['montant'], 2, ',', ' ') }} &euro;</td>
@@ -649,15 +643,7 @@
                                                 <td class="text-end fw-bold" style="padding:5px 4px;color:#444;">{{ $tri['realise'] }} &euro;</td>
                                                 <td class="text-end" style="padding:5px 4px;color:{{ $tri['ecartColor'] }};">{{ $tri['ecart'] }} &euro;</td>
                                             @elseif ($mode === 'projection')
-                                                @php
-                                                    $projScOpsTotal = 0.0;
-                                                    foreach ($operationNames as $_opId => $_opNom) {
-                                                        $projScOpsTotal += $projeter(
-                                                            (float) ($sc['operations'][$_opId] ?? 0),
-                                                            (float) ($sectionIdx['sc_ops'][$sc['sous_categorie_id']][$_opId] ?? 0)
-                                                        );
-                                                    }
-                                                @endphp
+                                                @php $projScOpsTotal = (float) ($section['proj']['sc'][$sc['sous_categorie_id']] ?? 0); @endphp
                                                 <td class="text-end fw-bold" style="padding:5px 8px;color:#444;">{{ number_format($projScOpsTotal, 2, ',', ' ') }} &euro;</td>
                                             @else
                                                 <td class="text-end fw-bold" style="padding:5px 8px;color:#444;">{{ number_format($scTotalRealise, 2, ',', ' ') }} &euro;</td>
@@ -669,11 +655,7 @@
                                                 <td class="text-end fw-bold" style="padding:5px 12px;color:#444;">{{ $tri['realise'] }} &euro;</td>
                                                 <td class="text-end" style="padding:5px 12px;color:{{ $tri['ecartColor'] }};">{{ $tri['ecart'] }} &euro;</td>
                                             @elseif ($mode === 'projection')
-                                                @php
-                                                    $rSc = (float) ($sc['montant'] ?? 0);
-                                                    $pSc = (float) ($sectionIdx['sc'][$sc['sous_categorie_id']] ?? 0);
-                                                    $projSc = $projeter($rSc, $pSc);
-                                                @endphp
+                                                @php $projSc = (float) ($section['proj']['sc'][$sc['sous_categorie_id']] ?? 0); @endphp
                                                 <td class="text-end" style="padding:5px 12px;color:#444;">{{ number_format($projSc, 2, ',', ' ') }} &euro;</td>
                                             @else
                                                 <td class="text-end" style="padding:5px 12px;color:#444;">{{ number_format($sc['montant'], 2, ',', ' ') }} &euro;</td>
@@ -858,13 +840,7 @@
                                     </td>
                                 @elseif ($mode === 'projection')
                                     @php
-                                        $projGrandTotal = 0.0;
-                                        foreach ($seances as $_s) {
-                                            $projGrandTotal += $projeter(
-                                                (float) ($totalSectionSeances[$_s] ?? 0),
-                                                (float) ($totalPrevuSeances[$_s] ?? 0)
-                                            );
-                                        }
+                                        $projGrandTotal = (float) ($section['proj']['total'] ?? 0);
                                         $projectedSectionTotals[$section['label']] = $projGrandTotal;
                                     @endphp
                                     <td class="text-end" style="padding:9px 8px;">{{ number_format($projGrandTotal, 2, ',', ' ') }} &euro;</td>
@@ -893,10 +869,7 @@
                                     <td class="text-end" style="padding:9px 4px;color:{{ $tri['ecartColor'] }};">{{ $tri['ecart'] }} &euro;</td>
                                 @elseif ($mode === 'projection')
                                     @php
-                                        $projSectionTotal = 0.0;
-                                        foreach ($operationNames as $_opId => $_opNom) {
-                                            $projSectionTotal += $projeter($totalSectionOps[$_opId], $totalPrevuSectionOps[$_opId]);
-                                        }
+                                        $projSectionTotal = (float) ($section['proj']['total'] ?? 0);
                                         $projectedSectionTotals[$section['label']] = $projSectionTotal;
                                     @endphp
                                     <td class="text-end" style="padding:9px 8px;">{{ number_format($projSectionTotal, 2, ',', ' ') }} &euro;</td>
@@ -911,7 +884,7 @@
                                     <td class="text-end" style="padding:9px 12px;color:{{ $tri['ecartColor'] }};">{{ $tri['ecart'] }} &euro;</td>
                                 @elseif ($mode === 'projection')
                                     @php
-                                        $projSecTotal = $projeter((float) $section['totalMontant'], (float) $totalPrevuSection);
+                                        $projSecTotal = (float) ($section['proj']['total'] ?? 0);
                                         $projectedSectionTotals[$section['label']] = $projSecTotal;
                                     @endphp
                                     <td class="text-end" style="padding:9px 12px;">{{ number_format($projSecTotal, 2, ',', ' ') }} &euro;</td>

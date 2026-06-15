@@ -78,6 +78,7 @@ final class RapportCompteResultatOperations extends Component
         $previsionsProduits = [];
         $seances = [];
         $operationNames = [];
+        $projections = null;
         $totalCharges = 0.0;
         $totalProduits = 0.0;
         $hasSelection = ! empty($this->selectedOperationIds);
@@ -99,6 +100,7 @@ final class RapportCompteResultatOperations extends Component
             $previsionsCharges = $data['previsions_charges'] ?? [];
             $previsionsProduits = $data['previsions_produits'] ?? [];
             $operationNames = $data['operation_names'] ?? [];
+            $projections = $data['projections'] ?? null;
             $totalCharges = $this->parSeances
                 ? collect($charges)->sum('total')
                 : collect($charges)->sum('montant');
@@ -115,6 +117,7 @@ final class RapportCompteResultatOperations extends Component
             'previsionsProduits' => $previsionsProduits,
             'seances' => $seances,
             'operationNames' => $operationNames,
+            'projections' => $projections,
             'totalCharges' => $totalCharges,
             'totalProduits' => $totalProduits,
             'resultatNet' => $totalProduits - $totalCharges,
