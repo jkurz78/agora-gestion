@@ -323,6 +323,7 @@
             $totalColspan = 2 + $nbDataCols;
         @endphp
 
+        @php $projectedSectionTotals = []; @endphp
         @foreach ([
             ['data' => $chargesDisplay, 'prevDisplay' => $previsionsCharges, 'label' => 'DÉPENSES', 'totalMontant' => $totalCharges],
             ['data' => $produitsDisplay, 'prevDisplay' => $previsionsProduits, 'label' => 'RECETTES', 'totalMontant' => $totalProduits],
@@ -864,6 +865,7 @@
                                                 (float) ($totalPrevuSeances[$_s] ?? 0)
                                             );
                                         }
+                                        $projectedSectionTotals[$section['label']] = $projGrandTotal;
                                     @endphp
                                     <td class="text-end" style="padding:9px 8px;">{{ number_format($projGrandTotal, 2, ',', ' ') }} &euro;</td>
                                 @else
@@ -895,6 +897,7 @@
                                         foreach ($operationNames as $_opId => $_opNom) {
                                             $projSectionTotal += $projeter($totalSectionOps[$_opId], $totalPrevuSectionOps[$_opId]);
                                         }
+                                        $projectedSectionTotals[$section['label']] = $projSectionTotal;
                                     @endphp
                                     <td class="text-end" style="padding:9px 8px;">{{ number_format($projSectionTotal, 2, ',', ' ') }} &euro;</td>
                                 @else
@@ -909,6 +912,7 @@
                                 @elseif ($mode === 'projection')
                                     @php
                                         $projSecTotal = $projeter((float) $section['totalMontant'], (float) $totalPrevuSection);
+                                        $projectedSectionTotals[$section['label']] = $projSecTotal;
                                     @endphp
                                     <td class="text-end" style="padding:9px 12px;">{{ number_format($projSecTotal, 2, ',', ' ') }} &euro;</td>
                                 @else
@@ -923,10 +927,16 @@
         @endforeach
 
         {{-- Barre résultat net --}}
+        @php
+            $displayResultat = $resultatNet;
+            if ($mode === 'projection' && count($projectedSectionTotals) === 2) {
+                $displayResultat = ($projectedSectionTotals['RECETTES'] ?? 0) - ($projectedSectionTotals['DÉPENSES'] ?? 0);
+            }
+        @endphp
         <div class="rounded p-4 d-flex justify-content-between align-items-center mt-2"
-             style="background:{{ $resultatNet >= 0 ? '#2E7D32' : '#B5453A' }};color:#fff;font-size:1.1rem;font-weight:700;">
-            <span>{{ $resultatNet >= 0 ? 'EXCÉDENT' : 'DÉFICIT' }}</span>
-            <span>{{ number_format(abs($resultatNet), 2, ',', ' ') }} &euro;</span>
+             style="background:{{ $displayResultat >= 0 ? '#2E7D32' : '#B5453A' }};color:#fff;font-size:1.1rem;font-weight:700;">
+            <span>{{ $displayResultat >= 0 ? 'EXCÉDENT' : 'DÉFICIT' }}</span>
+            <span>{{ number_format(abs($displayResultat), 2, ',', ' ') }} &euro;</span>
         </div>
     @endif
 </div>
