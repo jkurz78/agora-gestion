@@ -1100,6 +1100,8 @@ XML;
                 libelle: $transaction->libelle,
                 existingTransaction: $transaction,
             );
+
+            $transaction->forceFill(['equilibree' => true])->save();
         }
 
         return $transaction;
