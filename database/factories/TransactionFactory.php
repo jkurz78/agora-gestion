@@ -25,7 +25,7 @@ class TransactionFactory extends Factory
     {
         return [
             'association_id' => TenantContext::currentId() ?? 1,
-            'type' => fake()->randomElement(TypeTransaction::cases()),
+            'type' => fake()->randomElement([TypeTransaction::Recette, TypeTransaction::Depense]),
             'date' => fake()->dateTimeBetween('-1 year', 'now'),
             'libelle' => fake()->sentence(4),
             'montant_total' => fake()->randomFloat(2, 10, 5000),
@@ -46,6 +46,14 @@ class TransactionFactory extends Factory
     public function asRecette(): static
     {
         return $this->state(['type' => TypeTransaction::Recette]);
+    }
+
+    public function asVirement(): static
+    {
+        return $this->state([
+            'type' => TypeTransaction::Virement,
+            'journal' => \App\Enums\JournalComptable::Banque,
+        ]);
     }
 
     public function configure(): static
