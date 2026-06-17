@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\RemiseBancaire;
+use App\Models\Transaction;
 use App\Models\VirementInterne;
+use App\Services\Compta\EcritureGenerator;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -26,7 +28,13 @@ final class VirementInterneService
             $data['saisi_par'] = auth()->id();
             $data['numero_piece'] = app(NumeroPieceService::class)->assign(Carbon::parse($data['date']));
 
-            return VirementInterne::create($data);
+            $virement = VirementInterne::create($data);
+
+            if (config('compta.use_partie_double')) {
+                app(EcritureGenerator::class)->pourVirementInterne($virement);
+            }
+
+            return $virement;
         });
     }
 
@@ -37,9 +45,20 @@ final class VirementInterneService
         );
 
         return DB::transaction(function () use ($virement, $data) {
-            $virement->update($data);
+            $existingTx = Transaction::where('virement_interne_id', $virement->id)->first();
+            if ($existingTx !== null) {
+                $existingTx->lignes()->forceDelete();
+                $existingTx->forceDelete();
+            }
 
-            return $virement->fresh();
+            $virement->update($data);
+            $virement = $virement->fresh();
+
+            if (config('compta.use_partie_double')) {
+                app(EcritureGenerator::class)->pourVirementInterne($virement);
+            }
+
+            return $virement;
         });
     }
 
@@ -58,6 +77,12 @@ final class VirementInterneService
         }
 
         DB::transaction(function () use ($virement) {
+            $existingTx = Transaction::where('virement_interne_id', $virement->id)->first();
+            if ($existingTx !== null) {
+                $existingTx->lignes()->forceDelete();
+                $existingTx->forceDelete();
+            }
+
             $virement->delete();
         });
     }
