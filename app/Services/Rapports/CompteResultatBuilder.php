@@ -56,54 +56,11 @@ final class CompteResultatBuilder
     ): array {
         [$start, $end] = $this->exerciceDates($exercice);
 
-        $projections = $previsionnel ? $this->computeProjections($start, $end, $operationIds) : null;
+        $projMatrices = $previsionnel ? $this->computeProjections($start, $end, $operationIds) : null;
 
-        // ── Branche parOperations ─────────────────────────────────────────────
-        if ($parOperations) {
-            $chargesRows = $this->fetchDepenseParOperationRows($start, $end, $operationIds);
-            $produitsRows = $this->fetchRecetteParOperationRows($start, $end, $operationIds);
-
-            $result = [
-                'charges' => $this->buildHierarchyParOperations($chargesRows, $operationIds),
-                'produits' => $this->buildHierarchyParOperations($produitsRows, $operationIds),
-            ];
-
-            $operationNames = Operation::whereIn('id', $operationIds)
-                ->pluck('nom', 'id')
-                ->all();
-            $result['operation_names'] = $operationNames;
-
-            if ($previsionnel) {
-                $result['previsions_charges'] = $this->buildPrevisionsCharges($operationIds, false, false, true);
-                $result['previsions_produits'] = $this->buildPrevisionsProduits($operationIds, false, false, true);
-                $result['projections'] = $projections;
-            }
-
-            return $result;
-        }
-
-        // ── Branche simple (pas de ventilation) ──────────────────────────────
-        if (! $parSeances && ! $parTiers) {
-            $charges = $this->fetchDepenseRows($start, $end, $operationIds);
-            $produits = $this->fetchProduitsRows($start, $end, $exercice, $operationIds);
-
-            $result = [
-                'charges' => $this->buildHierarchySimple($charges),
-                'produits' => $this->buildHierarchySimple($produits),
-            ];
-
-            if ($previsionnel) {
-                $result['previsions_charges'] = $this->buildPrevisionsCharges($operationIds, $parSeances, $parTiers);
-                $result['previsions_produits'] = $this->buildPrevisionsProduits($operationIds, $parSeances, $parTiers);
-                $result['projections'] = $projections;
-            }
-
-            return $result;
-        }
-
-        // ── Branche séances / tiers ───────────────────────────────────────────
-        $chargesMap = $this->fetchOperationRows('depense', $start, $end, $operationIds, $parSeances, $parTiers);
-        $produitsMap = $this->fetchOperationRows('recette', $start, $end, $operationIds, $parSeances, $parTiers);
+        // ── Un seul fetch, toutes dimensions ─────────────────────────────────
+        $chargesMap = $this->fetchOperationRows('depense', $start, $end, $operationIds, $parSeances, $parTiers, $parOperations);
+        $produitsMap = $this->fetchOperationRows('recette', $start, $end, $operationIds, $parSeances, $parTiers, $parOperations);
 
         $allSeances = [];
         if ($parSeances) {
@@ -133,18 +90,76 @@ final class CompteResultatBuilder
         }
 
         $result = [
-            'charges' => $this->buildHierarchyOperations($chargesMap, $parSeances, $parTiers, $allSeances),
-            'produits' => $this->buildHierarchyOperations($produitsMap, $parSeances, $parTiers, $allSeances),
+            'charges' => $this->buildUnifiedHierarchy($chargesMap, $parSeances, $parTiers, $parOperations, $allSeances, $operationIds),
+            'produits' => $this->buildUnifiedHierarchy($produitsMap, $parSeances, $parTiers, $parOperations, $allSeances, $operationIds),
         ];
 
         if ($parSeances) {
             $result['seances'] = $allSeances;
         }
 
+        if ($parOperations) {
+            $result['operation_names'] = Operation::whereIn('id', $operationIds)
+                ->pluck('nom', 'id')
+                ->all();
+        }
+
+        if ($parSeances && $parOperations) {
+            $seancesParOp = DB::table('seances')
+                ->whereIn('operation_id', $operationIds)
+                ->when(TenantContext::hasBooted(), fn ($q) => $q->where('association_id', TenantContext::currentId()))
+                ->select('operation_id', 'numero')
+                ->orderBy('numero')
+                ->get()
+                ->groupBy('operation_id')
+                ->map(fn ($rows) => $rows->pluck('numero')->map(fn ($n) => (int) $n)->values()->all())
+                ->all();
+
+            foreach (array_merge(array_values($chargesMap), array_values($produitsMap)) as $entry) {
+                if (isset($entry['seance'], $entry['operation_id'])) {
+                    $s = (int) $entry['seance'];
+                    $eOpId = (int) $entry['operation_id'];
+                    if (! isset($seancesParOp[$eOpId])) {
+                        $seancesParOp[$eOpId] = [];
+                    }
+                    if (! in_array($s, $seancesParOp[$eOpId], true)) {
+                        $seancesParOp[$eOpId][] = $s;
+                    }
+                }
+            }
+
+            $hasHorsSeance = collect(array_merge(array_values($chargesMap), array_values($produitsMap)))
+                ->contains(fn ($entry) => ((int) ($entry['seance'] ?? -1)) === 0);
+            if ($hasHorsSeance || ($previsionnel && in_array(0, $allSeances, true))) {
+                foreach ($operationIds as $opId) {
+                    if (! isset($seancesParOp[$opId])) {
+                        $seancesParOp[$opId] = [];
+                    }
+                    if (! in_array(0, $seancesParOp[$opId], true)) {
+                        array_unshift($seancesParOp[$opId], 0);
+                    }
+                }
+            }
+
+            foreach ($operationIds as $opId) {
+                if (! isset($seancesParOp[$opId])) {
+                    $seancesParOp[$opId] = [];
+                }
+                sort($seancesParOp[$opId]);
+            }
+
+            $result['seances_par_operation'] = $seancesParOp;
+        }
+
         if ($previsionnel) {
-            $result['previsions_charges'] = $this->buildPrevisionsCharges($operationIds, $parSeances, $parTiers);
-            $result['previsions_produits'] = $this->buildPrevisionsProduits($operationIds, $parSeances, $parTiers);
-            $result['projections'] = $projections;
+            $prevC = $this->buildPrevisionsCharges($operationIds, $parSeances, $parTiers, $parOperations);
+            $prevP = $this->buildPrevisionsProduits($operationIds, $parSeances, $parTiers, $parOperations);
+            $result['charges'] = $this->mergePrevisionsIntoHierarchy($result['charges'], $prevC);
+            $result['produits'] = $this->mergePrevisionsIntoHierarchy($result['produits'], $prevP);
+            $result['previsions_charges'] = $prevC;
+            $result['previsions_produits'] = $prevP;
+            $result['proj_charges'] = $projMatrices['charges'];
+            $result['proj_produits'] = $projMatrices['produits'];
         }
 
         return $result;
@@ -500,221 +515,6 @@ final class CompteResultatBuilder
         return collect($flat)->map(fn ($row) => (object) $row);
     }
 
-    // ── Méthodes parOperations ────────────────────────────────────────────────
-
-    /**
-     * Agrégation des dépenses par (catégorie, sous-catégorie, opération).
-     *
-     * @param  array<int>  $operationIds
-     * @return array<string, array{categorie_id:int,categorie_nom:string,sous_categorie_id:int,sous_categorie_nom:string,operation_id:int,montant:float}>
-     */
-    private function fetchDepenseParOperationRows(string $start, string $end, array $operationIds): array
-    {
-        $map = [];
-
-        // Q1 : lignes sans affectations — operation_id sur transaction_lignes
-        $rows1 = DB::table('transaction_lignes')
-            ->join('sous_categories as sc', 'transaction_lignes.sous_categorie_id', '=', 'sc.id')
-            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
-            ->join('transactions as tx', 'tx.id', '=', 'transaction_lignes.transaction_id')
-            ->where('tx.type', 'depense')
-            ->leftJoin('transaction_ligne_affectations as tla', 'tla.transaction_ligne_id', '=', 'transaction_lignes.id')
-            ->whereNull('transaction_lignes.deleted_at')
-            ->whereNull('tx.deleted_at')
-            ->whereNull('tla.id')
-            ->whereIn('transaction_lignes.operation_id', $operationIds)
-            ->whereBetween('tx.date', [$start, $end])
-            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('tx.association_id', TenantContext::currentId()))
-            ->select([
-                'c.id as categorie_id', 'c.nom as categorie_nom',
-                'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom',
-                'transaction_lignes.operation_id',
-                DB::raw('SUM(transaction_lignes.montant) as montant'),
-            ])
-            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', 'transaction_lignes.operation_id')
-            ->get();
-
-        // Q2 : lignes avec affectations — operation_id sur tla
-        $rows2 = DB::table('transaction_ligne_affectations as tla2')
-            ->join('transaction_lignes', 'transaction_lignes.id', '=', 'tla2.transaction_ligne_id')
-            ->join('sous_categories as sc', 'transaction_lignes.sous_categorie_id', '=', 'sc.id')
-            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
-            ->join('transactions as tx', 'tx.id', '=', 'transaction_lignes.transaction_id')
-            ->where('tx.type', 'depense')
-            ->whereNull('transaction_lignes.deleted_at')
-            ->whereNull('tx.deleted_at')
-            ->whereIn('tla2.operation_id', $operationIds)
-            ->whereBetween('tx.date', [$start, $end])
-            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('tx.association_id', TenantContext::currentId()))
-            ->select([
-                'c.id as categorie_id', 'c.nom as categorie_nom',
-                'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom',
-                'tla2.operation_id',
-                DB::raw('SUM(tla2.montant) as montant'),
-            ])
-            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', 'tla2.operation_id')
-            ->get();
-
-        foreach ([$rows1, $rows2] as $rows) {
-            foreach ($rows as $row) {
-                $scId = (int) $row->sous_categorie_id;
-                $opId = (int) $row->operation_id;
-                $key = "{$scId}_{$opId}";
-                if (isset($map[$key])) {
-                    $map[$key]['montant'] += (float) $row->montant;
-                } else {
-                    $map[$key] = [
-                        'categorie_id' => (int) $row->categorie_id,
-                        'categorie_nom' => $row->categorie_nom,
-                        'sous_categorie_id' => $scId,
-                        'sous_categorie_nom' => $row->sous_categorie_nom,
-                        'operation_id' => $opId,
-                        'montant' => (float) $row->montant,
-                    ];
-                }
-            }
-        }
-
-        return $map;
-    }
-
-    /**
-     * Agrégation des recettes par (catégorie, sous-catégorie, opération).
-     *
-     * @param  array<int>  $operationIds
-     * @return array<string, array{categorie_id:int,categorie_nom:string,sous_categorie_id:int,sous_categorie_nom:string,operation_id:int,montant:float}>
-     */
-    private function fetchRecetteParOperationRows(string $start, string $end, array $operationIds): array
-    {
-        $map = [];
-
-        // Q1 : lignes sans affectations — operation_id sur transaction_lignes
-        $rows1 = DB::table('transaction_lignes')
-            ->join('sous_categories as sc', 'transaction_lignes.sous_categorie_id', '=', 'sc.id')
-            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
-            ->join('transactions as tx', 'tx.id', '=', 'transaction_lignes.transaction_id')
-            ->where('tx.type', 'recette')
-            ->leftJoin('transaction_ligne_affectations as tla', 'tla.transaction_ligne_id', '=', 'transaction_lignes.id')
-            ->whereNull('transaction_lignes.deleted_at')
-            ->whereNull('tx.deleted_at')
-            ->whereNull('tla.id')
-            ->whereIn('transaction_lignes.operation_id', $operationIds)
-            ->whereBetween('tx.date', [$start, $end])
-            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('tx.association_id', TenantContext::currentId()))
-            ->select([
-                'c.id as categorie_id', 'c.nom as categorie_nom',
-                'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom',
-                'transaction_lignes.operation_id',
-                DB::raw('SUM(transaction_lignes.montant) as montant'),
-            ])
-            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', 'transaction_lignes.operation_id')
-            ->get();
-
-        // Q2 : lignes avec affectations — operation_id sur tla
-        $rows2 = DB::table('transaction_ligne_affectations as tla2')
-            ->join('transaction_lignes', 'transaction_lignes.id', '=', 'tla2.transaction_ligne_id')
-            ->join('sous_categories as sc', 'transaction_lignes.sous_categorie_id', '=', 'sc.id')
-            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
-            ->join('transactions as tx', 'tx.id', '=', 'transaction_lignes.transaction_id')
-            ->where('tx.type', 'recette')
-            ->whereNull('transaction_lignes.deleted_at')
-            ->whereNull('tx.deleted_at')
-            ->whereIn('tla2.operation_id', $operationIds)
-            ->whereBetween('tx.date', [$start, $end])
-            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('tx.association_id', TenantContext::currentId()))
-            ->select([
-                'c.id as categorie_id', 'c.nom as categorie_nom',
-                'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom',
-                'tla2.operation_id',
-                DB::raw('SUM(tla2.montant) as montant'),
-            ])
-            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', 'tla2.operation_id')
-            ->get();
-
-        foreach ([$rows1, $rows2] as $rows) {
-            foreach ($rows as $row) {
-                $scId = (int) $row->sous_categorie_id;
-                $opId = (int) $row->operation_id;
-                $key = "{$scId}_{$opId}";
-                if (isset($map[$key])) {
-                    $map[$key]['montant'] += (float) $row->montant;
-                } else {
-                    $map[$key] = [
-                        'categorie_id' => (int) $row->categorie_id,
-                        'categorie_nom' => $row->categorie_nom,
-                        'sous_categorie_id' => $scId,
-                        'sous_categorie_nom' => $row->sous_categorie_nom,
-                        'operation_id' => $opId,
-                        'montant' => (float) $row->montant,
-                    ];
-                }
-            }
-        }
-
-        return $map;
-    }
-
-    /**
-     * Construit la hiérarchie catégorie → sous-catégorie avec dictionnaire `operations`.
-     *
-     * @param  array<string, array{categorie_id:int,categorie_nom:string,sous_categorie_id:int,sous_categorie_nom:string,operation_id:int,montant:float}>  $map
-     * @param  array<int>  $operationIds  Pour initialiser les clés à 0.0
-     * @return list<array>
-     */
-    private function buildHierarchyParOperations(array $map, array $operationIds): array
-    {
-        $zeroOps = array_fill_keys($operationIds, 0.0);
-
-        /** @var array<int, array> */
-        $categories = [];
-
-        foreach ($map as $entry) {
-            $catId = $entry['categorie_id'];
-            $scId = $entry['sous_categorie_id'];
-            $opId = $entry['operation_id'];
-            $montant = $entry['montant'];
-
-            if (! isset($categories[$catId])) {
-                $categories[$catId] = [
-                    'categorie_id' => $catId,
-                    'label' => $entry['categorie_nom'],
-                    'montant' => 0.0,
-                    'operations' => $zeroOps,
-                    'sous_categories_map' => [],
-                ];
-            }
-
-            if (! isset($categories[$catId]['sous_categories_map'][$scId])) {
-                $categories[$catId]['sous_categories_map'][$scId] = [
-                    'sous_categorie_id' => $scId,
-                    'label' => $entry['sous_categorie_nom'],
-                    'montant' => 0.0,
-                    'operations' => $zeroOps,
-                ];
-            }
-
-            $categories[$catId]['sous_categories_map'][$scId]['operations'][$opId] = ($categories[$catId]['sous_categories_map'][$scId]['operations'][$opId] ?? 0.0) + $montant;
-            $categories[$catId]['sous_categories_map'][$scId]['montant'] += $montant;
-            $categories[$catId]['operations'][$opId] = ($categories[$catId]['operations'][$opId] ?? 0.0) + $montant;
-            $categories[$catId]['montant'] += $montant;
-        }
-
-        $result = [];
-        foreach ($categories as $cat) {
-            $scs = [];
-            foreach ($cat['sous_categories_map'] as $sc) {
-                $scs[] = $sc;
-            }
-            usort($scs, fn ($a, $b) => strcmp($a['label'], $b['label']));
-            $cat['sous_categories'] = $scs;
-            unset($cat['sous_categories_map']);
-            $result[] = $cat;
-        }
-        usort($result, fn ($a, $b) => strcmp($a['label'], $b['label']));
-
-        return $result;
-    }
-
     /**
      * Construit 2 query builders (sans/avec affectations) avec SELECT/GROUP BY dynamiques.
      *
@@ -728,6 +528,7 @@ final class CompteResultatBuilder
         array $operationIds,
         bool $withSeance,
         bool $withTiers,
+        bool $withOperation = false,
     ): array {
         $baseCols = [
             'c.id as categorie_id', 'c.nom as categorie_nom',
@@ -752,6 +553,10 @@ final class CompteResultatBuilder
         if ($withSeance) {
             $q1Cols[] = DB::raw('COALESCE(transaction_lignes.seance, 0) as seance');
             $q1Group[] = DB::raw('COALESCE(transaction_lignes.seance, 0)');
+        }
+        if ($withOperation) {
+            $q1Cols[] = 'transaction_lignes.operation_id';
+            $q1Group[] = 'transaction_lignes.operation_id';
         }
         $q1Cols[] = DB::raw('SUM(transaction_lignes.montant) as montant');
 
@@ -780,6 +585,10 @@ final class CompteResultatBuilder
         if ($withSeance) {
             $q2Cols[] = DB::raw('COALESCE(tla2.seance, 0) as seance');
             $q2Group[] = DB::raw('COALESCE(tla2.seance, 0)');
+        }
+        if ($withOperation) {
+            $q2Cols[] = 'tla2.operation_id';
+            $q2Group[] = 'tla2.operation_id';
         }
         $q2Cols[] = DB::raw('SUM(tla2.montant) as montant');
 
@@ -817,8 +626,9 @@ final class CompteResultatBuilder
         array $operationIds,
         bool $withSeance,
         bool $withTiers,
+        bool $withOperation = false,
     ): array {
-        [$q1, $q2] = $this->buildOperationQueries($type, $start, $end, $operationIds, $withSeance, $withTiers);
+        [$q1, $q2] = $this->buildOperationQueries($type, $start, $end, $operationIds, $withSeance, $withTiers, $withOperation);
 
         $map = [];
         foreach ([$q1->get(), $q2->get()] as $rows) {
@@ -829,6 +639,9 @@ final class CompteResultatBuilder
                 }
                 if ($withSeance) {
                     $key .= '_'.$row->seance;
+                }
+                if ($withOperation) {
+                    $key .= '_op'.$row->operation_id;
                 }
 
                 if (isset($map[$key])) {
@@ -851,6 +664,9 @@ final class CompteResultatBuilder
                         $entry['tiers_prenom'] = $row->tiers_prenom !== '' ? $row->tiers_prenom : null;
                         $entry['tiers_entreprise'] = $row->tiers_entreprise !== '' ? $row->tiers_entreprise : null;
                     }
+                    if ($withOperation) {
+                        $entry['operation_id'] = (int) $row->operation_id;
+                    }
                     $map[$key] = $entry;
                 }
             }
@@ -860,41 +676,62 @@ final class CompteResultatBuilder
     }
 
     /**
-     * Construit la hiérarchie imbriquée (cat -> sous-cat -> tiers optionnel) avec montants simples ou ventilés par séance.
-     *
-     * @param  array<string, array>  $map
-     * @param  list<int>  $allSeances
+     * @param  array<string, array>  $map  Flat entries from fetchOperationRows
+     * @param  list<int>  $allSeances  Séance numbers (when $withSeance)
+     * @param  array<int>  $operationIds  Operation IDs (when $withOperation)
      * @return list<array>
      */
-    private function buildHierarchyOperations(array $map, bool $withSeance, bool $withTiers, array $allSeances = []): array
-    {
+    private function buildUnifiedHierarchy(
+        array $map,
+        bool $withSeance,
+        bool $withTiers,
+        bool $withOperation,
+        array $allSeances = [],
+        array $operationIds = [],
+    ): array {
+        $zeroOps = $withOperation ? array_fill_keys($operationIds, 0.0) : null;
+
         $categories = [];
 
         foreach ($map as $entry) {
             $catId = $entry['categorie_id'];
             $scId = $entry['sous_categorie_id'];
+            $montant = (float) $entry['montant'];
 
+            // ── Init catégorie ───────────────────────────────────────────────
             if (! isset($categories[$catId])) {
                 $categories[$catId] = [
                     'categorie_id' => $catId,
                     'label' => $entry['categorie_nom'],
+                    'montant' => 0.0,
                     'sous_categories_map' => [],
                 ];
                 if ($withSeance) {
                     $categories[$catId]['seances'] = array_fill_keys($allSeances, 0.0);
-                    $categories[$catId]['total'] = 0.0;
-                } else {
-                    $categories[$catId]['montant'] = 0.0;
+                }
+                if ($withOperation) {
+                    $categories[$catId]['operations'] = $zeroOps;
+                }
+                if ($withSeance && $withOperation) {
+                    $categories[$catId]['seance_operations'] = [];
                 }
             }
 
+            // ── Init sous-catégorie ──────────────────────────────────────────
             if (! isset($categories[$catId]['sous_categories_map'][$scId])) {
-                $scEntry = ['sous_categorie_id' => $scId, 'label' => $entry['sous_categorie_nom']];
+                $scEntry = [
+                    'sous_categorie_id' => $scId,
+                    'label' => $entry['sous_categorie_nom'],
+                    'montant' => 0.0,
+                ];
                 if ($withSeance) {
                     $scEntry['seances'] = array_fill_keys($allSeances, 0.0);
-                    $scEntry['total'] = 0.0;
-                } else {
-                    $scEntry['montant'] = 0.0;
+                }
+                if ($withOperation) {
+                    $scEntry['operations'] = $zeroOps;
+                }
+                if ($withSeance && $withOperation) {
+                    $scEntry['seance_operations'] = [];
                 }
                 if ($withTiers) {
                     $scEntry['tiers_map'] = [];
@@ -902,8 +739,7 @@ final class CompteResultatBuilder
                 $categories[$catId]['sous_categories_map'][$scId] = $scEntry;
             }
 
-            $montant = $entry['montant'];
-
+            // ── Init & accumulate tiers ──────────────────────────────────────
             if ($withTiers) {
                 $tiersId = $entry['tiers_id'];
                 if (! isset($categories[$catId]['sous_categories_map'][$scId]['tiers_map'][$tiersId])) {
@@ -911,35 +747,64 @@ final class CompteResultatBuilder
                         'tiers_id' => $tiersId,
                         'label' => $this->formatTiersLabel($entry),
                         'type' => $tiersId === 0 ? null : $entry['tiers_type'],
+                        'montant' => 0.0,
                     ];
                     if ($withSeance) {
                         $tEntry['seances'] = array_fill_keys($allSeances, 0.0);
-                        $tEntry['total'] = 0.0;
-                    } else {
-                        $tEntry['montant'] = 0.0;
+                    }
+                    if ($withOperation) {
+                        $tEntry['operations'] = $zeroOps;
+                    }
+                    if ($withSeance && $withOperation) {
+                        $tEntry['seance_operations'] = [];
                     }
                     $categories[$catId]['sous_categories_map'][$scId]['tiers_map'][$tiersId] = $tEntry;
                 }
+
+                $categories[$catId]['sous_categories_map'][$scId]['tiers_map'][$tiersId]['montant'] += $montant;
                 if ($withSeance) {
                     $categories[$catId]['sous_categories_map'][$scId]['tiers_map'][$tiersId]['seances'][$entry['seance']] += $montant;
-                    $categories[$catId]['sous_categories_map'][$scId]['tiers_map'][$tiersId]['total'] += $montant;
-                } else {
-                    $categories[$catId]['sous_categories_map'][$scId]['tiers_map'][$tiersId]['montant'] += $montant;
+                }
+                if ($withOperation) {
+                    $opId = $entry['operation_id'];
+                    $categories[$catId]['sous_categories_map'][$scId]['tiers_map'][$tiersId]['operations'][$opId]
+                        = ($categories[$catId]['sous_categories_map'][$scId]['tiers_map'][$tiersId]['operations'][$opId] ?? 0.0) + $montant;
+                }
+                if ($withSeance && $withOperation) {
+                    $seance = $entry['seance'];
+                    $opId = $entry['operation_id'];
+                    $categories[$catId]['sous_categories_map'][$scId]['tiers_map'][$tiersId]['seance_operations'][$seance][$opId]
+                        = ($categories[$catId]['sous_categories_map'][$scId]['tiers_map'][$tiersId]['seance_operations'][$seance][$opId] ?? 0.0) + $montant;
                 }
             }
+
+            // ── Accumulate SC + cat ──────────────────────────────────────────
+            $categories[$catId]['sous_categories_map'][$scId]['montant'] += $montant;
+            $categories[$catId]['montant'] += $montant;
 
             if ($withSeance) {
                 $seance = $entry['seance'];
                 $categories[$catId]['sous_categories_map'][$scId]['seances'][$seance] += $montant;
-                $categories[$catId]['sous_categories_map'][$scId]['total'] += $montant;
                 $categories[$catId]['seances'][$seance] += $montant;
-                $categories[$catId]['total'] += $montant;
-            } else {
-                $categories[$catId]['sous_categories_map'][$scId]['montant'] += $montant;
-                $categories[$catId]['montant'] += $montant;
+            }
+            if ($withOperation) {
+                $opId = $entry['operation_id'];
+                $categories[$catId]['sous_categories_map'][$scId]['operations'][$opId]
+                    = ($categories[$catId]['sous_categories_map'][$scId]['operations'][$opId] ?? 0.0) + $montant;
+                $categories[$catId]['operations'][$opId]
+                    = ($categories[$catId]['operations'][$opId] ?? 0.0) + $montant;
+            }
+            if ($withSeance && $withOperation) {
+                $seance = $entry['seance'];
+                $opId = $entry['operation_id'];
+                $categories[$catId]['sous_categories_map'][$scId]['seance_operations'][$seance][$opId]
+                    = ($categories[$catId]['sous_categories_map'][$scId]['seance_operations'][$seance][$opId] ?? 0.0) + $montant;
+                $categories[$catId]['seance_operations'][$seance][$opId]
+                    = ($categories[$catId]['seance_operations'][$seance][$opId] ?? 0.0) + $montant;
             }
         }
 
+        // ── Flatten & sort ───────────────────────────────────────────────────
         $result = [];
         foreach ($categories as $cat) {
             $scs = [];
@@ -1045,28 +910,6 @@ final class CompteResultatBuilder
         }
 
         return $this->groupByCategorie($map, true);
-    }
-
-    /**
-     * Construit la hiérarchie simple avec montant uniquement (onglet 2).
-     *
-     * @param  Collection<int, object>  $flat
-     * @return list<array>
-     */
-    private function buildHierarchySimple(Collection $flat): array
-    {
-        $map = [];
-        foreach ($flat as $row) {
-            $scId = (int) $row->sous_categorie_id;
-            $map[$scId] = [
-                'categorie_id' => (int) $row->categorie_id,
-                'categorie_nom' => $row->categorie_nom,
-                'sous_categorie_nom' => $row->sous_categorie_nom,
-                'montant' => (float) $row->montant,
-            ];
-        }
-
-        return $this->groupByCategorie($map, false);
     }
 
     /**
@@ -1208,6 +1051,72 @@ final class CompteResultatBuilder
     // ── Prévisionnel ──────────────────────────────────────────────────────────
 
     /**
+     * Injecte les catégories/SC qui existent dans les prévisions mais pas dans le réalisé,
+     * avec des montants à zéro, pour qu'elles apparaissent dans l'affichage.
+     *
+     * @param  list<array<string, mixed>>  $realise
+     * @param  list<array<string, mixed>>  $previsions
+     * @return list<array<string, mixed>>
+     */
+    private function mergePrevisionsIntoHierarchy(array $realise, array $previsions): array
+    {
+        $byCatId = [];
+        foreach ($realise as $cat) {
+            $byCatId[(int) ($cat['categorie_id'] ?? $cat['id'] ?? 0)] = $cat;
+        }
+
+        foreach ($previsions as $prevCat) {
+            $catId = (int) ($prevCat['categorie_id'] ?? $prevCat['id'] ?? 0);
+            if (! isset($byCatId[$catId])) {
+                $byCatId[$catId] = [
+                    'categorie_id' => $catId,
+                    'label' => $prevCat['label'],
+                    'sous_categories' => [],
+                    'montant' => 0.0,
+                ];
+            }
+
+            $byScId = [];
+            foreach ($byCatId[$catId]['sous_categories'] as $sc) {
+                $byScId[(int) ($sc['sous_categorie_id'] ?? 0)] = $sc;
+            }
+            foreach ($prevCat['sous_categories'] as $prevSc) {
+                $scId = (int) ($prevSc['sous_categorie_id'] ?? 0);
+                if (! isset($byScId[$scId])) {
+                    $byScId[$scId] = [
+                        'sous_categorie_id' => $scId,
+                        'label' => $prevSc['label'],
+                        'montant' => 0.0,
+                        'tiers' => [],
+                    ];
+                }
+
+                if (! empty($prevSc['tiers'])) {
+                    $existingTiersIds = [];
+                    foreach ($byScId[$scId]['tiers'] ?? [] as $t) {
+                        $existingTiersIds[(int) ($t['tiers_id'] ?? 0)] = true;
+                    }
+                    foreach ($prevSc['tiers'] as $prevT) {
+                        $tId = (int) ($prevT['tiers_id'] ?? 0);
+                        if (! isset($existingTiersIds[$tId])) {
+                            $byScId[$scId]['tiers'][] = [
+                                'tiers_id' => $tId,
+                                'label' => $prevT['label'] ?? '—',
+                                'type' => $prevT['type'] ?? null,
+                                'seances' => [],
+                                'montant' => 0.0,
+                            ];
+                        }
+                    }
+                }
+            }
+            $byCatId[$catId]['sous_categories'] = array_values($byScId);
+        }
+
+        return array_values($byCatId);
+    }
+
+    /**
      * Charges prévisionnelles depuis encadrement_previsions.
      *
      * @param  array<int>  $operationIds
@@ -1320,7 +1229,6 @@ final class CompteResultatBuilder
                     'label' => $row->categorie_nom,
                     'sous_categories' => [],
                     'seances' => [],
-                    'total' => 0.0,
                     'montant' => 0.0,
                 ];
                 if ($parOperations) {
@@ -1332,7 +1240,6 @@ final class CompteResultatBuilder
                     'sous_categorie_id' => $scId,
                     'label' => $row->sous_categorie_nom,
                     'seances' => [],
-                    'total' => 0.0,
                     'montant' => 0.0,
                     'tiers' => [],
                 ];
@@ -1348,9 +1255,7 @@ final class CompteResultatBuilder
                 $tree[$catId]['seances'][$seanceNum] = ($tree[$catId]['seances'][$seanceNum] ?? 0) + $montant;
                 $tree[$catId]['sous_categories'][$scId]['seances'][$seanceNum] = ($tree[$catId]['sous_categories'][$scId]['seances'][$seanceNum] ?? 0) + $montant;
             }
-            $tree[$catId]['total'] += $montant;
             $tree[$catId]['montant'] += $montant;
-            $tree[$catId]['sous_categories'][$scId]['total'] += $montant;
             $tree[$catId]['sous_categories'][$scId]['montant'] += $montant;
 
             if ($parOperations) {
@@ -1368,7 +1273,6 @@ final class CompteResultatBuilder
                         'label' => $tLabel,
                         'type' => null,
                         'seances' => [],
-                        'total' => 0.0,
                         'montant' => 0.0,
                     ];
                 }
@@ -1376,7 +1280,6 @@ final class CompteResultatBuilder
                     $seanceNum = (int) ($row->seance ?? 0);
                     $tree[$catId]['sous_categories'][$scId]['tiers'][$tId]['seances'][$seanceNum] = ($tree[$catId]['sous_categories'][$scId]['tiers'][$tId]['seances'][$seanceNum] ?? 0) + $montant;
                 }
-                $tree[$catId]['sous_categories'][$scId]['tiers'][$tId]['total'] += $montant;
                 $tree[$catId]['sous_categories'][$scId]['tiers'][$tId]['montant'] += $montant;
             }
         }
@@ -1393,94 +1296,172 @@ final class CompteResultatBuilder
     }
 
     /**
-     * Calcule les montants projetés par sous-catégorie en appliquant la logique
-     * de projection (réel > 0 → réel, sinon prévu) **par séance**, puis en sommant.
+     * Calcule les montants projetés dans une ProjectionMatrix :
+     * réel > 0 → réel, sinon prévu, au grain (sc, tiers, séance, opération).
      *
      * @param  array<int>  $operationIds
-     * @return array{charges: array{sc: array<int, float>, cat: array<int, float>, total: float}, produits: array{sc: array<int, float>, cat: array<int, float>, total: float}}
+     * @return array{charges: ProjectionMatrix, produits: ProjectionMatrix}
      */
     private function computeProjections(string $start, string $end, array $operationIds): array
     {
-        $allSeances = DB::table('seances')
-            ->whereIn('operation_id', $operationIds)
-            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('association_id', TenantContext::currentId()))
-            ->pluck('numero', 'id')
-            ->unique()
-            ->values()
-            ->map(fn ($s) => (int) $s)
-            ->all();
+        $result = [];
 
-        $projections = [];
         foreach (['depense', 'produits'] as $type) {
+            $matrix = new ProjectionMatrix;
+            $dbType = $type === 'produits' ? 'recette' : $type;
+
+            // Réel au grain (sc, tiers, séance, op)
             $reelMap = $this->fetchOperationRows(
-                $type === 'produits' ? 'recette' : $type,
-                $start, $end, $operationIds, true, false,
+                $dbType, $start, $end, $operationIds, true, true, true,
             );
 
-            $reelBySc = [];
-            $reelSeances = [];
+            $reelGrid = []; // [sc][tiers][seance][op] = montant
+            $scToCat = [];
             foreach ($reelMap as $row) {
                 $scId = (int) $row['sous_categorie_id'];
+                $tiersId = (int) $row['tiers_id'];
                 $seance = (int) $row['seance'];
-                $reelBySc[$scId][$seance] = (float) $row['montant'];
-                $reelSeances[$seance] = true;
-            }
-
-            $prevHierarchy = $type === 'depense'
-                ? $this->buildPrevisionsCharges($operationIds, true, false)
-                : $this->buildPrevisionsProduits($operationIds, true, false);
-
-            $prevBySc = [];
-            $scToCat = [];
-            foreach ($prevHierarchy as $cat) {
-                foreach ($cat['sous_categories'] ?? [] as $sc) {
-                    $scId = (int) $sc['sous_categorie_id'];
-                    $scToCat[$scId] = (int) $cat['categorie_id'];
-                    foreach ($sc['seances'] as $s => $montant) {
-                        $prevBySc[$scId][$s] = (float) $montant;
-                    }
+                $opId = (int) $row['operation_id'];
+                $reelGrid[$scId][$tiersId][$seance][$opId] = (float) $row['montant'];
+                if (! isset($scToCat[$scId])) {
+                    $scToCat[$scId] = (int) $row['categorie_id'];
                 }
             }
 
-            foreach ($reelBySc as $scId => $seanceData) {
+            // Prévu au grain (sc, tiers, séance, op)
+            $prevGrid = $type === 'depense'
+                ? $this->fetchFlatPrevisionsCharges($operationIds)
+                : $this->fetchFlatPrevisionsProduits($operationIds);
+
+            // Collect scToCat from prévisions too
+            foreach ($prevGrid as $scId => $tiersList) {
                 if (! isset($scToCat[$scId])) {
-                    foreach ($reelMap as $row) {
-                        if ((int) $row['sous_categorie_id'] === $scId) {
-                            $scToCat[$scId] = (int) $row['categorie_id'];
-                            break;
+                    $scToCat[$scId] = $this->lookupCategoryForSc($scId);
+                }
+            }
+
+            // Register sc→cat mappings
+            foreach ($scToCat as $scId => $catId) {
+                $matrix->setScCategory($scId, $catId);
+            }
+
+            // Enumerate all (sc, tiers, séance, op) cells from both grids
+            $allScIds = array_unique(array_merge(
+                array_keys($reelGrid),
+                array_keys($prevGrid),
+            ));
+
+            foreach ($allScIds as $scId) {
+                $allTiersIds = array_unique(array_merge(
+                    array_keys($reelGrid[$scId] ?? []),
+                    array_keys($prevGrid[$scId] ?? []),
+                ));
+
+                foreach ($allTiersIds as $tiersId) {
+                    $allSeances = array_unique(array_merge(
+                        array_keys($reelGrid[$scId][$tiersId] ?? []),
+                        array_keys($prevGrid[$scId][$tiersId] ?? []),
+                    ));
+
+                    foreach ($allSeances as $seance) {
+                        $allOps = array_unique(array_merge(
+                            array_keys($reelGrid[$scId][$tiersId][$seance] ?? []),
+                            array_keys($prevGrid[$scId][$tiersId][$seance] ?? []),
+                        ));
+
+                        foreach ($allOps as $opId) {
+                            $reel = (float) ($reelGrid[$scId][$tiersId][$seance][$opId] ?? 0);
+                            $prevu = (float) ($prevGrid[$scId][$tiersId][$seance][$opId] ?? 0);
+                            $proj = $reel > 0 ? $reel : $prevu;
+                            if ($proj != 0.0) {
+                                $matrix->set((int) $scId, (int) $tiersId, (int) $seance, (int) $opId, $proj);
+                            }
                         }
                     }
                 }
             }
 
-            $effectiveSeances = collect(array_merge($allSeances, array_keys($reelSeances)))
-                ->unique()
-                ->sort()
-                ->values()
-                ->all();
-
-            $allScIds = array_unique(array_merge(array_keys($reelBySc), array_keys($prevBySc)));
-            $scTotals = [];
-            $catTotals = [];
-            $grandTotal = 0.0;
-
-            foreach ($allScIds as $scId) {
-                $scTotal = 0.0;
-                foreach ($effectiveSeances as $s) {
-                    $reel = (float) ($reelBySc[$scId][$s] ?? 0);
-                    $prevu = (float) ($prevBySc[$scId][$s] ?? 0);
-                    $scTotal += $reel > 0 ? $reel : $prevu;
-                }
-                $scTotals[$scId] = $scTotal;
-                $grandTotal += $scTotal;
-                $catId = $scToCat[$scId] ?? 0;
-                $catTotals[$catId] = ($catTotals[$catId] ?? 0) + $scTotal;
-            }
-
             $key = $type === 'depense' ? 'charges' : 'produits';
-            $projections[$key] = ['sc' => $scTotals, 'cat' => $catTotals, 'total' => $grandTotal];
+            $result[$key] = $matrix;
         }
 
-        return $projections;
+        return $result;
+    }
+
+    /**
+     * Prévisions charges (encadrement_previsions) au grain plat : [sc][tiers][séance][op] = montant.
+     *
+     * @param  array<int>  $operationIds
+     * @return array<int, array<int, array<int, array<int, float>>>>
+     */
+    private function fetchFlatPrevisionsCharges(array $operationIds): array
+    {
+        $rows = DB::table('encadrement_previsions as ep')
+            ->join('seances as s', 's.id', '=', 'ep.seance_id')
+            ->whereIn('ep.operation_id', $operationIds)
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('ep.association_id', TenantContext::currentId()))
+            ->select([
+                'ep.sous_categorie_id',
+                DB::raw('COALESCE(ep.tiers_id, 0) as tiers_id'),
+                's.numero as seance',
+                'ep.operation_id',
+                DB::raw('SUM(ep.montant_prevu) as montant'),
+            ])
+            ->groupBy('ep.sous_categorie_id', 'ep.tiers_id', 's.numero', 'ep.operation_id')
+            ->get();
+
+        $grid = [];
+        foreach ($rows as $row) {
+            $grid[(int) $row->sous_categorie_id][(int) $row->tiers_id][(int) $row->seance][(int) $row->operation_id]
+                = (float) $row->montant;
+        }
+
+        return $grid;
+    }
+
+    /**
+     * Prévisions produits (reglements.montant_prevu) au grain plat : [sc][tiers][séance][op] = montant.
+     *
+     * @param  array<int>  $operationIds
+     * @return array<int, array<int, array<int, array<int, float>>>>
+     */
+    private function fetchFlatPrevisionsProduits(array $operationIds): array
+    {
+        $rows = DB::table('reglements as r')
+            ->join('participants as p', 'p.id', '=', 'r.participant_id')
+            ->join('operations as op', 'op.id', '=', 'p.operation_id')
+            ->join('type_operations as to_', 'to_.id', '=', 'op.type_operation_id')
+            ->join('sous_categories as sc', 'sc.id', '=', 'to_.sous_categorie_id')
+            ->join('seances as s', 's.id', '=', 'r.seance_id')
+            ->whereIn('p.operation_id', $operationIds)
+            ->where('r.montant_prevu', '>', 0)
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('op.association_id', TenantContext::currentId()))
+            ->select([
+                'sc.id as sous_categorie_id',
+                DB::raw('COALESCE(p.tiers_id, 0) as tiers_id'),
+                's.numero as seance',
+                'p.operation_id',
+                DB::raw('SUM(r.montant_prevu) as montant'),
+            ])
+            ->groupBy('sc.id', 'p.tiers_id', 's.numero', 'p.operation_id')
+            ->get();
+
+        $grid = [];
+        foreach ($rows as $row) {
+            $grid[(int) $row->sous_categorie_id][(int) $row->tiers_id][(int) $row->seance][(int) $row->operation_id]
+                = (float) $row->montant;
+        }
+
+        return $grid;
+    }
+
+    /**
+     * Lookup catégorie pour une sous-catégorie (fallback pour SC prévision-only).
+     */
+    private function lookupCategoryForSc(int $scId): int
+    {
+        return (int) DB::table('sous_categories')
+            ->where('id', $scId)
+            ->value('categorie_id');
     }
 }

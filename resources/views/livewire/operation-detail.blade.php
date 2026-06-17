@@ -94,9 +94,9 @@
                 <dd class="col-sm-9">{{ $operation->nombre_seances ?? '—' }}</dd>
                 <dt class="col-sm-3">Statut</dt>
                 <dd class="col-sm-9">
-                    <span class="badge {{ $operation->statut === \App\Enums\StatutOperation::EnCours ? 'bg-success' : 'bg-secondary' }}">
+                    <button type="button" wire:click="toggleStatut" class="badge border-0 {{ $operation->statut === \App\Enums\StatutOperation::EnCours ? 'bg-success' : 'bg-secondary' }}" style="cursor:pointer" title="Cliquer pour changer le statut">
                         {{ $operation->statut->label() }}
-                    </span>
+                    </button>
                 </dd>
             </dl>
         </div>

@@ -63,7 +63,7 @@ Les totaux (sous-catégorie, catégorie, section) sont la **somme des valeurs pr
 
 ### 4.2 Implémentation dans le Builder
 
-`CompteResultatBuilder::compteDeResultatOperations()` reçoit déjà les données réelles et les prévisions séparément. La fusion projection se fait **côté Blade** (ou dans un helper PHP dans la vue), pas dans le Builder. Cela évite de dupliquer la logique de fetch et garde le Builder comme source de données brutes.
+`CompteResultatBuilder::compteDeResultatOperations()` reçoit déjà les données réelles et les prévisions séparément. La fusion projection se fait **côté Blade** (ou dans un helper PHP dans la vue), pas dans le Builder. Le Builder calcule les projections par séance via `computeProjections()`.
 
 Helper de projection (closure Blade) :
 

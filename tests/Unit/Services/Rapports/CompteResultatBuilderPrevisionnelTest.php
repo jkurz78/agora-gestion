@@ -13,6 +13,7 @@ use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Services\Rapports\CompteResultatBuilder;
+use App\Services\Rapports\ProjectionMatrix;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Carbon;
 
@@ -195,4 +196,70 @@ it("filtre fail-closed les previsions produits d'autres associations", function 
 
     $total = collect($data['previsions_produits'])->sum(fn ($cat) => collect($cat['sous_categories'])->sum('montant'));
     expect($total)->toBe(60.0); // pas 9999 + 60
+});
+
+it('retourne ProjectionMatrix dans proj_charges/proj_produits', function (): void {
+    EncadrementPrevision::create([
+        'operation_id' => $this->operation->id,
+        'tiers_id' => $this->tiersEnc->id,
+        'sous_categorie_id' => $this->scDep->id,
+        'seance_id' => $this->seance->id,
+        'montant_prevu' => 200,
+    ]);
+    Reglement::create([
+        'participant_id' => $this->participant->id,
+        'seance_id' => $this->seance->id,
+        'montant_prevu' => 80,
+    ]);
+
+    $data = app(CompteResultatBuilder::class)->compteDeResultatOperations(
+        exercice: 2026,
+        operationIds: [$this->operation->id],
+        parSeances: true,
+        parTiers: true,
+        previsionnel: true,
+    );
+
+    expect($data)->toHaveKey('proj_charges')
+        ->and($data)->toHaveKey('proj_produits')
+        ->and($data['proj_charges'])->toBeInstanceOf(ProjectionMatrix::class)
+        ->and($data['proj_produits'])->toBeInstanceOf(ProjectionMatrix::class);
+
+    expect($data['proj_charges']->total())->toBe(200.0);
+    expect($data['proj_produits']->total())->toBe(80.0);
+
+    expect($data)->not->toHaveKey('projections');
+});
+
+it('ProjectionMatrix contient les valeurs projetées au grain tiers', function (): void {
+    EncadrementPrevision::create([
+        'operation_id' => $this->operation->id,
+        'tiers_id' => $this->tiersEnc->id,
+        'sous_categorie_id' => $this->scDep->id,
+        'seance_id' => $this->seance->id,
+        'montant_prevu' => 350,
+    ]);
+
+    $data = app(CompteResultatBuilder::class)->compteDeResultatOperations(
+        exercice: 2026,
+        operationIds: [$this->operation->id],
+        parSeances: true,
+        parTiers: true,
+        previsionnel: true,
+    );
+
+    /** @var ProjectionMatrix $projCharges */
+    $projCharges = $data['proj_charges'];
+
+    $scId = (int) $this->scDep->id;
+    $tiersId = (int) $this->tiersEnc->id;
+
+    $tiersTotal = $projCharges->byScTiers($scId)[$tiersId] ?? 0;
+    expect($tiersTotal)->toBe(350.0);
+
+    $tiersSeance = $projCharges->byScTiersSeance($scId)[$tiersId] ?? [];
+    expect(array_sum($tiersSeance))->toBe(350.0);
+
+    $tiersOp = $projCharges->byScTiersOp($scId)[$tiersId] ?? [];
+    expect(array_sum($tiersOp))->toBe(350.0);
 });

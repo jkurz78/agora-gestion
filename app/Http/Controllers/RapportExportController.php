@@ -9,6 +9,7 @@ use App\Livewire\AnalysePivot;
 use App\Models\Association;
 use App\Services\ExerciceService;
 use App\Services\ProvisionService;
+use App\Services\Rapports\ProjectionMatrix;
 use App\Services\RapportService;
 use App\Support\CurrentAssociation;
 use App\Support\PdfFooterRenderer;
@@ -17,6 +18,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -306,7 +308,6 @@ final class RapportExportController extends Controller
         $sheet = $spreadsheet->getActiveSheet();
 
         $modeLabel = match ($mode) {
-            'comparaison' => ' (Comparaison)',
             'projection' => ' (Projection)',
             default => '',
         };
@@ -322,10 +323,9 @@ final class RapportExportController extends Controller
             $idx = [];
             foreach ($hierarchy as $cat) {
                 foreach ($cat['sous_categories'] as $sc) {
-                    // previsions nodes use 'sous_categorie_id' as the key field name
                     $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
                     $entry = [
-                        'montant' => (float) ($sc['montant'] ?? $sc['total'] ?? 0),
+                        'montant' => (float) ($sc['montant'] ?? 0),
                         'seances' => $sc['seances'] ?? [],
                     ];
                     if ($parOperations) {
@@ -341,92 +341,302 @@ final class RapportExportController extends Controller
         $prevChargesIdx = $previsionnel ? $buildPrevIdx($data['previsions_charges'] ?? []) : [];
         $prevProduitsIdx = $previsionnel ? $buildPrevIdx($data['previsions_produits'] ?? []) : [];
 
-        // Projection helper: use réel if > 0, else use prévu
-        $projeter = fn (float $realise, float $prevu): float => $realise > 0 ? $realise : $prevu;
+        // ProjectionMatrix objects from Builder
+        /** @var ProjectionMatrix|null $projChargesMatrix */
+        $projChargesMatrix = $data['proj_charges'] ?? null;
+        /** @var ProjectionMatrix|null $projProduitsMatrix */
+        $projProduitsMatrix = $data['proj_produits'] ?? null;
 
-        // ── parOperations: header and data rows ──────────────────────────────────
-        if ($parOperations) {
-            if ($mode === 'comparaison') {
-                // Two header rows: row 1 has op names (merged 3 cols each) + Total; row 2 has Prévu/Réel/Écart per op
-                $headerRow1 = ['Type', 'Catégorie', 'Sous-catégorie'];
-                $headerRow2 = ['', '', ''];
-                $colIndex = 4; // 1-based column index, A=1
-                foreach ($operationNames as $opId => $opName) {
-                    $colLetter = Coordinate::stringFromColumnIndex($colIndex);
-                    $colLetterEnd = Coordinate::stringFromColumnIndex($colIndex + 2);
-                    $headerRow1[] = $opName;
-                    $headerRow1[] = '';
-                    $headerRow1[] = '';
-                    $headerRow2[] = 'Prévu';
-                    $headerRow2[] = 'Réel';
-                    $headerRow2[] = 'Écart';
-                    $sheet->mergeCells($colLetter.'1:'.$colLetterEnd.'1');
-                    $colIndex += 3;
-                }
-                // Total (3 sub-columns)
-                $totalColLetter = Coordinate::stringFromColumnIndex($colIndex);
-                $totalColLetterEnd = Coordinate::stringFromColumnIndex($colIndex + 2);
-                $headerRow1[] = 'Total';
-                $headerRow1[] = '';
-                $headerRow1[] = '';
-                $headerRow2[] = 'Prévu';
-                $headerRow2[] = 'Réel';
-                $headerRow2[] = 'Écart';
-                $sheet->mergeCells($totalColLetter.'1:'.$totalColLetterEnd.'1');
+        // Resolve per-section ProjectionMatrix
+        $projMatrixFor = fn (string $sectionLabel): ?ProjectionMatrix => $sectionLabel === 'DÉPENSES' ? $projChargesMatrix : $projProduitsMatrix;
 
-                $sheet->fromArray([$headerRow1], null, 'A1');
-                $sheet->fromArray([$headerRow2], null, 'A2');
-                $sheet->getStyle('A1:'.chr(64 + count($headerRow1)).'1')->getFont()->setBold(true);
-                $sheet->getStyle('A2:'.chr(64 + count($headerRow2)).'2')->getFont()->setBold(true);
-                $headers = $headerRow2; // for column count reference
-                $row = 3;
-            } else {
-                // Single header row: op names + Total
-                $headers = ['Type', 'Catégorie', 'Sous-catégorie'];
-                foreach ($operationNames as $opName) {
-                    $headers[] = $opName;
-                }
-                $headers[] = 'Total';
-                $sheet->fromArray([$headers], null, 'A1');
-                $sheet->getStyle('A1:'.chr(64 + count($headers)).'1')->getFont()->setBold(true);
-                $row = 2;
+        // Merge prevision-only is now done in the Builder — no need to do it here.
+
+        $seancesParOperation = $data['seances_par_operation'] ?? [];
+        $combinedMode = $parSeances && $parOperations;
+
+        // ── combinedMode: 2-level header (op → séances) with merge cells ────────
+        if ($combinedMode) {
+            $labelCols = ['Type', 'Catégorie', 'Sous-catégorie'];
+            if ($parTiers) {
+                $labelCols[] = 'Tiers';
+            }
+            $labelColCount = count($labelCols);
+
+            $col = 1;
+            foreach ($labelCols as $lbl) {
+                $cell = Coordinate::stringFromColumnIndex($col);
+                $sheet->setCellValue($cell.'1', $lbl);
+                $sheet->mergeCells($cell.'1:'.$cell.'2');
+                $col++;
             }
 
-            foreach ([['Charge', $data['charges'], $prevChargesIdx], ['Produit', $data['produits'], $prevProduitsIdx]] as [$type, $sections, $prevIdx]) {
+            foreach ($operationNames as $opId => $opNom) {
+                $opSeances = $seancesParOperation[$opId] ?? [];
+                $span = count($opSeances) + 1;
+                $startCol = Coordinate::stringFromColumnIndex($col);
+                $endCol = Coordinate::stringFromColumnIndex($col + $span - 1);
+                $sheet->setCellValue($startCol.'1', $opNom);
+                if ($span > 1) {
+                    $sheet->mergeCells($startCol.'1:'.$endCol.'1');
+                }
+                foreach ($opSeances as $s) {
+                    $sheet->setCellValue(Coordinate::stringFromColumnIndex($col).'2', $s === 0 ? 'H.S.' : 'S'.$s);
+                    $col++;
+                }
+                $sheet->setCellValue(Coordinate::stringFromColumnIndex($col).'2', 'Tot.');
+                $col++;
+            }
+
+            $totalColIdx = $col;
+            $totalColLetter = Coordinate::stringFromColumnIndex($totalColIdx);
+            $sheet->setCellValue($totalColLetter.'1', 'Total');
+            $sheet->mergeCells($totalColLetter.'1:'.$totalColLetter.'2');
+            $lastCol = $totalColLetter;
+
+            $sheet->getStyle('A1:'.$lastCol.'2')->getFont()->setBold(true);
+            $sheet->getStyle('A1:'.$lastCol.'1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $row = 3;
+
+            $sectionTotals = [];
+
+            foreach ([['Charge', $data['charges'], $prevChargesIdx, 'DÉPENSES'], ['Produit', $data['produits'], $prevProduitsIdx, 'RECETTES']] as [$type, $sections, $prevIdx, $sectionLabel]) {
+                $projMatrix = $projMatrixFor($sectionLabel);
+
                 foreach ($sections as $cat) {
                     foreach ($cat['sous_categories'] as $sc) {
                         $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
-                        $prevSc = $prevIdx[$scId] ?? ['montant' => 0.0, 'operations' => []];
+
+                        if ($parTiers && ! empty($sc['tiers'])) {
+                            foreach ($sc['tiers'] as $t) {
+                                $tId = (int) ($t['tiers_id'] ?? 0);
+                                $tValues = [$type, $cat['label'], $sc['label'], $t['label']];
+                                $projTSO = ($mode === 'projection' && $projMatrix) ? ($projMatrix->byScTiersSeanceOp($scId)[$tId] ?? []) : [];
+                                foreach ($operationNames as $opId => $opName) {
+                                    foreach ($seancesParOperation[$opId] ?? [] as $s) {
+                                        $tValues[] = ($mode === 'projection' && $projMatrix) ? (float) ($projTSO[$s][$opId] ?? 0) : (float) ($t['seance_operations'][$s][$opId] ?? 0);
+                                    }
+                                    $tValues[] = ($mode === 'projection' && $projMatrix)
+                                        ? (float) ($projMatrix->byScTiersOp($scId)[$tId][$opId] ?? 0)
+                                        : (float) ($t['operations'][$opId] ?? 0);
+                                }
+                                $tValues[] = ($mode === 'projection' && $projMatrix)
+                                    ? (float) ($projMatrix->byScTiers($scId)[$tId] ?? 0)
+                                    : (float) ($t['montant'] ?? 0);
+                                $sheet->fromArray([$tValues], null, 'A'.$row);
+                                $row++;
+                            }
+                        }
 
                         $values = [$type, $cat['label'], $sc['label']];
+                        if ($parTiers) {
+                            $values[] = 'TOTAL';
+                        }
+                        foreach ($operationNames as $opId => $opName) {
+                            foreach ($seancesParOperation[$opId] ?? [] as $s) {
+                                $values[] = ($mode === 'projection' && $projMatrix) ? (float) ($projMatrix->byScSeanceOp()[$scId][$s][$opId] ?? 0) : (float) ($sc['seance_operations'][$s][$opId] ?? 0);
+                            }
+                            $values[] = ($mode === 'projection' && $projMatrix)
+                                ? (float) ($projMatrix->byScOp()[$scId][$opId] ?? 0)
+                                : (float) ($sc['operations'][$opId] ?? 0);
+                        }
+                        $values[] = ($mode === 'projection' && $projMatrix)
+                            ? (float) ($projMatrix->bySc()[$scId] ?? 0)
+                            : (float) ($sc['montant'] ?? 0);
+                        $sheet->fromArray([$values], null, 'A'.$row);
+                        if ($parTiers) {
+                            $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFont()->setBold(true);
+                        }
+                        $row++;
+                    }
 
-                        if ($mode === 'comparaison') {
-                            $totalPrevu = 0.0;
-                            $totalRealise = 0.0;
-                            foreach ($operationNames as $opId => $opName) {
-                                $realise = (float) ($sc['operations'][$opId] ?? 0);
-                                $prevu = (float) ($prevSc['operations'][$opId] ?? 0);
-                                $values[] = $prevu;
-                                $values[] = $realise;
-                                $values[] = $realise - $prevu;
-                                $totalPrevu += $prevu;
-                                $totalRealise += $realise;
+                    $catValues = [$type, $cat['label'], 'TOTAL'];
+                    if ($parTiers) {
+                        $catValues[] = '';
+                    }
+                    $catId = (int) ($cat['categorie_id'] ?? 0);
+                    foreach ($operationNames as $opId => $opName) {
+                        foreach ($seancesParOperation[$opId] ?? [] as $s) {
+                            $catValues[] = ($mode === 'projection' && $projMatrix)
+                                ? collect($cat['sous_categories'])->sum(fn ($__sc) => (float) ($projMatrix->byScSeanceOp()[(int) ($__sc['sous_categorie_id'] ?? 0)][$s][$opId] ?? 0))
+                                : (float) ($cat['seance_operations'][$s][$opId] ?? 0);
+                        }
+                        $catValues[] = ($mode === 'projection' && $projMatrix)
+                            ? (float) ($projMatrix->byCatOp()[$catId][$opId] ?? 0)
+                            : (float) ($cat['operations'][$opId] ?? 0);
+                    }
+                    $catValues[] = ($mode === 'projection' && $projMatrix)
+                        ? (float) ($projMatrix->byCat()[$catId] ?? 0)
+                        : (float) ($cat['montant'] ?? 0);
+                    $sheet->fromArray([$catValues], null, 'A'.$row);
+                    $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFont()->setBold(true);
+                    $row++;
+                }
+
+                $sectionValues = ['', '', 'TOTAL '.$sectionLabel];
+                if ($parTiers) {
+                    $sectionValues[] = '';
+                }
+                $totalSectionSeanceOps = [];
+                foreach ($sections as $_cat) {
+                    foreach ($_cat['seance_operations'] ?? [] as $s => $ops) {
+                        foreach ($ops as $_opId => $m) {
+                            $totalSectionSeanceOps[$s][$_opId] = ($totalSectionSeanceOps[$s][$_opId] ?? 0.0) + (float) $m;
+                        }
+                    }
+                }
+                foreach ($operationNames as $opId => $opName) {
+                    foreach ($seancesParOperation[$opId] ?? [] as $s) {
+                        $sectionValues[] = ($mode === 'projection' && $projMatrix) ? (float) ($projMatrix->bySeanceOp()[$s][$opId] ?? 0) : (float) ($totalSectionSeanceOps[$s][$opId] ?? 0);
+                    }
+                    $opTotal = ($mode === 'projection' && $projMatrix) ? (float) ($projMatrix->byOp()[$opId] ?? 0) : 0.0;
+                    if (! ($mode === 'projection' && $projMatrix)) {
+                        $opTotal = 0.0;
+                        foreach ($sections as $_cat) {
+                            $opTotal += (float) ($_cat['operations'][$opId] ?? 0);
+                        }
+                    }
+                    $sectionValues[] = $opTotal;
+                    $sectionTotals[$sectionLabel][$opId] = $opTotal;
+                }
+                $grandTotal = ($mode === 'projection' && $projMatrix) ? $projMatrix->total() : 0.0;
+                if (! ($mode === 'projection' && $projMatrix)) {
+                    $grandTotal = 0.0;
+                    foreach ($sections as $_cat) {
+                        $grandTotal += (float) ($_cat['montant'] ?? 0);
+                    }
+                }
+                $sectionValues[] = $grandTotal;
+                $sectionTotals[$sectionLabel]['_total'] = $grandTotal;
+                $sheet->fromArray([$sectionValues], null, 'A'.$row);
+                $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFont()->setBold(true);
+                $row++;
+                $row++;
+            }
+
+            $resultatValues = ['', '', 'RÉSULTAT'];
+            if ($parTiers) {
+                $resultatValues[] = '';
+            }
+            foreach ($operationNames as $opId => $opName) {
+                foreach ($seancesParOperation[$opId] ?? [] as $s) {
+                    $resultatValues[] = '';
+                }
+                $recOp = (float) ($sectionTotals['RECETTES'][$opId] ?? 0.0);
+                $depOp = (float) ($sectionTotals['DÉPENSES'][$opId] ?? 0.0);
+                $resultatValues[] = $recOp - $depOp;
+            }
+            $recTotal = (float) ($sectionTotals['RECETTES']['_total'] ?? 0.0);
+            $depTotal = (float) ($sectionTotals['DÉPENSES']['_total'] ?? 0.0);
+            $resultatValues[] = $recTotal - $depTotal;
+            $sheet->fromArray([$resultatValues], null, 'A'.$row);
+            $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFont()->setBold(true);
+
+            $firstNumCol = Coordinate::stringFromColumnIndex($labelColCount + 1);
+            if ($row > 3) {
+                $sheet->getStyle($firstNumCol.'3:'.$lastCol.($row))->getNumberFormat()->setFormatCode('#,##0.00');
+            }
+
+            return $spreadsheet;
+        }
+
+        // ── parOperations: header and data rows ──────────────────────────────────
+        if ($parOperations) {
+            $labelCols = ['Type', 'Catégorie', 'Sous-catégorie'];
+            if ($parSeances) {
+                $labelCols[] = 'Séance';
+            }
+            if ($parTiers) {
+                $labelCols[] = 'Tiers';
+            }
+            $labelColCount = count($labelCols);
+
+            $headers = $labelCols;
+            foreach ($operationNames as $opName) {
+                $headers[] = $opName;
+            }
+            $headers[] = 'Total';
+            $sheet->fromArray([$headers], null, 'A1');
+            $sheet->getStyle('A1:'.Coordinate::stringFromColumnIndex(count($headers)).'1')->getFont()->setBold(true);
+            $row = 2;
+
+            $sectionTotals = [];
+
+            foreach ([['Charge', $data['charges'], $prevChargesIdx, 'DÉPENSES'], ['Produit', $data['produits'], $prevProduitsIdx, 'RECETTES']] as [$type, $sections, $prevIdx, $sectionLabel]) {
+                foreach ($sections as $cat) {
+                    foreach ($cat['sous_categories'] as $sc) {
+                        $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
+
+                        // Séance sub-rows (combined mode)
+                        if ($parSeances) {
+                            /** @var ProjectionMatrix|null $projMatrix */
+                            $projMatrix = $sectionLabel === 'DÉPENSES' ? $projChargesMatrix : $projProduitsMatrix;
+                            foreach ($seances as $s) {
+                                $sLabel = $s === 0 ? 'Hors séances' : 'S'.$s;
+                                $sValues = [$type, $cat['label'], $sc['label'], $sLabel];
+                                if ($parTiers) {
+                                    $sValues[] = '';
+                                }
+                                foreach ($operationNames as $opId => $opName) {
+                                    if ($mode === 'projection' && $projMatrix) {
+                                        $sValues[] = (float) ($projMatrix->byScSeanceOp()[$scId][$s][$opId] ?? 0);
+                                    } else {
+                                        $sValues[] = 0.0;
+                                    }
+                                }
+                                if ($mode === 'projection' && $projMatrix) {
+                                    $sValues[] = (float) ($projMatrix->byScSeance()[$scId][$s] ?? 0);
+                                } else {
+                                    $sValues[] = (float) ($sc['seances'][$s] ?? 0);
+                                }
+                                $sheet->fromArray([$sValues], null, 'A'.$row);
+                                $row++;
                             }
-                            $values[] = $totalPrevu;
-                            $values[] = $totalRealise;
-                            $values[] = $totalRealise - $totalPrevu;
-                        } elseif ($mode === 'projection') {
-                            $projectedTotal = 0.0;
-                            foreach ($operationNames as $opId => $opName) {
-                                $realise = (float) ($sc['operations'][$opId] ?? 0);
-                                $prevu = (float) ($prevSc['operations'][$opId] ?? 0);
-                                $projected = $projeter($realise, $prevu);
-                                $values[] = $projected;
-                                $projectedTotal += $projected;
+                        }
+
+                        // Tiers rows (before SC subtotal)
+                        if ($parTiers && ! empty($sc['tiers'])) {
+                            $projMatrix = $projMatrixFor($sectionLabel);
+                            foreach ($sc['tiers'] as $t) {
+                                $tId = (int) ($t['tiers_id'] ?? 0);
+                                $tValues = [$type, $cat['label'], $sc['label']];
+                                if ($parSeances) {
+                                    $tValues[] = '';
+                                }
+                                $tValues[] = $t['label'];
+                                if ($mode === 'projection' && $projMatrix) {
+                                    $projTOps = $projMatrix->byScTiersOp($scId)[$tId] ?? [];
+                                    foreach ($operationNames as $opId => $opName) {
+                                        $tValues[] = (float) ($projTOps[$opId] ?? 0);
+                                    }
+                                    $tValues[] = (float) ($projMatrix->byScTiers($scId)[$tId] ?? 0);
+                                } else {
+                                    foreach ($operationNames as $opId => $opName) {
+                                        $tValues[] = (float) ($t['operations'][$opId] ?? 0);
+                                    }
+                                    $tValues[] = (float) ($t['montant'] ?? 0);
+                                }
+                                $sheet->fromArray([$tValues], null, 'A'.$row);
+                                $row++;
                             }
-                            $values[] = $projectedTotal;
+                        }
+
+                        // SC row (subtotal when parTiers or parSeances)
+                        $values = [$type, $cat['label'], $sc['label']];
+                        if ($parSeances) {
+                            $values[] = 'TOTAL';
+                        }
+                        if ($parTiers) {
+                            $values[] = $parSeances ? '' : 'TOTAL';
+                        }
+
+                        $projMatrix = $projMatrixFor($sectionLabel);
+                        if ($mode === 'projection' && $projMatrix) {
+                            foreach ($operationNames as $opId => $opName) {
+                                $values[] = (float) ($projMatrix->byScOp()[$scId][$opId] ?? 0);
+                            }
+                            $values[] = (float) ($projMatrix->bySc()[$scId] ?? 0);
                         } else {
-                            // realise
                             $total = 0.0;
                             foreach ($operationNames as $opId => $opName) {
                                 $val = (float) ($sc['operations'][$opId] ?? 0);
@@ -437,45 +647,28 @@ final class RapportExportController extends Controller
                         }
 
                         $sheet->fromArray([$values], null, 'A'.$row);
+                        if ($parTiers || $parSeances) {
+                            $sheet->getStyle('A'.$row.':'.Coordinate::stringFromColumnIndex(count($values)).$row)->getFont()->setBold(true);
+                        }
                         $row++;
                     }
 
                     // Category total row
                     $catValues = [$type, $cat['label'], 'TOTAL'];
+                    if ($parSeances) {
+                        $catValues[] = '';
+                    }
+                    if ($parTiers) {
+                        $catValues[] = '';
+                    }
 
-                    if ($mode === 'comparaison') {
-                        $catTotalPrevu = 0.0;
-                        $catTotalRealise = 0.0;
+                    $projMatrix = $projMatrixFor($sectionLabel);
+                    if ($mode === 'projection' && $projMatrix) {
+                        $catId = (int) ($cat['categorie_id'] ?? 0);
                         foreach ($operationNames as $opId => $opName) {
-                            $catRealise = (float) ($cat['operations'][$opId] ?? 0);
-                            $catPrevu = 0.0;
-                            foreach ($cat['sous_categories'] as $sc) {
-                                $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
-                                $catPrevu += (float) ($prevIdx[$scId]['operations'][$opId] ?? 0);
-                            }
-                            $catValues[] = $catPrevu;
-                            $catValues[] = $catRealise;
-                            $catValues[] = $catRealise - $catPrevu;
-                            $catTotalPrevu += $catPrevu;
-                            $catTotalRealise += $catRealise;
+                            $catValues[] = (float) ($projMatrix->byCatOp()[$catId][$opId] ?? 0);
                         }
-                        $catValues[] = $catTotalPrevu;
-                        $catValues[] = $catTotalRealise;
-                        $catValues[] = $catTotalRealise - $catTotalPrevu;
-                    } elseif ($mode === 'projection') {
-                        $catProjectedTotal = 0.0;
-                        foreach ($operationNames as $opId => $opName) {
-                            $catProjected = 0.0;
-                            foreach ($cat['sous_categories'] as $sc) {
-                                $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
-                                $realise = (float) ($sc['operations'][$opId] ?? 0);
-                                $prevu = (float) ($prevIdx[$scId]['operations'][$opId] ?? 0);
-                                $catProjected += $projeter($realise, $prevu);
-                            }
-                            $catValues[] = $catProjected;
-                            $catProjectedTotal += $catProjected;
-                        }
-                        $catValues[] = $catProjectedTotal;
+                        $catValues[] = (float) ($projMatrix->byCat()[$catId] ?? 0);
                     } else {
                         $catTotal = 0.0;
                         foreach ($operationNames as $opId => $opName) {
@@ -487,16 +680,79 @@ final class RapportExportController extends Controller
                     }
 
                     $sheet->fromArray([$catValues], null, 'A'.$row);
-                    $sheet->getStyle('A'.$row.':'.chr(64 + count($catValues)).$row)->getFont()->setBold(true);
+                    $sheet->getStyle('A'.$row.':'.Coordinate::stringFromColumnIndex(count($catValues)).$row)->getFont()->setBold(true);
                     $row++;
                 }
+
+                // Section total row (TOTAL DÉPENSES / TOTAL RECETTES)
+                $sectionValues = ['', '', 'TOTAL '.$sectionLabel];
+                if ($parSeances) {
+                    $sectionValues[] = '';
+                }
+                if ($parTiers) {
+                    $sectionValues[] = '';
+                }
+
+                $projMatrix = $projMatrixFor($sectionLabel);
+                if ($mode === 'projection' && $projMatrix) {
+                    foreach ($operationNames as $opId => $opName) {
+                        $opTotal = (float) ($projMatrix->byOp()[$opId] ?? 0);
+                        $sectionValues[] = $opTotal;
+                        $sectionTotals[$sectionLabel][$opId] = $opTotal;
+                    }
+                    $grandTotal = $projMatrix->total();
+                    $sectionValues[] = $grandTotal;
+                    $sectionTotals[$sectionLabel]['_total'] = $grandTotal;
+                } else {
+                    foreach ($operationNames as $opId => $opName) {
+                        $opTotal = 0.0;
+                        foreach ($sections as $cat) {
+                            $opTotal += (float) ($cat['operations'][$opId] ?? 0);
+                        }
+                        $sectionValues[] = $opTotal;
+                        $sectionTotals[$sectionLabel][$opId] = $opTotal;
+                    }
+                    $grandTotal = 0.0;
+                    foreach ($sections as $cat) {
+                        $grandTotal += (float) ($cat['montant'] ?? 0);
+                    }
+                    $sectionValues[] = $grandTotal;
+                    $sectionTotals[$sectionLabel]['_total'] = $grandTotal;
+                }
+
+                $sheet->fromArray([$sectionValues], null, 'A'.$row);
+                $sheet->getStyle('A'.$row.':'.Coordinate::stringFromColumnIndex(count($sectionValues)).$row)->getFont()->setBold(true);
+                $row++;
+                $row++; // blank row between sections
             }
 
+            // RÉSULTAT row
+            $resultatValues = ['', '', 'RÉSULTAT'];
+            if ($parSeances) {
+                $resultatValues[] = '';
+            }
+            if ($parTiers) {
+                $resultatValues[] = '';
+            }
+
+            foreach ($operationNames as $opId => $opName) {
+                $recOp = (float) ($sectionTotals['RECETTES'][$opId] ?? 0.0);
+                $depOp = (float) ($sectionTotals['DÉPENSES'][$opId] ?? 0.0);
+                $resultatValues[] = $recOp - $depOp;
+            }
+            $recTotal = (float) ($sectionTotals['RECETTES']['_total'] ?? 0.0);
+            $depTotal = (float) ($sectionTotals['DÉPENSES']['_total'] ?? 0.0);
+            $resultatValues[] = $recTotal - $depTotal;
+
+            $sheet->fromArray([$resultatValues], null, 'A'.$row);
+            $sheet->getStyle('A'.$row.':'.Coordinate::stringFromColumnIndex(count($resultatValues)).$row)->getFont()->setBold(true);
+            $row++;
+
             // Format number columns (D onwards)
-            $lastCol = chr(64 + count($mode === 'comparaison' ? $headers : (array_merge(['', '', ''], array_values($operationNames), ['']))));
-            if ($row > ($mode === 'comparaison' ? 4 : 3)) {
-                $startRow = $mode === 'comparaison' ? 3 : 2;
-                $sheet->getStyle('D'.$startRow.':'.$lastCol.($row - 1))->getNumberFormat()->setFormatCode('#,##0.00');
+            $firstNumCol = Coordinate::stringFromColumnIndex($labelColCount + 1);
+            $lastCol = Coordinate::stringFromColumnIndex($labelColCount + count($operationNames) + 1);
+            if ($row > 3) {
+                $sheet->getStyle($firstNumCol.'2:'.$lastCol.($row - 1))->getNumberFormat()->setFormatCode('#,##0.00');
             }
 
             return $spreadsheet;
@@ -523,37 +779,42 @@ final class RapportExportController extends Controller
                 $headers[] = 'Montant';
             }
         }
-        if ($mode === 'comparaison') {
-            $headers[] = 'Prévu';
-            $headers[] = 'Écart';
-        }
         $sheet->fromArray([$headers], null, 'A'.$row);
-        $sheet->getStyle('A1:'.chr(64 + count($headers)).'1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:'.Coordinate::stringFromColumnIndex(count($headers)).'1')->getFont()->setBold(true);
         $row++;
 
-        foreach ([['Charge', $data['charges'], $prevChargesIdx], ['Produit', $data['produits'], $prevProduitsIdx]] as [$type, $sections, $prevIdx]) {
+        $sectionTotals = [];
+        $lastCol = Coordinate::stringFromColumnIndex(count($headers));
+
+        foreach ([['Charge', $data['charges'], $prevChargesIdx, 'DÉPENSES'], ['Produit', $data['produits'], $prevProduitsIdx, 'RECETTES']] as [$type, $sections, $prevIdx, $sectionLabel]) {
             foreach ($sections as $cat) {
                 foreach ($cat['sous_categories'] as $sc) {
                     $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
-                    $prevSc = $prevIdx[$scId] ?? ['montant' => 0.0, 'seances' => []];
 
                     if ($parTiers && ! empty($sc['tiers'])) {
+                        $projMatrix = $projMatrixFor($sectionLabel);
                         foreach ($sc['tiers'] as $t) {
+                            $tId = (int) ($t['tiers_id'] ?? 0);
                             $values = [$type, $cat['label'], $sc['label'], $t['label']];
                             if ($parSeances) {
-                                foreach ($seances as $s) {
-                                    $values[] = (float) ($t['seances'][$s] ?? 0);
+                                if ($mode === 'projection' && $projMatrix) {
+                                    $projTSeances = $projMatrix->byScTiersSeance($scId)[$tId] ?? [];
+                                    foreach ($seances as $s) {
+                                        $values[] = (float) ($projTSeances[$s] ?? 0);
+                                    }
+                                    $values[] = (float) ($projMatrix->byScTiers($scId)[$tId] ?? 0);
+                                } else {
+                                    foreach ($seances as $s) {
+                                        $values[] = (float) ($t['seances'][$s] ?? 0);
+                                    }
+                                    $values[] = (float) ($t['montant'] ?? 0);
                                 }
-                                $values[] = (float) ($t['total'] ?? 0);
                             } else {
-                                $values[] = (float) ($t['montant'] ?? 0);
-                            }
-                            // Previsionnel: les tiers individuels ne sont pas restitués ici par choix de design ;
-                            // la granularité affichée s'arrête à la sous-catégorie. Les prévisions par tiers
-                            // existent en DB (encadrement_previsions.tiers_id) mais sont agrégées au niveau sc.
-                            if ($mode === 'comparaison') {
-                                $values[] = '';
-                                $values[] = '';
+                                if ($mode === 'projection' && $projMatrix) {
+                                    $values[] = (float) ($projMatrix->byScTiers($scId)[$tId] ?? 0);
+                                } else {
+                                    $values[] = (float) ($t['montant'] ?? 0);
+                                }
                             }
                             $sheet->fromArray([$values], null, 'A'.$row);
                             $row++;
@@ -564,45 +825,29 @@ final class RapportExportController extends Controller
                     if ($parTiers) {
                         $values[] = 'TOTAL';
                     }
+                    $projMatrix = $projMatrixFor($sectionLabel);
                     if ($parSeances) {
-                        if ($mode === 'projection') {
+                        if ($mode === 'projection' && $projMatrix) {
                             foreach ($seances as $s) {
-                                $realise = (float) ($sc['seances'][$s] ?? 0);
-                                $prevu = (float) ($prevSc['seances'][$s] ?? 0);
-                                $values[] = $projeter($realise, $prevu);
+                                $values[] = (float) ($projMatrix->byScSeance()[$scId][$s] ?? 0);
                             }
-                            $projectedTotal = 0.0;
-                            foreach ($seances as $s) {
-                                $projectedTotal += $projeter((float) ($sc['seances'][$s] ?? 0), (float) ($prevSc['seances'][$s] ?? 0));
-                            }
-                            $values[] = $projectedTotal;
-                            $realise = $projectedTotal; // for cat total accumulation reference (not used below)
+                            $values[] = (float) ($projMatrix->bySc()[$scId] ?? 0);
                         } else {
                             foreach ($seances as $s) {
                                 $values[] = (float) ($sc['seances'][$s] ?? 0);
                             }
-                            $realise = (float) ($sc['total'] ?? 0);
-                            $values[] = $realise;
+                            $values[] = (float) ($sc['montant'] ?? 0);
                         }
                     } else {
-                        if ($mode === 'projection') {
-                            $realise = (float) ($sc['total'] ?? $sc['montant'] ?? 0);
-                            $prevu = (float) $prevSc['montant'];
-                            $values[] = $projeter($realise, $prevu);
-                            $realise = $projeter($realise, $prevu);
+                        if ($mode === 'projection' && $projMatrix) {
+                            $values[] = (float) ($projMatrix->bySc()[$scId] ?? 0);
                         } else {
-                            $realise = (float) ($sc['montant'] ?? 0);
-                            $values[] = $realise;
+                            $values[] = (float) ($sc['montant'] ?? 0);
                         }
-                    }
-                    if ($mode === 'comparaison') {
-                        $prevu = (float) $prevSc['montant'];
-                        $values[] = $prevu;
-                        $values[] = $realise - $prevu;
                     }
                     $sheet->fromArray([$values], null, 'A'.$row);
                     if ($parTiers) {
-                        $sheet->getStyle('A'.$row.':'.chr(64 + count($headers)).$row)->getFont()->setBold(true);
+                        $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFont()->setBold(true);
                     }
                     $row++;
                 }
@@ -611,70 +856,110 @@ final class RapportExportController extends Controller
                 if ($parTiers) {
                     $values[] = '';
                 }
+                $catId = (int) ($cat['categorie_id'] ?? 0);
+                $projMatrix = $projMatrixFor($sectionLabel);
                 if ($parSeances) {
-                    if ($mode === 'projection') {
+                    if ($mode === 'projection' && $projMatrix) {
                         foreach ($seances as $s) {
                             $catSeanceProjected = 0.0;
                             foreach ($cat['sous_categories'] as $sc) {
                                 $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
-                                $prevSc = $prevIdx[$scId] ?? ['montant' => 0.0, 'seances' => []];
-                                $catSeanceProjected += $projeter((float) ($sc['seances'][$s] ?? 0), (float) ($prevSc['seances'][$s] ?? 0));
+                                $catSeanceProjected += (float) ($projMatrix->byScSeance()[$scId][$s] ?? 0);
                             }
                             $values[] = $catSeanceProjected;
                         }
-                        $catProjected = 0.0;
-                        foreach ($seances as $s) {
-                            foreach ($cat['sous_categories'] as $sc) {
-                                $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
-                                $prevSc = $prevIdx[$scId] ?? ['montant' => 0.0, 'seances' => []];
-                                $catProjected += $projeter((float) ($sc['seances'][$s] ?? 0), (float) ($prevSc['seances'][$s] ?? 0));
-                            }
-                        }
-                        $catRealise = $catProjected;
-                        $values[] = $catRealise;
+                        $values[] = (float) ($projMatrix->byCat()[$catId] ?? 0);
                     } else {
                         foreach ($seances as $s) {
                             $values[] = (float) ($cat['seances'][$s] ?? 0);
                         }
-                        $catRealise = (float) ($cat['total'] ?? 0);
-                        $values[] = $catRealise;
+                        $values[] = (float) ($cat['montant'] ?? 0);
                     }
                 } else {
-                    if ($mode === 'projection') {
-                        $catProjected = 0.0;
-                        foreach ($cat['sous_categories'] as $sc) {
-                            $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
-                            $prevSc = $prevIdx[$scId] ?? ['montant' => 0.0, 'seances' => []];
-                            $scRealise = (float) ($sc['total'] ?? $sc['montant'] ?? 0);
-                            $scPrevu = (float) $prevSc['montant'];
-                            $catProjected += $projeter($scRealise, $scPrevu);
-                        }
-                        $catRealise = $catProjected;
-                        $values[] = $catRealise;
+                    if ($mode === 'projection' && $projMatrix) {
+                        $values[] = (float) ($projMatrix->byCat()[$catId] ?? 0);
                     } else {
-                        $catRealise = (float) ($cat['montant'] ?? 0);
-                        $values[] = $catRealise;
+                        $values[] = (float) ($cat['montant'] ?? 0);
                     }
-                }
-                if ($mode === 'comparaison') {
-                    // Compute cat prevu by summing sc previsions for sous_categories of this cat
-                    $catPrevu = 0.0;
-                    foreach ($cat['sous_categories'] as $sc) {
-                        $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
-                        $catPrevu += (float) ($prevIdx[$scId]['montant'] ?? 0);
-                    }
-                    $values[] = $catPrevu;
-                    $values[] = $catRealise - $catPrevu;
                 }
                 $sheet->fromArray([$values], null, 'A'.$row);
-                $sheet->getStyle('A'.$row.':'.chr(64 + count($headers)).$row)->getFont()->setBold(true);
+                $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFont()->setBold(true);
                 $row++;
             }
+
+            // Section total row (TOTAL DÉPENSES / TOTAL RECETTES)
+            $secValues = ['', '', 'TOTAL '.$sectionLabel];
+            if ($parTiers) {
+                $secValues[] = '';
+            }
+
+            $projMatrix = $projMatrixFor($sectionLabel);
+            if ($parSeances) {
+                if ($mode === 'projection' && $projMatrix) {
+                    $secTotal = $projMatrix->total();
+                    foreach ($seances as $s) {
+                        $seanceTotal = 0.0;
+                        foreach ($sections as $cat) {
+                            foreach ($cat['sous_categories'] as $sc) {
+                                $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
+                                $seanceTotal += (float) ($projMatrix->byScSeance()[$scId][$s] ?? 0);
+                            }
+                        }
+                        $secValues[] = $seanceTotal;
+                    }
+                    $secValues[] = $secTotal;
+                } else {
+                    $secTotal = 0.0;
+                    foreach ($seances as $s) {
+                        $seanceTotal = 0.0;
+                        foreach ($sections as $cat) {
+                            $seanceTotal += (float) ($cat['seances'][$s] ?? 0);
+                        }
+                        $secValues[] = $seanceTotal;
+                    }
+                    foreach ($sections as $cat) {
+                        $secTotal += (float) ($cat['montant'] ?? 0);
+                    }
+                    $secValues[] = $secTotal;
+                }
+            } else {
+                if ($mode === 'projection' && $projMatrix) {
+                    $secTotal = $projMatrix->total();
+                } else {
+                    $secTotal = 0.0;
+                    foreach ($sections as $cat) {
+                        $secTotal += (float) ($cat['montant'] ?? 0);
+                    }
+                }
+                $secValues[] = $secTotal;
+            }
+            $sectionTotals[$sectionLabel] = $secTotal;
+
+            $sheet->fromArray([$secValues], null, 'A'.$row);
+            $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFont()->setBold(true);
+            $row++;
+            $row++; // blank row between sections
         }
+
+        // RÉSULTAT row
+        $resultatValues = ['', '', 'RÉSULTAT'];
+        if ($parTiers) {
+            $resultatValues[] = '';
+        }
+        $recTotal = $sectionTotals['RECETTES'] ?? 0.0;
+        $depTotal = $sectionTotals['DÉPENSES'] ?? 0.0;
+        if ($parSeances) {
+            foreach ($seances as $s) {
+                $resultatValues[] = '';
+            }
+        }
+        $resultatValues[] = $recTotal - $depTotal;
+        $sheet->fromArray([$resultatValues], null, 'A'.$row);
+        $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFont()->setBold(true);
+        $row++;
 
         // Format number columns
         $firstNumCol = $parTiers ? 'E' : 'D';
-        $lastCol = chr(64 + count($headers));
         if ($row > 2) {
             $sheet->getStyle($firstNumCol.'2:'.$lastCol.($row - 1))->getNumberFormat()->setFormatCode('#,##0.00');
         }
@@ -765,7 +1050,7 @@ final class RapportExportController extends Controller
         // Headers from first row keys
         $headers = array_keys($data[0]);
         $sheet->fromArray([$headers], null, 'A1');
-        $sheet->getStyle('A1:'.chr(64 + count($headers)).'1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:'.Coordinate::stringFromColumnIndex(count($headers)).'1')->getFont()->setBold(true);
 
         $row = 2;
         foreach ($data as $entry) {
@@ -777,7 +1062,7 @@ final class RapportExportController extends Controller
         $montantCol = null;
         foreach ($headers as $i => $h) {
             if (in_array($h, ['Montant', 'Montant prévu'], true)) {
-                $montantCol = chr(65 + $i);
+                $montantCol = Coordinate::stringFromColumnIndex($i + 1);
                 break;
             }
         }
@@ -892,17 +1177,26 @@ final class RapportExportController extends Controller
         $operationIds = array_map('intval', (array) $request->query('ops', []));
         $parSeances = $request->boolean('seances');
         $parTiers = $request->boolean('tiers');
-        $previsionnel = $request->boolean('prev');
+        $mode = (string) $request->query('mode', 'realise');
+        $previsionnel = $mode !== 'realise';
+        $parOperations = $request->boolean('parops');
 
-        $data = $rapportService->compteDeResultatOperations($exercice, $operationIds, $parSeances, $parTiers, $previsionnel);
+        $data = $rapportService->compteDeResultatOperations($exercice, $operationIds, $parSeances, $parTiers, $previsionnel, $parOperations);
         $seances = $data['seances'] ?? [];
+        $operationNames = $data['operation_names'] ?? [];
+        $seancesParOperation = $data['seances_par_operation'] ?? [];
+        /** @var ProjectionMatrix|null $projChargesM */
+        $projChargesM = $data['proj_charges'] ?? null;
+        /** @var ProjectionMatrix|null $projProduitsM */
+        $projProduitsM = $data['proj_produits'] ?? null;
 
-        $totalCharges = $parSeances
-            ? collect($data['charges'])->sum('total')
-            : collect($data['charges'])->sum('montant');
-        $totalProduits = $parSeances
-            ? collect($data['produits'])->sum('total')
-            : collect($data['produits'])->sum('montant');
+        if ($mode === 'projection' && $projChargesM !== null) {
+            $totalCharges = $projChargesM->total();
+            $totalProduits = $projProduitsM->total();
+        } else {
+            $totalCharges = collect($data['charges'])->sum('montant');
+            $totalProduits = collect($data['produits'])->sum('montant');
+        }
 
         return [
             'charges' => $data['charges'],
@@ -910,9 +1204,15 @@ final class RapportExportController extends Controller
             'previsionsCharges' => $data['previsions_charges'] ?? [],
             'previsionsProduits' => $data['previsions_produits'] ?? [],
             'seances' => $seances,
+            'seancesParOperation' => $seancesParOperation,
             'parSeances' => $parSeances,
             'parTiers' => $parTiers,
             'previsionnel' => $previsionnel,
+            'mode' => $mode,
+            'parOperations' => $parOperations,
+            'operationNames' => $operationNames,
+            'projCharges' => $projChargesM,
+            'projProduits' => $projProduitsM,
             'totalCharges' => $totalCharges,
             'totalProduits' => $totalProduits,
             'resultatNet' => $totalProduits - $totalCharges,

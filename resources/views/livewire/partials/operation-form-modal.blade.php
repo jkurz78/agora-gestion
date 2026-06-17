@@ -53,6 +53,15 @@
 
         @if($showEditModal)
             <div class="mb-3">
+                <label class="form-label small fw-semibold">Statut</label>
+                <select class="form-select form-select-sm" wire:model="formStatut">
+                    @foreach(\App\Enums\StatutOperation::cases() as $statut)
+                        <option value="{{ $statut->value }}">{{ $statut->label() }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="mb-3">
                 <a href="{{ route('operations.types-operation.index') }}" class="small text-muted">
                     <i class="bi bi-gear me-1"></i> Reglages avances du type d'operation
                 </a>
