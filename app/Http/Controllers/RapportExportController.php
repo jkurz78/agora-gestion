@@ -308,14 +308,18 @@ final class RapportExportController extends Controller
         $sheet = $spreadsheet->getActiveSheet();
 
         $modeLabel = match ($mode) {
-            'projection' => ' (Projection)',
-            default => '',
+            'projection' => 'Projection',
+            default => 'Réalisé',
         };
-        $sheet->setTitle('CR par opérations'.$modeLabel);
+        $sheet->setTitle('CR par opérations ('.$modeLabel.')');
 
         $seances = $data['seances'] ?? [];
         $operationNames = $data['operation_names'] ?? [];
         $row = 1;
+
+        $sheet->setCellValue('A'.$row, 'Mode : '.$modeLabel);
+        $sheet->getStyle('A'.$row)->getFont()->setBold(true)->setItalic(true)->setSize(10);
+        $row++;
 
         // Build flat previsions lookup: sc_id => { montant, seances: {num => float}, operations?: {op_id => float} }
         // Only populated when $previsionnel is true.
@@ -1198,7 +1202,13 @@ final class RapportExportController extends Controller
             $totalProduits = collect($data['produits'])->sum('montant');
         }
 
+        $modeLabel = match ($mode) {
+            'projection' => 'Projection',
+            default => 'Réalisé',
+        };
+
         return [
+            'subtitle' => 'Mode : '.$modeLabel,
             'charges' => $data['charges'],
             'produits' => $data['produits'],
             'previsionsCharges' => $data['previsions_charges'] ?? [],
