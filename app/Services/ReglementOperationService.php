@@ -498,5 +498,7 @@ final class ReglementOperationService
             libelle: $tx->libelle,
             existingTransaction: $tx,
         );
+
+        $tx->forceFill(['equilibree' => true])->save();
     }
 }
