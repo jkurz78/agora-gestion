@@ -646,7 +646,7 @@ final class CompteResultatBuilder
         bool $withOperation = false,
     ): array {
         if (Config::get('compta.use_partie_double', false)) {
-            return $this->fetchOperationRowsPD($type, $start, $end, $operationIds, $withSeance, $withTiers);
+            return $this->fetchOperationRowsPD($type, $start, $end, $operationIds, $withSeance, $withTiers, $withOperation);
         }
 
         [$q1, $q2] = $this->buildOperationQueries($type, $start, $end, $operationIds, $withSeance, $withTiers, $withOperation);
@@ -1274,6 +1274,7 @@ final class CompteResultatBuilder
         array $operationIds,
         bool $withSeance,
         bool $withTiers,
+        bool $withOperation = false,
     ): array {
         $classe = $type === 'recette' ? 7 : 6;
         $isSigne7 = $classe === 7;
@@ -1303,6 +1304,10 @@ final class CompteResultatBuilder
         if ($withSeance) {
             $q1Cols[] = DB::raw('COALESCE(tl.seance, 0) as seance');
             $q1Group[] = DB::raw('COALESCE(tl.seance, 0)');
+        }
+        if ($withOperation) {
+            $q1Cols[] = 'tl.operation_id';
+            $q1Group[] = 'tl.operation_id';
         }
         $montantQ1 = $isSigne7
             ? DB::raw('SUM(tl.credit) - SUM(tl.debit) as montant')
@@ -1337,6 +1342,10 @@ final class CompteResultatBuilder
             $q2Cols[] = DB::raw('COALESCE(tla2.seance, 0) as seance');
             $q2Group[] = DB::raw('COALESCE(tla2.seance, 0)');
         }
+        if ($withOperation) {
+            $q2Cols[] = 'tla2.operation_id';
+            $q2Group[] = 'tla2.operation_id';
+        }
         $q2Cols[] = DB::raw('SUM(tla2.montant) as montant');
 
         $q2 = DB::table('transaction_ligne_affectations as tla2')
@@ -1368,6 +1377,9 @@ final class CompteResultatBuilder
                 if ($withSeance) {
                     $key .= '_'.$row->seance;
                 }
+                if ($withOperation) {
+                    $key .= '_op'.$row->operation_id;
+                }
 
                 if (isset($map[$key])) {
                     $map[$key]['montant'] += (float) $row->montant;
@@ -1388,6 +1400,9 @@ final class CompteResultatBuilder
                         $entry['tiers_nom'] = $row->tiers_nom !== '' ? $row->tiers_nom : null;
                         $entry['tiers_prenom'] = $row->tiers_prenom !== '' ? $row->tiers_prenom : null;
                         $entry['tiers_entreprise'] = $row->tiers_entreprise !== '' ? $row->tiers_entreprise : null;
+                    }
+                    if ($withOperation) {
+                        $entry['operation_id'] = (int) $row->operation_id;
                     }
                     $map[$key] = $entry;
                 }
