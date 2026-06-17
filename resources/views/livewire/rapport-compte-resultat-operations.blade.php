@@ -100,6 +100,12 @@
                 </select>
 
                 {{-- Toggles --}}
+                @if (count($selectedOperationIds) > 1)
+                <div class="form-check form-switch mb-0">
+                    <input type="checkbox" wire:model.live="parOperations" class="form-check-input" id="toggleOperations">
+                    <label class="form-check-label small" for="toggleOperations">Op&eacute;rations en colonnes</label>
+                </div>
+                @endif
                 <div class="form-check form-switch mb-0">
                     <input type="checkbox" wire:model.live="parSeances" class="form-check-input" id="toggleSeances">
                     <label class="form-check-label small" for="toggleSeances">S&eacute;ances en colonnes</label>
@@ -108,12 +114,6 @@
                     <input type="checkbox" wire:model.live="parTiers" class="form-check-input" id="toggleTiers">
                     <label class="form-check-label small" for="toggleTiers">Tiers en lignes</label>
                 </div>
-                @if (count($selectedOperationIds) > 1)
-                <div class="form-check form-switch mb-0">
-                    <input type="checkbox" wire:model.live="parOperations" class="form-check-input" id="toggleOperations">
-                    <label class="form-check-label small" for="toggleOperations">Op&eacute;rations en colonnes</label>
-                </div>
-                @endif
 
                 {{-- Export dropdown --}}
                 @if (! empty($selectedOperationIds))
