@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Enums\JournalComptable;
 use App\Enums\TypeTransaction;
 use App\Models\CompteBancaire;
-use App\Models\Compte;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;

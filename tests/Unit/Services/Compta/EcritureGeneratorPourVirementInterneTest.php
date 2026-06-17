@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\JournalComptable;
 use App\Enums\ModePaiement;
+use App\Enums\Sens;
 use App\Enums\TypeTransaction;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
@@ -51,7 +52,7 @@ it('Transaction belongsTo VirementInterne via virement_interne_id', function () 
         'saisi_par' => $user->id,
         'equilibree' => true,
         'type_ecriture' => 'normale',
-        'journal' => \App\Enums\JournalComptable::Banque,
+        'journal' => JournalComptable::Banque,
         'numero_piece' => '2025-2026:99999',
         'virement_interne_id' => $virement->id,
     ]);
@@ -191,7 +192,7 @@ it('throws RuntimeException when source 512X is missing', function () {
     $virement = creerVirement($cb1, $cb2);
 
     app(EcritureGenerator::class)->pourVirementInterne($virement);
-})->throws(\RuntimeException::class, 'source');
+})->throws(RuntimeException::class, 'source');
 
 it('throws RuntimeException when destination 512X is missing', function () {
     $cb1 = CompteBancaire::factory()->create([
@@ -208,7 +209,7 @@ it('throws RuntimeException when destination 512X is missing', function () {
     $virement = creerVirement($cb1, $cb2);
 
     app(EcritureGenerator::class)->pourVirementInterne($virement);
-})->throws(\RuntimeException::class, 'destination');
+})->throws(RuntimeException::class, 'destination');
 
 it('throws InvalidArgumentException when source and destination resolve to same 512X', function () {
     $cb1 = CompteBancaire::factory()->create([
@@ -221,10 +222,10 @@ it('throws InvalidArgumentException when source and destination resolve to same 
     $virement = creerVirement($cb1, $cb1);
 
     app(EcritureGenerator::class)->pourVirementInterne($virement);
-})->throws(\InvalidArgumentException::class, 'identiques');
+})->throws(InvalidArgumentException::class, 'identiques');
 
 it('Transaction::montantSigne returns positive for Virement type', function () {
-    $tx = new Transaction();
+    $tx = new Transaction;
     $tx->type = TypeTransaction::Virement;
     $tx->montant_total = 500.00;
 
@@ -232,11 +233,11 @@ it('Transaction::montantSigne returns positive for Virement type', function () {
 });
 
 it('Transaction::sensTresorerie returns Recette for normal Virement', function () {
-    $tx = new Transaction();
+    $tx = new Transaction;
     $tx->type = TypeTransaction::Virement;
     $tx->type_ecriture = 'normale';
 
-    expect($tx->sensTresorerie())->toBe(\App\Enums\Sens::Recette);
+    expect($tx->sensTresorerie())->toBe(Sens::Recette);
 });
 
 it('scopeOperationnel excludes Virement transactions', function () {

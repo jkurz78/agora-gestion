@@ -8,10 +8,10 @@ use App\Models\Categorie;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
-use App\Models\TransactionLigne;
 use App\Services\Compta\PartieDoubleGuard;
 use App\Services\TransactionService;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
 use Tests\Support\CreatesPartieDoubleContext;
 
 uses(CreatesPartieDoubleContext::class);
@@ -39,22 +39,22 @@ it('create() avec PD active et SousCategorie sans mapping → skip gracieux, pas
     ]);
     $scSansCerfa = SousCategorie::create([
         'association_id' => $this->association->id,
-        'categorie_id'   => $categorie->id,
-        'nom'            => 'SC sans mapping Compte',
-        'code_cerfa'     => null,
+        'categorie_id' => $categorie->id,
+        'nom' => 'SC sans mapping Compte',
+        'code_cerfa' => null,
     ]);
 
     $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $service = app(TransactionService::class);
 
     $data = [
-        'type'          => TypeTransaction::Recette->value,
-        'date'          => '2025-10-01',
-        'libelle'       => 'Recette sans mapping PD',
+        'type' => TypeTransaction::Recette->value,
+        'date' => '2025-10-01',
+        'libelle' => 'Recette sans mapping PD',
         'montant_total' => '100.00',
         'mode_paiement' => 'virement',
-        'compte_id'     => $this->compteBancaire->id,
-        'tiers_id'      => $tiers->id,
+        'compte_id' => $this->compteBancaire->id,
+        'tiers_id' => $tiers->id,
     ];
     $lignes = [['sous_categorie_id' => $scSansCerfa->id, 'montant' => '100.00']];
 
@@ -76,13 +76,13 @@ it('create() avec PD active et SousCategorie correctement mappée → guard pass
     $service = app(TransactionService::class);
 
     $data = [
-        'type'          => TypeTransaction::Recette->value,
-        'date'          => '2025-10-01',
-        'libelle'       => 'Recette mappée PD',
+        'type' => TypeTransaction::Recette->value,
+        'date' => '2025-10-01',
+        'libelle' => 'Recette mappée PD',
         'montant_total' => '200.00',
         'mode_paiement' => 'virement',
-        'compte_id'     => $this->compteBancaire->id,
-        'tiers_id'      => $tiers->id,
+        'compte_id' => $this->compteBancaire->id,
+        'tiers_id' => $tiers->id,
     ];
     $lignes = [['sous_categorie_id' => $this->sc706->id, 'montant' => '200.00']];
 
@@ -102,22 +102,22 @@ it('PartieDoubleGuard::assertComplete lance une exception si debit ≠ credit', 
 
     $transaction = Transaction::create([
         'association_id' => $this->association->id,
-        'type'           => TypeTransaction::Recette,
-        'date'           => '2025-10-01',
-        'libelle'        => 'TX déséquilibrée',
-        'montant_total'  => 100.0,
-        'saisi_par'      => $this->user->id,
-        'equilibree'     => true,   // marquée équilibrée mais lignes tronquées
+        'type' => TypeTransaction::Recette,
+        'date' => '2025-10-01',
+        'libelle' => 'TX déséquilibrée',
+        'montant_total' => 100.0,
+        'saisi_par' => $this->user->id,
+        'equilibree' => true,   // marquée équilibrée mais lignes tronquées
     ]);
 
     // Insérer une seule ligne PD (débit mais pas de crédit correspondant)
     // Utiliser DB::table pour contourner l'observer XOR qui empêche debit>0 ET credit=0 seul.
-    \Illuminate\Support\Facades\DB::table('transaction_lignes')->insert([
+    DB::table('transaction_lignes')->insert([
         'transaction_id' => $transaction->id,
-        'compte_id'      => $compte->id,
-        'debit'          => 100.0,
-        'credit'         => 0.0,
-        'montant'        => 0.0,
+        'compte_id' => $compte->id,
+        'debit' => 100.0,
+        'credit' => 0.0,
+        'montant' => 0.0,
     ]);
 
     expect(fn () => PartieDoubleGuard::assertComplete($transaction->fresh()))

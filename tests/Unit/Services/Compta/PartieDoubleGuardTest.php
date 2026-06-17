@@ -17,7 +17,7 @@ function makeComptePDG(string $numero = '607'): Compte
 {
     return Compte::create([
         'association_id' => TenantContext::currentId(),
-        'numero_pcg' => $numero . '-pdg-' . uniqid(),
+        'numero_pcg' => $numero.'-pdg-'.uniqid(),
         'intitule' => "Compte {$numero}",
         'classe' => (int) substr($numero, 0, 1),
         'lettrable' => false,
