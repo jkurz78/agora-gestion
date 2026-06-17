@@ -222,3 +222,29 @@ it('throws InvalidArgumentException when source and destination resolve to same 
 
     app(EcritureGenerator::class)->pourVirementInterne($virement);
 })->throws(\InvalidArgumentException::class, 'identiques');
+
+it('Transaction::montantSigne returns positive for Virement type', function () {
+    $tx = new Transaction();
+    $tx->type = TypeTransaction::Virement;
+    $tx->montant_total = 500.00;
+
+    expect($tx->montantSigne())->toBe(500.00);
+});
+
+it('Transaction::sensTresorerie returns Recette for normal Virement', function () {
+    $tx = new Transaction();
+    $tx->type = TypeTransaction::Virement;
+    $tx->type_ecriture = 'normale';
+
+    expect($tx->sensTresorerie())->toBe(\App\Enums\Sens::Recette);
+});
+
+it('scopeOperationnel excludes Virement transactions', function () {
+    [$cb1, $cb2, $compte512Source, $compte512Dest] = creerDeuxComptesBancairesAvec512();
+    $virement = creerVirement($cb1, $cb2);
+
+    $transaction = app(EcritureGenerator::class)->pourVirementInterne($virement);
+
+    $found = Transaction::operationnel()->where('id', $transaction->id)->exists();
+    expect($found)->toBeFalse();
+});

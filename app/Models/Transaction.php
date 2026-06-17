@@ -218,9 +218,10 @@ final class Transaction extends TenantModel
      */
     public function sensTresorerie(): Sens
     {
-        $sensNaturel = $this->type === TypeTransaction::Recette
-            ? Sens::Recette
-            : Sens::Depense;
+        $sensNaturel = match ($this->type) {
+            TypeTransaction::Recette, TypeTransaction::Virement => Sens::Recette,
+            TypeTransaction::Depense => Sens::Depense,
+        };
 
         return $this->type_ecriture === 'extourne'
             ? ($sensNaturel === Sens::Recette ? Sens::Depense : Sens::Recette)
