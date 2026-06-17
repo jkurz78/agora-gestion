@@ -16,6 +16,7 @@ use App\Exceptions\Compta\TiersRequisException;
 use App\Models\Compte;
 use App\Models\RemiseBancaire;
 use App\Models\Tiers;
+use App\Models\VirementInterne;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\NumeroPieceService;
@@ -1530,6 +1531,102 @@ final class EcritureGenerator
             );
 
             return [$t2Dep, $t2Don];
+        });
+    }
+
+    /**
+     * Génère l'écriture pour un virement interne : 512X source C / 512X destination D.
+     *
+     * 2 lignes, journal Banque, pas de tiers, pas de lettrage, pas de portage.
+     * Le numero_piece est repris du VirementInterne (un seul fait comptable).
+     *
+     * Résolution des comptes 512X : Compte::where('compte_bancaire_id', $cbId)->bancaires().
+     * Exception si un des deux comptes est introuvable (erreur de configuration).
+     */
+    public function pourVirementInterne(VirementInterne $virement): Transaction
+    {
+        $montant = (float) $virement->montant;
+        $libelle = $virement->reference ?: 'Virement interne';
+
+        // --- Résolution des comptes 512X ---
+        $compte512Source = Compte::where('compte_bancaire_id', (int) $virement->compte_source_id)
+            ->bancaires()
+            ->first();
+
+        if ($compte512Source === null) {
+            throw new \RuntimeException(
+                "Compte 512X introuvable pour CompteBancaire #{$virement->compte_source_id} (source). Configurez le plan comptable."
+            );
+        }
+
+        $compte512Dest = Compte::where('compte_bancaire_id', (int) $virement->compte_destination_id)
+            ->bancaires()
+            ->first();
+
+        if ($compte512Dest === null) {
+            throw new \RuntimeException(
+                "Compte 512X introuvable pour CompteBancaire #{$virement->compte_destination_id} (destination). Configurez le plan comptable."
+            );
+        }
+
+        // --- Invariant : comptes distincts ---
+        if ((int) $compte512Source->id === (int) $compte512Dest->id) {
+            throw new \InvalidArgumentException(
+                "Virement interne : les comptes source et destination sont identiques (Compte #{$compte512Source->id})."
+            );
+        }
+
+        // --- Création dans une transaction DB ---
+        return DB::transaction(function () use ($virement, $montant, $libelle, $compte512Source, $compte512Dest): Transaction {
+            $transaction = Transaction::create([
+                'association_id' => (int) TenantContext::currentId(),
+                'type' => TypeTransaction::Virement,
+                'date' => $virement->date->format('Y-m-d'),
+                'libelle' => $libelle,
+                'montant_total' => $montant,
+                'mode_paiement' => ModePaiement::Virement,
+                'saisi_par' => Auth::id(),
+                'equilibree' => true,
+                'type_ecriture' => 'normale',
+                'journal' => JournalComptable::Banque,
+                'numero_piece' => $virement->numero_piece,
+                'virement_interne_id' => $virement->id,
+            ]);
+
+            // Ligne débit — destination (argent arrive)
+            $ligneDebit = TransactionLigne::create([
+                'transaction_id' => $transaction->id,
+                'compte_id' => $compte512Dest->id,
+                'debit' => $montant,
+                'credit' => 0,
+                'tiers_id' => null,
+                'libelle' => $libelle,
+                'montant' => 0,
+                'sous_categorie_id' => null,
+            ]);
+            $ligneDebit->setRelation('compte', $compte512Dest);
+
+            // Ligne crédit — source (argent part)
+            $ligneCredit = TransactionLigne::create([
+                'transaction_id' => $transaction->id,
+                'compte_id' => $compte512Source->id,
+                'debit' => 0,
+                'credit' => $montant,
+                'tiers_id' => null,
+                'libelle' => $libelle,
+                'montant' => 0,
+                'sous_categorie_id' => null,
+            ]);
+            $ligneCredit->setRelation('compte', $compte512Source);
+
+            // --- Assertions paranoïaques ---
+            $lignes = collect([$ligneDebit, $ligneCredit]);
+            $this->assertEquilibre($lignes);
+            $this->assertTenantCoherence($lignes);
+            $this->assertPasDeTiersSurClasse5($lignes);
+
+            // Reload avec lignes pour que le caller puisse les lire
+            return $transaction->load('lignes.compte');
         });
     }
 
