@@ -45,6 +45,8 @@ final class OperationList extends Component
 
     public ?int $formTypeOperationId = null;
 
+    public string $formStatut = 'en_cours';
+
     public function mount(): void
     {
         if ($this->filterExercice === null) {
@@ -83,6 +85,7 @@ final class OperationList extends Component
         $this->formDateFin = $operation->date_fin?->format('Y-m-d') ?? '';
         $this->formNombreSeances = $operation->nombre_seances;
         $this->formTypeOperationId = $operation->type_operation_id;
+        $this->formStatut = $operation->statut->value;
 
         $this->showEditModal = true;
         $this->showCreateModal = false;
@@ -121,6 +124,7 @@ final class OperationList extends Component
 
         if ($this->editOperationId !== null) {
             $operation = Operation::findOrFail($this->editOperationId);
+            $data['statut'] = StatutOperation::from($this->formStatut);
             $operation->update($data);
         } else {
             $data['statut'] = StatutOperation::EnCours;
@@ -199,6 +203,7 @@ final class OperationList extends Component
         $this->formDateFin = '';
         $this->formNombreSeances = null;
         $this->formTypeOperationId = null;
+        $this->formStatut = 'en_cours';
         $this->resetValidation();
     }
 }

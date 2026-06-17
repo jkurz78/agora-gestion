@@ -22,8 +22,12 @@ final class RapportCompteResultatOperations extends Component
     #[Url(as: 'tiers')]
     public bool $parTiers = true;
 
-    #[Url(as: 'prev')]
-    public bool $previsionnel = false;
+    #[Url(as: 'mode')]
+    public string $mode = 'realise';  // 'realise' | 'projection'
+
+    #[Url(as: 'parops')]
+    public bool $parOperations = false;
+
 
     public function exportUrl(string $format): string
     {
@@ -36,7 +40,8 @@ final class RapportCompteResultatOperations extends Component
             'ops' => $this->selectedOperationIds,
             'seances' => $this->parSeances ? '1' : '0',
             'tiers' => $this->parTiers ? '1' : '0',
-            'prev' => $this->previsionnel ? '1' : '0',
+            'mode' => $this->mode,
+            'parops' => $this->parOperations ? '1' : '0',
         ]);
     }
 
@@ -51,9 +56,15 @@ final class RapportCompteResultatOperations extends Component
         $previsionsCharges = [];
         $previsionsProduits = [];
         $seances = [];
+        $operationNames = [];
+        $seancesParOperation = [];
+        $projCharges = null;
+        $projProduits = null;
         $totalCharges = 0.0;
         $totalProduits = 0.0;
         $hasSelection = ! empty($this->selectedOperationIds);
+
+        $previsionnel = $this->mode !== 'realise';
 
         if ($hasSelection) {
             $data = app(RapportService::class)->compteDeResultatOperations(
@@ -61,19 +72,26 @@ final class RapportCompteResultatOperations extends Component
                 $this->selectedOperationIds,
                 $this->parSeances,
                 $this->parTiers,
-                $this->previsionnel,
+                $previsionnel,
+                $this->parOperations,
             );
             $charges = $data['charges'];
             $produits = $data['produits'];
             $seances = $data['seances'] ?? [];
             $previsionsCharges = $data['previsions_charges'] ?? [];
             $previsionsProduits = $data['previsions_produits'] ?? [];
-            $totalCharges = $this->parSeances
-                ? collect($charges)->sum('total')
-                : collect($charges)->sum('montant');
-            $totalProduits = $this->parSeances
-                ? collect($produits)->sum('total')
-                : collect($produits)->sum('montant');
+            $operationNames = $data['operation_names'] ?? [];
+            $seancesParOperation = $data['seances_par_operation'] ?? [];
+            $projCharges = $data['proj_charges'] ?? null;
+            $projProduits = $data['proj_produits'] ?? null;
+
+            if ($this->mode === 'projection' && $projCharges !== null) {
+                $totalCharges = $projCharges->total();
+                $totalProduits = $projProduits->total();
+            } else {
+                $totalCharges = collect($charges)->sum('montant');
+                $totalProduits = collect($produits)->sum('montant');
+            }
         }
 
         return view('livewire.rapport-compte-resultat-operations', [
@@ -83,10 +101,16 @@ final class RapportCompteResultatOperations extends Component
             'previsionsCharges' => $previsionsCharges,
             'previsionsProduits' => $previsionsProduits,
             'seances' => $seances,
+            'operationNames' => $operationNames,
+            'seancesParOperation' => $seancesParOperation,
+            'projCharges' => $projCharges,
+            'projProduits' => $projProduits,
             'totalCharges' => $totalCharges,
             'totalProduits' => $totalProduits,
             'resultatNet' => $totalProduits - $totalCharges,
             'hasSelection' => $hasSelection,
+            'mode' => $this->mode,
+            'parOperations' => $this->parOperations,
         ]);
     }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\StatutOperation;
 use App\Enums\UsageComptable;
 use App\Models\EncadrementPrevision;
 use App\Models\Operation;
@@ -25,6 +26,14 @@ final class OperationDetail extends Component
     public function setTab(string $tab): void
     {
         $this->activeTab = $tab;
+    }
+
+    public function toggleStatut(): void
+    {
+        $this->operation->statut = $this->operation->statut === StatutOperation::EnCours
+            ? StatutOperation::Cloturee
+            : StatutOperation::EnCours;
+        $this->operation->save();
     }
 
     public function render(): View

@@ -198,14 +198,14 @@ it('compteDeResultatOperations avec parSeances regroupe par séance', function (
     expect($result['seances'])->toContain(0, 1);
 
     $cat = $result['charges'][0];
-    expect($cat)->toHaveKey('total');
+    expect($cat)->toHaveKey('montant');
     expect($cat)->toHaveKey('seances');
-    expect($cat['total'])->toBe(150.0);
+    expect($cat['montant'])->toBe(150.0);
     expect($cat['seances'][1])->toBe(100.0);
     expect($cat['seances'][0])->toBe(50.0);
 
     $sc0 = $cat['sous_categories'][0];
-    expect($sc0['total'])->toBe(150.0);
+    expect($sc0['montant'])->toBe(150.0);
     expect($sc0['seances'][1])->toBe(100.0);
 });
 
@@ -267,11 +267,11 @@ it('compteDeResultatOperations avec parSeances et parTiers combinés', function 
     $sc0 = $result['charges'][0]['sous_categories'][0];
     expect($sc0)->toHaveKey('tiers');
     expect($sc0)->toHaveKey('seances');
-    expect($sc0['total'])->toBe(75.0);
+    expect($sc0['montant'])->toBe(75.0);
 
     $t = $sc0['tiers'][0];
     expect($t)->toHaveKey('seances');
-    expect($t)->toHaveKey('total');
+    expect($t)->toHaveKey('montant');
     expect($t['seances'][2])->toBe(75.0);
-    expect($t['total'])->toBe(75.0);
+    expect($t['montant'])->toBe(75.0);
 });
