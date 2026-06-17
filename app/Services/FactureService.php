@@ -24,6 +24,7 @@ use App\Services\Compta\CompteTresorerieResolver;
 use App\Services\Compta\CompteVentilationResolver;
 use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\EtatReglementResolver;
+use App\Services\Compta\PartieDoubleGuard;
 use App\Support\CurrentAssociation;
 use App\Support\PdfFooterRenderer;
 use App\Tenant\TenantContext;
@@ -1102,6 +1103,7 @@ XML;
             );
 
             $transaction->forceFill(['equilibree' => true])->save();
+            PartieDoubleGuard::assertComplete($transaction->fresh());
         }
 
         return $transaction;

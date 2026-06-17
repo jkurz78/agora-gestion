@@ -12,6 +12,7 @@ use App\Models\Extourne;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\Compta\EcritureGenerator;
+use App\Services\Compta\PartieDoubleGuard;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -57,6 +58,7 @@ final class TransactionExtourneService
             $miroir = $this->creerTransactionMiroir($origine, $payload);
             $this->copierLignesInversees($origine, $miroir);
             $this->assertEquilibreMiroir($miroir);
+            PartieDoubleGuard::assertComplete($miroir);
 
             $extourne = Extourne::create([
                 'transaction_origine_id' => $origine->id,

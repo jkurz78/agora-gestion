@@ -8,6 +8,7 @@ use App\Models\RemiseBancaire;
 use App\Models\Transaction;
 use App\Models\VirementInterne;
 use App\Services\Compta\EcritureGenerator;
+use App\Services\Compta\PartieDoubleGuard;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -32,6 +33,7 @@ final class VirementInterneService
 
             if (config('compta.use_partie_double')) {
                 app(EcritureGenerator::class)->pourVirementInterne($virement);
+                PartieDoubleGuard::assertComplete($virement->fresh()->transaction);
             }
 
             return $virement;
@@ -56,6 +58,7 @@ final class VirementInterneService
 
             if (config('compta.use_partie_double')) {
                 app(EcritureGenerator::class)->pourVirementInterne($virement);
+                PartieDoubleGuard::assertComplete($virement->fresh()->transaction);
             }
 
             return $virement;

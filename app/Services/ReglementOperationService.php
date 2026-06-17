@@ -20,6 +20,7 @@ use App\Services\Compta\CompteTresorerieResolver;
 use App\Services\Compta\CompteVentilationResolver;
 use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\EtatReglementResolver;
+use App\Services\Compta\PartieDoubleGuard;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -500,5 +501,6 @@ final class ReglementOperationService
         );
 
         $tx->forceFill(['equilibree' => true])->save();
+        PartieDoubleGuard::assertComplete($tx->fresh());
     }
 }
