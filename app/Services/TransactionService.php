@@ -18,6 +18,7 @@ use App\Services\Compta\CompteVentilationResolver;
 use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\EtatReglementResolver;
 use App\Services\Compta\LettrageService;
+use App\Services\Compta\PartieDoubleGuard;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
@@ -286,6 +287,11 @@ final class TransactionService
         // reste à `equilibree=false` (défaut colonne) et apparaît à tort « déséquilibrée »
         // dans SmokeTestV5Command / BackfillAuditor pour toute saisie au formulaire.
         $transaction->forceFill(['equilibree' => true])->save();
+        // G.2 — garde de sécurité : vérifie que les lignes PD sont cohérentes après
+        // marquage equilibree=true. Placé ici (et non après enrichirPartieDouble dans les
+        // callers) pour ne pas déclencher sur les skip gracieux (tiers_id null, code_cerfa
+        // manquant, compte_id null) où PD n'est tout simplement pas applicable.
+        PartieDoubleGuard::assertComplete($transaction->fresh());
     }
 
     public function update(Transaction $transaction, array $data, array $lignes): Transaction
