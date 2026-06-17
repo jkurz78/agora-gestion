@@ -55,6 +55,8 @@ final class Transaction extends TenantModel
         'type_ecriture',
         // Journal de banque — ajouté Task 3
         'journal',
+        // Virement interne — ajouté Task 2
+        'virement_interne_id',
     ];
 
     protected function casts(): array
@@ -79,6 +81,8 @@ final class Transaction extends TenantModel
             'equilibree' => 'boolean',
             // Journal de banque — ajouté Task 3
             'journal' => JournalComptable::class,
+            // Virement interne — ajouté Task 2
+            'virement_interne_id' => 'integer',
         ];
     }
 
@@ -90,9 +94,11 @@ final class Transaction extends TenantModel
             if ($transaction->journal !== null) {
                 return;
             }
-            $transaction->journal = $transaction->type === TypeTransaction::Recette
-                ? JournalComptable::Vente
-                : JournalComptable::Achat;
+            $transaction->journal = match ($transaction->type) {
+                TypeTransaction::Recette => JournalComptable::Vente,
+                TypeTransaction::Depense => JournalComptable::Achat,
+                TypeTransaction::Virement => JournalComptable::Banque,
+            };
         });
     }
 
@@ -171,6 +177,11 @@ final class Transaction extends TenantModel
     public function reglement(): BelongsTo
     {
         return $this->belongsTo(Reglement::class, 'reglement_id');
+    }
+
+    public function virementInterne(): BelongsTo
+    {
+        return $this->belongsTo(VirementInterne::class);
     }
 
     public function lignes(): HasMany

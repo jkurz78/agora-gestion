@@ -8,12 +8,14 @@ enum TypeTransaction: string
 {
     case Depense = 'depense';
     case Recette = 'recette';
+    case Virement = 'virement';
 
     public function label(): string
     {
         return match ($this) {
             self::Depense => 'Dépense',
             self::Recette => 'Recette',
+            self::Virement => 'Virement',
         };
     }
 }
