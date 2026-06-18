@@ -44,11 +44,13 @@ final class SystemeSeeder
      * @param  string  $numeroPcg  The account number ('411', '401', or '5112')
      * @param  string  $intitule  French label ('Clients', 'Fournisseurs', 'Chèques à encaisser')
      * @param  int  $classe  PCG class (4 for tiers, 5 for caisse/chèques)
+     * @param  bool  $lettrable  Whether the account supports lettrage (default true; provisions use false)
      */
-    public static function unconditionalSql(string $numeroPcg, string $intitule, int $classe): string
+    public static function unconditionalSql(string $numeroPcg, string $intitule, int $classe, bool $lettrable = true): string
     {
         $isSqlite = DB::getDriverName() === 'sqlite';
         $insertClause = $isSqlite ? 'INSERT OR IGNORE' : 'INSERT IGNORE';
+        $lettrableInt = $lettrable ? 1 : 0;
 
         // Escape single quotes in intitulé defensively (none expected, but safe to have).
         $safePcg = str_replace("'", "''", $numeroPcg);
@@ -84,7 +86,7 @@ final class SystemeSeeder
                 1,
                 1,
                 0,
-                1,
+                {$lettrableInt},
                 NULL,
                 NULL,
                 NULL,
@@ -182,5 +184,17 @@ final class SystemeSeeder
 
         // Conditional: 530 Caisse (espèces) — only for tenants with live espèces transactions
         DB::statement(self::conditionalCaisseSql());
+
+        // Unconditional: 486 Charges constatées d'avance (classe 4, provisions — non lettrable)
+        DB::statement(self::unconditionalSql('486', 'Charges constatées d\'avance', 4, false));
+
+        // Unconditional: 487 Produits constatés d'avance (classe 4, provisions — non lettrable)
+        DB::statement(self::unconditionalSql('487', 'Produits constatés d\'avance', 4, false));
+
+        // Unconditional: 681 Dotations aux amort., dépréciations et provisions (classe 6 — non lettrable)
+        DB::statement(self::unconditionalSql('681', 'Dotations aux amort., dépréciations et provisions', 6, false));
+
+        // Unconditional: 781 Reprises sur amort., dépréciations et provisions (classe 7 — non lettrable)
+        DB::statement(self::unconditionalSql('781', 'Reprises sur amort., dépréciations et provisions', 7, false));
     }
 }
