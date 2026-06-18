@@ -10,6 +10,7 @@ use App\Models\Association;
 use App\Models\Compte;
 use App\Models\Exercice;
 use App\Models\Provision;
+use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\Compta\EcritureGenerator;
@@ -262,7 +263,7 @@ test('ProvisionPDService::supprimer removes all PD transactions', function () {
 });
 
 test('ProvisionIndex::save creates PD transactions on new provision', function () {
-    $sc = \App\Models\SousCategorie::factory()->create([
+    $sc = SousCategorie::factory()->create([
         'association_id' => $this->association->id,
     ]);
 
