@@ -10,6 +10,7 @@ use App\Models\Exercice;
 use App\Models\Provision;
 use App\Models\SousCategorie;
 use App\Models\User;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
@@ -23,6 +24,8 @@ beforeEach(function () {
 
     $this->exercice = Exercice::create(['association_id' => $this->association->id, 'annee' => 2025, 'statut' => StatutExercice::Ouvert]);
     session(['exercice_actif' => 2025]);
+
+    SystemeSeeder::seed();
 });
 
 afterEach(function () {
