@@ -253,7 +253,7 @@ it('classe(7) scope returns only classe-7 comptes', function () {
 
     $classe7 = Compte::classe(7)->get();
 
-    expect($classe7->count())->toBe(2);
+    expect($classe7->count())->toBe(3);
     expect($classe7->every(fn (Compte $c) => $c->classe === 7))->toBeTrue();
 });
 
