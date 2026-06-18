@@ -60,14 +60,13 @@ it('VirementInterneService::create() avec PD active → guard passe (virement es
 });
 
 // ---------------------------------------------------------------------------
-// VirementInterneService::create — guard silencieux quand PD désactivée
+// VirementInterneService::create — PD toujours actif, même sans flag explicite
 // ---------------------------------------------------------------------------
 
-it('VirementInterneService::create() avec PD désactivée → aucune exception (guard court-circuité)', function () {
-    Config::set('compta.use_partie_double', false);
-
+it('VirementInterneService::create() sans flag explicite → PD toujours générée', function () {
     $cb1 = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
     $cb2 = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
+    BancairesSeeder::seed();
 
     $service = app(VirementInterneService::class);
 
@@ -79,7 +78,7 @@ it('VirementInterneService::create() avec PD désactivée → aucune exception (
         'reference' => 'VIR-GUARD-002',
     ]);
 
-    // Pas de transaction PD créée, pas d'exception
     $transaction = Transaction::where('virement_interne_id', $virement->id)->first();
-    expect($transaction)->toBeNull();
+    expect($transaction)->not->toBeNull();
+    expect((bool) $transaction->equilibree)->toBeTrue();
 });

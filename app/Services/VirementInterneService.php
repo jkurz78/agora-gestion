@@ -31,10 +31,8 @@ final class VirementInterneService
 
             $virement = VirementInterne::create($data);
 
-            if (config('compta.use_partie_double')) {
-                app(EcritureGenerator::class)->pourVirementInterne($virement);
-                PartieDoubleGuard::assertComplete($virement->fresh()->transaction);
-            }
+            app(EcritureGenerator::class)->pourVirementInterne($virement);
+            PartieDoubleGuard::assertComplete($virement->fresh()->transaction);
 
             return $virement;
         });
@@ -56,10 +54,8 @@ final class VirementInterneService
             $virement->update($data);
             $virement = $virement->fresh();
 
-            if (config('compta.use_partie_double')) {
-                app(EcritureGenerator::class)->pourVirementInterne($virement);
-                PartieDoubleGuard::assertComplete($virement->fresh()->transaction);
-            }
+            app(EcritureGenerator::class)->pourVirementInterne($virement);
+            PartieDoubleGuard::assertComplete($virement->fresh()->transaction);
 
             return $virement;
         });

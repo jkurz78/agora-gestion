@@ -43,22 +43,7 @@ function makeLignePDG(Transaction $tx, Compte $compte, float $debit, float $cred
 }
 
 // ---------------------------------------------------------------------------
-// Test 1 : PD désactivé → pas d'exception même avec equilibree=false
-// ---------------------------------------------------------------------------
-
-test('[1] PD off — assertComplete ne lève pas d\'exception même si equilibree=false', function () {
-    config()->set('compta.use_partie_double', false);
-
-    $tx = Transaction::factory()->create([
-        'association_id' => TenantContext::currentId(),
-        'equilibree' => false,
-    ]);
-
-    expect(fn () => PartieDoubleGuard::assertComplete($tx))->not->toThrow(PartieDoubleIncompleteException::class);
-});
-
-// ---------------------------------------------------------------------------
-// Test 2 : Transaction HelloAsso → pas d'exception (bypass)
+// Test 1 : Transaction HelloAsso → pas d'exception (bypass)
 // ---------------------------------------------------------------------------
 
 test('[2] HelloAsso — assertComplete ne lève pas d\'exception même si equilibree=false', function () {

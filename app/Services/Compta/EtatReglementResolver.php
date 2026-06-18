@@ -103,18 +103,8 @@ final class EtatReglementResolver
         return $this->statutDepuisTresorerie($ligneTresorerie, $txPortage);
     }
 
-    /**
-     * Recalcule et persiste le statut miroir d'une T1 depuis le ledger.
-     *
-     * No-op en mode legacy (use_partie_double=false) : la colonne reste gérée
-     * à l'ancienne. Idempotent : ne sauvegarde que si la valeur dérivée diffère.
-     */
     public function syncer(Transaction $t1): void
     {
-        if (! config('compta.use_partie_double')) {
-            return;
-        }
-
         $derive = $this->resolve($t1);
 
         if ($t1->statut_reglement !== $derive) {

@@ -11,10 +11,6 @@ final class PartieDoubleGuard
 {
     public static function assertComplete(Transaction $tx): void
     {
-        if (! config('compta.use_partie_double')) {
-            return;
-        }
-
         if ($tx->helloasso_order_id !== null) {
             return;
         }

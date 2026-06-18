@@ -58,7 +58,11 @@ final class TransactionExtourneService
             $miroir = $this->creerTransactionMiroir($origine, $payload);
             $this->copierLignesInversees($origine, $miroir);
             $this->assertEquilibreMiroir($miroir);
-            PartieDoubleGuard::assertComplete($miroir);
+            // Guard PD uniquement si l'originale était une Tx PD (equilibree=true).
+            // Pour les Tx legacy (equilibree=false/null), le miroir est aussi non-PD.
+            if ($miroir->equilibree === true) {
+                PartieDoubleGuard::assertComplete($miroir);
+            }
 
             $extourne = Extourne::create([
                 'transaction_origine_id' => $origine->id,
@@ -124,8 +128,10 @@ final class TransactionExtourneService
             'helloasso_cashout_id' => null,
             'helloasso_payment_id' => null,
             'statut_reglement' => StatutReglement::EnAttente,
-            // PD
-            'equilibree' => true,
+            // PD : le miroir hérite du statut equilibree de l'originale.
+            // Si l'originale est une Tx legacy (sans lignes PD, equilibree=false/null),
+            // le miroir est aussi non-PD et le guard ne s'applique pas.
+            'equilibree' => (bool) $origine->equilibree,
             'type_ecriture' => 'extourne',
             'journal' => $origine->journal,
         ]);

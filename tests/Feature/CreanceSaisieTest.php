@@ -204,8 +204,12 @@ it('marquerRecu avec mode capture le mode_paiement et génère la T2 encaissemen
 });
 
 it('marquerRecu sans mode sur une créance reste rétro-compatible (skip T2 silencieux)', function () {
-    // Comportement de rétro-compatibilité : si mode null et aucun mode fourni,
-    // statut passe à Recu mais T2 n'est pas générée (skip silencieux existant).
+    // Comportement PD inconditionnel : si mode null et aucun mode fourni,
+    // T2 n'est pas générée (skip silencieux). Le statut_reglement reste en_attente
+    // car EtatReglementResolver dérive le statut depuis le grand livre :
+    // la ligne 411 de T1 n'est pas lettrée (pas d'encaissement) → résout EnAttente.
+    // Note : avant PD inconditionnel, la garde « 411 absent → statut inchangé » permettait
+    // de forcer Recu sans lettrage ; avec PD systématique, la 411 est toujours présente.
     Livewire::test(TransactionForm::class)
         ->call('showNewForm', 'recette')
         ->set('paiementRecu', false)
@@ -236,11 +240,12 @@ it('marquerRecu sans mode sur une créance reste rétro-compatible (skip T2 sile
     app(ReglementOperationService::class)->marquerRecu($tx);
 
     $tx->refresh();
-    // Statut passe bien à Recu
-    expect($tx->statut_reglement->value)->toBe('recu');
+    // En mode PD inconditionnel : EtatReglementResolver recalcule le statut depuis le ledger.
+    // 411 non lettrée (pas d'encaissement T2 généré car mode=null) → statut reste EnAttente.
+    expect($tx->statut_reglement->value)->toBe('en_attente');
     // Mode reste null
     expect($tx->mode_paiement)->toBeNull();
-    // Pas de T2 (skip silencieux)
+    // Pas de T2 (skip silencieux — mode null → reglerOuEncaisser ne crée pas de T2)
     expect(app(ReglementOperationService::class)->trouverEncaissementT2($tx))->toBeNull();
 });
 

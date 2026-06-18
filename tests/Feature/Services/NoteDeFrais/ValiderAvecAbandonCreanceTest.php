@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\JournalComptable;
 use App\Enums\ModePaiement;
 use App\Enums\NoteDeFraisLigneType;
 use App\Enums\StatutNoteDeFrais;
@@ -11,6 +12,7 @@ use App\Enums\TypeTransaction;
 use App\Enums\UsageComptable;
 use App\Models\Association;
 use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
@@ -19,6 +21,7 @@ use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\UsageSousCategorie;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\NoteDeFrais\NoteDeFraisValidationService;
 use App\Services\NoteDeFrais\ValidationData;
 use App\Tenant\TenantContext;
@@ -67,7 +70,10 @@ beforeEach(function (): void {
 
     $this->tiers = Tiers::factory()->create(['association_id' => $this->asso->id]);
 
-    // Sous-catégorie Dépense (pour les lignes NDF)
+    // Infrastructure partie double — comptes système 411, 401, 467 requis par abandonCreancePd()
+    SystemeSeeder::seed();
+
+    // Sous-catégorie Dépense (pour les lignes NDF) — code_cerfa='625' + Compte classe 6
     $this->catDepense = Categorie::factory()->create([
         'association_id' => $this->asso->id,
         'type' => TypeCategorie::Depense->value,
@@ -76,9 +82,14 @@ beforeEach(function (): void {
         'association_id' => $this->asso->id,
         'categorie_id' => $this->catDepense->id,
         'nom' => 'Frais divers',
+        'code_cerfa' => '625',
     ]);
+    Compte::firstOrCreate(
+        ['association_id' => $this->asso->id, 'numero_pcg' => '625'],
+        ['intitule' => 'Frais missions déplacements', 'classe' => 6, 'lettrable' => false, 'actif' => true, 'est_systeme' => false, 'pour_inscriptions' => false]
+    );
 
-    // Sous-catégorie Recette pour AbandonCreance
+    // Sous-catégorie Recette pour AbandonCreance — code_cerfa='771' + Compte classe 7
     $this->catRecette = Categorie::factory()->create([
         'association_id' => $this->asso->id,
         'type' => TypeCategorie::Recette->value,
@@ -87,7 +98,12 @@ beforeEach(function (): void {
         'association_id' => $this->asso->id,
         'categorie_id' => $this->catRecette->id,
         'nom' => 'Abandon de creance',
+        'code_cerfa' => '771',
     ]);
+    Compte::firstOrCreate(
+        ['association_id' => $this->asso->id, 'numero_pcg' => '771'],
+        ['intitule' => 'Dons et abandons de créances', 'classe' => 7, 'lettrable' => false, 'actif' => true, 'est_systeme' => false, 'pour_inscriptions' => false]
+    );
 
     $this->compte = CompteBancaire::factory()->create(['association_id' => $this->asso->id]);
 
@@ -110,8 +126,8 @@ it('cree deux transactions (depense + don) reglees pour un abandon de creance', 
 
     $txDon = $this->service->validerAvecAbandonCreance($ndf, $this->data, $dateDon);
 
-    // 2 transactions créées
-    expect(Transaction::count())->toBe(2);
+    // 4 transactions créées en mode PD : T1-dépense, T1-don, OD-compensation × 2
+    expect(Transaction::count())->toBe(4);
 
     // Transaction Don retournée est du bon type
     expect($txDon)->toBeInstanceOf(Transaction::class);
@@ -179,8 +195,10 @@ it('clone les lignes de la Depense vers le Don (operation, seance, notes, montan
     $ndf->refresh();
     $txDepense = Transaction::find($ndf->transaction_id);
 
-    $lignesDepense = $txDepense->lignes()->orderBy('id')->get();
-    $lignesDon = $txDon->lignes()->orderBy('id')->get();
+    // En mode PD, les lignes incluent des lignes comptables pures (401 C, 411 D) sans sous_categorie_id.
+    // On compare uniquement les lignes métier (NDF legacy) ayant une sous-catégorie.
+    $lignesDepense = $txDepense->lignes()->whereNotNull('sous_categorie_id')->orderBy('id')->get();
+    $lignesDon = $txDon->lignes()->whereNotNull('sous_categorie_id')->orderBy('id')->get();
 
     expect($lignesDon)->toHaveCount($lignesDepense->count());
 
@@ -211,8 +229,10 @@ it('met le Don sur le meme compte que la Depense', function (): void {
     $ndf->refresh();
     $txDepense = Transaction::find($ndf->transaction_id);
 
-    expect((int) $txDon->compte_id)->toBe((int) $this->compte->id);
-    expect((int) $txDon->compte_id)->toBe((int) $txDepense->compte_id);
+    // En mode PD, txDepense est liée au compte bancaire ; txDon est une écriture comptable
+    // pure (411/7xx) sans compte bancaire → compte_id null.
+    expect((int) $txDepense->compte_id)->toBe((int) $this->compte->id);
+    expect($txDon->compte_id)->toBeNull();
 });
 
 // ---------------------------------------------------------------------------
@@ -334,7 +354,9 @@ it('copie les pieces jointes des lignes NDF dans le repertoire de la transaction
 
     $ndf->refresh();
     $txDepense = Transaction::find($ndf->transaction_id);
-    $lignesTx = $txDepense->lignes()->orderBy('id')->get();
+    // En mode PD, les lignes incluent une ligne comptable pure (401 C) sans PJ.
+    // On vérifie uniquement les lignes ayant une pièce jointe copiée.
+    $lignesTx = $txDepense->lignes()->whereNotNull('piece_jointe_path')->orderBy('id')->get();
 
     expect($lignesTx)->toHaveCount(2);
 
@@ -475,7 +497,11 @@ it('apres abandon aucune des deux transactions nest en statut EnAttente', functi
 
     $this->service->validerAvecAbandonCreance($ndf, $this->data, '2025-10-20');
 
-    $enAttente = Transaction::where('statut_reglement', StatutReglement::EnAttente->value)->count();
+    // En mode PD, les 2 OD de compensation (journal=OD) restent en_attente (écritures comptables
+    // internes non soumises au flux de trésorerie). Les T1 txDepense et txDon doivent être Recu.
+    $enAttente = Transaction::where('statut_reglement', StatutReglement::EnAttente->value)
+        ->where(fn ($q) => $q->whereNull('journal')->orWhere('journal', '!=', JournalComptable::Od->value))
+        ->count();
     expect($enAttente)->toBe(0);
 });
 

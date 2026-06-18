@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\User;
+use App\Services\Compta\Migrations\BancairesSeeder;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\VirementInterneService;
 use App\Tenant\TenantContext;
 
@@ -22,8 +24,10 @@ afterEach(function () {
 });
 
 it('create assigne un numero_piece non null', function () {
+    SystemeSeeder::seed();
     $compte1 = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
     $compte2 = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
+    BancairesSeeder::seed();
 
     $virement = app(VirementInterneService::class)->create([
         'date' => '2025-10-01',

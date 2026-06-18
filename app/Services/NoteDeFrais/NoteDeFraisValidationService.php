@@ -173,11 +173,7 @@ final class NoteDeFraisValidationService
 
             $sousCatAbandon = $sousCatsAbandon->first();
 
-            if (config('compta.use_partie_double')) {
-                [$txDepense, $txDon] = $this->abandonCreancePd($ndf, $data, $dateDon, $sousCatAbandon);
-            } else {
-                [$txDepense, $txDon] = $this->abandonCreanceLegacy($ndf, $data, $dateDon, $sousCatAbandon);
-            }
+            [$txDepense, $txDon] = $this->abandonCreancePd($ndf, $data, $dateDon, $sousCatAbandon);
 
             // Mettre à jour la NDF
             $ndf->update([
@@ -385,10 +381,12 @@ final class NoteDeFraisValidationService
         );
 
         // 4. Synchroniser les statuts dérivés (lettrage → Recu)
-        $this->etatReglementResolver->syncer($txDepense->fresh());
-        $this->etatReglementResolver->syncer($txDon->fresh());
+        $txDepenseFresh = $txDepense->fresh();
+        $txDonFresh = $txDon->fresh();
+        $this->etatReglementResolver->syncer($txDepenseFresh);
+        $this->etatReglementResolver->syncer($txDonFresh);
 
-        return [$txDepense, $txDon];
+        return [$txDepenseFresh, $txDonFresh];
     }
 
     /**

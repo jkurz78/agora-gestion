@@ -10,6 +10,7 @@ use App\Livewire\BackOffice\NoteDeFrais\Show as BackOfficeShow;
 use App\Livewire\Portail\NoteDeFrais\Form;
 use App\Models\Association;
 use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
@@ -17,6 +18,7 @@ use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -71,12 +73,16 @@ function e2eCreateComptable(Association $asso): User
 }
 
 /**
- * Crée la sous-catégorie Dépense + sous-catégorie AbandonCreance (Recette).
+ * Crée la sous-catégorie Dépense + sous-catégorie AbandonCreance (Recette)
+ * + infrastructure partie double (comptes système 411/401/467 + comptes 625/771).
  *
  * @return array{scDepense: SousCategorie, scAbandon: SousCategorie}
  */
 function e2eCreateCategories(Association $asso): array
 {
+    // Infrastructure partie double — comptes système 411, 401, 467 requis par abandonCreancePd()
+    SystemeSeeder::seed();
+
     $catDepense = Categorie::factory()->create([
         'association_id' => $asso->id,
         'type' => TypeCategorie::Depense->value,
@@ -85,7 +91,12 @@ function e2eCreateCategories(Association $asso): array
         'association_id' => $asso->id,
         'categorie_id' => $catDepense->id,
         'nom' => 'Frais divers E2E',
+        'code_cerfa' => '625',
     ]);
+    Compte::firstOrCreate(
+        ['association_id' => $asso->id, 'numero_pcg' => '625'],
+        ['intitule' => 'Frais missions déplacements', 'classe' => 6, 'lettrable' => false, 'actif' => true, 'est_systeme' => false, 'pour_inscriptions' => false]
+    );
 
     $catRecette = Categorie::factory()->create([
         'association_id' => $asso->id,
@@ -95,7 +106,12 @@ function e2eCreateCategories(Association $asso): array
         'association_id' => $asso->id,
         'categorie_id' => $catRecette->id,
         'nom' => '771 Abandon de créance E2E',
+        'code_cerfa' => '771',
     ]);
+    Compte::firstOrCreate(
+        ['association_id' => $asso->id, 'numero_pcg' => '771'],
+        ['intitule' => 'Dons et abandons de créances', 'classe' => 7, 'lettrable' => false, 'actif' => true, 'est_systeme' => false, 'pour_inscriptions' => false]
+    );
 
     return ['scDepense' => $scDepense, 'scAbandon' => $scAbandon];
 }
@@ -201,8 +217,8 @@ it('Jean soumet une NDF avec abandon, le comptable constate, Jean voit le statut
     expect($ndf->transaction_id)->not->toBeNull();
     expect($ndf->don_transaction_id)->not->toBeNull();
 
-    // 2 nouvelles transactions
-    expect(Transaction::count())->toBe($countBefore + 2);
+    // 4 nouvelles transactions en mode PD : T1-dépense, T1-don, OD-compensation × 2
+    expect(Transaction::count())->toBe($countBefore + 4);
 
     // Transaction Dépense réglée
     $txDepense = Transaction::find($ndf->transaction_id);

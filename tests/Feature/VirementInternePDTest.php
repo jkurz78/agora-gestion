@@ -69,8 +69,7 @@ it('create() generates a PD transaction when use_partie_double is true', functio
     expect($transaction->lignes)->toHaveCount(2);
 });
 
-it('create() does NOT generate a PD transaction when use_partie_double is false', function () {
-    config(['compta.use_partie_double' => false]);
+it('create() generates PD even without explicit use_partie_double flag', function () {
     [$cb1, $cb2] = creerCompteBancairesPD();
 
     $service = app(VirementInterneService::class);
@@ -81,7 +80,9 @@ it('create() does NOT generate a PD transaction when use_partie_double is false'
         'compte_destination_id' => $cb2->id,
     ]);
 
-    expect(Transaction::where('virement_interne_id', $virement->id)->exists())->toBeFalse();
+    $tx = Transaction::where('virement_interne_id', $virement->id)->first();
+    expect($tx)->not->toBeNull();
+    expect($tx->equilibree)->toBeTrue();
 });
 
 // ---------------------------------------------------------------------------
@@ -120,8 +121,7 @@ it('update() recreates the PD transaction with new values', function () {
     expect($newTx->lignes)->toHaveCount(2);
 });
 
-it('update() works when PD is off (no transaction to delete)', function () {
-    config(['compta.use_partie_double' => false]);
+it('update() always recreates PD transaction', function () {
     [$cb1, $cb2] = creerCompteBancairesPD();
 
     $service = app(VirementInterneService::class);
@@ -139,8 +139,9 @@ it('update() works when PD is off (no transaction to delete)', function () {
         'compte_destination_id' => $cb2->id,
     ]);
 
-    expect((float) $virement->montant)->toBe(1200.00);
-    expect(Transaction::where('virement_interne_id', $virement->id)->exists())->toBeFalse();
+    $tx = Transaction::where('virement_interne_id', $virement->id)->first();
+    expect($tx)->not->toBeNull();
+    expect((float) $tx->montant_total)->toBe(1200.00);
 });
 
 // ---------------------------------------------------------------------------
@@ -173,8 +174,7 @@ it('delete() removes the PD transaction along with the virement', function () {
     expect(TransactionLigne::where('transaction_id', $transactionId)->exists())->toBeFalse();
 });
 
-it('delete() works when PD is off (no transaction to delete)', function () {
-    config(['compta.use_partie_double' => false]);
+it('delete() removes PD transaction along with virement (unconditional)', function () {
     [$cb1, $cb2] = creerCompteBancairesPD();
 
     $service = app(VirementInterneService::class);
@@ -185,7 +185,10 @@ it('delete() works when PD is off (no transaction to delete)', function () {
         'compte_destination_id' => $cb2->id,
     ]);
 
+    $txId = Transaction::where('virement_interne_id', $virement->id)->first()->id;
+
     $service->delete($virement);
 
     expect(VirementInterne::find($virement->id))->toBeNull();
+    expect(Transaction::withTrashed()->find($txId))->toBeNull();
 });

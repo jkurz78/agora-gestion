@@ -205,8 +205,8 @@ it('lettrables() scope returns only lettrable comptes', function () {
 
     $lettrables = Compte::lettrables()->get();
 
-    // 411, 401, 5112 are lettrable; the 706 we inserted is not.
-    expect($lettrables->count())->toBe(3);
+    // 411, 401, 467, 5112 are lettrable (SystemeSeeder seeds all 4); the 706 we inserted is not.
+    expect($lettrables->count())->toBe(4);
     expect($lettrables->every(fn (Compte $c) => $c->lettrable === true))->toBeTrue();
 
     // The non-lettrable 706 must not appear.

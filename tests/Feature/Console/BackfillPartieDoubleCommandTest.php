@@ -898,6 +898,13 @@ test('[AC1] recette en_attente avec mode → créance only — 411D/706C, aucune
         ['sous_categorie_id' => $this->sc706->id, 'montant' => '200.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 
+    // En mode PD inconditionnel, TransactionService crée T1+T2 et letters le 411.
+    // EtatReglementResolver::syncer() peut ensuite passer statut_reglement de
+    // en_attente → recu si le lettrage est complet. On re-force le statut en_attente
+    // AVANT simulerLegacySurTx pour que l'état simulé corresponde au cas bug #138
+    // (créance non encaissée avec mode_paiement renseigné).
+    $txEnAttente->forceFill(['statut_reglement' => StatutReglement::EnAttente->value])->saveQuietly();
+
     simulerLegacySurTx($txEnAttente);
 
     // Backfill

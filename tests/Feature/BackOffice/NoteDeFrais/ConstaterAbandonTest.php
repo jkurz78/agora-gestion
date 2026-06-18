@@ -10,6 +10,7 @@ use App\Enums\TypeTransaction;
 use App\Livewire\BackOffice\NoteDeFrais\Show;
 use App\Models\Association;
 use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
@@ -17,6 +18,7 @@ use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -51,15 +53,41 @@ function constaterAbandonSetupHappyPath(Association $association, string $ndfDat
 {
     Storage::fake('local');
 
+    // Infrastructure partie double — comptes système 411, 401, 467 requis par abandonCreancePd()
+    SystemeSeeder::seed();
+
+    $catDepense = Categorie::factory()->create([
+        'association_id' => $association->id,
+        'type' => TypeCategorie::Depense->value,
+    ]);
     $catRecette = Categorie::factory()->create([
         'association_id' => $association->id,
         'type' => TypeCategorie::Recette->value,
     ]);
+
+    // Sous-catégorie Dépense avec code_cerfa → Compte classe 6 pour PD
+    $scDepense = SousCategorie::factory()->create([
+        'association_id' => $association->id,
+        'categorie_id' => $catDepense->id,
+        'nom' => 'Frais déplacement',
+        'code_cerfa' => '625',
+    ]);
+    Compte::firstOrCreate(
+        ['association_id' => $association->id, 'numero_pcg' => '625'],
+        ['intitule' => 'Frais missions déplacements', 'classe' => 6, 'lettrable' => false, 'actif' => true, 'est_systeme' => false, 'pour_inscriptions' => false]
+    );
+
+    // Sous-catégorie AbandonCreance avec code_cerfa → Compte classe 7 pour PD
     $scAbandon = SousCategorie::factory()->pourAbandonCreance()->create([
         'association_id' => $association->id,
         'categorie_id' => $catRecette->id,
         'nom' => 'Don abandon test',
+        'code_cerfa' => '771',
     ]);
+    Compte::firstOrCreate(
+        ['association_id' => $association->id, 'numero_pcg' => '771'],
+        ['intitule' => 'Dons et abandons de créances', 'classe' => 7, 'lettrable' => false, 'actif' => true, 'est_systeme' => false, 'pour_inscriptions' => false]
+    );
 
     $compte = CompteBancaire::factory()->create([
         'association_id' => $association->id,
@@ -76,10 +104,9 @@ function constaterAbandonSetupHappyPath(Association $association, string $ndfDat
         'abandon_creance_propose' => true,
     ]);
 
-    $sousCategorie = SousCategorie::factory()->create(['association_id' => $association->id]);
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sousCategorie->id,
+        'sous_categorie_id' => $scDepense->id,
         'libelle' => 'Déplacement',
         'montant' => '75.00',
         'piece_jointe_path' => null,
@@ -171,8 +198,8 @@ it('confirmValidation avec choix=abandon crée 2 Transactions et passe la NDF en
         ->set('dateDon', '2026-03-10')
         ->call('confirmValidation');
 
-    // 2 nouvelles Transactions
-    expect(Transaction::count())->toBe($countBefore + 2);
+    // 4 nouvelles Transactions en mode PD : T1-dépense, T1-don, OD-compensation × 2
+    expect(Transaction::count())->toBe($countBefore + 4);
 
     // Statut NDF mis à jour
     $ndf->refresh();
