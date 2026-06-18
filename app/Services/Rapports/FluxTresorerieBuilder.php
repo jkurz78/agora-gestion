@@ -11,6 +11,7 @@ use App\Models\VirementInterne;
 use App\Services\ProvisionService;
 use App\Services\SoldeService;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 
 final class FluxTresorerieBuilder
@@ -66,9 +67,14 @@ final class FluxTresorerieBuilder
         $soldeTheorique = round($soldeOuverture + $variation, 2);
 
         // --- Provisions de fin d'exercice ---
-        $provisionService = app(ProvisionService::class);
-        $totalProvisions = $provisionService->totalProvisions($exercice);
-        $totalExtournes = $provisionService->totalExtournes($exercice);
+        if (Config::get('compta.use_partie_double', false)) {
+            $totalProvisions = 0.0;
+            $totalExtournes = 0.0;
+        } else {
+            $provisionService = app(ProvisionService::class);
+            $totalProvisions = $provisionService->totalProvisions($exercice);
+            $totalExtournes = $provisionService->totalExtournes($exercice);
+        }
 
         // --- Rapprochement (tous les comptes) ---
         $comptesReelsIds = CompteBancaire::pluck('id');
