@@ -9,6 +9,7 @@ use App\Exceptions\ExerciceCloturedException;
 use App\Models\Categorie;
 use App\Models\Operation;
 use App\Models\Provision;
+use App\Services\Compta\ProvisionPDService;
 use App\Services\ExerciceService;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
@@ -168,6 +169,8 @@ final class ProvisionIndex extends Component
             $provision = Provision::create($data);
         }
 
+        app(ProvisionPDService::class)->generer($provision);
+
         // Écriture physique de la pièce jointe après que l'id soit connu
         if ($this->piece_jointe !== null) {
             $extension = $this->piece_jointe->getClientOriginalExtension() ?: 'pdf';
@@ -211,7 +214,9 @@ final class ProvisionIndex extends Component
             return;
         }
 
-        Provision::findOrFail($id)->delete();
+        $provision = Provision::findOrFail($id);
+        app(ProvisionPDService::class)->supprimer($provision);
+        $provision->delete();
 
         $this->flashMessage = 'Provision supprimée.';
         $this->flashType = 'success';

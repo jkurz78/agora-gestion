@@ -3,16 +3,23 @@
 declare(strict_types=1);
 
 use App\Enums\JournalComptable;
+use App\Enums\StatutExercice;
 use App\Enums\TypeTransaction;
+use App\Livewire\Provisions\ProvisionIndex;
 use App\Models\Association;
 use App\Models\Compte;
+use App\Models\Exercice;
 use App\Models\Provision;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\Compta\ProvisionPDService;
+use App\Services\ExerciceService;
+use App\Services\Rapports\FluxTresorerieBuilder;
 use App\Tenant\TenantContext;
+use Illuminate\Support\Facades\Config;
+use Livewire\Livewire;
 
 beforeEach(function () {
     $this->association = Association::factory()->create();
@@ -23,6 +30,9 @@ beforeEach(function () {
     $this->actingAs($this->user);
 
     SystemeSeeder::seed();
+
+    $this->exercice = Exercice::create(['association_id' => $this->association->id, 'annee' => 2025, 'statut' => StatutExercice::Ouvert]);
+    session(['exercice_actif' => 2025]);
 });
 
 afterEach(function () {
@@ -249,4 +259,64 @@ test('ProvisionPDService::supprimer removes all PD transactions', function () {
 
     $service->supprimer($provision);
     expect(Transaction::where('provision_id', $provision->id)->count())->toBe(0);
+});
+
+test('ProvisionIndex::save creates PD transactions on new provision', function () {
+    $sc = \App\Models\SousCategorie::factory()->create([
+        'association_id' => $this->association->id,
+    ]);
+
+    Livewire::test(ProvisionIndex::class)
+        ->set('libelle', 'Test provision PD')
+        ->set('sous_categorie_id', (string) $sc->id)
+        ->set('type', 'depense')
+        ->set('montant', '1200.50')
+        ->call('save');
+
+    $provision = Provision::where('libelle', 'Test provision PD')->first();
+    expect($provision)->not->toBeNull();
+    expect(Transaction::where('provision_id', $provision->id)->count())->toBe(2);
+});
+
+test('ProvisionIndex::delete removes PD transactions', function () {
+    $provision = Provision::factory()->create([
+        'association_id' => $this->association->id,
+        'exercice' => app(ExerciceService::class)->current(),
+        'type' => 'depense',
+        'montant' => 500.00,
+        'libelle' => 'To delete',
+        'date' => '2026-08-31',
+        'saisi_par' => $this->user->id,
+    ]);
+
+    app(ProvisionPDService::class)->generer($provision);
+    expect(Transaction::where('provision_id', $provision->id)->count())->toBe(2);
+
+    Livewire::test(ProvisionIndex::class)
+        ->call('delete', $provision->id);
+
+    expect(Transaction::where('provision_id', $provision->id)->count())->toBe(0);
+    expect(Provision::find($provision->id))->toBeNull();
+});
+
+test('FluxTresorerieBuilder does not double-count provisions in PD mode', function () {
+    Config::set('compta.use_partie_double', true);
+
+    $provision = Provision::factory()->create([
+        'association_id' => $this->association->id,
+        'exercice' => 2025,
+        'type' => 'depense',
+        'montant' => 1000.00,
+        'libelle' => 'FNP test flux',
+        'date' => '2026-08-31',
+        'saisi_par' => $this->user->id,
+    ]);
+
+    app(ProvisionPDService::class)->generer($provision);
+
+    $builder = app(FluxTresorerieBuilder::class);
+    $result = $builder->fluxTresorerie(2025);
+
+    expect((float) $result['synthese']['total_provisions'])->toBe(0.0);
+    expect((float) $result['synthese']['total_extournes'])->toBe(0.0);
 });
