@@ -7,9 +7,11 @@ use App\Enums\TypeTransaction;
 use App\Models\Association;
 use App\Models\Compte;
 use App\Models\Provision;
+use App\Models\Transaction;
 use App\Models\User;
 use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\Migrations\SystemeSeeder;
+use App\Services\Compta\ProvisionPDService;
 use App\Tenant\TenantContext;
 
 beforeEach(function () {
@@ -170,4 +172,81 @@ test('pourProvisionExtourne — recette generates 681 D / 487 C, dated 1er sept 
 
     expect($ligne487)->not->toBeNull();
     expect((float) $ligne487->credit)->toBe(800.00);
+});
+
+test('ProvisionPDService::generer creates dotation + extourne for a dépense provision', function () {
+    $provision = Provision::factory()->create([
+        'association_id' => $this->association->id,
+        'exercice' => 2025,
+        'type' => 'depense',
+        'montant' => 2000.00,
+        'libelle' => 'FNP assurance',
+        'date' => '2026-08-31',
+        'saisi_par' => $this->user->id,
+    ]);
+
+    $service = app(ProvisionPDService::class);
+    $service->generer($provision);
+
+    $txs = Transaction::where('provision_id', $provision->id)->orderBy('date')->get();
+    expect($txs)->toHaveCount(2);
+
+    // Dotation (31 aug)
+    $dotation = $txs->first(fn ($t) => $t->type_ecriture === 'normale');
+    expect($dotation)->not->toBeNull();
+    expect($dotation->date->format('Y-m-d'))->toBe('2026-08-31');
+    expect($dotation->journal)->toBe(JournalComptable::Od);
+
+    // Extourne (1 sept)
+    $extourne = $txs->first(fn ($t) => $t->type_ecriture === 'extourne');
+    expect($extourne)->not->toBeNull();
+    expect($extourne->date->format('Y-m-d'))->toBe('2026-09-01');
+});
+
+test('ProvisionPDService::generer replaces existing TX on re-call', function () {
+    $provision = Provision::factory()->create([
+        'association_id' => $this->association->id,
+        'exercice' => 2025,
+        'type' => 'depense',
+        'montant' => 1000.00,
+        'libelle' => 'FNP test',
+        'date' => '2026-08-31',
+        'saisi_par' => $this->user->id,
+    ]);
+
+    $service = app(ProvisionPDService::class);
+    $service->generer($provision);
+
+    $oldIds = Transaction::where('provision_id', $provision->id)->pluck('id')->toArray();
+    expect($oldIds)->toHaveCount(2);
+
+    // Re-generate (simulates update)
+    $service->generer($provision);
+
+    // Old TX hard-deleted
+    foreach ($oldIds as $id) {
+        expect(Transaction::withTrashed()->find($id))->toBeNull();
+    }
+
+    // New TX created
+    expect(Transaction::where('provision_id', $provision->id)->count())->toBe(2);
+});
+
+test('ProvisionPDService::supprimer removes all PD transactions', function () {
+    $provision = Provision::factory()->create([
+        'association_id' => $this->association->id,
+        'exercice' => 2025,
+        'type' => 'recette',
+        'montant' => 500.00,
+        'libelle' => 'PCA test',
+        'date' => '2026-08-31',
+        'saisi_par' => $this->user->id,
+    ]);
+
+    $service = app(ProvisionPDService::class);
+    $service->generer($provision);
+    expect(Transaction::where('provision_id', $provision->id)->count())->toBe(2);
+
+    $service->supprimer($provision);
+    expect(Transaction::where('provision_id', $provision->id)->count())->toBe(0);
 });
