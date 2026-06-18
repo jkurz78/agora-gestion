@@ -9,6 +9,7 @@ use App\Traits\TenantStorage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 final class Provision extends TenantModel
@@ -66,6 +67,11 @@ final class Provision extends TenantModel
     public function saisiPar(): BelongsTo
     {
         return $this->belongsTo(User::class, 'saisi_par');
+    }
+
+    public function transactions(): HasMany
+    {
+        return $this->hasMany(Transaction::class);
     }
 
     /**

@@ -57,6 +57,8 @@ final class Transaction extends TenantModel
         'journal',
         // Virement interne — ajouté Task 2
         'virement_interne_id',
+        // Provision — ajouté Task 1
+        'provision_id',
     ];
 
     protected function casts(): array
@@ -182,6 +184,11 @@ final class Transaction extends TenantModel
     public function virementInterne(): BelongsTo
     {
         return $this->belongsTo(VirementInterne::class);
+    }
+
+    public function provision(): BelongsTo
+    {
+        return $this->belongsTo(Provision::class);
     }
 
     public function lignes(): HasMany
