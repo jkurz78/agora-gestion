@@ -8,7 +8,6 @@ use App\Http\Controllers\Concerns\ResolvesLogos;
 use App\Livewire\AnalysePivot;
 use App\Models\Association;
 use App\Services\ExerciceService;
-use App\Services\ProvisionService;
 use App\Services\Rapports\ProjectionMatrix;
 use App\Services\RapportService;
 use App\Support\CurrentAssociation;
@@ -120,15 +119,27 @@ final class RapportExportController extends Controller
     {
         $data = $rapportService->compteDeResultat($exercice);
 
-        $provisionService = app(ProvisionService::class);
-        $provisions = $provisionService->provisionsExercice($exercice);
-        $provisionsN1 = $provisionService->provisionsExercice($exercice - 1);
-        $extournes = $provisionService->extournesExercice($exercice);
-        $extournesN1 = $provisionService->extournesExercice($exercice - 1);
-        $totalProvisions = $provisionService->totalProvisions($exercice);
-        $totalProvisionsN1 = $provisionService->totalProvisions($exercice - 1);
-        $totalExtournes = $provisionService->totalExtournes($exercice);
-        $totalExtournesN1 = $provisionService->totalExtournes($exercice - 1);
+        $totalChargesN = collect($data['charges'])->sum('montant_n');
+        $totalProduitsN = collect($data['produits'])->sum('montant_n');
+        $totalChargesN1 = collect($data['charges'])->sum('montant_n1');
+        $totalProduitsN1 = collect($data['produits'])->sum('montant_n1');
+        $resultatCourant = (float) $totalProduitsN - (float) $totalChargesN;
+        $resultatCourantN1 = (float) $totalProduitsN1 - (float) $totalChargesN1;
+
+        [
+            'provisions' => $provisions,
+            'provisionsN1' => $provisionsN1,
+            'extournes' => $extournes,
+            'extournesN1' => $extournesN1,
+            'totalProvisions' => $totalProvisions,
+            'totalProvisionsN1' => $totalProvisionsN1,
+            'totalExtournes' => $totalExtournes,
+            'totalExtournesN1' => $totalExtournesN1,
+            'resultatBrut' => $resultatBrut,
+            'resultatBrutN1' => $resultatBrutN1,
+            'resultatNet' => $resultatNet,
+            'resultatNetN1' => $resultatNetN1,
+        ] = $rapportService->compteDeResultatProvisions($exercice, $resultatCourant, $resultatCourantN1);
 
         $labelN1 = ($exercice - 1).'-'.$exercice;
         $spreadsheet = new Spreadsheet;
@@ -171,18 +182,6 @@ final class RapportExportController extends Controller
                 $row++;
             }
         }
-
-        // Compute résultat values
-        $totalChargesN = collect($data['charges'])->sum('montant_n');
-        $totalProduitsN = collect($data['produits'])->sum('montant_n');
-        $totalChargesN1 = collect($data['charges'])->sum('montant_n1');
-        $totalProduitsN1 = collect($data['produits'])->sum('montant_n1');
-        $resultatCourant = (float) $totalProduitsN - (float) $totalChargesN;
-        $resultatCourantN1 = (float) $totalProduitsN1 - (float) $totalChargesN1;
-        $resultatBrut = $resultatCourant + $totalExtournes;
-        $resultatBrutN1 = $resultatCourantN1 + $totalExtournesN1;
-        $resultatNet = $resultatBrut + $totalProvisions;
-        $resultatNetN1 = $resultatBrutN1 + $totalProvisionsN1;
 
         // Blank separator row
         $row++;
@@ -1137,20 +1136,20 @@ final class RapportExportController extends Controller
         $resultatCourant = $totalProduitsN - $totalChargesN;
         $resultatCourantN1 = $totalProduitsN1 - $totalChargesN1;
 
-        $provisionService = app(ProvisionService::class);
-        $provisions = $provisionService->provisionsExercice($exercice);
-        $provisionsN1 = $provisionService->provisionsExercice($exercice - 1);
-        $extournes = $provisionService->extournesExercice($exercice);
-        $extournesN1 = $provisionService->extournesExercice($exercice - 1);
-        $totalProvisions = $provisionService->totalProvisions($exercice);
-        $totalProvisionsN1 = $provisionService->totalProvisions($exercice - 1);
-        $totalExtournes = $provisionService->totalExtournes($exercice);
-        $totalExtournesN1 = $provisionService->totalExtournes($exercice - 1);
-
-        $resultatBrut = $resultatCourant + $totalExtournes;
-        $resultatBrutN1 = $resultatCourantN1 + $totalExtournesN1;
-        $resultatNet = $resultatBrut + $totalProvisions;
-        $resultatNetN1 = $resultatBrutN1 + $totalProvisionsN1;
+        [
+            'provisions' => $provisions,
+            'provisionsN1' => $provisionsN1,
+            'extournes' => $extournes,
+            'extournesN1' => $extournesN1,
+            'totalProvisions' => $totalProvisions,
+            'totalProvisionsN1' => $totalProvisionsN1,
+            'totalExtournes' => $totalExtournes,
+            'totalExtournesN1' => $totalExtournesN1,
+            'resultatBrut' => $resultatBrut,
+            'resultatBrutN1' => $resultatBrutN1,
+            'resultatNet' => $resultatNet,
+            'resultatNetN1' => $resultatNetN1,
+        ] = $rapportService->compteDeResultatProvisions($exercice, (float) $resultatCourant, (float) $resultatCourantN1);
 
         return [
             'charges' => $data['charges'],

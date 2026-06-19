@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Services\Rapports\CompteResultatBuilder;
 use App\Services\Rapports\FluxTresorerieBuilder;
+use Illuminate\Support\Collection;
 
 final class RapportService
 {
@@ -30,6 +31,76 @@ final class RapportService
     public function compteDeResultat(int $exercice): array
     {
         return $this->compteResultat->compteDeResultat($exercice);
+    }
+
+    /**
+     * Bloc « provisions de fin d'exercice » du compte de résultat (détail + totaux + résultat brut/net).
+     *
+     * En mode partie double, les provisions vivent dans le grand livre sous les comptes
+     * 681/781 et sont déjà agrégées dans les charges/produits du compte de résultat. Les
+     * ré-additionner depuis la table `provisions` legacy provoquerait un double-comptage —
+     * on renvoie donc des totaux nuls et un résultat net = résultat courant.
+     *
+     * En mode legacy, les provisions n'ont pas d'écriture comptable : on les lit depuis la
+     * table `provisions` et on les applique en cascade (résultat courant → brut → net).
+     *
+     * @return array{
+     *     provisions: Collection,
+     *     provisionsN1: Collection,
+     *     extournes: Collection,
+     *     extournesN1: Collection,
+     *     totalProvisions: float,
+     *     totalProvisionsN1: float,
+     *     totalExtournes: float,
+     *     totalExtournesN1: float,
+     *     resultatBrut: float,
+     *     resultatBrutN1: float,
+     *     resultatNet: float,
+     *     resultatNetN1: float,
+     * }
+     */
+    public function compteDeResultatProvisions(int $exercice, float $resultatCourant, float $resultatCourantN1): array
+    {
+        if (config('compta.use_partie_double', false)) {
+            return [
+                'provisions' => collect(),
+                'provisionsN1' => collect(),
+                'extournes' => collect(),
+                'extournesN1' => collect(),
+                'totalProvisions' => 0.0,
+                'totalProvisionsN1' => 0.0,
+                'totalExtournes' => 0.0,
+                'totalExtournesN1' => 0.0,
+                'resultatBrut' => $resultatCourant,
+                'resultatBrutN1' => $resultatCourantN1,
+                'resultatNet' => $resultatCourant,
+                'resultatNetN1' => $resultatCourantN1,
+            ];
+        }
+
+        $provisionService = app(ProvisionService::class);
+        $totalProvisions = $provisionService->totalProvisions($exercice);
+        $totalProvisionsN1 = $provisionService->totalProvisions($exercice - 1);
+        $totalExtournes = $provisionService->totalExtournes($exercice);
+        $totalExtournesN1 = $provisionService->totalExtournes($exercice - 1);
+
+        $resultatBrut = $resultatCourant + $totalExtournes;
+        $resultatBrutN1 = $resultatCourantN1 + $totalExtournesN1;
+
+        return [
+            'provisions' => $provisionService->provisionsExercice($exercice),
+            'provisionsN1' => $provisionService->provisionsExercice($exercice - 1),
+            'extournes' => $provisionService->extournesExercice($exercice),
+            'extournesN1' => $provisionService->extournesExercice($exercice - 1),
+            'totalProvisions' => $totalProvisions,
+            'totalProvisionsN1' => $totalProvisionsN1,
+            'totalExtournes' => $totalExtournes,
+            'totalExtournesN1' => $totalExtournesN1,
+            'resultatBrut' => $resultatBrut,
+            'resultatBrutN1' => $resultatBrutN1,
+            'resultatNet' => $resultatBrut + $totalProvisions,
+            'resultatNetN1' => $resultatBrutN1 + $totalProvisionsN1,
+        ];
     }
 
     /**
