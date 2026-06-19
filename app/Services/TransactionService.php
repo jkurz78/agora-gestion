@@ -580,6 +580,11 @@ final class TransactionService
             throw new \RuntimeException('Cette transaction est liée à une facture validée et ne peut pas être supprimée.');
         }
         DB::transaction(function () use ($transaction) {
+            // Nettoyage T2 (encaissement/règlement séparé) si elle existe — symétrique
+            // avec annuler() : sans ça, supprimer une transaction réglée laisserait une
+            // T2 orpheline et un lettrage pendant dans le grand livre.
+            $this->supprimerT2SiExiste($transaction);
+
             // Supprimer la pièce jointe si présente
             if ($transaction->hasPieceJointe()) {
                 $this->deletePieceJointe($transaction);
