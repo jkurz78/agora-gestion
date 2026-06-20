@@ -60,6 +60,49 @@ it('creerDepuisTransaction est idempotent', function (): void {
     expect(Adhesion::count())->toBe(1);
 });
 
+it('creerDepuisTransaction ne duplique pas une adhésion déjà liée à la transaction (exercice différent)', function (): void {
+    // Régression : adhésion saisie via le wizard en mode durée (exercice=NULL),
+    // puis "marquer reçu" rejoue creerDepuisTransaction. L'ancien lookup par
+    // exercice (calculé à 2025) ne retrouvait pas l'adhésion exercice=NULL liée
+    // à la même transaction → doublon. Le bon idempotent = transaction_id.
+    $service = app(AdhesionService::class);
+
+    $sc = SousCategorie::factory()->pourCotisations()->create();
+    $tiers = Tiers::factory()->create();
+
+    $tx = Transaction::factory()->asRecette()->create([
+        'tiers_id' => $tiers->id,
+        'date' => '2026-06-20',
+    ]);
+    // Ligne cotisation posée sans déclencher l'observer (comme le wizard).
+    TransactionLigne::withoutEvents(function () use ($tx, $sc): void {
+        TransactionLigne::where('transaction_id', $tx->id)->delete();
+        TransactionLigne::factory()->create([
+            'transaction_id' => $tx->id,
+            'sous_categorie_id' => $sc->id,
+        ]);
+    });
+
+    // Adhésion déjà créée par le wizard pour CETTE transaction, mode durée → exercice NULL.
+    $existante = Adhesion::create([
+        'association_id' => $tiers->association_id,
+        'tiers_id' => $tiers->id,
+        'exercice' => null,
+        'transaction_id' => $tx->id,
+        'mode' => 'duree',
+        'date_debut' => '2025-09-01',
+        'date_fin' => '2026-08-31',
+        'montant_facial' => 25.00,
+        'label_formule' => 'Adhésion saison 2025-2026',
+    ]);
+
+    // L'observer rejoue creerDepuisTransaction (ex. au "marquer reçu").
+    $result = $service->creerDepuisTransaction($tx);
+
+    expect(Adhesion::count())->toBe(1);
+    expect($result->id)->toBe($existante->id);
+});
+
 it('creerDepuisTransaction retourne null si pas de ligne cotisation', function (): void {
     $service = app(AdhesionService::class);
 

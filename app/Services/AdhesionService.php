@@ -51,6 +51,23 @@ final class AdhesionService
         $formule = $this->resolveFormule($tx, $ligneCotisation);
 
         return DB::transaction(function () use ($tx, $formule): Adhesion {
+            // Idempotence forte : une adhésion déjà liée à CETTE transaction est
+            // l'adhésion de la transaction, quel que soit son exercice/mode. Le
+            // wizard la crée parfois en mode durée (exercice=NULL) — que le lookup
+            // par exercice ci-dessous ne retrouverait pas, d'où un doublon quand
+            // l'observer rejoue creerDepuisTransaction (ex. au "marquer reçu").
+            $parTransaction = Adhesion::withTrashed()
+                ->where('transaction_id', (int) $tx->id)
+                ->first();
+
+            if ($parTransaction !== null) {
+                if ($parTransaction->trashed()) {
+                    $parTransaction->restore();
+                }
+
+                return $parTransaction;
+            }
+
             $datesEtExercice = $this->computeDatesEtExercice($tx, $formule);
 
             // Idempotence : lookup selon mode
