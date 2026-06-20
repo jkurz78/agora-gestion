@@ -18,8 +18,6 @@ use Illuminate\Support\Facades\Http;
 
 final class InvoiceOcrService
 {
-    private const MODEL = 'claude-sonnet-4-20250514';
-
     private const DEMO_STUB_MONTANT = 100.0;
 
     private const DEMO_STUB_TIERS_NOM = 'Facture exemple';
@@ -34,6 +32,54 @@ final class InvoiceOcrService
     private function apiKey(): ?string
     {
         return CurrentAssociation::tryGet()?->anthropic_api_key;
+    }
+
+    /**
+     * Modèle Anthropic utilisé pour l'analyse.
+     * Priorité : choix de l'association (Paramètres) → défaut applicatif.
+     */
+    private function model(): string
+    {
+        $choisi = CurrentAssociation::tryGet()?->invoice_ocr_model;
+
+        if (is_string($choisi) && $choisi !== '') {
+            return $choisi;
+        }
+
+        return (string) config('services.anthropic.invoice_ocr_model', 'claude-sonnet-4-6');
+    }
+
+    /**
+     * Liste les modèles disponibles pour une clé API (GET /v1/models), afin
+     * d'alimenter le sélecteur des Paramètres — on ne devine jamais un ID.
+     *
+     * @return array<string, string> [id => libellé affichable], trié par libellé
+     *
+     * @throws OcrAnalysisException si l'appel échoue
+     */
+    public static function fetchAvailableModels(string $apiKey): array
+    {
+        $response = Http::withHeaders([
+            'x-api-key' => $apiKey,
+            'anthropic-version' => '2023-06-01',
+        ])->timeout(15)->get('https://api.anthropic.com/v1/models', ['limit' => 100]);
+
+        if ($response->failed()) {
+            throw new OcrAnalysisException('Impossible de récupérer la liste des modèles : '.$response->status().' — '.$response->body());
+        }
+
+        $models = [];
+        foreach ($response->json('data', []) as $model) {
+            $id = $model['id'] ?? null;
+            if (! is_string($id) || $id === '') {
+                continue;
+            }
+            $models[$id] = (string) ($model['display_name'] ?? $id);
+        }
+
+        asort($models, SORT_NATURAL | SORT_FLAG_CASE);
+
+        return $models;
     }
 
     /**
@@ -118,7 +164,7 @@ final class InvoiceOcrService
             'x-api-key' => $apiKey,
             'anthropic-version' => '2023-06-01',
         ])->timeout(30)->post('https://api.anthropic.com/v1/messages', [
-            'model' => self::MODEL,
+            'model' => $this->model(),
             'max_tokens' => 1024,
             'messages' => [[
                 'role' => 'user',

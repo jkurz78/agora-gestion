@@ -262,6 +262,34 @@
                         @endif
                     </div>
 
+                    <div class="mb-4">
+                        <label class="form-label">Modèle d'analyse</label>
+                        <div class="input-group">
+                            <select class="form-select @error('invoice_ocr_model') is-invalid @enderror"
+                                    wire:model="invoice_ocr_model">
+                                <option value="">Modèle par défaut</option>
+                                @foreach($availableOcrModels as $modelId => $modelLabel)
+                                    <option value="{{ $modelId }}">{{ $modelLabel }}</option>
+                                @endforeach
+                            </select>
+                            <button type="button" class="btn btn-outline-secondary"
+                                    wire:click="chargerModelesOcr" wire:loading.attr="disabled" wire:target="chargerModelesOcr">
+                                <span wire:loading.remove wire:target="chargerModelesOcr"><i class="bi bi-arrow-repeat"></i> Charger les modèles disponibles</span>
+                                <span wire:loading wire:target="chargerModelesOcr">Chargement…</span>
+                            </button>
+                        </div>
+                        @error('invoice_ocr_model') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
+                        @if($ocrModelsFlash)
+                            <div class="form-text text-{{ $ocrModelsFlashType === 'success' ? 'success' : ($ocrModelsFlashType === 'danger' ? 'danger' : 'warning') }}">
+                                {{ $ocrModelsFlash }}
+                            </div>
+                        @else
+                            <div class="form-text text-muted">
+                                Cliquez sur « Charger les modèles disponibles » pour lister les modèles de votre compte Anthropic, puis sélectionnez-en un. Laissé sur « par défaut », l'application choisit un modèle vision adapté.
+                            </div>
+                        @endif
+                    </div>
+
                     <button type="button" class="btn btn-primary" wire:click="save" wire:loading.attr="disabled">
                         <span wire:loading.remove><i class="bi bi-floppy"></i> Enregistrer</span>
                         <span wire:loading>Enregistrement…</span>

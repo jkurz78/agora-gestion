@@ -82,6 +82,72 @@ it('analyze parse correctement la réponse API', function () {
         ->and($result->lignes[0]->seance)->toBe(4);
 });
 
+it('utilise le modèle configuré (pilotable par config, pas en dur)', function () {
+    $this->association->update(['anthropic_api_key' => 'sk-test-key']);
+    SousCategorie::factory()->create();
+    config()->set('services.anthropic.invoice_ocr_model', 'claude-sonnet-4-6');
+
+    Http::fake([
+        'api.anthropic.com/*' => Http::response([
+            'content' => [['type' => 'text', 'text' => json_encode([
+                'date' => '2025-11-22', 'reference' => '1', 'tiers_id' => null,
+                'tiers_nom' => 'X', 'montant_total' => 10.0, 'lignes' => [], 'warnings' => [],
+            ])]],
+        ]),
+    ]);
+
+    app(InvoiceOcrService::class)->analyze(
+        UploadedFile::fake()->create('facture.pdf', 100, 'application/pdf')
+    );
+
+    Http::assertSent(fn ($request) => $request->url() === 'https://api.anthropic.com/v1/messages'
+        && $request['model'] === 'claude-sonnet-4-6'
+        && $request['model'] !== 'claude-sonnet-4-20250514');
+});
+
+it('utilise le modèle choisi par l\'association en priorité', function () {
+    $this->association->update(['anthropic_api_key' => 'sk-test-key', 'invoice_ocr_model' => 'claude-opus-4-8']);
+    SousCategorie::factory()->create();
+
+    Http::fake([
+        'api.anthropic.com/*' => Http::response([
+            'content' => [['type' => 'text', 'text' => json_encode([
+                'date' => '2025-01-01', 'reference' => '1', 'tiers_id' => null,
+                'tiers_nom' => 'X', 'montant_total' => 1.0, 'lignes' => [], 'warnings' => [],
+            ])]],
+        ]),
+    ]);
+
+    app(InvoiceOcrService::class)->analyze(
+        UploadedFile::fake()->create('facture.pdf', 100, 'application/pdf')
+    );
+
+    Http::assertSent(fn ($request) => $request->url() === 'https://api.anthropic.com/v1/messages'
+        && $request['model'] === 'claude-opus-4-8');
+});
+
+it('fetchAvailableModels liste les modèles via GET /v1/models', function () {
+    Http::fake([
+        'api.anthropic.com/v1/models*' => Http::response([
+            'data' => [
+                ['id' => 'claude-opus-4-8', 'display_name' => 'Claude Opus 4.8'],
+                ['id' => 'claude-sonnet-4-6', 'display_name' => 'Claude Sonnet 4.6'],
+            ],
+        ]),
+    ]);
+
+    $models = InvoiceOcrService::fetchAvailableModels('sk-test-key');
+
+    expect($models)->toHaveKey('claude-opus-4-8')
+        ->and($models['claude-sonnet-4-6'])->toBe('Claude Sonnet 4.6');
+});
+
+it('fetchAvailableModels lève une exception si l\'API échoue', function () {
+    Http::fake(['api.anthropic.com/v1/models*' => Http::response(['error' => 'unauthorized'], 401)]);
+
+    InvoiceOcrService::fetchAvailableModels('sk-bad-key');
+})->throws(OcrAnalysisException::class);
+
 it('analyze gère les warnings de cohérence', function () {
     $this->association->update(['anthropic_api_key' => 'sk-test-key']);
     SousCategorie::factory()->create();
