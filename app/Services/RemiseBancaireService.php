@@ -14,6 +14,7 @@ use App\Models\TransactionLigne;
 use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\EtatReglementResolver;
 use App\Services\Compta\LettrageService;
+use App\Services\Compta\PartieDoubleGuard;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -570,5 +571,8 @@ final class RemiseBancaireService
 
         // Lier la T4 à la remise (traçabilité : remise_id posé sur T4, sans reference)
         $t4->update(['remise_id' => $remise->id]);
+
+        // Garde PD finale — homogène avec les autres services générateurs d'écritures.
+        PartieDoubleGuard::assertComplete($t4);
     }
 }
