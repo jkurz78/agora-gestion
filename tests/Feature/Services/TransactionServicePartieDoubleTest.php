@@ -326,16 +326,18 @@ it('multi-ventilation recette comptant chèque — T1 (411D/2×7xxC) + T2 sépar
         'nom' => 'Formations',
         'code_cerfa' => '706B',
     ]);
-    $compte706B = Compte::create([
-        'association_id' => $this->association->id,
-        'numero_pcg' => '706B',
-        'intitule' => 'Formations',
-        'classe' => 7,
-        'lettrable' => false,
-        'actif' => true,
-        'est_systeme' => false,
-        'pour_inscriptions' => false,
-    ]);
+    // Le compte '706B' est matérialisé par l'observer à la création de la sous-catégorie.
+    $compte706B = Compte::firstOrCreate(
+        ['association_id' => $this->association->id, 'numero_pcg' => '706B'],
+        [
+            'intitule' => 'Formations',
+            'classe' => 7,
+            'lettrable' => false,
+            'actif' => true,
+            'est_systeme' => false,
+            'pour_inscriptions' => false,
+        ]
+    );
 
     $data = [
         'type' => TypeTransaction::Recette->value,

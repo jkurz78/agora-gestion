@@ -28,9 +28,9 @@ test('provisionAll seede les comptes systeme, bancaires et de gestion une fois l
     // Source 2 : un compte bancaire.
     $bancaire = CompteBancaire::factory()->create(['association_id' => $assoId]);
 
-    // Pré-condition : aucun de ces comptes n'existe encore (migrations ont tourné
-    // sur des tables source vides).
-    expect(Compte::where('numero_pcg', '706')->exists())->toBeFalse();
+    // Le compte de gestion '706' est déjà matérialisé par l'observer à la création
+    // de la sous-catégorie. provisionAll reste idempotent et ajoute système + bancaire.
+    expect(Compte::where('numero_pcg', '706')->exists())->toBeTrue();
 
     app(ComptesProvisioningService::class)->provisionAll();
 

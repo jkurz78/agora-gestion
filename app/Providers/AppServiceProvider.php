@@ -18,6 +18,7 @@ use App\Models\IncomingDocument;
 use App\Models\Newsletter\SubscriptionRequest;
 use App\Models\NoteDeFrais;
 use App\Models\RecuFiscalEmis;
+use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
@@ -26,6 +27,7 @@ use App\Observers\AdhesionRecuFiscalObserver;
 use App\Observers\AdhesionTransactionLigneObserver;
 use App\Observers\AssociationObserver;
 use App\Observers\ImmutableSlugObserver;
+use App\Observers\SousCategorieCompteObserver;
 use App\Observers\TransactionLigneObserver;
 use App\Observers\TransactionLigneRecuFiscalObserver;
 use App\Observers\TransactionObserver;
@@ -73,6 +75,7 @@ final class AppServiceProvider extends ServiceProvider
         TransactionLigne::observe(AdhesionTransactionLigneObserver::class);
         Adhesion::observe(AdhesionRecuFiscalObserver::class);
         User::observe(UserRoleObserver::class);
+        SousCategorie::observe(SousCategorieCompteObserver::class);
 
         // Rate limiter pour l'API newsletter publique : 5 requêtes / IP / heure.
         // Réponse 429 normalisée {"error": "rate_limit"} pour le contrat API.

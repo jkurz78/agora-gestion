@@ -33,17 +33,9 @@ it('les deux modèles coexistent avec le même numero_pcg / code_cerfa mais des 
         'nom' => 'Ventes de marchandises',
     ]);
 
-    // Crée manuellement le Compte miroir avec numero_pcg = '707'
-    $compte = Compte::create([
-        'association_id' => $association->id,
-        'numero_pcg' => '707',
-        'intitule' => 'Ventes de marchandises',
-        'classe' => 7,
-        'actif' => true,
-        'est_systeme' => false,
-        'pour_inscriptions' => false,
-        'lettrable' => false,
-    ]);
+    // Le Compte miroir (numero_pcg = '707') est matérialisé automatiquement par
+    // l'observer à la création de la sous-catégorie.
+    $compte = Compte::query()->where('numero_pcg', '707')->firstOrFail();
 
     // Les IDs peuvent être identiques ou différents — on ne le présuppose pas.
     // Ce qui compte : les instances PHP sont de classes distinctes.
@@ -63,21 +55,11 @@ it('les deux modèles coexistent avec le même numero_pcg / code_cerfa mais des 
 it('les scopes Eloquent de chaque modèle opèrent sans collision', function (): void {
     $association = TenantContext::current();
 
+    // Le compte miroir '707' est matérialisé par l'observer à la création.
     SousCategorie::factory()->create([
         'association_id' => $association->id,
         'code_cerfa' => '707',
         'nom' => 'Ventes',
-    ]);
-
-    Compte::create([
-        'association_id' => $association->id,
-        'numero_pcg' => '707',
-        'intitule' => 'Ventes',
-        'classe' => 7,
-        'actif' => true,
-        'est_systeme' => false,
-        'pour_inscriptions' => false,
-        'lettrable' => false,
     ]);
 
     // Les deux requêtes doivent aboutir sur leurs tables respectives sans erreur.

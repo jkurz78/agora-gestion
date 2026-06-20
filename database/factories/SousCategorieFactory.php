@@ -24,7 +24,9 @@ class SousCategorieFactory extends Factory
             'association_id' => TenantContext::currentId() ?? 1,
             'categorie_id' => Categorie::factory(),
             'nom' => fake()->words(2, true),
-            'code_cerfa' => fake()->optional(0.3)->numerify('####'),
+            // null par défaut : un code_cerfa déclenche l'observer qui matérialise
+            // un compte. Les tests qui en ont besoin le posent explicitement.
+            'code_cerfa' => null,
         ];
     }
 
