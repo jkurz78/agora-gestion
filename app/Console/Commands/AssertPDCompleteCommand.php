@@ -19,6 +19,10 @@ use Illuminate\Console\Command;
  *
  * --check : signale et sort en erreur si incomplétude détectée (CI).
  * Sans --check : signale et sort toujours en succès.
+ *
+ * Bilan HelloAsso (non bloquant) : compte aussi les transactions HelloAsso restées
+ * legacy (equilibree=false) — volontairement hors garde, mais signalées pour visibilité.
+ * N'affecte jamais le code de sortie. Détail via compta:helloasso-non-enrichies.
  */
 final class AssertPDCompleteCommand extends Command
 {
@@ -30,6 +34,7 @@ final class AssertPDCompleteCommand extends Command
     {
         $check = (bool) $this->option('check');
         $incomplete = 0;
+        $helloassoLegacy = 0;
 
         $associations = Association::query()->get();
 
@@ -57,12 +62,27 @@ final class AssertPDCompleteCommand extends Command
                             $this->warn(sprintf('Tx #%d : %s', (int) $tx->id, $reason));
                         }
                     });
+
+                // Bilan HelloAsso (non bloquant) : ces transactions sont volontairement
+                // exclues de la garde — leur enrichissement PD est best-effort au sync.
+                // On les compte uniquement pour la visibilité (angle mort sinon invisible).
+                $helloassoLegacy += Transaction::query()
+                    ->whereNotNull('helloasso_order_id')
+                    ->where('equilibree', false)
+                    ->count();
             }
         } finally {
             TenantContext::clear();
             if ($previousTenant !== null) {
                 TenantContext::boot($previousTenant);
             }
+        }
+
+        if ($helloassoLegacy > 0) {
+            $this->warn(sprintf(
+                'ℹ %d transaction(s) HelloAsso non enrichie(s) en PD (restées legacy) — détail : compta:helloasso-non-enrichies',
+                $helloassoLegacy,
+            ));
         }
 
         if ($incomplete === 0) {
