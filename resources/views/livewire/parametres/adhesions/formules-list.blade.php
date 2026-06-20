@@ -200,7 +200,7 @@
                                                 @error('newSousCatNom')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                             </div>
                                             <div class="col-md-3">
-                                                <label class="form-label small mb-1" for="new-sc-cerfa">Code CERFA</label>
+                                                <label class="form-label small mb-1" for="new-sc-cerfa">Compte comptable</label>
                                                 <input id="new-sc-cerfa"
                                                        type="text"
                                                        class="form-control form-control-sm"

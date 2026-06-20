@@ -135,7 +135,7 @@
                             @error('inlineNom') <div class="text-danger small">{{ $message }}</div> @enderror
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Code CERFA (optionnel)</label>
+                            <label class="form-label">Compte comptable (optionnel)</label>
                             <input type="text" class="form-control" wire:model="inlineCodeCerfa">
                             @error('inlineCodeCerfa') <div class="text-danger small">{{ $message }}</div> @enderror
                         </div>

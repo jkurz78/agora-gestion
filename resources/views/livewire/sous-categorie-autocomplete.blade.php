@@ -135,7 +135,7 @@
                 </div>
 
                 <div class="mb-4">
-                    <label class="form-label fw-semibold">Code CERFA <span class="text-muted fw-normal">(optionnel)</span></label>
+                    <label class="form-label fw-semibold">Compte comptable <span class="text-muted fw-normal">(optionnel)</span></label>
                     <input type="text" class="form-control" wire:model="newCodeCerfa" placeholder="ex : 641">
                     @error('newCodeCerfa') <div class="text-danger small">{{ $message }}</div> @enderror
                 </div>

@@ -37,7 +37,7 @@
                 <tr>
                     <th class="sortable" data-col="0" style="cursor:pointer;user-select:none">Catégorie <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
                     <th class="sortable" data-col="1" style="cursor:pointer;user-select:none">Nom <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
-                    <th class="sortable" data-col="2" style="cursor:pointer;user-select:none">Code CERFA <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
+                    <th class="sortable" data-col="2" style="cursor:pointer;user-select:none">Compte comptable <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
                     <th style="width:100px" class="text-center">Actions</th>
                 </tr>
             </thead>
@@ -68,7 +68,7 @@
                             </template>
                         </td>
 
-                        {{-- Code CERFA (éditable inline) --}}
+                        {{-- Compte comptable (éditable inline) --}}
                         <td wire:ignore.self
                             x-data="{ editing: false, value: @js($sc->code_cerfa ?? ''), original: @js($sc->code_cerfa ?? '') }"
                             @click="if (!editing) { editing = true; $nextTick(() => $refs.input.focus()) }"
@@ -139,7 +139,7 @@
                     @error('categorie_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
                 </div>
 
-                {{-- Nom + Code CERFA --}}
+                {{-- Nom + Compte comptable --}}
                 <div class="row g-2 mb-3">
                     <div class="col-md-8">
                         <label class="form-label small">Nom <span class="text-danger">*</span></label>
@@ -147,7 +147,7 @@
                         @error('nom') <div class="invalid-feedback">{{ $message }}</div> @enderror
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label small">Code CERFA</label>
+                        <label class="form-label small">Compte comptable</label>
                         <input type="text" wire:model="code_cerfa" class="form-control form-control-sm @error('code_cerfa') is-invalid @enderror" maxlength="10">
                         @error('code_cerfa') <div class="invalid-feedback">{{ $message }}</div> @enderror
                     </div>
