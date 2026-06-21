@@ -10,6 +10,7 @@ use App\Models\Association;
 use App\Services\ExerciceService;
 use App\Services\ProvisionService;
 use App\Services\Rapports\ProjectionMatrix;
+use App\Services\Rapports\VentilationFinanciereService;
 use App\Services\RapportService;
 use App\Support\CurrentAssociation;
 use App\Support\PdfFooterRenderer;
@@ -1032,14 +1033,16 @@ final class RapportExportController extends Controller
 
     private function xlsxAnalyse(string $mode, int $exercice, ExerciceService $exerciceService): Spreadsheet
     {
-        // Re-use the AnalysePivot data logic
-        $pivot = new AnalysePivot;
-        $pivot->mode = $mode;
-        $pivot->filterExercice = $exercice;
-
-        $data = $mode === 'participants'
-            ? $pivot->getParticipantsDataProperty()
-            : $pivot->getFinancierDataProperty();
+        if ($mode === 'participants') {
+            // L'onglet participants n'est pas (encore) extrait dans un service dédié.
+            $pivot = new AnalysePivot;
+            $pivot->mode = $mode;
+            $pivot->filterExercice = $exercice;
+            $data = $pivot->getParticipantsDataProperty();
+        } else {
+            // Financier : même source plate que l'écran Analyse (montant signé + éclatement).
+            $data = app(VentilationFinanciereService::class)->pourExercice($exercice);
+        }
 
         $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
