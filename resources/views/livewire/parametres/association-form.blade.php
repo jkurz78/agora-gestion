@@ -1,6 +1,6 @@
 {{-- resources/views/livewire/parametres/association-form.blade.php --}}
 <div
-    x-data="{ isDirty: false, ready: false, showUnsavedModal: false, pendingUrl: '' }"
+    x-data="{ tab: @entangle('activeTab'), isDirty: false, ready: false, showUnsavedModal: false, pendingUrl: '' }"
     x-on:focusin.once="$nextTick(() => ready = true)"
     x-on:input="if (ready) isDirty = true"
     x-on:change="if (ready) isDirty = true"
@@ -28,26 +28,26 @@
 
     <ul class="nav nav-tabs mb-3" role="tablist">
         <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="tab-infos" data-bs-toggle="tab" data-bs-target="#pane-infos"
-                    type="button" role="tab" aria-controls="pane-infos" aria-selected="true">
+            <button class="nav-link" :class="{ active: tab === 'infos' }" id="tab-infos" @click="tab = 'infos'"
+                    type="button" role="tab" aria-controls="pane-infos" :aria-selected="tab === 'infos'">
                 <i class="bi bi-building"></i> Informations
             </button>
         </li>
         <li class="nav-item" role="presentation">
-            <button class="nav-link" id="tab-facturation" data-bs-toggle="tab" data-bs-target="#pane-facturation"
-                    type="button" role="tab" aria-controls="pane-facturation" aria-selected="false">
+            <button class="nav-link" :class="{ active: tab === 'facturation' }" id="tab-facturation" @click="tab = 'facturation'"
+                    type="button" role="tab" aria-controls="pane-facturation" :aria-selected="tab === 'facturation'">
                 <i class="bi bi-receipt"></i> Facturation
             </button>
         </li>
         <li class="nav-item" role="presentation">
-            <button class="nav-link" id="tab-ocr" data-bs-toggle="tab" data-bs-target="#pane-ocr"
-                    type="button" role="tab" aria-controls="pane-ocr" aria-selected="false">
+            <button class="nav-link" :class="{ active: tab === 'ocr' }" id="tab-ocr" @click="tab = 'ocr'"
+                    type="button" role="tab" aria-controls="pane-ocr" :aria-selected="tab === 'ocr'">
                 <i class="bi bi-robot"></i> OCR / IA
             </button>
         </li>
         <li class="nav-item" role="presentation">
-            <button class="nav-link" id="tab-communication" data-bs-toggle="tab" data-bs-target="#pane-communication"
-                    type="button" role="tab" aria-controls="pane-communication" aria-selected="false">
+            <button class="nav-link" :class="{ active: tab === 'communication' }" id="tab-communication" @click="tab = 'communication'"
+                    type="button" role="tab" aria-controls="pane-communication" :aria-selected="tab === 'communication'">
                 <i class="bi bi-envelope"></i> Communication
             </button>
         </li>
@@ -55,7 +55,7 @@
 
     <div class="tab-content">
         {{-- Onglet Informations --}}
-        <div class="tab-pane fade show active" id="pane-infos" role="tabpanel" aria-labelledby="tab-infos">
+        <div class="tab-pane fade" :class="{ 'show active': tab === 'infos' }" id="pane-infos" role="tabpanel" aria-labelledby="tab-infos">
             <div class="row mt-3">
                 <div class="col-lg-8">
                     {{-- Cadre Identité --}}
@@ -177,7 +177,7 @@
         </div>
 
         {{-- Onglet Facturation --}}
-        <div class="tab-pane fade" id="pane-facturation" role="tabpanel" aria-labelledby="tab-facturation">
+        <div class="tab-pane fade" :class="{ 'show active': tab === 'facturation' }" id="pane-facturation" role="tabpanel" aria-labelledby="tab-facturation">
             <div class="mt-3">
                     <p class="text-muted small mb-4">
                         Ces informations apparaissent sur les <strong>factures</strong> émises par l'application (pied de page, mentions légales, coordonnées bancaires).
@@ -242,7 +242,7 @@
         </div>
 
         {{-- Onglet OCR / IA --}}
-        <div class="tab-pane fade" id="pane-ocr" role="tabpanel" aria-labelledby="tab-ocr">
+        <div class="tab-pane fade" :class="{ 'show active': tab === 'ocr' }" id="pane-ocr" role="tabpanel" aria-labelledby="tab-ocr">
             <div class="mt-3">
                     <p class="text-muted small mb-3">
                         Renseignez une clé API Anthropic pour activer l'analyse automatique des factures fournisseur.
@@ -298,7 +298,7 @@
         </div>
 
         {{-- Onglet Communication --}}
-        <div class="tab-pane fade" id="pane-communication" role="tabpanel" aria-labelledby="tab-communication">
+        <div class="tab-pane fade" :class="{ 'show active': tab === 'communication' }" id="pane-communication" role="tabpanel" aria-labelledby="tab-communication">
             <div class="mt-3">
                 <p class="text-muted small mb-3">
                     Adresse d'expédition utilisée pour les communications de masse aux tiers,

@@ -20,6 +20,9 @@ final class AssociationForm extends Component
 {
     use WithFileUploads;
 
+    /** Onglet actif — entangle Alpine pour survivre aux re-renders Livewire. */
+    public string $activeTab = 'infos';
+
     public string $nom = '';
 
     public string $adresse = '';

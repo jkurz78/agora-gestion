@@ -65,6 +65,20 @@ it('save persiste le modèle OCR choisi', function () {
     expect($this->association->fresh()->invoice_ocr_model)->toBe('claude-opus-4-8');
 });
 
+it('chargerModelesOcr ne fait pas perdre l\'onglet actif', function () {
+    Http::fake([
+        'api.anthropic.com/v1/models*' => Http::response([
+            'data' => [['id' => 'claude-sonnet-4-6', 'display_name' => 'Claude Sonnet 4.6']],
+        ]),
+    ]);
+
+    Livewire::test(AssociationForm::class)
+        ->set('activeTab', 'ocr')
+        ->set('anthropic_api_key', 'sk-test-key')
+        ->call('chargerModelesOcr')
+        ->assertSet('activeTab', 'ocr');
+});
+
 it('le modèle déjà choisi reste sélectionnable même retiré de la liste', function () {
     Http::fake([
         'api.anthropic.com/v1/models*' => Http::response([
