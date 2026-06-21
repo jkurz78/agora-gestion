@@ -124,7 +124,7 @@ it('returns financier data with correct fields including temporal dimensions', f
         'Tiers', 'Date', 'Montant', 'Sous-catégorie', 'Catégorie', 'Type', 'Compte',
         'Mois', 'Trimestre', 'Semestre',
     ]);
-    expect($data[0]['Montant'])->toBe(100.0);
+    expect($data[0]['Montant'])->toBe(-100.0); // dépense → signe négatif (spine)
     // January 2026 → exercice 2025 → T2 (Dec-Feb), S1 (Sept-Feb)
     expect($data[0]['Mois'])->toBe('Janvier 2026');
     expect($data[0]['Trimestre'])->toBe('T2 2025-2026');
