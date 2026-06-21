@@ -156,3 +156,41 @@ it('ne retourne pas les lignes d\'une autre association', function () {
     expect($rows)->toHaveCount(1);
     expect($rows[0]['Montant'])->toBe(11.0);
 });
+
+it('compose le libellé Tiers en gérant un nom de famille nul', function () {
+    // Particulier avec prénom + nom
+    $tiersComplet = Tiers::factory()->create([
+        'association_id' => $this->association->id,
+        'type' => 'particulier',
+        'prenom' => 'Jean',
+        'nom' => 'Dupont',
+    ]);
+    $txComplet = Transaction::create([
+        'association_id' => $this->association->id, 'tiers_id' => $tiersComplet->id,
+        'compte_id' => $this->compte->id, 'type' => 'recette', 'date' => '2026-01-15',
+        'libelle' => 'A', 'montant_total' => 10.00, 'mode_paiement' => 'virement',
+        'saisi_par' => $this->user->id,
+    ]);
+    TransactionLigne::create(['transaction_id' => $txComplet->id, 'sous_categorie_id' => $this->sousCategorie->id, 'montant' => 10.00]);
+
+    // Particulier avec nom seul (prénom null) — le cas qui révèle le bug CONCAT/NULL
+    $tiersNomSeul = Tiers::factory()->create([
+        'association_id' => $this->association->id,
+        'type' => 'particulier',
+        'prenom' => null,
+        'nom' => 'Martin',
+    ]);
+    $txNomSeul = Transaction::create([
+        'association_id' => $this->association->id, 'tiers_id' => $tiersNomSeul->id,
+        'compte_id' => $this->compte->id, 'type' => 'recette', 'date' => '2026-01-16',
+        'libelle' => 'B', 'montant_total' => 20.00, 'mode_paiement' => 'virement',
+        'saisi_par' => $this->user->id,
+    ]);
+    TransactionLigne::create(['transaction_id' => $txNomSeul->id, 'sous_categorie_id' => $this->sousCategorie->id, 'montant' => 20.00]);
+
+    $rows = app(VentilationFinanciereService::class)->pourExercice(2025);
+    $tiersValues = collect($rows)->pluck('Tiers')->all();
+
+    expect($tiersValues)->toContain('Jean Dupont');
+    expect($tiersValues)->toContain('Martin'); // pas de NULL, pas d'espace de tête
+});

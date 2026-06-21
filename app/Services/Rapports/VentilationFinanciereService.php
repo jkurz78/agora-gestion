@@ -105,7 +105,7 @@ final class VentilationFinanciereService
             'tx.reference as Référence',
             'tx.mode_paiement as Mode paiement',
             'tx.libelle as Libellé',
-            DB::raw("CASE WHEN tiers.type = 'entreprise' THEN COALESCE(tiers.entreprise, tiers.nom) ELSE CONCAT(COALESCE(tiers.prenom, ''), ' ', tiers.nom) END as Tiers"),
+            DB::raw("CASE WHEN tiers.type = 'entreprise' THEN COALESCE(tiers.entreprise, tiers.nom, '') ELSE TRIM(CONCAT(COALESCE(tiers.prenom, ''), ' ', COALESCE(tiers.nom, ''))) END as Tiers"),
             'tiers.type as Type tiers',
             'sc.nom as Sous-catégorie',
             'c.nom as Catégorie',
