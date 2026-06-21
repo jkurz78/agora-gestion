@@ -130,3 +130,8 @@ it('returns financier data with correct fields including temporal dimensions', f
     expect($data[0]['Trimestre'])->toBe('T2 2025-2026');
     expect($data[0]['Semestre'])->toBe('S1 2025-2026');
 });
+
+it('injecte le centrage CSS du popup de filtre PivotTable (Pb 2)', function () {
+    Livewire::test(AnalysePivot::class, ['mode' => 'financier'])
+        ->assertSeeHtml('.pvtFilterBox');
+});

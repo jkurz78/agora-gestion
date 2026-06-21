@@ -1,4 +1,18 @@
 <div>
+    {{-- Pb 2 : recentrer le popup « filtre des valeurs » de PivotTable.js,
+         positionné en absolu débordant à gauche par défaut. CSS pur, !important
+         pour surcharger le style inline posé par la lib. --}}
+    <style>
+        .pvtFilterBox {
+            position: fixed !important;
+            top: 50% !important;
+            left: 50% !important;
+            transform: translate(-50%, -50%);
+            max-height: 80vh;
+            overflow: auto;
+            z-index: 1060;
+        }
+    </style>
     {{-- Header with exercice selector --}}
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h4 class="mb-0"><i class="bi bi-graph-up me-2"></i>Analyse</h4>
