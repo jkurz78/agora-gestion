@@ -12,15 +12,25 @@
         .cr-neg { color: #B5453A; }
         .cr-pos { color: #2E7D32; }
         .cr-zero { color: #6c757d; }
+        @if($compareBudget)
         .budget-bar-track { background: #e2e8f0; border-radius: 4px; height: 10px; width: 110px; overflow: hidden; }
         .cr-total .budget-bar-track { background: rgba(255,255,255,.25); }
         .budget-bar-fill { height: 10px; border-radius: 4px; }
         .budget-label { font-size: 11px; text-align: right; color: #555; margin-top: 2px; }
         .cr-total .budget-label { color: rgba(255,255,255,.8); }
+        @endif
     </style>
 
-    {{-- Export --}}
-    <div class="d-flex justify-content-end mb-3">
+    {{-- Export + switches --}}
+    <div class="d-flex justify-content-end align-items-center gap-3 mb-3">
+        <div class="form-check form-switch mb-0">
+            <input type="checkbox" wire:model.live="compareN1" class="form-check-input" id="toggleN1">
+            <label class="form-check-label small" for="toggleN1">Afficher N&#8209;1</label>
+        </div>
+        <div class="form-check form-switch mb-0">
+            <input type="checkbox" wire:model.live="compareBudget" class="form-check-input" id="toggleBudget">
+            <label class="form-check-label small" for="toggleBudget">Afficher budget &amp; écart</label>
+        </div>
         <div class="btn-group">
             <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
                 <i class="bi bi-download me-1"></i>Exporter
@@ -65,12 +75,14 @@
                         <td></td>
                         @if($compareN1)<td class="text-end" style="width:115px;font-weight:400;font-size:12px;opacity:.85;">{{ $labelN1 }}</td>@endif
                         <td class="text-end" style="width:115px;font-weight:400;font-size:12px;opacity:.85;">{{ $labelN }}</td>
+                        @if($compareBudget)
                         <td class="text-end" style="width:115px;font-weight:400;font-size:12px;opacity:.85;">Budget</td>
                         <td class="text-end" style="width:90px;font-weight:400;font-size:12px;opacity:.85;">&Eacute;cart</td>
                         <td class="text-center" style="width:130px;font-weight:400;font-size:12px;opacity:.85;">Conso. budget</td>
+                        @endif
                     </tr>
                     <tr class="cr-section-label">
-                        <td colspan="7">EXTOURNES PROVISIONS N&minus;1</td>
+                        <td colspan="{{ 4 + ($compareN1 ? 1 : 0) + ($compareBudget ? 3 : 0) }}">EXTOURNES PROVISIONS N&minus;1</td>
                     </tr>
                     @php
                         // Build a merged list keyed by libelle+sous_cat for alignment
@@ -89,18 +101,22 @@
                             <td style="padding-left:32px;">{{ $item['libelle'] }} <span class="text-muted">({{ $item['sous_categorie_nom'] }})</span></td>
                             @if($compareN1)<td class="text-end cr-n1">{!! $extN1 ? number_format($extN1['montant_signe'], 2, ',', ' ').' &euro;' : '<span class="text-muted">&mdash;</span>' !!}</td>@endif
                             <td class="text-end">{!! $extN ? number_format($extN['montant_signe'], 2, ',', ' ').' &euro;' : '<span class="text-muted">&mdash;</span>' !!}</td>
+                            @if($compareBudget)
                             <td class="text-end"><span class="text-muted">&mdash;</span></td>
                             <td class="text-end"><span class="text-muted">&mdash;</span></td>
                             <td></td>
+                            @endif
                         </tr>
                     @endforeach
                     <tr class="cr-total">
                         <td colspan="2">TOTAL EXTOURNES</td>
                         @if($compareN1)<td class="text-end" style="color:#d0e4f7;">{!! $totalExtournesN1 != 0 ? number_format($totalExtournesN1, 2, ',', ' ').' &euro;' : '&mdash;' !!}</td>@endif
                         <td class="text-end">{{ number_format($totalExtournes, 2, ',', ' ') }} &euro;</td>
+                        @if($compareBudget)
                         <td class="text-end">&mdash;</td>
                         <td class="text-end">&mdash;</td>
                         <td></td>
+                        @endif
                     </tr>
                 </tbody>
             </table>
@@ -120,13 +136,15 @@
                         <td></td>
                         @if($compareN1)<td class="text-end" style="width:115px;font-weight:400;font-size:12px;opacity:.85;">{{ $labelN1 }}</td>@endif
                         <td class="text-end" style="width:115px;font-weight:400;font-size:12px;opacity:.85;">{{ $labelN }}</td>
+                        @if($compareBudget)
                         <td class="text-end" style="width:115px;font-weight:400;font-size:12px;opacity:.85;">Budget</td>
                         <td class="text-end" style="width:90px;font-weight:400;font-size:12px;opacity:.85;">&Eacute;cart</td>
                         <td class="text-center" style="width:130px;font-weight:400;font-size:12px;opacity:.85;">Conso. budget</td>
+                        @endif
                     </tr>
                     {{-- Titre section --}}
                     <tr class="cr-section-label">
-                        <td colspan="7">{{ $section['label'] }}</td>
+                        <td colspan="{{ 4 + ($compareN1 ? 1 : 0) + ($compareBudget ? 3 : 0) }}">{{ $section['label'] }}</td>
                     </tr>
 
                     @foreach ($section['data'] as $cat)
@@ -144,9 +162,11 @@
                             <td>{{ $cat['label'] }}</td>
                             @if($compareN1)<td class="text-end cr-n1">{!! $fmt($cat['montant_n1']) !!}</td>@endif
                             <td class="text-end">{!! $fmt($cat['montant_n']) !!}</td>
+                            @if($compareBudget)
                             <td class="text-end">{!! $fmt($cat['budget']) !!}</td>
                             <td class="text-end">{!! $renderEcart($cat['montant_n'], $cat['budget'], $section['isCharge']) !!}</td>
                             <td class="text-center">{!! $renderBar($cat['montant_n'], $cat['budget'], $section['isCharge']) !!}</td>
+                            @endif
                         </tr>
                         @foreach ($scVisibles as $sc)
                             <tr class="cr-sub">
@@ -154,9 +174,11 @@
                                 <td style="padding-left:32px;">{{ $sc['label'] }}</td>
                                 @if($compareN1)<td class="text-end cr-n1">{!! $fmt($sc['montant_n1']) !!}</td>@endif
                                 <td class="text-end">{!! $fmt($sc['montant_n']) !!}</td>
+                                @if($compareBudget)
                                 <td class="text-end">{!! $fmt($sc['budget']) !!}</td>
                                 <td class="text-end">{!! $renderEcart($sc['montant_n'], $sc['budget'], $section['isCharge']) !!}</td>
                                 <td class="text-center">{!! $renderBar($sc['montant_n'], $sc['budget'], $section['isCharge']) !!}</td>
+                                @endif
                             </tr>
                         @endforeach
                         @endif
@@ -167,9 +189,11 @@
                         <td colspan="2">TOTAL {{ $section['label'] }}</td>
                         @if($compareN1)<td class="text-end" style="color:#d0e4f7;">&mdash;</td>@endif
                         <td class="text-end">{{ number_format($section['total'], 2, ',', ' ') }} &euro;</td>
+                        @if($compareBudget)
                         <td class="text-end">&mdash;</td>
                         <td class="text-end">&mdash;</td>
                         <td></td>
+                        @endif
                     </tr>
                 </tbody>
             </table>
@@ -188,9 +212,11 @@
                         <td style="padding:9px 12px;">RÉSULTAT BRUT</td>
                         @if($compareN1)<td class="text-end" style="width:115px;padding:9px 12px;color:#d0e4f7;">{!! $resultatBrutN1 != 0 ? number_format($resultatBrutN1, 2, ',', ' ').' &euro;' : '&mdash;' !!}</td>@endif
                         <td class="text-end" style="width:115px;padding:9px 12px;">{{ number_format($resultatBrut, 2, ',', ' ') }} &euro;</td>
+                        @if($compareBudget)
                         <td style="width:115px;padding:9px 12px;"></td>
                         <td style="width:90px;padding:9px 12px;"></td>
                         <td style="width:130px;padding:9px 12px;"></td>
+                        @endif
                     </tr>
                 </tbody>
             </table>
@@ -208,12 +234,14 @@
                         <td></td>
                         @if($compareN1)<td class="text-end" style="width:115px;font-weight:400;font-size:12px;opacity:.85;">{{ $labelN1 }}</td>@endif
                         <td class="text-end" style="width:115px;font-weight:400;font-size:12px;opacity:.85;">{{ $labelN }}</td>
+                        @if($compareBudget)
                         <td class="text-end" style="width:115px;font-weight:400;font-size:12px;opacity:.85;">Budget</td>
                         <td class="text-end" style="width:90px;font-weight:400;font-size:12px;opacity:.85;">&Eacute;cart</td>
                         <td class="text-center" style="width:130px;font-weight:400;font-size:12px;opacity:.85;">Conso. budget</td>
+                        @endif
                     </tr>
                     <tr class="cr-section-label">
-                        <td colspan="7">PROVISIONS FIN D&#039;EXERCICE</td>
+                        <td colspan="{{ 4 + ($compareN1 ? 1 : 0) + ($compareBudget ? 3 : 0) }}">PROVISIONS FIN D&#039;EXERCICE</td>
                     </tr>
                     @php
                         $provN1ByKey = $provisionsN1->keyBy(fn($p) => $p['libelle'].'|'.$p['sous_categorie_id']);
@@ -231,18 +259,22 @@
                             <td style="padding-left:32px;">{{ $item['libelle'] }} <span class="text-muted">({{ $item['sous_categorie_nom'] }})</span></td>
                             @if($compareN1)<td class="text-end cr-n1">{!! $provN1 ? number_format($provN1['montant_signe'], 2, ',', ' ').' &euro;' : '<span class="text-muted">&mdash;</span>' !!}</td>@endif
                             <td class="text-end">{!! $provN ? number_format($provN['montant_signe'], 2, ',', ' ').' &euro;' : '<span class="text-muted">&mdash;</span>' !!}</td>
+                            @if($compareBudget)
                             <td class="text-end"><span class="text-muted">&mdash;</span></td>
                             <td class="text-end"><span class="text-muted">&mdash;</span></td>
                             <td></td>
+                            @endif
                         </tr>
                     @endforeach
                     <tr class="cr-total">
                         <td colspan="2">TOTAL PROVISIONS</td>
                         @if($compareN1)<td class="text-end" style="color:#d0e4f7;">{!! $totalProvisionsN1 != 0 ? number_format($totalProvisionsN1, 2, ',', ' ').' &euro;' : '&mdash;' !!}</td>@endif
                         <td class="text-end">{{ number_format($totalProvisions, 2, ',', ' ') }} &euro;</td>
+                        @if($compareBudget)
                         <td class="text-end">&mdash;</td>
                         <td class="text-end">&mdash;</td>
                         <td></td>
+                        @endif
                     </tr>
                 </tbody>
             </table>
@@ -261,9 +293,11 @@
                         <td style="padding:12px;">RÉSULTAT AJUSTÉ</td>
                         @if($compareN1)<td class="text-end" style="width:115px;padding:12px;color:rgba(255,255,255,.6);">{!! $resultatNetN1 != 0 ? number_format($resultatNetN1, 2, ',', ' ').' &euro;' : '&mdash;' !!}</td>@endif
                         <td class="text-end" style="width:115px;padding:12px;">{{ number_format($resultatNet, 2, ',', ' ') }} &euro;</td>
+                        @if($compareBudget)
                         <td style="width:115px;padding:12px;"></td>
                         <td style="width:90px;padding:12px;"></td>
                         <td style="width:130px;padding:12px;"></td>
+                        @endif
                     </tr>
                 </tbody>
             </table>
@@ -282,9 +316,11 @@
                         <td style="padding:12px;">RÉSULTAT</td>
                         @if($compareN1)<td class="text-end" style="width:115px;padding:12px;color:rgba(255,255,255,.6);">&mdash;</td>@endif
                         <td class="text-end" style="width:115px;padding:12px;">{{ number_format($resultatNet, 2, ',', ' ') }} &euro;</td>
+                        @if($compareBudget)
                         <td style="width:115px;padding:12px;"></td>
                         <td style="width:90px;padding:12px;"></td>
                         <td style="width:130px;padding:12px;"></td>
+                        @endif
                     </tr>
                 </tbody>
             </table>

@@ -145,3 +145,24 @@ it('masque la colonne N-1 quand compareN1 est false', function () {
         ->set('compareN1', false)
         ->assertDontSee('777,00');         // masquée
 });
+
+it('masque budget/écart/barre quand compareBudget est false', function () {
+    $cat = Categorie::factory()->depense()->create(['association_id' => $this->association->id]);
+    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $cat->id, 'nom' => 'Salle']);
+    BudgetLine::factory()->create(['association_id' => $this->association->id, 'sous_categorie_id' => $sc->id, 'exercice' => 2025, 'montant_prevu' => 1000.00]);
+    $d = Transaction::factory()->asDepense()->create(['association_id' => $this->association->id, 'date' => '2025-11-01', 'saisi_par' => $this->user->id]);
+    $d->lignes()->forceDelete();
+    TransactionLigne::factory()->create(['transaction_id' => $d->id, 'sous_categorie_id' => $sc->id, 'montant' => 800.00]);
+
+    Livewire::test(RapportCompteResultat::class)
+        ->assertSeeHtml('budget-bar-fill')   // barre visible par défaut
+        ->set('compareBudget', false)
+        ->assertDontSeeHtml('budget-bar-fill')
+        ->assertDontSee('80 %');
+});
+
+it('affiche les deux switches de comparaison', function () {
+    Livewire::test(RapportCompteResultat::class)
+        ->assertSeeHtml('wire:model.live="compareN1"')
+        ->assertSeeHtml('wire:model.live="compareBudget"');
+});
