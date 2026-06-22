@@ -42,7 +42,10 @@ Objectifs de la V1 :
 - collecter les reponses avec anonymat par defaut ;
 - permettre au repondant de lever volontairement l'anonymat pour etre recontacte ;
 - consulter les resultats dans AgoraGestion ;
-- exporter les reponses au format Excel pour analyse hors logiciel.
+- exporter les reponses au format Excel pour analyse hors logiciel ;
+- imprimer un questionnaire papier avec QR code individuel ;
+- permettre une saisie assistee par scan/OCR, toujours validee par un humain avant
+  sauvegarde.
 
 ## 3. Principes de conception
 
@@ -79,6 +82,24 @@ peuvent rendre certains retours reconnaissables.
 
 Le repondant peut choisir explicitement d'etre recontacte. Dans ce cas seulement,
 l'identite du participant peut etre exposee a l'equipe sur cette reponse.
+
+### 3.4 Collecte hybride papier + numerique
+
+Le questionnaire doit pouvoir exister sous deux formes pour une meme invitation :
+
+- un lien en ligne, utilisable directement depuis un email ou un QR code ;
+- une feuille papier imprimable, remplissable au stylo.
+
+Le QR code imprime sur la feuille porte l'identifiant securise de l'invitation. Il a
+deux usages :
+
+- si la personne a un smartphone, elle scanne le QR code et repond en ligne ;
+- si elle remplit la feuille, le QR code permet de rattacher le scan a la bonne
+  campagne, au bon questionnaire et a la bonne invitation lors de la saisie assistee.
+
+Le scan papier ne doit jamais etre sauvegarde automatiquement comme reponse definitive.
+L'IA/OCR produit une proposition de saisie ; un assistant humain la relit, corrige et
+valide avant enregistrement en base.
 
 ## 4. Perimetre fonctionnel V1
 
@@ -218,6 +239,60 @@ avec :
 
 Les en-tetes doivent rester stables pour faciliter l'analyse hors logiciel.
 
+### 4.8 Impression papier avec QR code
+
+Depuis une campagne, l'administrateur peut imprimer les questionnaires des participants
+selectionnes.
+
+Chaque questionnaire imprime contient :
+
+- le titre affiche ;
+- le texte d'introduction ;
+- la liste des questions dans l'ordre ;
+- les consignes de remplissage papier ;
+- le bloc de consentement optionnel au contact ;
+- un message de remerciement court ;
+- un QR code individuel ;
+- un identifiant lisible court, utile si le QR code est abime ou mal scanne.
+
+La mise en page papier peut afficher plusieurs questions par page. La contrainte "une
+question par page" concerne uniquement le parcours en ligne.
+
+Le QR code encode une URL publique tokenisee, equivalente au lien d'invitation. Il ne
+doit pas contenir de donnees personnelles en clair. Toute resolution vers le participant
+se fait cote serveur apres verification du token.
+
+### 4.9 Scan, OCR et assistant de saisie
+
+Apres un atelier, l'administrateur peut scanner les feuilles remplies et les deposer
+dans AgoraGestion.
+
+Flux cible :
+
+1. upload d'un scan ou lot de scans ;
+2. detection du QR code sur chaque feuille ;
+3. rattachement a la campagne et a l'invitation ;
+4. OCR et analyse IA des zones de reponse ;
+5. generation d'un brouillon de reponse ;
+6. affichage dans un assistant de saisie ;
+7. validation/correction humaine ;
+8. sauvegarde definitive en base.
+
+L'assistant de saisie doit montrer, question par question :
+
+- l'image source ou l'extrait de scan correspondant ;
+- la valeur proposee par l'IA ;
+- un niveau de confiance si disponible ;
+- le champ de correction manuel ;
+- les alertes de validation pour les questions obligatoires.
+
+Si le QR code est illisible, l'utilisateur peut rattacher manuellement le scan a une
+invitation via l'identifiant court imprime ou via une recherche participant/campagne.
+
+Si une invitation a deja une reponse soumise, l'assistant bloque la sauvegarde par
+defaut et propose une action explicite : ignorer le scan, remplacer la reponse, ou
+creer une nouvelle version si ce cas est retenu au plan.
+
 ## 5. Architecture proposee
 
 ### 5.1 Tables principales
@@ -232,6 +307,9 @@ Noms indicatifs, a affiner au plan d'implementation :
 | `questionnaire_invitations` | invitation personnelle d'un participant |
 | `questionnaire_submissions` | reponse soumise par une invitation |
 | `questionnaire_answers` | valeur d'une question pour une soumission |
+| `questionnaire_paper_batches` | lots d'impression ou de scans papier |
+| `questionnaire_paper_scans` | scan papier rattache a une invitation |
+| `questionnaire_ocr_drafts` | brouillon IA/OCR a valider avant sauvegarde |
 
 Tous les modeles tenant-scopes etendent `TenantModel`.
 
@@ -245,6 +323,7 @@ Association
 Operation
   └─ QuestionnaireCampaign
        ├─ QuestionnaireInvitation → Participant
+       │    └─ QuestionnairePaperScan
        └─ QuestionnaireSubmission
             └─ QuestionnaireAnswer → QuestionnaireQuestion
 ```
@@ -276,6 +355,10 @@ Services attendus :
 - cloture de campagne ;
 - agregation des resultats ;
 - generation de l'export Excel.
+- generation du PDF papier avec QR codes ;
+- upload et rattachement des scans ;
+- production d'un brouillon OCR/IA ;
+- validation humaine d'un brouillon OCR vers une soumission definitive.
 
 Les controllers et composants Livewire restent minces et deleguent la logique metier
 aux services.
@@ -296,6 +379,10 @@ email habituels et envoie un message aux participants selectionnes.
 Les relances automatiques ne sont pas obligatoires en V1, mais le modele d'invitation
 doit les permettre : statut, date d'envoi, date d'ouverture, date de soumission.
 
+Le QR code papier reutilise le meme principe que le lien email : un token long, non
+devinable, resolu cote serveur. Les supports de communication peuvent donc converger
+vers une meme URL de reponse.
+
 ## 7. Hors perimetre V1
 
 - questionnaires publics sans invitation ;
@@ -307,6 +394,9 @@ doit les permettre : statut, date d'envoi, date d'ouverture, date de soumission.
 - declenchements automatiques planifies ;
 - association automatique d'un modele a un type d'operation ;
 - edition collaborative ou versioning avance des modeles.
+- sauvegarde automatique de reponses OCR sans validation humaine ;
+- reconnaissance parfaite de l'ecriture manuscrite ;
+- traitement OCR en temps reel pendant l'atelier.
 
 Ces sujets restent compatibles avec le modele, mais ne doivent pas alourdir le premier
 lot.
@@ -320,9 +410,12 @@ lot.
 | Lot 3 — Parcours repondant | lien tokenise, intro, une question par page, validation obligatoire, remerciement | un participant peut repondre |
 | Lot 4 — Resultats & anonymat | stats simples, verbatims, consentement de contact | l'admin consulte les resultats sans identite par defaut |
 | Lot 5 — Export Excel | export `.xlsx` structure par campagne | analyse hors logiciel possible |
-| Lot 6 — Communication avancee | placeholders, relances manuelles, suivi d'envoi | integration plus fine avec les communications |
+| Lot 6 — Impression papier | PDF imprimable par campagne avec QR code individuel | un atelier peut distribuer des questionnaires papier |
+| Lot 7 — Scan & saisie assistee | upload scan, lecture QR, brouillon OCR/IA, assistant de validation | les reponses papier peuvent etre saisies avec controle humain |
+| Lot 8 — Communication avancee | placeholders, relances manuelles, suivi d'envoi | integration plus fine avec les communications |
 
-Les lots 1 a 5 constituent le minimum coherent pour le besoin primaire.
+Les lots 1 a 5 constituent le minimum coherent pour le besoin primaire numerique. Les
+lots 6 et 7 ajoutent le canal papier sans changer le modele de reponse final.
 
 ## 9. Tests & recette
 
@@ -346,6 +439,9 @@ Tests feature / Livewire :
 - affichage du message de fin ;
 - consultation des resultats ;
 - telechargement de l'export Excel.
+- generation d'un PDF papier contenant un QR code par invitation ;
+- upload d'un scan et rattachement via QR code ;
+- validation d'un brouillon OCR dans l'assistant de saisie.
 
 Recette manuelle :
 
@@ -355,7 +451,10 @@ Recette manuelle :
 4. soumettre une reponse anonyme ;
 5. soumettre une reponse avec consentement au contact ;
 6. verifier que seule la deuxieme expose l'identite ;
-7. exporter Excel et verifier les colonnes.
+7. exporter Excel et verifier les colonnes ;
+8. imprimer un questionnaire papier avec QR code ;
+9. scanner une feuille remplie ;
+10. valider la proposition OCR avant sauvegarde.
 
 ## 10. Risques & points d'attention
 
@@ -369,6 +468,13 @@ Recette manuelle :
   modifications de modele. Le plan devra trancher entre snapshot du modele a la creation
   de campagne ou verrouillage des questions apres envoi.
 - **Tokens** : les liens doivent etre longs, non devinables, expirables/cloturables.
+- **QR code papier** : il identifie techniquement l'invitation. L'anonymat reste donc
+  une politique d'affichage et d'export, pas une absence de lien technique.
+- **OCR manuscrit** : les erreurs sont probables. L'IA ne doit produire qu'un brouillon
+  relu et valide par un humain.
+- **Donnees sensibles dans les scans** : les fichiers papier numerises peuvent contenir
+  des verbatims identifiants. Leur stockage doit suivre les memes regles tenant et
+  d'acces que les autres documents sensibles.
 - **Multi-tenant** : toutes les requetes doivent rester fail-closed via `TenantModel`.
 
 ## 11. Questions a trancher au plan
@@ -381,4 +487,8 @@ Recette manuelle :
 - Les reponses partielles sont-elles conservees avant soumission finale ?
 - Une invitation peut-elle etre reouverte apres soumission, ou la reponse est-elle
   definitive ?
-
+- Le questionnaire papier doit-il etre un PDF par participant, un PDF groupe, ou les
+  deux ?
+- Le scan papier peut-il remplacer une reponse deja soumise en ligne ?
+- Quelle duree de conservation pour les scans originaux apres validation OCR ?
+- Quel fournisseur IA/OCR utiliser, et avec quelles garanties de confidentialite ?
