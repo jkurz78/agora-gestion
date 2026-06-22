@@ -89,6 +89,27 @@ it('affiche la barre de budget quand un budget existe', function () {
     Livewire::test(RapportCompteResultat::class)->assertSee('80 %');
 });
 
+it('barre budget recette au-dessus de l\'objectif → verte (et non rouge)', function () {
+    // Recette à 120 % de son budget → la barre doit être VERTE (plus que prévu = bien).
+    $catR = Categorie::factory()->recette()->create(['association_id' => $this->association->id]);
+    $scR = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $catR->id, 'nom' => 'Cotisations']);
+    BudgetLine::factory()->create(['association_id' => $this->association->id, 'sous_categorie_id' => $scR->id, 'exercice' => 2025, 'montant_prevu' => 1000.00]);
+    $r = Transaction::factory()->asRecette()->create(['association_id' => $this->association->id, 'date' => '2025-11-01', 'saisi_par' => $this->user->id]);
+    $r->lignes()->forceDelete();
+    TransactionLigne::factory()->create(['transaction_id' => $r->id, 'sous_categorie_id' => $scR->id, 'montant' => 1200.00]);
+
+    // Grosse dépense sans budget → résultat déficitaire (rouge) : le SEUL vert possible est la barre recette.
+    $catD = Categorie::factory()->depense()->create(['association_id' => $this->association->id]);
+    $scD = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $catD->id, 'nom' => 'Frais']);
+    $d = Transaction::factory()->asDepense()->create(['association_id' => $this->association->id, 'date' => '2025-11-01', 'saisi_par' => $this->user->id]);
+    $d->lignes()->forceDelete();
+    TransactionLigne::factory()->create(['transaction_id' => $d->id, 'sous_categorie_id' => $scD->id, 'montant' => 5000.00]);
+
+    Livewire::test(RapportCompteResultat::class)
+        ->assertSee('120 %')
+        ->assertSeeHtml('background:#2E7D32');
+});
+
 it("n'a pas de filtre opération", function () {
     Livewire::test(RapportCompteResultat::class)
         ->assertDontSeeHtml('selectedOperationIds')

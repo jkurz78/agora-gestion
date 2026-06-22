@@ -34,11 +34,11 @@
 
     @php
         // Helper : barre + % pour une ligne
-        $renderBar = function(?float $montantN, ?float $budget): string {
+        $renderBar = function(?float $montantN, ?float $budget, bool $isCharge): string {
             if ($budget === null || $budget <= 0 || $montantN === null) return '<span class="text-muted">&mdash;</span>';
             $pct     = $montantN / $budget * 100;
             $pctCap  = min($pct, 100);
-            $color   = $pct > 100 ? '#B5453A' : ($pct > 90 ? '#fd7e14' : '#2E7D32');
+            $color   = \App\Support\ComparaisonBudgetaire::couleurBarre($pct, $isCharge);
             return '<div class="budget-bar-track"><div class="budget-bar-fill" style="width:' . $pctCap . '%;background:' . $color . ';"></div></div>'
                  . '<div class="budget-label">' . number_format($pct, 0) . ' %</div>';
         };
@@ -146,7 +146,7 @@
                             <td class="text-end">{!! $fmt($cat['montant_n']) !!}</td>
                             <td class="text-end">{!! $fmt($cat['budget']) !!}</td>
                             <td class="text-end">{!! $renderEcart($cat['montant_n'], $cat['budget'], $section['isCharge']) !!}</td>
-                            <td class="text-center">{!! $renderBar($cat['montant_n'], $cat['budget']) !!}</td>
+                            <td class="text-center">{!! $renderBar($cat['montant_n'], $cat['budget'], $section['isCharge']) !!}</td>
                         </tr>
                         @foreach ($scVisibles as $sc)
                             <tr class="cr-sub">
@@ -156,7 +156,7 @@
                                 <td class="text-end">{!! $fmt($sc['montant_n']) !!}</td>
                                 <td class="text-end">{!! $fmt($sc['budget']) !!}</td>
                                 <td class="text-end">{!! $renderEcart($sc['montant_n'], $sc['budget'], $section['isCharge']) !!}</td>
-                                <td class="text-center">{!! $renderBar($sc['montant_n'], $sc['budget']) !!}</td>
+                                <td class="text-center">{!! $renderBar($sc['montant_n'], $sc['budget'], $section['isCharge']) !!}</td>
                             </tr>
                         @endforeach
                         @endif
