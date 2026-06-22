@@ -63,7 +63,7 @@
                     <tr class="cr-section-header">
                         <td style="width:20px;"></td>
                         <td></td>
-                        <td class="text-end" style="width:115px;font-weight:400;font-size:12px;opacity:.85;">{{ $labelN1 }}</td>
+                        @if($compareN1)<td class="text-end" style="width:115px;font-weight:400;font-size:12px;opacity:.85;">{{ $labelN1 }}</td>@endif
                         <td class="text-end" style="width:115px;font-weight:400;font-size:12px;opacity:.85;">{{ $labelN }}</td>
                         <td class="text-end" style="width:115px;font-weight:400;font-size:12px;opacity:.85;">Budget</td>
                         <td class="text-end" style="width:90px;font-weight:400;font-size:12px;opacity:.85;">&Eacute;cart</td>
@@ -87,7 +87,7 @@
                         <tr class="cr-sub">
                             <td></td>
                             <td style="padding-left:32px;">{{ $item['libelle'] }} <span class="text-muted">({{ $item['sous_categorie_nom'] }})</span></td>
-                            <td class="text-end cr-n1">{!! $extN1 ? number_format($extN1['montant_signe'], 2, ',', ' ').' &euro;' : '<span class="text-muted">&mdash;</span>' !!}</td>
+                            @if($compareN1)<td class="text-end cr-n1">{!! $extN1 ? number_format($extN1['montant_signe'], 2, ',', ' ').' &euro;' : '<span class="text-muted">&mdash;</span>' !!}</td>@endif
                             <td class="text-end">{!! $extN ? number_format($extN['montant_signe'], 2, ',', ' ').' &euro;' : '<span class="text-muted">&mdash;</span>' !!}</td>
                             <td class="text-end"><span class="text-muted">&mdash;</span></td>
                             <td class="text-end"><span class="text-muted">&mdash;</span></td>
@@ -96,7 +96,7 @@
                     @endforeach
                     <tr class="cr-total">
                         <td colspan="2">TOTAL EXTOURNES</td>
-                        <td class="text-end" style="color:#d0e4f7;">{!! $totalExtournesN1 != 0 ? number_format($totalExtournesN1, 2, ',', ' ').' &euro;' : '&mdash;' !!}</td>
+                        @if($compareN1)<td class="text-end" style="color:#d0e4f7;">{!! $totalExtournesN1 != 0 ? number_format($totalExtournesN1, 2, ',', ' ').' &euro;' : '&mdash;' !!}</td>@endif
                         <td class="text-end">{{ number_format($totalExtournes, 2, ',', ' ') }} &euro;</td>
                         <td class="text-end">&mdash;</td>
                         <td class="text-end">&mdash;</td>
@@ -118,7 +118,7 @@
                     <tr class="cr-section-header">
                         <td style="width:20px;"></td>
                         <td></td>
-                        <td class="text-end" style="width:115px;font-weight:400;font-size:12px;opacity:.85;">{{ $labelN1 }}</td>
+                        @if($compareN1)<td class="text-end" style="width:115px;font-weight:400;font-size:12px;opacity:.85;">{{ $labelN1 }}</td>@endif
                         <td class="text-end" style="width:115px;font-weight:400;font-size:12px;opacity:.85;">{{ $labelN }}</td>
                         <td class="text-end" style="width:115px;font-weight:400;font-size:12px;opacity:.85;">Budget</td>
                         <td class="text-end" style="width:90px;font-weight:400;font-size:12px;opacity:.85;">&Eacute;cart</td>
@@ -142,7 +142,7 @@
                         <tr class="cr-cat">
                             <td></td>
                             <td>{{ $cat['label'] }}</td>
-                            <td class="text-end cr-n1">{!! $fmt($cat['montant_n1']) !!}</td>
+                            @if($compareN1)<td class="text-end cr-n1">{!! $fmt($cat['montant_n1']) !!}</td>@endif
                             <td class="text-end">{!! $fmt($cat['montant_n']) !!}</td>
                             <td class="text-end">{!! $fmt($cat['budget']) !!}</td>
                             <td class="text-end">{!! $renderEcart($cat['montant_n'], $cat['budget'], $section['isCharge']) !!}</td>
@@ -152,7 +152,7 @@
                             <tr class="cr-sub">
                                 <td></td>
                                 <td style="padding-left:32px;">{{ $sc['label'] }}</td>
-                                <td class="text-end cr-n1">{!! $fmt($sc['montant_n1']) !!}</td>
+                                @if($compareN1)<td class="text-end cr-n1">{!! $fmt($sc['montant_n1']) !!}</td>@endif
                                 <td class="text-end">{!! $fmt($sc['montant_n']) !!}</td>
                                 <td class="text-end">{!! $fmt($sc['budget']) !!}</td>
                                 <td class="text-end">{!! $renderEcart($sc['montant_n'], $sc['budget'], $section['isCharge']) !!}</td>
@@ -165,7 +165,7 @@
                     {{-- Total --}}
                     <tr class="cr-total">
                         <td colspan="2">TOTAL {{ $section['label'] }}</td>
-                        <td class="text-end" style="color:#d0e4f7;">&mdash;</td>
+                        @if($compareN1)<td class="text-end" style="color:#d0e4f7;">&mdash;</td>@endif
                         <td class="text-end">{{ number_format($section['total'], 2, ',', ' ') }} &euro;</td>
                         <td class="text-end">&mdash;</td>
                         <td class="text-end">&mdash;</td>
@@ -186,7 +186,7 @@
                     <tr style="background:#5a7fa8;color:#fff;font-weight:700;font-size:14px;">
                         <td style="width:20px;padding:9px 12px;"></td>
                         <td style="padding:9px 12px;">RÉSULTAT BRUT</td>
-                        <td class="text-end" style="width:115px;padding:9px 12px;color:#d0e4f7;">{!! $resultatBrutN1 != 0 ? number_format($resultatBrutN1, 2, ',', ' ').' &euro;' : '&mdash;' !!}</td>
+                        @if($compareN1)<td class="text-end" style="width:115px;padding:9px 12px;color:#d0e4f7;">{!! $resultatBrutN1 != 0 ? number_format($resultatBrutN1, 2, ',', ' ').' &euro;' : '&mdash;' !!}</td>@endif
                         <td class="text-end" style="width:115px;padding:9px 12px;">{{ number_format($resultatBrut, 2, ',', ' ') }} &euro;</td>
                         <td style="width:115px;padding:9px 12px;"></td>
                         <td style="width:90px;padding:9px 12px;"></td>
@@ -206,7 +206,7 @@
                     <tr class="cr-section-header">
                         <td style="width:20px;"></td>
                         <td></td>
-                        <td class="text-end" style="width:115px;font-weight:400;font-size:12px;opacity:.85;">{{ $labelN1 }}</td>
+                        @if($compareN1)<td class="text-end" style="width:115px;font-weight:400;font-size:12px;opacity:.85;">{{ $labelN1 }}</td>@endif
                         <td class="text-end" style="width:115px;font-weight:400;font-size:12px;opacity:.85;">{{ $labelN }}</td>
                         <td class="text-end" style="width:115px;font-weight:400;font-size:12px;opacity:.85;">Budget</td>
                         <td class="text-end" style="width:90px;font-weight:400;font-size:12px;opacity:.85;">&Eacute;cart</td>
@@ -229,7 +229,7 @@
                         <tr class="cr-sub">
                             <td></td>
                             <td style="padding-left:32px;">{{ $item['libelle'] }} <span class="text-muted">({{ $item['sous_categorie_nom'] }})</span></td>
-                            <td class="text-end cr-n1">{!! $provN1 ? number_format($provN1['montant_signe'], 2, ',', ' ').' &euro;' : '<span class="text-muted">&mdash;</span>' !!}</td>
+                            @if($compareN1)<td class="text-end cr-n1">{!! $provN1 ? number_format($provN1['montant_signe'], 2, ',', ' ').' &euro;' : '<span class="text-muted">&mdash;</span>' !!}</td>@endif
                             <td class="text-end">{!! $provN ? number_format($provN['montant_signe'], 2, ',', ' ').' &euro;' : '<span class="text-muted">&mdash;</span>' !!}</td>
                             <td class="text-end"><span class="text-muted">&mdash;</span></td>
                             <td class="text-end"><span class="text-muted">&mdash;</span></td>
@@ -238,7 +238,7 @@
                     @endforeach
                     <tr class="cr-total">
                         <td colspan="2">TOTAL PROVISIONS</td>
-                        <td class="text-end" style="color:#d0e4f7;">{!! $totalProvisionsN1 != 0 ? number_format($totalProvisionsN1, 2, ',', ' ').' &euro;' : '&mdash;' !!}</td>
+                        @if($compareN1)<td class="text-end" style="color:#d0e4f7;">{!! $totalProvisionsN1 != 0 ? number_format($totalProvisionsN1, 2, ',', ' ').' &euro;' : '&mdash;' !!}</td>@endif
                         <td class="text-end">{{ number_format($totalProvisions, 2, ',', ' ') }} &euro;</td>
                         <td class="text-end">&mdash;</td>
                         <td class="text-end">&mdash;</td>
@@ -259,7 +259,7 @@
                     <tr style="background:{{ $resultatColor }};color:#fff;font-weight:700;font-size:14px;">
                         <td style="width:20px;padding:12px;"></td>
                         <td style="padding:12px;">RÉSULTAT AJUSTÉ</td>
-                        <td class="text-end" style="width:115px;padding:12px;color:rgba(255,255,255,.6);">{!! $resultatNetN1 != 0 ? number_format($resultatNetN1, 2, ',', ' ').' &euro;' : '&mdash;' !!}</td>
+                        @if($compareN1)<td class="text-end" style="width:115px;padding:12px;color:rgba(255,255,255,.6);">{!! $resultatNetN1 != 0 ? number_format($resultatNetN1, 2, ',', ' ').' &euro;' : '&mdash;' !!}</td>@endif
                         <td class="text-end" style="width:115px;padding:12px;">{{ number_format($resultatNet, 2, ',', ' ') }} &euro;</td>
                         <td style="width:115px;padding:12px;"></td>
                         <td style="width:90px;padding:12px;"></td>
@@ -280,7 +280,7 @@
                     <tr style="background:{{ $resultatColor }};color:#fff;font-weight:700;font-size:14px;">
                         <td style="width:20px;padding:12px;"></td>
                         <td style="padding:12px;">RÉSULTAT</td>
-                        <td class="text-end" style="width:115px;padding:12px;color:rgba(255,255,255,.6);">&mdash;</td>
+                        @if($compareN1)<td class="text-end" style="width:115px;padding:12px;color:rgba(255,255,255,.6);">&mdash;</td>@endif
                         <td class="text-end" style="width:115px;padding:12px;">{{ number_format($resultatNet, 2, ',', ' ') }} &euro;</td>
                         <td style="width:115px;padding:12px;"></td>
                         <td style="width:90px;padding:12px;"></td>

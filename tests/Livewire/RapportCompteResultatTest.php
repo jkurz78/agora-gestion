@@ -131,3 +131,17 @@ it('propage l\'état des toggles dans exportUrl', function () {
 
     expect($url)->toContain('n1=0')->toContain('budget=0');
 });
+
+it('masque la colonne N-1 quand compareN1 est false', function () {
+    $cat = Categorie::factory()->depense()->create(['association_id' => $this->association->id]);
+    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $cat->id, 'nom' => 'Frais']);
+    // Une dépense datée dans l'exercice N-1 (2024-2025) pour produire un montant_n1 distinct.
+    $d = Transaction::factory()->asDepense()->create(['association_id' => $this->association->id, 'date' => '2024-10-01', 'saisi_par' => $this->user->id]);
+    $d->lignes()->forceDelete();
+    TransactionLigne::factory()->create(['transaction_id' => $d->id, 'sous_categorie_id' => $sc->id, 'montant' => 777.00]);
+
+    Livewire::test(RapportCompteResultat::class)
+        ->assertSee('777,00')              // visible par défaut (colonne N-1 affichée)
+        ->set('compareN1', false)
+        ->assertDontSee('777,00');         // masquée
+});
