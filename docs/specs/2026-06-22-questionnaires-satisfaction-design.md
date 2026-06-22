@@ -267,6 +267,13 @@ se fait cote serveur apres verification du token.
 Apres un atelier, l'administrateur peut scanner les feuilles remplies et les deposer
 dans AgoraGestion.
 
+Deux canaux d'entree sont prevus :
+
+- **upload manuel** depuis l'ecran de suivi de la campagne, via un bouton "Ajouter une
+  reponse papier" ou "Ajouter un scan" ;
+- **reception par email** : l'administrateur envoie le scan en piece jointe a une
+  adresse technique AgoraGestion, qui cree une entree de traitement a partir du mail.
+
 Flux cible :
 
 1. upload d'un scan ou lot de scans ;
@@ -356,7 +363,9 @@ Services attendus :
 - agregation des resultats ;
 - generation de l'export Excel.
 - generation du PDF papier avec QR codes ;
-- upload et rattachement des scans ;
+- upload manuel des scans depuis le suivi de campagne ;
+- ingestion de scans recus par email avec piece jointe ;
+- rattachement des scans a une invitation via QR code ou identifiant court ;
 - production d'un brouillon OCR/IA ;
 - validation humaine d'un brouillon OCR vers une soumission definitive.
 
@@ -382,6 +391,11 @@ doit les permettre : statut, date d'envoi, date d'ouverture, date de soumission.
 Le QR code papier reutilise le meme principe que le lien email : un token long, non
 devinable, resolu cote serveur. Les supports de communication peuvent donc converger
 vers une meme URL de reponse.
+
+Pour le canal papier, le module communication peut aussi fournir une adresse de
+reception technique par association ou par instance. Un scan recu par email n'est pas
+une reponse : c'est une piece entrante a rattacher, analyser et valider dans
+l'assistant de saisie.
 
 ## 7. Hors perimetre V1
 
@@ -411,7 +425,7 @@ lot.
 | Lot 4 — Resultats & anonymat | stats simples, verbatims, consentement de contact | l'admin consulte les resultats sans identite par defaut |
 | Lot 5 — Export Excel | export `.xlsx` structure par campagne | analyse hors logiciel possible |
 | Lot 6 — Impression papier | PDF imprimable par campagne avec QR code individuel | un atelier peut distribuer des questionnaires papier |
-| Lot 7 — Scan & saisie assistee | upload scan, lecture QR, brouillon OCR/IA, assistant de validation | les reponses papier peuvent etre saisies avec controle humain |
+| Lot 7 — Scan & saisie assistee | upload manuel, reception email, lecture QR, brouillon OCR/IA, assistant de validation | les reponses papier peuvent etre saisies avec controle humain |
 | Lot 8 — Communication avancee | placeholders, relances manuelles, suivi d'envoi | integration plus fine avec les communications |
 
 Les lots 1 a 5 constituent le minimum coherent pour le besoin primaire numerique. Les
@@ -440,7 +454,8 @@ Tests feature / Livewire :
 - consultation des resultats ;
 - telechargement de l'export Excel.
 - generation d'un PDF papier contenant un QR code par invitation ;
-- upload d'un scan et rattachement via QR code ;
+- upload manuel d'un scan et rattachement via QR code ;
+- creation d'une entree de traitement depuis un email avec scan en piece jointe ;
 - validation d'un brouillon OCR dans l'assistant de saisie.
 
 Recette manuelle :
@@ -492,3 +507,5 @@ Recette manuelle :
 - Le scan papier peut-il remplacer une reponse deja soumise en ligne ?
 - Quelle duree de conservation pour les scans originaux apres validation OCR ?
 - Quel fournisseur IA/OCR utiliser, et avec quelles garanties de confidentialite ?
+- L'adresse email de reception des scans est-elle globale, par association, ou par
+  campagne ?
