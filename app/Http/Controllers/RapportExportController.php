@@ -98,7 +98,13 @@ final class RapportExportController extends Controller
         string $filename,
     ): StreamedResponse {
         $spreadsheet = match ($rapport) {
-            'compte-resultat' => $this->xlsxCompteResultat($rapportService, $exercice, $label),
+            'compte-resultat' => $this->xlsxCompteResultat(
+                $rapportService,
+                $exercice,
+                $label,
+                $request->boolean('n1', true),
+                $request->boolean('budget', true),
+            ),
             'operations' => $this->xlsxOperations($rapportService, $exercice, $request),
             'flux-tresorerie' => $this->xlsxFluxTresorerie($rapportService, $exercice),
             'analyse-financier' => $this->xlsxAnalyse('financier', $exercice, $exerciceService),
@@ -117,8 +123,13 @@ final class RapportExportController extends Controller
         ]);
     }
 
-    private function xlsxCompteResultat(RapportService $rapportService, int $exercice, string $label): Spreadsheet
-    {
+    private function xlsxCompteResultat(
+        RapportService $rapportService,
+        int $exercice,
+        string $label,
+        bool $compareN1 = true,
+        bool $compareBudget = true,
+    ): Spreadsheet {
         $data = $rapportService->compteDeResultat($exercice);
 
         $provisionService = app(ProvisionService::class);
@@ -290,6 +301,14 @@ final class RapportExportController extends Controller
 
         // Format number columns (covers all rows including provisions/extournes)
         $sheet->getStyle('D2:G'.$row)->getNumberFormat()->setFormatCode('#,##0.00');
+
+        // Colonnes : A Type | B Catégorie | C Sous-catégorie | D N-1 | E N | F Budget | G Écart
+        if (! $compareBudget) {
+            $sheet->removeColumn('F', 2); // Budget + Écart
+        }
+        if (! $compareN1) {
+            $sheet->removeColumn('D', 1); // N-1
+        }
 
         return $spreadsheet;
     }
