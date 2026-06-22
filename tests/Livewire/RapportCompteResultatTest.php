@@ -115,3 +115,19 @@ it("n'a pas de filtre opération", function () {
         ->assertDontSeeHtml('selectedOperationIds')
         ->assertOk();
 });
+
+it('a les deux toggles ON par défaut', function () {
+    Livewire::test(RapportCompteResultat::class)
+        ->assertSet('compareN1', true)
+        ->assertSet('compareBudget', true);
+});
+
+it('propage l\'état des toggles dans exportUrl', function () {
+    $url = Livewire::test(RapportCompteResultat::class)
+        ->set('compareN1', false)
+        ->set('compareBudget', false)
+        ->instance()
+        ->exportUrl('xlsx');
+
+    expect($url)->toContain('n1=0')->toContain('budget=0');
+});
