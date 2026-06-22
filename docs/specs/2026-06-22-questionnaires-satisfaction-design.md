@@ -6,7 +6,9 @@
 
 **Date :** 2026-06-22
 **Branche cible :** `main`
-**Statut :** en attente de validation utilisateur
+**Statut :** brainstorming — **superseded** par la spec relue
+[2026-06-22-questionnaires-satisfaction-spec.md](2026-06-22-questionnaires-satisfaction-spec.md)
+(les questions ouvertes du §11 y sont tranchées). Ce document reste la trace du design initial.
 
 ---
 
