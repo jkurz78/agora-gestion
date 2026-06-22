@@ -19,6 +19,71 @@ beforeEach(function () {
     ]);
 });
 
+it('affiche la raison sociale d\'un tiers entreprise sans nom ni prénom', function () {
+    $entreprise = Tiers::factory()->entreprise()->create([
+        'entreprise' => 'EPSILON MELIA',
+        'nom' => null,
+        'prenom' => null,
+    ]);
+    Transaction::factory()->asRecette()->create([
+        'compte_id' => $this->compte->id,
+        'date' => '2025-10-01',
+        'tiers_id' => $entreprise->id,
+        'saisi_par' => $this->user->id,
+    ]);
+
+    $result = $this->service->paginate(
+        compte: $this->compte, dateDebut: null, dateFin: null, searchTiers: null,
+        sortColumn: 'date', sortDirection: 'asc', perPage: 15, page: 1,
+    );
+
+    $row = collect($result['paginator']->items())->firstWhere('source_type', 'recette');
+    expect($row->tiers)->toBe('EPSILON MELIA');
+});
+
+it('combine raison sociale et contact pour une entreprise avec personne de contact', function () {
+    $entreprise = Tiers::factory()->entreprise()->create([
+        'entreprise' => 'EPONA',
+        'nom' => 'Kerecki',
+        'prenom' => 'Agnes',
+    ]);
+    Transaction::factory()->asRecette()->create([
+        'compte_id' => $this->compte->id,
+        'date' => '2025-10-01',
+        'tiers_id' => $entreprise->id,
+        'saisi_par' => $this->user->id,
+    ]);
+
+    $result = $this->service->paginate(
+        compte: $this->compte, dateDebut: null, dateFin: null, searchTiers: null,
+        sortColumn: 'date', sortDirection: 'asc', perPage: 15, page: 1,
+    );
+
+    $row = collect($result['paginator']->items())->firstWhere('source_type', 'recette');
+    expect($row->tiers)->toBe('EPONA (Agnes KERECKI)');
+});
+
+it('retrouve un tiers entreprise par sa raison sociale dans la recherche', function () {
+    $entreprise = Tiers::factory()->entreprise()->create([
+        'entreprise' => 'EPSILON MELIA',
+        'nom' => null,
+        'prenom' => null,
+    ]);
+    Transaction::factory()->asRecette()->create([
+        'compte_id' => $this->compte->id,
+        'date' => '2025-10-01',
+        'tiers_id' => $entreprise->id,
+        'saisi_par' => $this->user->id,
+    ]);
+
+    $result = $this->service->paginate(
+        compte: $this->compte, dateDebut: null, dateFin: null, searchTiers: 'EPSILON',
+        sortColumn: 'date', sortDirection: 'asc', perPage: 15, page: 1,
+    );
+
+    expect($result['paginator']->total())->toBe(1);
+});
+
 it('retourne une recette avec montant positif', function () {
     Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
@@ -95,7 +160,7 @@ it('retourne une recette (don) avec le nom du tiers', function () {
     expect($recette)->not->toBeNull();
     expect((float) $recette->montant)->toBe(50.00);
     expect(trim($recette->tiers))->toContain('Marie');
-    expect(trim($recette->tiers))->toContain('Dupont');
+    expect(trim($recette->tiers))->toContain('DUPONT');
 });
 
 it('un virement depuis compte A vers B apparaît sur A comme virement_sortant négatif, tiers = nom de B', function () {
@@ -224,7 +289,7 @@ it('filtre par tiers : seules les transactions correspondantes apparaissent', fu
 
     expect($result['paginator']->total())->toBe(1);
     $item = collect($result['paginator']->items())->first();
-    expect($item->tiers)->toBe('Association Tartempion');
+    expect($item->tiers)->toBe('ASSOCIATION TARTEMPION');
 });
 
 it('les recettes soft-deleted n\'apparaissent pas', function () {

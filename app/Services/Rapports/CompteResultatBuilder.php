@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Rapports;
 
 use App\Models\Operation;
+use App\Models\Tiers;
 use App\Tenant\TenantContext;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
@@ -1143,10 +1144,12 @@ final class CompteResultatBuilder
         }
         if ($parTiers) {
             $selects[] = 't.id as tiers_id';
-            $selects[] = DB::raw("COALESCE(NULLIF(TRIM(CONCAT_WS(' ', t.prenom, t.nom)), ''), '—') as tiers_label");
+            $selects[] = DB::raw('COALESCE(NULLIF('.Tiers::sqlRaisonSociale('t').", ''), '—') as tiers_label");
             $groupBy[] = 't.id';
             $groupBy[] = 't.prenom';
             $groupBy[] = 't.nom';
+            $groupBy[] = 't.type';
+            $groupBy[] = 't.entreprise';
         }
         if ($parOperations) {
             $selects[] = 'ep.operation_id';
@@ -1189,10 +1192,12 @@ final class CompteResultatBuilder
         }
         if ($parTiers) {
             $selects[] = 't.id as tiers_id';
-            $selects[] = DB::raw("COALESCE(NULLIF(TRIM(CONCAT_WS(' ', t.prenom, t.nom)), ''), '—') as tiers_label");
+            $selects[] = DB::raw('COALESCE(NULLIF('.Tiers::sqlRaisonSociale('t').", ''), '—') as tiers_label");
             $groupBy[] = 't.id';
             $groupBy[] = 't.prenom';
             $groupBy[] = 't.nom';
+            $groupBy[] = 't.type';
+            $groupBy[] = 't.entreprise';
         }
         if ($parOperations) {
             $selects[] = 'p.operation_id';

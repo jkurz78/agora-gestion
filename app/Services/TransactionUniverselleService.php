@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Enums\UsageComptable;
 use App\Models\CompteBancaire;
+use App\Models\Tiers;
 use App\Tenant\TenantContext;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Query\Builder;
@@ -170,7 +171,7 @@ final class TransactionUniverselleService
                 DATE(tx.date) as date,
                 tx.numero_piece,
                 tx.reference,
-                TRIM(CONCAT(COALESCE(t.prenom,''), ' ', COALESCE(t.nom,''))) as tiers,
+                ".Tiers::sqlLibelleListe('t')." as tiers,
                 t.type as tiers_type,
                 tx.tiers_id,
                 tx.libelle,
@@ -234,7 +235,7 @@ final class TransactionUniverselleService
                 DATE(tx.date) as date,
                 tx.numero_piece,
                 tx.reference,
-                TRIM(CONCAT(COALESCE(t.prenom,''), ' ', COALESCE(t.nom,''))) as tiers,
+                ".Tiers::sqlLibelleListe('t')." as tiers,
                 t.type as tiers_type,
                 tx.tiers_id,
                 tx.libelle,

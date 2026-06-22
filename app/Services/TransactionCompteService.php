@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\CompteBancaire;
+use App\Models\Tiers;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
@@ -81,7 +82,7 @@ final class TransactionCompteService
                 tx.type as source_type,
                 tx.date,
                 CASE WHEN tx.type = 'depense' THEN 'Dépense' ELSE 'Recette' END as type_label,
-                TRIM(CONCAT(COALESCE(t.prenom,''), ' ', COALESCE(t.nom,''))) as tiers,
+                ".Tiers::sqlLibelleListe('t')." as tiers,
                 t.type as tiers_type,
                 tx.libelle,
                 tx.reference,
@@ -96,7 +97,7 @@ final class TransactionCompteService
             ->when($dateDebut, fn ($q) => $q->where('tx.date', '>=', $dateDebut))
             ->when($dateFin, fn ($q) => $q->where('tx.date', '<=', $dateFin))
             ->when($tiersLike, fn ($q) => $q->whereRaw(
-                "TRIM(CONCAT(COALESCE(t.prenom,''), ' ', COALESCE(t.nom,''))) LIKE ?", [$tiersLike]
+                Tiers::sqlLibelleListe('t').' LIKE ?', [$tiersLike]
             ));
 
         $virementsSource = DB::table('virements_internes as vi')

@@ -110,6 +110,59 @@ final class Tiers extends TenantModel implements AuthenticatableContract
     }
 
     /**
+     * Fragment SQL du libellé d'affichage d'un tiers dans les LISTES (cellule dense).
+     *
+     * Reproduit en SQL la logique d'affichage, avec une différence assumée vs displayName() :
+     * pour une entreprise AVEC personne de contact, on combine « Raison sociale (Prénom NOM) ».
+     * Le nom de famille est mis en majuscule (cohérence avec l'accesseur getNomAttribute).
+     *
+     * Réservé aux listes (TransactionUniverselleService, TransactionCompteService,
+     * CompteResultatBuilder par tiers). Les DOCUMENTS (facture, devis) utilisent
+     * displayName() + displayContact() sur deux lignes — ne pas utiliser ce fragment là.
+     *
+     * @param  string  $alias  Alias SQL de la table tiers dans la requête (ex. 't').
+     */
+    public static function sqlLibelleListe(string $alias = 't'): string
+    {
+        $contact = "TRIM(CONCAT(COALESCE({$alias}.prenom,''), ' ', UPPER(COALESCE({$alias}.nom,''))))";
+
+        return "CASE
+            WHEN {$alias}.type = 'entreprise' THEN
+                CASE
+                    WHEN COALESCE({$alias}.entreprise,'') <> '' AND {$contact} <> ''
+                        THEN CONCAT({$alias}.entreprise, ' (', {$contact}, ')')
+                    WHEN COALESCE({$alias}.entreprise,'') <> ''
+                        THEN {$alias}.entreprise
+                    ELSE {$contact}
+                END
+            ELSE {$contact}
+        END";
+    }
+
+    /**
+     * Fragment SQL de la « raison sociale » / nom principal d'un tiers (SANS contact combiné).
+     *
+     * Équivalent SQL de l'affichage primaire (cf. displayName et le chemin réalisé du
+     * Compte de résultat par tiers) : entreprise → raison sociale (ou UPPER(nom) en repli) ;
+     * particulier → « Prénom NOM ». Nom de famille en majuscule (cohérence accesseur).
+     *
+     * À distinguer de sqlLibelleListe() qui, pour les LISTES, combine « Raison sociale (Prénom NOM) ».
+     * À utiliser là où le libellé doit rester le nom principal (ex. regroupement par tiers d'un état).
+     *
+     * @param  string  $alias  Alias SQL de la table tiers (ex. 't').
+     */
+    public static function sqlRaisonSociale(string $alias = 't'): string
+    {
+        $contact = "TRIM(CONCAT(COALESCE({$alias}.prenom,''), ' ', UPPER(COALESCE({$alias}.nom,''))))";
+
+        return "CASE
+            WHEN {$alias}.type = 'entreprise'
+                THEN COALESCE(NULLIF({$alias}.entreprise, ''), UPPER(COALESCE({$alias}.nom,'')))
+            ELSE {$contact}
+        END";
+    }
+
+    /**
      * Return disambiguation suffixes for a collection of tiers.
      * Only homonymes get a non-empty suffix.
      *

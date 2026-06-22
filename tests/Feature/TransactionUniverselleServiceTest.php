@@ -91,6 +91,62 @@ it('exclut les virements quand tiersId est fourni', function () {
     expect($result['paginator']->total())->toBe(0);
 });
 
+it('affiche la raison sociale d\'un tiers entreprise sans nom ni prénom', function () {
+    $entreprise = Tiers::factory()->entreprise()->create([
+        'entreprise' => 'EPSILON MELIA',
+        'nom' => null,
+        'prenom' => null,
+    ]);
+
+    Transaction::factory()->asRecette()->create([
+        'compte_id' => $this->compte->id,
+        'date' => '2025-01-10',
+        'tiers_id' => $entreprise->id,
+    ]);
+
+    $result = $this->svc->paginate(null, $entreprise->id, ['recette'], null, null, null, null, null, null, null, null);
+
+    expect($result['paginator']->total())->toBe(1);
+    expect($result['paginator']->items()[0]->tiers)->toBe('EPSILON MELIA');
+});
+
+it('combine raison sociale et contact pour une entreprise avec personne de contact', function () {
+    $entreprise = Tiers::factory()->entreprise()->create([
+        'entreprise' => 'EPONA',
+        'nom' => 'Kerecki',
+        'prenom' => 'Agnes',
+    ]);
+
+    Transaction::factory()->asDepense()->create([
+        'compte_id' => $this->compte->id,
+        'date' => '2025-01-10',
+        'tiers_id' => $entreprise->id,
+    ]);
+
+    $result = $this->svc->paginate(null, $entreprise->id, ['depense'], null, null, null, null, null, null, null, null);
+
+    expect($result['paginator']->items()[0]->tiers)->toBe('EPONA (Agnes KERECKI)');
+});
+
+it('affiche le contact prénom+nom pour un tiers particulier', function () {
+    $particulier = Tiers::factory()->create([
+        'type' => 'particulier',
+        'nom' => 'Durand',
+        'prenom' => 'Marie',
+        'entreprise' => null,
+    ]);
+
+    Transaction::factory()->asDepense()->create([
+        'compte_id' => $this->compte->id,
+        'date' => '2025-01-10',
+        'tiers_id' => $particulier->id,
+    ]);
+
+    $result = $this->svc->paginate(null, $particulier->id, ['depense'], null, null, null, null, null, null, null, null);
+
+    expect($result['paginator']->items()[0]->tiers)->toBe('Marie DURAND');
+});
+
 it('filtre par modePaiement', function () {
     Transaction::factory()->asDepense()->create([
         'compte_id' => $this->compte->id,
