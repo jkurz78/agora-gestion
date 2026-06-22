@@ -152,6 +152,7 @@ test('niveau 1: opérations clôturées affichées en opacité réduite', functi
     $op = Operation::factory()->create([
         'nom' => 'Op Clôturée',
         'statut' => StatutOperation::Cloturee,
+        'date_debut' => now(),
         'association_id' => $this->association->id,
     ]);
 

@@ -28,6 +28,13 @@ return [
         'key' => env('RESEND_KEY'),
     ],
 
+    'anthropic' => [
+        // Modèle utilisé pour l'OCR des factures fournisseur (analyse vision).
+        // Pilotable par env pour suivre les retraits de modèles Anthropic sans
+        // redéploiement (cf. retrait de claude-sonnet-4-20250514 le 15/06/2026).
+        'invoice_ocr_model' => env('INVOICE_OCR_MODEL', 'claude-sonnet-4-6'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
