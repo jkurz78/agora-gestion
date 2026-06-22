@@ -1116,7 +1116,7 @@ final class RapportExportController extends Controller
         $subtitle = 'Exercice '.$label;
 
         $viewData = match ($rapport) {
-            'compte-resultat' => $this->pdfCompteResultatData($rapportService, $exercice, $label),
+            'compte-resultat' => $this->pdfCompteResultatData($rapportService, $exercice, $label, $request),
             'operations' => $this->pdfOperationsData($rapportService, $exercice, $request),
             'flux-tresorerie' => $this->pdfFluxTresorerieData($rapportService, $exercice),
         };
@@ -1149,7 +1149,7 @@ final class RapportExportController extends Controller
         return $pdf->stream($filename);
     }
 
-    private function pdfCompteResultatData(RapportService $rapportService, int $exercice, string $label): array
+    private function pdfCompteResultatData(RapportService $rapportService, int $exercice, string $label, Request $request): array
     {
         $data = $rapportService->compteDeResultat($exercice);
         $totalChargesN = collect($data['charges'])->sum('montant_n');
@@ -1195,6 +1195,8 @@ final class RapportExportController extends Controller
             'resultatBrutN1' => $resultatBrutN1,
             'resultatNet' => $resultatNet,
             'resultatNetN1' => $resultatNetN1,
+            'compareN1' => $request->boolean('n1', true),
+            'compareBudget' => $request->boolean('budget', true),
         ];
     }
 

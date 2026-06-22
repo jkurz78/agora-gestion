@@ -50,3 +50,27 @@ it('XLSX : n1=0 retire la colonne N-1', function () {
     $response->assertOk();
     expect(headerCellsXlsx($response))->not->toContain($labelN1);
 });
+
+it('PDF : la route répond 200 avec les toggles', function () {
+    $this->get(route('rapports.export', ['rapport' => 'compte-resultat', 'format' => 'pdf', 'exercice' => 2025, 'n1' => '0', 'budget' => '0']))
+        ->assertOk();
+});
+
+it('PDF : la vue omet N-1 et budget quand les flags sont false', function () {
+    $html = view('pdf.rapport-compte-resultat', [
+        'charges' => [], 'produits' => [],
+        'labelN' => '2025-2026', 'labelN1' => '2024-2025',
+        'totalChargesN' => 0.0, 'totalProduitsN' => 0.0, 'totalChargesN1' => 0.0, 'totalProduitsN1' => 0.0,
+        'provisions' => collect(), 'provisionsN1' => collect(), 'extournes' => collect(), 'extournesN1' => collect(),
+        'totalProvisions' => 0.0, 'totalProvisionsN1' => 0.0, 'totalExtournes' => 0.0, 'totalExtournesN1' => 0.0,
+        'resultatBrut' => 0.0, 'resultatBrutN1' => 0.0,
+        'resultatNet' => 0.0, 'resultatNetN1' => 0.0,
+        'title' => 'Compte de résultat', 'subtitle' => 'Exercice 2025-2026',
+        'association' => null, 'headerLogoBase64' => null, 'headerLogoMime' => null,
+        'appLogoBase64' => null, 'footerLogoBase64' => null, 'footerLogoMime' => null,
+        'compareN1' => false, 'compareBudget' => false,
+    ])->render();
+
+    expect($html)->not->toContain('2024-2025')   // en-tête N-1
+        ->not->toContain('Budget');
+});
