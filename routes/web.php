@@ -436,6 +436,18 @@ Route::middleware(['auth', 'super-admin'])
             ->name('support.exit');
     });
 
+// ── Questionnaire public (sans auth ; le token hashé porte le contexte tenant) ──
+Route::prefix('q')->middleware('throttle:30,1')->group(function (): void {
+    Route::get('/{token}/consentement', [\App\Http\Controllers\QuestionnaireRepondantController::class, 'consentement'])
+        ->name('questionnaire.consentement');
+    Route::get('/{token}/merci', [\App\Http\Controllers\QuestionnaireRepondantController::class, 'merci'])
+        ->name('questionnaire.merci');
+    Route::get('/{token}', [\App\Http\Controllers\QuestionnaireRepondantController::class, 'show'])
+        ->name('questionnaire.show');
+    Route::post('/{token}', [\App\Http\Controllers\QuestionnaireRepondantController::class, 'store'])
+        ->name('questionnaire.store');
+});
+
 // ── Newsletter public (no auth, no tenant middleware — token embeds tenant context) ──
 Route::get('/newsletter/confirm/{token}', [NewsletterSubscriptionController::class, 'confirm'])
     ->middleware('throttle:30,1')
