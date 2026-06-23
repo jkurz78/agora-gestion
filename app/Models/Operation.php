@@ -80,4 +80,9 @@ final class Operation extends TenantModel
     {
         return $this->hasMany(EmailLog::class);
     }
+
+    public function questionnaireCampaigns(): HasMany
+    {
+        return $this->hasMany(QuestionnaireCampaign::class);
+    }
 }
