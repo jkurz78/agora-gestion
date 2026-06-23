@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\StatutCampagne;
 use App\Enums\StatutInvitation;
 use App\Enums\TypeQuestion;
+use App\Models\Association;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\QuestionnaireCampaign;
@@ -77,4 +78,24 @@ it('affiche déjà répondu si l invitation est soumise', function (): void {
     TenantContext::clear();
 
     $this->get("/q/{$clair}")->assertSee('déjà', false);
+});
+
+it('résout le tenant de l invitation même si un autre tenant est déjà booté', function (): void {
+    [$clair, $invitation] = makeOuverteInvitation();
+    // Capturés tant que le tenant de l'invitation est le contexte courant.
+    $invitationAssoId = (int) $invitation->association_id;
+    $titre = $invitation->campaign->titre_affiche;
+
+    // Un AUTRE tenant est le contexte courant au moment de la requête publique.
+    $autre = Association::factory()->create();
+    TenantContext::boot($autre);
+
+    // La résolution par hash (withoutGlobalScope + boot) sert l'association de
+    // l'invitation, jamais celle qui était bootée — isolation fail-closed publique.
+    $this->get("/q/{$clair}")
+        ->assertOk()
+        ->assertSee($titre, false);
+
+    expect((int) TenantContext::currentId())->toBe($invitationAssoId);
+    expect($invitationAssoId)->not->toBe((int) $autre->id);
 });
