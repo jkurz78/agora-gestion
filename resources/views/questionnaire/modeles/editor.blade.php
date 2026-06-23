@@ -1,7 +1,5 @@
-@extends('layouts.app')
+<x-app-layout>
+    <x-slot:title>{{ $template->titre_interne }}</x-slot:title>
 
-@section('content')
-    <div class="container-fluid py-3">
-        @livewire('questionnaire.modele-editor', ['template' => $template])
-    </div>
-@endsection
+    <livewire:questionnaire.modele-editor :template="$template" />
+</x-app-layout>

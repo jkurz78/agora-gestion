@@ -1,7 +1,5 @@
-@extends('layouts.app')
+<x-app-layout>
+    <x-slot:title>Modèles de questionnaires</x-slot:title>
 
-@section('content')
-    <div class="container-fluid py-3">
-        @livewire('questionnaire.modele-list')
-    </div>
-@endsection
+    <livewire:questionnaire.modele-list />
+</x-app-layout>
