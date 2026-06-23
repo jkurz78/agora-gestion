@@ -52,3 +52,18 @@ it('réordonne les questions', function (): void {
     expect($q2->fresh()->ordre)->toBe(1);
     expect($q1->fresh()->ordre)->toBe(2);
 });
+
+it('enregistre les messages intro/remerciement assainis', function (): void {
+    $t = QuestionnaireTemplate::factory()->create();
+
+    Livewire::test(ModeleEditor::class, ['template' => $t])
+        ->set('intro', '<p>Bonjour {prenom}</p><script>alert(1)</script>')
+        ->set('remerciement', '<p>Merci !</p>')
+        ->call('enregistrerMessages')
+        ->assertHasNoErrors();
+
+    $t->refresh();
+    expect($t->intro)->toContain('Bonjour {prenom}');
+    expect($t->intro)->not->toContain('<script>');
+    expect($t->remerciement)->toContain('Merci');
+});

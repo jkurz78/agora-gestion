@@ -18,10 +18,6 @@ final class ModeleList extends Component
 
     public string $titre_affiche = '';
 
-    public string $intro = '';
-
-    public string $remerciement = '';
-
     public function render(): View
     {
         return view('livewire.questionnaire.modele-list', [
@@ -33,7 +29,7 @@ final class ModeleList extends Component
 
     public function openCreate(): void
     {
-        $this->reset(['editingId', 'titre_interne', 'titre_affiche', 'intro', 'remerciement']);
+        $this->reset(['editingId', 'titre_interne', 'titre_affiche']);
         $this->showModal = true;
     }
 
@@ -43,8 +39,6 @@ final class ModeleList extends Component
         $this->editingId = (int) $m->id;
         $this->titre_interne = $m->titre_interne;
         $this->titre_affiche = $m->titre_affiche;
-        $this->intro = $m->intro ?? '';
-        $this->remerciement = $m->remerciement ?? '';
         $this->showModal = true;
     }
 
@@ -53,8 +47,6 @@ final class ModeleList extends Component
         $data = $this->validate([
             'titre_interne' => 'required|string|max:150',
             'titre_affiche' => 'required|string|max:150',
-            'intro' => 'nullable|string',
-            'remerciement' => 'nullable|string',
         ]);
 
         if ($this->editingId !== null) {

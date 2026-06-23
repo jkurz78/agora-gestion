@@ -59,14 +59,6 @@
                             <input type="text" class="form-control" wire:model="titre_affiche">
                             @error('titre_affiche') <div class="text-danger small">{{ $message }}</div> @enderror
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label">Introduction</label>
-                            <textarea class="form-control" rows="2" wire:model="intro"></textarea>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Message de remerciement</label>
-                            <textarea class="form-control" rows="2" wire:model="remerciement"></textarea>
-                        </div>
                     </div>
                     <div class="modal-footer">
                         <button class="btn btn-secondary" wire:click="$set('showModal', false)">Annuler</button>
