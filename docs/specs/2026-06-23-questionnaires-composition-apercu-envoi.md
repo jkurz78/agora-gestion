@@ -106,8 +106,9 @@ déjà sur la page).
   - **objet** (input) + **corps** (TinyMCE enrichi) + bouton « Insérer une variable » (le jeu inclut
     `{lien_questionnaire}`),
   - **sélection des participants** (défaut = tous ; pour une relance = non soumis),
-  - un **corps par défaut** pré-rempli (gabarit minimal seedé). La sauvegarde/réutilisation de
-    gabarits d'email questionnaire est **hors périmètre** de ce slice (nicety ultérieure).
+  - un **corps par défaut** pré-rempli (gabarit minimal seedé). **DETTE TECH actée** : la
+    sauvegarde/réutilisation de gabarits d'email questionnaire est **hors périmètre** de ce slice
+    (à reprendre via `EmailTemplate`/`MessageTemplate` quand le besoin se confirme).
 
 ### 5.2 Envoi
 - `app/Services/Questionnaire/QuestionnaireEnvoiService.php` :
