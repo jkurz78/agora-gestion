@@ -31,6 +31,11 @@ final class ModeleEditor extends Component
     /** Une option par ligne (saisie brute admin) — pour les choix uniques. */
     public string $optionsBrut = '';
 
+    /** Commentaire optionnel (satisfaction uniquement). */
+    public bool $commentaire = false;
+
+    public string $commentaireLibelle = '';
+
     public ?int $editingQuestionId = null;
 
     public function mount(QuestionnaireTemplate $template): void
@@ -78,7 +83,7 @@ final class ModeleEditor extends Component
             'config' => $this->buildConfig($type),
         ]);
 
-        $this->reset(['libelle', 'aide', 'obligatoire', 'optionsBrut']);
+        $this->reset(['libelle', 'aide', 'obligatoire', 'optionsBrut', 'commentaire', 'commentaireLibelle']);
         $this->type = 'texte_court';
     }
 
@@ -116,6 +121,13 @@ final class ModeleEditor extends Component
     /** @return array<string, mixed>|null */
     private function buildConfig(TypeQuestion $type): ?array
     {
+        if ($type === TypeQuestion::Satisfaction && $this->commentaire) {
+            return [
+                'commentaire' => true,
+                'commentaire_libelle' => $this->commentaireLibelle !== '' ? $this->commentaireLibelle : 'Un commentaire ? (optionnel)',
+            ];
+        }
+
         if (! $type->aDesOptions()) {
             return null;
         }

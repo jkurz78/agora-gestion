@@ -53,6 +53,21 @@ it('réordonne les questions', function (): void {
     expect($q1->fresh()->ordre)->toBe(2);
 });
 
+it('active un commentaire optionnel sur une question satisfaction', function (): void {
+    $t = \App\Models\QuestionnaireTemplate::factory()->create();
+
+    \Livewire\Livewire::test(\App\Livewire\Questionnaire\ModeleEditor::class, ['template' => $t])
+        ->set('libelle', 'Note globale')
+        ->set('type', \App\Enums\TypeQuestion::Satisfaction->value)
+        ->set('commentaire', true)
+        ->set('commentaireLibelle', 'Pourquoi cette note ?')
+        ->call('ajouterQuestion');
+
+    $q = $t->questions()->first();
+    expect($q->config['commentaire'])->toBeTrue();
+    expect($q->config['commentaire_libelle'])->toBe('Pourquoi cette note ?');
+});
+
 it('enregistre les messages intro/remerciement assainis', function (): void {
     $t = QuestionnaireTemplate::factory()->create();
 

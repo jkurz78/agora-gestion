@@ -98,6 +98,19 @@
                         <textarea class="form-control" rows="3" wire:model="optionsBrut"></textarea>
                     </div>
                 @endif
+                @if ($type === 'satisfaction')
+                    <div class="col-md-12 d-flex align-items-center gap-3 flex-wrap">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" wire:model.live="commentaire" id="commentaire_toggle">
+                            <label class="form-check-label" for="commentaire_toggle">Commentaire optionnel</label>
+                        </div>
+                        @if ($commentaire)
+                            <input type="text" class="form-control flex-grow-1"
+                                   placeholder="Un commentaire ? (optionnel)"
+                                   wire:model="commentaireLibelle">
+                        @endif
+                    </div>
+                @endif
                 <div class="col-12">
                     <button class="btn btn-primary" wire:click="ajouterQuestion">Ajouter</button>
                 </div>
