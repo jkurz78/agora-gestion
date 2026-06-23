@@ -6,9 +6,11 @@ namespace App\Livewire\Questionnaire;
 
 use App\Models\Operation;
 use App\Models\QuestionnaireCampaign;
+use App\Models\QuestionnaireInvitation;
 use App\Models\QuestionnaireTemplate;
 use App\Services\Questionnaire\QuestionnaireCampaignService;
 use App\Services\Questionnaire\QuestionnaireInvitationService;
+use App\Services\Questionnaire\QuestionnaireReponseService;
 use Illuminate\View\View;
 use Livewire\Component;
 
@@ -38,6 +40,7 @@ final class OperationQuestionnaires extends Component
             // sont ajoutés au lot 4 (withCount('submissions as soumises_count') à ce moment-là).
             'campagnes' => $this->operation->questionnaireCampaigns()
                 ->withCount('invitations')
+                ->with(['invitations.participant.tiers'])
                 ->latest()
                 ->get(),
             'modeles' => QuestionnaireTemplate::where('actif', true)->orderBy('titre_interne')->get(),
@@ -67,6 +70,16 @@ final class OperationQuestionnaires extends Component
     public function cloturer(int $campagneId, QuestionnaireCampaignService $campagnes): void
     {
         $campagnes->cloturer($this->campagne($campagneId));
+    }
+
+    public function rouvrirInvitation(int $invitationId, QuestionnaireReponseService $reponses): void
+    {
+        $invitation = QuestionnaireInvitation::whereHas(
+            'campaign',
+            fn ($q) => $q->where('operation_id', $this->operation->id),
+        )->findOrFail($invitationId);
+
+        $reponses->rouvrir($invitation);
     }
 
     private function campagne(int $id): QuestionnaireCampaign

@@ -46,6 +46,21 @@
                         @endif
                     </td>
                 </tr>
+                @foreach ($c->invitations->where('statut', \App\Enums\StatutInvitation::Soumis) as $inv)
+                    <tr class="table-light small">
+                        <td colspan="3" class="ps-4 text-muted">
+                            {{ $inv->participant?->tiers?->displayName() ?? '—' }}
+                            <span class="badge bg-success ms-1">Soumis</span>
+                        </td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-secondary"
+                                    wire:click="rouvrirInvitation({{ $inv->id }})"
+                                    wire:confirm="Rouvrir cette réponse ?">
+                                Rouvrir
+                            </button>
+                        </td>
+                    </tr>
+                @endforeach
             @empty
                 <tr><td colspan="4" class="text-muted text-center py-4">Aucune campagne.</td></tr>
             @endforelse
