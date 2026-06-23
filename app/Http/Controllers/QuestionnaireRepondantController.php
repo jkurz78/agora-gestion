@@ -84,12 +84,13 @@ final class QuestionnaireRepondantController extends Controller
             abort_if($question === null, 404);
 
             $valeur = $request->input("q_{$question->id}");
+            $commentaire = $request->input("q_{$question->id}_commentaire");
 
             if ($question->obligatoire && ($valeur === null || $valeur === '')) {
                 return back()->withErrors(['reponse' => 'Cette question est obligatoire.'])->withInput();
             }
 
-            $this->reponses->enregistrerReponse($submission, $question, $valeur);
+            $this->reponses->enregistrerReponse($submission, $question, $valeur, $commentaire);
 
             $total = $campagne->questions()->count();
             $next = $page + 1;

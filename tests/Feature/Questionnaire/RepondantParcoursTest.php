@@ -93,6 +93,28 @@ it('affiche l intro en HTML avec variables résolues', function (): void {
         ->assertSee('<strong>', false); // HTML rendu, pas échappé
 });
 
+it('le parcours enregistre le commentaire de satisfaction', function (): void {
+    $op = \App\Models\Operation::factory()->create();
+    $participant = \App\Models\Participant::factory()->create(['operation_id' => $op->id]);
+    $campagne = \App\Models\QuestionnaireCampaign::factory()->for($op, 'operation')->create(['statut' => 'ouverte']);
+    $q = \App\Models\QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'type' => 'satisfaction', 'ordre' => 1, 'config' => ['commentaire' => true],
+    ]);
+    $clair = \Illuminate\Support\Str::random(48);
+    $inv = \App\Models\QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create([
+        'participant_id' => $participant->id,
+        'token_hash' => app(\App\Services\Questionnaire\QuestionnaireTokenService::class)->hash($clair),
+    ]);
+    \App\Tenant\TenantContext::clear();
+
+    $this->post("/q/{$clair}", ['action' => 'start']);
+    $this->post("/q/{$clair}", ['action' => 'next', 'page' => 1, "q_{$q->id}" => '4', "q_{$q->id}_commentaire" => 'RAS positif']);
+
+    $a = $inv->fresh()->submissions()->first()->answers()->first();
+    expect($a->value_integer)->toBe(4);
+    expect($a->value_text)->toBe('RAS positif');
+});
+
 it('résout le tenant de l invitation même si un autre tenant est déjà booté', function (): void {
     [$clair, $invitation] = makeOuverteInvitation();
     // Capturés tant que le tenant de l'invitation est le contexte courant.
