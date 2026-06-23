@@ -44,8 +44,9 @@ final class QuestionnaireReponseService
         QuestionnaireSubmission $submission,
         QuestionnaireCampaignQuestion $question,
         int|string|bool|null $valeurBrute,
+        ?string $commentaire = null,
     ): void {
-        $payload = $this->normaliser($question, $valeurBrute);
+        $payload = $this->normaliser($question, $valeurBrute, $commentaire);
 
         $submission->answers()->updateOrCreate(
             ['campaign_question_id' => $question->id],
@@ -54,27 +55,32 @@ final class QuestionnaireReponseService
     }
 
     /** @return array<string, mixed> */
-    private function normaliser(QuestionnaireCampaignQuestion $question, int|string|bool|null $v): array
+    private function normaliser(QuestionnaireCampaignQuestion $question, int|string|bool|null $v, ?string $commentaire = null): array
     {
         $base = [
             'value_text' => null, 'value_integer' => null,
             'value_boolean' => null, 'value_option' => null, 'value_meta' => null,
         ];
 
-        if ($v === null || $v === '') {
-            return $base;
-        }
-
-        return match ($question->type) {
-            TypeQuestion::TexteCourt, TypeQuestion::TexteLong => [...$base, 'value_text' => (string) $v],
-            TypeQuestion::Satisfaction, TypeQuestion::Ressenti => [...$base, 'value_integer' => (int) $v],
-            TypeQuestion::CaseACocher => [...$base, 'value_boolean' => (bool) $v],
-            TypeQuestion::ChoixUnique => [
+        $payload = match ($question->type) {
+            TypeQuestion::TexteCourt, TypeQuestion::TexteLong => ($v === null || $v === '') ? $base : [...$base, 'value_text' => (string) $v],
+            TypeQuestion::Satisfaction, TypeQuestion::Ressenti => ($v === null || $v === '') ? $base : [...$base, 'value_integer' => (int) $v],
+            TypeQuestion::CaseACocher => ($v === null || $v === '') ? $base : [...$base, 'value_boolean' => (bool) $v],
+            TypeQuestion::ChoixUnique => ($v === null || $v === '') ? $base : [
                 ...$base,
                 'value_option' => (string) $v,
                 'value_meta' => ['libelle' => $question->libelleOption((string) $v)],
             ],
         };
+
+        // Commentaire optionnel (satisfaction) : stocké dans value_text, indépendamment de la note.
+        if ($question->type === TypeQuestion::Satisfaction
+            && ($question->config['commentaire'] ?? false)
+            && $commentaire !== null && $commentaire !== '') {
+            $payload['value_text'] = $commentaire;
+        }
+
+        return $payload;
     }
 
     public function finaliser(QuestionnaireSubmission $submission, bool $accepteContact): void
@@ -97,19 +103,19 @@ final class QuestionnaireReponseService
 
     private function verifierObligatoires(QuestionnaireSubmission $submission): void
     {
-        $repondues = $submission->answers()
-            ->get()
-            ->filter(fn ($a) => $a->value_text !== null || $a->value_integer !== null
-                || $a->value_boolean !== null || $a->value_option !== null)
-            ->pluck('campaign_question_id')
-            ->all();
+        $answers = $submission->answers()->get()->keyBy('campaign_question_id');
 
-        $obligatoiresManquantes = $submission->campaign->questions()
+        $manquante = $submission->campaign->questions()
             ->where('obligatoire', true)
-            ->whereNotIn('id', $repondues)
-            ->exists();
+            ->get()
+            ->first(function ($q) use ($answers): bool {
+                $col = $q->type->valueColumn();           // colonne primaire du type
+                $a = $answers->get($q->id);
 
-        if ($obligatoiresManquantes) {
+                return $a === null || $a->{$col} === null; // primaire absente = non répondue
+            });
+
+        if ($manquante !== null) {
             throw new ReponseObligatoireException('Une question obligatoire n\'est pas renseignée.');
         }
     }

@@ -68,6 +68,44 @@ it('finalise et marque invitation soumis', function (): void {
     expect($invitation->fresh()->submitted_at)->not->toBeNull();
 });
 
+it('enregistre note et commentaire sur la même ligne', function (): void {
+    $svc = app(\App\Services\Questionnaire\QuestionnaireReponseService::class);
+    $campagne = \App\Models\QuestionnaireCampaign::factory()->create();
+    $q = \App\Models\QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'type' => \App\Enums\TypeQuestion::Satisfaction, 'ordre' => 1,
+        'config' => ['commentaire' => true, 'commentaire_libelle' => 'Pourquoi ?'],
+    ]);
+    $inv = \App\Models\QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create();
+    $sub = $svc->demarrerOuReprendre($inv);
+
+    $svc->enregistrerReponse($sub, $q, '4', commentaire: 'Très bon accueil');
+
+    $a = $sub->fresh()->answers()->first();
+    expect($a->value_integer)->toBe(4);
+    expect($a->value_text)->toBe('Très bon accueil');
+});
+
+it('obligatoire : la note seule valide, le commentaire seul ne valide pas', function (): void {
+    $svc = app(\App\Services\Questionnaire\QuestionnaireReponseService::class);
+    $campagne = \App\Models\QuestionnaireCampaign::factory()->create();
+    $q = \App\Models\QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'type' => \App\Enums\TypeQuestion::Satisfaction, 'ordre' => 1, 'obligatoire' => true,
+        'config' => ['commentaire' => true],
+    ]);
+    $inv = \App\Models\QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create();
+    $sub = $svc->demarrerOuReprendre($inv);
+
+    // commentaire seul (pas de note) → bloque
+    $svc->enregistrerReponse($sub, $q, null, commentaire: 'un avis');
+    expect(fn () => $svc->finaliser($sub, accepteContact: false))
+        ->toThrow(\App\Exceptions\Questionnaire\ReponseObligatoireException::class);
+
+    // note fournie → passe
+    $svc->enregistrerReponse($sub, $q, '5', commentaire: 'un avis');
+    $svc->finaliser($sub, accepteContact: false);
+    expect($sub->fresh()->statut->value)->toBe('soumise');
+});
+
 it('réouverture admin : invitation et soumission repassent en cours, submitted_at nul', function (): void {
     $svc = app(QuestionnaireReponseService::class);
     $invitation = makeInvitation();
