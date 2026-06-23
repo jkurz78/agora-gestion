@@ -189,6 +189,8 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
         Route::get('/modeles/{template}', function (\App\Models\QuestionnaireTemplate $template) {
             return view('questionnaire.modeles.editor', compact('template'));
         })->name('modeles.editor');
+        Route::get('/modeles/{template}/apercu', [\App\Http\Controllers\QuestionnaireApercuController::class, 'modele'])->name('modeles.apercu');
+        Route::get('/campagnes/{campagne}/apercu', [\App\Http\Controllers\QuestionnaireApercuController::class, 'campagne'])->name('campagnes.apercu');
         Route::get('/campagnes/{campagne}/resultats', function (\App\Models\QuestionnaireCampaign $campagne) {
             return view('questionnaire.resultats.index', compact('campagne'));
         })->name('campagnes.resultats');
