@@ -8,6 +8,7 @@ use App\Enums\StatutSubmission;
 use App\Enums\TypeQuestion;
 use App\Models\QuestionnaireAnswer;
 use App\Models\QuestionnaireCampaign;
+use App\Models\QuestionnaireCampaignQuestion;
 use Illuminate\Support\Collection;
 
 final class QuestionnaireResultatService
@@ -47,12 +48,12 @@ final class QuestionnaireResultatService
      * @param  Collection<int, QuestionnaireAnswer>  $answers
      * @return array<string, mixed>
      */
-    private function agreger(TypeQuestion $type, $answers, $question): array
+    private function agreger(TypeQuestion $type, Collection $answers, QuestionnaireCampaignQuestion $question): array
     {
         return match ($type) {
             TypeQuestion::Satisfaction, TypeQuestion::Ressenti => [
                 'moyenne' => $answers->isNotEmpty()
-                    ? round((float) $answers->avg('value_integer'), $type === TypeQuestion::Ressenti ? 1 : 1)
+                    ? round((float) $answers->avg('value_integer'), 1)
                     : null,
                 'distribution' => $answers->countBy('value_integer')->all(),
                 'n' => $answers->count(),

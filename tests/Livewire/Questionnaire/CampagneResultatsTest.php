@@ -24,7 +24,12 @@ it('n expose l identité que pour les répondants ayant consenti', function (): 
     $svc->enregistrerReponse($subB, $q, 'Rappelez-moi');
     $svc->finaliser($subB, accepteContact: true); // consent
 
+    $identiteAnonyme = $invA->participant->tiers->displayName();    // ne doit PAS apparaître
+    $identiteConsentante = $invB->participant->tiers->displayName(); // doit apparaître
+
     Livewire::test(CampagneResultats::class, ['campagne' => $campagne])
-        ->assertSee('Rappelez-moi')        // verbatim visible (anonyme par défaut)
-        ->assertSee('petit groupe', false); // avertissement présent
+        ->assertSee('Rappelez-moi')         // verbatim visible (anonyme par défaut)
+        ->assertSee('petit groupe', false)  // avertissement présent
+        ->assertSee($identiteConsentante)   // identité exposée car consentement
+        ->assertDontSee($identiteAnonyme);  // identité du non-consentant masquée
 });
