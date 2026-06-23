@@ -1,4 +1,11 @@
 <div>
+    {{-- Actions --}}
+    <div class="d-flex justify-content-end mb-3">
+        <a href="{{ route('questionnaires.campagnes.export', $campagne) }}" class="btn btn-outline-success">
+            <i class="bi bi-file-earmark-excel me-1"></i>Exporter en Excel
+        </a>
+    </div>
+
     {{-- Compteurs --}}
     <div class="row g-3 mb-4">
         <div class="col-md-4">

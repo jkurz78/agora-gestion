@@ -48,3 +48,14 @@ it('affiche la page résultats d une campagne (host page x-app-layout)', functio
         ->assertOk()
         ->assertSee('Satisfaction parcours juin');
 });
+
+it('exporte le xlsx d une campagne (regression guard)', function (): void {
+    $campagne = QuestionnaireCampaign::factory()->create([
+        'titre_affiche' => 'Export test',
+        'statut' => 'ouverte',
+    ]);
+
+    $this->get(route('questionnaires.campagnes.export', $campagne))
+        ->assertOk()
+        ->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+});

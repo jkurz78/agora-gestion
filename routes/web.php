@@ -192,6 +192,8 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
         Route::get('/campagnes/{campagne}/resultats', function (\App\Models\QuestionnaireCampaign $campagne) {
             return view('questionnaire.resultats.index', compact('campagne'));
         })->name('campagnes.resultats');
+        Route::get('/campagnes/{campagne}/export', \App\Http\Controllers\QuestionnaireExportController::class)
+            ->name('campagnes.export');
     });
 
 // ── Dashboard ──
