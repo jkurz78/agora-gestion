@@ -2,6 +2,11 @@
 
 @section('content')
     @php
+        // Rendus directs de la vue (exports/audit) qui ne passent pas les toggles :
+        // par défaut on affiche les deux colonnes (comportement d'avant les toggles).
+        $compareN1 = $compareN1 ?? true;
+        $compareBudget = $compareBudget ?? true;
+
         $fmt = fn(?float $v): string => $v !== null ? number_format($v, 2, ',', ' ') . ' €' : '—';
         $hasAdjustments = $provisions->isNotEmpty() || $provisionsN1->isNotEmpty() || $extournes->isNotEmpty() || $extournesN1->isNotEmpty();
 
