@@ -1832,7 +1832,7 @@ final class OperationQuestionnaires extends Component
 }
 ```
 
-- [ ] **Step 4 : Vue Livewire** `resources/views/livewire/questionnaire/operation-questionnaires.blade.php` — tableau des campagnes (titre, statut badge, invitations, soumises, taux), bouton « Nouvelle campagne » ouvrant un bloc avec `<select wire:model="selectedTemplateId">` + liste de participants à cocher (`wire:model="selectedParticipants"` valeur = id), boutons Ouvrir/Clôturer (`wire:confirm`) selon `$c->statut`, lien « Résultats » vers `route('questionnaires.campagnes.resultats', $c)` (route ajoutée au lot 4). En-tête de tableau `table-dark` + style projet. (Markup analogue à `modele-list.blade.php`.)
+- [ ] **Step 4 : Vue Livewire** `resources/views/livewire/questionnaire/operation-questionnaires.blade.php` — tableau des campagnes (titre, statut badge, invitations), bouton « Nouvelle campagne » ouvrant un bloc avec `<select wire:model="selectedTemplateId">` + liste de participants à cocher (`wire:model="selectedParticipants"` valeur = id), boutons Ouvrir/Clôturer (`wire:confirm`) selon `$c->statut`. En-tête de tableau `table-dark` + style projet. (Markup analogue à `modele-list.blade.php`.) **NB lot 2 : ne PAS afficher la colonne soumises/taux ni le lien « Résultats » — la route `questionnaires.campagnes.resultats` et la table submissions n'existent qu'aux lots 3-4. Ces éléments sont ajoutés au lot 4 (Task 4.2 Step 7).**
 
 - [ ] **Step 5 : Insérer sur la fiche opération** — Dans `resources/views/gestion/operations/show.blade.php`, ajouter une section (ou un onglet, selon la structure existante de la page) :
 
@@ -2906,6 +2906,11 @@ Route::get('/campagnes/{campagne}/resultats', function (\App\Models\Questionnair
 git add app/Livewire/Questionnaire/CampagneResultats.php resources/views/livewire/questionnaire/campagne-resultats.blade.php resources/views/questionnaire/resultats/index.blade.php routes/web.php tests/Livewire/Questionnaire/CampagneResultatsTest.php
 git commit -m "feat(questionnaires): écran résultats + anonymat (identité ssi consentement)"
 ```
+
+- [ ] **Step 7 : Enrichir la section campagnes (différé du lot 2)** — Maintenant que la route `questionnaires.campagnes.resultats` et la table submissions existent :
+  - Dans `app/Livewire/Questionnaire/OperationQuestionnaires.php`, ajouter au `render()` le compteur soumissions : `->withCount(['invitations', 'submissions as soumises_count' => fn ($q) => $q->where('statut', 'soumise')])`.
+  - Dans `resources/views/livewire/questionnaire/operation-questionnaires.blade.php`, ajouter la colonne « Soumises / Taux » (`$c->soumises_count` / `$c->invitations_count`) et le lien « Résultats » → `route('questionnaires.campagnes.resultats', $c)`.
+  - Vérifier que `tests/Livewire/Questionnaire/OperationQuestionnairesTest.php` reste vert. Commit : `git commit -am "feat(questionnaires): compteur soumissions + lien résultats sur la section campagnes"`.
 
 **✅ Jalon Lot 4 : l'admin consulte les résultats sans identité par défaut.**
 
