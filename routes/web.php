@@ -180,6 +180,17 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
         })->name('show');
     });
 
+// ── Questionnaires (catalogue de modèles ; campagnes = depuis la fiche opération) ──
+Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
+    ->prefix('questionnaires')
+    ->name('questionnaires.')
+    ->group(function (): void {
+        Route::view('/modeles', 'questionnaire.modeles.index')->name('modeles.index');
+        Route::get('/modeles/{template}', function (\App\Models\QuestionnaireTemplate $template) {
+            return view('questionnaire.modeles.editor', compact('template'));
+        })->name('modeles.editor');
+    });
+
 // ── Dashboard ──
 Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
     ->get('/dashboard', [DashboardController::class, 'index'])

@@ -402,6 +402,13 @@ $activeGroup = match(true) {
                                 </a>
                             </li>
 
+                            <li class="nav-item">
+                                <a href="{{ route('questionnaires.modeles.index') }}"
+                                   class="nav-link {{ request()->routeIs('questionnaires.*') ? 'active' : '' }}">
+                                    <i class="bi bi-clipboard-check me-1"></i> Questionnaires
+                                </a>
+                            </li>
+
                         </ul>
                     </div>
                 </div>
