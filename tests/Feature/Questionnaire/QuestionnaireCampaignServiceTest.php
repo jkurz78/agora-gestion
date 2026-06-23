@@ -1,0 +1,43 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Enums\StatutCampagne;
+use App\Enums\TypeQuestion;
+use App\Models\Operation;
+use App\Models\QuestionnaireTemplate;
+use App\Models\QuestionnaireTemplateQuestion;
+use App\Services\Questionnaire\QuestionnaireCampaignService;
+
+it('fige un snapshot des questions du modèle dans la campagne', function (): void {
+    $op = Operation::factory()->create();
+    $t = QuestionnaireTemplate::factory()->create(['titre_affiche' => 'Avis', 'remerciement' => 'Merci']);
+    QuestionnaireTemplateQuestion::factory()->for($t, 'template')->create([
+        'libelle' => 'Note', 'type' => TypeQuestion::Satisfaction, 'ordre' => 1,
+    ]);
+
+    $campagne = app(QuestionnaireCampaignService::class)->creerDepuisModele($op, $t);
+
+    expect($campagne->statut)->toBe(StatutCampagne::Brouillon);
+    expect($campagne->titre_affiche)->toBe('Avis');
+    expect($campagne->questions)->toHaveCount(1);
+    expect($campagne->questions->first()->libelle)->toBe('Note');
+
+    // Modifier le modèle après coup NE change PAS la campagne (snapshot).
+    $t->questions()->first()->update(['libelle' => 'MODIFIÉ']);
+    expect($campagne->fresh()->questions->first()->libelle)->toBe('Note');
+});
+
+it('ouvre puis clôture une campagne', function (): void {
+    $op = Operation::factory()->create();
+    $t = QuestionnaireTemplate::factory()->create();
+    $svc = app(QuestionnaireCampaignService::class);
+    $campagne = $svc->creerDepuisModele($op, $t);
+
+    $svc->ouvrir($campagne);
+    expect($campagne->fresh()->statut)->toBe(StatutCampagne::Ouverte);
+    expect($campagne->fresh()->ouverte_at)->not->toBeNull();
+
+    $svc->cloturer($campagne);
+    expect($campagne->fresh()->statut)->toBe(StatutCampagne::Cloturee);
+});
