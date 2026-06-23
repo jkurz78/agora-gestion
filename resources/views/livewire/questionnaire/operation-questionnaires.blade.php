@@ -10,6 +10,7 @@
                 <th>Titre</th>
                 <th class="text-center">Statut</th>
                 <th class="text-center">Invitations</th>
+                <th class="text-center">Soumises / Taux</th>
                 <th class="text-end">Actions</th>
             </tr>
         </thead>
@@ -29,7 +30,17 @@
                         <span class="badge {{ $badgeClass }}">{{ $c->statut->label() }}</span>
                     </td>
                     <td class="text-center">{{ $c->invitations_count }}</td>
+                    <td class="text-center">
+                        {{ $c->soumises_count }}
+                        @if ($c->invitations_count > 0)
+                            <span class="text-muted small">({{ round($c->soumises_count / $c->invitations_count * 100) }}%)</span>
+                        @endif
+                    </td>
                     <td class="text-end">
+                        <a href="{{ route('questionnaires.campagnes.resultats', $c) }}"
+                           class="btn btn-sm btn-outline-info me-1">
+                            Résultats
+                        </a>
                         @if ($c->statut->peutOuvrir())
                             <button class="btn btn-sm btn-outline-success"
                                     wire:click="ouvrir({{ $c->id }})"
@@ -62,7 +73,7 @@
                     </tr>
                 @endforeach
             @empty
-                <tr><td colspan="4" class="text-muted text-center py-4">Aucune campagne.</td></tr>
+                <tr><td colspan="5" class="text-muted text-center py-4">Aucune campagne.</td></tr>
             @endforelse
         </tbody>
     </table>

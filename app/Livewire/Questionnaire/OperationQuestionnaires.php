@@ -35,11 +35,11 @@ final class OperationQuestionnaires extends Component
     public function render(): View
     {
         return view('livewire.questionnaire.operation-questionnaires', [
-            // NB : pas de comptage des soumissions ici — la table questionnaire_submissions
-            // n'existe qu'à partir du lot 3. Le compteur soumises/taux + le lien « Résultats »
-            // sont ajoutés au lot 4 (withCount('submissions as soumises_count') à ce moment-là).
             'campagnes' => $this->operation->questionnaireCampaigns()
-                ->withCount('invitations')
+                ->withCount([
+                    'invitations',
+                    'submissions as soumises_count' => fn ($q) => $q->where('statut', 'soumise'),
+                ])
                 ->with(['invitations.participant.tiers'])
                 ->latest()
                 ->get(),
