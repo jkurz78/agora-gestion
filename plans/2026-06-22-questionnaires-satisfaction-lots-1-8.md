@@ -642,16 +642,14 @@ final class ModeleList extends Component
 </div>
 ```
 
-- [ ] **Step 5 : Page hôte** `resources/views/questionnaire/modeles/index.blade.php`
+- [ ] **Step 5 : Page hôte** `resources/views/questionnaire/modeles/index.blade.php` (convention back-office : **`<x-app-layout>`**, jamais `@extends('layouts.app')` qui est un layout composant `{{ $slot }}`)
 
 ```blade
-@extends('layouts.app')
+<x-app-layout>
+    <x-slot:title>Modèles de questionnaires</x-slot:title>
 
-@section('content')
-    <div class="container-fluid py-3">
-        @livewire('questionnaire.modele-list')
-    </div>
-@endsection
+    <livewire:questionnaire.modele-list />
+</x-app-layout>
 ```
 
 - [ ] **Step 6 : Routes** — Ajouter dans `routes/web.php`, après le groupe `operations` (importer en tête `use App\Models\QuestionnaireTemplate;`) :
@@ -944,16 +942,14 @@ final class ModeleEditor extends Component
 
 Note : `aDesOptions()` est une méthode proxy du modèle question (`return $this->type->aDesOptions();`), ajoutée à la Task 1.3.
 
-- [ ] **Step 5 : Page hôte** `resources/views/questionnaire/modeles/editor.blade.php`
+- [ ] **Step 5 : Page hôte** `resources/views/questionnaire/modeles/editor.blade.php` (convention back-office : **`<x-app-layout>`**)
 
 ```blade
-@extends('layouts.app')
+<x-app-layout>
+    <x-slot:title>{{ $template->titre_interne }}</x-slot:title>
 
-@section('content')
-    <div class="container-fluid py-3">
-        @livewire('questionnaire.modele-editor', ['template' => $template])
-    </div>
-@endsection
+    <livewire:questionnaire.modele-editor :template="$template" />
+</x-app-layout>
 ```
 
 - [ ] **Step 6 : Lancer (passe)** — `vendor/bin/pest tests/Livewire/Questionnaire/ModeleEditorTest.php` → PASS.
@@ -2883,14 +2879,13 @@ final class CampagneResultats extends Component
 
 - [ ] **Step 5 : Page hôte + route**
 
-`resources/views/questionnaire/resultats/index.blade.php` :
+`resources/views/questionnaire/resultats/index.blade.php` (convention back-office : **`<x-app-layout>`**, jamais `@extends('layouts.app')` — celui-ci est un layout composant `{{ $slot }}`) :
 ```blade
-@extends('layouts.app')
-@section('content')
-    <div class="container-fluid py-3">
-        @livewire('questionnaire.campagne-resultats', ['campagne' => $campagne])
-    </div>
-@endsection
+<x-app-layout>
+    <x-slot:title>Résultats — {{ $campagne->titre_affiche }}</x-slot:title>
+
+    <livewire:questionnaire.campagne-resultats :campagne="$campagne" />
+</x-app-layout>
 ```
 
 Route (dans le groupe `questionnaires.*`) :
