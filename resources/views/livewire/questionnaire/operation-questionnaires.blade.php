@@ -37,6 +37,11 @@
                         @endif
                     </td>
                     <td class="text-end">
+                        <a href="{{ route('questionnaires.campagnes.apercu', $c) }}"
+                           target="_blank"
+                           class="btn btn-sm btn-outline-secondary me-1">
+                            Prévisualiser
+                        </a>
                         <a href="{{ route('questionnaires.campagnes.resultats', $c) }}"
                            class="btn btn-sm btn-outline-info me-1">
                             Résultats

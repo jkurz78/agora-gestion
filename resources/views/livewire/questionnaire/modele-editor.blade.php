@@ -1,5 +1,10 @@
 <div>
-    <a href="{{ route('questionnaires.modeles.index') }}" class="btn btn-sm btn-link px-0 mb-2">&larr; Modèles</a>
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <a href="{{ route('questionnaires.modeles.index') }}" class="btn btn-sm btn-link px-0">&larr; Modèles</a>
+        <a href="{{ route('questionnaires.modeles.apercu', $template) }}" target="_blank" class="btn btn-sm btn-outline-secondary">
+            Prévisualiser
+        </a>
+    </div>
     <h1 class="h4">{{ $template->titre_interne }}</h1>
 
     {{-- Section : Messages du questionnaire --}}
