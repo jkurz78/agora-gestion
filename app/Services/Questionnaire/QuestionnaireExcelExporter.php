@@ -27,6 +27,9 @@ final class QuestionnaireExcelExporter
         ];
         foreach ($questions as $q) {
             $entetes[] = $q->libelle; // libellé figé (snapshot) → stable
+            if ($q->type === TypeQuestion::Satisfaction && ($q->config['commentaire'] ?? false)) {
+                $entetes[] = $q->libelle.' — commentaire';
+            }
         }
 
         $rows = [$entetes];
@@ -56,7 +59,11 @@ final class QuestionnaireExcelExporter
 
             $answersParQ = $sub->answers->keyBy('campaign_question_id');
             foreach ($questions as $q) {
-                $ligne[] = $this->valeurAffichee($q->type, $answersParQ->get($q->id), $q);
+                $answer = $answersParQ->get($q->id);
+                $ligne[] = $this->valeurAffichee($q->type, $answer, $q);
+                if ($q->type === TypeQuestion::Satisfaction && ($q->config['commentaire'] ?? false)) {
+                    $ligne[] = $answer?->value_text ?? '';
+                }
             }
 
             $rows[] = $ligne;
