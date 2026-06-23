@@ -57,6 +57,9 @@ final class QuestionnaireResultatService
                     : null,
                 'distribution' => $answers->countBy('value_integer')->all(),
                 'n' => $answers->count(),
+                ...(($question->config['commentaire'] ?? false)
+                    ? ['verbatims' => $answers->pluck('value_text')->filter()->values()->all()]
+                    : []),
             ],
             TypeQuestion::CaseACocher => [
                 'oui' => $answers->where('value_boolean', true)->count(),

@@ -9,6 +9,23 @@ use App\Models\QuestionnaireInvitation;
 use App\Services\Questionnaire\QuestionnaireReponseService;
 use App\Services\Questionnaire\QuestionnaireResultatService;
 
+it('agrège les commentaires d une satisfaction commentée', function (): void {
+    $campagne = \App\Models\QuestionnaireCampaign::factory()->create(['statut' => 'ouverte']);
+    $q = \App\Models\QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'type' => \App\Enums\TypeQuestion::Satisfaction, 'ordre' => 1, 'config' => ['commentaire' => true],
+    ]);
+    $svc = app(\App\Services\Questionnaire\QuestionnaireReponseService::class);
+    $inv = \App\Models\QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create();
+    $sub = $svc->demarrerOuReprendre($inv);
+    $svc->enregistrerReponse($sub, $q, '5', commentaire: 'Parfait');
+    $svc->finaliser($sub, accepteContact: false);
+
+    $res = app(\App\Services\Questionnaire\QuestionnaireResultatService::class)->pourCampagne($campagne->fresh());
+
+    expect($res['questions'][0]['moyenne'])->toBe(5.0);
+    expect($res['questions'][0]['verbatims'])->toContain('Parfait');
+});
+
 it('agrège satisfaction et exclut les soumissions non soumises', function (): void {
     $campagne = QuestionnaireCampaign::factory()->create(['statut' => 'ouverte']);
     $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([

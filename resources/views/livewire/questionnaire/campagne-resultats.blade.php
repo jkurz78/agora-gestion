@@ -69,6 +69,16 @@
                     @else
                         <span class="text-muted">Aucune réponse.</span>
                     @endif
+                    @if (!empty($q['verbatims'] ?? []))
+                        <div class="mt-3">
+                            <p class="fw-semibold small mb-1">Commentaires :</p>
+                            @foreach ($q['verbatims'] as $verbatim)
+                                <blockquote class="blockquote border-start border-3 ps-3 mb-2">
+                                    <p class="mb-0 fst-italic text-muted small">« {{ $verbatim }} »</p>
+                                </blockquote>
+                            @endforeach
+                        </div>
+                    @endif
 
                 @elseif ($q['type'] === \App\Enums\TypeQuestion::CaseACocher)
                     <div class="d-flex gap-3">
