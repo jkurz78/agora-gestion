@@ -78,6 +78,16 @@
                             </div>
                         @endforeach
                     </div>
+                    @if ($question->config['commentaire'] ?? false)
+                        <div class="mt-3">
+                            <label class="form-label small text-muted" for="{{ $fieldName }}_commentaire">
+                                {{ $question->config['commentaire_libelle'] ?? 'Un commentaire ? (optionnel)' }}
+                            </label>
+                            <textarea class="form-control" rows="2"
+                                      id="{{ $fieldName }}_commentaire"
+                                      name="{{ $fieldName }}_commentaire">{{ old("{$fieldName}_commentaire", $answer?->value_text) }}</textarea>
+                        </div>
+                    @endif
                     @break
 
                 @case('ressenti')
