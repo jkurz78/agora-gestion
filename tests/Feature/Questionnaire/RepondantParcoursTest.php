@@ -80,6 +80,19 @@ it('affiche déjà répondu si l invitation est soumise', function (): void {
     $this->get("/q/{$clair}")->assertSee('déjà', false);
 });
 
+it('affiche l intro en HTML avec variables résolues', function (): void {
+    [$clair, $invitation] = makeOuverteInvitation();
+    $invitation->campaign->update(['intro' => '<p>Bonjour <strong>{prenom}</strong></p>']);
+    $invitation->participant->tiers->update(['prenom' => 'Camille']);
+    \App\Tenant\TenantContext::clear();
+
+    $this->get("/q/{$clair}")
+        ->assertOk()
+        ->assertSee('Bonjour', false)
+        ->assertSee('Camille', false)
+        ->assertSee('<strong>', false); // HTML rendu, pas échappé
+});
+
 it('résout le tenant de l invitation même si un autre tenant est déjà booté', function (): void {
     [$clair, $invitation] = makeOuverteInvitation();
     // Capturés tant que le tenant de l'invitation est le contexte courant.

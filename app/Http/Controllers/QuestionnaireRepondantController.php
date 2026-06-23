@@ -10,6 +10,7 @@ use App\Models\Association;
 use App\Models\QuestionnaireInvitation;
 use App\Services\Questionnaire\QuestionnaireReponseService;
 use App\Services\Questionnaire\QuestionnaireTokenService;
+use App\Services\Questionnaire\QuestionnaireVariableResolver;
 use App\Tenant\TenantContext;
 use App\Tenant\TenantScope;
 use Illuminate\Contracts\View\View;
@@ -21,6 +22,7 @@ final class QuestionnaireRepondantController extends Controller
     public function __construct(
         private readonly QuestionnaireTokenService $tokens,
         private readonly QuestionnaireReponseService $reponses,
+        private readonly QuestionnaireVariableResolver $variables,
     ) {}
 
     public function show(Request $request, string $token): View
@@ -39,7 +41,15 @@ final class QuestionnaireRepondantController extends Controller
         $questions = $campagne->questions()->get();
 
         if ($page === 0) {
-            return view('questionnaire.repondant.intro', compact('invitation', 'campagne', 'token'));
+            $vars = $this->variables->pour($invitation);
+
+            return view('questionnaire.repondant.intro', [
+                'invitation' => $invitation,
+                'campagne' => $campagne,
+                'token' => $token,
+                'introHtml' => $this->variables->remplacer((string) ($campagne->intro ?? ''), $vars),
+                'titre' => $this->variables->remplacer((string) $campagne->titre_affiche, $vars),
+            ]);
         }
 
         $question = $questions[$page - 1] ?? null;
@@ -116,8 +126,14 @@ final class QuestionnaireRepondantController extends Controller
     public function merci(string $token): View
     {
         $invitation = $this->resoudre($token);
+        $campagne = $invitation->campaign;
+        $vars = $this->variables->pour($invitation);
 
-        return view('questionnaire.repondant.merci', ['campagne' => $invitation->campaign]);
+        return view('questionnaire.repondant.merci', [
+            'campagne' => $campagne,
+            'remerciementHtml' => $this->variables->remplacer((string) ($campagne->remerciement ?? ''), $vars),
+            'titre' => $this->variables->remplacer((string) $campagne->titre_affiche, $vars),
+        ]);
     }
 
     /** Résolution par hash + boot tenant (D18, miroir SubscriptionService::findByToken). */
