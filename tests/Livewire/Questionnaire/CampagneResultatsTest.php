@@ -1,0 +1,30 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Livewire\Questionnaire\CampagneResultats;
+use App\Models\QuestionnaireCampaign;
+use App\Models\QuestionnaireCampaignQuestion;
+use App\Models\QuestionnaireInvitation;
+use App\Services\Questionnaire\QuestionnaireReponseService;
+use Livewire\Livewire;
+
+it('n expose l identité que pour les répondants ayant consenti', function (): void {
+    $campagne = QuestionnaireCampaign::factory()->create(['statut' => 'ouverte']);
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create(['type' => 'texte_court']);
+    $svc = app(QuestionnaireReponseService::class);
+
+    $invA = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create();
+    $subA = $svc->demarrerOuReprendre($invA);
+    $svc->enregistrerReponse($subA, $q, 'RAS');
+    $svc->finaliser($subA, accepteContact: false); // anonyme
+
+    $invB = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create();
+    $subB = $svc->demarrerOuReprendre($invB);
+    $svc->enregistrerReponse($subB, $q, 'Rappelez-moi');
+    $svc->finaliser($subB, accepteContact: true); // consent
+
+    Livewire::test(CampagneResultats::class, ['campagne' => $campagne])
+        ->assertSee('Rappelez-moi')        // verbatim visible (anonyme par défaut)
+        ->assertSee('petit groupe', false); // avertissement présent
+});

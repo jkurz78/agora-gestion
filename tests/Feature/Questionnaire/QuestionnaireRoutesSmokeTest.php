@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Association;
+use App\Models\QuestionnaireCampaign;
 use App\Models\QuestionnaireTemplate;
 use App\Models\User;
 use App\Tenant\TenantContext;
@@ -35,4 +36,15 @@ it('affiche la page éditeur de questions (host page x-app-layout)', function ()
     $this->get(route('questionnaires.modeles.editor', $template))
         ->assertOk()
         ->assertSee('Mon modèle');
+});
+
+it('affiche la page résultats d une campagne (host page x-app-layout)', function (): void {
+    $campagne = QuestionnaireCampaign::factory()->create([
+        'titre_affiche' => 'Satisfaction parcours juin',
+        'statut' => 'ouverte',
+    ]);
+
+    $this->get(route('questionnaires.campagnes.resultats', $campagne))
+        ->assertOk()
+        ->assertSee('Satisfaction parcours juin');
 });

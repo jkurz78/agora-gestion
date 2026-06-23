@@ -189,6 +189,9 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
         Route::get('/modeles/{template}', function (\App\Models\QuestionnaireTemplate $template) {
             return view('questionnaire.modeles.editor', compact('template'));
         })->name('modeles.editor');
+        Route::get('/campagnes/{campagne}/resultats', function (\App\Models\QuestionnaireCampaign $campagne) {
+            return view('questionnaire.resultats.index', compact('campagne'));
+        })->name('campagnes.resultats');
     });
 
 // ── Dashboard ──
