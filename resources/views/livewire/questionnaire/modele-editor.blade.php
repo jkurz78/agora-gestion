@@ -28,20 +28,16 @@
             {{-- Éditeur Intro --}}
             <div class="mb-3">
                 <label class="form-label fw-semibold">Introduction (page d'accueil du répondant)</label>
-                <div wire:ignore
-                     x-data="qEditorIntro()"
-                     x-init="init()">
-                    <textarea id="q-editor-intro" x-ref="editor">{!! $intro !!}</textarea>
+                <div wire:ignore>
+                    <textarea id="q-editor-intro" rows="10" style="width:100%">{!! $intro !!}</textarea>
                 </div>
             </div>
 
             {{-- Éditeur Remerciement --}}
             <div class="mb-3">
                 <label class="form-label fw-semibold">Message de remerciement (page finale)</label>
-                <div wire:ignore
-                     x-data="qEditorMerci()"
-                     x-init="init()">
-                    <textarea id="q-editor-merci" x-ref="editor">{!! $remerciement !!}</textarea>
+                <div wire:ignore>
+                    <textarea id="q-editor-remerciement" rows="10" style="width:100%">{!! $remerciement !!}</textarea>
                 </div>
             </div>
 
@@ -126,11 +122,10 @@
 
 @assets
 <script>
-    // ---- Questionnaire message editors (TinyMCE + Alpine) ----
-    // Two distinct editors on the same page: intro (qEditorIntro) and merci (qEditorMerci).
-    // Pattern mirrors operation-communication.blade.php: wire:ignore + Alpine + tinymce.init.
+    // ---- Questionnaire message editors — shared helpers (loaded once, deduped by Livewire) ----
 
     function _qStripVarSpans(html) {
+        // Callback form avoids dollar-N corruption in Livewire SupportAutoInjectedAssets.
         return html.replace(
             /<span\b[^>]*\bq-mce-var\b[^>]*>(\{[^}]+\})<\/span>/g,
             function (_match, token) { return token; }
@@ -148,105 +143,6 @@
         return html;
     }
 
-    function _qMakeEditorComponent(wireProperty) {
-        return {
-            editor: null,
-
-            init() {
-                this.$nextTick(() => this.setup());
-                this.$cleanup(() => this.destroy());
-            },
-
-            setup() {
-                if (typeof tinymce === 'undefined') {
-                    setTimeout(() => this.setup(), 300);
-                    return;
-                }
-
-                var textarea = this.$refs.editor;
-                if (!textarea) return;
-
-                var self = this;
-
-                // Variable insertion menu items
-                var menuItems = _qVariables.map(function (v) {
-                    return {
-                        type: 'menuitem',
-                        text: v,
-                        onAction: function () {
-                            if (self.editor) {
-                                self.editor.insertContent('<span class="q-mce-var mce-noneditable">' + v + '</span>&nbsp;');
-                            }
-                        },
-                    };
-                });
-
-                tinymce.init({
-                    target: textarea,
-                    language: 'fr_FR',
-                    language_url: '/vendor/tinymce/langs/fr_FR.js',
-                    height: 280,
-                    menubar: false,
-                    statusbar: false,
-                    promotion: false,
-                    plugins: 'lists link noneditable',
-                    toolbar: 'undo redo | bold italic underline | bullist numlist | link | variablesBtn',
-                    noneditable_class: 'q-mce-var',
-                    content_style: 'body { font-family: Arial, sans-serif; font-size: 14px; } .q-mce-var { background: #f3edff; border: 1px solid #d4c5f9; border-radius: 3px; padding: 1px 3px; font-family: monospace; font-size: 12px; color: #7c3aed; display: inline-block; }',
-                    setup: function (editor) {
-                        self.editor = editor;
-
-                        editor.ui.registry.addMenuButton('variablesBtn', {
-                            text: 'Variables',
-                            fetch: function (callback) { callback(menuItems); },
-                        });
-
-                        editor.on('init', function () {
-                            editor.setContent(_qWrapVars(editor.getContent()));
-                        });
-
-                        // Sync to Livewire on every content change
-                        editor.on('change input', function () {
-                            var content = _qStripVarSpans(editor.getContent());
-                            var wireEl = editor.targetElm.closest('[wire\\:id]');
-                            if (wireEl) {
-                                Livewire.find(wireEl.getAttribute('wire:id')).set(wireProperty, content);
-                            }
-                        });
-                    },
-                });
-            },
-
-            destroy() {
-                if (this.editor) {
-                    try { tinymce.remove(this.editor); } catch (e) {}
-                    this.editor = null;
-                }
-            },
-
-            getContent() {
-                return this.editor ? _qStripVarSpans(this.editor.getContent()) : '';
-            },
-        };
-    }
-
-    if (typeof Alpine !== 'undefined') {
-        if (!Alpine.components?.qEditorIntro) {
-            Alpine.data('qEditorIntro', () => _qMakeEditorComponent('intro'));
-        }
-        if (!Alpine.components?.qEditorMerci) {
-            Alpine.data('qEditorMerci', () => _qMakeEditorComponent('remerciement'));
-        }
-    }
-
-    // ---- Helper: find the Livewire wire:id on the modele-editor component ----
-    function _qGetWire() {
-        var el = document.getElementById('q-editor-intro');
-        if (!el) el = document.getElementById('q-editor-merci');
-        var root = el && el.closest('[wire\\:id]');
-        return root ? Livewire.find(root.getAttribute('wire:id')) : null;
-    }
-
     // ---- Insert variable at cursor in whichever editor is active ----
     function qInsertVariable(v) {
         if (typeof tinymce === 'undefined') return;
@@ -255,40 +151,87 @@
             active.insertContent('<span class="q-mce-var mce-noneditable">' + v + '</span>&nbsp;');
         }
     }
+</script>
+@endassets
 
-    // ---- Sync both editors then call enregistrerMessages ----
-    function qSyncAndSave() {
+@script
+<script>
+    // ---- Init TinyMCE editors (runs after Livewire morphs the DOM, $wire in scope) ----
+    // Two editors: q-editor-intro (prop 'intro') and
+    // q-editor-remerciement (prop 'remerciement').
+
+    var _qMenuItems = _qVariables.map(function (v) {
+        return {
+            type: 'menuitem',
+            text: v,
+            onAction: function () {
+                var active = tinymce.activeEditor;
+                if (active) {
+                    active.insertContent('<span class="q-mce-var mce-noneditable">' + v + '</span>&nbsp;');
+                }
+            },
+        };
+    });
+
+    function _qInitEditor(id, wireProp) {
         if (typeof tinymce === 'undefined') {
-            var wire = _qGetWire();
-            if (wire) wire.call('enregistrerMessages');
+            setTimeout(function () { _qInitEditor(id, wireProp); }, 200);
             return;
         }
 
-        // Sync intro
-        var introEl = document.getElementById('q-editor-intro');
-        var introRoot = introEl && introEl.closest('[wire\\:id]');
-        if (introRoot) {
-            var introEditor = tinymce.get(introEl.id);
-            if (introEditor) {
-                Livewire.find(introRoot.getAttribute('wire:id')).set('intro', _qStripVarSpans(introEditor.getContent()));
-            }
-        }
+        // Already initialized — skip.
+        if (tinymce.get(id)) return;
 
-        // Sync remerciement
-        var merciEl = document.getElementById('q-editor-merci');
-        var merciRoot = merciEl && merciEl.closest('[wire\\:id]');
-        if (merciRoot) {
-            var merciEditor = tinymce.get(merciEl.id);
-            if (merciEditor) {
-                Livewire.find(merciRoot.getAttribute('wire:id')).set('remerciement', _qStripVarSpans(merciEditor.getContent()));
-            }
-        }
+        var textarea = document.getElementById(id);
+        if (!textarea) return;
 
-        // Wait for Livewire to settle, then call the action
-        setTimeout(function () {
-            var wire = _qGetWire();
-            if (wire) wire.call('enregistrerMessages');
-        }, 150);
+        tinymce.init({
+            target: textarea,
+            language: 'fr_FR',
+            language_url: '/vendor/tinymce/langs/fr_FR.js',
+            height: 320,
+            menubar: false,
+            statusbar: false,
+            promotion: false,
+            plugins: 'lists link noneditable',
+            toolbar: 'undo redo | bold italic underline | bullist numlist | link | variablesBtn',
+            noneditable_class: 'q-mce-var',
+            content_style: 'body { font-family: Arial, sans-serif; font-size: 14px; } .q-mce-var { background: #f3edff; border: 1px solid #d4c5f9; border-radius: 3px; padding: 1px 3px; font-family: monospace; font-size: 12px; color: #7c3aed; display: inline-block; }',
+            setup: function (editor) {
+                editor.ui.registry.addMenuButton('variablesBtn', {
+                    text: 'Variables',
+                    fetch: function (callback) { callback(_qMenuItems); },
+                });
+
+                editor.on('init', function () {
+                    editor.setContent(_qWrapVars(editor.getContent()));
+                });
+
+                // Sync stripped content to Livewire on every change.
+                editor.on('change input', function () {
+                    $wire.set(wireProp, _qStripVarSpans(editor.getContent()));
+                });
+            },
+        });
     }
+
+    _qInitEditor('q-editor-intro', 'intro');
+    _qInitEditor('q-editor-remerciement', 'remerciement');
+
+    // ---- Sync both editors then call enregistrerMessages ----
+    window.qSyncAndSave = function () {
+        var introEditor = tinymce.get('q-editor-intro');
+        var merciEditor = tinymce.get('q-editor-remerciement');
+
+        if (introEditor) {
+            $wire.set('intro', _qStripVarSpans(introEditor.getContent()));
+        }
+        if (merciEditor) {
+            $wire.set('remerciement', _qStripVarSpans(merciEditor.getContent()));
+        }
+
+        // Wait for Livewire to settle, then call the action.
+        setTimeout(function () { $wire.call('enregistrerMessages'); }, 150);
+    };
 </script>
-@endassets
+@endscript
