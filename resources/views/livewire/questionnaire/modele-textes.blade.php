@@ -68,7 +68,6 @@
 @script
 <script>
     // Flush both editors into Livewire before calling enregistrer().
-    // Flush both editors into Livewire before calling enregistrer().
     // Keys match window['__qgSync_' + editorId] set in the tinymce-rich-editor partial.
     window.qTextesSyncAndSave = function () {
         var syncIntro = window['__qgSync_q-textes-intro'];

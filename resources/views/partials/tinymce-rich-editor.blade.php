@@ -16,12 +16,6 @@
     <textarea id="{{ $id }}" rows="10" style="width:100%">{!! $content !!}</textarea>
 </div>
 
-@once
-<style>
-/* Variable chips inside TinyMCE (shared across all instances on the page) */
-</style>
-@endonce
-
 @script
 <script>
     (function () {

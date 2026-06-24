@@ -10,21 +10,21 @@
         @error('objet') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
     </div>
 
-    {{-- Inserter variables --}}
-    <div class="mb-2 d-flex align-items-center gap-2 flex-wrap" id="envoi-var-buttons">
-        <span class="small text-muted fw-semibold me-1">Insérer :</span>
-        @foreach (['{prenom}', '{nom}', '{operation}', '{type_operation}', '{association}', '{date_debut}', '{date_fin}', '{nb_seances}', '{lien_questionnaire}'] as $var)
-            <button type="button" class="btn btn-sm btn-outline-secondary font-monospace py-0"
-                    onclick="envoiInsertVariable('{{ $var }}')" title="Insérer {{ $var }}">{{ $var }}</button>
-        @endforeach
-    </div>
-
     {{-- Corps TinyMCE --}}
     <div class="mb-3">
         <label class="form-label fw-semibold">Corps de l'email</label>
-        <div wire:ignore>
-            <textarea id="envoi-corps-editor" rows="12" style="width:100%">{!! $corps !!}</textarea>
-        </div>
+        @include('partials.tinymce-rich-editor', [
+            'id'      => 'q-envoi-corps',
+            'model'   => 'corps',
+            'content' => $corps,
+            'height'  => 320,
+            'groups'  => [
+                'Participant'  => ['{prenom}' => 'Prénom', '{nom}' => 'Nom', '{civilite}' => 'Civilité', '{politesse}' => 'Politesse'],
+                'Opération'    => ['{operation}' => 'Opération', '{type_operation}' => 'Type opération', '{date_debut}' => 'Date début', '{date_fin}' => 'Date fin', '{nb_seances}' => 'Nb séances'],
+                'Association'  => ['{association}' => 'Association'],
+                'Lien'         => ['{lien_questionnaire}' => 'Lien du questionnaire'],
+            ],
+        ])
         @error('corps') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
     </div>
 
@@ -64,58 +64,11 @@
     </div>
 </div>
 
-@assets
-<script>
-    function envoiInsertVariable(v) {
-        if (typeof tinymce === 'undefined') return;
-        var active = tinymce.activeEditor;
-        if (active) {
-            active.insertContent(v);
-        }
-    }
-</script>
-@endassets
-
 @script
 <script>
-    var _envoiEditorId = 'envoi-corps-editor';
-
-    function _envoiInitEditor() {
-        if (typeof tinymce === 'undefined') {
-            setTimeout(_envoiInitEditor, 200);
-            return;
-        }
-
-        if (tinymce.get(_envoiEditorId)) return;
-
-        var textarea = document.getElementById(_envoiEditorId);
-        if (!textarea) return;
-
-        tinymce.init({
-            target: textarea,
-            language: 'fr_FR',
-            language_url: '/vendor/tinymce/langs/fr_FR.js',
-            height: 320,
-            menubar: false,
-            statusbar: false,
-            promotion: false,
-            plugins: 'lists link',
-            toolbar: 'undo redo | bold italic underline | bullist numlist | link',
-            setup: function (editor) {
-                editor.on('change input', function () {
-                    $wire.set('corps', editor.getContent());
-                });
-            },
-        });
-    }
-
-    _envoiInitEditor();
-
     window.envoiSyncAndCall = function (action) {
-        var editor = tinymce.get(_envoiEditorId);
-        if (editor) {
-            $wire.set('corps', editor.getContent());
-        }
+        var syncCorps = window['__qgSync_q-envoi-corps'];
+        if (typeof syncCorps === 'function') { syncCorps(); }
         setTimeout(function () { $wire.call(action); }, 150);
     };
 </script>
