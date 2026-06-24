@@ -68,5 +68,35 @@ it('active un commentaire optionnel sur une question satisfaction', function ():
     expect($q->config['commentaire_libelle'])->toBe('Pourquoi cette note ?');
 });
 
+it('stocke les labels d extrémité d une question ressenti dans la config', function (): void {
+    $t = QuestionnaireTemplate::factory()->create();
+
+    Livewire::test(ModeleEditor::class, ['template' => $t])
+        ->set('libelle', 'Comment vous sentez-vous ?')
+        ->set('type', TypeQuestion::Ressenti->value)
+        ->set('labelGauche', 'Très mal')
+        ->set('labelDroite', 'Très bien')
+        ->call('ajouterQuestion')
+        ->assertHasNoErrors();
+
+    $q = $t->questions()->first();
+    expect($q->type)->toBe(TypeQuestion::Ressenti);
+    expect($q->config['label_gauche'])->toBe('Très mal');
+    expect($q->config['label_droite'])->toBe('Très bien');
+});
+
+it('stocke null en config ressenti quand les labels sont vides', function (): void {
+    $t = QuestionnaireTemplate::factory()->create();
+
+    Livewire::test(ModeleEditor::class, ['template' => $t])
+        ->set('libelle', 'Comment vous sentez-vous ?')
+        ->set('type', TypeQuestion::Ressenti->value)
+        ->call('ajouterQuestion')
+        ->assertHasNoErrors();
+
+    $q = $t->questions()->first();
+    expect($q->config)->toBeNull();
+});
+
 // Note: la persistance intro/remerciement est désormais gérée par ModeleTextes
 // (écran "Textes" séparé). Les tests correspondants sont dans ModeleTextesTest.

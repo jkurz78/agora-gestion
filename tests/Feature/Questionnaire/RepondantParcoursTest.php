@@ -134,6 +134,32 @@ it('le parcours enregistre le commentaire de satisfaction', function (): void {
     expect($a->value_text)->toBe('RAS positif');
 });
 
+it('affiche un input hidden pour la question ressenti (sans valeur par défaut)', function (): void {
+    $op = \App\Models\Operation::factory()->create();
+    $participant = \App\Models\Participant::factory()->create(['operation_id' => $op->id]);
+    $campagne = \App\Models\QuestionnaireCampaign::factory()->for($op, 'operation')->create(['statut' => 'ouverte']);
+    $q = \App\Models\QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'type' => \App\Enums\TypeQuestion::Ressenti, 'ordre' => 1, 'obligatoire' => false,
+    ]);
+    $clair = \Illuminate\Support\Str::random(48);
+    \App\Models\QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create([
+        'participant_id' => $participant->id,
+        'token_hash' => app(\App\Services\Questionnaire\QuestionnaireTokenService::class)->hash($clair),
+    ]);
+    \App\Tenant\TenantContext::clear();
+
+    $this->post("/q/{$clair}", ['action' => 'start']);
+
+    $response = $this->get("/q/{$clair}?page=1");
+    $response->assertOk();
+
+    // Un input hidden nommé q_{id} doit exister (vide tant que non positionné)
+    $fieldName = "q_{$q->id}";
+    $response->assertSee("name=\"{$fieldName}\"", false);
+    // Pas de valeur par défaut : le widget ne préremplit pas 50
+    $response->assertSee('Placez le curseur selon votre ressenti', false);
+});
+
 it('résout le tenant de l invitation même si un autre tenant est déjà booté', function (): void {
     [$clair, $invitation] = makeOuverteInvitation();
     // Capturés tant que le tenant de l'invitation est le contexte courant.
