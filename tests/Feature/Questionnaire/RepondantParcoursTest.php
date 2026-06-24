@@ -72,6 +72,25 @@ it('bloque la sauvegarde d une question obligatoire vide puis finalise', functio
     expect($invitation->fresh()->statut)->toBe(StatutInvitation::Soumis);
 });
 
+it('affiche 5 inputs radio satisfaction (valeurs 1 à 5) sous forme de smileys', function (): void {
+    [$clair, $invitation] = makeOuverteInvitation();
+    TenantContext::clear();
+
+    $this->post("/q/{$clair}", ['action' => 'start'])->assertRedirect();
+
+    $question = $invitation->campaign->questions()->first();
+    $response = $this->get("/q/{$clair}?page=1");
+    $response->assertOk();
+
+    $fieldName = "q_{$question->id}";
+    foreach (range(1, 5) as $val) {
+        $response->assertSee("name=\"{$fieldName}\"", false);
+        $response->assertSee("value=\"{$val}\"", false);
+    }
+    // S'assure que le SVG smiley est présent
+    $response->assertSee('q-satis-svg', false);
+});
+
 it('affiche déjà répondu si l invitation est soumise', function (): void {
     [$clair, $invitation] = makeOuverteInvitation();
     $invitation->update(['statut' => StatutInvitation::Soumis]);
