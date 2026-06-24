@@ -25,6 +25,8 @@ final class OperationQuestionnaires extends Component
 
     public bool $showCreate = false;
 
+    public ?int $envoiCampagneId = null;
+
     public function mount(Operation $operation): void
     {
         $this->operation = $operation;
@@ -32,9 +34,15 @@ final class OperationQuestionnaires extends Component
         $this->selectedParticipants = $operation->participants()->pluck('id')->map(fn ($i) => (int) $i)->all();
     }
 
+    public function toggleEnvoi(int $campagneId): void
+    {
+        $this->envoiCampagneId = $this->envoiCampagneId === $campagneId ? null : $campagneId;
+    }
+
     public function render(): View
     {
         return view('livewire.questionnaire.operation-questionnaires', [
+            'envoiCampagneId' => $this->envoiCampagneId,
             'campagnes' => $this->operation->questionnaireCampaigns()
                 ->withCount([
                     'invitations',
