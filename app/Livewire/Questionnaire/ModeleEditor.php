@@ -31,6 +31,11 @@ final class ModeleEditor extends Component
 
     public string $commentaireLibelle = '';
 
+    /** Labels d'extrémité (ressenti uniquement). */
+    public string $labelGauche = '';
+
+    public string $labelDroite = '';
+
     public ?int $editingQuestionId = null;
 
     public function mount(QuestionnaireTemplate $template): void
@@ -66,7 +71,7 @@ final class ModeleEditor extends Component
             'config' => $this->buildConfig($type),
         ]);
 
-        $this->reset(['libelle', 'aide', 'obligatoire', 'optionsBrut', 'commentaire', 'commentaireLibelle']);
+        $this->reset(['libelle', 'aide', 'obligatoire', 'optionsBrut', 'commentaire', 'commentaireLibelle', 'labelGauche', 'labelDroite']);
         $this->type = 'texte_court';
     }
 
@@ -109,6 +114,18 @@ final class ModeleEditor extends Component
                 'commentaire' => true,
                 'commentaire_libelle' => $this->commentaireLibelle !== '' ? $this->commentaireLibelle : 'Un commentaire ? (optionnel)',
             ];
+        }
+
+        if ($type === TypeQuestion::Ressenti) {
+            $config = [];
+            if ($this->labelGauche !== '') {
+                $config['label_gauche'] = $this->labelGauche;
+            }
+            if ($this->labelDroite !== '') {
+                $config['label_droite'] = $this->labelDroite;
+            }
+
+            return $config !== [] ? $config : null;
         }
 
         if (! $type->aDesOptions()) {

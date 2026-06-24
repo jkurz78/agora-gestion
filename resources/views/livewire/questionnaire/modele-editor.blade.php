@@ -74,6 +74,18 @@
                         @endif
                     </div>
                 @endif
+                @if ($type === 'ressenti')
+                    <div class="col-md-6">
+                        <input type="text" class="form-control"
+                               placeholder="😡 / texte gauche (optionnel)"
+                               wire:model="labelGauche">
+                    </div>
+                    <div class="col-md-6">
+                        <input type="text" class="form-control"
+                               placeholder="😄 / texte droite (optionnel)"
+                               wire:model="labelDroite">
+                    </div>
+                @endif
                 <div class="col-12">
                     <button class="btn btn-primary" wire:click="ajouterQuestion">Ajouter</button>
                 </div>
