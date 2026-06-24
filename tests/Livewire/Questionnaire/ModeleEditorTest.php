@@ -54,11 +54,11 @@ it('réordonne les questions', function (): void {
 });
 
 it('active un commentaire optionnel sur une question satisfaction', function (): void {
-    $t = \App\Models\QuestionnaireTemplate::factory()->create();
+    $t = QuestionnaireTemplate::factory()->create();
 
-    \Livewire\Livewire::test(\App\Livewire\Questionnaire\ModeleEditor::class, ['template' => $t])
+    Livewire::test(ModeleEditor::class, ['template' => $t])
         ->set('libelle', 'Note globale')
-        ->set('type', \App\Enums\TypeQuestion::Satisfaction->value)
+        ->set('type', TypeQuestion::Satisfaction->value)
         ->set('commentaire', true)
         ->set('commentaireLibelle', 'Pourquoi cette note ?')
         ->call('ajouterQuestion');
@@ -68,17 +68,5 @@ it('active un commentaire optionnel sur une question satisfaction', function ():
     expect($q->config['commentaire_libelle'])->toBe('Pourquoi cette note ?');
 });
 
-it('enregistre les messages intro/remerciement assainis', function (): void {
-    $t = QuestionnaireTemplate::factory()->create();
-
-    Livewire::test(ModeleEditor::class, ['template' => $t])
-        ->set('intro', '<p>Bonjour {prenom}</p><script>alert(1)</script>')
-        ->set('remerciement', '<p>Merci !</p>')
-        ->call('enregistrerMessages')
-        ->assertHasNoErrors();
-
-    $t->refresh();
-    expect($t->intro)->toContain('Bonjour {prenom}');
-    expect($t->intro)->not->toContain('<script>');
-    expect($t->remerciement)->toContain('Merci');
-});
+// Note: la persistance intro/remerciement est désormais gérée par ModeleTextes
+// (écran "Textes" séparé). Les tests correspondants sont dans ModeleTextesTest.

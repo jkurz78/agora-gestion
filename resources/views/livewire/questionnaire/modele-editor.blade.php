@@ -1,52 +1,14 @@
 <div>
     <div class="d-flex justify-content-between align-items-center mb-2">
         <a href="{{ route('questionnaires.modeles.index') }}" class="btn btn-sm btn-link px-0">&larr; Modèles</a>
-        <a href="{{ route('questionnaires.modeles.apercu', $template) }}" target="_blank" class="btn btn-sm btn-outline-secondary">
-            Prévisualiser
-        </a>
-    </div>
-    <h1 class="h4">{{ $template->titre_interne }}</h1>
-
-    {{-- Section : Messages du questionnaire --}}
-    <div class="card mb-4">
-        <div class="card-header fw-semibold">Messages du questionnaire</div>
-        <div class="card-body">
-
-            @if (session('messages_ok'))
-                <div class="alert alert-success py-2 mb-3">Messages enregistrés.</div>
-            @endif
-
-            {{-- Liste des variables disponibles pour l'insertion --}}
-            <div class="mb-2 d-flex align-items-center gap-2 flex-wrap" id="q-var-buttons">
-                <span class="small text-muted fw-semibold me-1">Insérer :</span>
-                @foreach (['{prenom}', '{nom}', '{operation}', '{type_operation}', '{association}', '{date_debut}', '{date_fin}', '{nb_seances}'] as $var)
-                    <button type="button" class="btn btn-sm btn-outline-secondary font-monospace py-0"
-                            onclick="qInsertVariable('{{ $var }}')" title="Insérer {{ $var }}">{{ $var }}</button>
-                @endforeach
-            </div>
-
-            {{-- Éditeur Intro --}}
-            <div class="mb-3">
-                <label class="form-label fw-semibold">Introduction (page d'accueil du répondant)</label>
-                <div wire:ignore>
-                    <textarea id="q-editor-intro" rows="10" style="width:100%">{!! $intro !!}</textarea>
-                </div>
-            </div>
-
-            {{-- Éditeur Remerciement --}}
-            <div class="mb-3">
-                <label class="form-label fw-semibold">Message de remerciement (page finale)</label>
-                <div wire:ignore>
-                    <textarea id="q-editor-remerciement" rows="10" style="width:100%">{!! $remerciement !!}</textarea>
-                </div>
-            </div>
-
-            <button type="button" class="btn btn-primary"
-                    onclick="qSyncAndSave()">
-                Enregistrer les messages
-            </button>
+        <div class="d-flex gap-2">
+            <a href="{{ route('questionnaires.modeles.textes', $template) }}" class="btn btn-sm btn-outline-secondary">Textes</a>
+            <a href="{{ route('questionnaires.modeles.apercu', $template) }}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                Prévisualiser
+            </a>
         </div>
     </div>
+    <h1 class="h4">{{ $template->titre_interne }}</h1>
 
     <table class="table align-middle">
         <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
@@ -119,119 +81,3 @@
         </div>
     </div>
 </div>
-
-@assets
-<script>
-    // ---- Questionnaire message editors — shared helpers (loaded once, deduped by Livewire) ----
-
-    function _qStripVarSpans(html) {
-        // Callback form avoids dollar-N corruption in Livewire SupportAutoInjectedAssets.
-        return html.replace(
-            /<span\b[^>]*\bq-mce-var\b[^>]*>(\{[^}]+\})<\/span>/g,
-            function (_match, token) { return token; }
-        );
-    }
-
-    var _qVariables = ['{prenom}', '{nom}', '{operation}', '{type_operation}', '{association}', '{date_debut}', '{date_fin}', '{nb_seances}'];
-
-    function _qWrapVars(html) {
-        _qVariables.forEach(function (v) {
-            var escaped = v.replace(/[{}]/g, '\\$&');
-            var regex = new RegExp('(?!<span[^>]*>)' + escaped + '(?![^<]*<\\/span>)', 'g');
-            html = html.replace(regex, '<span class="q-mce-var mce-noneditable">' + v + '</span>');
-        });
-        return html;
-    }
-
-    // ---- Insert variable at cursor in whichever editor is active ----
-    function qInsertVariable(v) {
-        if (typeof tinymce === 'undefined') return;
-        var active = tinymce.activeEditor;
-        if (active) {
-            active.insertContent('<span class="q-mce-var mce-noneditable">' + v + '</span>&nbsp;');
-        }
-    }
-</script>
-@endassets
-
-@script
-<script>
-    // ---- Init TinyMCE editors (runs after Livewire morphs the DOM, $wire in scope) ----
-    // Two editors: q-editor-intro (prop 'intro') and
-    // q-editor-remerciement (prop 'remerciement').
-
-    var _qMenuItems = _qVariables.map(function (v) {
-        return {
-            type: 'menuitem',
-            text: v,
-            onAction: function () {
-                var active = tinymce.activeEditor;
-                if (active) {
-                    active.insertContent('<span class="q-mce-var mce-noneditable">' + v + '</span>&nbsp;');
-                }
-            },
-        };
-    });
-
-    function _qInitEditor(id, wireProp) {
-        if (typeof tinymce === 'undefined') {
-            setTimeout(function () { _qInitEditor(id, wireProp); }, 200);
-            return;
-        }
-
-        // Already initialized — skip.
-        if (tinymce.get(id)) return;
-
-        var textarea = document.getElementById(id);
-        if (!textarea) return;
-
-        tinymce.init({
-            target: textarea,
-            language: 'fr_FR',
-            language_url: '/vendor/tinymce/langs/fr_FR.js',
-            height: 320,
-            menubar: false,
-            statusbar: false,
-            promotion: false,
-            plugins: 'lists link noneditable',
-            toolbar: 'undo redo | bold italic underline | bullist numlist | link | variablesBtn',
-            noneditable_class: 'q-mce-var',
-            content_style: 'body { font-family: Arial, sans-serif; font-size: 14px; } .q-mce-var { background: #f3edff; border: 1px solid #d4c5f9; border-radius: 3px; padding: 1px 3px; font-family: monospace; font-size: 12px; color: #7c3aed; display: inline-block; }',
-            setup: function (editor) {
-                editor.ui.registry.addMenuButton('variablesBtn', {
-                    text: 'Variables',
-                    fetch: function (callback) { callback(_qMenuItems); },
-                });
-
-                editor.on('init', function () {
-                    editor.setContent(_qWrapVars(editor.getContent()));
-                });
-
-                // Sync stripped content to Livewire on every change.
-                editor.on('change input', function () {
-                    $wire.set(wireProp, _qStripVarSpans(editor.getContent()));
-                });
-            },
-        });
-    }
-
-    _qInitEditor('q-editor-intro', 'intro');
-    _qInitEditor('q-editor-remerciement', 'remerciement');
-
-    // ---- Sync both editors then call enregistrerMessages ----
-    window.qSyncAndSave = function () {
-        var introEditor = tinymce.get('q-editor-intro');
-        var merciEditor = tinymce.get('q-editor-remerciement');
-
-        if (introEditor) {
-            $wire.set('intro', _qStripVarSpans(introEditor.getContent()));
-        }
-        if (merciEditor) {
-            $wire.set('remerciement', _qStripVarSpans(merciEditor.getContent()));
-        }
-
-        // Wait for Livewire to settle, then call the action.
-        setTimeout(function () { $wire.call('enregistrerMessages'); }, 150);
-    };
-</script>
-@endscript

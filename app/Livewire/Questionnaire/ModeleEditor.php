@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Livewire\Questionnaire;
 
 use App\Enums\TypeQuestion;
-use App\Models\EmailTemplate;
 use App\Models\QuestionnaireTemplate;
 use App\Models\QuestionnaireTemplateQuestion;
 use Illuminate\Support\Str;
@@ -15,10 +14,6 @@ use Livewire\Component;
 final class ModeleEditor extends Component
 {
     public QuestionnaireTemplate $template;
-
-    public string $intro = '';
-
-    public string $remerciement = '';
 
     public string $libelle = '';
 
@@ -41,18 +36,6 @@ final class ModeleEditor extends Component
     public function mount(QuestionnaireTemplate $template): void
     {
         $this->template = $template;
-        $this->intro = $template->intro ?? '';
-        $this->remerciement = $template->remerciement ?? '';
-    }
-
-    public function enregistrerMessages(): void
-    {
-        $this->template->update([
-            'intro' => $this->intro === '' ? null : EmailTemplate::sanitizeCorps($this->intro),
-            'remerciement' => $this->remerciement === '' ? null : EmailTemplate::sanitizeCorps($this->remerciement),
-        ]);
-
-        session()->flash('messages_ok', true);
     }
 
     public function render(): View
