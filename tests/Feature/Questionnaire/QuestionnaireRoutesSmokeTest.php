@@ -38,6 +38,18 @@ it('affiche la page éditeur de questions (host page x-app-layout)', function ()
         ->assertSee('Mon modèle');
 });
 
+it('affiche la page Textes du modèle (host page x-app-layout)', function (): void {
+    $template = QuestionnaireTemplate::factory()->create([
+        'titre_interne' => 'Textes modèle test',
+        'intro' => '<p>Intro test</p>',
+    ]);
+
+    $this->get(route('questionnaires.modeles.textes', $template))
+        ->assertOk()
+        ->assertSee('Textes modèle test')
+        ->assertSee('Textes du questionnaire');
+});
+
 it('affiche la page résultats d une campagne (host page x-app-layout)', function (): void {
     $campagne = QuestionnaireCampaign::factory()->create([
         'titre_affiche' => 'Satisfaction parcours juin',

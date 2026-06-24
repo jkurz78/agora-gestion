@@ -27,6 +27,7 @@
                         </button>
                     </td>
                     <td class="text-end">
+                        <a href="{{ route('questionnaires.modeles.textes', $m) }}" class="btn btn-sm btn-outline-secondary">Textes</a>
                         <a href="{{ route('questionnaires.modeles.editor', $m) }}" class="btn btn-sm btn-outline-primary">Questions</a>
                         <button class="btn btn-sm btn-outline-secondary" wire:click="openEdit({{ $m->id }})">Éditer</button>
                         <button class="btn btn-sm btn-outline-danger"
