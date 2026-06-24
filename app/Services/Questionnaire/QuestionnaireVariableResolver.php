@@ -4,12 +4,22 @@ declare(strict_types=1);
 
 namespace App\Services\Questionnaire;
 
+use App\Models\Operation;
 use App\Models\QuestionnaireCampaign;
 use App\Models\QuestionnaireInvitation;
+use App\Models\Seance;
 use App\Support\CurrentAssociation;
+use Illuminate\Support\Collection;
 
 final class QuestionnaireVariableResolver
 {
+    /**
+     * Clés dont la valeur est du HTML construit en interne — ne doit PAS être échappée dans remplacer().
+     *
+     * @var array<int, string>
+     */
+    private const HTML_KEYS = ['{table_seances}', '{table_seances_a_venir}'];
+
     /**
      * @return array<string, string>
      */
@@ -19,17 +29,32 @@ final class QuestionnaireVariableResolver
         $tiers = $participant?->tiers;
         $operation = $invitation->campaign->operation;
 
+        $civilite = (string) ($tiers?->civilite?->value ?? '');
+        $politesse = (string) ($tiers?->civilite?->label() ?? '');
+        $prenom = (string) ($tiers?->prenom ?? '');
+        $nom = (string) ($tiers?->nom ?? '');
+        $nomSeul = trim($nom);
+        $prenomNom = trim($prenom.' '.$nom);
+
         $vars = [
-            '{prenom}' => (string) ($tiers?->prenom ?? ''),
-            '{nom}' => (string) ($tiers?->nom ?? ''),
-            '{civilite}' => (string) ($tiers?->civilite?->value ?? ''),
-            '{politesse}' => (string) ($tiers?->civilite?->label() ?? ''),
+            '{prenom}' => $prenom,
+            '{nom}' => $nom,
+            '{email_participant}' => (string) ($tiers?->email ?? ''),
+            '{civilite}' => $civilite,
+            '{politesse}' => $politesse,
+            '{civilite_nom}' => $civilite !== '' ? trim($civilite.' '.$nomSeul) : $nomSeul,
+            '{politesse_nom}' => $politesse !== '' ? trim($politesse.' '.$nomSeul) : $nomSeul,
+            '{civilite_prenom_nom}' => $civilite !== '' ? trim($civilite.' '.$prenomNom) : $prenomNom,
+            '{politesse_prenom_nom}' => $politesse !== '' ? trim($politesse.' '.$prenomNom) : $prenomNom,
+            '{salutation}' => $politesse !== '' ? $politesse : 'Madame, Monsieur',
             '{operation}' => (string) ($operation?->nom ?? ''),
             '{type_operation}' => (string) ($operation?->typeOperation?->nom ?? ''),
             '{association}' => (string) (CurrentAssociation::tryGet()?->nom ?? ''),
             '{date_debut}' => $operation?->date_debut?->format('d/m/Y') ?? '',
             '{date_fin}' => $operation?->date_fin?->format('d/m/Y') ?? '',
             '{nb_seances}' => (string) ($operation?->nombre_seances ?? ''),
+            '{table_seances}' => $this->buildTableSeances($operation, false),
+            '{table_seances_a_venir}' => $this->buildTableSeances($operation, true),
         ];
 
         if ($avecLien) {
@@ -49,26 +74,89 @@ final class QuestionnaireVariableResolver
         return [
             '{prenom}' => 'Jean',
             '{nom}' => 'Dupont',
+            '{email_participant}' => 'jean.dupont@example.fr',
             '{civilite}' => 'M.',
             '{politesse}' => 'Monsieur',
+            '{civilite_nom}' => 'M. DUPONT',
+            '{politesse_nom}' => 'Monsieur DUPONT',
+            '{civilite_prenom_nom}' => 'M. Jean Dupont',
+            '{politesse_prenom_nom}' => 'Monsieur Jean Dupont',
+            '{salutation}' => 'Madame, Monsieur',
             '{operation}' => $operation?->nom ?? 'Mon opération',
             '{type_operation}' => $operation?->typeOperation?->nom ?? 'Type d\'opération',
             '{association}' => CurrentAssociation::tryGet()?->nom ?? 'Mon association',
             '{date_debut}' => $operation?->date_debut?->format('d/m/Y') ?? now()->format('d/m/Y'),
             '{date_fin}' => $operation?->date_fin?->format('d/m/Y') ?? now()->addMonth()->format('d/m/Y'),
             '{nb_seances}' => (string) ($operation?->nombre_seances ?? '6'),
+            '{table_seances}' => '',
+            '{table_seances_a_venir}' => '',
         ];
     }
 
     /**
-     * Remplace les {variables} ; les valeurs sont échappées (anti-injection HTML).
+     * Remplace les {variables} dans le HTML.
+     *
+     * Les valeurs scalaires sont échappées (anti-injection HTML).
+     * Exception : les clés HTML_KEYS ({table_seances}, {table_seances_a_venir}) sont
+     * construites en interne depuis des données DB et insérées brutes.
      *
      * @param  array<string, string>  $vars
      */
     public function remplacer(string $html, array $vars): string
     {
-        $echappees = array_map(fn (string $v): string => e($v), $vars);
+        $htmlKeys = self::HTML_KEYS;
 
-        return strtr($html, $echappees);
+        $echappees = array_map(
+            static fn (string $v, string $k): string => in_array($k, $htmlKeys, true) ? $v : e($v),
+            $vars,
+            array_keys($vars),
+        );
+
+        return strtr($html, array_combine(array_keys($vars), $echappees));
+    }
+
+    /**
+     * Construit un tableau HTML des séances de l'opération (même logique que MessageLibreMail::buildTableSeances).
+     * Retourne '' si l'opération est null ou sans séances.
+     */
+    private function buildTableSeances(?Operation $operation, bool $aVenirOnly): string
+    {
+        if ($operation === null) {
+            return '';
+        }
+
+        /** @var Collection<int, Seance> $seances */
+        $seances = $operation->seances;
+
+        if ($seances->isEmpty()) {
+            return '';
+        }
+
+        $today = now()->startOfDay();
+        $filtered = $aVenirOnly
+            ? $seances->filter(fn (Seance $s) => $s->date && $s->date->gte($today))
+            : $seances;
+
+        if ($filtered->isEmpty()) {
+            return '';
+        }
+
+        $rows = '';
+        foreach ($filtered->sortBy('date') as $s) {
+            $rows .= '<tr>'
+                .'<td style="padding:6px 10px;border:1px solid #ddd;text-align:center">'.$s->numero.'</td>'
+                .'<td style="padding:6px 10px;border:1px solid #ddd">'.$s->date?->format('d/m/Y').'</td>'
+                .'<td style="padding:6px 10px;border:1px solid #ddd">'.e($s->titre_affiche).'</td>'
+                .'</tr>';
+        }
+
+        return '<table style="width:100%;border-collapse:collapse;margin:8px 0;font-size:13px">'
+            .'<tr style="background:#3d5473;color:#fff">'
+            .'<th style="padding:6px 10px;text-align:center;width:50px">N°</th>'
+            .'<th style="padding:6px 10px;width:100px">Date</th>'
+            .'<th style="padding:6px 10px">Titre</th>'
+            .'</tr>'
+            .$rows
+            .'</table>';
     }
 }
