@@ -77,3 +77,25 @@ it('n échappe pas le HTML de table_seances mais échappe les scalaires', functi
     expect($html)->not->toContain('<b>x</b>'); // scalaire échappé
     expect($html)->toContain('&lt;b&gt;');
 });
+
+it('{logo} est inséré brut par remplacer (HTML-safe, non double-échappé)', function (): void {
+    $resolver = app(QuestionnaireVariableResolver::class);
+    $logoHtml = '<img src="data:image/png;base64,abc" alt="Logo" style="max-height:60px;height:auto;width:auto;">';
+    $result = $resolver->remplacer('Début {logo} Fin', ['{logo}' => $logoHtml]);
+
+    // Le tag img doit être inséré brut — pas d'échappement HTML.
+    expect($result)->toContain('<img src=');
+    expect($result)->not->toContain('&lt;img');
+});
+
+it('{logo} est présent dans pour() et exemple() et absent des HTML_KEYS n a pas effet sur scalaires', function (): void {
+    $invitation = QuestionnaireInvitation::factory()->create();
+
+    $vars = app(QuestionnaireVariableResolver::class)->pour($invitation);
+    expect($vars)->toHaveKey('{logo}');
+
+    $exemple = app(QuestionnaireVariableResolver::class)->exemple();
+    expect($exemple)->toHaveKey('{logo}');
+    // Sans logo configuré, la valeur est une chaîne vide ou un tag img.
+    expect($exemple['{logo}'])->toBeString();
+});

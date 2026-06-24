@@ -14,15 +14,19 @@
     <div class="mb-3">
         <label class="form-label fw-semibold">Corps de l'email</label>
         @include('partials.tinymce-rich-editor', [
-            'id'      => 'q-envoi-corps',
-            'model'   => 'corps',
-            'content' => $corps,
-            'height'  => 320,
-            'groups'  => [
-                'Participant'  => ['{prenom}' => 'Prénom', '{nom}' => 'Nom', '{civilite}' => 'Civilité', '{politesse}' => 'Politesse'],
-                'Opération'    => ['{operation}' => 'Opération', '{type_operation}' => 'Type opération', '{date_debut}' => 'Date début', '{date_fin}' => 'Date fin', '{nb_seances}' => 'Nb séances'],
-                'Association'  => ['{association}' => 'Association'],
-                'Lien'         => ['{lien_questionnaire}' => 'Lien du questionnaire'],
+            'id'          => 'q-envoi-corps',
+            'model'       => 'corps',
+            'content'     => $corps,
+            'height'      => 320,
+            'groups'      => [
+                'Participant' => ['{prenom}' => 'Prénom', '{nom}' => 'Nom', '{email_participant}' => 'Email'],
+                'Politesse'   => ['{civilite}' => 'Civilité', '{politesse}' => 'Politesse', '{civilite_nom}' => 'M. NOM', '{politesse_nom}' => 'Monsieur NOM', '{salutation}' => 'Salutation'],
+                'Opération'   => ['{operation}' => 'Opération', '{type_operation}' => 'Type', '{date_debut}' => 'Date début', '{date_fin}' => 'Date fin', '{nb_seances}' => 'Nb séances', '{association}' => 'Association'],
+                'Lien'        => ['{lien_questionnaire}' => 'Lien du questionnaire'],
+            ],
+            'insertItems' => [
+                "Logo de l'association" => '{logo}',
+                'Tableau des séances'   => '{table_seances}',
             ],
         ])
         @error('corps') <div class="text-danger small mt-1">{{ $message }}</div> @enderror

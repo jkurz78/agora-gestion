@@ -29,14 +29,18 @@
             <div class="mb-4">
                 <label class="form-label fw-semibold">Introduction (page d'accueil du répondant)</label>
                 @include('partials.tinymce-rich-editor', [
-                    'id'      => 'q-textes-intro',
-                    'model'   => 'intro',
-                    'content' => $intro,
-                    'height'  => 320,
-                    'groups'  => [
-                        'Participant'  => ['{prenom}' => 'Prénom', '{nom}' => 'Nom', '{civilite}' => 'Civilité', '{politesse}' => 'Politesse'],
-                        'Opération'    => ['{operation}' => 'Opération', '{type_operation}' => 'Type opération', '{date_debut}' => 'Date début', '{date_fin}' => 'Date fin', '{nb_seances}' => 'Nb séances'],
-                        'Association'  => ['{association}' => 'Association'],
+                    'id'          => 'q-textes-intro',
+                    'model'       => 'intro',
+                    'content'     => $intro,
+                    'height'      => 320,
+                    'groups'      => [
+                        'Participant' => ['{prenom}' => 'Prénom', '{nom}' => 'Nom', '{email_participant}' => 'Email'],
+                        'Politesse'   => ['{civilite}' => 'Civilité', '{politesse}' => 'Politesse', '{civilite_nom}' => 'M. NOM', '{politesse_nom}' => 'Monsieur NOM', '{salutation}' => 'Salutation'],
+                        'Opération'   => ['{operation}' => 'Opération', '{type_operation}' => 'Type', '{date_debut}' => 'Date début', '{date_fin}' => 'Date fin', '{nb_seances}' => 'Nb séances', '{association}' => 'Association'],
+                    ],
+                    'insertItems' => [
+                        "Logo de l'association" => '{logo}',
+                        'Tableau des séances'   => '{table_seances}',
                     ],
                 ])
             </div>
@@ -45,14 +49,18 @@
             <div class="mb-4">
                 <label class="form-label fw-semibold">Message de remerciement (page finale)</label>
                 @include('partials.tinymce-rich-editor', [
-                    'id'      => 'q-textes-merci',
-                    'model'   => 'remerciement',
-                    'content' => $remerciement,
-                    'height'  => 320,
-                    'groups'  => [
-                        'Participant'  => ['{prenom}' => 'Prénom', '{nom}' => 'Nom', '{civilite}' => 'Civilité', '{politesse}' => 'Politesse'],
-                        'Opération'    => ['{operation}' => 'Opération', '{type_operation}' => 'Type opération', '{date_debut}' => 'Date début', '{date_fin}' => 'Date fin', '{nb_seances}' => 'Nb séances'],
-                        'Association'  => ['{association}' => 'Association'],
+                    'id'          => 'q-textes-merci',
+                    'model'       => 'remerciement',
+                    'content'     => $remerciement,
+                    'height'      => 320,
+                    'groups'      => [
+                        'Participant' => ['{prenom}' => 'Prénom', '{nom}' => 'Nom', '{email_participant}' => 'Email'],
+                        'Politesse'   => ['{civilite}' => 'Civilité', '{politesse}' => 'Politesse', '{civilite_nom}' => 'M. NOM', '{politesse_nom}' => 'Monsieur NOM', '{salutation}' => 'Salutation'],
+                        'Opération'   => ['{operation}' => 'Opération', '{type_operation}' => 'Type', '{date_debut}' => 'Date début', '{date_fin}' => 'Date fin', '{nb_seances}' => 'Nb séances', '{association}' => 'Association'],
+                    ],
+                    'insertItems' => [
+                        "Logo de l'association" => '{logo}',
+                        'Tableau des séances'   => '{table_seances}',
                     ],
                 ])
             </div>

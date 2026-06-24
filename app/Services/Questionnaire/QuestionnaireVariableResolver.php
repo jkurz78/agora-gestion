@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Services\Questionnaire;
 
+use App\Models\Association;
 use App\Models\Operation;
 use App\Models\QuestionnaireCampaign;
 use App\Models\QuestionnaireInvitation;
 use App\Models\Seance;
 use App\Support\CurrentAssociation;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 
 final class QuestionnaireVariableResolver
 {
@@ -18,7 +20,7 @@ final class QuestionnaireVariableResolver
      *
      * @var array<int, string>
      */
-    private const HTML_KEYS = ['{table_seances}', '{table_seances_a_venir}'];
+    private const HTML_KEYS = ['{table_seances}', '{table_seances_a_venir}', '{logo}'];
 
     /**
      * @return array<string, string>
@@ -55,6 +57,7 @@ final class QuestionnaireVariableResolver
             '{nb_seances}' => (string) ($operation?->nombre_seances ?? ''),
             '{table_seances}' => $this->buildTableSeances($operation, false),
             '{table_seances_a_venir}' => $this->buildTableSeances($operation, true),
+            '{logo}' => $this->buildLogoImg(CurrentAssociation::tryGet()),
         ];
 
         if ($avecLien) {
@@ -90,6 +93,7 @@ final class QuestionnaireVariableResolver
             '{nb_seances}' => (string) ($operation?->nombre_seances ?? '6'),
             '{table_seances}' => '',
             '{table_seances_a_venir}' => '',
+            '{logo}' => $this->buildLogoImg(CurrentAssociation::tryGet()),
         ];
     }
 
@@ -113,6 +117,29 @@ final class QuestionnaireVariableResolver
         );
 
         return strtr($html, array_combine(array_keys($vars), $echappees));
+    }
+
+    /**
+     * Construit un <img> inline (data URI) pour le logo de l'association.
+     * Retourne '' si aucun logo n'est défini ou si le fichier est absent.
+     * La data URI évite toute dépendance à un domaine ou une URL signée.
+     */
+    private function buildLogoImg(?Association $association): string
+    {
+        if ($association === null) {
+            return '';
+        }
+
+        $fullPath = $association->brandingLogoFullPath();
+        if ($fullPath === null || ! Storage::disk('local')->exists($fullPath)) {
+            return '';
+        }
+
+        $contents = Storage::disk('local')->get($fullPath);
+        $mime = Storage::disk('local')->mimeType($fullPath) ?: 'image/png';
+        $dataUri = 'data:'.$mime.';base64,'.base64_encode((string) $contents);
+
+        return '<img src="'.htmlspecialchars($dataUri).'" alt="Logo" style="max-height:60px;height:auto;width:auto;">';
     }
 
     /**
