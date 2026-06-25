@@ -14,6 +14,17 @@
 </head>
 <body>
     <div class="container questionnaire-card">
+        @php $assoEntete = \App\Support\CurrentAssociation::tryGet(); @endphp
+        @if ($assoEntete)
+            <div class="text-center mb-4">
+                @php $logoEntete = $assoEntete->brandingLogoDataUri(); @endphp
+                @if ($logoEntete)
+                    <img src="{{ $logoEntete }}" alt="{{ $assoEntete->nom }}" style="max-height:72px;width:auto" class="mb-2">
+                @endif
+                <h1 class="h5 mb-0">{{ $assoEntete->nom }}</h1>
+            </div>
+        @endif
+
         <div class="card shadow-sm">
             <div class="card-body p-4">
                 @yield('content')

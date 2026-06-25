@@ -197,3 +197,12 @@ it('le bouton Précédent revient en arrière en persistant la saisie', function
     $answer = $invitation->fresh()->submissions()->first()->answers()->first();
     expect($answer->value_integer)->toBe(3); // saisie conservée malgré le retour
 });
+
+it('affiche le nom de l association en en-tête du parcours', function (): void {
+    [$clair, $invitation] = makeOuverteInvitation();
+    $nomAsso = \App\Support\CurrentAssociation::get()->nom; // tenant courant du test
+    TenantContext::clear();
+
+    // Le nom de l'association apparaît au-dessus du cadre (en-tête centré).
+    $this->get("/q/{$clair}")->assertOk()->assertSee($nomAsso, false);
+});
