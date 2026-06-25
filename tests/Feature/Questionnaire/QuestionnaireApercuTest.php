@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 use App\Models\Association;
 use App\Models\Operation;
+use App\Models\QuestionnaireAnswer;
 use App\Models\QuestionnaireCampaign;
 use App\Models\QuestionnaireCampaignQuestion;
-use App\Models\QuestionnaireAnswer;
 use App\Models\QuestionnaireSubmission;
 use App\Models\QuestionnaireTemplate;
 use App\Models\QuestionnaireTemplateQuestion;
@@ -178,8 +178,8 @@ it('anonymise=false : l aperçu passe directement à merci depuis la dernière q
         ->assertRedirect($base.'?page=merci');
 
     // Zéro écriture en base.
-    expect(\App\Models\QuestionnaireSubmission::count())->toBe(0);
-    expect(\App\Models\QuestionnaireAnswer::count())->toBe(0);
+    expect(QuestionnaireSubmission::count())->toBe(0);
+    expect(QuestionnaireAnswer::count())->toBe(0);
 });
 
 it('l aperçu bloque sur une question obligatoire vide (comme le parcours réel)', function (): void {
@@ -191,16 +191,131 @@ it('l aperçu bloque sur une question obligatoire vide (comme le parcours réel)
     $store = route('questionnaires.campagnes.apercu.store', $campagne);
     $base = route('questionnaires.campagnes.apercu', $campagne);
 
-    // Suivant avec une valeur vide → reste sur la page 1 avec une erreur.
+    // Suivant avec une valeur vide → reste sur la page 1 avec une erreur keyed q_{id}.
     $this->post($store, ['action' => 'next', 'page' => 1, "q_{$q->id}" => ''])
         ->assertRedirect($base.'?page=1')
-        ->assertSessionHasErrors('reponse');
+        ->assertSessionHasErrors("q_{$q->id}");
 
     // Avec une valeur → avance (1 seule question → consentement).
     $this->post($store, ['action' => 'next', 'page' => 1, "q_{$q->id}" => 'ok'])
         ->assertRedirect($base.'?page=consentement');
 
     // Toujours zéro écriture en base.
+    expect(QuestionnaireSubmission::count())->toBe(0);
+    expect(QuestionnaireAnswer::count())->toBe(0);
+});
+
+it('l aperçu écran-aware : 2 questions groupées apparaissent sur la même page', function (): void {
+    $t = QuestionnaireTemplate::factory()->create(['titre_affiche' => 'Sondage groupé']);
+    $q1 = QuestionnaireTemplateQuestion::factory()->for($t, 'template')->create([
+        'libelle' => 'Première question', 'type' => 'texte_court', 'ordre' => 1,
+        'grouper_avec_precedente' => false,
+    ]);
+    $q2 = QuestionnaireTemplateQuestion::factory()->for($t, 'template')->create([
+        'libelle' => 'Deuxième question', 'type' => 'texte_court', 'ordre' => 2,
+        'grouper_avec_precedente' => true,
+    ]);
+
+    // Page 1 doit afficher les deux libellés (un seul écran de 2 questions).
+    $this->get(route('questionnaires.modeles.apercu', ['template' => $t->id, 'page' => 1]))
+        ->assertOk()
+        ->assertSee('Première question', false)
+        ->assertSee('Deuxième question', false);
+
+    // Barre de progression affiche « 1 sur 1 » (un seul écran).
+    $this->get(route('questionnaires.modeles.apercu', ['template' => $t->id, 'page' => 1]))
+        ->assertSee('Page 1 sur 1', false);
+
+    expect(QuestionnaireSubmission::count())->toBe(0);
+    expect(QuestionnaireAnswer::count())->toBe(0);
+});
+
+it('l aperçu écran-aware : next avec une question obligatoire vide redirige sur la même page avec erreur q_{id}', function (): void {
+    $t = QuestionnaireTemplate::factory()->create();
+    $q1 = QuestionnaireTemplateQuestion::factory()->for($t, 'template')->create([
+        'type' => 'texte_court', 'ordre' => 1, 'obligatoire' => true,
+        'grouper_avec_precedente' => false,
+    ]);
+    $q2 = QuestionnaireTemplateQuestion::factory()->for($t, 'template')->create([
+        'type' => 'texte_court', 'ordre' => 2, 'obligatoire' => false,
+        'grouper_avec_precedente' => true,
+    ]);
+    $store = route('questionnaires.modeles.apercu.store', $t);
+    $base = route('questionnaires.modeles.apercu', $t);
+
+    // q1 vide → erreur sur q_{q1->id}, reste page 1, zéro DB.
+    $this->post($store, ['action' => 'next', 'page' => 1, "q_{$q1->id}" => '', "q_{$q2->id}" => 'ok'])
+        ->assertRedirect($base.'?page=1')
+        ->assertSessionHasErrors("q_{$q1->id}");
+
+    // Les deux renseignées → avance vers consentement (1 seul écran → fin).
+    $this->post($store, ['action' => 'next', 'page' => 1, "q_{$q1->id}" => 'réponse', "q_{$q2->id}" => 'ok'])
+        ->assertRedirect($base.'?page=consentement');
+
+    expect(QuestionnaireSubmission::count())->toBe(0);
+    expect(QuestionnaireAnswer::count())->toBe(0);
+});
+
+it('l aperçu écran-aware : next puis prev conserve les réponses des deux questions de l écran', function (): void {
+    $t = QuestionnaireTemplate::factory()->create(['anonymise' => true]);
+    $q1 = QuestionnaireTemplateQuestion::factory()->for($t, 'template')->create([
+        'libelle' => 'Question A', 'type' => 'texte_court', 'ordre' => 1,
+        'grouper_avec_precedente' => false, 'obligatoire' => false,
+    ]);
+    $q2 = QuestionnaireTemplateQuestion::factory()->for($t, 'template')->create([
+        'libelle' => 'Question B', 'type' => 'texte_court', 'ordre' => 2,
+        'grouper_avec_precedente' => false, 'obligatoire' => false,
+    ]);
+    $store = route('questionnaires.modeles.apercu.store', $t);
+    $base = route('questionnaires.modeles.apercu', $t);
+
+    // Remplir écran 1 (q1) et avancer.
+    $this->post($store, ['action' => 'next', 'page' => 1, "q_{$q1->id}" => 'valeur-A'])
+        ->assertRedirect($base.'?page=2');
+
+    // Remplir écran 2 (q2) et reculer.
+    $this->post($store, ['action' => 'prev', 'page' => 2, "q_{$q2->id}" => 'valeur-B'])
+        ->assertRedirect($base.'?page=1');
+
+    // Revenir sur l'écran 1 : valeur-A toujours là.
+    $this->get($base.'?page=1')
+        ->assertOk()
+        ->assertSee('valeur-A', false);
+
+    // Revenir sur l'écran 2 : valeur-B toujours là.
+    $this->get($base.'?page=2')
+        ->assertOk()
+        ->assertSee('valeur-B', false);
+
+    expect(QuestionnaireSubmission::count())->toBe(0);
+    expect(QuestionnaireAnswer::count())->toBe(0);
+});
+
+it('l aperçu écran-aware : une question Information s affiche sans input et n est jamais obligatoire', function (): void {
+    $t = QuestionnaireTemplate::factory()->create();
+    $qInfo = QuestionnaireTemplateQuestion::factory()->for($t, 'template')->create([
+        'libelle' => 'Titre de section', 'type' => 'information', 'ordre' => 1,
+        'aide' => 'Texte explicatif ici.', 'obligatoire' => true, // obligatoire ignoré pour Information
+        'grouper_avec_precedente' => false,
+    ]);
+    $qTexte = QuestionnaireTemplateQuestion::factory()->for($t, 'template')->create([
+        'libelle' => 'Votre avis', 'type' => 'texte_court', 'ordre' => 2,
+        'obligatoire' => false, 'grouper_avec_precedente' => true,
+    ]);
+    $store = route('questionnaires.modeles.apercu.store', $t);
+    $base = route('questionnaires.modeles.apercu', $t);
+
+    // Les deux sur la même page (grouper_avec_precedente = true sur qTexte).
+    $response = $this->get($base.'?page=1');
+    $response->assertOk()
+        ->assertSee('Titre de section', false)
+        ->assertSee('Texte explicatif ici.', false)
+        ->assertSee('Votre avis', false);
+
+    // POST sans rien remplir → pas d'erreur sur qInfo (Information ignoré).
+    $this->post($store, ['action' => 'next', 'page' => 1, "q_{$qTexte->id}" => ''])
+        ->assertRedirect($base.'?page=consentement'); // 1 seul écran, non obligatoire → avance
+
     expect(QuestionnaireSubmission::count())->toBe(0);
     expect(QuestionnaireAnswer::count())->toBe(0);
 });

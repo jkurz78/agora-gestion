@@ -8,6 +8,7 @@ use App\Models\QuestionnaireCampaign;
 use App\Models\QuestionnaireCampaignQuestion;
 use App\Models\QuestionnaireTemplate;
 use App\Models\QuestionnaireTemplateQuestion;
+use App\Services\Questionnaire\QuestionnaireEcranResolver;
 use App\Services\Questionnaire\QuestionnaireVariableResolver;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -16,7 +17,10 @@ use Illuminate\Support\Collection;
 
 final class QuestionnaireApercuController extends Controller
 {
-    public function __construct(private readonly QuestionnaireVariableResolver $variables) {}
+    public function __construct(
+        private readonly QuestionnaireVariableResolver $variables,
+        private readonly QuestionnaireEcranResolver $ecranResolver,
+    ) {}
 
     public function modele(Request $request, QuestionnaireTemplate $template): View
     {
@@ -85,7 +89,8 @@ final class QuestionnaireApercuController extends Controller
     private function rendre(Request $request, string $source, string $titre, string $intro, string $remerciement, $questions, array $vars, string $retour, string $base, string $postUrl, bool $anonymise = true, bool $autoriserRetour = true, bool $afficherProgression = true): View
     {
         $page = $request->query('page', '0');
-        $total = $questions->count();
+        $ecrans = $this->ecranResolver->decouper($questions);
+        $total = count($ecrans);
         $sessionKey = 'apercu_reponses.'.$source;
 
         $commun = [
@@ -117,24 +122,31 @@ final class QuestionnaireApercuController extends Controller
             return view('questionnaire.apercu.intro', $commun + ['introHtml' => $this->variables->remplacer($intro, $vars)]);
         }
 
-        $question = $questions[$page - 1] ?? null;
-        abort_if($question === null, 404);
+        $ecran = $ecrans[$page - 1] ?? null;
+        abort_if($ecran === null, 404);
 
-        // Pre-fill from session
+        // Pre-fill every real question of the screen from session
         $reponses = session($sessionKey, []);
-        $oldValue = $reponses[$question->id] ?? null;
-        $oldCommentaire = $reponses[$question->id.'_commentaire'] ?? null;
+        $oldValues = [];
+        $oldCommentaires = [];
+        foreach ($ecran as $q) {
+            if (! $q->type->estReponse()) {
+                continue;
+            }
+            $oldValues[$q->id] = $reponses[$q->id] ?? null;
+            $oldCommentaires[$q->id] = $reponses[$q->id.'_commentaire'] ?? null;
+        }
 
         return view('questionnaire.apercu.question', $commun + [
-            'question' => $question,
+            'ecran' => $ecran,
             'page' => $page,
-            'oldValue' => $oldValue,
-            'oldCommentaire' => $oldCommentaire,
+            'oldValues' => $oldValues,
+            'oldCommentaires' => $oldCommentaires,
         ]);
     }
 
     /**
-     * Handle POST navigation: store current answer in session, redirect to next/prev page.
+     * Handle POST navigation: store current screen's answers in session, redirect to next/prev page.
      *
      * @param  Collection<int, QuestionnaireCampaignQuestion|QuestionnaireTemplateQuestion>  $questions
      */
@@ -142,23 +154,27 @@ final class QuestionnaireApercuController extends Controller
     {
         $action = $request->input('action', 'next');
         $page = max(1, (int) $request->input('page', 1));
-        $total = $questions->count();
+        $ecrans = $this->ecranResolver->decouper($questions);
+        $total = count($ecrans);
         $sessionKey = 'apercu_reponses.'.$source;
 
-        // Persist the current page's answer (if any) into session — NO DB writes
-        $question = $questions[$page - 1] ?? null;
-        $value = null;
-        if ($question !== null) {
-            $fieldName = 'q_'.$question->id;
-            $value = $request->input($fieldName);
-            $commentaire = $request->input($fieldName.'_commentaire');
+        // Persist every real question of the current screen into session — NO DB writes
+        $ecran = $ecrans[$page - 1] ?? null;
+        $reponses = session($sessionKey, []);
 
-            $reponses = session($sessionKey, []);
-            if ($value !== null) {
-                $reponses[$question->id] = $value;
-            }
-            if ($commentaire !== null) {
-                $reponses[$question->id.'_commentaire'] = $commentaire;
+        if ($ecran !== null) {
+            foreach ($ecran as $q) {
+                if (! $q->type->estReponse()) {
+                    continue; // Information : pas de saisie
+                }
+                $value = $request->input("q_{$q->id}");
+                $commentaire = $request->input("q_{$q->id}_commentaire");
+                if ($value !== null) {
+                    $reponses[$q->id] = $value;
+                }
+                if ($commentaire !== null) {
+                    $reponses[$q->id.'_commentaire'] = $commentaire;
+                }
             }
             session([$sessionKey => $reponses]);
         }
@@ -168,10 +184,21 @@ final class QuestionnaireApercuController extends Controller
             return redirect($base.'?page='.($page > 1 ? $page - 1 : 0));
         }
 
-        // Suivant : bloque sur une question obligatoire vide, comme le parcours réel.
-        if ($question !== null && $question->obligatoire && ($value === null || $value === '')) {
-            return redirect($base.'?page='.$page)
-                ->withErrors(['reponse' => 'Cette question est obligatoire.']);
+        // Suivant : valider toutes les questions obligatoires de l'écran.
+        if ($ecran !== null) {
+            $erreurs = [];
+            foreach ($ecran as $q) {
+                if (! $q->type->estReponse()) {
+                    continue; // Information : pas de validation
+                }
+                $value = $request->input("q_{$q->id}");
+                if ($q->obligatoire && ($value === null || $value === '')) {
+                    $erreurs["q_{$q->id}"] = 'Cette question est obligatoire.';
+                }
+            }
+            if ($erreurs !== []) {
+                return redirect($base.'?page='.$page)->withErrors($erreurs);
+            }
         }
 
         if ($page >= $total) {
