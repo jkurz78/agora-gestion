@@ -5,24 +5,18 @@ declare(strict_types=1);
 namespace App\Livewire\Questionnaire;
 
 use App\Models\QuestionnaireTemplate;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 use Livewire\Component;
+use Livewire\Features\SupportRedirects\Redirector;
 
 final class ModeleList extends Component
 {
     public bool $showModal = false;
 
-    public ?int $editingId = null;
-
     public string $titre_interne = '';
 
     public string $titre_affiche = '';
-
-    public bool $anonymise = true;
-
-    public bool $autoriserRetour = true;
-
-    public bool $afficherProgression = true;
 
     public function render(): View
     {
@@ -35,43 +29,20 @@ final class ModeleList extends Component
 
     public function openCreate(): void
     {
-        $this->reset(['editingId', 'titre_interne', 'titre_affiche']);
-        $this->anonymise = true;
-        $this->autoriserRetour = true;
-        $this->afficherProgression = true;
+        $this->reset(['titre_interne', 'titre_affiche']);
         $this->showModal = true;
     }
 
-    public function openEdit(int $id): void
-    {
-        $m = QuestionnaireTemplate::findOrFail($id);
-        $this->editingId = (int) $m->id;
-        $this->titre_interne = $m->titre_interne;
-        $this->titre_affiche = $m->titre_affiche;
-        $this->anonymise = $m->anonymise;
-        $this->autoriserRetour = $m->autoriser_retour;
-        $this->afficherProgression = $m->afficher_progression;
-        $this->showModal = true;
-    }
-
-    public function save(): void
+    public function save(): RedirectResponse|Redirector
     {
         $data = $this->validate([
             'titre_interne' => 'required|string|max:150',
             'titre_affiche' => 'required|string|max:150',
         ]);
 
-        $data['anonymise'] = $this->anonymise;
-        $data['autoriser_retour'] = $this->autoriserRetour;
-        $data['afficher_progression'] = $this->afficherProgression;
+        $model = QuestionnaireTemplate::create($data);
 
-        if ($this->editingId !== null) {
-            QuestionnaireTemplate::findOrFail($this->editingId)->update($data);
-        } else {
-            QuestionnaireTemplate::create($data);
-        }
-
-        $this->showModal = false;
+        return redirect()->route('questionnaires.modeles.infos', $model);
     }
 
     public function toggleActif(int $id): void

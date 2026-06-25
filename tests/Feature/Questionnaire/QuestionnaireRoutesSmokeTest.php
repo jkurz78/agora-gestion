@@ -30,15 +30,31 @@ it('affiche la page liste des modèles (host page x-app-layout)', function (): v
         ->assertSee('Satisfaction parcours');
 });
 
-it('affiche la page éditeur de questions (host page x-app-layout)', function (): void {
+it('affiche la page Informations avec la barre de navigation complète', function (): void {
+    $template = QuestionnaireTemplate::factory()->create(['titre_interne' => 'Modèle nav test']);
+
+    $this->get(route('questionnaires.modeles.infos', $template))
+        ->assertOk()
+        ->assertSee('Modèle nav test')
+        ->assertSee('Informations')
+        ->assertSee('Textes')
+        ->assertSee('Questions')
+        ->assertSee('Prévisualiser');
+});
+
+it('affiche la page éditeur de questions avec la barre de navigation complète', function (): void {
     $template = QuestionnaireTemplate::factory()->create(['titre_interne' => 'Mon modèle']);
 
     $this->get(route('questionnaires.modeles.editor', $template))
         ->assertOk()
-        ->assertSee('Mon modèle');
+        ->assertSee('Mon modèle')
+        ->assertSee('Informations')
+        ->assertSee('Textes')
+        ->assertSee('Questions')
+        ->assertSee('Prévisualiser');
 });
 
-it('affiche la page Textes du modèle (host page x-app-layout)', function (): void {
+it('affiche la page Textes avec la barre de navigation complète', function (): void {
     $template = QuestionnaireTemplate::factory()->create([
         'titre_interne' => 'Textes modèle test',
         'intro' => '<p>Intro test</p>',
@@ -47,7 +63,11 @@ it('affiche la page Textes du modèle (host page x-app-layout)', function (): vo
     $this->get(route('questionnaires.modeles.textes', $template))
         ->assertOk()
         ->assertSee('Textes modèle test')
-        ->assertSee('Textes du questionnaire');
+        ->assertSee('Textes du questionnaire')
+        ->assertSee('Informations')
+        ->assertSee('Textes')
+        ->assertSee('Questions')
+        ->assertSee('Prévisualiser');
 });
 
 it('affiche la page résultats d une campagne (host page x-app-layout)', function (): void {

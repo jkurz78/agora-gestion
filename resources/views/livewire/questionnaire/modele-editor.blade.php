@@ -1,14 +1,5 @@
 <div>
-    <div class="d-flex justify-content-between align-items-center mb-2">
-        <a href="{{ route('questionnaires.modeles.index') }}" class="btn btn-sm btn-link px-0">&larr; Modèles</a>
-        <div class="d-flex gap-2">
-            <a href="{{ route('questionnaires.modeles.textes', $template) }}" class="btn btn-sm btn-outline-secondary">Textes</a>
-            <a href="{{ route('questionnaires.modeles.apercu', $template) }}" target="_blank" class="btn btn-sm btn-outline-secondary">
-                Prévisualiser
-            </a>
-        </div>
-    </div>
-    <h1 class="h4">{{ $template->titre_interne }}</h1>
+    @include('questionnaire.partials.modele-nav', ['template' => $template, 'active' => 'questions'])
 
     <table class="table align-middle">
         <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">

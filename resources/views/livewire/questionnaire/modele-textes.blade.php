@@ -1,11 +1,5 @@
 <div>
-    <div class="d-flex justify-content-between align-items-center mb-2">
-        <a href="{{ route('questionnaires.modeles.index') }}" class="btn btn-sm btn-link px-0">&larr; Retour aux modèles</a>
-        <a href="{{ route('questionnaires.modeles.apercu', $template) }}" target="_blank" class="btn btn-sm btn-outline-secondary">
-            Prévisualiser
-        </a>
-    </div>
-    <h1 class="h4">{{ $template->titre_interne }} — Textes</h1>
+    @include('questionnaire.partials.modele-nav', ['template' => $template, 'active' => 'textes'])
 
     @if (session('textes_ok'))
         <div class="alert alert-success py-2 mb-3">Textes enregistrés.</div>

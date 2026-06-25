@@ -191,6 +191,9 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
     ->name('questionnaires.')
     ->group(function (): void {
         Route::view('/modeles', 'questionnaire.modeles.index')->name('modeles.index');
+        Route::get('/modeles/{template}/infos', function (QuestionnaireTemplate $template) {
+            return view('questionnaire.modeles.infos', compact('template'));
+        })->name('modeles.infos');
         Route::get('/modeles/{template}', function (QuestionnaireTemplate $template) {
             return view('questionnaire.modeles.editor', compact('template'));
         })->name('modeles.editor');
