@@ -100,6 +100,25 @@ final class QuestionnaireRepondantController extends Controller
                 : redirect()->route('questionnaire.show', ['token' => $token, 'page' => $next]);
         }
 
+        if ($action === 'prev') {
+            $page = (int) $request->input('page');
+            $question = $campagne->questions()->get()[$page - 1] ?? null;
+
+            // Retour en arrière : on persiste la saisie courante sans bloquer (obligatoire ignoré).
+            if ($question !== null) {
+                $this->reponses->enregistrerReponse(
+                    $submission,
+                    $question,
+                    $request->input("q_{$question->id}"),
+                    $request->input("q_{$question->id}_commentaire"),
+                );
+            }
+
+            return redirect()->route('questionnaire.show', [
+                'token' => $token, 'page' => max(0, $page - 1),
+            ]);
+        }
+
         if ($action === 'finish') {
             try {
                 $this->reponses->finaliser($submission, $request->boolean('accepte_contact'));
@@ -121,6 +140,7 @@ final class QuestionnaireRepondantController extends Controller
 
         return view('questionnaire.repondant.consentement', [
             'token' => $token, 'campagne' => $invitation->campaign,
+            'total' => $invitation->campaign->questions()->count(),
         ]);
     }
 

@@ -43,10 +43,12 @@
         ])
     </div>
 
-    <div class="d-flex justify-content-end">
+    <div class="d-flex justify-content-between">
         @php
+            $precedent = $page > 1 ? $base . '?page=' . ($page - 1) : $base . '?page=0';
             $suivant = $page < $total ? $base . '?page=' . ($page + 1) : $base . '?page=consentement';
         @endphp
-        <a href="{{ $suivant }}" class="btn btn-primary">Suivant</a>
+        <a href="{{ $precedent }}" class="btn btn-outline-secondary">← Précédent</a>
+        <a href="{{ $suivant }}" class="btn btn-primary">Suivant →</a>
     </div>
 @endsection

@@ -21,7 +21,8 @@
         </label>
     </div>
 
-    <div class="d-flex justify-content-end">
+    <div class="d-flex justify-content-between">
+        <a href="{{ $base }}?page={{ $total }}" class="btn btn-outline-secondary">← Précédent</a>
         <a href="{{ $base }}?page=merci" class="btn btn-success">Terminer</a>
     </div>
 @endsection

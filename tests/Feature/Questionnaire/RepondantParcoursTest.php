@@ -179,3 +179,21 @@ it('résout le tenant de l invitation même si un autre tenant est déjà booté
     expect((int) TenantContext::currentId())->toBe($invitationAssoId);
     expect($invitationAssoId)->not->toBe((int) $autre->id);
 });
+
+it('le bouton Précédent revient en arrière en persistant la saisie', function (): void {
+    [$clair, $invitation] = makeOuverteInvitation(); // 1 question satisfaction obligatoire
+    TenantContext::clear();
+
+    $this->post("/q/{$clair}", ['action' => 'start']);
+
+    // La page question affiche un bouton Précédent.
+    $this->get("/q/{$clair}?page=1")->assertOk()->assertSee('Précédent');
+
+    // Précédent depuis la page 1 → persiste la note (sans bloquer) → retour à l'intro (page 0).
+    $question = $invitation->campaign->questions()->first();
+    $this->post("/q/{$clair}", ['action' => 'prev', 'page' => 1, "q_{$question->id}" => '3'])
+        ->assertRedirect(route('questionnaire.show', ['token' => $clair, 'page' => 0]));
+
+    $answer = $invitation->fresh()->submissions()->first()->answers()->first();
+    expect($answer->value_integer)->toBe(3); // saisie conservée malgré le retour
+});

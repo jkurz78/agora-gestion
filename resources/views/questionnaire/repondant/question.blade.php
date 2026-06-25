@@ -20,7 +20,6 @@
 
     <form method="POST" action="{{ route('questionnaire.store', ['token' => $token]) }}">
         @csrf
-        <input type="hidden" name="action" value="next">
         <input type="hidden" name="page" value="{{ $page }}">
 
         <div class="mb-4">
@@ -48,8 +47,13 @@
             ])
         </div>
 
-        <div class="d-flex justify-content-end">
-            <button type="submit" class="btn btn-primary">Suivant</button>
+        <div class="d-flex justify-content-between">
+            <button type="submit" name="action" value="prev" class="btn btn-outline-secondary" formnovalidate>
+                ← Précédent
+            </button>
+            <button type="submit" name="action" value="next" class="btn btn-primary">
+                Suivant →
+            </button>
         </div>
     </form>
 @endsection

@@ -22,7 +22,9 @@
             </label>
         </div>
 
-        <div class="d-flex justify-content-end">
+        <div class="d-flex justify-content-between">
+            <a href="{{ route('questionnaire.show', ['token' => $token, 'page' => $total]) }}"
+               class="btn btn-outline-secondary">← Précédent</a>
             <button type="submit" class="btn btn-success">Envoyer mes réponses</button>
         </div>
     </form>
