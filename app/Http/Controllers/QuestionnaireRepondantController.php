@@ -8,6 +8,7 @@ use App\Enums\StatutInvitation;
 use App\Exceptions\Questionnaire\ReponseObligatoireException;
 use App\Models\Association;
 use App\Models\QuestionnaireInvitation;
+use App\Services\Questionnaire\QuestionnaireEcranResolver;
 use App\Services\Questionnaire\QuestionnaireReponseService;
 use App\Services\Questionnaire\QuestionnaireTokenService;
 use App\Services\Questionnaire\QuestionnaireVariableResolver;
@@ -23,6 +24,7 @@ final class QuestionnaireRepondantController extends Controller
         private readonly QuestionnaireTokenService $tokens,
         private readonly QuestionnaireReponseService $reponses,
         private readonly QuestionnaireVariableResolver $variables,
+        private readonly QuestionnaireEcranResolver $ecranResolver,
     ) {}
 
     public function show(Request $request, string $token): View
@@ -38,7 +40,9 @@ final class QuestionnaireRepondantController extends Controller
         }
 
         $page = max(0, (int) $request->query('page', '0'));
-        $questions = $campagne->questions()->get();
+        $questions = $campagne->questions()->orderBy('ordre')->get();
+        $ecrans = $this->ecranResolver->decouper($questions);
+        $total = count($ecrans);
 
         if ($page === 0) {
             $vars = $this->variables->pour($invitation);
@@ -52,16 +56,20 @@ final class QuestionnaireRepondantController extends Controller
             ]);
         }
 
-        $question = $questions[$page - 1] ?? null;
-        abort_if($question === null, 404);
+        $ecran = $ecrans[$page - 1] ?? null;
+        abort_if($ecran === null, 404);
 
-        // valeur déjà saisie (reprise)
+        // réponses déjà saisies (reprise) — indexées par campaign_question_id
         $submission = $this->reponses->demarrerOuReprendre($invitation);
-        $answer = $submission->answers()->where('campaign_question_id', $question->id)->first();
+        $answers = $submission->answers()->get()->keyBy('campaign_question_id');
 
         return view('questionnaire.repondant.question', [
-            'token' => $token, 'campagne' => $campagne, 'question' => $question,
-            'page' => $page, 'total' => $questions->count(), 'answer' => $answer,
+            'token' => $token,
+            'campagne' => $campagne,
+            'ecran' => $ecran,
+            'page' => $page,
+            'total' => $total,
+            'answers' => $answers,
         ]);
     }
 
@@ -80,19 +88,41 @@ final class QuestionnaireRepondantController extends Controller
 
         if ($action === 'next') {
             $page = (int) $request->input('page');
-            $question = $campagne->questions()->get()[$page - 1] ?? null;
-            abort_if($question === null, 404);
+            $questions = $campagne->questions()->orderBy('ordre')->get();
+            $ecrans = $this->ecranResolver->decouper($questions);
+            $total = count($ecrans);
+            $ecran = $ecrans[$page - 1] ?? null;
+            abort_if($ecran === null, 404);
 
-            $valeur = $request->input("q_{$question->id}");
-            $commentaire = $request->input("q_{$question->id}_commentaire");
+            // Valider TOUTES les questions de l'écran avant de persister.
+            $erreurs = [];
+            foreach ($ecran as $q) {
+                if (! $q->type->estReponse()) {
+                    continue; // Information : pas de lecture / validation / persistance
+                }
 
-            if ($question->obligatoire && ($valeur === null || $valeur === '')) {
-                return back()->withErrors(['reponse' => 'Cette question est obligatoire.'])->withInput();
+                $valeur = $request->input("q_{$q->id}");
+
+                if ($q->obligatoire && ($valeur === null || $valeur === '')) {
+                    $erreurs["q_{$q->id}"] = 'Cette question est obligatoire.';
+                }
             }
 
-            $this->reponses->enregistrerReponse($submission, $question, $valeur, $commentaire);
+            if ($erreurs !== []) {
+                return back()->withErrors($erreurs)->withInput();
+            }
 
-            $total = $campagne->questions()->count();
+            // Aucune erreur : persister toutes les réponses.
+            foreach ($ecran as $q) {
+                if (! $q->type->estReponse()) {
+                    continue;
+                }
+
+                $valeur = $request->input("q_{$q->id}");
+                $commentaire = $request->input("q_{$q->id}_commentaire");
+                $this->reponses->enregistrerReponse($submission, $q, $valeur, $commentaire);
+            }
+
             $next = $page + 1;
 
             if ($next > $total) {
@@ -110,16 +140,23 @@ final class QuestionnaireRepondantController extends Controller
 
         if ($action === 'prev') {
             $page = (int) $request->input('page');
-            $question = $campagne->questions()->get()[$page - 1] ?? null;
+            $questions = $campagne->questions()->orderBy('ordre')->get();
+            $ecrans = $this->ecranResolver->decouper($questions);
+            $ecran = $ecrans[$page - 1] ?? null;
 
             // Retour en arrière : on persiste la saisie courante sans bloquer (obligatoire ignoré).
-            if ($question !== null) {
-                $this->reponses->enregistrerReponse(
-                    $submission,
-                    $question,
-                    $request->input("q_{$question->id}"),
-                    $request->input("q_{$question->id}_commentaire"),
-                );
+            if ($ecran !== null) {
+                foreach ($ecran as $q) {
+                    if (! $q->type->estReponse()) {
+                        continue;
+                    }
+                    $this->reponses->enregistrerReponse(
+                        $submission,
+                        $q,
+                        $request->input("q_{$q->id}"),
+                        $request->input("q_{$q->id}_commentaire"),
+                    );
+                }
             }
 
             return redirect()->route('questionnaire.show', [
@@ -144,11 +181,16 @@ final class QuestionnaireRepondantController extends Controller
     public function consentement(string $token): View
     {
         $invitation = $this->resoudre($token);
-        abort_unless($invitation->campaign->statut->accepteReponses(), 422);
+        $campagne = $invitation->campaign;
+        abort_unless($campagne->statut->accepteReponses(), 422);
+
+        $questions = $campagne->questions()->orderBy('ordre')->get();
+        $total = count($this->ecranResolver->decouper($questions));
 
         return view('questionnaire.repondant.consentement', [
-            'token' => $token, 'campagne' => $invitation->campaign,
-            'total' => $invitation->campaign->questions()->count(),
+            'token' => $token,
+            'campagne' => $campagne,
+            'total' => $total,
         ]);
     }
 

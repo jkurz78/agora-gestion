@@ -12,6 +12,7 @@ use App\Models\QuestionnaireCampaign;
 use App\Models\QuestionnaireCampaignQuestion;
 use App\Models\QuestionnaireInvitation;
 use App\Services\Questionnaire\QuestionnaireTokenService;
+use App\Support\CurrentAssociation;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Str;
 
@@ -103,7 +104,7 @@ it('affiche l intro en HTML avec variables résolues', function (): void {
     [$clair, $invitation] = makeOuverteInvitation();
     $invitation->campaign->update(['intro' => '<p>Bonjour <strong>{prenom}</strong></p>']);
     $invitation->participant->tiers->update(['prenom' => 'Camille']);
-    \App\Tenant\TenantContext::clear();
+    TenantContext::clear();
 
     $this->get("/q/{$clair}")
         ->assertOk()
@@ -113,18 +114,18 @@ it('affiche l intro en HTML avec variables résolues', function (): void {
 });
 
 it('le parcours enregistre le commentaire de satisfaction', function (): void {
-    $op = \App\Models\Operation::factory()->create();
-    $participant = \App\Models\Participant::factory()->create(['operation_id' => $op->id]);
-    $campagne = \App\Models\QuestionnaireCampaign::factory()->for($op, 'operation')->create(['statut' => 'ouverte']);
-    $q = \App\Models\QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+    $op = Operation::factory()->create();
+    $participant = Participant::factory()->create(['operation_id' => $op->id]);
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['statut' => 'ouverte']);
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
         'type' => 'satisfaction', 'ordre' => 1, 'config' => ['commentaire' => true],
     ]);
-    $clair = \Illuminate\Support\Str::random(48);
-    $inv = \App\Models\QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create([
+    $clair = Str::random(48);
+    $inv = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create([
         'participant_id' => $participant->id,
-        'token_hash' => app(\App\Services\Questionnaire\QuestionnaireTokenService::class)->hash($clair),
+        'token_hash' => app(QuestionnaireTokenService::class)->hash($clair),
     ]);
-    \App\Tenant\TenantContext::clear();
+    TenantContext::clear();
 
     $this->post("/q/{$clair}", ['action' => 'start']);
     $this->post("/q/{$clair}", ['action' => 'next', 'page' => 1, "q_{$q->id}" => '4', "q_{$q->id}_commentaire" => 'RAS positif']);
@@ -135,18 +136,18 @@ it('le parcours enregistre le commentaire de satisfaction', function (): void {
 });
 
 it('affiche un input hidden pour la question ressenti (sans valeur par défaut)', function (): void {
-    $op = \App\Models\Operation::factory()->create();
-    $participant = \App\Models\Participant::factory()->create(['operation_id' => $op->id]);
-    $campagne = \App\Models\QuestionnaireCampaign::factory()->for($op, 'operation')->create(['statut' => 'ouverte']);
-    $q = \App\Models\QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
-        'type' => \App\Enums\TypeQuestion::Ressenti, 'ordre' => 1, 'obligatoire' => false,
+    $op = Operation::factory()->create();
+    $participant = Participant::factory()->create(['operation_id' => $op->id]);
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['statut' => 'ouverte']);
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'type' => TypeQuestion::Ressenti, 'ordre' => 1, 'obligatoire' => false,
     ]);
-    $clair = \Illuminate\Support\Str::random(48);
-    \App\Models\QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create([
+    $clair = Str::random(48);
+    QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create([
         'participant_id' => $participant->id,
-        'token_hash' => app(\App\Services\Questionnaire\QuestionnaireTokenService::class)->hash($clair),
+        'token_hash' => app(QuestionnaireTokenService::class)->hash($clair),
     ]);
-    \App\Tenant\TenantContext::clear();
+    TenantContext::clear();
 
     $this->post("/q/{$clair}", ['action' => 'start']);
 
@@ -200,7 +201,7 @@ it('le bouton Précédent revient en arrière en persistant la saisie', function
 
 it('affiche le nom de l association en en-tête du parcours', function (): void {
     [$clair, $invitation] = makeOuverteInvitation();
-    $nomAsso = \App\Support\CurrentAssociation::get()->nom; // tenant courant du test
+    $nomAsso = CurrentAssociation::get()->nom; // tenant courant du test
     TenantContext::clear();
 
     // Le nom de l'association apparaît au-dessus du cadre (en-tête centré).
@@ -253,6 +254,271 @@ it('autoriser_retour=false : le bouton Précédent est absent de la page questio
     $this->get("/q/{$clair}?page=1")
         ->assertOk()
         ->assertDontSee('Précédent', false);
+});
+
+// ────────────────────────────────────────────────────────────────
+// Tests écran-aware (Task 3 — sections légères)
+// ────────────────────────────────────────────────────────────────
+
+it('deux questions groupées apparaissent toutes les deux sur une seule page', function (): void {
+    $op = Operation::factory()->create();
+    $participant = Participant::factory()->create(['operation_id' => $op->id]);
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'statut' => StatutCampagne::Ouverte,
+        'afficher_progression' => true,
+        'anonymise' => true,
+    ]);
+    $q1 = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Première question', 'type' => TypeQuestion::TexteCourt,
+        'ordre' => 1, 'obligatoire' => false, 'grouper_avec_precedente' => false,
+    ]);
+    $q2 = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Deuxième question groupée', 'type' => TypeQuestion::TexteCourt,
+        'ordre' => 2, 'obligatoire' => false, 'grouper_avec_precedente' => true,
+    ]);
+    $clair = Str::random(48);
+    QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create([
+        'participant_id' => $participant->id,
+        'token_hash' => app(QuestionnaireTokenService::class)->hash($clair),
+        'statut' => StatutInvitation::NonOuvert,
+    ]);
+    TenantContext::clear();
+
+    $this->post("/q/{$clair}", ['action' => 'start']);
+
+    $response = $this->get("/q/{$clair}?page=1");
+    $response->assertOk();
+
+    // Les deux questions doivent être sur la même page (page 1 = seul écran).
+    $response->assertSee('Première question', false);
+    $response->assertSee('Deuxième question groupée', false);
+
+    // La barre de progression indique 1 seul écran (total = 1).
+    $response->assertSee('Page 1 sur 1', false);
+});
+
+it('total de la barre de progression = nombre d écrans (et non nombre de questions)', function (): void {
+    $op = Operation::factory()->create();
+    $participant = Participant::factory()->create(['operation_id' => $op->id]);
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'statut' => StatutCampagne::Ouverte,
+        'afficher_progression' => true,
+        'anonymise' => true,
+    ]);
+    // Q1 seule sur écran 1, Q2+Q3 groupées sur écran 2 → 2 écrans pour 3 questions.
+    QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Q1', 'type' => TypeQuestion::TexteCourt,
+        'ordre' => 1, 'obligatoire' => false, 'grouper_avec_precedente' => false,
+    ]);
+    QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Q2', 'type' => TypeQuestion::TexteCourt,
+        'ordre' => 2, 'obligatoire' => false, 'grouper_avec_precedente' => false,
+    ]);
+    QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Q3', 'type' => TypeQuestion::TexteCourt,
+        'ordre' => 3, 'obligatoire' => false, 'grouper_avec_precedente' => true,
+    ]);
+    $clair = Str::random(48);
+    QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create([
+        'participant_id' => $participant->id,
+        'token_hash' => app(QuestionnaireTokenService::class)->hash($clair),
+        'statut' => StatutInvitation::NonOuvert,
+    ]);
+    TenantContext::clear();
+
+    $this->post("/q/{$clair}", ['action' => 'start']);
+
+    // Écran 1 : « Page 1 sur 2 »
+    $this->get("/q/{$clair}?page=1")->assertOk()->assertSee('Page 1 sur 2', false);
+    // Écran 2 : « Page 2 sur 2 »
+    $this->get("/q/{$clair}?page=2")->assertOk()->assertSee('Page 2 sur 2', false);
+});
+
+it('next bloque si une question obligatoire de l écran est vide', function (): void {
+    $op = Operation::factory()->create();
+    $participant = Participant::factory()->create(['operation_id' => $op->id]);
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'statut' => StatutCampagne::Ouverte, 'anonymise' => true,
+    ]);
+    $q1 = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Q obligatoire', 'type' => TypeQuestion::TexteCourt,
+        'ordre' => 1, 'obligatoire' => true, 'grouper_avec_precedente' => false,
+    ]);
+    $q2 = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Q optionnelle groupée', 'type' => TypeQuestion::TexteCourt,
+        'ordre' => 2, 'obligatoire' => false, 'grouper_avec_precedente' => true,
+    ]);
+    $clair = Str::random(48);
+    $invitation = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create([
+        'participant_id' => $participant->id,
+        'token_hash' => app(QuestionnaireTokenService::class)->hash($clair),
+        'statut' => StatutInvitation::NonOuvert,
+    ]);
+    TenantContext::clear();
+
+    $this->post("/q/{$clair}", ['action' => 'start']);
+
+    // q1 vide → erreur q_{id}
+    $this->from("/q/{$clair}?page=1")
+        ->post("/q/{$clair}", [
+            'action' => 'next', 'page' => 1,
+            "q_{$q1->id}" => '', "q_{$q2->id}" => 'quelque chose',
+        ])
+        ->assertSessionHasErrors("q_{$q1->id}");
+
+    // Aucune réponse ne doit avoir été persistée.
+    expect($invitation->fresh()->submissions()->first()?->answers()->count())->toBe(0);
+});
+
+it('next persiste les deux réponses et avance à l écran suivant quand tout est valide', function (): void {
+    $op = Operation::factory()->create();
+    $participant = Participant::factory()->create(['operation_id' => $op->id]);
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'statut' => StatutCampagne::Ouverte, 'anonymise' => true,
+    ]);
+    $q1 = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Q1', 'type' => TypeQuestion::TexteCourt,
+        'ordre' => 1, 'obligatoire' => true, 'grouper_avec_precedente' => false,
+    ]);
+    $q2 = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Q2 groupée', 'type' => TypeQuestion::TexteCourt,
+        'ordre' => 2, 'obligatoire' => false, 'grouper_avec_precedente' => true,
+    ]);
+    // Second écran indépendant.
+    $q3 = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Q3 second écran', 'type' => TypeQuestion::TexteCourt,
+        'ordre' => 3, 'obligatoire' => false, 'grouper_avec_precedente' => false,
+    ]);
+    $clair = Str::random(48);
+    $invitation = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create([
+        'participant_id' => $participant->id,
+        'token_hash' => app(QuestionnaireTokenService::class)->hash($clair),
+        'statut' => StatutInvitation::NonOuvert,
+    ]);
+    TenantContext::clear();
+
+    $this->post("/q/{$clair}", ['action' => 'start']);
+
+    // Valider et avancer depuis l'écran 1 (Q1+Q2 groupées).
+    $this->post("/q/{$clair}", [
+        'action' => 'next', 'page' => 1,
+        "q_{$q1->id}" => 'Réponse 1', "q_{$q2->id}" => 'Réponse 2',
+    ])->assertRedirect(route('questionnaire.show', ['token' => $clair, 'page' => 2]));
+
+    $submission = $invitation->fresh()->submissions()->first();
+    $answers = $submission->answers()->get()->keyBy('campaign_question_id');
+
+    // Les deux réponses de l'écran 1 doivent être persistées.
+    expect($answers->get($q1->id)?->value_text)->toBe('Réponse 1');
+    expect($answers->get($q2->id)?->value_text)->toBe('Réponse 2');
+});
+
+it('prev persiste les saisies de l écran courant et revient en arrière', function (): void {
+    $op = Operation::factory()->create();
+    $participant = Participant::factory()->create(['operation_id' => $op->id]);
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'statut' => StatutCampagne::Ouverte,
+    ]);
+    $q1 = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Q1 écran 1', 'type' => TypeQuestion::TexteCourt,
+        'ordre' => 1, 'obligatoire' => false, 'grouper_avec_precedente' => false,
+    ]);
+    $q2 = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Q2 écran 2', 'type' => TypeQuestion::TexteCourt,
+        'ordre' => 2, 'obligatoire' => true, 'grouper_avec_precedente' => false,
+    ]);
+    $q3 = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Q3 groupée avec Q2', 'type' => TypeQuestion::TexteCourt,
+        'ordre' => 3, 'obligatoire' => false, 'grouper_avec_precedente' => true,
+    ]);
+    $clair = Str::random(48);
+    $invitation = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create([
+        'participant_id' => $participant->id,
+        'token_hash' => app(QuestionnaireTokenService::class)->hash($clair),
+        'statut' => StatutInvitation::NonOuvert,
+    ]);
+    TenantContext::clear();
+
+    $this->post("/q/{$clair}", ['action' => 'start']);
+
+    // Avancer à l'écran 2 (valide).
+    $this->post("/q/{$clair}", ['action' => 'next', 'page' => 1, "q_{$q1->id}" => 'saisie 1']);
+
+    // Précédent depuis l'écran 2 : persiste Q2+Q3 sans bloquer (obligatoire ignoré).
+    $this->post("/q/{$clair}", [
+        'action' => 'prev', 'page' => 2,
+        "q_{$q2->id}" => 'saisie 2', "q_{$q3->id}" => 'saisie 3',
+    ])->assertRedirect(route('questionnaire.show', ['token' => $clair, 'page' => 1]));
+
+    $submission = $invitation->fresh()->submissions()->first();
+    $answers = $submission->answers()->get()->keyBy('campaign_question_id');
+
+    expect($answers->get($q2->id)?->value_text)->toBe('saisie 2');
+    expect($answers->get($q3->id)?->value_text)->toBe('saisie 3');
+});
+
+it('une question Information affiche son libellé et son aide sans champ de saisie', function (): void {
+    $op = Operation::factory()->create();
+    $participant = Participant::factory()->create(['operation_id' => $op->id]);
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'statut' => StatutCampagne::Ouverte, 'anonymise' => true,
+    ]);
+    QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Section introduction',
+        'aide' => 'Texte explicatif de la section.',
+        'type' => TypeQuestion::Information,
+        'ordre' => 1, 'obligatoire' => false, 'grouper_avec_precedente' => false,
+    ]);
+    $q2 = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Votre avis', 'type' => TypeQuestion::TexteCourt,
+        'ordre' => 2, 'obligatoire' => false, 'grouper_avec_precedente' => true,
+    ]);
+    $clair = Str::random(48);
+    $invitation = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create([
+        'participant_id' => $participant->id,
+        'token_hash' => app(QuestionnaireTokenService::class)->hash($clair),
+        'statut' => StatutInvitation::NonOuvert,
+    ]);
+    TenantContext::clear();
+
+    $this->post("/q/{$clair}", ['action' => 'start']);
+
+    $response = $this->get("/q/{$clair}?page=1");
+    $response->assertOk();
+    // Le libellé et l'aide de la question Information sont affichés.
+    $response->assertSee('Section introduction', false);
+    $response->assertSee('Texte explicatif de la section.', false);
+    // Q2 (TexteCourt groupée sur le même écran) doit avoir un champ de saisie.
+    $response->assertSee("name=\"q_{$q2->id}\"", false);
+});
+
+it('une question Information ne génère pas de QuestionnaireAnswer', function (): void {
+    $op = Operation::factory()->create();
+    $participant = Participant::factory()->create(['operation_id' => $op->id]);
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'statut' => StatutCampagne::Ouverte, 'anonymise' => true,
+    ]);
+    $qInfo = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Intertitre', 'type' => TypeQuestion::Information,
+        'ordre' => 1, 'obligatoire' => false, 'grouper_avec_precedente' => false,
+    ]);
+    $clair = Str::random(48);
+    $invitation = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create([
+        'participant_id' => $participant->id,
+        'token_hash' => app(QuestionnaireTokenService::class)->hash($clair),
+        'statut' => StatutInvitation::NonOuvert,
+    ]);
+    TenantContext::clear();
+
+    $this->post("/q/{$clair}", ['action' => 'start']);
+
+    // Soumettre l'écran 1 (qui ne contient que la question Information).
+    $this->post("/q/{$clair}", ['action' => 'next', 'page' => 1]);
+
+    $submission = $invitation->fresh()->submissions()->first();
+
+    // Aucune réponse ne doit être créée pour la question Information.
+    expect($submission->answers()->where('campaign_question_id', $qInfo->id)->count())->toBe(0);
 });
 
 it('anonymise=false : la dernière question redirige vers merci (sans passer par consentement)', function (): void {
