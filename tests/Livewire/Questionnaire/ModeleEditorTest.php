@@ -100,3 +100,100 @@ it('stocke null en config ressenti quand les labels sont vides', function (): vo
 
 // Note: la persistance intro/remerciement est désormais gérée par ModeleTextes
 // (écran "Textes" séparé). Les tests correspondants sont dans ModeleTextesTest.
+
+// ── Type Information ──────────────────────────────────────────────────────────
+
+it('crée une question Information avec titre et texte', function (): void {
+    $t = QuestionnaireTemplate::factory()->create();
+
+    Livewire::test(ModeleEditor::class, ['template' => $t])
+        ->set('libelle', 'Section A')
+        ->set('aide', 'Texte descriptif de la section')
+        ->set('type', TypeQuestion::Information->value)
+        ->call('ajouterQuestion')
+        ->assertHasNoErrors();
+
+    $q = $t->questions()->first();
+    expect($q->type)->toBe(TypeQuestion::Information);
+    expect($q->libelle)->toBe('Section A');
+    expect($q->aide)->toBe('Texte descriptif de la section');
+});
+
+it('force obligatoire=false pour une question Information même si le flag était coché', function (): void {
+    $t = QuestionnaireTemplate::factory()->create();
+
+    Livewire::test(ModeleEditor::class, ['template' => $t])
+        ->set('libelle', 'Intertitre')
+        ->set('type', TypeQuestion::Information->value)
+        ->set('obligatoire', true)   // simuler un état stale
+        ->call('ajouterQuestion')
+        ->assertHasNoErrors();
+
+    $q = $t->questions()->first();
+    expect($q->type)->toBe(TypeQuestion::Information);
+    expect($q->obligatoire)->toBeFalse();
+});
+
+it('crée une question Information sans texte (aide optionnelle)', function (): void {
+    $t = QuestionnaireTemplate::factory()->create();
+
+    Livewire::test(ModeleEditor::class, ['template' => $t])
+        ->set('libelle', 'Intertitre sans texte')
+        ->set('type', TypeQuestion::Information->value)
+        ->call('ajouterQuestion')
+        ->assertHasNoErrors();
+
+    $q = $t->questions()->first();
+    expect($q->type)->toBe(TypeQuestion::Information);
+    expect($q->aide)->toBeNull();
+});
+
+it('une question non-Information conserve obligatoire et ses options normalement', function (): void {
+    $t = QuestionnaireTemplate::factory()->create();
+
+    Livewire::test(ModeleEditor::class, ['template' => $t])
+        ->set('libelle', 'Votre avis ?')
+        ->set('type', TypeQuestion::TexteCourt->value)
+        ->set('obligatoire', true)
+        ->call('ajouterQuestion')
+        ->assertHasNoErrors();
+
+    $q = $t->questions()->first();
+    expect($q->type)->toBe(TypeQuestion::TexteCourt);
+    expect($q->obligatoire)->toBeTrue();
+});
+
+// ── toggleGroupe ──────────────────────────────────────────────────────────────
+
+it('toggleGroupe bascule grouper_avec_precedente de false à true', function (): void {
+    $t = QuestionnaireTemplate::factory()->create();
+    $q1 = QuestionnaireTemplateQuestion::factory()->for($t, 'template')->create(['ordre' => 1, 'grouper_avec_precedente' => false]);
+    $q2 = QuestionnaireTemplateQuestion::factory()->for($t, 'template')->create(['ordre' => 2, 'grouper_avec_precedente' => false]);
+
+    Livewire::test(ModeleEditor::class, ['template' => $t])
+        ->call('toggleGroupe', $q2->id);
+
+    expect($q2->fresh()->grouper_avec_precedente)->toBeTrue();
+    expect($q1->fresh()->grouper_avec_precedente)->toBeFalse(); // inchangé
+});
+
+it('toggleGroupe bascule grouper_avec_precedente de true à false', function (): void {
+    $t = QuestionnaireTemplate::factory()->create();
+    QuestionnaireTemplateQuestion::factory()->for($t, 'template')->create(['ordre' => 1, 'grouper_avec_precedente' => false]);
+    $q2 = QuestionnaireTemplateQuestion::factory()->for($t, 'template')->create(['ordre' => 2, 'grouper_avec_precedente' => true]);
+
+    Livewire::test(ModeleEditor::class, ['template' => $t])
+        ->call('toggleGroupe', $q2->id);
+
+    expect($q2->fresh()->grouper_avec_precedente)->toBeFalse();
+});
+
+it('toggleGroupe ne s applique qu aux questions du même modèle', function (): void {
+    $t1 = QuestionnaireTemplate::factory()->create();
+    $t2 = QuestionnaireTemplate::factory()->create();
+    $q_autre = QuestionnaireTemplateQuestion::factory()->for($t2, 'template')->create(['ordre' => 1, 'grouper_avec_precedente' => false]);
+
+    expect(fn () => Livewire::test(ModeleEditor::class, ['template' => $t1])
+        ->call('toggleGroupe', $q_autre->id)
+    )->toThrow(Exception::class);
+});

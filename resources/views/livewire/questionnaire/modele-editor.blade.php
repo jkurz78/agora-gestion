@@ -3,15 +3,40 @@
 
     <table class="table align-middle">
         <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
-            <tr><th style="width:60px">#</th><th>Question</th><th>Type</th><th class="text-center">Obligatoire</th><th class="text-end">Actions</th></tr>
+            <tr>
+                <th style="width:60px">#</th>
+                <th>Question</th>
+                <th>Type</th>
+                <th class="text-center">Obligatoire</th>
+                <th class="text-center" title="Grouper avec la précédente (affichage sur le même écran)">Grouper</th>
+                <th class="text-end">Actions</th>
+            </tr>
         </thead>
         <tbody>
             @forelse ($questions as $q)
+                @php $premier = $loop->first; @endphp
                 <tr>
                     <td>{{ $q->ordre }}</td>
-                    <td>{{ $q->libelle }}@if($q->aDesOptions()) <span class="text-muted small">({{ count($q->options()) }} options)</span>@endif</td>
+                    <td>
+                        @if ($q->grouper_avec_precedente)
+                            <span class="text-muted me-1">↳</span>
+                        @endif
+                        <span @class(['ms-3' => $q->grouper_avec_precedente])>{{ $q->libelle }}</span>
+                        @if($q->aDesOptions()) <span class="text-muted small">({{ count($q->options()) }} options)</span>@endif
+                    </td>
                     <td>{{ $q->type->label() }}</td>
                     <td class="text-center">{{ $q->obligatoire ? 'Oui' : 'Non' }}</td>
+                    <td class="text-center">
+                        @if (! $premier)
+                            <input type="checkbox"
+                                   class="form-check-input"
+                                   @checked($q->grouper_avec_precedente)
+                                   wire:click="toggleGroupe({{ $q->id }})"
+                                   title="Grouper avec la question précédente">
+                        @else
+                            <span class="text-muted">—</span>
+                        @endif
+                    </td>
                     <td class="text-end">
                         <button class="btn btn-sm btn-outline-secondary" wire:click="monter({{ $q->id }})">↑</button>
                         <button class="btn btn-sm btn-outline-secondary" wire:click="descendre({{ $q->id }})">↓</button>
@@ -19,7 +44,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="5" class="text-muted text-center py-3">Aucune question.</td></tr>
+                <tr><td colspan="6" class="text-muted text-center py-3">Aucune question.</td></tr>
             @endforelse
         </tbody>
     </table>
@@ -29,7 +54,7 @@
             <h2 class="h6">Ajouter une question</h2>
             <div class="row g-2">
                 <div class="col-md-5">
-                    <input type="text" class="form-control" placeholder="Libellé" wire:model="libelle">
+                    <input type="text" class="form-control" placeholder="Titre" wire:model="libelle">
                     @error('libelle') <div class="text-danger small">{{ $message }}</div> @enderror
                 </div>
                 <div class="col-md-3">
@@ -39,12 +64,16 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="col-md-2 form-check d-flex align-items-center ms-2">
-                    <input type="checkbox" class="form-check-input me-1" wire:model="obligatoire" id="obl">
-                    <label class="form-check-label" for="obl">Obligatoire</label>
-                </div>
+                @if ($type !== 'information')
+                    <div class="col-md-2 form-check d-flex align-items-center ms-2">
+                        <input type="checkbox" class="form-check-input me-1" wire:model="obligatoire" id="obl">
+                        <label class="form-check-label" for="obl">Obligatoire</label>
+                    </div>
+                @endif
                 <div class="col-md-12">
-                    <input type="text" class="form-control" placeholder="Aide (optionnelle)" wire:model="aide">
+                    <input type="text" class="form-control"
+                           placeholder="{{ $type === 'information' ? 'Texte (optionnel)' : 'Aide (optionnelle)' }}"
+                           wire:model="aide">
                 </div>
                 @if ($type === 'choix_unique')
                     <div class="col-md-12">

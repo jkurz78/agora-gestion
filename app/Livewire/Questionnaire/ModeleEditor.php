@@ -61,18 +61,27 @@ final class ModeleEditor extends Component
         $type = TypeQuestion::from($this->type);
         $ordre = (int) $this->template->questions()->max('ordre') + 1;
 
+        // Une question de type Information ne peut jamais être obligatoire.
+        $obligatoire = $type === TypeQuestion::Information ? false : $this->obligatoire;
+
         QuestionnaireTemplateQuestion::create([
             'template_id' => $this->template->id,
             'libelle' => $this->libelle,
             'aide' => $this->aide ?: null,
             'type' => $type,
             'ordre' => $ordre,
-            'obligatoire' => $this->obligatoire,
+            'obligatoire' => $obligatoire,
             'config' => $this->buildConfig($type),
         ]);
 
         $this->reset(['libelle', 'aide', 'obligatoire', 'optionsBrut', 'commentaire', 'commentaireLibelle', 'labelGauche', 'labelDroite']);
         $this->type = 'texte_court';
+    }
+
+    public function toggleGroupe(int $id): void
+    {
+        $question = $this->template->questions()->findOrFail($id);
+        $question->update(['grouper_avec_precedente' => ! $question->grouper_avec_precedente]);
     }
 
     public function supprimerQuestion(int $id): void
