@@ -114,7 +114,7 @@ $activeGroup = match(true) {
     request()->routeIs('banques.rapprochement.*', 'banques.virements.*', 'banques.helloasso-sync',
         'banques.comptes.*', 'banques.remises*') => 'banques',
     request()->routeIs('tiers.*') => 'tiers',
-    request()->routeIs('operations.*') => 'operations',
+    request()->routeIs('operations.*', 'questionnaires.*') => 'operations',
     request()->routeIs('facturation.factures*', 'devis-manuels*') => 'facturation',
     request()->routeIs('rapports.*') => 'rapports',
     request()->routeIs('exercices.*') => 'exercices',
