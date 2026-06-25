@@ -21,6 +21,9 @@ class QuestionnaireTemplateFactory extends Factory
             'intro' => fake()->optional()->paragraph(),
             'remerciement' => 'Merci pour votre retour.',
             'actif' => true,
+            'anonymise' => true,
+            'autoriser_retour' => true,
+            'afficher_progression' => true,
         ];
     }
 }

@@ -25,6 +25,9 @@ class QuestionnaireCampaignFactory extends Factory
             'statut' => 'brouillon',
             'ouverte_at' => null,
             'cloturee_at' => null,
+            'anonymise' => true,
+            'autoriser_retour' => true,
+            'afficher_progression' => true,
         ];
     }
 }

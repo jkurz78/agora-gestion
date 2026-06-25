@@ -16,6 +16,7 @@ final class QuestionnaireCampaign extends TenantModel
     protected $fillable = [
         'association_id', 'operation_id', 'template_id',
         'titre_affiche', 'intro', 'remerciement', 'statut', 'ouverte_at', 'cloturee_at',
+        'anonymise', 'autoriser_retour', 'afficher_progression',
     ];
 
     protected function casts(): array
@@ -24,6 +25,9 @@ final class QuestionnaireCampaign extends TenantModel
             'statut' => StatutCampagne::class,
             'ouverte_at' => 'datetime',
             'cloturee_at' => 'datetime',
+            'anonymise' => 'boolean',
+            'autoriser_retour' => 'boolean',
+            'afficher_progression' => 'boolean',
         ];
     }
 

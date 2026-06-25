@@ -18,6 +18,12 @@ final class ModeleList extends Component
 
     public string $titre_affiche = '';
 
+    public bool $anonymise = true;
+
+    public bool $autoriserRetour = true;
+
+    public bool $afficherProgression = true;
+
     public function render(): View
     {
         return view('livewire.questionnaire.modele-list', [
@@ -30,6 +36,9 @@ final class ModeleList extends Component
     public function openCreate(): void
     {
         $this->reset(['editingId', 'titre_interne', 'titre_affiche']);
+        $this->anonymise = true;
+        $this->autoriserRetour = true;
+        $this->afficherProgression = true;
         $this->showModal = true;
     }
 
@@ -39,6 +48,9 @@ final class ModeleList extends Component
         $this->editingId = (int) $m->id;
         $this->titre_interne = $m->titre_interne;
         $this->titre_affiche = $m->titre_affiche;
+        $this->anonymise = $m->anonymise;
+        $this->autoriserRetour = $m->autoriser_retour;
+        $this->afficherProgression = $m->afficher_progression;
         $this->showModal = true;
     }
 
@@ -48,6 +60,10 @@ final class ModeleList extends Component
             'titre_interne' => 'required|string|max:150',
             'titre_affiche' => 'required|string|max:150',
         ]);
+
+        $data['anonymise'] = $this->anonymise;
+        $data['autoriser_retour'] = $this->autoriserRetour;
+        $data['afficher_progression'] = $this->afficherProgression;
 
         if ($this->editingId !== null) {
             QuestionnaireTemplate::findOrFail($this->editingId)->update($data);

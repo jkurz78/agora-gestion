@@ -13,11 +13,17 @@ final class QuestionnaireTemplate extends TenantModel
 
     protected $fillable = [
         'association_id', 'titre_interne', 'titre_affiche', 'intro', 'remerciement', 'actif',
+        'anonymise', 'autoriser_retour', 'afficher_progression',
     ];
 
     protected function casts(): array
     {
-        return ['actif' => 'boolean'];
+        return [
+            'actif' => 'boolean',
+            'anonymise' => 'boolean',
+            'autoriser_retour' => 'boolean',
+            'afficher_progression' => 'boolean',
+        ];
     }
 
     public function questions(): HasMany

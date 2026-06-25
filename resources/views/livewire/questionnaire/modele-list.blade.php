@@ -60,6 +60,28 @@
                             <input type="text" class="form-control" wire:model="titre_affiche">
                             @error('titre_affiche') <div class="text-danger small">{{ $message }}</div> @enderror
                         </div>
+                        <hr>
+                        <div class="mb-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" wire:model="anonymise" id="chk-anonymise">
+                                <label class="form-check-label" for="chk-anonymise">Questionnaire anonymisé</label>
+                            </div>
+                            <div class="text-muted small ms-4">Si décoché, l'identité du répondant est visible dans les résultats et l'écran de consentement au contact est masqué.</div>
+                        </div>
+                        <div class="mb-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" wire:model="autoriserRetour" id="chk-retour">
+                                <label class="form-check-label" for="chk-retour">Autoriser le retour</label>
+                            </div>
+                            <div class="text-muted small ms-4">Affiche un bouton Précédent pendant le parcours.</div>
+                        </div>
+                        <div class="mb-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" wire:model="afficherProgression" id="chk-progression">
+                                <label class="form-check-label" for="chk-progression">Afficher la progression</label>
+                            </div>
+                            <div class="text-muted small ms-4">Affiche le compteur Question x/n.</div>
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button class="btn btn-secondary" wire:click="$set('showModal', false)">Annuler</button>

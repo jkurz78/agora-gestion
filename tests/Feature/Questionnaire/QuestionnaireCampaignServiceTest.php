@@ -28,6 +28,32 @@ it('fige un snapshot des questions du modèle dans la campagne', function (): vo
     expect($campagne->fresh()->questions->first()->libelle)->toBe('Note');
 });
 
+it('copie les 3 réglages du modèle dans la campagne', function (): void {
+    $op = Operation::factory()->create();
+    $t = QuestionnaireTemplate::factory()->create([
+        'anonymise' => false,
+        'autoriser_retour' => false,
+        'afficher_progression' => false,
+    ]);
+
+    $campagne = app(QuestionnaireCampaignService::class)->creerDepuisModele($op, $t);
+
+    expect($campagne->anonymise)->toBeFalse();
+    expect($campagne->autoriser_retour)->toBeFalse();
+    expect($campagne->afficher_progression)->toBeFalse();
+});
+
+it('les réglages par défaut du snapshot sont true', function (): void {
+    $op = Operation::factory()->create();
+    $t = QuestionnaireTemplate::factory()->create();
+
+    $campagne = app(QuestionnaireCampaignService::class)->creerDepuisModele($op, $t);
+
+    expect($campagne->anonymise)->toBeTrue();
+    expect($campagne->autoriser_retour)->toBeTrue();
+    expect($campagne->afficher_progression)->toBeTrue();
+});
+
 it('ouvre puis clôture une campagne', function (): void {
     $op = Operation::factory()->create();
     $t = QuestionnaireTemplate::factory()->create();

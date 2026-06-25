@@ -22,6 +22,9 @@ final class QuestionnaireCampaignService
                 'intro' => $template->intro,
                 'remerciement' => $template->remerciement,
                 'statut' => StatutCampagne::Brouillon,
+                'anonymise' => $template->anonymise,
+                'autoriser_retour' => $template->autoriser_retour,
+                'afficher_progression' => $template->afficher_progression,
             ]);
 
             foreach ($template->questions()->get() as $q) {
