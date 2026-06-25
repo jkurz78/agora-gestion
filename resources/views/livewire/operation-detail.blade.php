@@ -76,6 +76,10 @@
 
     @if($activeTab === 'communication')
         <livewire:operation-communication :operation="$operation" :key="'oc-'.$operation->id" />
+
+        <div class="mt-4">
+            <livewire:questionnaire.operation-questionnaires :operation="$operation" :key="'oq-'.$operation->id" />
+        </div>
     @endif
 
     @if($activeTab === 'details')
