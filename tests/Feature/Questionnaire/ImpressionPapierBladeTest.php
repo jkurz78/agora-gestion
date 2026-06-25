@@ -187,6 +187,46 @@ it('groupe deux questions dans le même bloc groupe-papier', function (): void {
         ->toContain('Q3 separate');
 });
 
+it('numérote les groupes « Page x sur N » quand il y a plusieurs groupes', function (): void {
+    $data = buildPaperData(
+        [
+            ['libelle' => 'Q1', 'type' => TypeQuestion::TexteCourt],
+            ['libelle' => 'Q2', 'type' => TypeQuestion::TexteCourt],
+        ],
+        [[0], [1]], // 2 groupes
+    );
+
+    $html = view('pdf.questionnaire-papier', [
+        'campagne' => $data['campagne'],
+        'nomAsso' => 'Mon Association',
+        'logoDataUri' => null,
+        'groupes' => $data['groupes'],
+        'pages' => $data['pages'],
+    ])->render();
+
+    expect($html)
+        ->toContain('Page 1 sur 2')
+        ->toContain('Page 2 sur 2');
+});
+
+it('n\'affiche pas de numéro de groupe quand il n\'y a qu\'un seul groupe', function (): void {
+    $data = buildPaperData(
+        [['libelle' => 'Q seule', 'type' => TypeQuestion::TexteCourt]],
+        [[0]], // 1 seul groupe
+    );
+
+    $html = view('pdf.questionnaire-papier', [
+        'campagne' => $data['campagne'],
+        'nomAsso' => 'Mon Association',
+        'logoDataUri' => null,
+        'groupes' => $data['groupes'],
+        'pages' => $data['pages'],
+    ])->render();
+
+    // 'class="groupe-numero"' (le div rendu), pas la simple chaîne (présente dans le CSS).
+    expect($html)->not->toContain('class="groupe-numero"');
+});
+
 it('insère la classe coupe (page-break) uniquement à partir de la 2e invitation', function (): void {
     $op = Operation::factory()->create();
     $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([

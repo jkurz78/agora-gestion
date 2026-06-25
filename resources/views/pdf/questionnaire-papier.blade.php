@@ -89,6 +89,16 @@
             margin-bottom: 12px;
             page-break-inside: avoid;
         }
+        .groupe-numero {
+            font-size: 9px;
+            font-weight: bold;
+            color: #3d5473;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid #d8dff0;
+        }
         .question {
             margin-bottom: 10px;
             page-break-inside: avoid;
@@ -183,6 +193,9 @@
         {{-- ======= CORPS : questions par groupe ======= --}}
         @foreach($groupes as $groupe)
             <div class="groupe-papier">
+                @if(count($groupes) > 1)
+                    <div class="groupe-numero">Page {{ $loop->iteration }} sur {{ count($groupes) }}</div>
+                @endif
                 @foreach($groupe as $q)
                     <div class="question">
                         @if($q->type === TypeQuestion::Information)
