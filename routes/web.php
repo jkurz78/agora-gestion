@@ -25,6 +25,9 @@ use App\Http\Controllers\ParticipantExportController;
 use App\Http\Controllers\ParticipantFichePdfController;
 use App\Http\Controllers\ParticipantImportTemplateController;
 use App\Http\Controllers\ParticipantPdfController;
+use App\Http\Controllers\QuestionnaireApercuController;
+use App\Http\Controllers\QuestionnaireExportController;
+use App\Http\Controllers\QuestionnaireRepondantController;
 use App\Http\Controllers\RapportExportController;
 use App\Http\Controllers\RapprochementPdfController;
 use App\Http\Controllers\RapprochementPieceJointeController;
@@ -60,6 +63,8 @@ use App\Models\CompteBancaire;
 use App\Models\Facture;
 use App\Models\Operation;
 use App\Models\Participant;
+use App\Models\QuestionnaireCampaign;
+use App\Models\QuestionnaireTemplate;
 use App\Models\RapprochementBancaire;
 use App\Models\RemiseBancaire;
 use App\Models\Tiers;
@@ -186,18 +191,20 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
     ->name('questionnaires.')
     ->group(function (): void {
         Route::view('/modeles', 'questionnaire.modeles.index')->name('modeles.index');
-        Route::get('/modeles/{template}', function (\App\Models\QuestionnaireTemplate $template) {
+        Route::get('/modeles/{template}', function (QuestionnaireTemplate $template) {
             return view('questionnaire.modeles.editor', compact('template'));
         })->name('modeles.editor');
-        Route::get('/modeles/{template}/textes', function (\App\Models\QuestionnaireTemplate $template) {
+        Route::get('/modeles/{template}/textes', function (QuestionnaireTemplate $template) {
             return view('questionnaire.modeles.textes', compact('template'));
         })->name('modeles.textes');
-        Route::get('/modeles/{template}/apercu', [\App\Http\Controllers\QuestionnaireApercuController::class, 'modele'])->name('modeles.apercu');
-        Route::get('/campagnes/{campagne}/apercu', [\App\Http\Controllers\QuestionnaireApercuController::class, 'campagne'])->name('campagnes.apercu');
-        Route::get('/campagnes/{campagne}/resultats', function (\App\Models\QuestionnaireCampaign $campagne) {
+        Route::get('/modeles/{template}/apercu', [QuestionnaireApercuController::class, 'modele'])->name('modeles.apercu');
+        Route::post('/modeles/{template}/apercu', [QuestionnaireApercuController::class, 'storeModele'])->name('modeles.apercu.store');
+        Route::get('/campagnes/{campagne}/apercu', [QuestionnaireApercuController::class, 'campagne'])->name('campagnes.apercu');
+        Route::post('/campagnes/{campagne}/apercu', [QuestionnaireApercuController::class, 'storeCampagne'])->name('campagnes.apercu.store');
+        Route::get('/campagnes/{campagne}/resultats', function (QuestionnaireCampaign $campagne) {
             return view('questionnaire.resultats.index', compact('campagne'));
         })->name('campagnes.resultats');
-        Route::get('/campagnes/{campagne}/export', \App\Http\Controllers\QuestionnaireExportController::class)
+        Route::get('/campagnes/{campagne}/export', QuestionnaireExportController::class)
             ->name('campagnes.export');
     });
 
@@ -448,13 +455,13 @@ Route::middleware(['auth', 'super-admin'])
 
 // ── Questionnaire public (sans auth ; le token hashé porte le contexte tenant) ──
 Route::prefix('q')->middleware('throttle:30,1')->group(function (): void {
-    Route::get('/{token}/consentement', [\App\Http\Controllers\QuestionnaireRepondantController::class, 'consentement'])
+    Route::get('/{token}/consentement', [QuestionnaireRepondantController::class, 'consentement'])
         ->name('questionnaire.consentement');
-    Route::get('/{token}/merci', [\App\Http\Controllers\QuestionnaireRepondantController::class, 'merci'])
+    Route::get('/{token}/merci', [QuestionnaireRepondantController::class, 'merci'])
         ->name('questionnaire.merci');
-    Route::get('/{token}', [\App\Http\Controllers\QuestionnaireRepondantController::class, 'show'])
+    Route::get('/{token}', [QuestionnaireRepondantController::class, 'show'])
         ->name('questionnaire.show');
-    Route::post('/{token}', [\App\Http\Controllers\QuestionnaireRepondantController::class, 'store'])
+    Route::post('/{token}', [QuestionnaireRepondantController::class, 'store'])
         ->name('questionnaire.store');
 });
 

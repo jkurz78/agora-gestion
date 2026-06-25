@@ -18,37 +18,37 @@
         </div>
     </div>
 
-    <div class="mb-4">
-        <label class="form-label fw-semibold">
-            {{ $question->libelle }}
-            @if ($question->obligatoire)
-                <span class="text-danger" title="Obligatoire">*</span>
+    <form method="POST" action="{{ $postUrl }}">
+        @csrf
+        <input type="hidden" name="page" value="{{ $page }}">
+
+        <div class="mb-4">
+            <label class="form-label fw-semibold">
+                {{ $question->libelle }}
+                @if ($question->obligatoire)
+                    <span class="text-danger" title="Obligatoire">*</span>
+                @endif
+            </label>
+
+            @if ($question->aide)
+                <p class="text-muted small mb-2">{{ $question->aide }}</p>
             @endif
-        </label>
 
-        @if ($question->aide)
-            <p class="text-muted small mb-2">{{ $question->aide }}</p>
-        @endif
+            @php
+                $fieldName = "q_{$question->id}";
+            @endphp
 
-        @php
-            $fieldName = "q_{$question->id}";
-            $oldValue  = null;
-        @endphp
+            @include('questionnaire.repondant.partials.champ', [
+                'question'  => $question,
+                'fieldName' => $fieldName,
+                'oldValue'  => $oldValue ?? null,
+                'answer'    => null,
+            ])
+        </div>
 
-        @include('questionnaire.repondant.partials.champ', [
-            'question'  => $question,
-            'fieldName' => $fieldName,
-            'oldValue'  => null,
-            'answer'    => null,
-        ])
-    </div>
-
-    <div class="d-flex justify-content-between">
-        @php
-            $precedent = $page > 1 ? $base . '?page=' . ($page - 1) : $base . '?page=0';
-            $suivant = $page < $total ? $base . '?page=' . ($page + 1) : $base . '?page=consentement';
-        @endphp
-        <a href="{{ $precedent }}" class="btn btn-outline-secondary">← Précédent</a>
-        <a href="{{ $suivant }}" class="btn btn-primary">Suivant →</a>
-    </div>
+        <div class="d-flex justify-content-between">
+            <button type="submit" name="action" value="prev" class="btn btn-outline-secondary">← Précédent</button>
+            <button type="submit" name="action" value="next" class="btn btn-primary">Suivant →</button>
+        </div>
+    </form>
 @endsection

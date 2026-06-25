@@ -133,7 +133,7 @@
                 </label>
                 <textarea class="form-control" rows="2"
                           id="{{ $fieldName }}_commentaire"
-                          name="{{ $fieldName }}_commentaire">{{ old("{$fieldName}_commentaire", $answer?->value_text) }}</textarea>
+                          name="{{ $fieldName }}_commentaire">{{ old("{$fieldName}_commentaire", $oldCommentaire ?? $answer?->value_text) }}</textarea>
             </div>
         @endif
         @break
