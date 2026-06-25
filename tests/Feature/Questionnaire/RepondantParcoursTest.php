@@ -206,3 +206,77 @@ it('affiche le nom de l association en en-tête du parcours', function (): void 
     // Le nom de l'association apparaît au-dessus du cadre (en-tête centré).
     $this->get("/q/{$clair}")->assertOk()->assertSee($nomAsso, false);
 });
+
+it('afficher_progression=false : la barre de progression est absente de la page question', function (): void {
+    $op = Operation::factory()->create();
+    $participant = Participant::factory()->create(['operation_id' => $op->id]);
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'statut' => StatutCampagne::Ouverte, 'afficher_progression' => false,
+    ]);
+    QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Note', 'type' => TypeQuestion::Satisfaction, 'ordre' => 1, 'obligatoire' => false,
+    ]);
+    $clair = Str::random(48);
+    QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create([
+        'participant_id' => $participant->id,
+        'token_hash' => app(QuestionnaireTokenService::class)->hash($clair),
+        'statut' => StatutInvitation::NonOuvert,
+    ]);
+    TenantContext::clear();
+
+    $this->post("/q/{$clair}", ['action' => 'start']);
+
+    $this->get("/q/{$clair}?page=1")
+        ->assertOk()
+        ->assertDontSee('sur ', false); // « Question x sur n » absent
+});
+
+it('autoriser_retour=false : le bouton Précédent est absent de la page question', function (): void {
+    $op = Operation::factory()->create();
+    $participant = Participant::factory()->create(['operation_id' => $op->id]);
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'statut' => StatutCampagne::Ouverte, 'autoriser_retour' => false,
+    ]);
+    QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Note', 'type' => TypeQuestion::Satisfaction, 'ordre' => 1, 'obligatoire' => false,
+    ]);
+    $clair = Str::random(48);
+    QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create([
+        'participant_id' => $participant->id,
+        'token_hash' => app(QuestionnaireTokenService::class)->hash($clair),
+        'statut' => StatutInvitation::NonOuvert,
+    ]);
+    TenantContext::clear();
+
+    $this->post("/q/{$clair}", ['action' => 'start']);
+
+    $this->get("/q/{$clair}?page=1")
+        ->assertOk()
+        ->assertDontSee('Précédent', false);
+});
+
+it('anonymise=false : la dernière question redirige vers merci (sans passer par consentement)', function (): void {
+    $op = Operation::factory()->create();
+    $participant = Participant::factory()->create(['operation_id' => $op->id]);
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'statut' => StatutCampagne::Ouverte, 'anonymise' => false, 'remerciement' => 'Merci !',
+    ]);
+    $question = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Note', 'type' => TypeQuestion::Satisfaction, 'ordre' => 1, 'obligatoire' => true,
+    ]);
+    $clair = Str::random(48);
+    $invitation = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create([
+        'participant_id' => $participant->id,
+        'token_hash' => app(QuestionnaireTokenService::class)->hash($clair),
+        'statut' => StatutInvitation::NonOuvert,
+    ]);
+    TenantContext::clear();
+
+    $this->post("/q/{$clair}", ['action' => 'start'])->assertRedirect();
+
+    // Dernière (et seule) question : next → doit aller vers merci, PAS consentement.
+    $this->post("/q/{$clair}", ['action' => 'next', 'page' => 1, "q_{$question->id}" => '5'])
+        ->assertRedirect(route('questionnaire.merci', ['token' => $clair]));
+
+    expect($invitation->fresh()->statut)->toBe(StatutInvitation::Soumis);
+});

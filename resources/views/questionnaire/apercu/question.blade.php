@@ -6,6 +6,7 @@
     </div>
 
     {{-- Barre de progression --}}
+    @if ($afficher_progression ?? true)
     <div class="mb-4">
         <div class="d-flex justify-content-between text-muted small mb-1">
             <span>Question {{ $page }} sur {{ $total }}</span>
@@ -17,6 +18,7 @@
                  aria-valuenow="{{ $page }}" aria-valuemin="0" aria-valuemax="{{ $total }}"></div>
         </div>
     </div>
+    @endif
 
     @if ($errors->any())
         <div class="alert alert-danger py-2">{{ $errors->first('reponse') }}</div>
@@ -50,8 +52,10 @@
             ])
         </div>
 
-        <div class="d-flex justify-content-between">
+        <div class="d-flex {{ ($autoriser_retour ?? true) ? 'justify-content-between' : 'justify-content-end' }}">
+            @if ($autoriser_retour ?? true)
             <button type="submit" name="action" value="prev" class="btn btn-outline-secondary">← Précédent</button>
+            @endif
             <button type="submit" name="action" value="next" class="btn btn-primary">Suivant →</button>
         </div>
     </form>

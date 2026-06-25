@@ -29,6 +29,25 @@ it('exporte deux colonnes pour une satisfaction commentée', function (): void {
     expect($rows[1])->toContain('Bien');
 });
 
+it('anonymise=false : l identité est remplie même sans consentement dans l export', function (): void {
+    $campagne = QuestionnaireCampaign::factory()->create(['statut' => 'ouverte', 'anonymise' => false, 'titre_affiche' => 'Nominatif']);
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Avis', 'type' => TypeQuestion::TexteCourt, 'ordre' => 1,
+    ]);
+    $svc = app(QuestionnaireReponseService::class);
+    $inv = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create();
+    $inv->participant->tiers->update(['prenom' => 'Marie', 'nom' => 'DUPONT']);
+    $sub = $svc->demarrerOuReprendre($inv);
+    $svc->enregistrerReponse($sub, $q, 'Très bien');
+    $svc->finaliser($sub, accepteContact: false); // pas de consentement
+
+    $rows = app(QuestionnaireExcelExporter::class)->lignes($campagne->fresh());
+
+    // Identité doit être remplie malgré l'absence de consentement.
+    $identiteCell = $rows[1][7]; // colonne index 7 = « Participant (si contact accepté) »
+    expect((string) $identiteCell)->toContain('DUPONT');
+});
+
 it('produit des en-têtes stables avec colonnes identité même sans consentement', function (): void {
     $campagne = QuestionnaireCampaign::factory()->create(['statut' => 'ouverte', 'titre_affiche' => 'Avis']);
     $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([

@@ -22,9 +22,11 @@
             </label>
         </div>
 
-        <div class="d-flex justify-content-between">
+        <div class="d-flex {{ $campagne->autoriser_retour ? 'justify-content-between' : 'justify-content-end' }}">
+            @if ($campagne->autoriser_retour)
             <a href="{{ route('questionnaire.show', ['token' => $token, 'page' => $total]) }}"
                class="btn btn-outline-secondary">← Précédent</a>
+            @endif
             <button type="submit" class="btn btn-success">Envoyer mes réponses</button>
         </div>
     </form>

@@ -42,9 +42,11 @@ final class QuestionnaireExcelExporter
         foreach ($soumissions as $sub) {
             $consent = (bool) $sub->accepte_contact;
             $participant = $sub->invitation?->participant;
-            $identite = $consent && $participant?->tiers
+            // Identité : exposée si le questionnaire est nominatif OU si le répondant a consenti.
+            $montrerIdentite = (! $campagne->anonymise) || $consent;
+            $identite = $montrerIdentite && $participant?->tiers
                 ? trim(($participant->tiers->prenom ?? '').' '.($participant->tiers->nom ?? ''))
-                : ''; // colonne TOUJOURS présente, valeur vide sans consentement
+                : ''; // colonne TOUJOURS présente, valeur vide si identité non divulguée
 
             $ligne = [
                 $campagne->operation->association->nom ?? '',

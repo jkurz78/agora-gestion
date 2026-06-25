@@ -21,12 +21,16 @@ final class CampagneResultats extends Component
 
     public function render(QuestionnaireResultatService $service): View
     {
-        // Lignes nominatives : uniquement celles ayant consenti (D9/D10).
-        $contacts = $this->campagne->submissions()
+        $query = $this->campagne->submissions()
             ->where('statut', StatutSubmission::Soumise->value)
-            ->where('accepte_contact', true)
-            ->with('invitation.participant.tiers')
-            ->get();
+            ->with('invitation.participant.tiers');
+
+        // Non anonyme : toutes les soumissions ; anonyme : uniquement celles ayant consenti (D9/D10).
+        if ($this->campagne->anonymise) {
+            $query->where('accepte_contact', true);
+        }
+
+        $contacts = $query->get();
 
         return view('livewire.questionnaire.campagne-resultats', [
             'resultats' => $service->pourCampagne($this->campagne),

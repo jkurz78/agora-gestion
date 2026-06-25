@@ -164,6 +164,24 @@ it('réinitialise la session aperçu quand on revient sur l intro', function ():
     expect(QuestionnaireAnswer::count())->toBe(0);
 });
 
+it('anonymise=false : l aperçu passe directement à merci depuis la dernière question (zéro DB)', function (): void {
+    $op = Operation::factory()->create();
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['anonymise' => false]);
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'type' => 'texte_court', 'ordre' => 1, 'obligatoire' => false,
+    ]);
+    $store = route('questionnaires.campagnes.apercu.store', $campagne);
+    $base = route('questionnaires.campagnes.apercu', $campagne);
+
+    // Dernière (et seule) question, suivant → merci directement (pas consentement).
+    $this->post($store, ['action' => 'next', 'page' => 1, "q_{$q->id}" => 'ok'])
+        ->assertRedirect($base.'?page=merci');
+
+    // Zéro écriture en base.
+    expect(\App\Models\QuestionnaireSubmission::count())->toBe(0);
+    expect(\App\Models\QuestionnaireAnswer::count())->toBe(0);
+});
+
 it('l aperçu bloque sur une question obligatoire vide (comme le parcours réel)', function (): void {
     $op = Operation::factory()->create();
     $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create();

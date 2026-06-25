@@ -95,9 +95,17 @@ final class QuestionnaireRepondantController extends Controller
             $total = $campagne->questions()->count();
             $next = $page + 1;
 
-            return $next > $total
-                ? redirect()->route('questionnaire.consentement', ['token' => $token])
-                : redirect()->route('questionnaire.show', ['token' => $token, 'page' => $next]);
+            if ($next > $total) {
+                if (! $campagne->anonymise) {
+                    $this->reponses->finaliser($submission, accepteContact: false);
+
+                    return redirect()->route('questionnaire.merci', ['token' => $token]);
+                }
+
+                return redirect()->route('questionnaire.consentement', ['token' => $token]);
+            }
+
+            return redirect()->route('questionnaire.show', ['token' => $token, 'page' => $next]);
         }
 
         if ($action === 'prev') {

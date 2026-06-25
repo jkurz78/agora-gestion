@@ -21,8 +21,10 @@
         </label>
     </div>
 
-    <div class="d-flex justify-content-between">
+    <div class="d-flex {{ ($autoriser_retour ?? true) ? 'justify-content-between' : 'justify-content-end' }}">
+        @if ($autoriser_retour ?? true)
         <a href="{{ $base }}?page={{ $total }}" class="btn btn-outline-secondary">← Précédent</a>
+        @endif
         <a href="{{ $base }}?page=merci" class="btn btn-success">Terminer</a>
     </div>
 @endsection

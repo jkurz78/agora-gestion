@@ -31,6 +31,9 @@ final class QuestionnaireApercuController extends Controller
             retour: route('questionnaires.modeles.editor', $template),
             base: route('questionnaires.modeles.apercu', $template),
             postUrl: route('questionnaires.modeles.apercu.store', $template),
+            anonymise: (bool) $template->anonymise,
+            autoriserRetour: (bool) $template->autoriser_retour,
+            afficherProgression: (bool) $template->afficher_progression,
         );
     }
 
@@ -41,6 +44,7 @@ final class QuestionnaireApercuController extends Controller
             source: 'modele_'.$template->id,
             questions: $template->questions()->get(),
             base: route('questionnaires.modeles.apercu', $template),
+            anonymise: (bool) $template->anonymise,
         );
     }
 
@@ -57,6 +61,9 @@ final class QuestionnaireApercuController extends Controller
             retour: route('operations.show', $campagne->operation_id),
             base: route('questionnaires.campagnes.apercu', $campagne),
             postUrl: route('questionnaires.campagnes.apercu.store', $campagne),
+            anonymise: (bool) $campagne->anonymise,
+            autoriserRetour: (bool) $campagne->autoriser_retour,
+            afficherProgression: (bool) $campagne->afficher_progression,
         );
     }
 
@@ -67,6 +74,7 @@ final class QuestionnaireApercuController extends Controller
             source: 'campagne_'.$campagne->id,
             questions: $campagne->questions()->get(),
             base: route('questionnaires.campagnes.apercu', $campagne),
+            anonymise: (bool) $campagne->anonymise,
         );
     }
 
@@ -74,7 +82,7 @@ final class QuestionnaireApercuController extends Controller
      * @param  Collection<int, QuestionnaireCampaignQuestion|QuestionnaireTemplateQuestion>  $questions
      * @param  array<string, string>  $vars
      */
-    private function rendre(Request $request, string $source, string $titre, string $intro, string $remerciement, $questions, array $vars, string $retour, string $base, string $postUrl): View
+    private function rendre(Request $request, string $source, string $titre, string $intro, string $remerciement, $questions, array $vars, string $retour, string $base, string $postUrl, bool $anonymise = true, bool $autoriserRetour = true, bool $afficherProgression = true): View
     {
         $page = $request->query('page', '0');
         $total = $questions->count();
@@ -86,6 +94,9 @@ final class QuestionnaireApercuController extends Controller
             'postUrl' => $postUrl,
             'retour' => $retour,
             'total' => $total,
+            'anonymise' => $anonymise,
+            'autoriser_retour' => $autoriserRetour,
+            'afficher_progression' => $afficherProgression,
         ];
 
         if ($page === 'consentement') {
@@ -127,7 +138,7 @@ final class QuestionnaireApercuController extends Controller
      *
      * @param  Collection<int, QuestionnaireCampaignQuestion|QuestionnaireTemplateQuestion>  $questions
      */
-    private function stocker(Request $request, string $source, $questions, string $base): RedirectResponse
+    private function stocker(Request $request, string $source, $questions, string $base, bool $anonymise = true): RedirectResponse
     {
         $action = $request->input('action', 'next');
         $page = max(1, (int) $request->input('page', 1));
@@ -164,6 +175,13 @@ final class QuestionnaireApercuController extends Controller
         }
 
         if ($page >= $total) {
+            // Non anonyme : sauter le consentement, aller directement à merci (efface session).
+            if (! $anonymise) {
+                session()->forget($sessionKey);
+
+                return redirect($base.'?page=merci');
+            }
+
             return redirect($base.'?page=consentement');
         }
 

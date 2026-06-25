@@ -34,7 +34,8 @@
         </div>
     </div>
 
-    {{-- Bandeau d'avertissement anonymat — systématique (contient "petit groupe") --}}
+    {{-- Bandeau d'avertissement anonymat — affiché seulement si le questionnaire est anonyme --}}
+    @if ($campagne->anonymise)
     <div class="alert alert-info d-flex gap-2 align-items-start mb-4" role="alert">
         <i class="bi bi-shield-check fs-5 flex-shrink-0"></i>
         <div>
@@ -43,6 +44,7 @@
             Les identités ne sont visibles que dans la section « Souhaitent être recontactés » pour les participants qui l'ont explicitement demandé.
         </div>
     </div>
+    @endif
 
     {{-- Résultats par question --}}
     @forelse ($resultats['questions'] as $q)
@@ -121,11 +123,15 @@
         <p class="text-muted">Ce questionnaire ne comporte aucune question.</p>
     @endforelse
 
-    {{-- Section contacts : identité nominative uniquement si consentement explicite --}}
+    {{-- Section contacts / répondants nominatifs --}}
     @if ($contacts->isNotEmpty())
         <div class="card mt-4 border-primary">
             <div class="card-header bg-primary text-white fw-semibold">
-                Souhaitent être recontactés ({{ $contacts->count() }})
+                @if ($campagne->anonymise)
+                    Souhaitent être recontactés ({{ $contacts->count() }})
+                @else
+                    Répondants (questionnaire nominatif) ({{ $contacts->count() }})
+                @endif
             </div>
             <div class="card-body p-0">
                 <ul class="list-group list-group-flush">
