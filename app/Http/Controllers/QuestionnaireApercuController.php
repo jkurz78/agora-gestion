@@ -136,31 +136,33 @@ final class QuestionnaireApercuController extends Controller
 
         // Persist the current page's answer (if any) into session — NO DB writes
         $question = $questions[$page - 1] ?? null;
+        $value = null;
         if ($question !== null) {
             $fieldName = 'q_'.$question->id;
-            $reponses = session($sessionKey, []);
-
             $value = $request->input($fieldName);
+            $commentaire = $request->input($fieldName.'_commentaire');
+
+            $reponses = session($sessionKey, []);
             if ($value !== null) {
                 $reponses[$question->id] = $value;
             }
-
-            $commentaire = $request->input($fieldName.'_commentaire');
             if ($commentaire !== null) {
                 $reponses[$question->id.'_commentaire'] = $commentaire;
             }
-
             session([$sessionKey => $reponses]);
         }
 
-        // Determine destination page
+        // Retour en arrière : jamais de blocage.
         if ($action === 'prev') {
-            $dest = $page > 1 ? $page - 1 : 0;
-
-            return redirect($base.'?page='.$dest);
+            return redirect($base.'?page='.($page > 1 ? $page - 1 : 0));
         }
 
-        // next / finish
+        // Suivant : bloque sur une question obligatoire vide, comme le parcours réel.
+        if ($question !== null && $question->obligatoire && ($value === null || $value === '')) {
+            return redirect($base.'?page='.$page)
+                ->withErrors(['reponse' => 'Cette question est obligatoire.']);
+        }
+
         if ($page >= $total) {
             return redirect($base.'?page=consentement');
         }

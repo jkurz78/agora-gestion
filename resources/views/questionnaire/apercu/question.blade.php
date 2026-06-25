@@ -18,6 +18,10 @@
         </div>
     </div>
 
+    @if ($errors->any())
+        <div class="alert alert-danger py-2">{{ $errors->first('reponse') }}</div>
+    @endif
+
     <form method="POST" action="{{ $postUrl }}">
         @csrf
         <input type="hidden" name="page" value="{{ $page }}">

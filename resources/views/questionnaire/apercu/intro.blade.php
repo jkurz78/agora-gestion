@@ -11,5 +11,7 @@
         <div class="mb-4">{!! $introHtml !!}</div>
     @endif
 
-    <a href="{{ $base }}?page=1" class="btn btn-primary">Commencer</a>
+    <div class="d-flex justify-content-end">
+        <a href="{{ $base }}?page=1" class="btn btn-primary">Commencer</a>
+    </div>
 @endsection

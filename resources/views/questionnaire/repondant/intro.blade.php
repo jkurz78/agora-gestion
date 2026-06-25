@@ -12,6 +12,8 @@
     <form method="POST" action="{{ route('questionnaire.store', ['token' => $token]) }}">
         @csrf
         <input type="hidden" name="action" value="start">
-        <button type="submit" class="btn btn-primary">Commencer</button>
+        <div class="d-flex justify-content-end">
+            <button type="submit" class="btn btn-primary">Commencer</button>
+        </div>
     </form>
 @endsection

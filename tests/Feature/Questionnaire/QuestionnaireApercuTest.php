@@ -163,3 +163,26 @@ it('réinitialise la session aperçu quand on revient sur l intro', function ():
     expect(QuestionnaireSubmission::count())->toBe(0);
     expect(QuestionnaireAnswer::count())->toBe(0);
 });
+
+it('l aperçu bloque sur une question obligatoire vide (comme le parcours réel)', function (): void {
+    $op = Operation::factory()->create();
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create();
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'type' => 'texte_court', 'ordre' => 1, 'obligatoire' => true,
+    ]);
+    $store = route('questionnaires.campagnes.apercu.store', $campagne);
+    $base = route('questionnaires.campagnes.apercu', $campagne);
+
+    // Suivant avec une valeur vide → reste sur la page 1 avec une erreur.
+    $this->post($store, ['action' => 'next', 'page' => 1, "q_{$q->id}" => ''])
+        ->assertRedirect($base.'?page=1')
+        ->assertSessionHasErrors('reponse');
+
+    // Avec une valeur → avance (1 seule question → consentement).
+    $this->post($store, ['action' => 'next', 'page' => 1, "q_{$q->id}" => 'ok'])
+        ->assertRedirect($base.'?page=consentement');
+
+    // Toujours zéro écriture en base.
+    expect(QuestionnaireSubmission::count())->toBe(0);
+    expect(QuestionnaireAnswer::count())->toBe(0);
+});
