@@ -19,7 +19,7 @@ final class QuestionnaireExcelExporter
      */
     public function lignes(QuestionnaireCampaign $campagne): array
     {
-        $questions = $campagne->questions()->get();
+        $questions = $campagne->questions()->get()->filter(fn ($q) => $q->type->estReponse());
 
         $entetes = [
             'Association', 'Type opération', 'Opération', 'Campagne', 'Date de soumission',

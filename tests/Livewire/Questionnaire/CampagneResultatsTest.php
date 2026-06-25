@@ -27,6 +27,25 @@ it('anonymise=false : l identité du répondant (sans consentement) est visible 
         ->assertDontSee('petit groupe', false); // avertissement anonymat absent
 });
 
+it('les blocs Information sont exclus des résultats', function (): void {
+    $campagne = QuestionnaireCampaign::factory()->create(['statut' => 'ouverte', 'anonymise' => false]);
+    $qInfo = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Titre section info', 'type' => 'information', 'ordre' => 1,
+    ]);
+    $qReal = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Votre avis', 'type' => 'texte_court', 'ordre' => 2,
+    ]);
+    $svc = app(QuestionnaireReponseService::class);
+    $inv = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create();
+    $sub = $svc->demarrerOuReprendre($inv);
+    $svc->enregistrerReponse($sub, $qReal, 'Très satisfait');
+    $svc->finaliser($sub, accepteContact: false);
+
+    Livewire::test(CampagneResultats::class, ['campagne' => $campagne])
+        ->assertSee('Votre avis')
+        ->assertDontSee('Titre section info');
+});
+
 it('n expose l identité que pour les répondants ayant consenti', function (): void {
     $campagne = QuestionnaireCampaign::factory()->create(['statut' => 'ouverte']);
     $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create(['type' => 'texte_court']);

@@ -26,15 +26,17 @@ final class QuestionnaireResultatService
         $nbSoumissions = $soumissions->count();
         $answersParQuestion = $soumissions->flatMap->answers->groupBy('campaign_question_id');
 
-        $questions = $campagne->questions()->get()->map(function ($q) use ($answersParQuestion): array {
-            $answers = $answersParQuestion->get($q->id, collect());
+        $questions = $campagne->questions()->get()
+            ->filter(fn ($q) => $q->type->estReponse())
+            ->map(function ($q) use ($answersParQuestion): array {
+                $answers = $answersParQuestion->get($q->id, collect());
 
-            return [
-                'libelle' => $q->libelle,
-                'type' => $q->type,
-                ...$this->agreger($q->type, $answers, $q),
-            ];
-        })->all();
+                return [
+                    'libelle' => $q->libelle,
+                    'type' => $q->type,
+                    ...$this->agreger($q->type, $answers, $q),
+                ];
+            })->values()->all();
 
         return [
             'nb_invitations' => $nbInvitations,
