@@ -98,10 +98,15 @@ par écran). Progression « Page x / N ». Saut du consentement si non-anonyme (
 - **Type Information** dans le sélecteur de type. Quand `type=information`, le formulaire
   d'édition n'affiche que **Titre** (`libelle`) + **Texte** (`aide`) ; masque options,
   obligatoire (forcé `false`), commentaire satisfaction, libellés ressenti.
-- **Case « Sur le même écran que la précédente »** (`grouper_avec_precedente`) par ligne de
-  question, **désactivée/masquée sur la 1ʳᵉ ligne**.
+- **Case « Sur le même écran que la précédente »** (`grouper_avec_precedente`) **inline dans la
+  liste** des questions (une case dans la ligne du tableau, **pas** dans le formulaire
+  d'édition) : `wire:click="toggleGroupe({id})"` qui bascule **et persiste immédiatement**,
+  miroir exact de `toggleActif` sur la liste des modèles. **Masquée sur la 1ʳᵉ ligne** (rien
+  ne précède). C'est volontaire : on arrange les groupes en voyant toute la liste, et le
+  regroupement est une décision d'adjacence — donc une opération de liste, pas de fiche.
 - **Indice visuel** (léger) : les lignes groupées sont légèrement indentées / préfixées d'un
-  « ↳ » pour visualiser les écrans sur la liste à plat. Cosmétique, pas de logique.
+  « ↳ » pour visualiser les écrans sur la liste à plat, mis à jour dès le clic. Cosmétique,
+  pas de logique.
 - Réordonnancement inchangé (le regroupement étant positionnel, il suit le nouvel ordre).
 
 ## 8. Résultats & export
