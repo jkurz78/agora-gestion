@@ -8,7 +8,7 @@ use App\Models\QuestionnaireCampaign;
 use App\Support\CurrentAssociation;
 use App\Support\QuestionnaireQrCode;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Http\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class QuestionnaireImpressionService
 {
@@ -64,15 +64,23 @@ final class QuestionnaireImpressionService
     /**
      * Génère et retourne le PDF à télécharger.
      *
+     * Retourne un StreamedResponse pour que Livewire SupportFileDownloads
+     * puisse l'intercepter et déclencher le téléchargement côté navigateur.
+     *
      * @param  array<int>  $participantIds
      */
-    public function telecharger(QuestionnaireCampaign $campagne, array $participantIds): Response
+    public function telecharger(QuestionnaireCampaign $campagne, array $participantIds): StreamedResponse
     {
-        return Pdf::loadView(
+        $filename = "questionnaire-{$campagne->id}.pdf";
+        $pdf = Pdf::loadView(
             'pdf.questionnaire-papier',
             $this->construireDonnees($campagne, $participantIds)
-        )
-            ->setPaper('a4')
-            ->download("questionnaire-{$campagne->id}.pdf");
+        )->setPaper('a4');
+
+        return response()->streamDownload(
+            fn () => print ($pdf->output()),
+            $filename,
+            ['Content-Type' => 'application/pdf'],
+        );
     }
 }

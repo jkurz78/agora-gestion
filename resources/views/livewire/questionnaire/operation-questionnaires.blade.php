@@ -58,6 +58,10 @@
                                     wire:click="toggleEnvoi({{ $c->id }})">
                                 Envoyer les invitations
                             </button>
+                            <button class="btn btn-sm btn-outline-secondary"
+                                    wire:click="toggleImpression({{ $c->id }})">
+                                Imprimer (papier)
+                            </button>
                         @endif
                         @if ($c->statut->peutCloturer())
                             <button class="btn btn-sm btn-outline-warning"
@@ -72,6 +76,13 @@
                     <tr>
                         <td colspan="5" class="p-3 bg-light">
                             @livewire('questionnaire.envoi-compose', ['campagne' => $c], key('envoi-'.$c->id))
+                        </td>
+                    </tr>
+                @endif
+                @if ($c->statut === \App\Enums\StatutCampagne::Ouverte && $impressionCampagneId === $c->id)
+                    <tr>
+                        <td colspan="5" class="p-3 bg-light">
+                            @livewire('questionnaire.impression-papier', ['campagne' => $c], key('impression-'.$c->id))
                         </td>
                     </tr>
                 @endif

@@ -7,7 +7,7 @@ use App\Models\Participant;
 use App\Models\QuestionnaireCampaign;
 use App\Models\QuestionnaireCampaignQuestion;
 use App\Services\Questionnaire\QuestionnaireImpressionService;
-use Illuminate\Http\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Construit une campagne avec questions et participants pour les tests d'impression.
@@ -111,12 +111,12 @@ it('construireDonnees retourne un tableau non-vide de groupes correspondant aux 
     expect(count($données['groupes']))->toBe(2);
 });
 
-it('telecharger retourne une Response HTTP', function (): void {
+it('telecharger retourne une StreamedResponse HTTP', function (): void {
     ['campagne' => $campagne, 'participantIds' => $pids] = buildImpressionFixture();
 
     $response = app(QuestionnaireImpressionService::class)->telecharger($campagne, $pids);
 
-    expect($response)->toBeInstanceOf(Response::class);
+    expect($response)->toBeInstanceOf(StreamedResponse::class);
 });
 
 it('le contenu du PDF commence par %PDF (rendu DomPDF réel)', function (): void {
@@ -124,5 +124,10 @@ it('le contenu du PDF commence par %PDF (rendu DomPDF réel)', function (): void
 
     $response = app(QuestionnaireImpressionService::class)->telecharger($campagne, $pids);
 
-    expect($response->getContent())->toStartWith('%PDF');
+    // StreamedResponse n'expose pas getContent() — on capture le flux.
+    ob_start();
+    $response->sendContent();
+    $content = ob_get_clean();
+
+    expect($content)->toStartWith('%PDF');
 });
