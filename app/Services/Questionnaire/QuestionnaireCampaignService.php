@@ -34,6 +34,7 @@ final class QuestionnaireCampaignService
                     'type' => $q->type,
                     'ordre' => $q->ordre,
                     'obligatoire' => $q->obligatoire,
+                    'grouper_avec_precedente' => $q->grouper_avec_precedente,
                     'config' => $q->config, // snapshot des options + rendu
                 ]);
             }

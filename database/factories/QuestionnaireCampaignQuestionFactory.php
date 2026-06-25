@@ -24,6 +24,7 @@ class QuestionnaireCampaignQuestionFactory extends Factory
             'type' => TypeQuestion::TexteCourt,
             'ordre' => fake()->numberBetween(0, 10),
             'obligatoire' => false,
+            'grouper_avec_precedente' => false,
             'config' => null,
         ];
     }

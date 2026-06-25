@@ -24,6 +24,7 @@ class QuestionnaireTemplateQuestionFactory extends Factory
             'type' => TypeQuestion::TexteCourt,
             'ordre' => 1,
             'obligatoire' => false,
+            'grouper_avec_precedente' => false,
             'config' => null,
         ];
     }

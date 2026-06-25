@@ -54,6 +54,30 @@ it('les réglages par défaut du snapshot sont true', function (): void {
     expect($campagne->afficher_progression)->toBeTrue();
 });
 
+it('snapshot copie grouper_avec_precedente=true du modèle vers la campagne', function (): void {
+    $op = Operation::factory()->create();
+    $t = QuestionnaireTemplate::factory()->create();
+    QuestionnaireTemplateQuestion::factory()->for($t, 'template')->create([
+        'libelle' => 'Q groupée', 'ordre' => 1, 'grouper_avec_precedente' => true,
+    ]);
+
+    $campagne = app(QuestionnaireCampaignService::class)->creerDepuisModele($op, $t);
+
+    expect($campagne->questions->first()->grouper_avec_precedente)->toBeTrue();
+});
+
+it('snapshot copie grouper_avec_precedente=false par défaut', function (): void {
+    $op = Operation::factory()->create();
+    $t = QuestionnaireTemplate::factory()->create();
+    QuestionnaireTemplateQuestion::factory()->for($t, 'template')->create([
+        'libelle' => 'Q normale', 'ordre' => 1,
+    ]);
+
+    $campagne = app(QuestionnaireCampaignService::class)->creerDepuisModele($op, $t);
+
+    expect($campagne->questions->first()->grouper_avec_precedente)->toBeFalse();
+});
+
 it('ouvre puis clôture une campagne', function (): void {
     $op = Operation::factory()->create();
     $t = QuestionnaireTemplate::factory()->create();

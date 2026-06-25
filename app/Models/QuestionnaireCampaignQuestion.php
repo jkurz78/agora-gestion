@@ -14,6 +14,7 @@ final class QuestionnaireCampaignQuestion extends TenantModel
 
     protected $fillable = [
         'association_id', 'campaign_id', 'libelle', 'aide', 'type', 'ordre', 'obligatoire', 'config',
+        'grouper_avec_precedente',
     ];
 
     protected function casts(): array
@@ -22,6 +23,7 @@ final class QuestionnaireCampaignQuestion extends TenantModel
             'type' => TypeQuestion::class,
             'ordre' => 'integer',
             'obligatoire' => 'boolean',
+            'grouper_avec_precedente' => 'boolean',
             'config' => 'array',
         ];
     }

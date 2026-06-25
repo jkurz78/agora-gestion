@@ -12,6 +12,7 @@ enum TypeQuestion: string
     case Ressenti = 'ressenti';
     case CaseACocher = 'case_a_cocher';
     case ChoixUnique = 'choix_unique';
+    case Information = 'information';
 
     public function label(): string
     {
@@ -22,12 +23,17 @@ enum TypeQuestion: string
             self::Ressenti => 'Ressenti (curseur 0-100)',
             self::CaseACocher => 'Case à cocher (oui/non)',
             self::ChoixUnique => 'Choix unique',
+            self::Information => 'Information / intertitre',
         };
     }
 
     /** Colonne de questionnaire_answers où la valeur est stockée (D8). */
     public function valueColumn(): string
     {
+        if ($this === self::Information) {
+            throw new \LogicException('TypeQuestion::Information n\'a pas de colonne de réponse');
+        }
+
         return match ($this) {
             self::TexteCourt, self::TexteLong => 'value_text',
             self::Satisfaction, self::Ressenti => 'value_integer',
@@ -39,6 +45,12 @@ enum TypeQuestion: string
     public function aDesOptions(): bool
     {
         return $this === self::ChoixUnique;
+    }
+
+    /** Vrai pour tous les types qui stockent une réponse (faux pour Information). */
+    public function estReponse(): bool
+    {
+        return $this !== self::Information;
     }
 
     /** @return array<int, array{value: string, label: string}> */
