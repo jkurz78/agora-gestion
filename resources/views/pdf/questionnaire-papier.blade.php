@@ -82,22 +82,25 @@
 
         /* ---- Corps / groupes ---- */
         .groupe-papier {
-            background: #f5f7fb;
+            background: #f7f9fc;
             border: 1px solid #d8dff0;
+            border-left: 3px solid #3d5473;
             border-radius: 3px;
             padding: 10px 12px;
             margin-bottom: 12px;
             page-break-inside: avoid;
         }
         .groupe-numero {
+            display: inline-block;
+            background: #3d5473;
+            color: #fff;
             font-size: 9px;
             font-weight: bold;
-            color: #3d5473;
             text-transform: uppercase;
             letter-spacing: 1px;
-            margin-bottom: 6px;
-            padding-bottom: 4px;
-            border-bottom: 1px solid #d8dff0;
+            padding: 2px 9px;
+            border-radius: 9px;
+            margin-bottom: 8px;
         }
         .question {
             margin-bottom: 10px;

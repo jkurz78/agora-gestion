@@ -17,20 +17,22 @@
 
     @case('satisfaction')
         @php
-            $satisLabels = [
-                1 => 'Très insatisfait',
-                2 => 'Insatisfait',
-                3 => 'Neutre',
-                4 => 'Satisfait',
-                5 => 'Très satisfait',
+            // Niveau => [libellé, couleur de l'icône (rouge → vert)]
+            $satisNiveaux = [
+                1 => ['Très insatisfait', '#e74c3c'],
+                2 => ['Insatisfait',      '#e67e22'],
+                3 => ['Neutre',           '#f1c40f'],
+                4 => ['Satisfait',        '#82c91e'],
+                5 => ['Très satisfait',   '#2f9e44'],
             ];
         @endphp
         <table style="width:100%; border-collapse:collapse; margin-top:8px;">
             <tr>
-                @foreach($satisLabels as $val => $lbl)
+                @foreach($satisNiveaux as $val => $niveau)
                     <td style="width:20%; text-align:center; vertical-align:top; padding:0 4px;">
-                        <div style="font-size:9px; color:#444; margin-bottom:4px; line-height:1.2;">{{ $lbl }}</div>
-                        <div style="width:20px; height:20px; border:2px solid #333; margin:0 auto; background:#fff; font-size:14px; line-height:18px; text-align:center;">&#9744;</div>
+                        <div style="width:22px; height:22px; border-radius:11px; background:{{ $niveau[1] }}; margin:0 auto 4px;"></div>
+                        <div style="font-size:9px; color:#444; margin-bottom:5px; line-height:1.2;">{{ $niveau[0] }}</div>
+                        <div style="width:18px; height:18px; border:1.5px solid #555; margin:0 auto; background:#fff;"></div>
                     </td>
                 @endforeach
             </tr>
@@ -46,27 +48,17 @@
             $labelG = $question->config['label_gauche'] ?? 'Pas du tout';
             $labelD = $question->config['label_droite'] ?? 'Tout à fait';
         @endphp
-        <table style="width:100%; border-collapse:collapse; margin-top:8px;">
+        <table style="width:100%; border-collapse:collapse; margin-top:10px;">
             <tr>
-                <td style="width:18%; vertical-align:middle; font-size:9px; color:#444; text-align:left;">{{ $labelG }}</td>
-                <td style="vertical-align:middle; padding:0 8px;">
-                    <div style="border-bottom:2px solid #333; height:1px; margin-top:16px; position:relative;">
-                        {{-- Tick marks every 10% --}}
-                        <table style="width:100%; border-collapse:collapse; margin-top:0;">
-                            <tr>
-                                @for($t = 0; $t <= 10; $t++)
-                                    <td style="width:{{ 100/11 }}%; text-align:center; vertical-align:top; padding:0;">
-                                        <div style="border-left:1px solid #777; height:6px; margin:0 auto; width:1px;"></div>
-                                    </td>
-                                @endfor
-                            </tr>
-                        </table>
-                    </div>
-                    <div style="font-size:8px; color:#888; text-align:center; margin-top:2px;">Marquez d'une croix</div>
+                <td style="vertical-align:middle; font-size:9px; color:#444; text-align:right; white-space:nowrap; padding-right:8px;">{{ $labelG }}</td>
+                <td style="vertical-align:middle; width:72%;">
+                    {{-- Ligne nue : on y marque un trait vertical --}}
+                    <div style="border-bottom:1.5px solid #333; font-size:0; line-height:0;">&nbsp;</div>
                 </td>
-                <td style="width:18%; vertical-align:middle; font-size:9px; color:#444; text-align:right;">{{ $labelD }}</td>
+                <td style="vertical-align:middle; font-size:9px; color:#444; text-align:left; white-space:nowrap; padding-left:8px;">{{ $labelD }}</td>
             </tr>
         </table>
+        <div style="font-size:8px; color:#999; text-align:center; margin-top:3px;">Marquez d'un trait vertical</div>
         @break
 
     @case('case_a_cocher')

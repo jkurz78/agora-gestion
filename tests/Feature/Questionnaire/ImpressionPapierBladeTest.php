@@ -371,7 +371,7 @@ it('rend les labels gauche/droite d\'une question ressenti', function (): void {
     expect($html)
         ->toContain('Jamais')
         ->toContain('Toujours')
-        ->toContain('Marquez d\'une croix');
+        ->toContain('Marquez d\'un trait vertical');
 });
 
 it('rend les options d\'un choix unique', function (): void {
