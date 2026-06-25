@@ -32,8 +32,15 @@
     <textarea x-ref="editor" id="{{ $id }}" rows="10" style="width:100%">{!! $content !!}</textarea>
 </div>
 
-@assets
 <script>
+    // qgRichEditor : FONCTION GLOBALE (et non Alpine.data dans un bloc d'assets Livewire).
+    // Livewire ne collecte pas les blocs assets/script situés dans un partiel inclus, donc
+    // la version Alpine.data ne s'exécutait jamais (erreur « qgRichEditor is not defined »).
+    // Un script simple, lui, s'exécute dans le partiel ; Alpine résout x-data="qgRichEditor()"
+    // sur la fonction globale. Garde anti-double-définition (le partiel est inclus 2x).
+    if (!window.__qgRichEditorDefined) {
+        window.__qgRichEditorDefined = true;
+
     // Strip mce-variable spans back to plain {token} strings.
     // Uses callback form — avoids dollar-N corruption in Livewire SupportAutoInjectedAssets.
     function __qgStripVarSpans(html) {
@@ -53,11 +60,8 @@
         return html;
     }
 
-    // Register the Alpine component once (guard prevents double-registration on hot-reload).
-    if (typeof Alpine !== 'undefined' && !Alpine._qgRichEditorRegistered) {
-        Alpine._qgRichEditorRegistered = true;
-
-        Alpine.data('qgRichEditor', function () {
+    // Fonction globale appelée par x-data="qgRichEditor()".
+    window.qgRichEditor = function () {
             return {
                 editor: null,
                 cfg: null,
@@ -270,7 +274,6 @@
                     }
                 },
             };
-        });
+        };
     }
 </script>
-@endassets
