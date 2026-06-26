@@ -614,6 +614,80 @@ it('STL : next avec note et texte valides persiste value_integer + value_text et
     expect($answer->value_text)->toBe('Très satisfait');
 });
 
+it('STL : l écran affiche les smileys ET un textarea q_{id}_commentaire', function (): void {
+    $op = Operation::factory()->create();
+    $participant = Participant::factory()->create(['operation_id' => $op->id]);
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'statut' => StatutCampagne::Ouverte, 'anonymise' => true,
+    ]);
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'type' => TypeQuestion::SatisfactionTexteLong, 'ordre' => 1,
+        'obligatoire' => false, 'config' => ['texte_obligatoire' => false],
+    ]);
+    $clair = Str::random(48);
+    QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create([
+        'participant_id' => $participant->id,
+        'token_hash' => app(QuestionnaireTokenService::class)->hash($clair),
+        'statut' => StatutInvitation::NonOuvert,
+    ]);
+    TenantContext::clear();
+
+    $this->post("/q/{$clair}", ['action' => 'start']);
+
+    $response = $this->get("/q/{$clair}?page=1");
+    $response->assertOk();
+
+    // Les smileys sont présents.
+    $response->assertSee('q-satis-group', false);
+    $response->assertSee('q-satis-svg', false);
+
+    // Le textarea long texte est présent.
+    $fieldName = "q_{$q->id}";
+    $response->assertSee("name=\"{$fieldName}_commentaire\"", false);
+    $response->assertSee('Votre commentaire', false);
+});
+
+it('STL : le label du textarea porte une étoile rouge quand texte_obligatoire=true', function (): void {
+    $op = Operation::factory()->create();
+    $participant = Participant::factory()->create(['operation_id' => $op->id]);
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'statut' => StatutCampagne::Ouverte, 'anonymise' => true,
+    ]);
+    QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'type' => TypeQuestion::SatisfactionTexteLong, 'ordre' => 1,
+        'obligatoire' => false, 'config' => ['texte_obligatoire' => true],
+    ]);
+    $clair = Str::random(48);
+    QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create([
+        'participant_id' => $participant->id,
+        'token_hash' => app(QuestionnaireTokenService::class)->hash($clair),
+        'statut' => StatutInvitation::NonOuvert,
+    ]);
+    TenantContext::clear();
+
+    $this->post("/q/{$clair}", ['action' => 'start']);
+
+    $this->get("/q/{$clair}?page=1")
+        ->assertOk()
+        ->assertSee('text-danger', false);
+});
+
+it('régression satisfaction : les smileys sont toujours affichés sans commentaire quand config commentaire absent', function (): void {
+    [$clair, $invitation] = makeOuverteInvitation(); // type Satisfaction, sans commentaire
+    TenantContext::clear();
+
+    $this->post("/q/{$clair}", ['action' => 'start']);
+
+    $response = $this->get("/q/{$clair}?page=1");
+    $response->assertOk();
+    $response->assertSee('q-satis-group', false);
+    $response->assertSee('q-satis-svg', false);
+
+    // Pas de textarea commentaire sans config['commentaire'] = true.
+    $question = $invitation->campaign->questions()->first();
+    $response->assertDontSee("name=\"q_{$question->id}_commentaire\"", false);
+});
+
 it('anonymise=false : la dernière question redirige vers merci (sans passer par consentement)', function (): void {
     $op = Operation::factory()->create();
     $participant = Participant::factory()->create(['operation_id' => $op->id]);
