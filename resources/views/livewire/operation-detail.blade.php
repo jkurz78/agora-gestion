@@ -42,6 +42,11 @@
             </button>
         </li>
         <li class="nav-item">
+            <button class="nav-link {{ $activeTab === 'questionnaires' ? 'active' : '' }}" wire:click="setTab('questionnaires')">
+                <i class="bi bi-clipboard-check me-1"></i>Questionnaires
+            </button>
+        </li>
+        <li class="nav-item">
             <button class="nav-link {{ $activeTab === 'communication' ? 'active' : '' }}" wire:click="setTab('communication')">
                 <i class="bi bi-envelope me-1"></i>Communication
             </button>
@@ -74,12 +79,12 @@
         <livewire:reglement-table :operation="$operation" :key="'rt-'.$operation->id" />
     @endif
 
+    @if($activeTab === 'questionnaires')
+        <livewire:questionnaire.operation-questionnaires :operation="$operation" :key="'oq-'.$operation->id" />
+    @endif
+
     @if($activeTab === 'communication')
         <livewire:operation-communication :operation="$operation" :key="'oc-'.$operation->id" />
-
-        <div class="mt-4">
-            <livewire:questionnaire.operation-questionnaires :operation="$operation" :key="'oq-'.$operation->id" />
-        </div>
     @endif
 
     @if($activeTab === 'details')

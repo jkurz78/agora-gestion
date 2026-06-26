@@ -47,6 +47,28 @@ it('ouvre une campagne brouillon', function (): void {
     expect($campagne->fresh()->statut)->toBe(StatutCampagne::Ouverte);
 });
 
+it('affiche le titre_affiche de la campagne dans la liste', function (): void {
+    $op = Operation::factory()->create();
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'titre_affiche' => 'Évaluation de la formation',
+        'statut' => StatutCampagne::Brouillon,
+    ]);
+
+    Livewire::test(OperationQuestionnaires::class, ['operation' => $op])
+        ->assertSee('Évaluation de la formation');
+});
+
+it('affiche le bouton Lancer et pas Ouvrir', function (): void {
+    $op = Operation::factory()->create();
+    QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'statut' => StatutCampagne::Brouillon,
+    ]);
+
+    Livewire::test(OperationQuestionnaires::class, ['operation' => $op])
+        ->assertSee('Lancer')
+        ->assertDontSee('Ouvrir');
+});
+
 it('permet à l admin de rouvrir une invitation soumise', function (): void {
     $op = Operation::factory()->create();
     $participant = Participant::factory()->create(['operation_id' => $op->id]);

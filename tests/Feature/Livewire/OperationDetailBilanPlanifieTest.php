@@ -84,3 +84,15 @@ it('expose totaux planifiés et écarts dans les viewData', function (): void {
         ->assertViewHas('totalRecettesPrev', 50.0)
         ->assertViewHas('soldePrev', -150.0);
 });
+
+it('setTab questionnaires charge le composant questionnaires et pas sur communication', function (): void {
+    Livewire::test(OperationDetail::class, ['operation' => $this->operation])
+        ->call('setTab', 'questionnaires')
+        ->assertSet('activeTab', 'questionnaires')
+        ->assertSee('Questionnaire');
+
+    Livewire::test(OperationDetail::class, ['operation' => $this->operation])
+        ->call('setTab', 'communication')
+        ->assertSet('activeTab', 'communication')
+        ->assertDontSee('Questionnaire de satisfaction');
+});
