@@ -56,7 +56,7 @@
             </label>
             <textarea class="form-control" rows="4"
                       id="{{ $fieldName }}_commentaire"
-                      name="{{ $fieldName }}_commentaire">{{ old("{$fieldName}_commentaire", $answer?->value_text) }}</textarea>
+                      name="{{ $fieldName }}_commentaire">{{ old("{$fieldName}_commentaire", $oldCommentaire ?? $answer?->value_text) }}</textarea>
         </div>
         @break
 
