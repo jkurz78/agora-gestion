@@ -59,6 +59,8 @@ function buildPaperData(
         [
             'invitation' => $invitation->load('participant.tiers'),
             'qr' => 'data:image/png;base64,AAAA',
+            'introHtml' => (string) ($campagne->intro ?? ''),
+            'remerciementHtml' => '',
         ],
     ];
 
@@ -258,6 +260,8 @@ it('insère la classe coupe (page-break) uniquement à partir de la 2e invitatio
         return [
             'invitation' => $inv->load('participant.tiers'),
             'qr' => 'data:image/png;base64,AAAA',
+            'introHtml' => '',
+            'remerciementHtml' => '',
         ];
     })->values()->all();
 
@@ -500,4 +504,146 @@ it('utilise les labels par défaut pour ressenti sans config', function (): void
     expect($html)
         ->toContain('Pas du tout')
         ->toContain('Tout à fait');
+});
+
+// -----------------------------------------------------------------------
+// Nouveaux tests : intro/remerciement résolus, lignes 12mm, footer
+// -----------------------------------------------------------------------
+
+it('rend introHtml résolu (pas le literal {prenom}) dans le bloc campagne-intro', function (): void {
+    $data = buildPaperData(
+        [['libelle' => 'Question test', 'type' => TypeQuestion::TexteCourt]],
+        [[0]],
+    );
+
+    // On surcharge introHtml pour simuler ce que le service résoudrait.
+    $data['pages'][0]['introHtml'] = '<p>Bonjour <strong>Marie</strong> !</p>';
+
+    $html = view('pdf.questionnaire-papier', [
+        'campagne' => $data['campagne'],
+        'nomAsso' => 'Mon Association',
+        'logoDataUri' => null,
+        'groupes' => $data['groupes'],
+        'pages' => $data['pages'],
+    ])->render();
+
+    // Le HTML résolu est inséré brut (balises présentes, pas échappées).
+    expect($html)
+        ->toContain('Bonjour <strong>Marie</strong> !')
+        ->not->toContain('&lt;strong&gt;')
+        ->not->toContain('{prenom}');
+});
+
+it('rend remerciementHtml résolu quand fourni, sinon le fallback générique', function (): void {
+    $data = buildPaperData(
+        [['libelle' => 'Question test', 'type' => TypeQuestion::TexteCourt]],
+        [[0]],
+    );
+
+    // Avec remerciementHtml fourni
+    $data['pages'][0]['remerciementHtml'] = '<em>Un grand merci, Jean !</em>';
+
+    $htmlAvec = view('pdf.questionnaire-papier', [
+        'campagne' => $data['campagne'],
+        'nomAsso' => 'Mon Association',
+        'logoDataUri' => null,
+        'groupes' => $data['groupes'],
+        'pages' => $data['pages'],
+    ])->render();
+
+    expect($htmlAvec)
+        ->toContain('<em>Un grand merci, Jean !</em>')
+        ->not->toContain('Merci pour votre retour !');
+
+    // Sans remerciementHtml (vide) → fallback
+    $data['pages'][0]['remerciementHtml'] = '';
+
+    $htmlSans = view('pdf.questionnaire-papier', [
+        'campagne' => $data['campagne'],
+        'nomAsso' => 'Mon Association',
+        'logoDataUri' => null,
+        'groupes' => $data['groupes'],
+        'pages' => $data['pages'],
+    ])->render();
+
+    expect($htmlSans)->toContain('Merci pour votre retour !');
+});
+
+it('la question texte_long produit 4 divs de ligne manuscrite (border-bottom:1px solid #333)', function (): void {
+    $data = buildPaperData(
+        [['libelle' => 'Votre commentaire', 'type' => TypeQuestion::TexteLong]],
+        [[0]],
+    );
+
+    $html = view('pdf.questionnaire-papier', [
+        'campagne' => $data['campagne'],
+        'nomAsso' => 'Mon Association',
+        'logoDataUri' => null,
+        'groupes' => $data['groupes'],
+        'pages' => $data['pages'],
+    ])->render();
+
+    // 4 lignes règlées de 12mm
+    expect(substr_count($html, 'height:12mm; border-bottom:1px solid #333;'))->toBeGreaterThanOrEqual(4);
+    // Plus aucun rectangle plein
+    expect($html)->not->toContain('height:5.5em');
+});
+
+it('la zone satisfaction_texte_long produit 3 divs de ligne manuscrite', function (): void {
+    $data = buildPaperData(
+        [['libelle' => 'Avis détaillé', 'type' => TypeQuestion::SatisfactionTexteLong]],
+        [[0]],
+    );
+
+    $html = view('pdf.questionnaire-papier', [
+        'campagne' => $data['campagne'],
+        'nomAsso' => 'Mon Association',
+        'logoDataUri' => null,
+        'groupes' => $data['groupes'],
+        'pages' => $data['pages'],
+    ])->render();
+
+    // class marker toujours là
+    expect($html)->toContain('class="texte-3-lignes"');
+    // 3 lignes de 12mm (pas de rectangle plein)
+    expect(substr_count($html, 'height:12mm; border-bottom:1px solid #333;'))->toBeGreaterThanOrEqual(3);
+    expect($html)->not->toContain('border:1px solid #555; height:3.6em');
+});
+
+it('le pied de page (pdf-footer) est présent dans le HTML', function (): void {
+    $data = buildPaperData(
+        [['libelle' => 'Question footer', 'type' => TypeQuestion::TexteCourt]],
+        [[0]],
+    );
+
+    $html = view('pdf.questionnaire-papier', [
+        'campagne' => $data['campagne'],
+        'nomAsso' => 'Mon Association',
+        'logoDataUri' => null,
+        'groupes' => $data['groupes'],
+        'pages' => $data['pages'],
+    ])->render();
+
+    // Le div position:fixed du pied de page est présent
+    expect($html)->toContain('class="pdf-footer"');
+});
+
+it('le code_court est rendu en petit texte gris (style discret)', function (): void {
+    $data = buildPaperData(
+        [['libelle' => 'Question code', 'type' => TypeQuestion::TexteCourt]],
+        [[0]],
+    );
+
+    $html = view('pdf.questionnaire-papier', [
+        'campagne' => $data['campagne'],
+        'nomAsso' => 'Mon Association',
+        'logoDataUri' => null,
+        'groupes' => $data['groupes'],
+        'pages' => $data['pages'],
+    ])->render();
+
+    // Le CSS du code-court inclut une petite taille et la couleur grise
+    expect($html)
+        ->toContain('font-size: 8px')
+        ->toContain('color: #999');
 });

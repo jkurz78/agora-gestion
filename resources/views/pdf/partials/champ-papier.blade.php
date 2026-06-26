@@ -12,7 +12,12 @@
         @break
 
     @case('texte_long')
-        <div style="border:1px solid #555; height:5.5em; margin-top:6px; background:#fff;"></div>
+        <div style="margin-top:6px;">
+            <div style="height:12mm; border-bottom:1px solid #333;"></div>
+            <div style="height:12mm; border-bottom:1px solid #333;"></div>
+            <div style="height:12mm; border-bottom:1px solid #333;"></div>
+            <div style="height:12mm; border-bottom:1px solid #333;"></div>
+        </div>
         @break
 
     @case('ressenti')

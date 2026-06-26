@@ -103,6 +103,57 @@ final class PdfFooterRenderer
     }
 
     /**
+     * Pied de page questionnaire papier.
+     *
+     * Left : $leftText (e.g. "Imprimé le DD/MM/YYYY — Opération — Titre")
+     * Right : "page X / N"
+     *
+     * This layout differs from render() (which centers the page count and
+     * right-aligns an info string) so it is a separate method.
+     */
+    public static function renderQuestionnaire(PDF $pdf, string $leftText): void
+    {
+        try {
+            $domPdf = $pdf->getDomPDF();
+        } catch (\Throwable) {
+            return;
+        }
+        if (! $domPdf instanceof Dompdf) {
+            return;
+        }
+
+        $domPdf->render();
+        $canvas = $domPdf->getCanvas();
+        $fontMetrics = $domPdf->getFontMetrics();
+        $font = $fontMetrics->getFont('DejaVu Sans');
+
+        $pageWidth = $canvas->get_width();
+        $y = $canvas->get_height() - self::FOOTER_Y_OFFSET;
+
+        // Left : info text (operation + title + print date)
+        $canvas->page_text(
+            self::SIDE_MARGIN,
+            $y,
+            $leftText,
+            $font,
+            self::TEXT_SIZE,
+            self::TEXT_COLOR,
+        );
+
+        // Right : "page X / N"
+        $pageText = 'page {PAGE_NUM} / {PAGE_COUNT}';
+        $refWidth = $fontMetrics->getTextWidth('page 00 / 00', $font, self::TEXT_SIZE);
+        $canvas->page_text(
+            $pageWidth - self::SIDE_MARGIN - $refWidth,
+            $y,
+            $pageText,
+            $font,
+            self::TEXT_SIZE,
+            self::TEXT_COLOR,
+        );
+    }
+
+    /**
      * Build the "Généré par AgoraGestion le … à HHhMM" string used on external
      * documents (factures, devis) so the recipient knows when the document was
      * produced.

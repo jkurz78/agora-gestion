@@ -6,7 +6,7 @@
      *   $nomAsso     — string
      *   $logoDataUri — string|null  (data URI de l'image)
      *   $groupes     — array<int, \Illuminate\Support\Collection>  questions découpées en groupes
-     *   $pages       — array<int, array{invitation: QuestionnaireInvitation, qr: string}>
+     *   $pages       — array<int, array{invitation: QuestionnaireInvitation, qr: string, introHtml: string, remerciementHtml: string}>
      */
 @endphp
 <!DOCTYPE html>
@@ -21,7 +21,7 @@
             font-size: 11px;
             color: #212529;
             line-height: 1.5;
-            margin: 12mm 12mm 20mm 12mm;
+            margin: 12mm 12mm 28mm 12mm;
         }
         table { border-collapse: collapse; }
         table.layout { width: 100%; }
@@ -63,12 +63,27 @@
         }
         .code-court {
             font-family: DejaVu Sans Mono, monospace;
-            font-size: 13px;
-            font-weight: bold;
-            letter-spacing: 2px;
-            color: #3d5473;
+            font-size: 8px;
+            font-weight: normal;
+            letter-spacing: 1px;
+            color: #999;
             margin-top: 4px;
         }
+
+        /* ---- Pied de page fixe (DomPDF position:fixed) ---- */
+        .pdf-footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 22mm;
+            border-top: 1px solid #ddd;
+            padding-top: 4px;
+            font-size: 8px;
+            color: #888;
+        }
+        .pdf-footer-left  { float: left; }
+        .pdf-footer-right { float: right; }
         .qr-hint {
             font-size: 8px;
             color: #888;
@@ -145,9 +160,11 @@
 @foreach($pages as $i => $page)
     @php
         /** @var \App\Models\QuestionnaireInvitation $invitation */
-        $invitation = $page['invitation'];
-        $qrDataUri  = $page['qr'];
-        $nomParticipant = $invitation->participant?->tiers?->displayName() ?? '';
+        $invitation       = $page['invitation'];
+        $qrDataUri        = $page['qr'];
+        $introHtml        = $page['introHtml'] ?? '';
+        $remerciementHtml = $page['remerciementHtml'] ?? '';
+        $nomParticipant   = $invitation->participant?->tiers?->displayName() ?? '';
     @endphp
 
     <div class="invitation{{ $i > 0 ? ' coupe' : '' }}">
@@ -163,8 +180,8 @@
                         @endif
                         <div class="asso-name">{{ $nomAsso }}</div>
                         <div class="campagne-titre">{{ $campagne->titre_affiche }}</div>
-                        @if($campagne->intro)
-                            <div class="campagne-intro">{!! nl2br(e($campagne->intro)) !!}</div>
+                        @if($introHtml !== '')
+                            <div class="campagne-intro">{!! $introHtml !!}</div>
                         @endif
                         @if($nomParticipant)
                             <div class="participant-nom">Participant&nbsp;: <strong>{{ $nomParticipant }}</strong></div>
@@ -210,7 +227,11 @@
                                 @if($q->config['texte_obligatoire'] ?? false)
                                     <div style="font-size:8px; color:#888; margin-top:4px;">Réponse obligatoire</div>
                                 @endif
-                                <div class="texte-3-lignes" style="border:1px solid #555; height:3.6em; margin-top:4px; background:#fff;"></div>
+                                <div class="texte-3-lignes" style="margin-top:4px;">
+                                    <div style="height:12mm; border-bottom:1px solid #333;"></div>
+                                    <div style="height:12mm; border-bottom:1px solid #333;"></div>
+                                    <div style="height:12mm; border-bottom:1px solid #333;"></div>
+                                </div>
                             @elseif(!empty($q->config['commentaire']) && !empty($q->config['commentaire_libelle']))
                                 <div style="margin-top:8px; font-size:9px; color:#555;">{{ $q->config['commentaire_libelle'] }}</div>
                                 <div style="border-bottom:1px solid #555; height:1.6em; margin-top:4px;"></div>
@@ -238,10 +259,25 @@
         @endif
 
         {{-- ======= REMERCIEMENT ======= --}}
-        <div class="remerciement">Merci pour votre retour !</div>
+        <div class="remerciement">
+            @if($remerciementHtml !== '')
+                {!! $remerciementHtml !!}
+            @else
+                Merci pour votre retour !
+            @endif
+        </div>
 
     </div>
 @endforeach
+
+{{-- ======= PIED DE PAGE FIXE ======= --}}
+{{--
+    Le texte du pied de page (« Imprimé le … — opération — titre » à gauche,
+    « page X / N » à droite) est injecté sur chaque page par
+    App\Support\PdfFooterRenderer::renderQuestionnaire() via canvas->page_text().
+    Ce div position:fixed fournit uniquement le filet de séparation.
+--}}
+<div class="pdf-footer"></div>
 
 </body>
 </html>

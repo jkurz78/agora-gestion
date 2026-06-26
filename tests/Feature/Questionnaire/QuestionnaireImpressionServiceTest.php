@@ -6,6 +6,7 @@ use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\QuestionnaireCampaign;
 use App\Models\QuestionnaireCampaignQuestion;
+use App\Models\Tiers;
 use App\Services\Questionnaire\QuestionnaireImpressionService;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -130,4 +131,56 @@ it('le contenu du PDF commence par %PDF (rendu DomPDF réel)', function (): void
     $content = ob_get_clean();
 
     expect($content)->toStartWith('%PDF');
+});
+
+// -----------------------------------------------------------------------
+// Tests intro/remerciement résolus par invitation
+// -----------------------------------------------------------------------
+
+it('construireDonnees retourne introHtml et remerciementHtml par page', function (): void {
+    ['campagne' => $campagne, 'participantIds' => $pids] = buildImpressionFixture();
+
+    // Injecter une intro avec variable {prenom}
+    $campagne->update(['intro' => 'Bonjour {prenom}', 'remerciement' => 'Merci {prenom} !']);
+
+    $données = app(QuestionnaireImpressionService::class)->construireDonnees($campagne, $pids);
+
+    foreach ($données['pages'] as $page) {
+        expect($page)->toHaveKey('introHtml');
+        expect($page)->toHaveKey('remerciementHtml');
+    }
+});
+
+it('construireDonnees résout {prenom} dans introHtml avec le prénom du participant', function (): void {
+    $op = Operation::factory()->create();
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'titre_affiche' => 'Test résolution',
+        'statut' => 'ouverte',
+        'intro' => 'Bonjour {prenom}',
+        'remerciement' => 'Au revoir {prenom}',
+    ]);
+
+    QuestionnaireCampaignQuestion::factory()
+        ->for($campagne, 'campaign')
+        ->create(['libelle' => 'Q', 'type' => 'texte_court', 'ordre' => 1]);
+
+    // Participant avec un prénom connu
+    $tiers = Tiers::factory()->create(['prenom' => 'Élisabeth', 'nom' => 'Dupont']);
+    $participant = Participant::factory()->create([
+        'operation_id' => $op->id,
+        'tiers_id' => $tiers->id,
+    ]);
+
+    $données = app(QuestionnaireImpressionService::class)
+        ->construireDonnees($campagne, [(int) $participant->id]);
+
+    $page = $données['pages'][0];
+
+    expect($page['introHtml'])
+        ->toContain('Élisabeth')
+        ->not->toContain('{prenom}');
+
+    expect($page['remerciementHtml'])
+        ->toContain('Élisabeth')
+        ->not->toContain('{prenom}');
 });

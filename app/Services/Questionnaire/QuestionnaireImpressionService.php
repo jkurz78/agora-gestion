@@ -6,6 +6,7 @@ namespace App\Services\Questionnaire;
 
 use App\Models\QuestionnaireCampaign;
 use App\Support\CurrentAssociation;
+use App\Support\PdfFooterRenderer;
 use App\Support\QuestionnaireQrCode;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -15,6 +16,7 @@ final class QuestionnaireImpressionService
     public function __construct(
         private readonly QuestionnaireInvitationService $invitations,
         private readonly QuestionnaireEcranResolver $resolver,
+        private readonly QuestionnaireVariableResolver $variables,
     ) {}
 
     /**
@@ -45,12 +47,22 @@ final class QuestionnaireImpressionService
             $campagne->questions()->orderBy('ordre')->get()
         );
 
-        // 4. Construire les pages (une par invitation) avec le QR code.
+        // 4. Construire les pages (une par invitation) avec le QR code,
+        //    l'intro et le remerciement résolus par invitation.
+        $introSource = (string) ($campagne->intro ?? '');
+        $remerciementSource = (string) ($campagne->remerciement ?? '');
+
         $pages = $invitations
-            ->map(fn ($inv) => [
-                'invitation' => $inv,
-                'qr' => QuestionnaireQrCode::dataUri($inv->lienReponse()),
-            ])
+            ->map(function ($inv) use ($introSource, $remerciementSource): array {
+                $vars = $this->variables->pour($inv);
+
+                return [
+                    'invitation' => $inv,
+                    'qr' => QuestionnaireQrCode::dataUri($inv->lienReponse()),
+                    'introHtml' => $this->variables->remplacer($introSource, $vars),
+                    'remerciementHtml' => $this->variables->remplacer($remerciementSource, $vars),
+                ];
+            })
             ->all();
 
         // 5. Récupérer les infos de l'association courante.
@@ -76,6 +88,14 @@ final class QuestionnaireImpressionService
             'pdf.questionnaire-papier',
             $this->construireDonnees($campagne, $participantIds)
         )->setPaper('a4');
+
+        // Pied de page : « Imprimé le … — opération — titre questionnaire » (gauche) + page X/N (droite).
+        $leftText = implode(' — ', array_filter([
+            'Imprimé le '.now()->format('d/m/Y'),
+            $campagne->operation?->nom,
+            $campagne->titre_affiche,
+        ]));
+        PdfFooterRenderer::renderQuestionnaire($pdf, $leftText);
 
         return response()->streamDownload(
             fn () => print ($pdf->output()),
