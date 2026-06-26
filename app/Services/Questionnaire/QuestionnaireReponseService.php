@@ -29,6 +29,7 @@ final class QuestionnaireReponseService
                     'campaign_id' => $invitation->campaign_id,
                     'statut' => StatutSubmission::EnCours,
                     'source' => 'en_ligne',
+                    'active_key' => $invitation->id,
                 ]);
             }
 
