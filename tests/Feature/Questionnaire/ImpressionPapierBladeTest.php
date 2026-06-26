@@ -187,13 +187,13 @@ it('groupe deux questions dans le même bloc groupe-papier', function (): void {
         ->toContain('Q3 separate');
 });
 
-it('numérote les groupes « Page x sur N » quand il y a plusieurs groupes', function (): void {
+it('préfixe le numéro du groupe devant le titre du premier élément de chaque groupe', function (): void {
     $data = buildPaperData(
         [
-            ['libelle' => 'Q1', 'type' => TypeQuestion::TexteCourt],
-            ['libelle' => 'Q2', 'type' => TypeQuestion::TexteCourt],
+            ['libelle' => 'Première question', 'type' => TypeQuestion::TexteCourt],
+            ['libelle' => 'Deuxième question', 'type' => TypeQuestion::TexteCourt],
         ],
-        [[0], [1]], // 2 groupes
+        [[0], [1]], // 2 groupes d'une question
     );
 
     $html = view('pdf.questionnaire-papier', [
@@ -204,15 +204,21 @@ it('numérote les groupes « Page x sur N » quand il y a plusieurs groupes', fu
         'pages' => $data['pages'],
     ])->render();
 
+    // Numéro de groupe collé au titre, plus aucune pastille « Page x sur N ».
     expect($html)
-        ->toContain('Page 1 sur 2')
-        ->toContain('Page 2 sur 2');
+        ->toContain('1. Première question')
+        ->toContain('2. Deuxième question')
+        ->not->toContain('class="groupe-numero"')
+        ->not->toContain('sur 2');
 });
 
-it('n\'affiche pas de numéro de groupe quand il n\'y a qu\'un seul groupe', function (): void {
+it('ne numérote que le premier élément d\'un groupe multi-questions', function (): void {
     $data = buildPaperData(
-        [['libelle' => 'Q seule', 'type' => TypeQuestion::TexteCourt]],
-        [[0]], // 1 seul groupe
+        [
+            ['libelle' => 'Tête de groupe', 'type' => TypeQuestion::TexteCourt],
+            ['libelle' => 'Question suivante', 'type' => TypeQuestion::TexteCourt],
+        ],
+        [[0, 1]], // un seul groupe de 2 questions
     );
 
     $html = view('pdf.questionnaire-papier', [
@@ -223,8 +229,12 @@ it('n\'affiche pas de numéro de groupe quand il n\'y a qu\'un seul groupe', fun
         'pages' => $data['pages'],
     ])->render();
 
-    // 'class="groupe-numero"' (le div rendu), pas la simple chaîne (présente dans le CSS).
-    expect($html)->not->toContain('class="groupe-numero"');
+    // La 1ʳᵉ question porte « 1. », la suivante n'est pas numérotée.
+    expect($html)
+        ->toContain('1. Tête de groupe')
+        ->toContain('Question suivante')
+        ->not->toContain('1. Question suivante')
+        ->not->toContain('2. Question suivante');
 });
 
 it('insère la classe coupe (page-break) uniquement à partir de la 2e invitation', function (): void {

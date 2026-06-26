@@ -90,18 +90,6 @@
             margin-bottom: 12px;
             page-break-inside: avoid;
         }
-        .groupe-numero {
-            display: inline-block;
-            background: #3d5473;
-            color: #fff;
-            font-size: 9px;
-            font-weight: bold;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            padding: 2px 9px;
-            border-radius: 9px;
-            margin-bottom: 8px;
-        }
         .question {
             margin-bottom: 10px;
             page-break-inside: avoid;
@@ -195,21 +183,21 @@
 
         {{-- ======= CORPS : questions par groupe ======= --}}
         @foreach($groupes as $groupe)
+            @php $numeroGroupe = $loop->iteration; @endphp
             <div class="groupe-papier">
-                @if(count($groupes) > 1)
-                    <div class="groupe-numero">Page {{ $loop->iteration }} sur {{ count($groupes) }}</div>
-                @endif
                 @foreach($groupe as $q)
+                    {{-- Le premier élément du groupe porte le numéro du groupe. --}}
+                    @php $prefixeNumero = $loop->first ? $numeroGroupe.'. ' : ''; @endphp
                     <div class="question">
                         @if($q->type === TypeQuestion::Information)
                             {{-- Intertitre : libellé en titre, aide en texte, pas de zone de réponse --}}
-                            <div class="info-titre">{{ $q->libelle }}</div>
+                            <div class="info-titre">{{ $prefixeNumero }}{{ $q->libelle }}</div>
                             @if($q->aide)
                                 <div class="info-aide">{{ $q->aide }}</div>
                             @endif
                         @else
                             <div class="question-libelle">
-                                {{ $q->libelle }}@if($q->obligatoire)<span class="question-obligatoire"> *</span>@endif
+                                {{ $prefixeNumero }}{{ $q->libelle }}@if($q->obligatoire)<span class="question-obligatoire"> *</span>@endif
                             </div>
                             @if($q->aide)
                                 <div class="question-aide">{{ $q->aide }}</div>
