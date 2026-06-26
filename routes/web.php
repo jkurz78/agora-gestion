@@ -28,6 +28,7 @@ use App\Http\Controllers\ParticipantPdfController;
 use App\Http\Controllers\QuestionnaireApercuController;
 use App\Http\Controllers\QuestionnaireExportController;
 use App\Http\Controllers\QuestionnaireRepondantController;
+use App\Http\Controllers\QuestionnaireScanImageController;
 use App\Http\Controllers\RapportExportController;
 use App\Http\Controllers\RapprochementPdfController;
 use App\Http\Controllers\RapprochementPieceJointeController;
@@ -64,6 +65,7 @@ use App\Models\Facture;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\QuestionnaireCampaign;
+use App\Models\QuestionnairePaperScan;
 use App\Models\QuestionnaireTemplate;
 use App\Models\RapprochementBancaire;
 use App\Models\RemiseBancaire;
@@ -223,6 +225,16 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
             return app(QuestionnaireImpressionService::class)
                 ->afficher($campagne, $participantIds);
         })->name('campagnes.pdf');
+        Route::get('/campagnes/{campagne}/scans', function (QuestionnaireCampaign $campagne) {
+            return view('questionnaire.scans.index', compact('campagne'));
+        })->name('campagnes.scans');
+        Route::get('/scans/{scan}/image', QuestionnaireScanImageController::class)
+            ->name('campagnes.scans.image');
+        Route::get('/scans/{scan}/valider', function (QuestionnairePaperScan $scan) {
+            abort_unless($scan->ocrDraft !== null && $scan->ocrDraft->statut === 'brouillon', 404);
+
+            return view('questionnaire.scans.valider', compact('scan'));
+        })->name('campagnes.scans.valider');
     });
 
 // ── Dashboard ──

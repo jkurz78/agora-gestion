@@ -63,6 +63,10 @@
                                class="btn btn-sm btn-outline-secondary">
                                 PDF
                             </a>
+                            <a href="{{ route('questionnaires.campagnes.scans', $c) }}"
+                               class="btn btn-sm btn-outline-dark">
+                                <i class="bi bi-qr-code-scan me-1"></i>Scans
+                            </a>
                         @endif
                         @if ($c->statut->peutCloturer())
                             <button class="btn btn-sm btn-outline-warning"
