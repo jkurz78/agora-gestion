@@ -6,10 +6,13 @@ use App\Enums\StatutInvitation;
 use App\Enums\StatutSubmission;
 use App\Enums\TypeQuestion;
 use App\Exceptions\Questionnaire\ReponseObligatoireException;
+use App\Models\Operation;
+use App\Models\Participant;
 use App\Models\QuestionnaireCampaign;
 use App\Models\QuestionnaireCampaignQuestion;
 use App\Models\QuestionnaireInvitation;
 use App\Services\Questionnaire\QuestionnaireReponseService;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 function makeInvitation(): QuestionnaireInvitation
 {
@@ -240,4 +243,95 @@ it('réouverture admin : invitation et soumission repassent en cours, submitted_
     expect($submission->fresh()->submitted_at)->toBeNull();
     // Réponses conservées :
     expect($submission->fresh()->answers)->toHaveCount(1);
+});
+
+// -----------------------------------------------------------------------
+// Tests supersede / creerDepuisOcr (Lot 7)
+// -----------------------------------------------------------------------
+
+it('creerDepuisOcr crée une soumission papier soumise', function (): void {
+    $op = Operation::factory()->create();
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['statut' => 'ouverte']);
+    $q1 = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Question', 'type' => 'texte_court', 'ordre' => 1, 'obligatoire' => true,
+    ]);
+    $participant = Participant::factory()->create(['operation_id' => $op->id]);
+    $invitation = $campagne->invitations()->create([
+        'association_id' => $campagne->association_id,
+        'participant_id' => $participant->id,
+        'token_hash' => hash('sha256', 'test-token'),
+        'token_chiffre' => 'test-token',
+        'code_court' => 'ABCD1234',
+        'statut' => StatutInvitation::NonOuvert,
+    ]);
+
+    $svc = app(QuestionnaireReponseService::class);
+    $sub = $svc->creerDepuisOcr($invitation, [(string) $q1->id => 'Réponse papier'], accepteContact: false);
+
+    expect($sub->statut)->toBe(StatutSubmission::Soumise);
+    expect($sub->source)->toBe('papier');
+    expect((int) $sub->active_key)->toBe((int) $invitation->id);
+    expect($sub->answers)->toHaveCount(1);
+});
+
+it('creerDepuisOcr refuse de remplacer sans flag remplacer', function (): void {
+    $op = Operation::factory()->create();
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['statut' => 'ouverte']);
+    $q1 = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Question', 'type' => 'texte_court', 'ordre' => 1, 'obligatoire' => false,
+    ]);
+    $participant = Participant::factory()->create(['operation_id' => $op->id]);
+    $invitation = $campagne->invitations()->create([
+        'association_id' => $campagne->association_id,
+        'participant_id' => $participant->id,
+        'token_hash' => hash('sha256', 'test2'),
+        'token_chiffre' => 'test2',
+        'code_court' => 'EFGH5678',
+        'statut' => StatutInvitation::NonOuvert,
+    ]);
+
+    $svc = app(QuestionnaireReponseService::class);
+    // Create first submission
+    $svc->demarrerOuReprendre($invitation);
+    $svc->finaliser($invitation->submissions()->first(), accepteContact: false);
+
+    // Try to create OCR submission without remplacer flag
+    expect(fn () => $svc->creerDepuisOcr($invitation, [(string) $q1->id => 'val'], accepteContact: false, remplacer: false))
+        ->toThrow(HttpException::class);
+});
+
+it('creerDepuisOcr remplace l ancienne soumission (supersede non destructif)', function (): void {
+    $op = Operation::factory()->create();
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['statut' => 'ouverte']);
+    $q1 = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Question', 'type' => 'satisfaction', 'ordre' => 1, 'obligatoire' => true,
+    ]);
+    $participant = Participant::factory()->create(['operation_id' => $op->id]);
+    $invitation = $campagne->invitations()->create([
+        'association_id' => $campagne->association_id,
+        'participant_id' => $participant->id,
+        'token_hash' => hash('sha256', 'test3'),
+        'token_chiffre' => 'test3',
+        'code_court' => 'IJKL9012',
+        'statut' => StatutInvitation::NonOuvert,
+    ]);
+
+    $svc = app(QuestionnaireReponseService::class);
+    $ancienne = $svc->demarrerOuReprendre($invitation);
+    $svc->enregistrerReponse($ancienne, $q1, 3);
+    $svc->finaliser($ancienne, accepteContact: false);
+
+    // Supersede with OCR submission
+    $nouvelle = $svc->creerDepuisOcr($invitation, [(string) $q1->id => 5], accepteContact: true, remplacer: true);
+
+    expect($nouvelle->statut)->toBe(StatutSubmission::Soumise);
+    expect($nouvelle->source)->toBe('papier');
+
+    $ancienne->refresh();
+    expect($ancienne->statut)->toBe(StatutSubmission::Remplacee);
+    expect($ancienne->active_key)->toBeNull();
+    expect((int) $ancienne->remplacee_par_id)->toBe((int) $nouvelle->id);
+
+    // Invariant: exactly one active
+    expect($invitation->submissions()->whereNotNull('active_key')->count())->toBe(1);
 });

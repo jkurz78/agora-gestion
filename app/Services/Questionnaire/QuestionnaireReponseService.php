@@ -165,6 +165,70 @@ final class QuestionnaireReponseService
         }
     }
 
+    /**
+     * Crée une soumission papier depuis un payload OCR validé.
+     * Supersede non destructif : l'ancienne soumission passe en "remplacee", la nouvelle prend la clé active.
+     *
+     * @param  array<string|int, int|string|bool|null>  $valeursParQuestionId  question_id => valeur brute
+     */
+    public function creerDepuisOcr(
+        QuestionnaireInvitation $invitation,
+        array $valeursParQuestionId,
+        bool $accepteContact,
+        bool $remplacer = false,
+    ): QuestionnaireSubmission {
+        return DB::transaction(function () use ($invitation, $valeursParQuestionId, $accepteContact, $remplacer): QuestionnaireSubmission {
+            $active = $invitation->submissions()
+                ->whereIn('statut', [StatutSubmission::EnCours->value, StatutSubmission::Soumise->value])
+                ->first();
+
+            if ($active !== null) {
+                abort_unless($remplacer, 422, 'Une réponse existe déjà (choisir Ignorer ou Remplacer).');
+            }
+
+            // Crée la nouvelle soumission SANS active_key (sera fixée après le supersede)
+            $nouvelle = $invitation->submissions()->create([
+                'campaign_id' => $invitation->campaign_id,
+                'statut' => StatutSubmission::EnCours,
+                'source' => 'papier',
+                'active_key' => null,
+            ]);
+
+            // Enregistre les réponses
+            $questions = $invitation->campaign->questions()->get()->keyBy('id');
+            foreach ($valeursParQuestionId as $qid => $valeur) {
+                $q = $questions->get((int) $qid);
+                if ($q !== null) {
+                    $this->enregistrerReponse($nouvelle, $q, $valeur);
+                }
+            }
+
+            // Vérifie les champs obligatoires
+            $this->verifierObligatoires($nouvelle);
+
+            // Supersede : libère l'active_key AVANT de la revendiquer sur la nouvelle soumission
+            if ($active !== null) {
+                $active->update([
+                    'statut' => StatutSubmission::Remplacee,
+                    'active_key' => null,
+                    'remplacee_par_id' => $nouvelle->id,
+                ]);
+            }
+
+            // Finalise la nouvelle soumission
+            $nouvelle->update([
+                'statut' => StatutSubmission::Soumise,
+                'accepte_contact' => $accepteContact,
+                'submitted_at' => now(),
+                'active_key' => $invitation->id,
+            ]);
+
+            $invitation->update(['statut' => StatutInvitation::Soumis, 'submitted_at' => now()]);
+
+            return $nouvelle;
+        });
+    }
+
     /** Réouverture admin (D4) : symétrique invitation + soumission, réponses conservées. */
     public function rouvrir(QuestionnaireInvitation $invitation): void
     {
