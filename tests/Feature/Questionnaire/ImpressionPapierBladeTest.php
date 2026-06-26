@@ -339,7 +339,7 @@ it('rend le logo quand logoDataUri est fourni', function (): void {
     expect($html)->toContain('src="'.$logoUri.'"');
 });
 
-it('rend les 5 niveaux de satisfaction avec des cases à cocher', function (): void {
+it('rend les 5 smileys de satisfaction sans libellés texte et sur la même ligne que le titre', function (): void {
     $data = buildPaperData(
         [['libelle' => 'Satisfaction test', 'type' => TypeQuestion::Satisfaction]],
         [[0]],
@@ -353,11 +353,84 @@ it('rend les 5 niveaux de satisfaction avec des cases à cocher', function (): v
         'pages' => $data['pages'],
     ])->render();
 
-    // Les 5 niveaux
+    // Les 5 SVG smileys sont présents (5 fois la balise img data:image/svg+xml)
+    expect(substr_count($html, 'src="data:image/svg+xml;base64'))->toBe(5);
+
+    // Les libellés texte ont été supprimés du rendu papier
     expect($html)
-        ->toContain('Très insatisfait')
-        ->toContain('Neutre')
-        ->toContain('Très satisfait');
+        ->not->toContain('Très insatisfait')
+        ->not->toContain('Très satisfait');
+
+    // Le titre et les smileys sont dans la même table (structure 2 colonnes)
+    expect($html)->toContain('smileys-compact');
+});
+
+it('rend satisfaction_texte_long avec smileys et zone texte 3 lignes sans libellés', function (): void {
+    $data = buildPaperData(
+        [['libelle' => 'Votre avis détaillé', 'type' => TypeQuestion::SatisfactionTexteLong]],
+        [[0]],
+    );
+
+    $html = view('pdf.questionnaire-papier', [
+        'campagne' => $data['campagne'],
+        'nomAsso' => 'Mon Association',
+        'logoDataUri' => null,
+        'groupes' => $data['groupes'],
+        'pages' => $data['pages'],
+    ])->render();
+
+    // 5 smileys SVG présents
+    expect(substr_count($html, 'src="data:image/svg+xml;base64'))->toBe(5);
+
+    // Zone texte 3 lignes présente (class marker)
+    expect($html)->toContain('class="texte-3-lignes"');
+
+    // Pas de libellés texte satisfaction
+    expect($html)
+        ->not->toContain('Très insatisfait')
+        ->not->toContain('Très satisfait');
+});
+
+it('affiche la mention obligatoire sur la zone texte quand texte_obligatoire=true', function (): void {
+    $data = buildPaperData(
+        [[
+            'libelle' => 'Dites-nous tout',
+            'type' => TypeQuestion::SatisfactionTexteLong,
+            'config' => ['texte_obligatoire' => true],
+        ]],
+        [[0]],
+    );
+
+    $html = view('pdf.questionnaire-papier', [
+        'campagne' => $data['campagne'],
+        'nomAsso' => 'Mon Association',
+        'logoDataUri' => null,
+        'groupes' => $data['groupes'],
+        'pages' => $data['pages'],
+    ])->render();
+
+    expect($html)->toContain('Réponse obligatoire');
+});
+
+it('affiche la ligne commentaire court sous satisfaction simple quand config commentaire', function (): void {
+    $data = buildPaperData(
+        [[
+            'libelle' => 'Satisfaction simple commentaire',
+            'type' => TypeQuestion::Satisfaction,
+            'config' => ['commentaire' => true, 'commentaire_libelle' => 'Précisez votre réponse'],
+        ]],
+        [[0]],
+    );
+
+    $html = view('pdf.questionnaire-papier', [
+        'campagne' => $data['campagne'],
+        'nomAsso' => 'Mon Association',
+        'logoDataUri' => null,
+        'groupes' => $data['groupes'],
+        'pages' => $data['pages'],
+    ])->render();
+
+    expect($html)->toContain('Précisez votre réponse');
 });
 
 it('rend les labels gauche/droite d\'une question ressenti', function (): void {

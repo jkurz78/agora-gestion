@@ -195,6 +195,26 @@
                             @if($q->aide)
                                 <div class="info-aide">{{ $q->aide }}</div>
                             @endif
+                        @elseif(in_array($q->type, [TypeQuestion::Satisfaction, TypeQuestion::SatisfactionTexteLong], true))
+                            {{-- Satisfaction : titre à gauche, smileys compacts sans libellés à droite sur la même ligne --}}
+                            <table style="width:100%; border-collapse:collapse;"><tr>
+                                <td style="vertical-align:middle;">
+                                    <span class="question-libelle">{{ $prefixeNumero }}{{ $q->libelle }}@if($q->obligatoire)<span class="question-obligatoire"> *</span>@endif</span>
+                                    @if($q->aide)<div class="question-aide">{{ $q->aide }}</div>@endif
+                                </td>
+                                <td style="vertical-align:middle; text-align:right; white-space:nowrap; width:175px;">
+                                    @include('pdf.partials.champ-papier-smileys', ['question' => $q])
+                                </td>
+                            </tr></table>
+                            @if($q->type === TypeQuestion::SatisfactionTexteLong)
+                                @if($q->config['texte_obligatoire'] ?? false)
+                                    <div style="font-size:8px; color:#888; margin-top:4px;">Réponse obligatoire</div>
+                                @endif
+                                <div class="texte-3-lignes" style="border:1px solid #555; height:3.6em; margin-top:4px; background:#fff;"></div>
+                            @elseif(!empty($q->config['commentaire']) && !empty($q->config['commentaire_libelle']))
+                                <div style="margin-top:8px; font-size:9px; color:#555;">{{ $q->config['commentaire_libelle'] }}</div>
+                                <div style="border-bottom:1px solid #555; height:1.6em; margin-top:4px;"></div>
+                            @endif
                         @else
                             <div class="question-libelle">
                                 {{ $prefixeNumero }}{{ $q->libelle }}@if($q->obligatoire)<span class="question-obligatoire"> *</span>@endif
