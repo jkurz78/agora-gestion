@@ -10,6 +10,7 @@ use App\Services\Emargement\ImagickQrCodeExtractor;
 use App\Services\IncomingDocuments\IncomingDocumentIngester;
 use App\Services\Questionnaire\Contracts\QrDecoderContract;
 use App\Services\Questionnaire\QuestionnaireQrDecoder;
+use App\Services\Questionnaire\QuestionnaireScanDocumentHandler;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
 
@@ -28,7 +29,7 @@ final class IncomingDocumentsServiceProvider extends ServiceProvider
         $this->app->bind(IncomingDocumentIngester::class, function (Application $app): IncomingDocumentIngester {
             return new IncomingDocumentIngester([
                 $app->make(EmargementDocumentHandler::class),
-                // v2.9+ : ajouter d'autres handlers ici (ex: FactureDocumentHandler)
+                $app->make(QuestionnaireScanDocumentHandler::class),
             ]);
         });
     }
