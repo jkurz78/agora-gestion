@@ -39,10 +39,28 @@ final class EnvoiCompose extends Component
             ->all();
     }
 
+    public function toggleTousParticipants(): void
+    {
+        $avecEmail = $this->campagne->operation
+            ->participants()
+            ->with('tiers')
+            ->get()
+            ->filter(fn ($p) => ! empty($p->tiers?->email));
+
+        if (count($this->selectedParticipants) === $avecEmail->count() && $avecEmail->count() > 0) {
+            $this->selectedParticipants = [];
+        } else {
+            $this->selectedParticipants = $avecEmail->pluck('id')->map(fn ($id) => (int) $id)->all();
+        }
+    }
+
     public function render(): View
     {
+        $participants = $this->campagne->operation->participants()->with('tiers')->get();
+
         return view('livewire.questionnaire.envoi-compose', [
-            'participants' => $this->campagne->operation->participants()->with('tiers')->get(),
+            'participants' => $participants,
+            'participantsAvecEmailCount' => $participants->filter(fn ($p) => ! empty($p->tiers?->email))->count(),
         ]);
     }
 
