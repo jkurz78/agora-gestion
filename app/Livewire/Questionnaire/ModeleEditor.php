@@ -31,6 +31,9 @@ final class ModeleEditor extends Component
 
     public string $commentaireLibelle = '';
 
+    /** Zone de texte long obligatoire (satisfaction_texte_long uniquement). */
+    public bool $texteObligatoire = false;
+
     /** Labels d'extrémité (ressenti uniquement). */
     public string $labelGauche = '';
 
@@ -49,6 +52,32 @@ final class ModeleEditor extends Component
             'questions' => $this->template->questions()->get(),
             'types' => TypeQuestion::pourSelect(),
         ]);
+    }
+
+    public function editerQuestion(int $id): void
+    {
+        $question = $this->template->questions()->findOrFail($id);
+        $this->editingQuestionId = $id;
+        $this->libelle = $question->libelle;
+        $this->aide = $question->aide ?? '';
+        $this->type = $question->type->value;
+        $this->obligatoire = $question->obligatoire;
+
+        // Charger les props spécifiques au type
+        $config = $question->config ?? [];
+        $this->commentaire = (bool) ($config['commentaire'] ?? false);
+        $this->commentaireLibelle = $config['commentaire_libelle'] ?? '';
+        $this->labelGauche = $config['label_gauche'] ?? '';
+        $this->labelDroite = $config['label_droite'] ?? '';
+        $this->texteObligatoire = (bool) ($config['texte_obligatoire'] ?? false);
+
+        // Options (choix unique)
+        if ($question->type->aDesOptions()) {
+            $options = $config['options'] ?? [];
+            $this->optionsBrut = implode("\n", array_column($options, 'libelle'));
+        } else {
+            $this->optionsBrut = '';
+        }
     }
 
     public function ajouterQuestion(): void
@@ -74,7 +103,7 @@ final class ModeleEditor extends Component
             'config' => $this->buildConfig($type),
         ]);
 
-        $this->reset(['libelle', 'aide', 'obligatoire', 'optionsBrut', 'commentaire', 'commentaireLibelle', 'labelGauche', 'labelDroite']);
+        $this->reset(['libelle', 'aide', 'obligatoire', 'optionsBrut', 'commentaire', 'commentaireLibelle', 'labelGauche', 'labelDroite', 'texteObligatoire']);
         $this->type = 'texte_court';
     }
 
@@ -123,6 +152,10 @@ final class ModeleEditor extends Component
                 'commentaire' => true,
                 'commentaire_libelle' => $this->commentaireLibelle !== '' ? $this->commentaireLibelle : 'Un commentaire ? (optionnel)',
             ];
+        }
+
+        if ($type === TypeQuestion::SatisfactionTexteLong) {
+            return ['texte_obligatoire' => $this->texteObligatoire];
         }
 
         if ($type === TypeQuestion::Ressenti) {

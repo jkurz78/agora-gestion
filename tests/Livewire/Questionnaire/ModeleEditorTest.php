@@ -197,3 +197,92 @@ it('toggleGroupe ne s applique qu aux questions du même modèle', function (): 
         ->call('toggleGroupe', $q_autre->id)
     )->toThrow(Exception::class);
 });
+
+// ── Type SatisfactionTexteLong ────────────────────────────────────────────────
+
+it('crée une question satisfaction_texte_long avec obligatoire et texte_obligatoire à true', function (): void {
+    $t = QuestionnaireTemplate::factory()->create();
+
+    Livewire::test(ModeleEditor::class, ['template' => $t])
+        ->set('libelle', 'Satisfaction globale + commentaire')
+        ->set('type', TypeQuestion::SatisfactionTexteLong->value)
+        ->set('obligatoire', true)
+        ->set('texteObligatoire', true)
+        ->call('ajouterQuestion')
+        ->assertHasNoErrors();
+
+    $q = $t->questions()->first();
+    expect($q->type)->toBe(TypeQuestion::SatisfactionTexteLong);
+    expect($q->obligatoire)->toBeTrue();
+    expect($q->config['texte_obligatoire'])->toBeTrue();
+});
+
+it('crée une question satisfaction_texte_long avec texte_obligatoire à false', function (): void {
+    $t = QuestionnaireTemplate::factory()->create();
+
+    Livewire::test(ModeleEditor::class, ['template' => $t])
+        ->set('libelle', 'Satisfaction globale')
+        ->set('type', TypeQuestion::SatisfactionTexteLong->value)
+        ->set('obligatoire', true)
+        ->set('texteObligatoire', false)
+        ->call('ajouterQuestion')
+        ->assertHasNoErrors();
+
+    $q = $t->questions()->first();
+    expect($q->type)->toBe(TypeQuestion::SatisfactionTexteLong);
+    expect($q->obligatoire)->toBeTrue();
+    expect((bool) ($q->config['texte_obligatoire'] ?? false))->toBeFalse();
+});
+
+it('editerQuestion recharge texteObligatoire depuis la config', function (): void {
+    $t = QuestionnaireTemplate::factory()->create();
+    $q = QuestionnaireTemplateQuestion::factory()->for($t, 'template')->create([
+        'type' => TypeQuestion::SatisfactionTexteLong,
+        'libelle' => 'Votre avis',
+        'obligatoire' => true,
+        'config' => ['texte_obligatoire' => true],
+        'ordre' => 1,
+    ]);
+
+    $component = Livewire::test(ModeleEditor::class, ['template' => $t])
+        ->call('editerQuestion', $q->id);
+
+    $component->assertSet('type', TypeQuestion::SatisfactionTexteLong->value);
+    $component->assertSet('obligatoire', true);
+    $component->assertSet('texteObligatoire', true);
+});
+
+it('editerQuestion recharge texteObligatoire à false depuis la config', function (): void {
+    $t = QuestionnaireTemplate::factory()->create();
+    $q = QuestionnaireTemplateQuestion::factory()->for($t, 'template')->create([
+        'type' => TypeQuestion::SatisfactionTexteLong,
+        'libelle' => 'Votre avis',
+        'obligatoire' => false,
+        'config' => ['texte_obligatoire' => false],
+        'ordre' => 1,
+    ]);
+
+    $component = Livewire::test(ModeleEditor::class, ['template' => $t])
+        ->call('editerQuestion', $q->id);
+
+    $component->assertSet('texteObligatoire', false);
+});
+
+it('la création satisfaction standard reste inchangée après l ajout du nouveau type', function (): void {
+    $t = QuestionnaireTemplate::factory()->create();
+
+    Livewire::test(ModeleEditor::class, ['template' => $t])
+        ->set('libelle', 'Note globale')
+        ->set('type', TypeQuestion::Satisfaction->value)
+        ->set('obligatoire', true)
+        ->set('commentaire', true)
+        ->set('commentaireLibelle', 'Pourquoi ?')
+        ->call('ajouterQuestion')
+        ->assertHasNoErrors();
+
+    $q = $t->questions()->first();
+    expect($q->type)->toBe(TypeQuestion::Satisfaction);
+    expect($q->obligatoire)->toBeTrue();
+    expect($q->config['commentaire'])->toBeTrue();
+    expect($q->config['commentaire_libelle'])->toBe('Pourquoi ?');
+});

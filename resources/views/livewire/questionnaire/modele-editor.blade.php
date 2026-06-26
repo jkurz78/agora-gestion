@@ -94,6 +94,15 @@
                         @endif
                     </div>
                 @endif
+                @if ($type === 'satisfaction_texte_long')
+                    <div class="col-md-12 d-flex align-items-center gap-3 flex-wrap">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" wire:model="texteObligatoire" id="texte_obligatoire_toggle">
+                            <label class="form-check-label" for="texte_obligatoire_toggle">Texte long obligatoire</label>
+                        </div>
+                        <small class="text-muted">Une zone de texte long s'affiche toujours après les smileys.</small>
+                    </div>
+                @endif
                 @if ($type === 'ressenti')
                     <div class="col-md-6">
                         <input type="text" class="form-control"
