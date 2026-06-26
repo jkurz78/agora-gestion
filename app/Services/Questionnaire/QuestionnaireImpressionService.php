@@ -9,8 +9,9 @@ use App\Support\CurrentAssociation;
 use App\Support\PdfFooterRenderer;
 use App\Support\QuestionnaireQrCode;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Barryvdh\DomPDF\PDF as PdfInstance;
 use Illuminate\Http\Response;
+use setasign\Fpdi\Fpdi;
+use setasign\Fpdi\PdfParser\StreamReader;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class QuestionnaireImpressionService
@@ -84,9 +85,9 @@ final class QuestionnaireImpressionService
      */
     public function afficher(QuestionnaireCampaign $campagne, array $participantIds): Response
     {
-        $pdf = $this->construirePdf($campagne, $participantIds);
+        $content = $this->construirePdfFusionne($campagne, $participantIds);
 
-        return response($pdf->output(), 200, [
+        return response($content, 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => "inline; filename=\"questionnaire-{$campagne->id}.pdf\"",
         ]);
@@ -103,36 +104,65 @@ final class QuestionnaireImpressionService
     public function telecharger(QuestionnaireCampaign $campagne, array $participantIds): StreamedResponse
     {
         $filename = "questionnaire-{$campagne->id}.pdf";
-        $pdf = $this->construirePdf($campagne, $participantIds);
+        $content = $this->construirePdfFusionne($campagne, $participantIds);
 
         return response()->streamDownload(
-            fn () => print ($pdf->output()),
+            fn () => print ($content),
             $filename,
             ['Content-Type' => 'application/pdf'],
         );
     }
 
     /**
-     * Construit l'objet PDF DomPDF avec le footer injecté.
-     * Partagé entre afficher() et telecharger().
+     * Rend un PDF par invitation (avec nom du répondant en pied de page
+     * et pagination propre à chaque répondant), puis fusionne via FPDI.
+     *
+     * Si une invitation produit un nombre impair de pages, une page blanche
+     * est ajoutée pour que l'impression recto-verso ne mélange pas les
+     * formulaires de deux répondants différents.
      *
      * @param  array<int>  $participantIds
      */
-    private function construirePdf(QuestionnaireCampaign $campagne, array $participantIds): PdfInstance
+    private function construirePdfFusionne(QuestionnaireCampaign $campagne, array $participantIds): string
     {
-        $pdf = Pdf::loadView(
-            'pdf.questionnaire-papier',
-            $this->construireDonnees($campagne, $participantIds)
-        )->setPaper('a4');
+        $donnees = $this->construireDonnees($campagne, $participantIds);
 
-        // Pied de page : « Imprimé le … — opération — titre questionnaire » (gauche) + page X/N (droite).
         $leftText = implode(' — ', array_filter([
             'Imprimé le '.now()->format('d/m/Y'),
             $campagne->operation?->nom,
             $campagne->titre_affiche,
         ]));
-        PdfFooterRenderer::renderQuestionnaire($pdf, $leftText);
 
-        return $pdf;
+        $merger = new Fpdi();
+
+        foreach ($donnees['pages'] as $page) {
+            $nomParticipant = $page['invitation']->participant?->tiers?->displayName() ?? '';
+
+            $singlePdf = Pdf::loadView('pdf.questionnaire-papier', [
+                'campagne' => $donnees['campagne'],
+                'nomAsso' => $donnees['nomAsso'],
+                'logoDataUri' => $donnees['logoDataUri'],
+                'groupes' => $donnees['groupes'],
+                'pages' => [$page],
+            ])->setPaper('a4');
+
+            PdfFooterRenderer::renderQuestionnaire($singlePdf, $leftText, $nomParticipant);
+
+            $pdfContent = $singlePdf->output();
+
+            $pageCount = $merger->setSourceFile(StreamReader::createByString($pdfContent));
+            for ($p = 1; $p <= $pageCount; $p++) {
+                $tpl = $merger->importPage($p);
+                $size = $merger->getTemplateSize($tpl);
+                $merger->AddPage($size['orientation'], [$size['width'], $size['height']]);
+                $merger->useTemplate($tpl);
+            }
+
+            if ($pageCount % 2 !== 0) {
+                $merger->AddPage('P', [210, 297]);
+            }
+        }
+
+        return $merger->Output('S');
     }
 }

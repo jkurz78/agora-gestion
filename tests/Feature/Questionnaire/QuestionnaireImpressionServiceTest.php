@@ -9,6 +9,8 @@ use App\Models\QuestionnaireCampaignQuestion;
 use App\Models\Tiers;
 use App\Services\Questionnaire\QuestionnaireImpressionService;
 use Illuminate\Http\Response;
+use setasign\Fpdi\Fpdi;
+use setasign\Fpdi\PdfParser\StreamReader;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -175,6 +177,50 @@ it('construireDonnees retourne introHtml et remerciementHtml par page', function
         expect($page)->toHaveKey('introHtml');
         expect($page)->toHaveKey('remerciementHtml');
     }
+});
+
+// -----------------------------------------------------------------------
+// Tests FPDI fusion : pagination par répondant + recto-verso
+// -----------------------------------------------------------------------
+
+it('le PDF fusionné a un nombre pair de pages grâce au padding recto-verso', function (): void {
+    ['campagne' => $campagne, 'participantIds' => $pids] = buildImpressionFixture();
+
+    $response = app(QuestionnaireImpressionService::class)->afficher($campagne, $pids);
+    $pdfContent = $response->getContent();
+
+    $reader = new Fpdi();
+    $pageCount = $reader->setSourceFile(StreamReader::createByString($pdfContent));
+
+    expect($pageCount % 2)->toBe(0);
+});
+
+it('un répondant unique produit un PDF de 2 pages (1 contenu + 1 blanche recto-verso)', function (): void {
+    $op = Operation::factory()->create();
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'titre_affiche' => 'Test footer nom',
+        'statut' => 'ouverte',
+    ]);
+
+    QuestionnaireCampaignQuestion::factory()
+        ->for($campagne, 'campaign')
+        ->create(['libelle' => 'Q', 'type' => 'texte_court', 'ordre' => 1]);
+
+    $tiers = Tiers::factory()->create(['prenom' => 'Sylvie', 'nom' => 'Martin']);
+    $participant = Participant::factory()->create([
+        'operation_id' => $op->id,
+        'tiers_id' => $tiers->id,
+    ]);
+
+    $response = app(QuestionnaireImpressionService::class)
+        ->afficher($campagne, [(int) $participant->id]);
+
+    $pdfContent = $response->getContent();
+    expect($pdfContent)->toStartWith('%PDF');
+
+    $reader = new Fpdi();
+    $pageCount = $reader->setSourceFile(StreamReader::createByString($pdfContent));
+    expect($pageCount)->toBe(2);
 });
 
 it('construireDonnees résout {prenom} dans introHtml avec le prénom du participant', function (): void {

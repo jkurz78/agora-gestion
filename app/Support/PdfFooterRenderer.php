@@ -111,7 +111,7 @@ final class PdfFooterRenderer
      * This layout differs from render() (which centers the page count and
      * right-aligns an info string) so it is a separate method.
      */
-    public static function renderQuestionnaire(PDF $pdf, string $leftText): void
+    public static function renderQuestionnaire(PDF $pdf, string $leftText, string $respondentName = ''): void
     {
         try {
             $domPdf = $pdf->getDomPDF();
@@ -139,6 +139,19 @@ final class PdfFooterRenderer
             self::TEXT_SIZE,
             self::TEXT_COLOR,
         );
+
+        // Center : respondent name (when provided)
+        if ($respondentName !== '') {
+            $nameWidth = $fontMetrics->getTextWidth($respondentName, $font, self::TEXT_SIZE);
+            $canvas->page_text(
+                ($pageWidth - $nameWidth) / 2,
+                $y,
+                $respondentName,
+                $font,
+                self::TEXT_SIZE,
+                self::TEXT_COLOR,
+            );
+        }
 
         // Right : "page X / N"
         $pageText = 'page {PAGE_NUM} / {PAGE_COUNT}';
