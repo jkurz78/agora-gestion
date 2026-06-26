@@ -63,6 +63,14 @@ final class QuestionnaireResultatService
                     ? ['verbatims' => $answers->pluck('value_text')->filter()->values()->all()]
                     : []),
             ],
+            TypeQuestion::SatisfactionTexteLong => [
+                'moyenne' => $answers->isNotEmpty()
+                    ? round((float) $answers->avg('value_integer'), 1)
+                    : null,
+                'distribution' => $answers->countBy('value_integer')->all(),
+                'n' => $answers->count(),
+                'verbatims' => $answers->pluck('value_text')->filter()->values()->all(),
+            ],
             TypeQuestion::CaseACocher => [
                 'oui' => $answers->where('value_boolean', true)->count(),
                 'non' => $answers->where('value_boolean', false)->count(),

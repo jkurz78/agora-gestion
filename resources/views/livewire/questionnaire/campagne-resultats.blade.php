@@ -54,7 +54,7 @@
                 <span class="badge bg-secondary">{{ $q['type']->label() }}</span>
             </div>
             <div class="card-body">
-                @if ($q['type'] === \App\Enums\TypeQuestion::Satisfaction || $q['type'] === \App\Enums\TypeQuestion::Ressenti)
+                @if ($q['type'] === \App\Enums\TypeQuestion::Satisfaction || $q['type'] === \App\Enums\TypeQuestion::Ressenti || $q['type'] === \App\Enums\TypeQuestion::SatisfactionTexteLong)
                     @if ($q['moyenne'] !== null)
                         <div class="mb-2">
                             <span class="fs-4 fw-bold">{{ number_format($q['moyenne'], 1, ',', '') }}</span>

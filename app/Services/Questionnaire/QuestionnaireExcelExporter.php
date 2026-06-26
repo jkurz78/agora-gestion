@@ -30,6 +30,9 @@ final class QuestionnaireExcelExporter
             if ($q->type === TypeQuestion::Satisfaction && ($q->config['commentaire'] ?? false)) {
                 $entetes[] = $q->libelle.' — commentaire';
             }
+            if ($q->type === TypeQuestion::SatisfactionTexteLong) {
+                $entetes[] = $q->libelle.' — commentaire';
+            }
         }
 
         $rows = [$entetes];
@@ -66,6 +69,9 @@ final class QuestionnaireExcelExporter
                 if ($q->type === TypeQuestion::Satisfaction && ($q->config['commentaire'] ?? false)) {
                     $ligne[] = $answer?->value_text ?? '';
                 }
+                if ($q->type === TypeQuestion::SatisfactionTexteLong) {
+                    $ligne[] = $answer?->value_text ?? '';
+                }
             }
 
             $rows[] = $ligne;
@@ -92,7 +98,7 @@ final class QuestionnaireExcelExporter
 
         return match ($type) {
             TypeQuestion::TexteCourt, TypeQuestion::TexteLong => $answer->value_text ?? '',
-            TypeQuestion::Satisfaction, TypeQuestion::Ressenti => $answer->value_integer ?? '',
+            TypeQuestion::Satisfaction, TypeQuestion::SatisfactionTexteLong, TypeQuestion::Ressenti => $answer->value_integer ?? '',
             TypeQuestion::CaseACocher => $answer->value_boolean ? 'Oui' : 'Non',
             TypeQuestion::ChoixUnique => $question->libelleOption((string) $answer->value_option) ?? ($answer->value_option ?? ''),
         };

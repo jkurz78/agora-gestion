@@ -46,6 +46,34 @@ it('les blocs Information sont exclus des résultats', function (): void {
         ->assertDontSee('Titre section info');
 });
 
+it('satisfaction_texte_long : affiche la distribution de notes ET les verbatims', function (): void {
+    $campagne = QuestionnaireCampaign::factory()->create(['statut' => 'ouverte', 'anonymise' => false]);
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Note + commentaire', 'type' => 'satisfaction_texte_long', 'ordre' => 1,
+    ]);
+    $svc = app(QuestionnaireReponseService::class);
+
+    $inv1 = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create();
+    $sub1 = $svc->demarrerOuReprendre($inv1);
+    $svc->enregistrerReponse($sub1, $q, '4', commentaire: 'Très bien dans l ensemble');
+    $svc->finaliser($sub1, accepteContact: false);
+
+    $inv2 = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create();
+    $sub2 = $svc->demarrerOuReprendre($inv2);
+    $svc->enregistrerReponse($sub2, $q, '2', commentaire: 'Peut mieux faire');
+    $svc->finaliser($sub2, accepteContact: false);
+
+    Livewire::test(CampagneResultats::class, ['campagne' => $campagne])
+        ->assertStatus(200)
+        // Note moyenne / distribution présente
+        ->assertSee('3,0')          // moyenne (4+2)/2 = 3,0
+        ->assertSee('4')            // note 4 dans la distribution
+        ->assertSee('2')            // note 2 dans la distribution
+        // Verbatims présents
+        ->assertSee('Très bien dans l ensemble')
+        ->assertSee('Peut mieux faire');
+});
+
 it('n expose l identité que pour les répondants ayant consenti', function (): void {
     $campagne = QuestionnaireCampaign::factory()->create(['statut' => 'ouverte']);
     $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create(['type' => 'texte_court']);

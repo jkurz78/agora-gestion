@@ -91,3 +91,25 @@ it('produit des en-têtes stables avec colonnes identité même sans consentemen
     expect($rows[1])->toContain('');   // colonne identité vide
     expect($rows[1])->toContain(4);
 });
+
+it('satisfaction_texte_long : exporte deux colonnes note + commentaire', function (): void {
+    $campagne = QuestionnaireCampaign::factory()->create(['statut' => 'ouverte']);
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Qualité globale', 'type' => TypeQuestion::SatisfactionTexteLong, 'ordre' => 1,
+    ]);
+    $svc = app(QuestionnaireReponseService::class);
+    $inv = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create();
+    $sub = $svc->demarrerOuReprendre($inv);
+    $svc->enregistrerReponse($sub, $q, '5', commentaire: 'Excellent accueil');
+    $svc->finaliser($sub, accepteContact: false);
+
+    $rows = app(QuestionnaireExcelExporter::class)->lignes($campagne->fresh());
+
+    // En-têtes : colonne note + colonne commentaire
+    expect($rows[0])->toContain('Qualité globale');
+    expect($rows[0])->toContain('Qualité globale — commentaire');
+
+    // Données : note entière + texte du commentaire
+    expect($rows[1])->toContain(5);
+    expect($rows[1])->toContain('Excellent accueil');
+});
