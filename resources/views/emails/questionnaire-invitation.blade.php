@@ -1,7 +1,17 @@
 <!DOCTYPE html>
 <html lang="fr">
-<head><meta charset="UTF-8"></head>
-<body style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#333;margin:0;padding:20px">
-{!! $corpsHtml !!}
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial, sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: 0 auto; padding: 20px; }
+        .footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid #eee; font-size: 0.85rem; color: #888; }
+    </style>
+</head>
+<body>
+    <div>{!! $corpsHtml !!}</div>
+
+    <div class="footer">
+        <p>Si vous n'êtes pas concerné par ce message, vous pouvez l'ignorer.</p>
+    </div>
 </body>
 </html>

@@ -33,11 +33,11 @@
                         'Participant' => ['{prenom}' => 'Prénom', '{nom}' => 'Nom', '{email_participant}' => 'Email'],
                         'Politesse'   => ['{civilite}' => 'Civilité', '{politesse}' => 'Politesse', '{civilite_nom}' => 'M. NOM', '{politesse_nom}' => 'Monsieur NOM', '{salutation}' => 'Salutation'],
                         'Opération'   => ['{operation}' => 'Opération', '{type_operation}' => 'Type', '{date_debut}' => 'Date début', '{date_fin}' => 'Date fin', '{nb_seances}' => 'Nb séances', '{association}' => 'Association'],
-                        'Lien'        => ['{lien_questionnaire}' => 'Lien du questionnaire'],
                     ],
                     'insertItems' => [
                         "Logo de l'association" => '{logo}',
                         'Tableau des séances'   => '{table_seances}',
+                        'Bouton accès questionnaire' => '{bloc_liens}',
                     ],
                 ])
                 @error('corps') <div class="text-danger small mt-1">{{ $message }}</div> @enderror

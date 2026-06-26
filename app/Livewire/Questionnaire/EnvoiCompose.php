@@ -14,7 +14,7 @@ final class EnvoiCompose extends Component
 {
     public const CORPS_DEFAUT = '<p>Bonjour {prenom},</p>'
         .'<p>Nous vous invitons à répondre à notre questionnaire de satisfaction.</p>'
-        .'<p><a href="{lien_questionnaire}">Accéder au questionnaire</a></p>'
+        .'{bloc_liens}'
         .'<p>Merci pour votre retour !</p>';
 
     public QuestionnaireCampaign $campagne;

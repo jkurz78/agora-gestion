@@ -20,7 +20,7 @@ final class QuestionnaireVariableResolver
      *
      * @var array<int, string>
      */
-    private const HTML_KEYS = ['{table_seances}', '{table_seances_a_venir}', '{logo}'];
+    private const HTML_KEYS = ['{table_seances}', '{table_seances_a_venir}', '{logo}', '{bloc_liens}'];
 
     /**
      * @return array<string, string>
@@ -61,7 +61,11 @@ final class QuestionnaireVariableResolver
         ];
 
         if ($avecLien) {
-            $vars['{lien_questionnaire}'] = $invitation->lienReponse();
+            $url = $invitation->lienReponse();
+            $codeCourt = $invitation->code_court ?? '';
+
+            $vars['{lien_questionnaire}'] = $url;
+            $vars['{bloc_liens}'] = $this->buildBlocLiens($url, $codeCourt);
         }
 
         return $vars;
@@ -94,6 +98,8 @@ final class QuestionnaireVariableResolver
             '{table_seances}' => '',
             '{table_seances_a_venir}' => '',
             '{logo}' => $this->buildLogoImg(CurrentAssociation::tryGet()),
+            '{lien_questionnaire}' => 'https://example.com/q/exemple-token',
+            '{bloc_liens}' => $this->buildBlocLiens('https://example.com/q/exemple-token', ''),
         ];
     }
 
@@ -117,6 +123,15 @@ final class QuestionnaireVariableResolver
         );
 
         return strtr($html, array_combine(array_keys($vars), $echappees));
+    }
+
+    private function buildBlocLiens(string $url, string $codeCourt): string
+    {
+        $urlSafe = htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
+
+        return '<p style="text-align:center;margin:25px 0;">'
+            .'<a href="'.$urlSafe.'" style="display:inline-block;padding:10px 24px;background:#3d5473;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">'
+            .'Accéder au questionnaire</a></p>';
     }
 
     /**
