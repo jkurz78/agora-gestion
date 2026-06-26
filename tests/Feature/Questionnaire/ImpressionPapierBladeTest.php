@@ -628,6 +628,28 @@ it('le pied de page (pdf-footer) est présent dans le HTML', function (): void {
     expect($html)->toContain('class="pdf-footer"');
 });
 
+it('affiche le nom de l opération dans l en-tête de l invitation', function (): void {
+    $data = buildPaperData(
+        [['libelle' => 'Question opération', 'type' => TypeQuestion::TexteCourt]],
+        [[0]],
+    );
+
+    // L'opération est créée par buildPaperData via factory ; on récupère son nom.
+    $nomOperation = $data['campagne']->operation->nom;
+
+    $html = view('pdf.questionnaire-papier', [
+        'campagne' => $data['campagne'],
+        'nomAsso' => 'Mon Association',
+        'logoDataUri' => null,
+        'groupes' => $data['groupes'],
+        'pages' => $data['pages'],
+    ])->render();
+
+    expect($html)
+        ->toContain('campagne-operation')
+        ->toContain($nomOperation);
+});
+
 it('le code_court est rendu en petit texte gris (style discret)', function (): void {
     $data = buildPaperData(
         [['libelle' => 'Question code', 'type' => TypeQuestion::TexteCourt]],

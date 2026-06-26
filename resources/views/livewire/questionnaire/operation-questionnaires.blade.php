@@ -58,10 +58,11 @@
                                class="btn btn-sm btn-outline-primary">
                                 Envoyer les invitations
                             </a>
-                            <button class="btn btn-sm btn-outline-secondary"
-                                    wire:click="toggleImpression({{ $c->id }})">
-                                Imprimer (papier)
-                            </button>
+                            <a href="{{ route('questionnaires.campagnes.pdf', $c) }}"
+                               target="_blank"
+                               class="btn btn-sm btn-outline-secondary">
+                                PDF
+                            </a>
                         @endif
                         @if ($c->statut->peutCloturer())
                             <button class="btn btn-sm btn-outline-warning"
@@ -72,13 +73,6 @@
                         @endif
                     </td>
                 </tr>
-                @if ($c->statut === \App\Enums\StatutCampagne::Ouverte && $impressionCampagneId === $c->id)
-                    <tr>
-                        <td colspan="5" class="p-3 bg-light">
-                            @livewire('questionnaire.impression-papier', ['campagne' => $c], key('impression-'.$c->id))
-                        </td>
-                    </tr>
-                @endif
                 @foreach ($c->invitations->where('statut', \App\Enums\StatutInvitation::Soumis) as $inv)
                     <tr class="table-light small">
                         <td colspan="3" class="ps-4 text-muted">

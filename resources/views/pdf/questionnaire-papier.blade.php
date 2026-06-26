@@ -180,6 +180,9 @@
                         @endif
                         <div class="asso-name">{{ $nomAsso }}</div>
                         <div class="campagne-titre">{{ $campagne->titre_affiche }}</div>
+                        @if($campagne->operation?->nom)
+                            <div class="campagne-operation" style="font-size:10px; color:#555;">{{ $campagne->operation->nom }}</div>
+                        @endif
                         @if($introHtml !== '')
                             <div class="campagne-intro">{!! $introHtml !!}</div>
                         @endif

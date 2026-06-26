@@ -8,6 +8,7 @@ use App\Models\QuestionnaireCampaign;
 use App\Models\QuestionnaireCampaignQuestion;
 use App\Models\Tiers;
 use App\Services\Questionnaire\QuestionnaireImpressionService;
+use Illuminate\Http\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -131,6 +132,31 @@ it('le contenu du PDF commence par %PDF (rendu DomPDF réel)', function (): void
     $content = ob_get_clean();
 
     expect($content)->toStartWith('%PDF');
+});
+
+it('afficher retourne un Response HTTP avec Content-Type application/pdf', function (): void {
+    ['campagne' => $campagne, 'participantIds' => $pids] = buildImpressionFixture();
+
+    $response = app(QuestionnaireImpressionService::class)->afficher($campagne, $pids);
+
+    expect($response)->toBeInstanceOf(Response::class);
+    expect($response->headers->get('Content-Type'))->toBe('application/pdf');
+});
+
+it('afficher retourne un PDF inline (Content-Disposition contient inline)', function (): void {
+    ['campagne' => $campagne, 'participantIds' => $pids] = buildImpressionFixture();
+
+    $response = app(QuestionnaireImpressionService::class)->afficher($campagne, $pids);
+
+    expect($response->headers->get('Content-Disposition'))->toContain('inline');
+});
+
+it('afficher retourne un contenu débutant par %PDF', function (): void {
+    ['campagne' => $campagne, 'participantIds' => $pids] = buildImpressionFixture();
+
+    $response = app(QuestionnaireImpressionService::class)->afficher($campagne, $pids);
+
+    expect($response->getContent())->toStartWith('%PDF');
 });
 
 // -----------------------------------------------------------------------

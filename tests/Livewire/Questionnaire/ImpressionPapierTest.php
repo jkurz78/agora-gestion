@@ -2,65 +2,84 @@
 
 declare(strict_types=1);
 
-use App\Livewire\Questionnaire\ImpressionPapier;
+use App\Models\Association;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\QuestionnaireCampaign;
 use App\Models\QuestionnaireCampaignQuestion;
-use App\Enums\TypeQuestion;
-use Livewire\Livewire;
+use App\Models\User;
+use App\Tenant\TenantContext;
 
-it('présélectionne tous les participants de l opération au montage', function (): void {
-    $op = Operation::factory()->create();
-    $p1 = Participant::factory()->create(['operation_id' => $op->id]);
-    $p2 = Participant::factory()->create(['operation_id' => $op->id]);
-    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['statut' => 'ouverte']);
-
-    $component = Livewire::test(ImpressionPapier::class, ['campagne' => $campagne]);
-
-    $selected = $component->get('selectedParticipants');
-    expect($selected)->toHaveCount(2)
-        ->toContain($p1->id)
-        ->toContain($p2->id);
+/**
+ * Tests de la route GET questionnaires.campagnes.pdf
+ * (remplace l'ancien composant Livewire ImpressionPapier).
+ */
+beforeEach(function (): void {
+    $this->association = Association::factory()->create();
+    $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
+    $this->actingAs($this->user);
 });
 
-it('imprimer génère les invitations et retourne un téléchargement PDF', function (): void {
-    $op = Operation::factory()->create();
-    $p = Participant::factory()->create(['operation_id' => $op->id]);
-    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['statut' => 'ouverte']);
+afterEach(function (): void {
+    TenantContext::clear();
+});
 
-    // Ajouter une question pour que le PDF soit valide
+/**
+ * Construit une campagne ouverte avec un participant et une question.
+ *
+ * @return array{campagne: QuestionnaireCampaign, participant: Participant}
+ */
+function buildPdfRouteFixture(): array
+{
+    $op = Operation::factory()->create(['nom' => 'Formation Laravel 2026']);
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'titre_affiche' => 'Enquête satisfaction',
+        'statut' => 'ouverte',
+    ]);
     QuestionnaireCampaignQuestion::factory()
         ->for($campagne, 'campaign')
-        ->create(['libelle' => 'Question test', 'type' => TypeQuestion::TexteCourt, 'ordre' => 1]);
+        ->create(['libelle' => 'Question route', 'type' => 'texte_court', 'ordre' => 1]);
+    $participant = Participant::factory()->create(['operation_id' => $op->id]);
+
+    return compact('campagne', 'participant');
+}
+
+it('GET questionnaires.campagnes.pdf retourne 200 avec Content-Type application/pdf', function (): void {
+    ['campagne' => $campagne] = buildPdfRouteFixture();
+
+    $this->get(route('questionnaires.campagnes.pdf', $campagne))
+        ->assertOk()
+        ->assertHeader('Content-Type', 'application/pdf');
+});
+
+it('la réponse PDF commence par %PDF (rendu DomPDF réel)', function (): void {
+    ['campagne' => $campagne] = buildPdfRouteFixture();
+
+    $response = $this->get(route('questionnaires.campagnes.pdf', $campagne));
+
+    expect($response->getContent())->toStartWith('%PDF');
+});
+
+it('Content-Disposition contient inline (ouverture dans le navigateur)', function (): void {
+    ['campagne' => $campagne] = buildPdfRouteFixture();
+
+    $response = $this->get(route('questionnaires.campagnes.pdf', $campagne));
+
+    expect($response->headers->get('Content-Disposition'))->toContain('inline');
+});
+
+it('les invitations sont créées pour les participants de l opération (idempotent)', function (): void {
+    ['campagne' => $campagne] = buildPdfRouteFixture();
 
     expect($campagne->invitations()->count())->toBe(0);
 
-    Livewire::test(ImpressionPapier::class, ['campagne' => $campagne])
-        ->set('selectedParticipants', [$p->id])
-        ->call('imprimer')
-        ->assertFileDownloaded("questionnaire-{$campagne->id}.pdf");
-
-    // Les invitations ont été générées de façon idempotente
+    $this->get(route('questionnaires.campagnes.pdf', $campagne));
     expect($campagne->invitations()->count())->toBe(1);
-});
 
-it('imprimer ne génère qu une seule invitation par participant si appelé deux fois (idempotent)', function (): void {
-    $op = Operation::factory()->create();
-    $p = Participant::factory()->create(['operation_id' => $op->id]);
-    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['statut' => 'ouverte']);
-
-    QuestionnaireCampaignQuestion::factory()
-        ->for($campagne, 'campaign')
-        ->create(['libelle' => 'Q idempotent', 'type' => TypeQuestion::TexteCourt, 'ordre' => 1]);
-
-    Livewire::test(ImpressionPapier::class, ['campagne' => $campagne])
-        ->set('selectedParticipants', [$p->id])
-        ->call('imprimer');
-
-    Livewire::test(ImpressionPapier::class, ['campagne' => $campagne])
-        ->set('selectedParticipants', [$p->id])
-        ->call('imprimer');
-
+    // Second appel : idempotent
+    $this->get(route('questionnaires.campagnes.pdf', $campagne));
     expect($campagne->invitations()->count())->toBe(1);
 });

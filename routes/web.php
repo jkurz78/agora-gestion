@@ -69,6 +69,7 @@ use App\Models\RapprochementBancaire;
 use App\Models\RemiseBancaire;
 use App\Models\Tiers;
 use App\Models\TypeOperation;
+use App\Services\Questionnaire\QuestionnaireImpressionService;
 use Illuminate\Support\Facades\Route;
 
 // ── Installation (fresh-install wizard) ──
@@ -212,6 +213,16 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
         })->name('campagnes.resultats');
         Route::get('/campagnes/{campagne}/export', QuestionnaireExportController::class)
             ->name('campagnes.export');
+        Route::get('/campagnes/{campagne}/pdf', function (QuestionnaireCampaign $campagne) {
+            $participantIds = $campagne->operation
+                ->participants()
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            return app(QuestionnaireImpressionService::class)
+                ->afficher($campagne, $participantIds);
+        })->name('campagnes.pdf');
     });
 
 // ── Dashboard ──

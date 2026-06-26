@@ -87,6 +87,24 @@ it('n expose plus toggleEnvoi dans le composant liste', function (): void {
     expect(method_exists($component->instance(), 'toggleEnvoi'))->toBeFalse();
 });
 
+it('affiche le lien PDF vers route questionnaires.campagnes.pdf pour une campagne ouverte', function (): void {
+    $op = Operation::factory()->create();
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'statut' => StatutCampagne::Ouverte,
+    ]);
+
+    Livewire::test(OperationQuestionnaires::class, ['operation' => $op])
+        ->assertSee(route('questionnaires.campagnes.pdf', $campagne));
+});
+
+it('n expose plus toggleImpression dans le composant liste', function (): void {
+    $op = Operation::factory()->create();
+
+    $component = Livewire::test(OperationQuestionnaires::class, ['operation' => $op]);
+
+    expect(method_exists($component->instance(), 'toggleImpression'))->toBeFalse();
+});
+
 it('permet à l admin de rouvrir une invitation soumise', function (): void {
     $op = Operation::factory()->create();
     $participant = Participant::factory()->create(['operation_id' => $op->id]);

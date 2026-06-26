@@ -9,6 +9,8 @@ use App\Support\CurrentAssociation;
 use App\Support\PdfFooterRenderer;
 use App\Support\QuestionnaireQrCode;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Barryvdh\DomPDF\PDF as PdfInstance;
+use Illuminate\Http\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class QuestionnaireImpressionService
@@ -74,6 +76,23 @@ final class QuestionnaireImpressionService
     }
 
     /**
+     * Retourne le PDF prêt à être affiché en ligne dans le navigateur.
+     *
+     * Content-Disposition: inline — le navigateur l'ouvre dans l'onglet.
+     *
+     * @param  array<int>  $participantIds
+     */
+    public function afficher(QuestionnaireCampaign $campagne, array $participantIds): Response
+    {
+        $pdf = $this->construirePdf($campagne, $participantIds);
+
+        return response($pdf->output(), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => "inline; filename=\"questionnaire-{$campagne->id}.pdf\"",
+        ]);
+    }
+
+    /**
      * Génère et retourne le PDF à télécharger.
      *
      * Retourne un StreamedResponse pour que Livewire SupportFileDownloads
@@ -84,6 +103,23 @@ final class QuestionnaireImpressionService
     public function telecharger(QuestionnaireCampaign $campagne, array $participantIds): StreamedResponse
     {
         $filename = "questionnaire-{$campagne->id}.pdf";
+        $pdf = $this->construirePdf($campagne, $participantIds);
+
+        return response()->streamDownload(
+            fn () => print ($pdf->output()),
+            $filename,
+            ['Content-Type' => 'application/pdf'],
+        );
+    }
+
+    /**
+     * Construit l'objet PDF DomPDF avec le footer injecté.
+     * Partagé entre afficher() et telecharger().
+     *
+     * @param  array<int>  $participantIds
+     */
+    private function construirePdf(QuestionnaireCampaign $campagne, array $participantIds): PdfInstance
+    {
         $pdf = Pdf::loadView(
             'pdf.questionnaire-papier',
             $this->construireDonnees($campagne, $participantIds)
@@ -97,10 +133,6 @@ final class QuestionnaireImpressionService
         ]));
         PdfFooterRenderer::renderQuestionnaire($pdf, $leftText);
 
-        return response()->streamDownload(
-            fn () => print ($pdf->output()),
-            $filename,
-            ['Content-Type' => 'application/pdf'],
-        );
+        return $pdf;
     }
 }
