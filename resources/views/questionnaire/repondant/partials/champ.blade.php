@@ -52,7 +52,7 @@
         @endphp
 
         <style>
-            .q-satis-group { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-start; }
+            .q-satis-group { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-start; justify-content: center; }
             .q-satis-item { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; }
             .q-satis-item input[type="radio"] {
                 position: absolute;
