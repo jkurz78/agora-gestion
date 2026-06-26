@@ -69,6 +69,24 @@ it('affiche le bouton Lancer et pas Ouvrir', function (): void {
         ->assertDontSee('Ouvrir');
 });
 
+it('affiche un lien vers la page d envoi pour une campagne ouverte', function (): void {
+    $op = Operation::factory()->create();
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'statut' => StatutCampagne::Ouverte,
+    ]);
+
+    Livewire::test(OperationQuestionnaires::class, ['operation' => $op])
+        ->assertSee(route('questionnaires.campagnes.envoi', $campagne));
+});
+
+it('n expose plus toggleEnvoi dans le composant liste', function (): void {
+    $op = Operation::factory()->create();
+
+    $component = Livewire::test(OperationQuestionnaires::class, ['operation' => $op]);
+
+    expect(method_exists($component->instance(), 'toggleEnvoi'))->toBeFalse();
+});
+
 it('permet à l admin de rouvrir une invitation soumise', function (): void {
     $op = Operation::factory()->create();
     $participant = Participant::factory()->create(['operation_id' => $op->id]);

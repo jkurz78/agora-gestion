@@ -204,6 +204,9 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
         Route::post('/modeles/{template}/apercu', [QuestionnaireApercuController::class, 'storeModele'])->name('modeles.apercu.store');
         Route::get('/campagnes/{campagne}/apercu', [QuestionnaireApercuController::class, 'campagne'])->name('campagnes.apercu');
         Route::post('/campagnes/{campagne}/apercu', [QuestionnaireApercuController::class, 'storeCampagne'])->name('campagnes.apercu.store');
+        Route::get('/campagnes/{campagne}/envoi', function (QuestionnaireCampaign $campagne) {
+            return view('questionnaire.campagnes.envoi', compact('campagne'));
+        })->name('campagnes.envoi');
         Route::get('/campagnes/{campagne}/resultats', function (QuestionnaireCampaign $campagne) {
             return view('questionnaire.resultats.index', compact('campagne'));
         })->name('campagnes.resultats');

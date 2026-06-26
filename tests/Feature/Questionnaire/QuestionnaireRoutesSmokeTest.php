@@ -81,6 +81,19 @@ it('affiche la page résultats d une campagne (host page x-app-layout)', functio
         ->assertSee('Satisfaction parcours juin');
 });
 
+it('affiche la page d envoi des invitations (host page x-app-layout, textarea TinyMCE présente)', function (): void {
+    $campagne = QuestionnaireCampaign::factory()->create([
+        'titre_affiche' => 'Invitation test',
+        'statut' => 'ouverte',
+    ]);
+
+    $this->get(route('questionnaires.campagnes.envoi', $campagne))
+        ->assertOk()
+        ->assertSee('Invitation test')
+        ->assertSee('q-envoi-corps', false)
+        ->assertSee('Envoyer les invitations');
+});
+
 it('exporte le xlsx d une campagne (regression guard)', function (): void {
     $campagne = QuestionnaireCampaign::factory()->create([
         'titre_affiche' => 'Export test',

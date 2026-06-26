@@ -54,10 +54,10 @@
                             </button>
                         @endif
                         @if ($c->statut === \App\Enums\StatutCampagne::Ouverte)
-                            <button class="btn btn-sm btn-outline-primary"
-                                    wire:click="toggleEnvoi({{ $c->id }})">
+                            <a href="{{ route('questionnaires.campagnes.envoi', $c) }}"
+                               class="btn btn-sm btn-outline-primary">
                                 Envoyer les invitations
-                            </button>
+                            </a>
                             <button class="btn btn-sm btn-outline-secondary"
                                     wire:click="toggleImpression({{ $c->id }})">
                                 Imprimer (papier)
@@ -72,13 +72,6 @@
                         @endif
                     </td>
                 </tr>
-                @if ($c->statut === \App\Enums\StatutCampagne::Ouverte && $envoiCampagneId === $c->id)
-                    <tr>
-                        <td colspan="5" class="p-3 bg-light">
-                            @livewire('questionnaire.envoi-compose', ['campagne' => $c], key('envoi-'.$c->id))
-                        </td>
-                    </tr>
-                @endif
                 @if ($c->statut === \App\Enums\StatutCampagne::Ouverte && $impressionCampagneId === $c->id)
                     <tr>
                         <td colspan="5" class="p-3 bg-light">
