@@ -127,11 +127,7 @@ final class QuestionnaireImpressionService
     {
         $donnees = $this->construireDonnees($campagne, $participantIds);
 
-        $leftText = implode(' — ', array_filter([
-            'Imprimé le '.now()->format('d/m/Y'),
-            $campagne->operation?->nom,
-            $campagne->titre_affiche,
-        ]));
+        $leftText = $campagne->operation?->nom ?? '';
 
         $merger = new Fpdi();
 
