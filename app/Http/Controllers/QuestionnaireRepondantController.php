@@ -102,10 +102,8 @@ final class QuestionnaireRepondantController extends Controller
                 }
 
                 $valeur = $request->input("q_{$q->id}");
-
-                if ($q->obligatoire && ($valeur === null || $valeur === '')) {
-                    $erreurs["q_{$q->id}"] = 'Cette question est obligatoire.';
-                }
+                $commentaire = $request->input("q_{$q->id}_commentaire");
+                $erreurs = array_merge($erreurs, $this->reponses->champsManquants($q, $valeur, $commentaire));
             }
 
             if ($erreurs !== []) {

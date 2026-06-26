@@ -69,13 +69,13 @@ it('finalise et marque invitation soumis', function (): void {
 });
 
 it('enregistre note et commentaire sur la même ligne', function (): void {
-    $svc = app(\App\Services\Questionnaire\QuestionnaireReponseService::class);
-    $campagne = \App\Models\QuestionnaireCampaign::factory()->create();
-    $q = \App\Models\QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
-        'type' => \App\Enums\TypeQuestion::Satisfaction, 'ordre' => 1,
+    $svc = app(QuestionnaireReponseService::class);
+    $campagne = QuestionnaireCampaign::factory()->create();
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'type' => TypeQuestion::Satisfaction, 'ordre' => 1,
         'config' => ['commentaire' => true, 'commentaire_libelle' => 'Pourquoi ?'],
     ]);
-    $inv = \App\Models\QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create();
+    $inv = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create();
     $sub = $svc->demarrerOuReprendre($inv);
 
     $svc->enregistrerReponse($sub, $q, '4', commentaire: 'Très bon accueil');
@@ -86,23 +86,142 @@ it('enregistre note et commentaire sur la même ligne', function (): void {
 });
 
 it('obligatoire : la note seule valide, le commentaire seul ne valide pas', function (): void {
-    $svc = app(\App\Services\Questionnaire\QuestionnaireReponseService::class);
-    $campagne = \App\Models\QuestionnaireCampaign::factory()->create();
-    $q = \App\Models\QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
-        'type' => \App\Enums\TypeQuestion::Satisfaction, 'ordre' => 1, 'obligatoire' => true,
+    $svc = app(QuestionnaireReponseService::class);
+    $campagne = QuestionnaireCampaign::factory()->create();
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'type' => TypeQuestion::Satisfaction, 'ordre' => 1, 'obligatoire' => true,
         'config' => ['commentaire' => true],
     ]);
-    $inv = \App\Models\QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create();
+    $inv = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create();
     $sub = $svc->demarrerOuReprendre($inv);
 
     // commentaire seul (pas de note) → bloque
     $svc->enregistrerReponse($sub, $q, null, commentaire: 'un avis');
     expect(fn () => $svc->finaliser($sub, accepteContact: false))
-        ->toThrow(\App\Exceptions\Questionnaire\ReponseObligatoireException::class);
+        ->toThrow(ReponseObligatoireException::class);
 
     // note fournie → passe
     $svc->enregistrerReponse($sub, $q, '5', commentaire: 'un avis');
     $svc->finaliser($sub, accepteContact: false);
+    expect($sub->fresh()->statut->value)->toBe('soumise');
+});
+
+// ── SatisfactionTexteLong ────────────────────────────────────────
+
+it('STL : enregistrerReponse stocke note (value_integer) ET texte (value_text)', function (): void {
+    $svc = app(QuestionnaireReponseService::class);
+    $campagne = QuestionnaireCampaign::factory()->create();
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'type' => TypeQuestion::SatisfactionTexteLong, 'ordre' => 1,
+        'obligatoire' => true, 'config' => [],
+    ]);
+    $inv = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create();
+    $sub = $svc->demarrerOuReprendre($inv);
+
+    $svc->enregistrerReponse($sub, $q, '3', commentaire: 'Bonne expérience');
+
+    $a = $sub->fresh()->answers()->first();
+    expect($a->value_integer)->toBe(3);
+    expect($a->value_text)->toBe('Bonne expérience');
+});
+
+it('STL : enregistrerReponse stocke la note seule quand le texte est vide', function (): void {
+    $svc = app(QuestionnaireReponseService::class);
+    $campagne = QuestionnaireCampaign::factory()->create();
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'type' => TypeQuestion::SatisfactionTexteLong, 'ordre' => 1,
+        'obligatoire' => false, 'config' => [],
+    ]);
+    $inv = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create();
+    $sub = $svc->demarrerOuReprendre($inv);
+
+    $svc->enregistrerReponse($sub, $q, '5', commentaire: null);
+
+    $a = $sub->fresh()->answers()->first();
+    expect($a->value_integer)->toBe(5);
+    expect($a->value_text)->toBeNull();
+});
+
+it('STL champsManquants : note obligatoire vide → erreur q_{id}', function (): void {
+    $svc = app(QuestionnaireReponseService::class);
+    $campagne = QuestionnaireCampaign::factory()->create();
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'type' => TypeQuestion::SatisfactionTexteLong, 'ordre' => 1,
+        'obligatoire' => true, 'config' => ['texte_obligatoire' => false],
+    ]);
+
+    $erreurs = $svc->champsManquants($q, null, null);
+    expect($erreurs)->toHaveKey("q_{$q->id}");
+    expect($erreurs)->not->toHaveKey("q_{$q->id}_commentaire");
+});
+
+it('STL champsManquants : texte obligatoire vide → erreur q_{id}_commentaire', function (): void {
+    $svc = app(QuestionnaireReponseService::class);
+    $campagne = QuestionnaireCampaign::factory()->create();
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'type' => TypeQuestion::SatisfactionTexteLong, 'ordre' => 1,
+        'obligatoire' => false, 'config' => ['texte_obligatoire' => true],
+    ]);
+
+    $erreurs = $svc->champsManquants($q, '4', null);
+    expect($erreurs)->not->toHaveKey("q_{$q->id}");
+    expect($erreurs)->toHaveKey("q_{$q->id}_commentaire");
+});
+
+it('STL champsManquants : note + texte tous les deux obligatoires vides → deux erreurs', function (): void {
+    $svc = app(QuestionnaireReponseService::class);
+    $campagne = QuestionnaireCampaign::factory()->create();
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'type' => TypeQuestion::SatisfactionTexteLong, 'ordre' => 1,
+        'obligatoire' => true, 'config' => ['texte_obligatoire' => true],
+    ]);
+
+    $erreurs = $svc->champsManquants($q, null, null);
+    expect($erreurs)->toHaveKey("q_{$q->id}");
+    expect($erreurs)->toHaveKey("q_{$q->id}_commentaire");
+});
+
+it('STL champsManquants : note + texte tous les deux présents et rien d obligatoire → aucune erreur', function (): void {
+    $svc = app(QuestionnaireReponseService::class);
+    $campagne = QuestionnaireCampaign::factory()->create();
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'type' => TypeQuestion::SatisfactionTexteLong, 'ordre' => 1,
+        'obligatoire' => false, 'config' => ['texte_obligatoire' => false],
+    ]);
+
+    expect($svc->champsManquants($q, '2', 'un texte'))->toBe([]);
+});
+
+it('STL verifierObligatoires : texte obligatoire manquant bloque la finalisation même si la note est fournie', function (): void {
+    $svc = app(QuestionnaireReponseService::class);
+    $campagne = QuestionnaireCampaign::factory()->create();
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'type' => TypeQuestion::SatisfactionTexteLong, 'ordre' => 1,
+        'obligatoire' => false, 'config' => ['texte_obligatoire' => true],
+    ]);
+    $inv = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create();
+    $sub = $svc->demarrerOuReprendre($inv);
+
+    // Enregistrer la note sans le texte → le texte est obligatoire
+    $svc->enregistrerReponse($sub, $q, '4', commentaire: null);
+
+    expect(fn () => $svc->finaliser($sub, accepteContact: false))
+        ->toThrow(ReponseObligatoireException::class);
+});
+
+it('STL verifierObligatoires : note + texte présents → finalisation OK', function (): void {
+    $svc = app(QuestionnaireReponseService::class);
+    $campagne = QuestionnaireCampaign::factory()->create();
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'type' => TypeQuestion::SatisfactionTexteLong, 'ordre' => 1,
+        'obligatoire' => true, 'config' => ['texte_obligatoire' => true],
+    ]);
+    $inv = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create();
+    $sub = $svc->demarrerOuReprendre($inv);
+
+    $svc->enregistrerReponse($sub, $q, '5', commentaire: 'Excellent');
+    $svc->finaliser($sub, accepteContact: false);
+
     expect($sub->fresh()->statut->value)->toBe('soumise');
 });
 

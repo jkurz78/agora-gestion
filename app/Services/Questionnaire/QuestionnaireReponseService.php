@@ -11,6 +11,7 @@ use App\Exceptions\Questionnaire\ReponseObligatoireException;
 use App\Models\QuestionnaireCampaignQuestion;
 use App\Models\QuestionnaireInvitation;
 use App\Models\QuestionnaireSubmission;
+use App\Models\QuestionnaireTemplateQuestion;
 use Illuminate\Support\Facades\DB;
 
 final class QuestionnaireReponseService
@@ -64,7 +65,7 @@ final class QuestionnaireReponseService
 
         $payload = match ($question->type) {
             TypeQuestion::TexteCourt, TypeQuestion::TexteLong => ($v === null || $v === '') ? $base : [...$base, 'value_text' => (string) $v],
-            TypeQuestion::Satisfaction, TypeQuestion::Ressenti => ($v === null || $v === '') ? $base : [...$base, 'value_integer' => (int) $v],
+            TypeQuestion::Satisfaction, TypeQuestion::SatisfactionTexteLong, TypeQuestion::Ressenti => ($v === null || $v === '') ? $base : [...$base, 'value_integer' => (int) $v],
             TypeQuestion::CaseACocher => ($v === null || $v === '') ? $base : [...$base, 'value_boolean' => (bool) $v],
             TypeQuestion::ChoixUnique => ($v === null || $v === '') ? $base : [
                 ...$base,
@@ -76,6 +77,12 @@ final class QuestionnaireReponseService
         // Commentaire optionnel (satisfaction) : stocké dans value_text, indépendamment de la note.
         if ($question->type === TypeQuestion::Satisfaction
             && ($question->config['commentaire'] ?? false)
+            && $commentaire !== null && $commentaire !== '') {
+            $payload['value_text'] = $commentaire;
+        }
+
+        // Texte long compound (SatisfactionTexteLong) : value_text toujours stocké quand non vide.
+        if ($question->type === TypeQuestion::SatisfactionTexteLong
             && $commentaire !== null && $commentaire !== '') {
             $payload['value_text'] = $commentaire;
         }
@@ -101,18 +108,55 @@ final class QuestionnaireReponseService
         });
     }
 
+    /**
+     * Retourne les erreurs de validation pour une question donnée.
+     *
+     * @return array<string, string> erreurs par nom de champ (q_{id} et/ou q_{id}_commentaire)
+     */
+    public function champsManquants(QuestionnaireCampaignQuestion|QuestionnaireTemplateQuestion $q, ?string $note, ?string $texte): array
+    {
+        if ($q->type === TypeQuestion::SatisfactionTexteLong) {
+            $erreurs = [];
+
+            if ($q->obligatoire && ($note === null || $note === '')) {
+                $erreurs["q_{$q->id}"] = 'Veuillez indiquer votre satisfaction.';
+            }
+
+            if (($q->config['texte_obligatoire'] ?? false) && ($texte === null || $texte === '')) {
+                $erreurs["q_{$q->id}_commentaire"] = 'Ce texte est obligatoire.';
+            }
+
+            return $erreurs;
+        }
+
+        // Tous les autres types réponse : validation standard sur la colonne primaire.
+        if ($q->type->estReponse() && $q->obligatoire && ($note === null || $note === '')) {
+            return ["q_{$q->id}" => 'Cette question est obligatoire.'];
+        }
+
+        return [];
+    }
+
     private function verifierObligatoires(QuestionnaireSubmission $submission): void
     {
         $answers = $submission->answers()->get()->keyBy('campaign_question_id');
 
         $manquante = $submission->campaign->questions()
-            ->where('obligatoire', true)
             ->get()
-            ->first(function ($q) use ($answers): bool {
-                $col = $q->type->valueColumn();           // colonne primaire du type
+            ->first(function (QuestionnaireCampaignQuestion $q) use ($answers): bool {
+                if (! $q->type->estReponse()) {
+                    return false;
+                }
+
                 $a = $answers->get($q->id);
 
-                return $a === null || $a->{$col} === null; // primaire absente = non répondue
+                // Extraire la valeur primaire selon la colonne du type.
+                $colonne = $q->type->valueColumn();
+                $valeurPrimaire = $a === null ? null : $a->{$colonne};
+                $note = $valeurPrimaire === null ? null : (string) $valeurPrimaire;
+                $texte = $a?->value_text;
+
+                return $this->champsManquants($q, $note, $texte) !== [];
             });
 
         if ($manquante !== null) {

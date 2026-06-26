@@ -291,6 +291,61 @@ it('l aperçu écran-aware : next puis prev conserve les réponses des deux ques
     expect(QuestionnaireAnswer::count())->toBe(0);
 });
 
+// ── SatisfactionTexteLong — aperçu ──────────────────────────────
+
+it('STL aperçu : next bloque si la note obligatoire est vide (zéro DB)', function (): void {
+    $op = Operation::factory()->create();
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['anonymise' => true]);
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'type' => 'satisfaction_texte_long', 'ordre' => 1,
+        'obligatoire' => true, 'config' => ['texte_obligatoire' => false],
+    ]);
+    $store = route('questionnaires.campagnes.apercu.store', $campagne);
+    $base = route('questionnaires.campagnes.apercu', $campagne);
+
+    $this->post($store, ['action' => 'next', 'page' => 1, "q_{$q->id}" => '', "q_{$q->id}_commentaire" => 'texte'])
+        ->assertRedirect($base.'?page=1')
+        ->assertSessionHasErrors("q_{$q->id}");
+
+    expect(QuestionnaireSubmission::count())->toBe(0);
+    expect(QuestionnaireAnswer::count())->toBe(0);
+});
+
+it('STL aperçu : next bloque si le texte obligatoire est vide (zéro DB)', function (): void {
+    $op = Operation::factory()->create();
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['anonymise' => true]);
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'type' => 'satisfaction_texte_long', 'ordre' => 1,
+        'obligatoire' => false, 'config' => ['texte_obligatoire' => true],
+    ]);
+    $store = route('questionnaires.campagnes.apercu.store', $campagne);
+    $base = route('questionnaires.campagnes.apercu', $campagne);
+
+    $this->post($store, ['action' => 'next', 'page' => 1, "q_{$q->id}" => '3', "q_{$q->id}_commentaire" => ''])
+        ->assertRedirect($base.'?page=1')
+        ->assertSessionHasErrors("q_{$q->id}_commentaire");
+
+    expect(QuestionnaireSubmission::count())->toBe(0);
+    expect(QuestionnaireAnswer::count())->toBe(0);
+});
+
+it('STL aperçu : next avec note et texte valides avance sans écriture DB', function (): void {
+    $op = Operation::factory()->create();
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['anonymise' => true]);
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'type' => 'satisfaction_texte_long', 'ordre' => 1,
+        'obligatoire' => true, 'config' => ['texte_obligatoire' => true],
+    ]);
+    $store = route('questionnaires.campagnes.apercu.store', $campagne);
+    $base = route('questionnaires.campagnes.apercu', $campagne);
+
+    $this->post($store, ['action' => 'next', 'page' => 1, "q_{$q->id}" => '5', "q_{$q->id}_commentaire" => 'Super'])
+        ->assertRedirect($base.'?page=consentement');
+
+    expect(QuestionnaireSubmission::count())->toBe(0);
+    expect(QuestionnaireAnswer::count())->toBe(0);
+});
+
 it('l aperçu écran-aware : une question Information s affiche sans input et n est jamais obligatoire', function (): void {
     $t = QuestionnaireTemplate::factory()->create();
     $qInfo = QuestionnaireTemplateQuestion::factory()->for($t, 'template')->create([

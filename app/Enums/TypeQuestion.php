@@ -9,6 +9,7 @@ enum TypeQuestion: string
     case TexteCourt = 'texte_court';
     case TexteLong = 'texte_long';
     case Satisfaction = 'satisfaction';
+    case SatisfactionTexteLong = 'satisfaction_texte_long';
     case Ressenti = 'ressenti';
     case CaseACocher = 'case_a_cocher';
     case ChoixUnique = 'choix_unique';
@@ -20,6 +21,7 @@ enum TypeQuestion: string
             self::TexteCourt => 'Texte court',
             self::TexteLong => 'Texte long',
             self::Satisfaction => 'Satisfaction (5 niveaux)',
+            self::SatisfactionTexteLong => 'Satisfaction + texte long',
             self::Ressenti => 'Ressenti (curseur 0-100)',
             self::CaseACocher => 'Case à cocher (oui/non)',
             self::ChoixUnique => 'Choix unique',
@@ -36,7 +38,7 @@ enum TypeQuestion: string
 
         return match ($this) {
             self::TexteCourt, self::TexteLong => 'value_text',
-            self::Satisfaction, self::Ressenti => 'value_integer',
+            self::Satisfaction, self::SatisfactionTexteLong, self::Ressenti => 'value_integer',
             self::CaseACocher => 'value_boolean',
             self::ChoixUnique => 'value_option',
         };

@@ -521,6 +521,99 @@ it('une question Information ne génère pas de QuestionnaireAnswer', function (
     expect($submission->answers()->where('campaign_question_id', $qInfo->id)->count())->toBe(0);
 });
 
+// ── SatisfactionTexteLong — parcours répondant ──────────────────
+
+it('STL : next bloque si la note obligatoire est vide (q_{id})', function (): void {
+    $op = Operation::factory()->create();
+    $participant = Participant::factory()->create(['operation_id' => $op->id]);
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'statut' => StatutCampagne::Ouverte, 'anonymise' => true,
+    ]);
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'type' => TypeQuestion::SatisfactionTexteLong, 'ordre' => 1,
+        'obligatoire' => true, 'config' => ['texte_obligatoire' => false],
+    ]);
+    $clair = Str::random(48);
+    $invitation = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create([
+        'participant_id' => $participant->id,
+        'token_hash' => app(QuestionnaireTokenService::class)->hash($clair),
+        'statut' => StatutInvitation::NonOuvert,
+    ]);
+    TenantContext::clear();
+
+    $this->post("/q/{$clair}", ['action' => 'start']);
+
+    $this->from("/q/{$clair}?page=1")
+        ->post("/q/{$clair}", [
+            'action' => 'next', 'page' => 1,
+            "q_{$q->id}" => '', "q_{$q->id}_commentaire" => 'du texte',
+        ])
+        ->assertSessionHasErrors("q_{$q->id}");
+
+    expect($invitation->fresh()->submissions()->first()?->answers()->count())->toBe(0);
+});
+
+it('STL : next bloque si le texte obligatoire est vide (q_{id}_commentaire)', function (): void {
+    $op = Operation::factory()->create();
+    $participant = Participant::factory()->create(['operation_id' => $op->id]);
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'statut' => StatutCampagne::Ouverte, 'anonymise' => true,
+    ]);
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'type' => TypeQuestion::SatisfactionTexteLong, 'ordre' => 1,
+        'obligatoire' => false, 'config' => ['texte_obligatoire' => true],
+    ]);
+    $clair = Str::random(48);
+    $invitation = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create([
+        'participant_id' => $participant->id,
+        'token_hash' => app(QuestionnaireTokenService::class)->hash($clair),
+        'statut' => StatutInvitation::NonOuvert,
+    ]);
+    TenantContext::clear();
+
+    $this->post("/q/{$clair}", ['action' => 'start']);
+
+    $this->from("/q/{$clair}?page=1")
+        ->post("/q/{$clair}", [
+            'action' => 'next', 'page' => 1,
+            "q_{$q->id}" => '4', "q_{$q->id}_commentaire" => '',
+        ])
+        ->assertSessionHasErrors("q_{$q->id}_commentaire");
+
+    expect($invitation->fresh()->submissions()->first()?->answers()->count())->toBe(0);
+});
+
+it('STL : next avec note et texte valides persiste value_integer + value_text et avance', function (): void {
+    $op = Operation::factory()->create();
+    $participant = Participant::factory()->create(['operation_id' => $op->id]);
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'statut' => StatutCampagne::Ouverte, 'anonymise' => true,
+    ]);
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'type' => TypeQuestion::SatisfactionTexteLong, 'ordre' => 1,
+        'obligatoire' => true, 'config' => ['texte_obligatoire' => true],
+    ]);
+    $clair = Str::random(48);
+    $invitation = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create([
+        'participant_id' => $participant->id,
+        'token_hash' => app(QuestionnaireTokenService::class)->hash($clair),
+        'statut' => StatutInvitation::NonOuvert,
+    ]);
+    TenantContext::clear();
+
+    $this->post("/q/{$clair}", ['action' => 'start']);
+
+    $this->post("/q/{$clair}", [
+        'action' => 'next', 'page' => 1,
+        "q_{$q->id}" => '5', "q_{$q->id}_commentaire" => 'Très satisfait',
+    ])->assertRedirect(route('questionnaire.consentement', ['token' => $clair]));
+
+    $sub = $invitation->fresh()->submissions()->first();
+    $answer = $sub->answers()->first();
+    expect($answer->value_integer)->toBe(5);
+    expect($answer->value_text)->toBe('Très satisfait');
+});
+
 it('anonymise=false : la dernière question redirige vers merci (sans passer par consentement)', function (): void {
     $op = Operation::factory()->create();
     $participant = Participant::factory()->create(['operation_id' => $op->id]);

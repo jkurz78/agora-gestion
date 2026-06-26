@@ -40,3 +40,21 @@ it('valueColumn sur Information lève une LogicException', function (): void {
 it('Information n\'a pas d\'options', function (): void {
     expect(TypeQuestion::Information->aDesOptions())->toBeFalse();
 });
+
+// ── SatisfactionTexteLong ────────────────────────────────────────
+
+it('SatisfactionTexteLong a le bon libellé', function (): void {
+    expect(TypeQuestion::SatisfactionTexteLong->label())->toBe('Satisfaction + texte long');
+});
+
+it('SatisfactionTexteLong a value_integer comme colonne primaire', function (): void {
+    expect(TypeQuestion::SatisfactionTexteLong->valueColumn())->toBe('value_integer');
+});
+
+it('SatisfactionTexteLong est un type réponse', function (): void {
+    expect(TypeQuestion::SatisfactionTexteLong->estReponse())->toBeTrue();
+});
+
+it('SatisfactionTexteLong n\'a pas d\'options', function (): void {
+    expect(TypeQuestion::SatisfactionTexteLong->aDesOptions())->toBeFalse();
+});

@@ -9,6 +9,7 @@ use App\Models\QuestionnaireCampaignQuestion;
 use App\Models\QuestionnaireTemplate;
 use App\Models\QuestionnaireTemplateQuestion;
 use App\Services\Questionnaire\QuestionnaireEcranResolver;
+use App\Services\Questionnaire\QuestionnaireReponseService;
 use App\Services\Questionnaire\QuestionnaireVariableResolver;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -20,6 +21,7 @@ final class QuestionnaireApercuController extends Controller
     public function __construct(
         private readonly QuestionnaireVariableResolver $variables,
         private readonly QuestionnaireEcranResolver $ecranResolver,
+        private readonly QuestionnaireReponseService $reponses,
     ) {}
 
     public function modele(Request $request, QuestionnaireTemplate $template): View
@@ -192,9 +194,8 @@ final class QuestionnaireApercuController extends Controller
                     continue; // Information : pas de validation
                 }
                 $value = $request->input("q_{$q->id}");
-                if ($q->obligatoire && ($value === null || $value === '')) {
-                    $erreurs["q_{$q->id}"] = 'Cette question est obligatoire.';
-                }
+                $commentaire = $request->input("q_{$q->id}_commentaire");
+                $erreurs = array_merge($erreurs, $this->reponses->champsManquants($q, $value, $commentaire));
             }
             if ($erreurs !== []) {
                 return redirect($base.'?page='.$page)->withErrors($erreurs);
