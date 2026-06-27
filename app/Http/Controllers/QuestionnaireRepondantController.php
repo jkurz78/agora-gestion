@@ -31,6 +31,7 @@ final class QuestionnaireRepondantController extends Controller
     {
         $invitation = $this->resoudre($token);
         $campagne = $invitation->campaign;
+        $saisiePour = $request->boolean('saisie_pour');
 
         if (! $campagne->statut->accepteReponses()) {
             return view('questionnaire.repondant.indisponible', compact('campagne'));
@@ -53,13 +54,13 @@ final class QuestionnaireRepondantController extends Controller
                 'token' => $token,
                 'introHtml' => $this->variables->remplacer((string) ($campagne->intro ?? ''), $vars),
                 'titre' => $this->variables->remplacer((string) $campagne->titre_affiche, $vars),
+                'saisiePour' => $saisiePour,
             ]);
         }
 
         $ecran = $ecrans[$page - 1] ?? null;
         abort_if($ecran === null, 404);
 
-        // réponses déjà saisies (reprise) — indexées par campaign_question_id
         $submission = $this->reponses->demarrerOuReprendre($invitation);
         $answers = $submission->answers()->get()->keyBy('campaign_question_id');
 
@@ -70,6 +71,7 @@ final class QuestionnaireRepondantController extends Controller
             'page' => $page,
             'total' => $total,
             'answers' => $answers,
+            'saisiePour' => $saisiePour,
         ]);
     }
 
@@ -80,10 +82,12 @@ final class QuestionnaireRepondantController extends Controller
         abort_unless($campagne->statut->accepteReponses(), 422);
 
         $action = (string) $request->input('action');
+        $saisiePour = $request->boolean('saisie_pour');
         $submission = $this->reponses->demarrerOuReprendre($invitation);
+        $extraParams = $saisiePour ? ['saisie_pour' => 1] : [];
 
         if ($action === 'start') {
-            return redirect()->route('questionnaire.show', ['token' => $token, 'page' => 1]);
+            return redirect()->route('questionnaire.show', ['token' => $token, 'page' => 1, ...$extraParams]);
         }
 
         if ($action === 'next') {
@@ -94,28 +98,25 @@ final class QuestionnaireRepondantController extends Controller
             $ecran = $ecrans[$page - 1] ?? null;
             abort_if($ecran === null, 404);
 
-            // Valider TOUTES les questions de l'écran avant de persister.
-            $erreurs = [];
-            foreach ($ecran as $q) {
-                if (! $q->type->estReponse()) {
-                    continue; // Information : pas de lecture / validation / persistance
+            if (! $saisiePour) {
+                $erreurs = [];
+                foreach ($ecran as $q) {
+                    if (! $q->type->estReponse()) {
+                        continue;
+                    }
+                    $valeur = $request->input("q_{$q->id}");
+                    $commentaire = $request->input("q_{$q->id}_commentaire");
+                    $erreurs = array_merge($erreurs, $this->reponses->champsManquants($q, $valeur, $commentaire));
                 }
-
-                $valeur = $request->input("q_{$q->id}");
-                $commentaire = $request->input("q_{$q->id}_commentaire");
-                $erreurs = array_merge($erreurs, $this->reponses->champsManquants($q, $valeur, $commentaire));
+                if ($erreurs !== []) {
+                    return back()->withErrors($erreurs)->withInput();
+                }
             }
 
-            if ($erreurs !== []) {
-                return back()->withErrors($erreurs)->withInput();
-            }
-
-            // Aucune erreur : persister toutes les réponses.
             foreach ($ecran as $q) {
                 if (! $q->type->estReponse()) {
                     continue;
                 }
-
                 $valeur = $request->input("q_{$q->id}");
                 $commentaire = $request->input("q_{$q->id}_commentaire");
                 $this->reponses->enregistrerReponse($submission, $q, $valeur, $commentaire);
@@ -124,6 +125,12 @@ final class QuestionnaireRepondantController extends Controller
             $next = $page + 1;
 
             if ($next > $total) {
+                if ($saisiePour) {
+                    $this->reponses->finaliserSansBloquer($submission, accepteContact: false);
+
+                    return redirect()->route('questionnaire.merci', ['token' => $token]);
+                }
+
                 if (! $campagne->anonymise) {
                     $this->reponses->finaliser($submission, accepteContact: false);
 
@@ -133,7 +140,7 @@ final class QuestionnaireRepondantController extends Controller
                 return redirect()->route('questionnaire.consentement', ['token' => $token]);
             }
 
-            return redirect()->route('questionnaire.show', ['token' => $token, 'page' => $next]);
+            return redirect()->route('questionnaire.show', ['token' => $token, 'page' => $next, ...$extraParams]);
         }
 
         if ($action === 'prev') {
@@ -142,7 +149,6 @@ final class QuestionnaireRepondantController extends Controller
             $ecrans = $this->ecranResolver->decouper($questions);
             $ecran = $ecrans[$page - 1] ?? null;
 
-            // Retour en arrière : on persiste la saisie courante sans bloquer (obligatoire ignoré).
             if ($ecran !== null) {
                 foreach ($ecran as $q) {
                     if (! $q->type->estReponse()) {
@@ -158,15 +164,19 @@ final class QuestionnaireRepondantController extends Controller
             }
 
             return redirect()->route('questionnaire.show', [
-                'token' => $token, 'page' => max(0, $page - 1),
+                'token' => $token, 'page' => max(0, $page - 1), ...$extraParams,
             ]);
         }
 
         if ($action === 'finish') {
             try {
-                $this->reponses->finaliser($submission, $request->boolean('accepte_contact'));
+                if ($saisiePour) {
+                    $this->reponses->finaliserSansBloquer($submission, $request->boolean('accepte_contact'));
+                } else {
+                    $this->reponses->finaliser($submission, $request->boolean('accepte_contact'));
+                }
             } catch (ReponseObligatoireException) {
-                return redirect()->route('questionnaire.show', ['token' => $token, 'page' => 1])
+                return redirect()->route('questionnaire.show', ['token' => $token, 'page' => 1, ...$extraParams])
                     ->withErrors(['reponse' => 'Une question obligatoire n\'est pas renseignée.']);
             }
 

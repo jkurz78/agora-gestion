@@ -38,15 +38,21 @@ final class ImagickQrCodeExtractor implements QrCodeExtractor
                 return QrExtractionResult::failure('pdf_unreadable', 'Rasterisation a échoué sans exception');
             }
 
-            // 2. Decode QR from the rasterized PNG
-            try {
-                $decoded = (new QrReader($tempPng))->text();
-            } catch (Throwable $e) {
-                return QrExtractionResult::failure('qr_unreadable', $e->getMessage());
+            // 2. Decode QR from the rasterized PNG (zbar first, Zxing fallback)
+            $decoded = $this->decodeViaZbar($tempPng);
+
+            if ($decoded === null) {
+                try {
+                    $zxingResult = (new QrReader($tempPng))->text();
+                    $decoded = ($zxingResult !== null && $zxingResult !== false && $zxingResult !== '')
+                        ? (string) $zxingResult
+                        : null;
+                } catch (Throwable $e) {
+                    return QrExtractionResult::failure('qr_unreadable', $e->getMessage());
+                }
             }
 
-            // QrReader::text() returns string on success, false on decode failure, or null.
-            if ($decoded === null || $decoded === false || $decoded === '') {
+            if ($decoded === null) {
                 return QrExtractionResult::failure('qr_not_found', null);
             }
 
@@ -74,5 +80,23 @@ final class ImagickQrCodeExtractor implements QrCodeExtractor
                 @unlink($tempPng);
             }
         }
+    }
+
+    private function decodeViaZbar(string $imagePath): ?string
+    {
+        $zbarBin = '/usr/bin/zbarimg';
+        if (! file_exists($zbarBin)) {
+            return null;
+        }
+
+        $output = [];
+        $exitCode = 0;
+        exec($zbarBin.' --raw -q '.escapeshellarg($imagePath).' 2>/dev/null', $output, $exitCode);
+
+        if ($exitCode !== 0 || $output === []) {
+            return null;
+        }
+
+        return trim(implode("\n", $output));
     }
 }

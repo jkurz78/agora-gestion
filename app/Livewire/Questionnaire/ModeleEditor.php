@@ -90,7 +90,6 @@ final class ModeleEditor extends Component
         $type = TypeQuestion::from($this->type);
         $ordre = (int) $this->template->questions()->max('ordre') + 1;
 
-        // Une question de type Information ne peut jamais être obligatoire.
         $obligatoire = $type === TypeQuestion::Information ? false : $this->obligatoire;
 
         QuestionnaireTemplateQuestion::create([
@@ -103,6 +102,39 @@ final class ModeleEditor extends Component
             'config' => $this->buildConfig($type),
         ]);
 
+        $this->resetFormulaire();
+    }
+
+    public function sauvegarderQuestion(): void
+    {
+        $this->validate([
+            'libelle' => 'required|string|max:255',
+            'type' => 'required|in:'.implode(',', array_column(TypeQuestion::cases(), 'value')),
+        ]);
+
+        $question = $this->template->questions()->findOrFail($this->editingQuestionId);
+        $type = TypeQuestion::from($this->type);
+        $obligatoire = $type === TypeQuestion::Information ? false : $this->obligatoire;
+
+        $question->update([
+            'libelle' => $this->libelle,
+            'aide' => $this->aide ?: null,
+            'type' => $type,
+            'obligatoire' => $obligatoire,
+            'config' => $this->buildConfig($type),
+        ]);
+
+        $this->resetFormulaire();
+    }
+
+    public function annulerEdition(): void
+    {
+        $this->resetFormulaire();
+    }
+
+    private function resetFormulaire(): void
+    {
+        $this->editingQuestionId = null;
         $this->reset(['libelle', 'aide', 'obligatoire', 'optionsBrut', 'commentaire', 'commentaireLibelle', 'labelGauche', 'labelDroite', 'texteObligatoire']);
         $this->type = 'texte_court';
     }

@@ -19,8 +19,8 @@ RUN apk add --no-cache \
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install pdo pdo_mysql mbstring zip exif pcntl bcmath gd opcache
 
-# Extension imagick (requis par spatie/pdf-to-image)
-RUN apk add --no-cache imagemagick \
+# Extension imagick (requis par spatie/pdf-to-image) + zbar (QR scan papier)
+RUN apk add --no-cache imagemagick zbar \
     && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS imagemagick-dev \
     && pecl install imagick \
     && docker-php-ext-enable imagick \

@@ -12,27 +12,8 @@
     @endif
 
     <div class="row">
-        {{-- Left: scan image --}}
-        <div class="col-md-5">
-            <div class="card sticky-top" style="top: 1rem;">
-                <div class="card-header">
-                    <h6 class="mb-0"><i class="bi bi-image me-1"></i> Scan</h6>
-                </div>
-                <div class="card-body p-1">
-                    <img src="{{ route('questionnaires.campagnes.scans.image', $scan) }}"
-                         alt="Scan du questionnaire"
-                         class="img-fluid border rounded">
-                </div>
-                @if ($participant)
-                    <div class="card-footer small text-muted">
-                        <i class="bi bi-person me-1"></i> {{ $participant->displayName() }}
-                    </div>
-                @endif
-            </div>
-        </div>
-
-        {{-- Right: OCR values + correction form --}}
-        <div class="col-md-7">
+        {{-- Left: OCR values + correction form (main content, larger) --}}
+        <div class="col-lg-7">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h6 class="mb-0"><i class="bi bi-robot me-1"></i> Réponses détectées</h6>
@@ -84,6 +65,25 @@
                                     @break
 
                                 @case('satisfaction')
+                                    <div class="d-flex gap-2 mb-1">
+                                        @for ($i = 1; $i <= 5; $i++)
+                                            <div class="form-check form-check-inline">
+                                                <input class="form-check-input" type="radio"
+                                                       name="q_{{ $qid }}"
+                                                       id="q_{{ $qid }}_{{ $i }}"
+                                                       value="{{ $i }}"
+                                                       wire:model="valeurs.{{ $qid }}">
+                                                <label class="form-check-label" for="q_{{ $qid }}_{{ $i }}">{{ $i }}</label>
+                                            </div>
+                                        @endfor
+                                    </div>
+                                    @if ($q->config['commentaire'] ?? false)
+                                        <textarea class="form-control form-control-sm mt-1" rows="2"
+                                                  placeholder="{{ $q->config['commentaire_libelle'] ?? 'Commentaire (optionnel)' }}"
+                                                  wire:model="commentaires.{{ $qid }}"></textarea>
+                                    @endif
+                                    @break
+
                                 @case('satisfaction_texte_long')
                                     <div class="d-flex gap-2 mb-1">
                                         @for ($i = 1; $i <= 5; $i++)
@@ -97,6 +97,9 @@
                                             </div>
                                         @endfor
                                     </div>
+                                    <textarea class="form-control form-control-sm mt-1" rows="2"
+                                              placeholder="Commentaire (optionnel)"
+                                              wire:model="commentaires.{{ $qid }}"></textarea>
                                     @break
 
                                 @case('ressenti')
@@ -148,6 +151,39 @@
                         <i class="bi bi-check-circle me-1"></i> Valider et enregistrer
                     </button>
                 </div>
+            </div>
+        </div>
+
+        {{-- Right: scan preview --}}
+        <div class="col-lg-5">
+            <div class="card sticky-top" style="top: 1rem;">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0"><i class="bi bi-image me-1"></i> Scan</h6>
+                    <a href="{{ route('questionnaires.campagnes.scans.image', $scan) }}"
+                       target="_blank"
+                       class="btn btn-sm btn-outline-secondary py-0 px-2"
+                       title="Ouvrir en plein écran">
+                        <i class="bi bi-arrows-fullscreen"></i>
+                    </a>
+                </div>
+                <div class="card-body p-1">
+                    @if (str_ends_with($scan->chemin_fichier, '.pdf'))
+                        <iframe src="{{ route('questionnaires.campagnes.scans.image', $scan) }}"
+                                style="width:100%; height:80vh; border:none;"
+                                class="rounded"></iframe>
+                    @else
+                        <img src="{{ route('questionnaires.campagnes.scans.image', $scan) }}"
+                             alt="Scan du questionnaire"
+                             class="img-fluid border rounded"
+                             style="cursor:pointer"
+                             onclick="window.open(this.src, '_blank')">
+                    @endif
+                </div>
+                @if ($participant)
+                    <div class="card-footer small text-muted">
+                        <i class="bi bi-person me-1"></i> {{ $participant->displayName() }}
+                    </div>
+                @endif
             </div>
         </div>
     </div>

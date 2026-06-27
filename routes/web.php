@@ -28,6 +28,7 @@ use App\Http\Controllers\ParticipantPdfController;
 use App\Http\Controllers\QuestionnaireApercuController;
 use App\Http\Controllers\QuestionnaireExportController;
 use App\Http\Controllers\QuestionnaireRepondantController;
+use App\Http\Controllers\QuestionnaireResultatsPdfController;
 use App\Http\Controllers\QuestionnaireScanImageController;
 use App\Http\Controllers\RapportExportController;
 use App\Http\Controllers\RapprochementPdfController;
@@ -235,6 +236,14 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
 
             return view('questionnaire.scans.valider', compact('scan'));
         })->name('campagnes.scans.valider');
+
+        Route::get('/campagnes/{campagne}/resultats/pdf', [QuestionnaireResultatsPdfController::class, 'campagne'])
+            ->name('campagnes.resultats.pdf');
+        Route::get('/resultats/consolides', function () {
+            return view('questionnaire.resultats.consolides');
+        })->name('resultats.consolides');
+        Route::get('/resultats/consolides/pdf', [QuestionnaireResultatsPdfController::class, 'consolides'])
+            ->name('resultats.consolides.pdf');
     });
 
 // ── Dashboard ──

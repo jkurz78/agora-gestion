@@ -12,6 +12,9 @@
     <form method="POST" action="{{ route('questionnaire.store', ['token' => $token]) }}">
         @csrf
         <input type="hidden" name="action" value="start">
+        @if (!empty($saisiePour))
+            <input type="hidden" name="saisie_pour" value="1">
+        @endif
         <div class="d-flex justify-content-end">
             <button type="submit" class="btn btn-primary">Commencer</button>
         </div>

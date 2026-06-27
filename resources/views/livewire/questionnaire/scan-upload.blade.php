@@ -92,6 +92,11 @@
                                         Valider
                                     </a>
                                 @endif
+                                <button class="btn btn-sm btn-outline-danger"
+                                        wire:click="supprimerScan({{ $scan->id }})"
+                                        wire:confirm="Supprimer ce scan ?">
+                                    <i class="bi bi-trash"></i>
+                                </button>
                             </td>
                         </tr>
                     @empty

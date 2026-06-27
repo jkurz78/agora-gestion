@@ -27,6 +27,40 @@ final class QuestionnaireScanService
         return $this->ingerer($file->getRealPath(), $mime, $cheminRelatif, 'upload', $campaignId);
     }
 
+    public function ingererPourInvitation(UploadedFile $file, QuestionnaireInvitation $invitation): QuestionnairePaperScan
+    {
+        $mime = $file->getMimeType() ?? 'image/png';
+        $cheminRelatif = $this->stocker($file);
+        $filePath = Storage::disk('local')->path('associations/'.TenantContext::currentId().'/'.$cheminRelatif);
+
+        $scan = QuestionnairePaperScan::create([
+            'association_id' => TenantContext::currentId(),
+            'campaign_id' => (int) $invitation->campaign_id,
+            'invitation_id' => (int) $invitation->id,
+            'source' => 'upload_manuel',
+            'chemin_fichier' => $cheminRelatif,
+            'qr_statut' => 'ignore',
+            'statut' => 'rattache',
+        ]);
+
+        if (QuestionnaireOcrService::isConfigured()) {
+            $campaign = $invitation->campaign;
+            $campaign->loadMissing('questions');
+
+            $ocrResult = $this->ocr->analyzeFromPath($filePath, $mime, $campaign);
+
+            QuestionnaireOcrDraft::create([
+                'association_id' => TenantContext::currentId(),
+                'scan_id' => $scan->id,
+                'invitation_id' => (int) $invitation->id,
+                'payload' => $ocrResult,
+                'statut' => 'brouillon',
+            ]);
+        }
+
+        return $scan;
+    }
+
     public function ingererDepuisFichier(string $path, string $mime, string $source, ?string $token = null, ?int $campaignId = null): QuestionnairePaperScan
     {
         // Copy to tenant storage

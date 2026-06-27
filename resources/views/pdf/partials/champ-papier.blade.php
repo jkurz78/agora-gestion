@@ -48,9 +48,10 @@
     @case('choix_unique')
         @php $options = $question->options(); @endphp
         <div style="margin-top:6px;">
+            <div style="font-size:8px; color:#888; margin-bottom:3px; font-style:italic;">Cochez une seule réponse</div>
             @foreach($options as $opt)
                 <div style="margin-bottom:4px;">
-                    <span style="font-size:16px; line-height:1; vertical-align:middle;">&#9744;</span>
+                    <span style="font-size:16px; line-height:1; vertical-align:middle;">&#9675;</span>
                     <span style="font-size:10px; color:#333; margin-left:6px; vertical-align:middle;">{{ $opt['libelle'] }}</span>
                 </div>
             @endforeach

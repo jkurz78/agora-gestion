@@ -9,6 +9,8 @@ use App\Enums\TypeQuestion;
 use App\Models\QuestionnaireAnswer;
 use App\Models\QuestionnaireCampaign;
 use App\Models\QuestionnaireCampaignQuestion;
+use App\Models\QuestionnaireInvitation;
+use App\Models\QuestionnaireSubmission;
 use Illuminate\Support\Collection;
 
 final class QuestionnaireResultatService
@@ -16,9 +18,22 @@ final class QuestionnaireResultatService
     /** @return array{nb_invitations:int, nb_soumissions:int, taux:float, questions:array<int,array<string,mixed>>} */
     public function pourCampagne(QuestionnaireCampaign $campagne): array
     {
-        $nbInvitations = $campagne->invitations()->count();
+        return $this->pourCampagnes(collect([$campagne]));
+    }
 
-        $soumissions = $campagne->submissions()
+    /**
+     * Résultats consolidés multi-campagnes (même modèle).
+     *
+     * @param  Collection<int, QuestionnaireCampaign>  $campagnes
+     * @return array{nb_invitations:int, nb_soumissions:int, taux:float, questions:array<int,array<string,mixed>>}
+     */
+    public function pourCampagnes(Collection $campagnes): array
+    {
+        $campagneIds = $campagnes->pluck('id');
+
+        $nbInvitations = QuestionnaireInvitation::whereIn('campaign_id', $campagneIds)->count();
+
+        $soumissions = QuestionnaireSubmission::whereIn('campaign_id', $campagneIds)
             ->where('statut', StatutSubmission::Soumise->value)
             ->with('answers')
             ->get();
@@ -26,15 +41,22 @@ final class QuestionnaireResultatService
         $nbSoumissions = $soumissions->count();
         $answersParQuestion = $soumissions->flatMap->answers->groupBy('campaign_question_id');
 
-        $questions = $campagne->questions()->get()
+        $premiere = $campagnes->first();
+        $questions = $premiere->questions()->get()
             ->filter(fn ($q) => $q->type->estReponse())
-            ->map(function ($q) use ($answersParQuestion): array {
-                $answers = $answersParQuestion->get($q->id, collect());
+            ->map(function ($q) use ($answersParQuestion, $campagnes): array {
+                $allAnswers = collect();
+                foreach ($campagnes as $c) {
+                    $mappedQ = $c->questions()->where('libelle', $q->libelle)->where('type', $q->type->value)->first();
+                    if ($mappedQ !== null) {
+                        $allAnswers = $allAnswers->merge($answersParQuestion->get($mappedQ->id, collect()));
+                    }
+                }
 
                 return [
                     'libelle' => $q->libelle,
                     'type' => $q->type,
-                    ...$this->agreger($q->type, $answers, $q),
+                    ...$this->agreger($q->type, $allAnswers, $q),
                 ];
             })->values()->all();
 

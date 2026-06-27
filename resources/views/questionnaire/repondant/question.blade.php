@@ -18,6 +18,9 @@
 
     <form method="POST" action="{{ route('questionnaire.store', ['token' => $token]) }}">
         @csrf
+        @if (!empty($saisiePour))
+            <input type="hidden" name="saisie_pour" value="1">
+        @endif
         <input type="hidden" name="page" value="{{ $page }}">
 
         @foreach ($ecran as $question)

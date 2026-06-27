@@ -96,17 +96,29 @@ final class QuestionnaireReponseService
         DB::transaction(function () use ($submission, $accepteContact): void {
             $this->verifierObligatoires($submission);
 
-            $submission->update([
-                'statut' => StatutSubmission::Soumise,
-                'accepte_contact' => $accepteContact,
-                'submitted_at' => now(),
-            ]);
-
-            $submission->invitation->update([
-                'statut' => StatutInvitation::Soumis,
-                'submitted_at' => now(),
-            ]);
+            $this->marquerSoumise($submission, $accepteContact);
         });
+    }
+
+    public function finaliserSansBloquer(QuestionnaireSubmission $submission, bool $accepteContact): void
+    {
+        DB::transaction(function () use ($submission, $accepteContact): void {
+            $this->marquerSoumise($submission, $accepteContact);
+        });
+    }
+
+    private function marquerSoumise(QuestionnaireSubmission $submission, bool $accepteContact): void
+    {
+        $submission->update([
+            'statut' => StatutSubmission::Soumise,
+            'accepte_contact' => $accepteContact,
+            'submitted_at' => now(),
+        ]);
+
+        $submission->invitation->update([
+            'statut' => StatutInvitation::Soumis,
+            'submitted_at' => now(),
+        ]);
     }
 
     /**
@@ -171,13 +183,18 @@ final class QuestionnaireReponseService
      *
      * @param  array<string|int, int|string|bool|null>  $valeursParQuestionId  question_id => valeur brute
      */
+    /**
+     * @param  array<string|int, int|string|bool|null>  $valeursParQuestionId
+     * @param  array<string|int, string>  $commentairesParQuestionId
+     */
     public function creerDepuisOcr(
         QuestionnaireInvitation $invitation,
         array $valeursParQuestionId,
-        bool $accepteContact,
+        array $commentairesParQuestionId = [],
+        bool $accepteContact = false,
         bool $remplacer = false,
     ): QuestionnaireSubmission {
-        return DB::transaction(function () use ($invitation, $valeursParQuestionId, $accepteContact, $remplacer): QuestionnaireSubmission {
+        return DB::transaction(function () use ($invitation, $valeursParQuestionId, $commentairesParQuestionId, $accepteContact, $remplacer): QuestionnaireSubmission {
             $active = $invitation->submissions()
                 ->whereIn('statut', [StatutSubmission::EnCours->value, StatutSubmission::Soumise->value])
                 ->first();
@@ -198,13 +215,12 @@ final class QuestionnaireReponseService
             $questions = $invitation->campaign->questions()->get()->keyBy('id');
             foreach ($valeursParQuestionId as $qid => $valeur) {
                 $q = $questions->get((int) $qid);
-                if ($q !== null) {
-                    $this->enregistrerReponse($nouvelle, $q, $valeur);
+                if ($q === null || ! $q->type->estReponse()) {
+                    continue;
                 }
+                $commentaire = $commentairesParQuestionId[(string) $qid] ?? ($commentairesParQuestionId[(int) $qid] ?? null);
+                $this->enregistrerReponse($nouvelle, $q, $valeur, $commentaire);
             }
-
-            // Vérifie les champs obligatoires
-            $this->verifierObligatoires($nouvelle);
 
             // Supersede : libère l'active_key AVANT de la revendiquer sur la nouvelle soumission
             if ($active !== null) {

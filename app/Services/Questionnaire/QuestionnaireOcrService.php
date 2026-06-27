@@ -89,14 +89,22 @@ final class QuestionnaireOcrService
     {
         $lignes = $campagne->questions->map(
             fn ($q) => "- id {$q->id} ({$q->type->value}) : {$q->libelle}".
-                ($q->aDesOptions() ? ' [options: '.collect($q->options())->pluck('libelle')->join(', ').']' : '')
+                ($q->aDesOptions() ? ' [options: '.collect($q->options())->map(fn ($o) => $o['valeur'].' = '.$o['libelle'])->join(', ').']' : '')
         )->join("\n");
 
-        return 'Tu lis une feuille de questionnaire remplie à la main. Pour chaque question ci-dessous, '.
-            'renvoie un JSON {"<id>":{"value":<valeur>,"confidence":<0..1>}}. '.
-            'satisfaction/satisfaction_texte_long : entier 1-5 pour la note (+ champ "text" pour le commentaire si présent), '.
-            'ressenti=entier 0-100, case_a_cocher=true/false, '.
-            "choix_unique=valeur technique de l'option cochée, textes=transcription.\n\nQuestions :\n{$lignes}";
+        return "Tu lis une feuille de questionnaire remplie à la main.\n".
+            "IMPORTANT : réponds UNIQUEMENT avec un objet JSON brut, sans texte, sans explication, sans balise markdown.\n".
+            "Format attendu : {\"<question_id>\":{\"value\":<valeur>,\"confidence\":<0.0-1.0>}}\n\n".
+            "Règles par type :\n".
+            "- satisfaction / satisfaction_texte_long : value = entier 1 à 5 (note smiley). Si un commentaire texte est écrit, ajouter un champ \"text\".\n".
+            "- ressenti : value = entier 0 à 100. Le participant a tracé un trait VERTICAL sur une barre horizontale. Mesure la position du trait en pourcentage de la longueur totale de la barre (bord gauche = 0, bord droit = 100). Sois précis au pixel près, ne pas arrondir à 5 ou 10.\n".
+            "- case_a_cocher : value = true ou false\n".
+            "- choix_unique : value = la VALEUR TECHNIQUE (le code AVANT le signe =) de l'option cochée, PAS le libellé\n".
+            "- texte_court / texte_long : value = transcription du texte manuscrit\n\n".
+            "Si une question n'a pas de réponse lisible, mets confidence à 0 et value à null.\n\n".
+            "En plus des questions, cherche une case cochée « J'accepte d'être recontacté » ".
+            "(souvent en bas du formulaire). Ajoute une clé \"_accepte_contact\" avec value true/false.\n\n".
+            "Questions :\n{$lignes}";
     }
 
     /**

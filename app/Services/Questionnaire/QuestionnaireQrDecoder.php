@@ -55,6 +55,36 @@ final class QuestionnaireQrDecoder implements QrDecoderContract
 
     private function decodeFromImage(string $imagePath): ?string
     {
+        $decoded = $this->decodeViaZbar($imagePath)
+            ?? $this->decodeViaZxing($imagePath);
+
+        if ($decoded === null || $decoded === '') {
+            return null;
+        }
+
+        return $this->extractTokenFromUrl($decoded);
+    }
+
+    private function decodeViaZbar(string $imagePath): ?string
+    {
+        $zbarBin = '/usr/bin/zbarimg';
+        if (! file_exists($zbarBin)) {
+            return null;
+        }
+
+        $output = [];
+        $exitCode = 0;
+        exec($zbarBin.' --raw -q '.escapeshellarg($imagePath).' 2>/dev/null', $output, $exitCode);
+
+        if ($exitCode !== 0 || $output === []) {
+            return null;
+        }
+
+        return trim(implode("\n", $output));
+    }
+
+    private function decodeViaZxing(string $imagePath): ?string
+    {
         try {
             $decoded = (new QrReader($imagePath))->text();
         } catch (Throwable) {
@@ -65,7 +95,7 @@ final class QuestionnaireQrDecoder implements QrDecoderContract
             return null;
         }
 
-        return $this->extractTokenFromUrl((string) $decoded);
+        return (string) $decoded;
     }
 
     private function extractTokenFromUrl(string $url): ?string

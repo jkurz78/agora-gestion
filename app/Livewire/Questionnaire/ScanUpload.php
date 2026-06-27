@@ -7,6 +7,8 @@ namespace App\Livewire\Questionnaire;
 use App\Models\QuestionnaireCampaign;
 use App\Models\QuestionnairePaperScan;
 use App\Services\Questionnaire\QuestionnaireScanService;
+use App\Tenant\TenantContext;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -46,5 +48,19 @@ final class ScanUpload extends Component
 
         $this->reset('fichier');
         session()->flash('scan_ok', 'Scan importé avec succès.');
+    }
+
+    public function supprimerScan(int $id): void
+    {
+        $scan = QuestionnairePaperScan::where('campaign_id', $this->campagne->id)->findOrFail($id);
+
+        $scan->ocrDraft?->delete();
+
+        $tenantPath = 'associations/'.TenantContext::currentId().'/'.$scan->chemin_fichier;
+        Storage::disk('local')->delete($tenantPath);
+
+        $scan->delete();
+
+        session()->flash('scan_ok', 'Scan supprimé.');
     }
 }

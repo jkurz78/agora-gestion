@@ -38,6 +38,7 @@
                         @endif
                     </td>
                     <td class="text-end">
+                        <button class="btn btn-sm btn-outline-primary" wire:click="editerQuestion({{ $q->id }})" title="Modifier"><i class="bi bi-pencil"></i></button>
                         <button class="btn btn-sm btn-outline-secondary" wire:click="monter({{ $q->id }})">↑</button>
                         <button class="btn btn-sm btn-outline-secondary" wire:click="descendre({{ $q->id }})">↓</button>
                         <button class="btn btn-sm btn-outline-danger" wire:click="supprimerQuestion({{ $q->id }})" wire:confirm="Supprimer cette question ?">×</button>
@@ -51,7 +52,7 @@
 
     <div class="card">
         <div class="card-body">
-            <h2 class="h6">Ajouter une question</h2>
+            <h2 class="h6">{{ $editingQuestionId ? 'Modifier la question' : 'Ajouter une question' }}</h2>
             <div class="row g-2">
                 <div class="col-md-5">
                     <input type="text" class="form-control" placeholder="Titre" wire:model="libelle">
@@ -115,8 +116,13 @@
                                wire:model="labelDroite">
                     </div>
                 @endif
-                <div class="col-12">
-                    <button class="btn btn-primary" wire:click="ajouterQuestion">Ajouter</button>
+                <div class="col-12 d-flex gap-2">
+                    @if ($editingQuestionId)
+                        <button class="btn btn-primary" wire:click="sauvegarderQuestion">Enregistrer</button>
+                        <button class="btn btn-outline-secondary" wire:click="annulerEdition">Annuler</button>
+                    @else
+                        <button class="btn btn-primary" wire:click="ajouterQuestion">Ajouter</button>
+                    @endif
                 </div>
             </div>
         </div>

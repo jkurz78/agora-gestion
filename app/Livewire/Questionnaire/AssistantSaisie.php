@@ -19,6 +19,9 @@ final class AssistantSaisie extends Component
     /** @var array<string, mixed> Values keyed by question_id */
     public array $valeurs = [];
 
+    /** @var array<string, string> Commentaires/texte long keyed by question_id */
+    public array $commentaires = [];
+
     public bool $accepteContact = false;
 
     public bool $showRemplacer = false;
@@ -28,9 +31,16 @@ final class AssistantSaisie extends Component
         $this->scan = $scan;
         $this->draft = $scan->ocrDraft;
 
-        // Pre-fill values from OCR payload
         foreach ($this->draft->payload as $qid => $entry) {
+            if ($qid === '_accepte_contact') {
+                $this->accepteContact = ! empty($entry['value']);
+
+                continue;
+            }
             $this->valeurs[(string) $qid] = $entry['value'] ?? '';
+            if (isset($entry['text']) && $entry['text'] !== null) {
+                $this->commentaires[(string) $qid] = (string) $entry['text'];
+            }
         }
     }
 
@@ -72,6 +82,7 @@ final class AssistantSaisie extends Component
         $service->creerDepuisOcr(
             invitation: $invitation,
             valeursParQuestionId: $this->valeurs,
+            commentairesParQuestionId: $this->commentaires,
             accepteContact: $this->accepteContact,
             remplacer: $hasExisting,
         );
