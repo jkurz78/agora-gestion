@@ -50,6 +50,26 @@ final class Tiers extends TenantModel implements AuthenticatableContract
         ];
     }
 
+    public function setEmailAttribute(?string $value): void
+    {
+        $this->attributes['email'] = $value !== null ? trim($value) : null;
+    }
+
+    public function setNomAttribute(?string $value): void
+    {
+        $this->attributes['nom'] = $value !== null ? trim($value) : null;
+    }
+
+    public function setPrenomAttribute(?string $value): void
+    {
+        $this->attributes['prenom'] = $value !== null ? trim($value) : null;
+    }
+
+    public function setTelephoneAttribute(?string $value): void
+    {
+        $this->attributes['telephone'] = $value !== null ? trim($value) : null;
+    }
+
     /**
      * Tiers n'a pas de colonne password — retourne une chaîne vide
      * pour satisfaire le contrat Authenticatable sans lever d'exception.
