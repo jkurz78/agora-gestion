@@ -159,12 +159,13 @@
 
 @foreach($pages as $i => $page)
     @php
-        /** @var \App\Models\QuestionnaireInvitation $invitation */
-        $invitation       = $page['invitation'];
+        $anonyme          = $anonyme ?? false;
+        $invitation       = $page['invitation'] ?? null;
+        $bearer           = $page['bearer'] ?? null;
         $qrDataUri        = $page['qr'];
         $introHtml        = $page['introHtml'] ?? '';
         $remerciementHtml = $page['remerciementHtml'] ?? '';
-        $nomParticipant   = $invitation->participant?->tiers?->displayName() ?? '';
+        $nomParticipant   = $anonyme ? '' : ($invitation?->participant?->tiers?->displayName() ?? '');
     @endphp
 
     <div class="invitation{{ $i > 0 ? ' coupe' : '' }}">
@@ -194,7 +195,9 @@
                     {{-- Colonne droite : QR + code court --}}
                     <td class="qr-cell">
                         <img src="{{ $qrDataUri }}" width="120" height="120" alt="QR code">
-                        <div class="code-court">{{ $invitation->code_court }}</div>
+                        @if(!$anonyme && $invitation?->code_court)
+                            <div class="code-court">{{ $invitation->code_court }}</div>
+                        @endif
                         <div class="qr-hint">Scannez pour répondre en ligne</div>
                     </td>
                 </tr>
@@ -257,7 +260,13 @@
         @if($campagne->anonymise)
             <div class="consentement">
                 <span style="font-size:14px; vertical-align:middle;">&#9744;</span>
-                <span style="vertical-align:middle; margin-left:6px;">J'accepte d'être recontacté(e) à propos de mes réponses.</span>
+                <span style="vertical-align:middle; margin-left:6px;">J'accepte que mes réponses soient rattachées à mon nom pour que l'association puisse me recontacter.</span>
+                @if($anonyme)
+                    <div style="margin-top:8px;">
+                        <span style="font-size:9px; color:#666;">Prénom Nom (optionnel) :</span>
+                        <div style="border-bottom:1px solid #555; height:1.6em; margin-top:4px;"></div>
+                    </div>
+                @endif
             </div>
         @endif
 

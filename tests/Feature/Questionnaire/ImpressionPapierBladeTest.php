@@ -301,10 +301,10 @@ it('affiche le bloc consentement quand anonymise=true et pas quand false', funct
     $htmlNonAnon = $viewData(false)();
 
     // Présent quand anonymise=true
-    expect($htmlAnon)->toContain("J'accepte d'être recontacté(e)");
+    expect($htmlAnon)->toContain("J'accepte que mes réponses soient rattachées à mon nom");
 
     // Absent quand anonymise=false
-    expect($htmlNonAnon)->not->toContain("J'accepte d'être recontacté(e)");
+    expect($htmlNonAnon)->not->toContain("J'accepte que mes réponses soient rattachées à mon nom");
 });
 
 it('rend le remerciement en fin d\'invitation', function (): void {

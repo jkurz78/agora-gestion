@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\Operation;
 use App\Models\Participant;
+use App\Models\QuestionnaireBearerToken;
 use App\Models\QuestionnaireCampaign;
 use App\Models\QuestionnaireCampaignQuestion;
 use App\Models\Tiers;
@@ -255,4 +256,54 @@ it('construireDonnees résout {prenom} dans introHtml avec le prénom du partici
     expect($page['remerciementHtml'])
         ->toContain('Élisabeth')
         ->not->toContain('{prenom}');
+});
+
+// -----------------------------------------------------------------------
+// Tests impression anonyme (bearer tokens + QR)
+// -----------------------------------------------------------------------
+
+it('construireDonneesAnonymes génère N bearer tokens et N pages sans nom', function (): void {
+    $op = Operation::factory()->create();
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['anonymise' => true]);
+    QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Note', 'type' => \App\Enums\TypeQuestion::Satisfaction, 'ordre' => 1,
+    ]);
+
+    $service = app(QuestionnaireImpressionService::class);
+    $donnees = $service->construireDonneesAnonymes($campagne, 5);
+
+    expect($donnees['pages'])->toHaveCount(5);
+    expect(QuestionnaireBearerToken::where('campaign_id', $campagne->id)->count())->toBe(5);
+
+    foreach ($donnees['pages'] as $page) {
+        expect($page['bearer'])->toBeInstanceOf(QuestionnaireBearerToken::class);
+        expect($page['qr'])->toContain('data:image/png;base64');
+        expect($page)->not->toHaveKey('invitation');
+    }
+});
+
+it('construireDonneesAnonymes est idempotent sur appels successifs (bearers additifs)', function (): void {
+    $op = Operation::factory()->create();
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['anonymise' => true]);
+    QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Note', 'type' => \App\Enums\TypeQuestion::Satisfaction, 'ordre' => 1,
+    ]);
+
+    $service = app(QuestionnaireImpressionService::class);
+    $service->construireDonneesAnonymes($campagne, 3);
+    $service->construireDonneesAnonymes($campagne, 2);
+
+    expect(QuestionnaireBearerToken::where('campaign_id', $campagne->id)->count())->toBe(5);
+});
+
+it('telechargerAnonyme retourne une StreamedResponse PDF', function (): void {
+    $op = Operation::factory()->create();
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['anonymise' => true]);
+    QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Note', 'type' => \App\Enums\TypeQuestion::Satisfaction, 'ordre' => 1,
+    ]);
+
+    $response = app(QuestionnaireImpressionService::class)->telechargerAnonyme($campagne, 2);
+
+    expect($response)->toBeInstanceOf(\Symfony\Component\HttpFoundation\StreamedResponse::class);
 });

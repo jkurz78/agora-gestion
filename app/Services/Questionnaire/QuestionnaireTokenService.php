@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\Questionnaire;
 
+use App\Models\QuestionnaireBearerToken;
+use App\Models\QuestionnaireCampaign;
+use App\Tenant\TenantContext;
 use Illuminate\Support\Str;
 
 final class QuestionnaireTokenService
@@ -36,5 +39,24 @@ final class QuestionnaireTokenService
         }
 
         return substr($code, 0, 4).'-'.substr($code, 4);
+    }
+
+    /**
+     * Génère un bearer token anonyme pour la campagne donnée.
+     *
+     * @return array{clair: string, bearer: QuestionnaireBearerToken}
+     */
+    public function genererBearer(QuestionnaireCampaign $campagne): array
+    {
+        $clair = Str::random(48);
+        $hash = hash('sha256', $clair);
+
+        $bearer = QuestionnaireBearerToken::create([
+            'association_id' => TenantContext::currentId(),
+            'campaign_id' => $campagne->id,
+            'token_hash' => $hash,
+        ]);
+
+        return ['clair' => $clair, 'bearer' => $bearer];
     }
 }

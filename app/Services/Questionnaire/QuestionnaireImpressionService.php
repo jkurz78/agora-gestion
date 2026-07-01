@@ -94,6 +94,60 @@ final class QuestionnaireImpressionService
     }
 
     /**
+     * Version anonyme : génère N bearer tokens + N pages sans participant.
+     *
+     * @return array{campagne: QuestionnaireCampaign, nomAsso: string, logoDataUri: string|null, groupes: array, pages: array}
+     */
+    public function construireDonneesAnonymes(QuestionnaireCampaign $campagne, int $nombreFormulaires): array
+    {
+        $tokenService = app(QuestionnaireTokenService::class);
+        $groupes = $this->resolver->decouper(
+            $campagne->questions()->orderBy('ordre')->get()
+        );
+
+        $introSource = (string) ($campagne->intro ?? '');
+        $remerciementSource = (string) ($campagne->remerciement ?? '');
+        $vars = $this->variables->pourAnonyme($campagne);
+
+        $introHtml = $this->variables->remplacer($introSource, $vars);
+        $remerciementHtml = $this->variables->remplacer($remerciementSource, $vars);
+
+        $pages = [];
+        for ($i = 0; $i < $nombreFormulaires; $i++) {
+            $result = $tokenService->genererBearer($campagne);
+            $url = url("/q-anon/{$result['clair']}");
+
+            $pages[] = [
+                'bearer' => $result['bearer'],
+                'qr' => QuestionnaireQrCode::dataUri($url),
+                'introHtml' => $introHtml,
+                'remerciementHtml' => $remerciementHtml,
+            ];
+        }
+
+        $asso = CurrentAssociation::tryGet();
+        $nomAsso = $asso?->nom ?? '';
+        $logoDataUri = $asso?->brandingLogoDataUri();
+
+        return compact('campagne', 'nomAsso', 'logoDataUri', 'groupes', 'pages');
+    }
+
+    /**
+     * Génère et retourne le PDF anonyme à télécharger.
+     */
+    public function telechargerAnonyme(QuestionnaireCampaign $campagne, int $nombreFormulaires): StreamedResponse
+    {
+        $filename = "questionnaire-{$campagne->id}-anonyme.pdf";
+        $content = $this->construirePdfFusionneAnonyme($campagne, $nombreFormulaires);
+
+        return response()->streamDownload(
+            fn () => print ($content),
+            $filename,
+            ['Content-Type' => 'application/pdf'],
+        );
+    }
+
+    /**
      * Génère et retourne le PDF à télécharger.
      *
      * Retourne un StreamedResponse pour que Livewire SupportFileDownloads
@@ -146,6 +200,47 @@ final class QuestionnaireImpressionService
 
             $pdfContent = $singlePdf->output();
 
+            $pageCount = $merger->setSourceFile(StreamReader::createByString($pdfContent));
+            for ($p = 1; $p <= $pageCount; $p++) {
+                $tpl = $merger->importPage($p);
+                $size = $merger->getTemplateSize($tpl);
+                $merger->AddPage($size['orientation'], [$size['width'], $size['height']]);
+                $merger->useTemplate($tpl);
+            }
+
+            if ($pageCount % 2 !== 0) {
+                $merger->AddPage('P', [210, 297]);
+            }
+        }
+
+        return $merger->Output('S');
+    }
+
+    /**
+     * Rend un PDF par bearer token (sans nom de participant), puis fusionne via FPDI.
+     *
+     * Même logique de padding recto-verso que construirePdfFusionne().
+     */
+    private function construirePdfFusionneAnonyme(QuestionnaireCampaign $campagne, int $nombreFormulaires): string
+    {
+        $donnees = $this->construireDonneesAnonymes($campagne, $nombreFormulaires);
+
+        $leftText = $campagne->operation?->nom ?? '';
+        $merger = new Fpdi();
+
+        foreach ($donnees['pages'] as $page) {
+            $singlePdf = Pdf::loadView('pdf.questionnaire-papier', [
+                'campagne' => $donnees['campagne'],
+                'nomAsso' => $donnees['nomAsso'],
+                'logoDataUri' => $donnees['logoDataUri'],
+                'groupes' => $donnees['groupes'],
+                'pages' => [$page],
+                'anonyme' => true,
+            ])->setPaper('a4');
+
+            PdfFooterRenderer::renderQuestionnaire($singlePdf, $leftText, '');
+
+            $pdfContent = $singlePdf->output();
             $pageCount = $merger->setSourceFile(StreamReader::createByString($pdfContent));
             for ($p = 1; $p <= $pageCount; $p++) {
                 $tpl = $merger->importPage($p);
