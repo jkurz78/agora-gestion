@@ -59,6 +59,19 @@ final class QuestionnaireQrDecoder implements QrDecoderContract
             ?? $this->decodeViaZxing($imagePath);
 
         if ($decoded === null || $decoded === '') {
+            // Zxing struggles with large smartphone photos — resize and retry
+            $resized = $this->resizeForQr($imagePath);
+            if ($resized !== null) {
+                try {
+                    $decoded = $this->decodeViaZbar($resized)
+                        ?? $this->decodeViaZxing($resized);
+                } finally {
+                    @unlink($resized);
+                }
+            }
+        }
+
+        if ($decoded === null || $decoded === '') {
             return null;
         }
 
@@ -96,6 +109,55 @@ final class QuestionnaireQrDecoder implements QrDecoderContract
         }
 
         return (string) $decoded;
+    }
+
+    private function resizeForQr(string $imagePath): ?string
+    {
+        try {
+            $info = getimagesize($imagePath);
+            if ($info === false) {
+                return null;
+            }
+            [$w, $h] = $info;
+
+            if ($w <= 1200 && $h <= 1200) {
+                return null;
+            }
+
+            $scale = min(1200 / $w, 1200 / $h);
+            $nw = (int) round($w * $scale);
+            $nh = (int) round($h * $scale);
+
+            $src = match ($info[2]) {
+                IMAGETYPE_JPEG => imagecreatefromjpeg($imagePath),
+                IMAGETYPE_PNG => imagecreatefrompng($imagePath),
+                IMAGETYPE_WEBP => imagecreatefromwebp($imagePath),
+                default => null,
+            };
+
+            if ($src === null || $src === false) {
+                return null;
+            }
+
+            $dst = imagecreatetruecolor($nw, $nh);
+            if ($dst === false) {
+                imagedestroy($src);
+
+                return null;
+            }
+
+            imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $w, $h);
+            imagedestroy($src);
+
+            $tempPath = storage_path('app/private/temp/questionnaire-scan/'.uniqid('qr-resize-').'.png');
+            File::ensureDirectoryExists(dirname($tempPath));
+            imagepng($dst, $tempPath);
+            imagedestroy($dst);
+
+            return $tempPath;
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     private function extractTokenFromUrl(string $url): ?string
