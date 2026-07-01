@@ -99,3 +99,34 @@ it('{logo} est présent dans pour() et exemple() et absent des HTML_KEYS n a pas
     // Sans logo configuré, la valeur est une chaîne vide ou un tag img.
     expect($exemple['{logo}'])->toBeString();
 });
+
+it('pourAnonyme retourne des valeurs neutres pour les clés nominatives', function (): void {
+    $campagne = QuestionnaireCampaign::factory()->create();
+    $resolver = app(QuestionnaireVariableResolver::class);
+
+    $vars = $resolver->pourAnonyme($campagne);
+
+    expect($vars['{prenom}'])->toBe('');
+    expect($vars['{nom}'])->toBe('');
+    expect($vars['{email_participant}'])->toBe('');
+    expect($vars['{civilite}'])->toBe('');
+    expect($vars['{politesse}'])->toBe('');
+    expect($vars['{salutation}'])->toBe('Madame, Monsieur');
+    expect($vars['{civilite_nom}'])->toBe('');
+    expect($vars['{politesse_nom}'])->toBe('Madame, Monsieur');
+    expect($vars['{civilite_prenom_nom}'])->toBe('');
+    expect($vars['{politesse_prenom_nom}'])->toBe('Madame, Monsieur');
+    expect($vars['{lien_questionnaire}'])->toBe('');
+    expect($vars['{bloc_liens}'])->toBe('');
+});
+
+it('pourAnonyme conserve les variables neutres opération/asso', function (): void {
+    $op = \App\Models\Operation::factory()->create(['nom' => 'Stage été']);
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create();
+    $resolver = app(QuestionnaireVariableResolver::class);
+
+    $vars = $resolver->pourAnonyme($campagne);
+
+    expect($vars['{operation}'])->toBe('Stage été');
+    expect($vars['{association}'])->not->toBe('');
+});

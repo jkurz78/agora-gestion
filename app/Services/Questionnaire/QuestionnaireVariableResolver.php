@@ -72,6 +72,42 @@ final class QuestionnaireVariableResolver
     }
 
     /**
+     * Retourne des variables de remplacement sans participant — les clés nominatives
+     * (nom, prénom, email…) sont remplacées par des valeurs neutres, les clés
+     * opération/association conservent leur valeur réelle.
+     *
+     * @return array<string, string>
+     */
+    public function pourAnonyme(QuestionnaireCampaign $campagne): array
+    {
+        $operation = $campagne->operation;
+
+        return [
+            '{prenom}' => '',
+            '{nom}' => '',
+            '{email_participant}' => '',
+            '{civilite}' => '',
+            '{politesse}' => '',
+            '{civilite_nom}' => '',
+            '{politesse_nom}' => 'Madame, Monsieur',
+            '{civilite_prenom_nom}' => '',
+            '{politesse_prenom_nom}' => 'Madame, Monsieur',
+            '{salutation}' => 'Madame, Monsieur',
+            '{operation}' => (string) ($operation?->nom ?? ''),
+            '{type_operation}' => (string) ($operation?->typeOperation?->nom ?? ''),
+            '{association}' => (string) (CurrentAssociation::tryGet()?->nom ?? ''),
+            '{date_debut}' => $operation?->date_debut?->format('d/m/Y') ?? '',
+            '{date_fin}' => $operation?->date_fin?->format('d/m/Y') ?? '',
+            '{nb_seances}' => (string) ($operation?->nombre_seances ?? ''),
+            '{table_seances}' => $this->buildTableSeances($operation, false),
+            '{table_seances_a_venir}' => $this->buildTableSeances($operation, true),
+            '{logo}' => $this->buildLogoImg(CurrentAssociation::tryGet()),
+            '{lien_questionnaire}' => '',
+            '{bloc_liens}' => '',
+        ];
+    }
+
+    /**
      * @return array<string, string>
      */
     public function exemple(?QuestionnaireCampaign $campagne = null): array
