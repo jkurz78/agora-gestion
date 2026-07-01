@@ -15,7 +15,7 @@ final class QuestionnaireSubmission extends TenantModel
     use HasFactory;
 
     protected $fillable = [
-        'association_id', 'campaign_id', 'invitation_id', 'statut', 'accepte_contact', 'source', 'submitted_at',
+        'association_id', 'campaign_id', 'invitation_id', 'bearer_token_id', 'statut', 'accepte_contact', 'source', 'submitted_at',
         'remplacee_par_id', 'active_key',
     ];
 
@@ -36,6 +36,11 @@ final class QuestionnaireSubmission extends TenantModel
     public function invitation(): BelongsTo
     {
         return $this->belongsTo(QuestionnaireInvitation::class, 'invitation_id');
+    }
+
+    public function bearerToken(): BelongsTo
+    {
+        return $this->belongsTo(QuestionnaireBearerToken::class, 'bearer_token_id');
     }
 
     public function answers(): HasMany

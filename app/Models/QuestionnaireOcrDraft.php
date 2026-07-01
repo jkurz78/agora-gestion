@@ -12,7 +12,7 @@ final class QuestionnaireOcrDraft extends TenantModel
     use HasFactory;
 
     protected $fillable = [
-        'association_id', 'scan_id', 'invitation_id', 'payload', 'statut',
+        'association_id', 'scan_id', 'invitation_id', 'bearer_token_id', 'payload', 'statut',
     ];
 
     protected function casts(): array
@@ -30,5 +30,10 @@ final class QuestionnaireOcrDraft extends TenantModel
     public function invitation(): BelongsTo
     {
         return $this->belongsTo(QuestionnaireInvitation::class, 'invitation_id');
+    }
+
+    public function bearerToken(): BelongsTo
+    {
+        return $this->belongsTo(QuestionnaireBearerToken::class, 'bearer_token_id');
     }
 }
