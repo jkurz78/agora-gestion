@@ -503,6 +503,18 @@ Route::prefix('q')->middleware('throttle:30,1')->group(function (): void {
         ->name('questionnaire.store');
 });
 
+// ── Questionnaire public — canal bearer anonyme (QR papier sans invitation) ──
+Route::prefix('q-anon')->middleware('throttle:30,1')->group(function (): void {
+    Route::get('/{token}/consentement', [QuestionnaireRepondantController::class, 'consentementBearer'])
+        ->name('questionnaire.bearer.consentement');
+    Route::get('/{token}/merci', [QuestionnaireRepondantController::class, 'merciBearer'])
+        ->name('questionnaire.bearer.merci');
+    Route::get('/{token}', [QuestionnaireRepondantController::class, 'showBearer'])
+        ->name('questionnaire.bearer.show');
+    Route::post('/{token}', [QuestionnaireRepondantController::class, 'storeBearer'])
+        ->name('questionnaire.bearer.store');
+});
+
 // ── Newsletter public (no auth, no tenant middleware — token embeds tenant context) ──
 Route::get('/newsletter/confirm/{token}', [NewsletterSubscriptionController::class, 'confirm'])
     ->middleware('throttle:30,1')

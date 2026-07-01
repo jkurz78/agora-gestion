@@ -16,7 +16,7 @@
     </div>
     @endif
 
-    <form method="POST" action="{{ route('questionnaire.store', ['token' => $token]) }}">
+    <form method="POST" action="{{ route(($bearer ?? false) ? 'questionnaire.bearer.store' : 'questionnaire.store', ['token' => $token]) }}">
         @csrf
         @if (!empty($saisiePour))
             <input type="hidden" name="saisie_pour" value="1">

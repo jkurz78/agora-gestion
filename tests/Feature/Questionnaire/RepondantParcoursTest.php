@@ -8,6 +8,7 @@ use App\Enums\TypeQuestion;
 use App\Models\Association;
 use App\Models\Operation;
 use App\Models\Participant;
+use App\Models\QuestionnaireBearerToken;
 use App\Models\QuestionnaireCampaign;
 use App\Models\QuestionnaireCampaignQuestion;
 use App\Models\QuestionnaireInvitation;
@@ -712,4 +713,70 @@ it('anonymise=false : la dernière question redirige vers merci (sans passer par
         ->assertRedirect(route('questionnaire.merci', ['token' => $clair]));
 
     expect($invitation->fresh()->statut)->toBe(StatutInvitation::Soumis);
+});
+
+// ── Bearer / anonymous flow ──────────────────────────────────────
+
+function makeBearerCampagne(): array
+{
+    $op = Operation::factory()->create();
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'statut' => StatutCampagne::Ouverte, 'anonymise' => true, 'remerciement' => 'Merci !',
+    ]);
+    QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Note', 'type' => TypeQuestion::Satisfaction, 'ordre' => 1, 'obligatoire' => true,
+    ]);
+
+    $clair = Str::random(48);
+    $bearer = QuestionnaireBearerToken::factory()->for($campagne, 'campaign')->create([
+        'token_hash' => hash('sha256', $clair),
+    ]);
+
+    return [$clair, $bearer, $campagne];
+}
+
+it('parcours bearer : intro → question → consentement → merci', function (): void {
+    [$clair, $bearer, $campagne] = makeBearerCampagne();
+    TenantContext::clear();
+
+    // intro
+    $this->get("/q-anon/{$clair}")
+        ->assertOk()
+        ->assertSee($campagne->titre_affiche, false);
+
+    // start
+    $this->post("/q-anon/{$clair}", ['action' => 'start'])->assertRedirect();
+
+    // répondre
+    $question = $campagne->questions()->first();
+    $this->post("/q-anon/{$clair}", ['action' => 'next', 'page' => 1, "q_{$question->id}" => '4'])
+        ->assertRedirect();
+
+    // consentement
+    $this->get("/q-anon/{$clair}/consentement")->assertOk();
+
+    // finaliser sans consentement
+    $this->post("/q-anon/{$clair}", ['action' => 'finish', 'accepte_contact' => '0'])
+        ->assertRedirect();
+
+    // la soumission est liée au bearer, pas à une invitation
+    $sub = $bearer->fresh()->submissions()->first();
+    expect($sub)->not->toBeNull();
+    expect((int) $sub->bearer_token_id)->toBe((int) $bearer->id);
+    expect($sub->invitation_id)->toBeNull();
+    expect($sub->statut->value)->toBe('soumise');
+});
+
+it('parcours bearer : déjà répondu → indisponible', function (): void {
+    [$clair, $bearer, $campagne] = makeBearerCampagne();
+    TenantContext::clear();
+
+    // premier parcours complet
+    $this->post("/q-anon/{$clair}", ['action' => 'start']);
+    $question = $campagne->questions()->first();
+    $this->post("/q-anon/{$clair}", ['action' => 'next', 'page' => 1, "q_{$question->id}" => '5']);
+    $this->post("/q-anon/{$clair}", ['action' => 'finish', 'accepte_contact' => '0']);
+
+    // deuxième visite → déjà répondu
+    $this->get("/q-anon/{$clair}")->assertOk()->assertSee('déjà', false);
 });

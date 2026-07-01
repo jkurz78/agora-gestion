@@ -9,7 +9,7 @@
         <div class="mb-4">{!! nl2br(e($campagne->intro)) !!}</div>
     @endif
 
-    <form method="POST" action="{{ route('questionnaire.store', ['token' => $token]) }}">
+    <form method="POST" action="{{ route(($bearer ?? false) ? 'questionnaire.bearer.store' : 'questionnaire.store', ['token' => $token]) }}">
         @csrf
         <input type="hidden" name="action" value="start">
         @if (!empty($saisiePour))

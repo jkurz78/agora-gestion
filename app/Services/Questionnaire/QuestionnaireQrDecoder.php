@@ -162,9 +162,9 @@ final class QuestionnaireQrDecoder implements QrDecoderContract
 
     private function extractTokenFromUrl(string $url): ?string
     {
-        // Accept: https://example.com/q/{token} or https://example.com/q/{token}/consentement
-        // The token is the path segment right after /q/
-        if (preg_match('#/q/([A-Za-z0-9]{20,})#', $url, $matches)) {
+        // Accept: https://example.com/q/{token} or https://example.com/q-anon/{token} (and /consentement suffix)
+        // The token is the path segment right after /q/ or /q-anon/
+        if (preg_match('#/q(?:-anon)?/([A-Za-z0-9]{20,})#', $url, $matches)) {
             return $matches[1];
         }
 

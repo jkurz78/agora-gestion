@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Enums\StatutInvitation;
+use App\Enums\StatutSubmission;
 use App\Exceptions\Questionnaire\ReponseObligatoireException;
 use App\Models\Association;
+use App\Models\QuestionnaireBearerToken;
 use App\Models\QuestionnaireInvitation;
 use App\Services\Questionnaire\QuestionnaireEcranResolver;
 use App\Services\Questionnaire\QuestionnaireReponseService;
@@ -233,5 +235,201 @@ final class QuestionnaireRepondantController extends Controller
         }
 
         return $invitation;
+    }
+
+    // ── Canal bearer anonyme (QR papier sans invitation) ─────────────────────
+
+    public function showBearer(Request $request, string $token): View
+    {
+        $bearer = $this->resoudreBearer($token);
+        $campagne = $bearer->campaign;
+
+        if (! $campagne->statut->accepteReponses()) {
+            return view('questionnaire.repondant.indisponible', compact('campagne'));
+        }
+
+        $existante = $bearer->submissions()
+            ->where('statut', StatutSubmission::Soumise->value)
+            ->first();
+        if ($existante !== null) {
+            return view('questionnaire.repondant.indisponible', ['campagne' => $campagne, 'dejaRepondu' => true]);
+        }
+
+        $page = max(0, (int) $request->query('page', '0'));
+        $questions = $campagne->questions()->orderBy('ordre')->get();
+        $ecrans = $this->ecranResolver->decouper($questions);
+        $total = count($ecrans);
+
+        if ($page === 0) {
+            $vars = $this->variables->pourAnonyme($campagne);
+
+            return view('questionnaire.repondant.intro', [
+                'invitation' => null,
+                'campagne' => $campagne,
+                'token' => $token,
+                'introHtml' => $this->variables->remplacer((string) ($campagne->intro ?? ''), $vars),
+                'titre' => $this->variables->remplacer((string) $campagne->titre_affiche, $vars),
+                'saisiePour' => false,
+                'bearer' => true,
+            ]);
+        }
+
+        $ecran = $ecrans[$page - 1] ?? null;
+        abort_if($ecran === null, 404);
+
+        $submission = $this->reponses->demarrerOuReprendreBearer($bearer);
+        $answers = $submission->answers()->get()->keyBy('campaign_question_id');
+
+        return view('questionnaire.repondant.question', [
+            'token' => $token,
+            'campagne' => $campagne,
+            'ecran' => $ecran,
+            'page' => $page,
+            'total' => $total,
+            'answers' => $answers,
+            'saisiePour' => false,
+            'bearer' => true,
+        ]);
+    }
+
+    public function storeBearer(Request $request, string $token): RedirectResponse
+    {
+        $bearer = $this->resoudreBearer($token);
+        $campagne = $bearer->campaign;
+        abort_unless($campagne->statut->accepteReponses(), 422);
+
+        $action = (string) $request->input('action');
+        $submission = $this->reponses->demarrerOuReprendreBearer($bearer);
+
+        if ($action === 'start') {
+            return redirect()->route('questionnaire.bearer.show', ['token' => $token, 'page' => 1]);
+        }
+
+        if ($action === 'next') {
+            $page = (int) $request->input('page');
+            $questions = $campagne->questions()->orderBy('ordre')->get();
+            $ecrans = $this->ecranResolver->decouper($questions);
+            $total = count($ecrans);
+            $ecran = $ecrans[$page - 1] ?? null;
+            abort_if($ecran === null, 404);
+
+            $erreurs = [];
+            foreach ($ecran as $q) {
+                if (! $q->type->estReponse()) {
+                    continue;
+                }
+                $valeur = $request->input("q_{$q->id}");
+                $commentaire = $request->input("q_{$q->id}_commentaire");
+                $erreurs = array_merge($erreurs, $this->reponses->champsManquants($q, $valeur, $commentaire));
+            }
+            if ($erreurs !== []) {
+                return back()->withErrors($erreurs)->withInput();
+            }
+
+            foreach ($ecran as $q) {
+                if (! $q->type->estReponse()) {
+                    continue;
+                }
+                $this->reponses->enregistrerReponse(
+                    $submission, $q,
+                    $request->input("q_{$q->id}"),
+                    $request->input("q_{$q->id}_commentaire"),
+                );
+            }
+
+            $next = $page + 1;
+
+            if ($next > $total) {
+                return redirect()->route('questionnaire.bearer.consentement', ['token' => $token]);
+            }
+
+            return redirect()->route('questionnaire.bearer.show', ['token' => $token, 'page' => $next]);
+        }
+
+        if ($action === 'prev') {
+            $page = (int) $request->input('page');
+            $questions = $campagne->questions()->orderBy('ordre')->get();
+            $ecrans = $this->ecranResolver->decouper($questions);
+            $ecran = $ecrans[$page - 1] ?? null;
+
+            if ($ecran !== null) {
+                foreach ($ecran as $q) {
+                    if (! $q->type->estReponse()) {
+                        continue;
+                    }
+                    $this->reponses->enregistrerReponse(
+                        $submission,
+                        $q,
+                        $request->input("q_{$q->id}"),
+                        $request->input("q_{$q->id}_commentaire"),
+                    );
+                }
+            }
+
+            return redirect()->route('questionnaire.bearer.show', ['token' => $token, 'page' => max(0, $page - 1)]);
+        }
+
+        if ($action === 'finish') {
+            try {
+                $this->reponses->finaliser($submission, $request->boolean('accepte_contact'));
+            } catch (ReponseObligatoireException) {
+                return redirect()->route('questionnaire.bearer.show', ['token' => $token, 'page' => 1])
+                    ->withErrors(['reponse' => 'Une question obligatoire n\'est pas renseignée.']);
+            }
+
+            return redirect()->route('questionnaire.bearer.merci', ['token' => $token]);
+        }
+
+        abort(400);
+    }
+
+    public function consentementBearer(string $token): View
+    {
+        $bearer = $this->resoudreBearer($token);
+        $campagne = $bearer->campaign;
+        abort_unless($campagne->statut->accepteReponses(), 422);
+
+        $questions = $campagne->questions()->orderBy('ordre')->get();
+        $total = count($this->ecranResolver->decouper($questions));
+
+        return view('questionnaire.repondant.consentement', [
+            'token' => $token,
+            'campagne' => $campagne,
+            'total' => $total,
+            'bearer' => true,
+        ]);
+    }
+
+    public function merciBearer(string $token): View
+    {
+        $bearer = $this->resoudreBearer($token);
+        $campagne = $bearer->campaign;
+        $vars = $this->variables->pourAnonyme($campagne);
+
+        return view('questionnaire.repondant.merci', [
+            'campagne' => $campagne,
+            'remerciementHtml' => $this->variables->remplacer((string) ($campagne->remerciement ?? ''), $vars),
+            'titre' => $this->variables->remplacer((string) $campagne->titre_affiche, $vars),
+        ]);
+    }
+
+    /** Résolution bearer par hash + boot tenant (canal anonyme, QR papier). */
+    private function resoudreBearer(string $tokenClair): QuestionnaireBearerToken
+    {
+        $hash = $this->tokens->hash($tokenClair);
+
+        $bearer = QuestionnaireBearerToken::withoutGlobalScope(TenantScope::class)
+            ->where('token_hash', $hash)
+            ->first();
+
+        abort_if($bearer === null, 404);
+
+        if (! TenantContext::hasBooted() || (int) TenantContext::currentId() !== (int) $bearer->association_id) {
+            $association = Association::find($bearer->association_id);
+            abort_if($association === null, 404);
+            TenantContext::boot($association);
+        }
+
+        return $bearer;
     }
 }
