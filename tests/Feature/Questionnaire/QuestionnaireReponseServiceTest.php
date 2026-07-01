@@ -16,7 +16,7 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 
 function makeInvitation(): QuestionnaireInvitation
 {
-    $campagne = QuestionnaireCampaign::factory()->create();
+    $campagne = QuestionnaireCampaign::factory()->create(['anonymise' => false]);
     QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
         'libelle' => 'Note', 'type' => TypeQuestion::Satisfaction, 'ordre' => 1, 'obligatoire' => true,
     ]);
@@ -251,7 +251,7 @@ it('réouverture admin : invitation et soumission repassent en cours, submitted_
 
 it('creerDepuisOcr crée une soumission papier soumise', function (): void {
     $op = Operation::factory()->create();
-    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['statut' => 'ouverte']);
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['statut' => 'ouverte', 'anonymise' => false]);
     $q1 = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
         'libelle' => 'Question', 'type' => 'texte_court', 'ordre' => 1, 'obligatoire' => true,
     ]);
@@ -276,7 +276,7 @@ it('creerDepuisOcr crée une soumission papier soumise', function (): void {
 
 it('creerDepuisOcr refuse de remplacer sans flag remplacer', function (): void {
     $op = Operation::factory()->create();
-    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['statut' => 'ouverte']);
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['statut' => 'ouverte', 'anonymise' => false]);
     $q1 = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
         'libelle' => 'Question', 'type' => 'texte_court', 'ordre' => 1, 'obligatoire' => false,
     ]);
@@ -302,7 +302,7 @@ it('creerDepuisOcr refuse de remplacer sans flag remplacer', function (): void {
 
 it('creerDepuisOcr remplace l ancienne soumission (supersede non destructif)', function (): void {
     $op = Operation::factory()->create();
-    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['statut' => 'ouverte']);
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['statut' => 'ouverte', 'anonymise' => false]);
     $q1 = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
         'libelle' => 'Question', 'type' => 'satisfaction', 'ordre' => 1, 'obligatoire' => true,
     ]);
@@ -334,4 +334,106 @@ it('creerDepuisOcr remplace l ancienne soumission (supersede non destructif)', f
 
     // Invariant: exactly one active
     expect($invitation->submissions()->whereNotNull('active_key')->count())->toBe(1);
+});
+
+// ── Anonymisation ──────────────────────────────────────────────────
+
+it('finaliser anonymise sans consentement → nulle invitation_id mais garde invitation soumis', function (): void {
+    $svc = app(QuestionnaireReponseService::class);
+    $campagne = QuestionnaireCampaign::factory()->create(['anonymise' => true]);
+    QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Note', 'type' => TypeQuestion::Satisfaction, 'ordre' => 1, 'obligatoire' => true,
+    ]);
+    $invitation = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create();
+    $submission = $svc->demarrerOuReprendre($invitation);
+    $svc->enregistrerReponse($submission, $campagne->questions()->first(), '5');
+
+    $svc->finaliser($submission, accepteContact: false);
+
+    $submission->refresh();
+    $invitation->refresh();
+    expect($submission->invitation_id)->toBeNull();
+    expect($submission->active_key)->toBeNull();
+    expect($submission->statut)->toBe(StatutSubmission::Soumise);
+    expect($invitation->statut)->toBe(StatutInvitation::Soumis);
+    expect($invitation->submitted_at)->not->toBeNull();
+});
+
+it('finaliser anonymise avec consentement → conserve le FK', function (): void {
+    $svc = app(QuestionnaireReponseService::class);
+    $campagne = QuestionnaireCampaign::factory()->create(['anonymise' => true]);
+    QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Note', 'type' => TypeQuestion::Satisfaction, 'ordre' => 1, 'obligatoire' => true,
+    ]);
+    $invitation = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create();
+    $submission = $svc->demarrerOuReprendre($invitation);
+    $svc->enregistrerReponse($submission, $campagne->questions()->first(), '4');
+
+    $svc->finaliser($submission, accepteContact: true);
+
+    $submission->refresh();
+    expect($submission->invitation_id)->not->toBeNull();
+    expect($submission->accepte_contact)->toBeTrue();
+});
+
+it('finaliser non-anonymise sans consentement → conserve le FK (statu quo)', function (): void {
+    $svc = app(QuestionnaireReponseService::class);
+    $campagne = QuestionnaireCampaign::factory()->create(['anonymise' => false]);
+    QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Note', 'type' => TypeQuestion::Satisfaction, 'ordre' => 1, 'obligatoire' => true,
+    ]);
+    $invitation = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create();
+    $submission = $svc->demarrerOuReprendre($invitation);
+    $svc->enregistrerReponse($submission, $campagne->questions()->first(), '3');
+
+    $svc->finaliser($submission, accepteContact: false);
+
+    expect($submission->fresh()->invitation_id)->not->toBeNull();
+});
+
+it('rouvrir refuse une soumission anonymisée (invitation_id null)', function (): void {
+    $svc = app(QuestionnaireReponseService::class);
+    $campagne = QuestionnaireCampaign::factory()->create(['anonymise' => true]);
+    QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Note', 'type' => TypeQuestion::Satisfaction, 'ordre' => 1, 'obligatoire' => true,
+    ]);
+    $invitation = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create();
+    $submission = $svc->demarrerOuReprendre($invitation);
+    $svc->enregistrerReponse($submission, $campagne->questions()->first(), '5');
+    $svc->finaliser($submission, accepteContact: false);
+
+    expect(fn () => $svc->rouvrir($invitation))
+        ->toThrow(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+});
+
+it('demarrerOuReprendreBearer crée une soumission liée au bearer', function (): void {
+    $svc = app(QuestionnaireReponseService::class);
+    $campagne = QuestionnaireCampaign::factory()->create(['anonymise' => true]);
+    QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Note', 'type' => TypeQuestion::Satisfaction, 'ordre' => 1,
+    ]);
+    $bearer = \App\Models\QuestionnaireBearerToken::factory()->for($campagne, 'campaign')->create();
+
+    $s1 = $svc->demarrerOuReprendreBearer($bearer);
+    $s2 = $svc->demarrerOuReprendreBearer($bearer);
+
+    expect($s1->id)->toBe($s2->id);
+    expect($s1->bearer_token_id)->toBe($bearer->id);
+    expect($s1->invitation_id)->toBeNull();
+});
+
+it('finaliser bearer sans invitation ne crash pas', function (): void {
+    $svc = app(QuestionnaireReponseService::class);
+    $campagne = QuestionnaireCampaign::factory()->create(['anonymise' => true]);
+    QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Note', 'type' => TypeQuestion::Satisfaction, 'ordre' => 1, 'obligatoire' => true,
+    ]);
+    $bearer = \App\Models\QuestionnaireBearerToken::factory()->for($campagne, 'campaign')->create();
+    $sub = $svc->demarrerOuReprendreBearer($bearer);
+    $svc->enregistrerReponse($sub, $campagne->questions()->first(), '4');
+
+    $svc->finaliser($sub, accepteContact: false);
+
+    expect($sub->fresh()->statut)->toBe(StatutSubmission::Soumise);
+    expect($sub->fresh()->invitation_id)->toBeNull();
 });

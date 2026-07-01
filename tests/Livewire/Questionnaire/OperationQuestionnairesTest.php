@@ -110,6 +110,7 @@ it('permet à l admin de rouvrir une invitation soumise', function (): void {
     $participant = Participant::factory()->create(['operation_id' => $op->id]);
     $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
         'statut' => StatutCampagne::Ouverte,
+        'anonymise' => false,
     ]);
     $clair = Str::random(48);
     $invitation = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create([

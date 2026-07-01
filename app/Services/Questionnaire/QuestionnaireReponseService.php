@@ -8,6 +8,7 @@ use App\Enums\StatutInvitation;
 use App\Enums\StatutSubmission;
 use App\Enums\TypeQuestion;
 use App\Exceptions\Questionnaire\ReponseObligatoireException;
+use App\Models\QuestionnaireBearerToken;
 use App\Models\QuestionnaireCampaignQuestion;
 use App\Models\QuestionnaireInvitation;
 use App\Models\QuestionnaireSubmission;
@@ -35,6 +36,29 @@ final class QuestionnaireReponseService
 
             if ($invitation->statut === StatutInvitation::NonOuvert) {
                 $invitation->update(['statut' => StatutInvitation::Commence, 'opened_at' => now()]);
+            }
+
+            return $submission;
+        });
+    }
+
+    /** Invariant ≤1 active par bearer token : récupère la soumission active ou en crée une (pas d'invitation). */
+    public function demarrerOuReprendreBearer(QuestionnaireBearerToken $bearer): QuestionnaireSubmission
+    {
+        return DB::transaction(function () use ($bearer): QuestionnaireSubmission {
+            $submission = $bearer->submissions()
+                ->whereIn('statut', [StatutSubmission::EnCours->value, StatutSubmission::Soumise->value])
+                ->first();
+
+            if ($submission === null) {
+                $submission = QuestionnaireSubmission::create([
+                    'campaign_id' => $bearer->campaign_id,
+                    'invitation_id' => null,
+                    'bearer_token_id' => $bearer->id,
+                    'statut' => StatutSubmission::EnCours,
+                    'source' => 'en_ligne',
+                    'active_key' => null,
+                ]);
             }
 
             return $submission;
@@ -97,6 +121,15 @@ final class QuestionnaireReponseService
             $this->verifierObligatoires($submission);
 
             $this->marquerSoumise($submission, $accepteContact);
+
+            // Oubli du lien si anonymise ET pas de consentement
+            $campagne = $submission->campaign;
+            if ($campagne->anonymise && ! $accepteContact && $submission->invitation_id !== null) {
+                $submission->update([
+                    'invitation_id' => null,
+                    'active_key' => null,
+                ]);
+            }
         });
     }
 
@@ -104,6 +137,14 @@ final class QuestionnaireReponseService
     {
         DB::transaction(function () use ($submission, $accepteContact): void {
             $this->marquerSoumise($submission, $accepteContact);
+
+            $campagne = $submission->campaign;
+            if ($campagne->anonymise && ! $accepteContact && $submission->invitation_id !== null) {
+                $submission->update([
+                    'invitation_id' => null,
+                    'active_key' => null,
+                ]);
+            }
         });
     }
 
@@ -115,10 +156,12 @@ final class QuestionnaireReponseService
             'submitted_at' => now(),
         ]);
 
-        $submission->invitation->update([
-            'statut' => StatutInvitation::Soumis,
-            'submitted_at' => now(),
-        ]);
+        if ($submission->invitation_id !== null) {
+            $submission->invitation->update([
+                'statut' => StatutInvitation::Soumis,
+                'submitted_at' => now(),
+            ]);
+        }
     }
 
     /**
@@ -254,6 +297,11 @@ final class QuestionnaireReponseService
             $submission = $invitation->submissions()
                 ->where('statut', StatutSubmission::Soumise->value)
                 ->first();
+
+            // Campagne anonymisée + invitation soumise sans soumission liée = réponse oubliée
+            if ($submission === null && $fresh?->campaign->anonymise && $fresh->statut === StatutInvitation::Soumis) {
+                abort(422, 'Soumission anonymisée : réouverture impossible.');
+            }
 
             if ($submission !== null) {
                 $submission->update(['statut' => StatutSubmission::EnCours, 'submitted_at' => null]);
