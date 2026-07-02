@@ -91,6 +91,7 @@ it('affiche le lien PDF vers route questionnaires.campagnes.pdf pour une campagn
     $op = Operation::factory()->create();
     $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
         'statut' => StatutCampagne::Ouverte,
+        'anonymise' => false,
     ]);
 
     Livewire::test(OperationQuestionnaires::class, ['operation' => $op])
@@ -123,4 +124,27 @@ it('permet à l admin de rouvrir une invitation soumise', function (): void {
         ->call('rouvrirInvitation', $invitation->id);
 
     expect($invitation->fresh()->statut->value)->toBe('commence');
+});
+
+it('campagne anonymise affiche Imprimer anonyme dans le dropdown', function (): void {
+    $op = Operation::factory()->create();
+    QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'statut' => StatutCampagne::Ouverte,
+        'anonymise' => true,
+    ]);
+
+    Livewire::test(OperationQuestionnaires::class, ['operation' => $op])
+        ->assertSee('Imprimer anonyme');
+});
+
+it('campagne non-anonymise ne montre pas Imprimer anonyme', function (): void {
+    $op = Operation::factory()->create();
+    QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'statut' => StatutCampagne::Ouverte,
+        'anonymise' => false,
+    ]);
+
+    Livewire::test(OperationQuestionnaires::class, ['operation' => $op])
+        ->assertDontSee('Imprimer anonyme')
+        ->assertSee('PDF papier');
 });

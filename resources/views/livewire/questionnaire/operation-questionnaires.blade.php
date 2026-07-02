@@ -93,11 +93,26 @@
                                     Plus
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-end">
-                                    <li>
-                                        <a class="dropdown-item" href="{{ route('questionnaires.campagnes.pdf', $c) }}" target="_blank">
-                                            <i class="bi bi-file-earmark-pdf me-2"></i>PDF papier
-                                        </a>
-                                    </li>
+                                    @if ($c->anonymise)
+                                        <li>
+                                            <div class="dropdown-item d-flex align-items-center gap-2">
+                                                <input type="number" min="1" max="200"
+                                                       wire:model.defer="nombreFormulairesAnonymes"
+                                                       class="form-control form-control-sm"
+                                                       style="width:70px" title="Nombre de formulaires">
+                                                <button class="btn btn-sm btn-outline-primary"
+                                                        wire:click="imprimerAnonyme({{ $c->id }})">
+                                                    <i class="bi bi-printer me-1"></i>Imprimer anonyme
+                                                </button>
+                                            </div>
+                                        </li>
+                                    @else
+                                        <li>
+                                            <a class="dropdown-item" href="{{ route('questionnaires.campagnes.pdf', $c) }}" target="_blank">
+                                                <i class="bi bi-file-earmark-pdf me-2"></i>PDF papier
+                                            </a>
+                                        </li>
+                                    @endif
                                     <li>
                                         <a class="dropdown-item" href="{{ route('questionnaires.campagnes.scans', $c) }}">
                                             <i class="bi bi-qr-code-scan me-2"></i>Scans reçus
@@ -168,7 +183,7 @@
                                                     <i class="bi bi-camera me-1"></i>Scanner
                                                 </button>
                                             @endif
-                                            @if ($inv->statut === \App\Enums\StatutInvitation::Soumis)
+                                            @if ($inv->statut === \App\Enums\StatutInvitation::Soumis && !$campagneModale->anonymise)
                                                 <button class="btn btn-sm btn-outline-secondary"
                                                         wire:click="rouvrirInvitation({{ $inv->id }})"
                                                         wire:confirm="Rouvrir cette réponse ?">
