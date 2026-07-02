@@ -48,3 +48,49 @@ it('agrège satisfaction et exclut les soumissions non soumises', function (): v
     expect($resultats['nb_soumissions'])->toBe(3);
     expect($resultats['questions'][0]['moyenne'])->toBe(4.0); // (5+3+4)/3
 });
+
+it('taux basé sur participants de l opération et non sur invitations', function (): void {
+    $op = \App\Models\Operation::factory()->create();
+    // 5 participants sur l'opération
+    \App\Models\Participant::factory()->count(5)->create(['operation_id' => $op->id]);
+
+    $campagne = \App\Models\QuestionnaireCampaign::factory()->for($op, 'operation')->create(['anonymise' => true]);
+    \App\Models\QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Note', 'type' => \App\Enums\TypeQuestion::Satisfaction, 'ordre' => 1,
+    ]);
+
+    // 3 soumissions bearer (sans invitation)
+    $bearers = \App\Models\QuestionnaireBearerToken::factory()
+        ->for($campagne, 'campaign')
+        ->count(3)
+        ->create();
+
+    foreach ($bearers as $b) {
+        \App\Models\QuestionnaireSubmission::factory()->create([
+            'campaign_id' => $campagne->id,
+            'invitation_id' => null,
+            'bearer_token_id' => $b->id,
+            'statut' => 'soumise',
+            'submitted_at' => now(),
+        ]);
+    }
+
+    $service = app(\App\Services\Questionnaire\QuestionnaireResultatService::class);
+    $resultats = $service->pourCampagne($campagne);
+
+    expect($resultats['nb_soumissions'])->toBe(3);
+    expect($resultats['taux'])->toBe(60.0); // 3/5 * 100
+});
+
+it('taux papier pur sans invitation ne divise pas par zéro', function (): void {
+    $op = \App\Models\Operation::factory()->create();
+    \App\Models\Participant::factory()->count(2)->create(['operation_id' => $op->id]);
+    $campagne = \App\Models\QuestionnaireCampaign::factory()->for($op, 'operation')->create(['anonymise' => true]);
+    \App\Models\QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Note', 'type' => \App\Enums\TypeQuestion::Satisfaction, 'ordre' => 1,
+    ]);
+    // 0 invitations, 0 soumissions
+
+    $resultats = app(\App\Services\Questionnaire\QuestionnaireResultatService::class)->pourCampagne($campagne);
+    expect($resultats['taux'])->toBe(0.0);
+});

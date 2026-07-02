@@ -6,10 +6,10 @@ namespace App\Services\Questionnaire;
 
 use App\Enums\StatutSubmission;
 use App\Enums\TypeQuestion;
+use App\Models\Participant;
 use App\Models\QuestionnaireAnswer;
 use App\Models\QuestionnaireCampaign;
 use App\Models\QuestionnaireCampaignQuestion;
-use App\Models\QuestionnaireInvitation;
 use App\Models\QuestionnaireSubmission;
 use Illuminate\Support\Collection;
 
@@ -31,7 +31,8 @@ final class QuestionnaireResultatService
     {
         $campagneIds = $campagnes->pluck('id');
 
-        $nbInvitations = QuestionnaireInvitation::whereIn('campaign_id', $campagneIds)->count();
+        $operationIds = $campagnes->pluck('operation_id')->unique()->filter();
+        $nbParticipants = Participant::whereIn('operation_id', $operationIds)->count();
 
         $soumissions = QuestionnaireSubmission::whereIn('campaign_id', $campagneIds)
             ->where('statut', StatutSubmission::Soumise->value)
@@ -61,9 +62,9 @@ final class QuestionnaireResultatService
             })->values()->all();
 
         return [
-            'nb_invitations' => $nbInvitations,
+            'nb_invitations' => $nbParticipants,
             'nb_soumissions' => $nbSoumissions,
-            'taux' => $nbInvitations > 0 ? round($nbSoumissions / $nbInvitations * 100, 1) : 0.0,
+            'taux' => $nbParticipants > 0 ? round($nbSoumissions / $nbParticipants * 100, 1) : 0.0,
             'questions' => $questions,
         ];
     }

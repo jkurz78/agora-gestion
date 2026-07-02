@@ -4,7 +4,7 @@
         <div class="card text-center">
             <div class="card-body">
                 <div class="fs-3 fw-bold">{{ $resultats['nb_invitations'] }}</div>
-                <div class="text-muted small">Invitations envoyées</div>
+                <div class="text-muted small">Participants</div>
             </div>
         </div>
     </div>

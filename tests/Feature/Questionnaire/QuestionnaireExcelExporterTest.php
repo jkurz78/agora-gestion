@@ -113,3 +113,33 @@ it('satisfaction_texte_long : exporte deux colonnes note + commentaire', functio
     expect($rows[1])->toContain(5);
     expect($rows[1])->toContain('Excellent accueil');
 });
+
+it('export Excel : soumission anonymisée → colonne identité vide', function (): void {
+    $campagne = \App\Models\QuestionnaireCampaign::factory()->create(['anonymise' => true]);
+    $q = \App\Models\QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Note', 'type' => \App\Enums\TypeQuestion::Satisfaction, 'ordre' => 1,
+    ]);
+
+    $bearer = \App\Models\QuestionnaireBearerToken::factory()->for($campagne, 'campaign')->create();
+    $sub = \App\Models\QuestionnaireSubmission::factory()->create([
+        'campaign_id' => $campagne->id,
+        'invitation_id' => null,
+        'bearer_token_id' => $bearer->id,
+        'statut' => 'soumise',
+        'accepte_contact' => false,
+        'submitted_at' => now(),
+    ]);
+    \App\Models\QuestionnaireAnswer::factory()->create([
+        'submission_id' => $sub->id,
+        'campaign_question_id' => $q->id,
+        'value_integer' => 4,
+    ]);
+
+    $exporter = app(\App\Services\Questionnaire\QuestionnaireExcelExporter::class);
+    $lignes = $exporter->lignes($campagne);
+
+    expect($lignes)->toHaveCount(2); // entête + 1 ligne
+    $ligne = $lignes[1];
+    expect($ligne[7])->toBe(''); // colonne Participant vide
+    expect($ligne[8])->toBe(4);  // la note est présente
+});

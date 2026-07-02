@@ -48,7 +48,7 @@
         <tr>
             <td>
                 <div class="val">{{ $resultats['nb_invitations'] }}</div>
-                <div class="lbl">Invitations</div>
+                <div class="lbl">Participants</div>
             </td>
             <td>
                 <div class="val">{{ $resultats['nb_soumissions'] }}</div>
