@@ -49,10 +49,18 @@ final class AssistantSaisie extends Component
         $campagne = $this->scan->campaign;
         $campagne->loadMissing('questions');
         $invitation = $this->scan->invitation;
+        $bearer = $this->scan->bearerToken;
 
-        $hasExisting = $invitation?->submissions()
-            ->whereIn('statut', ['en_cours', 'soumise'])
-            ->exists() ?? false;
+        $hasExisting = false;
+        if ($invitation !== null) {
+            $hasExisting = $invitation->submissions()
+                ->whereIn('statut', ['en_cours', 'soumise'])
+                ->exists();
+        } elseif ($bearer !== null) {
+            $hasExisting = $bearer->submissions()
+                ->whereIn('statut', ['en_cours', 'soumise'])
+                ->exists();
+        }
 
         return view('livewire.questionnaire.assistant-saisie', [
             'campagne' => $campagne,
@@ -67,25 +75,47 @@ final class AssistantSaisie extends Component
     public function valider(QuestionnaireReponseService $service): void
     {
         $invitation = $this->scan->invitation;
-        abort_unless($invitation !== null, 422, 'Scan non rattaché à une invitation.');
+        $bearer = $this->scan->bearerToken;
 
-        $hasExisting = $invitation->submissions()
-            ->whereIn('statut', ['en_cours', 'soumise'])
-            ->exists();
+        abort_unless($invitation !== null || $bearer !== null, 422, 'Scan non rattaché.');
 
-        if ($hasExisting && ! $this->showRemplacer) {
-            $this->showRemplacer = true;
+        if ($invitation !== null) {
+            $hasExisting = $invitation->submissions()
+                ->whereIn('statut', ['en_cours', 'soumise'])
+                ->exists();
 
-            return;
+            if ($hasExisting && ! $this->showRemplacer) {
+                $this->showRemplacer = true;
+
+                return;
+            }
+
+            $service->creerDepuisOcr(
+                invitation: $invitation,
+                valeursParQuestionId: $this->valeurs,
+                commentairesParQuestionId: $this->commentaires,
+                accepteContact: $this->accepteContact,
+                remplacer: $hasExisting,
+            );
+        } else {
+            $hasExisting = $bearer->submissions()
+                ->whereIn('statut', ['en_cours', 'soumise'])
+                ->exists();
+
+            if ($hasExisting && ! $this->showRemplacer) {
+                $this->showRemplacer = true;
+
+                return;
+            }
+
+            $service->creerDepuisOcrAnonyme(
+                bearer: $bearer,
+                valeursParQuestionId: $this->valeurs,
+                commentairesParQuestionId: $this->commentaires,
+                accepteContact: $this->accepteContact,
+                remplacer: $hasExisting,
+            );
         }
-
-        $service->creerDepuisOcr(
-            invitation: $invitation,
-            valeursParQuestionId: $this->valeurs,
-            commentairesParQuestionId: $this->commentaires,
-            accepteContact: $this->accepteContact,
-            remplacer: $hasExisting,
-        );
 
         $this->draft->update(['statut' => 'valide']);
         $this->scan->update(['statut' => 'traite']);

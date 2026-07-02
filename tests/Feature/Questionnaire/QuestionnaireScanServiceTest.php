@@ -86,6 +86,63 @@ it('ingererUpload rattache le scan quand le QR contient un token valide', functi
     expect((int) $scan->campaign_id)->toBe((int) $campagne->id);
 });
 
+it('ingererUpload rattache le scan quand le QR contient un bearer token valide', function (): void {
+    $op = Operation::factory()->create();
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'statut' => 'ouverte',
+        'anonymise' => true,
+    ]);
+    QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Q1', 'type' => 'texte_court', 'ordre' => 1,
+    ]);
+
+    $tokenClair = 'AbCdEfGhIjKlMnOpQrStUvWxYz012345678901234567';
+    $bearer = \App\Models\QuestionnaireBearerToken::create([
+        'association_id' => $campagne->association_id,
+        'campaign_id' => $campagne->id,
+        'token_hash' => hash('sha256', $tokenClair),
+    ]);
+
+    $this->app->bind(QrDecoderContract::class, function () use ($tokenClair) {
+        $mock = Mockery::mock(QrDecoderContract::class);
+        $mock->shouldReceive('decodeFromPath')->andReturn($tokenClair);
+
+        return $mock;
+    });
+
+    $file = UploadedFile::fake()->image('scan.png', 800, 1200);
+    $scan = app(QuestionnaireScanService::class)->ingererUpload($file);
+
+    expect($scan->qr_statut)->toBe('detecte');
+    expect($scan->statut)->toBe('rattache');
+    expect($scan->invitation_id)->toBeNull();
+    expect((int) $scan->bearer_token_id)->toBe((int) $bearer->id);
+    expect((int) $scan->campaign_id)->toBe((int) $campagne->id);
+});
+
+it('creerDepuisOcrAnonyme crée une soumission bearer papier', function (): void {
+    $op = Operation::factory()->create();
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['anonymise' => true]);
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Note', 'type' => \App\Enums\TypeQuestion::Satisfaction, 'ordre' => 1,
+    ]);
+
+    $bearer = \App\Models\QuestionnaireBearerToken::factory()->for($campagne, 'campaign')->create();
+
+    $service = app(\App\Services\Questionnaire\QuestionnaireReponseService::class);
+    $sub = $service->creerDepuisOcrAnonyme(
+        bearer: $bearer,
+        valeursParQuestionId: [(string) $q->id => 4],
+        accepteContact: false,
+    );
+
+    expect($sub->statut)->toBe(\App\Enums\StatutSubmission::Soumise);
+    expect($sub->invitation_id)->toBeNull();
+    expect((int) $sub->bearer_token_id)->toBe((int) $bearer->id);
+    expect($sub->source)->toBe('papier');
+    expect($sub->answers()->count())->toBe(1);
+});
+
 it('ingererUpload crée un brouillon OCR quand la clé API est configurée', function (): void {
     $op = Operation::factory()->create();
     $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['statut' => 'ouverte']);

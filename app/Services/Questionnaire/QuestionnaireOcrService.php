@@ -92,6 +92,16 @@ final class QuestionnaireOcrService
                 ($q->aDesOptions() ? ' [options: '.collect($q->options())->map(fn ($o) => $o['valeur'].' = '.$o['libelle'])->join(', ').']' : '')
         )->join("\n");
 
+        $consentementTexte = $campagne->anonymise
+            ? "« J'accepte que mes réponses soient rattachées à mon nom »"
+            : "« J'accepte d'être recontacté »";
+
+        $champNom = $campagne->anonymise
+            ? "\n\nSi la case de consentement est cochée, cherche aussi un champ « Prénom Nom » ".
+              "manuscrit en dessous. Ajoute une clé \"_nom_transcrit\" avec value = texte transcrit. ".
+              "Si la case n'est PAS cochée, ignore tout champ nom — ne le transcris pas.\n"
+            : '';
+
         return "Tu lis une feuille de questionnaire remplie à la main.\n".
             "IMPORTANT : réponds UNIQUEMENT avec un objet JSON brut, sans texte, sans explication, sans balise markdown.\n".
             "Format attendu : {\"<question_id>\":{\"value\":<valeur>,\"confidence\":<0.0-1.0>}}\n\n".
@@ -102,9 +112,10 @@ final class QuestionnaireOcrService
             "- choix_unique : value = la VALEUR TECHNIQUE (le code AVANT le signe =) de l'option cochée, PAS le libellé\n".
             "- texte_court / texte_long : value = transcription du texte manuscrit\n\n".
             "Si une question n'a pas de réponse lisible, mets confidence à 0 et value à null.\n\n".
-            "En plus des questions, cherche une case cochée « J'accepte d'être recontacté » ".
-            "(souvent en bas du formulaire). Ajoute une clé \"_accepte_contact\" avec value true/false.\n\n".
-            "Questions :\n{$lignes}";
+            "En plus des questions, cherche une case cochée {$consentementTexte} ".
+            "(souvent en bas du formulaire). Ajoute une clé \"_accepte_contact\" avec value true/false.\n".
+            $champNom.
+            "\nQuestions :\n{$lignes}";
     }
 
     /**

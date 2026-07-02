@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Questionnaire;
 
+use App\Models\QuestionnaireBearerToken;
 use App\Models\QuestionnaireInvitation;
 use App\Models\QuestionnaireOcrDraft;
 use App\Models\QuestionnairePaperScan;
@@ -82,40 +83,49 @@ final class QuestionnaireScanService
         // 1. Decode QR (or use pre-decoded token from email handler)
         $token = $tokenPreDecoded ?? $this->decoder->decodeFromPath($filePath, $mime);
 
-        // 2. Resolve invitation from token
+        // 2. Resolve invitation from token (fallback to bearer)
         $invitation = null;
+        $bearer = null;
         $qrStatut = 'illisible';
 
         if ($token !== null) {
             $qrStatut = 'detecte';
             $tokenHash = hash('sha256', $token);
+
             $invitation = QuestionnaireInvitation::withoutGlobalScopes()
                 ->where('token_hash', $tokenHash)
                 ->first();
+
+            if ($invitation === null) {
+                $bearer = QuestionnaireBearerToken::withoutGlobalScopes()
+                    ->where('token_hash', $tokenHash)
+                    ->first();
+            }
         }
 
         // 3. Create scan record
         $scan = QuestionnairePaperScan::create([
             'association_id' => TenantContext::currentId(),
-            'campaign_id' => $invitation?->campaign_id ?? $campaignId,
+            'campaign_id' => $invitation?->campaign_id ?? $bearer?->campaign_id ?? $campaignId,
             'invitation_id' => $invitation?->id,
+            'bearer_token_id' => $bearer?->id,
             'source' => $source,
             'chemin_fichier' => $cheminRelatif,
             'qr_statut' => $qrStatut,
-            'statut' => $invitation !== null ? 'rattache' : 'en_attente',
+            'statut' => ($invitation !== null || $bearer !== null) ? 'rattache' : 'en_attente',
         ]);
 
-        // 4. If invitation resolved AND OCR configured, run OCR
-        if ($invitation !== null && QuestionnaireOcrService::isConfigured()) {
-            $campaign = $invitation->campaign;
-            $campaign->loadMissing('questions');
-
-            $ocrResult = $this->ocr->analyzeFromPath($filePath, $mime, $campaign);
+        // 4. If invitation or bearer resolved AND OCR configured, run OCR
+        $resolvedCampaign = $invitation?->campaign ?? $bearer?->campaign;
+        if ($resolvedCampaign !== null && QuestionnaireOcrService::isConfigured()) {
+            $resolvedCampaign->loadMissing('questions');
+            $ocrResult = $this->ocr->analyzeFromPath($filePath, $mime, $resolvedCampaign);
 
             QuestionnaireOcrDraft::create([
                 'association_id' => TenantContext::currentId(),
                 'scan_id' => $scan->id,
-                'invitation_id' => $invitation->id,
+                'invitation_id' => $invitation?->id,
+                'bearer_token_id' => $bearer?->id,
                 'payload' => $ocrResult,
                 'statut' => 'brouillon',
             ]);

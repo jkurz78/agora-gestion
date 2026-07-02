@@ -288,6 +288,65 @@ final class QuestionnaireReponseService
         });
     }
 
+    /**
+     * Crée une soumission papier anonyme depuis un payload OCR validé.
+     *
+     * @param  array<string|int, int|string|bool|null>  $valeursParQuestionId
+     * @param  array<string|int, string>  $commentairesParQuestionId
+     */
+    public function creerDepuisOcrAnonyme(
+        QuestionnaireBearerToken $bearer,
+        array $valeursParQuestionId,
+        array $commentairesParQuestionId = [],
+        bool $accepteContact = false,
+        bool $remplacer = false,
+    ): QuestionnaireSubmission {
+        return DB::transaction(function () use ($bearer, $valeursParQuestionId, $commentairesParQuestionId, $accepteContact, $remplacer): QuestionnaireSubmission {
+            $active = $bearer->submissions()
+                ->whereIn('statut', [StatutSubmission::EnCours->value, StatutSubmission::Soumise->value])
+                ->first();
+
+            if ($active !== null) {
+                abort_unless($remplacer, 422, 'Une réponse existe déjà (choisir Ignorer ou Remplacer).');
+            }
+
+            $nouvelle = QuestionnaireSubmission::create([
+                'campaign_id' => $bearer->campaign_id,
+                'invitation_id' => null,
+                'bearer_token_id' => $bearer->id,
+                'statut' => StatutSubmission::EnCours,
+                'source' => 'papier',
+                'active_key' => null,
+            ]);
+
+            $questions = $bearer->campaign->questions()->get()->keyBy('id');
+            foreach ($valeursParQuestionId as $qid => $valeur) {
+                $q = $questions->get((int) $qid);
+                if ($q === null || ! $q->type->estReponse()) {
+                    continue;
+                }
+                $commentaire = $commentairesParQuestionId[(string) $qid] ?? ($commentairesParQuestionId[(int) $qid] ?? null);
+                $this->enregistrerReponse($nouvelle, $q, $valeur, $commentaire);
+            }
+
+            if ($active !== null) {
+                $active->update([
+                    'statut' => StatutSubmission::Remplacee,
+                    'active_key' => null,
+                    'remplacee_par_id' => $nouvelle->id,
+                ]);
+            }
+
+            $nouvelle->update([
+                'statut' => StatutSubmission::Soumise,
+                'accepte_contact' => $accepteContact,
+                'submitted_at' => now(),
+            ]);
+
+            return $nouvelle;
+        });
+    }
+
     /** Réouverture admin (D4) : symétrique invitation + soumission, réponses conservées. */
     public function rouvrir(QuestionnaireInvitation $invitation): void
     {
