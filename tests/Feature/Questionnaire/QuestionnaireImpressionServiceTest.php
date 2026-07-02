@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\TypeQuestion;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\QuestionnaireBearerToken;
@@ -190,7 +191,7 @@ it('le PDF fusionné a un nombre pair de pages grâce au padding recto-verso', f
     $response = app(QuestionnaireImpressionService::class)->afficher($campagne, $pids);
     $pdfContent = $response->getContent();
 
-    $reader = new Fpdi();
+    $reader = new Fpdi;
     $pageCount = $reader->setSourceFile(StreamReader::createByString($pdfContent));
 
     expect($pageCount % 2)->toBe(0);
@@ -219,7 +220,7 @@ it('un répondant unique produit un PDF de 2 pages (1 contenu + 1 blanche recto-
     $pdfContent = $response->getContent();
     expect($pdfContent)->toStartWith('%PDF');
 
-    $reader = new Fpdi();
+    $reader = new Fpdi;
     $pageCount = $reader->setSourceFile(StreamReader::createByString($pdfContent));
     expect($pageCount)->toBe(2);
 });
@@ -266,7 +267,7 @@ it('construireDonneesAnonymes génère N bearer tokens et N pages sans nom', fun
     $op = Operation::factory()->create();
     $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['anonymise' => true]);
     QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
-        'libelle' => 'Note', 'type' => \App\Enums\TypeQuestion::Satisfaction, 'ordre' => 1,
+        'libelle' => 'Note', 'type' => TypeQuestion::Satisfaction, 'ordre' => 1,
     ]);
 
     $service = app(QuestionnaireImpressionService::class);
@@ -286,7 +287,7 @@ it('construireDonneesAnonymes est idempotent sur appels successifs (bearers addi
     $op = Operation::factory()->create();
     $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['anonymise' => true]);
     QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
-        'libelle' => 'Note', 'type' => \App\Enums\TypeQuestion::Satisfaction, 'ordre' => 1,
+        'libelle' => 'Note', 'type' => TypeQuestion::Satisfaction, 'ordre' => 1,
     ]);
 
     $service = app(QuestionnaireImpressionService::class);
@@ -300,10 +301,10 @@ it('telechargerAnonyme retourne une StreamedResponse PDF', function (): void {
     $op = Operation::factory()->create();
     $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['anonymise' => true]);
     QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
-        'libelle' => 'Note', 'type' => \App\Enums\TypeQuestion::Satisfaction, 'ordre' => 1,
+        'libelle' => 'Note', 'type' => TypeQuestion::Satisfaction, 'ordre' => 1,
     ]);
 
     $response = app(QuestionnaireImpressionService::class)->telechargerAnonyme($campagne, 2);
 
-    expect($response)->toBeInstanceOf(\Symfony\Component\HttpFoundation\StreamedResponse::class);
+    expect($response)->toBeInstanceOf(StreamedResponse::class);
 });

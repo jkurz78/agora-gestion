@@ -3,9 +3,12 @@
 declare(strict_types=1);
 
 use App\Enums\TypeQuestion;
+use App\Models\QuestionnaireAnswer;
+use App\Models\QuestionnaireBearerToken;
 use App\Models\QuestionnaireCampaign;
 use App\Models\QuestionnaireCampaignQuestion;
 use App\Models\QuestionnaireInvitation;
+use App\Models\QuestionnaireSubmission;
 use App\Services\Questionnaire\QuestionnaireExcelExporter;
 use App\Services\Questionnaire\QuestionnaireReponseService;
 
@@ -115,13 +118,13 @@ it('satisfaction_texte_long : exporte deux colonnes note + commentaire', functio
 });
 
 it('export Excel : soumission anonymisée → colonne identité vide', function (): void {
-    $campagne = \App\Models\QuestionnaireCampaign::factory()->create(['anonymise' => true]);
-    $q = \App\Models\QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
-        'libelle' => 'Note', 'type' => \App\Enums\TypeQuestion::Satisfaction, 'ordre' => 1,
+    $campagne = QuestionnaireCampaign::factory()->create(['anonymise' => true]);
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Note', 'type' => TypeQuestion::Satisfaction, 'ordre' => 1,
     ]);
 
-    $bearer = \App\Models\QuestionnaireBearerToken::factory()->for($campagne, 'campaign')->create();
-    $sub = \App\Models\QuestionnaireSubmission::factory()->create([
+    $bearer = QuestionnaireBearerToken::factory()->for($campagne, 'campaign')->create();
+    $sub = QuestionnaireSubmission::factory()->create([
         'campaign_id' => $campagne->id,
         'invitation_id' => null,
         'bearer_token_id' => $bearer->id,
@@ -129,13 +132,13 @@ it('export Excel : soumission anonymisée → colonne identité vide', function 
         'accepte_contact' => false,
         'submitted_at' => now(),
     ]);
-    \App\Models\QuestionnaireAnswer::factory()->create([
+    QuestionnaireAnswer::factory()->create([
         'submission_id' => $sub->id,
         'campaign_question_id' => $q->id,
         'value_integer' => 4,
     ]);
 
-    $exporter = app(\App\Services\Questionnaire\QuestionnaireExcelExporter::class);
+    $exporter = app(QuestionnaireExcelExporter::class);
     $lignes = $exporter->lignes($campagne);
 
     expect($lignes)->toHaveCount(2); // entête + 1 ligne

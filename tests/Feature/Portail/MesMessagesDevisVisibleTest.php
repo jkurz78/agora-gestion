@@ -26,7 +26,6 @@ use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Models\User;
-use App\Support\PortailRoute;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
@@ -40,7 +39,7 @@ beforeEach(function (): void {
 
     // ─── Association tenant ───────────────────────────────────────────────────
     $this->association = Association::factory()->create([
-        'email_from'      => 'asso@example.com',
+        'email_from' => 'asso@example.com',
         'email_from_name' => 'Association Test',
     ]);
     TenantContext::boot($this->association);
@@ -48,24 +47,24 @@ beforeEach(function (): void {
     // ─── Back-office user (admin) ─────────────────────────────────────────────
     $this->user = User::factory()->create();
     $this->user->associations()->attach($this->association->id, [
-        'role'      => 'admin',
+        'role' => 'admin',
         'joined_at' => now(),
     ]);
 
     // ─── Tiers (le membre du portail) ─────────────────────────────────────────
     $this->tiers = Tiers::factory()->create([
         'association_id' => $this->association->id,
-        'email'          => 'membre@example.com',
-        'prenom'         => 'Alice',
-        'nom'            => 'MARTIN',
+        'email' => 'membre@example.com',
+        'prenom' => 'Alice',
+        'nom' => 'MARTIN',
     ]);
 
     // ─── Opération + participant ───────────────────────────────────────────────
     $sousCategorie = SousCategorie::factory()->create();
     $typeOp = TypeOperation::factory()->create([
         'sous_categorie_id' => $sousCategorie->id,
-        'email_from'        => 'asso@example.com',
-        'email_from_name'   => 'Association Test',
+        'email_from' => 'asso@example.com',
+        'email_from_name' => 'Association Test',
     ]);
 
     $this->operation = Operation::factory()->create([
@@ -73,28 +72,28 @@ beforeEach(function (): void {
     ]);
 
     $this->participant = Participant::create([
-        'tiers_id'          => $this->tiers->id,
-        'operation_id'      => $this->operation->id,
-        'date_inscription'  => now(),
+        'tiers_id' => $this->tiers->id,
+        'operation_id' => $this->operation->id,
+        'date_inscription' => now(),
     ]);
 
     // ─── Devis DocumentPrevisionnel ───────────────────────────────────────────
     $this->doc = DocumentPrevisionnel::factory()->devis()->create([
-        'operation_id'   => $this->operation->id,
+        'operation_id' => $this->operation->id,
         'participant_id' => $this->participant->id,
-        'version'        => 1,
-        'date'           => now()->toDateString(),
-        'montant_total'  => 250.00,
-        'lignes_json'    => [],
+        'version' => 1,
+        'date' => now()->toDateString(),
+        'montant_total' => 250.00,
+        'lignes_json' => [],
     ]);
 
     // ─── Template email catégorie Document ───────────────────────────────────
     $this->template = EmailTemplate::create([
-        'association_id'   => $this->association->id,
-        'categorie'        => CategorieEmail::Document->value,
-        'type_operation_id'=> null,
-        'objet'            => 'Votre devis n° {numero_document}',
-        'corps'            => '<p>Bonjour {prenom},</p><p>Votre devis est joint.</p>',
+        'association_id' => $this->association->id,
+        'categorie' => CategorieEmail::Document->value,
+        'type_operation_id' => null,
+        'objet' => 'Votre devis n° {numero_document}',
+        'corps' => '<p>Bonjour {prenom},</p><p>Votre devis est joint.</p>',
     ]);
 });
 
@@ -150,7 +149,7 @@ it('le devis envoyé depuis ReglementTable est visible sur Mes Messages avec PJ 
     // Assertion 4 : GET sur l'URL de téléchargement → 200 + application/pdf + %PDF
     $attachUrl = route('portail.messages.attachment', [
         'association' => $this->association->slug,
-        'emailLog'    => $log->id,
+        'emailLog' => $log->id,
     ]);
 
     $response = $this->get($attachUrl);

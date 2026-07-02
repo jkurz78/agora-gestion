@@ -53,7 +53,7 @@ final class ComptaCheckIntegrityCommand extends Command
 
             if (! empty($this->issues)) {
                 $globalIssues = true;
-                $this->error("Association #{$association->id} ({$association->nom}) — " . count($this->issues) . ' anomalie(s) :');
+                $this->error("Association #{$association->id} ({$association->nom}) — ".count($this->issues).' anomalie(s) :');
                 foreach ($this->issues as $issue) {
                     $this->line("  ⚠️  {$issue}");
                 }
@@ -158,7 +158,7 @@ final class ComptaCheckIntegrityCommand extends Command
         $shouldFix = (bool) $this->option('fix');
 
         // Requête agrégée : toutes les TX où montant_total ≠ sum(lignes ventilation)
-        $divergences = DB::select("
+        $divergences = DB::select('
             SELECT t.id, t.montant_total, COALESCE(s.sum_lignes, 0) as sum_lignes
             FROM transactions t
             LEFT JOIN (
@@ -170,7 +170,7 @@ final class ComptaCheckIntegrityCommand extends Command
             WHERE t.association_id = ?
               AND t.deleted_at IS NULL
               AND ROUND(t.montant_total * 100) != ROUND(COALESCE(s.sum_lignes, 0) * 100)
-        ", [TenantContext::currentId()]);
+        ', [TenantContext::currentId()]);
 
         foreach ($divergences as $d) {
             $this->issues[] = "TX#{$d->id} : montant_total={$d->montant_total} ≠ sum(lignes)={$d->sum_lignes}";
@@ -190,7 +190,7 @@ final class ComptaCheckIntegrityCommand extends Command
      */
     private function checkAdhesionMontants(): void
     {
-        $divergences = DB::select("
+        $divergences = DB::select('
             SELECT a.id as adhesion_id, a.montant_facial, a.transaction_id,
                    COALESCE(s.sum_lignes, 0) as sum_lignes
             FROM adhesions a
@@ -206,7 +206,7 @@ final class ComptaCheckIntegrityCommand extends Command
               AND a.transaction_id IS NOT NULL
               AND t.deleted_at IS NULL
               AND ROUND(a.montant_facial * 100) != ROUND(COALESCE(s.sum_lignes, 0) * 100)
-        ", [TenantContext::currentId()]);
+        ', [TenantContext::currentId()]);
 
         foreach ($divergences as $d) {
             $this->issues[] = "Adhésion #{$d->adhesion_id} (TX#{$d->transaction_id}) : montant_facial={$d->montant_facial} ≠ sum(lignes)={$d->sum_lignes}";

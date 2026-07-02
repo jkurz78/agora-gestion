@@ -6,8 +6,8 @@ use App\Enums\CategorieEmail;
 use App\Models\Association;
 use App\Models\EmailLog;
 use App\Models\Tiers;
-use App\Services\Email\EmailLogStorageService;
 use App\Models\User;
+use App\Services\Email\EmailLogStorageService;
 use App\Tenant\TenantContext;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -112,7 +112,7 @@ it('le chemin du PDF contient l\'association_id courant', function (): void {
     TenantContext::boot($assoc);
 
     $tiers = Tiers::factory()->create();
-    $mail = new FakeMailable();
+    $mail = new FakeMailable;
 
     $emailLog = $this->service->logSent(
         mail: $mail,
@@ -133,7 +133,7 @@ it('le chemin du PDF contient l\'association_id courant', function (): void {
 
 it('sanitize le nom de fichier et empêche le path traversal', function (): void {
     $tiers = Tiers::factory()->create();
-    $mail = new FakeMailable();
+    $mail = new FakeMailable;
 
     $emailLog = $this->service->logSent(
         mail: $mail,
@@ -191,7 +191,7 @@ it('logSent auto-remplit envoye_par avec Auth::id() quand authentifié', functio
     $this->actingAs($user);
 
     $tiers = Tiers::factory()->create();
-    $mail = new FakeMailable();
+    $mail = new FakeMailable;
 
     $emailLog = $this->service->logSent(
         mail: $mail,
@@ -222,7 +222,7 @@ it('logError auto-remplit envoye_par avec Auth::id() quand authentifié', functi
 
 it('logSent laisse envoye_par null quand aucun utilisateur authentifié', function (): void {
     $tiers = Tiers::factory()->create();
-    $mail = new FakeMailable();
+    $mail = new FakeMailable;
 
     $emailLog = $this->service->logSent(
         mail: $mail,
@@ -240,7 +240,7 @@ it('logSent laisse envoye_par null quand aucun utilisateur authentifié', functi
 
 it('les champs extra sont persistés dans l\'EmailLog', function (): void {
     $tiers = Tiers::factory()->create();
-    $mail = new FakeMailable();
+    $mail = new FakeMailable;
 
     $emailLog = $this->service->logSent(
         mail: $mail,

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\Association;
 use App\Models\User;
 use App\Tenant\TenantContext;
+use Illuminate\Testing\TestResponse;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 beforeEach(function () {
@@ -16,7 +17,7 @@ beforeEach(function () {
     $this->actingAs($this->user);
 });
 
-function headerCellsXlsx(\Illuminate\Testing\TestResponse $response): array
+function headerCellsXlsx(TestResponse $response): array
 {
     $tmp = tempnam(sys_get_temp_dir(), 'cr').'.xlsx';
     file_put_contents($tmp, $response->streamedContent());

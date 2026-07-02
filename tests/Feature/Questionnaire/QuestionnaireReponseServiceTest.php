@@ -8,6 +8,7 @@ use App\Enums\TypeQuestion;
 use App\Exceptions\Questionnaire\ReponseObligatoireException;
 use App\Models\Operation;
 use App\Models\Participant;
+use App\Models\QuestionnaireBearerToken;
 use App\Models\QuestionnaireCampaign;
 use App\Models\QuestionnaireCampaignQuestion;
 use App\Models\QuestionnaireInvitation;
@@ -403,7 +404,7 @@ it('rouvrir refuse une soumission anonymisée (invitation_id null)', function ()
     $svc->finaliser($submission, accepteContact: false);
 
     expect(fn () => $svc->rouvrir($invitation))
-        ->toThrow(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+        ->toThrow(HttpException::class);
 });
 
 it('demarrerOuReprendreBearer crée une soumission liée au bearer', function (): void {
@@ -412,7 +413,7 @@ it('demarrerOuReprendreBearer crée une soumission liée au bearer', function ()
     QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
         'libelle' => 'Note', 'type' => TypeQuestion::Satisfaction, 'ordre' => 1,
     ]);
-    $bearer = \App\Models\QuestionnaireBearerToken::factory()->for($campagne, 'campaign')->create();
+    $bearer = QuestionnaireBearerToken::factory()->for($campagne, 'campaign')->create();
 
     $s1 = $svc->demarrerOuReprendreBearer($bearer);
     $s2 = $svc->demarrerOuReprendreBearer($bearer);
@@ -422,13 +423,31 @@ it('demarrerOuReprendreBearer crée une soumission liée au bearer', function ()
     expect($s1->invitation_id)->toBeNull();
 });
 
+it('non-régression : anonymise false → finaliser conserve le FK et invitation soumis', function (): void {
+    $svc = app(QuestionnaireReponseService::class);
+    $campagne = QuestionnaireCampaign::factory()->create(['anonymise' => false]);
+    QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Note', 'type' => TypeQuestion::Satisfaction, 'ordre' => 1, 'obligatoire' => true,
+    ]);
+    $invitation = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create();
+    $submission = $svc->demarrerOuReprendre($invitation);
+    $svc->enregistrerReponse($submission, $campagne->questions()->first(), '5');
+
+    $svc->finaliser($submission, accepteContact: false);
+
+    $submission->refresh();
+    expect($submission->invitation_id)->not->toBeNull();
+    expect($submission->statut)->toBe(StatutSubmission::Soumise);
+    expect($invitation->fresh()->statut)->toBe(StatutInvitation::Soumis);
+});
+
 it('finaliser bearer sans invitation ne crash pas', function (): void {
     $svc = app(QuestionnaireReponseService::class);
     $campagne = QuestionnaireCampaign::factory()->create(['anonymise' => true]);
     QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
         'libelle' => 'Note', 'type' => TypeQuestion::Satisfaction, 'ordre' => 1, 'obligatoire' => true,
     ]);
-    $bearer = \App\Models\QuestionnaireBearerToken::factory()->for($campagne, 'campaign')->create();
+    $bearer = QuestionnaireBearerToken::factory()->for($campagne, 'campaign')->create();
     $sub = $svc->demarrerOuReprendreBearer($bearer);
     $svc->enregistrerReponse($sub, $campagne->questions()->first(), '4');
 

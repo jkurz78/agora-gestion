@@ -183,7 +183,7 @@ final class QuestionnaireImpressionService
 
         $leftText = $campagne->operation?->nom ?? '';
 
-        $merger = new Fpdi();
+        $merger = new Fpdi;
 
         foreach ($donnees['pages'] as $page) {
             $nomParticipant = $page['invitation']->participant?->tiers?->displayName() ?? '';
@@ -226,7 +226,7 @@ final class QuestionnaireImpressionService
         $donnees = $this->construireDonneesAnonymes($campagne, $nombreFormulaires);
 
         $leftText = $campagne->operation?->nom ?? '';
-        $merger = new Fpdi();
+        $merger = new Fpdi;
 
         foreach ($donnees['pages'] as $page) {
             $singlePdf = Pdf::loadView('pdf.questionnaire-papier', [

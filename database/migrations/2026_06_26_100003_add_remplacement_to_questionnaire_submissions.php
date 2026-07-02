@@ -17,9 +17,9 @@ return new class extends Migration
             $table->unique('active_key');
         });
 
-        \DB::table('questionnaire_submissions')
+        DB::table('questionnaire_submissions')
             ->whereIn('statut', ['en_cours', 'soumise'])
-            ->update(['active_key' => \DB::raw('invitation_id')]);
+            ->update(['active_key' => DB::raw('invitation_id')]);
     }
 
     public function down(): void

@@ -121,7 +121,7 @@ it('pourAnonyme retourne des valeurs neutres pour les clés nominatives', functi
 });
 
 it('pourAnonyme conserve les variables neutres opération/asso', function (): void {
-    $op = \App\Models\Operation::factory()->create(['nom' => 'Stage été']);
+    $op = Operation::factory()->create(['nom' => 'Stage été']);
     $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create();
     $resolver = app(QuestionnaireVariableResolver::class);
 

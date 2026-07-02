@@ -28,7 +28,6 @@ final class RapportCompteResultatOperations extends Component
     #[Url(as: 'parops')]
     public bool $parOperations = false;
 
-
     public function exportUrl(string $format): string
     {
         $exercice = app(ExerciceService::class)->current();

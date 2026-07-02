@@ -98,7 +98,7 @@ final class QuestionnaireOcrService
 
         $champNom = $campagne->anonymise
             ? "\n\nSi la case de consentement est cochée, cherche aussi un champ « Prénom Nom » ".
-              "manuscrit en dessous. Ajoute une clé \"_nom_transcrit\" avec value = texte transcrit. ".
+              'manuscrit en dessous. Ajoute une clé "_nom_transcrit" avec value = texte transcrit. '.
               "Si la case n'est PAS cochée, ignore tout champ nom — ne le transcris pas.\n"
             : '';
 

@@ -3,24 +3,28 @@
 declare(strict_types=1);
 
 use App\Enums\TypeQuestion;
+use App\Models\Operation;
+use App\Models\Participant;
+use App\Models\QuestionnaireBearerToken;
 use App\Models\QuestionnaireCampaign;
 use App\Models\QuestionnaireCampaignQuestion;
 use App\Models\QuestionnaireInvitation;
+use App\Models\QuestionnaireSubmission;
 use App\Services\Questionnaire\QuestionnaireReponseService;
 use App\Services\Questionnaire\QuestionnaireResultatService;
 
 it('agrège les commentaires d une satisfaction commentée', function (): void {
-    $campagne = \App\Models\QuestionnaireCampaign::factory()->create(['statut' => 'ouverte']);
-    $q = \App\Models\QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
-        'type' => \App\Enums\TypeQuestion::Satisfaction, 'ordre' => 1, 'config' => ['commentaire' => true],
+    $campagne = QuestionnaireCampaign::factory()->create(['statut' => 'ouverte']);
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'type' => TypeQuestion::Satisfaction, 'ordre' => 1, 'config' => ['commentaire' => true],
     ]);
-    $svc = app(\App\Services\Questionnaire\QuestionnaireReponseService::class);
-    $inv = \App\Models\QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create();
+    $svc = app(QuestionnaireReponseService::class);
+    $inv = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create();
     $sub = $svc->demarrerOuReprendre($inv);
     $svc->enregistrerReponse($sub, $q, '5', commentaire: 'Parfait');
     $svc->finaliser($sub, accepteContact: false);
 
-    $res = app(\App\Services\Questionnaire\QuestionnaireResultatService::class)->pourCampagne($campagne->fresh());
+    $res = app(QuestionnaireResultatService::class)->pourCampagne($campagne->fresh());
 
     expect($res['questions'][0]['moyenne'])->toBe(5.0);
     expect($res['questions'][0]['verbatims'])->toContain('Parfait');
@@ -50,23 +54,23 @@ it('agrège satisfaction et exclut les soumissions non soumises', function (): v
 });
 
 it('taux basé sur participants de l opération et non sur invitations', function (): void {
-    $op = \App\Models\Operation::factory()->create();
+    $op = Operation::factory()->create();
     // 5 participants sur l'opération
-    \App\Models\Participant::factory()->count(5)->create(['operation_id' => $op->id]);
+    Participant::factory()->count(5)->create(['operation_id' => $op->id]);
 
-    $campagne = \App\Models\QuestionnaireCampaign::factory()->for($op, 'operation')->create(['anonymise' => true]);
-    \App\Models\QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
-        'libelle' => 'Note', 'type' => \App\Enums\TypeQuestion::Satisfaction, 'ordre' => 1,
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['anonymise' => true]);
+    QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Note', 'type' => TypeQuestion::Satisfaction, 'ordre' => 1,
     ]);
 
     // 3 soumissions bearer (sans invitation)
-    $bearers = \App\Models\QuestionnaireBearerToken::factory()
+    $bearers = QuestionnaireBearerToken::factory()
         ->for($campagne, 'campaign')
         ->count(3)
         ->create();
 
     foreach ($bearers as $b) {
-        \App\Models\QuestionnaireSubmission::factory()->create([
+        QuestionnaireSubmission::factory()->create([
             'campaign_id' => $campagne->id,
             'invitation_id' => null,
             'bearer_token_id' => $b->id,
@@ -75,7 +79,7 @@ it('taux basé sur participants de l opération et non sur invitations', functio
         ]);
     }
 
-    $service = app(\App\Services\Questionnaire\QuestionnaireResultatService::class);
+    $service = app(QuestionnaireResultatService::class);
     $resultats = $service->pourCampagne($campagne);
 
     expect($resultats['nb_soumissions'])->toBe(3);
@@ -83,14 +87,14 @@ it('taux basé sur participants de l opération et non sur invitations', functio
 });
 
 it('taux papier pur sans invitation ne divise pas par zéro', function (): void {
-    $op = \App\Models\Operation::factory()->create();
-    \App\Models\Participant::factory()->count(2)->create(['operation_id' => $op->id]);
-    $campagne = \App\Models\QuestionnaireCampaign::factory()->for($op, 'operation')->create(['anonymise' => true]);
-    \App\Models\QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
-        'libelle' => 'Note', 'type' => \App\Enums\TypeQuestion::Satisfaction, 'ordre' => 1,
+    $op = Operation::factory()->create();
+    Participant::factory()->count(2)->create(['operation_id' => $op->id]);
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['anonymise' => true]);
+    QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Note', 'type' => TypeQuestion::Satisfaction, 'ordre' => 1,
     ]);
     // 0 invitations, 0 soumissions
 
-    $resultats = app(\App\Services\Questionnaire\QuestionnaireResultatService::class)->pourCampagne($campagne);
+    $resultats = app(QuestionnaireResultatService::class)->pourCampagne($campagne);
     expect($resultats['taux'])->toBe(0.0);
 });

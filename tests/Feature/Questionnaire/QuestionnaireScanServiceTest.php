@@ -3,14 +3,18 @@
 declare(strict_types=1);
 
 use App\Enums\StatutInvitation;
+use App\Enums\StatutSubmission;
+use App\Enums\TypeQuestion;
 use App\Models\Operation;
 use App\Models\Participant;
+use App\Models\QuestionnaireBearerToken;
 use App\Models\QuestionnaireCampaign;
 use App\Models\QuestionnaireCampaignQuestion;
 use App\Models\QuestionnaireOcrDraft;
 use App\Models\QuestionnairePaperScan;
 use App\Services\Questionnaire\Contracts\QrDecoderContract;
 use App\Services\Questionnaire\QuestionnaireQrDecoder;
+use App\Services\Questionnaire\QuestionnaireReponseService;
 use App\Services\Questionnaire\QuestionnaireScanService;
 use App\Support\CurrentAssociation;
 use Illuminate\Http\UploadedFile;
@@ -97,7 +101,7 @@ it('ingererUpload rattache le scan quand le QR contient un bearer token valide',
     ]);
 
     $tokenClair = 'AbCdEfGhIjKlMnOpQrStUvWxYz012345678901234567';
-    $bearer = \App\Models\QuestionnaireBearerToken::create([
+    $bearer = QuestionnaireBearerToken::create([
         'association_id' => $campagne->association_id,
         'campaign_id' => $campagne->id,
         'token_hash' => hash('sha256', $tokenClair),
@@ -124,19 +128,19 @@ it('creerDepuisOcrAnonyme crée une soumission bearer papier', function (): void
     $op = Operation::factory()->create();
     $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['anonymise' => true]);
     $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
-        'libelle' => 'Note', 'type' => \App\Enums\TypeQuestion::Satisfaction, 'ordre' => 1,
+        'libelle' => 'Note', 'type' => TypeQuestion::Satisfaction, 'ordre' => 1,
     ]);
 
-    $bearer = \App\Models\QuestionnaireBearerToken::factory()->for($campagne, 'campaign')->create();
+    $bearer = QuestionnaireBearerToken::factory()->for($campagne, 'campaign')->create();
 
-    $service = app(\App\Services\Questionnaire\QuestionnaireReponseService::class);
+    $service = app(QuestionnaireReponseService::class);
     $sub = $service->creerDepuisOcrAnonyme(
         bearer: $bearer,
         valeursParQuestionId: [(string) $q->id => 4],
         accepteContact: false,
     );
 
-    expect($sub->statut)->toBe(\App\Enums\StatutSubmission::Soumise);
+    expect($sub->statut)->toBe(StatutSubmission::Soumise);
     expect($sub->invitation_id)->toBeNull();
     expect((int) $sub->bearer_token_id)->toBe((int) $bearer->id);
     expect($sub->source)->toBe('papier');
