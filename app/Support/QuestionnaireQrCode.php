@@ -13,8 +13,8 @@ final class QuestionnaireQrCode
     {
         $builder = new Builder(
             writer: new PngWriter,
-            size: 220,
-            margin: 8,
+            size: 600,
+            margin: 12,
         );
 
         $result = $builder->build(data: $url);

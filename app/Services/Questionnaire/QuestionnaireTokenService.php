@@ -72,7 +72,9 @@ final class QuestionnaireTokenService
      */
     public function bearerPourCampagne(QuestionnaireCampaign $campagne): array
     {
-        $existing = QuestionnaireBearerToken::where('campaign_id', (int) $campagne->id)->first();
+        $existing = QuestionnaireBearerToken::where('campaign_id', (int) $campagne->id)
+            ->whereNotNull('token_clair')
+            ->first();
 
         if ($existing !== null) {
             return ['clair' => $existing->token_clair, 'bearer' => $existing];
