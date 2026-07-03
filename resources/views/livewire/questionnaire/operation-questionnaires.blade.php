@@ -95,16 +95,9 @@
                                 <ul class="dropdown-menu dropdown-menu-end">
                                     @if ($c->anonymise)
                                         <li>
-                                            <div class="dropdown-item d-flex align-items-center gap-2">
-                                                <input type="number" min="1" max="200"
-                                                       wire:model.defer="nombreFormulairesAnonymes"
-                                                       class="form-control form-control-sm"
-                                                       style="width:70px" title="Nombre de formulaires">
-                                                <button class="btn btn-sm btn-outline-primary"
-                                                        wire:click="imprimerAnonyme({{ $c->id }})">
-                                                    <i class="bi bi-printer me-1"></i>Imprimer anonyme
-                                                </button>
-                                            </div>
+                                            <a class="dropdown-item" href="{{ route('questionnaires.campagnes.pdf-anonyme', $c) }}" target="_blank">
+                                                <i class="bi bi-printer me-2"></i>Imprimer anonyme
+                                            </a>
                                         </li>
                                     @else
                                         <li>

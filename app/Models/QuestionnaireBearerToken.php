@@ -17,6 +17,7 @@ final class QuestionnaireBearerToken extends TenantModel
         'association_id',
         'campaign_id',
         'token_hash',
+        'token_clair',
     ];
 
     public function campaign(): BelongsTo

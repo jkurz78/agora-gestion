@@ -9,7 +9,6 @@ use App\Models\QuestionnaireCampaign;
 use App\Models\QuestionnaireInvitation;
 use App\Models\QuestionnaireTemplate;
 use App\Services\Questionnaire\QuestionnaireCampaignService;
-use App\Services\Questionnaire\QuestionnaireImpressionService;
 use App\Services\Questionnaire\QuestionnaireInvitationService;
 use App\Services\Questionnaire\QuestionnaireReponseService;
 use App\Services\Questionnaire\QuestionnaireScanService;
@@ -17,7 +16,6 @@ use Illuminate\View\View;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class OperationQuestionnaires extends Component
 {
@@ -38,8 +36,6 @@ final class OperationQuestionnaires extends Component
 
     /** @var TemporaryUploadedFile|null */
     public $scanFichier = null;
-
-    public int $nombreFormulairesAnonymes = 10;
 
     public function mount(Operation $operation): void
     {
@@ -89,14 +85,6 @@ final class OperationQuestionnaires extends Component
     {
         $this->scanPourInvitationId = $invitationId;
         $this->reset('scanFichier');
-    }
-
-    public function imprimerAnonyme(int $campagneId, QuestionnaireImpressionService $impression): StreamedResponse
-    {
-        $campagne = $this->campagne($campagneId);
-        abort_unless($campagne->anonymise, 422);
-
-        return $impression->telechargerAnonyme($campagne, $this->nombreFormulairesAnonymes);
     }
 
     public function importerScanPour(QuestionnaireScanService $scanService): void

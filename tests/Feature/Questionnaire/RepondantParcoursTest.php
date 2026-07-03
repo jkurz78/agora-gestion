@@ -12,6 +12,7 @@ use App\Models\QuestionnaireBearerToken;
 use App\Models\QuestionnaireCampaign;
 use App\Models\QuestionnaireCampaignQuestion;
 use App\Models\QuestionnaireInvitation;
+use App\Models\QuestionnaireSubmission;
 use App\Services\Questionnaire\QuestionnaireTokenService;
 use App\Support\CurrentAssociation;
 use App\Tenant\TenantContext;
@@ -777,6 +778,31 @@ it('parcours bearer : déjà répondu → indisponible', function (): void {
     $this->post("/q-anon/{$clair}", ['action' => 'next', 'page' => 1, "q_{$question->id}" => '5']);
     $this->post("/q-anon/{$clair}", ['action' => 'finish', 'accepte_contact' => '0']);
 
-    // deuxième visite → déjà répondu
+    // deuxième visite (même session) → déjà répondu
     $this->get("/q-anon/{$clair}")->assertOk()->assertSee('déjà', false);
+});
+
+it('parcours bearer : un second visiteur (nouvelle session) peut répondre après le premier', function (): void {
+    [$clair, $bearer, $campagne] = makeBearerCampagne();
+    TenantContext::clear();
+
+    // Premier visiteur : parcours complet.
+    $this->post("/q-anon/{$clair}", ['action' => 'start']);
+    $question = $campagne->questions()->first();
+    $this->post("/q-anon/{$clair}", ['action' => 'next', 'page' => 1, "q_{$question->id}" => '5']);
+    $this->post("/q-anon/{$clair}", ['action' => 'finish', 'accepte_contact' => '0']);
+
+    // Simule un second visiteur : nouvelle session HTTP (flags qanon_* réinitialisés).
+    $this->flushSession();
+
+    $this->get("/q-anon/{$clair}")
+        ->assertOk()
+        ->assertDontSee('déjà', false);
+
+    $this->post("/q-anon/{$clair}", ['action' => 'start']);
+    $this->post("/q-anon/{$clair}", ['action' => 'next', 'page' => 1, "q_{$question->id}" => '3']);
+    $this->post("/q-anon/{$clair}", ['action' => 'finish', 'accepte_contact' => '0'])
+        ->assertRedirect();
+
+    expect(QuestionnaireSubmission::where('bearer_token_id', $bearer->id)->count())->toBe(2);
 });

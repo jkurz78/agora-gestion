@@ -226,6 +226,11 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
             return app(QuestionnaireImpressionService::class)
                 ->afficher($campagne, $participantIds);
         })->name('campagnes.pdf');
+        Route::get('/campagnes/{campagne}/pdf-anonyme', function (QuestionnaireCampaign $campagne) {
+            abort_unless($campagne->anonymise, 404);
+
+            return app(QuestionnaireImpressionService::class)->afficherAnonyme($campagne);
+        })->name('campagnes.pdf-anonyme');
         Route::get('/campagnes/{campagne}/scans', function (QuestionnaireCampaign $campagne) {
             return view('questionnaire.scans.index', compact('campagne'));
         })->name('campagnes.scans');

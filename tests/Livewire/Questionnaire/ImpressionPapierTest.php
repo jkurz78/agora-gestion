@@ -83,3 +83,37 @@ it('les invitations sont créées pour les participants de l opération (idempot
     $this->get(route('questionnaires.campagnes.pdf', $campagne));
     expect($campagne->invitations()->count())->toBe(1);
 });
+
+// -----------------------------------------------------------------------
+// Route GET questionnaires.campagnes.pdf-anonyme (impression anonyme simplifiée)
+// -----------------------------------------------------------------------
+
+it('route pdf-anonyme affiche un PDF inline pour campagne anonyme', function (): void {
+    $op = Operation::factory()->create();
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'statut' => 'ouverte',
+        'anonymise' => true,
+    ]);
+    $campagne->questions()->create([
+        'association_id' => $campagne->association_id,
+        'libelle' => 'Test question',
+        'type' => 'satisfaction',
+        'ordre' => 1,
+        'obligatoire' => false,
+        'config' => [],
+    ]);
+
+    $response = $this->get(route('questionnaires.campagnes.pdf-anonyme', $campagne));
+
+    $response->assertOk();
+    $response->assertHeader('Content-Type', 'application/pdf');
+});
+
+it('route pdf-anonyme refuse une campagne non anonymisée (404)', function (): void {
+    ['campagne' => $campagne] = buildPdfRouteFixture();
+    $campagne->update(['anonymise' => false]);
+
+    $response = $this->get(route('questionnaires.campagnes.pdf-anonyme', $campagne));
+
+    $response->assertNotFound();
+});

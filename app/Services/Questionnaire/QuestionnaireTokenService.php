@@ -59,4 +59,35 @@ final class QuestionnaireTokenService
 
         return ['clair' => $clair, 'bearer' => $bearer];
     }
+
+    /**
+     * Retourne (ou crée) l'unique bearer token de la campagne (impression anonyme simplifiée :
+     * un seul token, réutilisé pour tous les tirages papier).
+     *
+     * Le clair n'est connu que lors de la création (jamais stocké en clair habituellement) :
+     * on le persiste ici via `token_clair` car ce token est campagne-level et visible admin
+     * (nécessaire pour régénérer l'URL du QR code sans avoir à recréer un token).
+     *
+     * @return array{clair: string|null, bearer: QuestionnaireBearerToken}
+     */
+    public function bearerPourCampagne(QuestionnaireCampaign $campagne): array
+    {
+        $existing = QuestionnaireBearerToken::where('campaign_id', (int) $campagne->id)->first();
+
+        if ($existing !== null) {
+            return ['clair' => $existing->token_clair, 'bearer' => $existing];
+        }
+
+        $clair = Str::random(48);
+        $hash = hash('sha256', $clair);
+
+        $bearer = QuestionnaireBearerToken::create([
+            'association_id' => TenantContext::currentId(),
+            'campaign_id' => $campagne->id,
+            'token_hash' => $hash,
+            'token_clair' => $clair,
+        ]);
+
+        return ['clair' => $clair, 'bearer' => $bearer];
+    }
 }

@@ -94,11 +94,12 @@ final class QuestionnaireImpressionService
     }
 
     /**
-     * Version anonyme : génère N bearer tokens + N pages sans participant.
+     * Version anonyme : réutilise (ou crée) l'unique bearer token de la campagne
+     * et construit une seule page sans participant.
      *
      * @return array{campagne: QuestionnaireCampaign, nomAsso: string, logoDataUri: string|null, groupes: array, pages: array}
      */
-    public function construireDonneesAnonymes(QuestionnaireCampaign $campagne, int $nombreFormulaires): array
+    public function construireDonneesAnonyme(QuestionnaireCampaign $campagne): array
     {
         $tokenService = app(QuestionnaireTokenService::class);
         $groupes = $this->resolver->decouper(
@@ -112,18 +113,18 @@ final class QuestionnaireImpressionService
         $introHtml = $this->variables->remplacer($introSource, $vars);
         $remerciementHtml = $this->variables->remplacer($remerciementSource, $vars);
 
-        $pages = [];
-        for ($i = 0; $i < $nombreFormulaires; $i++) {
-            $result = $tokenService->genererBearer($campagne);
-            $url = url("/q-anon/{$result['clair']}");
+        $result = $tokenService->bearerPourCampagne($campagne);
+        $clair = $result['clair'] ?? $result['bearer']->token_clair;
+        $url = url("/q-anon/{$clair}");
 
-            $pages[] = [
+        $pages = [
+            [
                 'bearer' => $result['bearer'],
                 'qr' => QuestionnaireQrCode::dataUri($url),
                 'introHtml' => $introHtml,
                 'remerciementHtml' => $remerciementHtml,
-            ];
-        }
+            ],
+        ];
 
         $asso = CurrentAssociation::tryGet();
         $nomAsso = $asso?->nom ?? '';
@@ -133,18 +134,19 @@ final class QuestionnaireImpressionService
     }
 
     /**
-     * Génère et retourne le PDF anonyme à télécharger.
+     * Retourne le PDF anonyme prêt à être affiché en ligne dans le navigateur.
+     *
+     * Content-Disposition: inline — le navigateur l'ouvre dans l'onglet (l'utilisateur
+     * imprime ensuite plusieurs exemplaires via la fonction copie de son imprimante).
      */
-    public function telechargerAnonyme(QuestionnaireCampaign $campagne, int $nombreFormulaires): StreamedResponse
+    public function afficherAnonyme(QuestionnaireCampaign $campagne): Response
     {
-        $filename = "questionnaire-{$campagne->id}-anonyme.pdf";
-        $content = $this->construirePdfFusionneAnonyme($campagne, $nombreFormulaires);
+        $content = $this->construirePdfAnonyme($campagne);
 
-        return response()->streamDownload(
-            fn () => print ($content),
-            $filename,
-            ['Content-Type' => 'application/pdf'],
-        );
+        return response($content, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => "inline; filename=\"questionnaire-{$campagne->id}-anonyme.pdf\"",
+        ]);
     }
 
     /**
@@ -217,43 +219,26 @@ final class QuestionnaireImpressionService
     }
 
     /**
-     * Rend un PDF par bearer token (sans nom de participant), puis fusionne via FPDI.
-     *
-     * Même logique de padding recto-verso que construirePdfFusionne().
+     * Rend le PDF anonyme à page unique (un seul formulaire, un seul QR code
+     * campagne-level, sans nom de participant, sans fusion FPDI).
      */
-    private function construirePdfFusionneAnonyme(QuestionnaireCampaign $campagne, int $nombreFormulaires): string
+    private function construirePdfAnonyme(QuestionnaireCampaign $campagne): string
     {
-        $donnees = $this->construireDonneesAnonymes($campagne, $nombreFormulaires);
+        $donnees = $this->construireDonneesAnonyme($campagne);
 
         $leftText = $campagne->operation?->nom ?? '';
-        $merger = new Fpdi;
 
-        foreach ($donnees['pages'] as $page) {
-            $singlePdf = Pdf::loadView('pdf.questionnaire-papier', [
-                'campagne' => $donnees['campagne'],
-                'nomAsso' => $donnees['nomAsso'],
-                'logoDataUri' => $donnees['logoDataUri'],
-                'groupes' => $donnees['groupes'],
-                'pages' => [$page],
-                'anonyme' => true,
-            ])->setPaper('a4');
+        $pdf = Pdf::loadView('pdf.questionnaire-papier', [
+            'campagne' => $donnees['campagne'],
+            'nomAsso' => $donnees['nomAsso'],
+            'logoDataUri' => $donnees['logoDataUri'],
+            'groupes' => $donnees['groupes'],
+            'pages' => $donnees['pages'],
+            'anonyme' => true,
+        ])->setPaper('a4');
 
-            PdfFooterRenderer::renderQuestionnaire($singlePdf, $leftText, '');
+        PdfFooterRenderer::renderQuestionnaire($pdf, $leftText, '');
 
-            $pdfContent = $singlePdf->output();
-            $pageCount = $merger->setSourceFile(StreamReader::createByString($pdfContent));
-            for ($p = 1; $p <= $pageCount; $p++) {
-                $tpl = $merger->importPage($p);
-                $size = $merger->getTemplateSize($tpl);
-                $merger->AddPage($size['orientation'], [$size['width'], $size['height']]);
-                $merger->useTemplate($tpl);
-            }
-
-            if ($pageCount % 2 !== 0) {
-                $merger->AddPage('P', [210, 297]);
-            }
-        }
-
-        return $merger->Output('S');
+        return $pdf->output();
     }
 }

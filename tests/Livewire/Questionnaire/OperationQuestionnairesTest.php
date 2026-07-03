@@ -126,15 +126,16 @@ it('permet à l admin de rouvrir une invitation soumise', function (): void {
     expect($invitation->fresh()->statut->value)->toBe('commence');
 });
 
-it('campagne anonymise affiche Imprimer anonyme dans le dropdown', function (): void {
+it('campagne anonymise affiche Imprimer anonyme dans le dropdown avec un lien vers la route pdf-anonyme', function (): void {
     $op = Operation::factory()->create();
-    QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
         'statut' => StatutCampagne::Ouverte,
         'anonymise' => true,
     ]);
 
     Livewire::test(OperationQuestionnaires::class, ['operation' => $op])
-        ->assertSee('Imprimer anonyme');
+        ->assertSee('Imprimer anonyme')
+        ->assertSee(route('questionnaires.campagnes.pdf-anonyme', $campagne));
 });
 
 it('campagne non-anonymise ne montre pas Imprimer anonyme', function (): void {

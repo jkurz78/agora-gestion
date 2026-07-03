@@ -42,24 +42,37 @@ final class QuestionnaireReponseService
         });
     }
 
-    /** Invariant ≤1 active par bearer token : récupère la soumission active ou en crée une (pas d'invitation). */
+    /**
+     * Bearer unique par campagne : le suivi ≤1 soumission active ne peut plus se faire
+     * par bearer (partagé entre tous les répondants papier). On bascule sur la session
+     * HTTP du navigateur : chaque nouveau visiteur (nouvelle session) qui scanne le QR
+     * démarre sa propre soumission.
+     */
     public function demarrerOuReprendreBearer(QuestionnaireBearerToken $bearer): QuestionnaireSubmission
     {
         return DB::transaction(function () use ($bearer): QuestionnaireSubmission {
-            $submission = $bearer->submissions()
-                ->whereIn('statut', [StatutSubmission::EnCours->value, StatutSubmission::Soumise->value])
-                ->first();
+            $sessionKey = "qanon_submission_{$bearer->id}";
+            $submissionId = session($sessionKey);
 
-            if ($submission === null) {
-                $submission = QuestionnaireSubmission::create([
-                    'campaign_id' => $bearer->campaign_id,
-                    'invitation_id' => null,
-                    'bearer_token_id' => $bearer->id,
-                    'statut' => StatutSubmission::EnCours,
-                    'source' => 'en_ligne',
-                    'active_key' => null,
-                ]);
+            if ($submissionId !== null) {
+                $submission = QuestionnaireSubmission::where('id', (int) $submissionId)
+                    ->where('statut', StatutSubmission::EnCours->value)
+                    ->first();
+                if ($submission !== null) {
+                    return $submission;
+                }
             }
+
+            $submission = QuestionnaireSubmission::create([
+                'campaign_id' => $bearer->campaign_id,
+                'invitation_id' => null,
+                'bearer_token_id' => $bearer->id,
+                'statut' => StatutSubmission::EnCours,
+                'source' => 'en_ligne',
+                'active_key' => null,
+            ]);
+
+            session([$sessionKey => $submission->id]);
 
             return $submission;
         });
@@ -291,6 +304,9 @@ final class QuestionnaireReponseService
     /**
      * Crée une soumission papier anonyme depuis un payload OCR validé.
      *
+     * Bearer unique par campagne (réutilisé pour tous les tirages papier) : chaque scan
+     * crée systématiquement sa propre soumission, sans vérification de doublon actif.
+     *
      * @param  array<string|int, int|string|bool|null>  $valeursParQuestionId
      * @param  array<string|int, string>  $commentairesParQuestionId
      */
@@ -301,15 +317,7 @@ final class QuestionnaireReponseService
         bool $accepteContact = false,
         bool $remplacer = false,
     ): QuestionnaireSubmission {
-        return DB::transaction(function () use ($bearer, $valeursParQuestionId, $commentairesParQuestionId, $accepteContact, $remplacer): QuestionnaireSubmission {
-            $active = $bearer->submissions()
-                ->whereIn('statut', [StatutSubmission::EnCours->value, StatutSubmission::Soumise->value])
-                ->first();
-
-            if ($active !== null) {
-                abort_unless($remplacer, 422, 'Une réponse existe déjà (choisir Ignorer ou Remplacer).');
-            }
-
+        return DB::transaction(function () use ($bearer, $valeursParQuestionId, $commentairesParQuestionId, $accepteContact): QuestionnaireSubmission {
             $nouvelle = QuestionnaireSubmission::create([
                 'campaign_id' => $bearer->campaign_id,
                 'invitation_id' => null,
@@ -327,14 +335,6 @@ final class QuestionnaireReponseService
                 }
                 $commentaire = $commentairesParQuestionId[(string) $qid] ?? ($commentairesParQuestionId[(int) $qid] ?? null);
                 $this->enregistrerReponse($nouvelle, $q, $valeur, $commentaire);
-            }
-
-            if ($active !== null) {
-                $active->update([
-                    'statut' => StatutSubmission::Remplacee,
-                    'active_key' => null,
-                    'remplacee_par_id' => $nouvelle->id,
-                ]);
             }
 
             $nouvelle->update([

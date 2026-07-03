@@ -260,10 +260,10 @@ it('construireDonnees résout {prenom} dans introHtml avec le prénom du partici
 });
 
 // -----------------------------------------------------------------------
-// Tests impression anonyme (bearer tokens + QR)
+// Tests impression anonyme simplifiée (un seul bearer token + une page + QR)
 // -----------------------------------------------------------------------
 
-it('construireDonneesAnonymes génère N bearer tokens et N pages sans nom', function (): void {
+it('construireDonneesAnonyme génère un seul bearer token et une seule page sans nom', function (): void {
     $op = Operation::factory()->create();
     $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['anonymise' => true]);
     QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
@@ -271,19 +271,18 @@ it('construireDonneesAnonymes génère N bearer tokens et N pages sans nom', fun
     ]);
 
     $service = app(QuestionnaireImpressionService::class);
-    $donnees = $service->construireDonneesAnonymes($campagne, 5);
+    $donnees = $service->construireDonneesAnonyme($campagne);
 
-    expect($donnees['pages'])->toHaveCount(5);
-    expect(QuestionnaireBearerToken::where('campaign_id', $campagne->id)->count())->toBe(5);
+    expect($donnees['pages'])->toHaveCount(1);
+    expect(QuestionnaireBearerToken::where('campaign_id', $campagne->id)->count())->toBe(1);
 
-    foreach ($donnees['pages'] as $page) {
-        expect($page['bearer'])->toBeInstanceOf(QuestionnaireBearerToken::class);
-        expect($page['qr'])->toContain('data:image/png;base64');
-        expect($page)->not->toHaveKey('invitation');
-    }
+    $page = $donnees['pages'][0];
+    expect($page['bearer'])->toBeInstanceOf(QuestionnaireBearerToken::class);
+    expect($page['qr'])->toContain('data:image/png;base64');
+    expect($page)->not->toHaveKey('invitation');
 });
 
-it('construireDonneesAnonymes est idempotent sur appels successifs (bearers additifs)', function (): void {
+it('construireDonneesAnonyme est idempotent : réutilise le même bearer sur appels successifs', function (): void {
     $op = Operation::factory()->create();
     $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['anonymise' => true]);
     QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
@@ -291,20 +290,24 @@ it('construireDonneesAnonymes est idempotent sur appels successifs (bearers addi
     ]);
 
     $service = app(QuestionnaireImpressionService::class);
-    $service->construireDonneesAnonymes($campagne, 3);
-    $service->construireDonneesAnonymes($campagne, 2);
+    $premier = $service->construireDonneesAnonyme($campagne);
+    $second = $service->construireDonneesAnonyme($campagne);
 
-    expect(QuestionnaireBearerToken::where('campaign_id', $campagne->id)->count())->toBe(5);
+    expect(QuestionnaireBearerToken::where('campaign_id', $campagne->id)->count())->toBe(1);
+    expect($second['pages'][0]['bearer']->id)->toBe($premier['pages'][0]['bearer']->id);
 });
 
-it('telechargerAnonyme retourne une StreamedResponse PDF', function (): void {
+it('afficherAnonyme retourne un Response HTTP PDF inline', function (): void {
     $op = Operation::factory()->create();
     $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['anonymise' => true]);
     QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
         'libelle' => 'Note', 'type' => TypeQuestion::Satisfaction, 'ordre' => 1,
     ]);
 
-    $response = app(QuestionnaireImpressionService::class)->telechargerAnonyme($campagne, 2);
+    $response = app(QuestionnaireImpressionService::class)->afficherAnonyme($campagne);
 
-    expect($response)->toBeInstanceOf(StreamedResponse::class);
+    expect($response)->toBeInstanceOf(Response::class);
+    expect($response->headers->get('Content-Type'))->toBe('application/pdf');
+    expect($response->headers->get('Content-Disposition'))->toContain('inline');
+    expect($response->getContent())->toStartWith('%PDF');
 });

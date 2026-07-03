@@ -51,13 +51,13 @@ final class AssistantSaisie extends Component
         $invitation = $this->scan->invitation;
         $bearer = $this->scan->bearerToken;
 
+        // Bearer unique par campagne (partagé entre tous les répondants papier) :
+        // la notion de "réponse déjà existante" n'a de sens que pour une invitation
+        // nominative. Pour un scan anonyme, chaque nouveau scan crée systématiquement
+        // sa propre soumission (voir QuestionnaireReponseService::creerDepuisOcrAnonyme).
         $hasExisting = false;
         if ($invitation !== null) {
             $hasExisting = $invitation->submissions()
-                ->whereIn('statut', ['en_cours', 'soumise'])
-                ->exists();
-        } elseif ($bearer !== null) {
-            $hasExisting = $bearer->submissions()
                 ->whereIn('statut', ['en_cours', 'soumise'])
                 ->exists();
         }
@@ -98,22 +98,13 @@ final class AssistantSaisie extends Component
                 remplacer: $hasExisting,
             );
         } else {
-            $hasExisting = $bearer->submissions()
-                ->whereIn('statut', ['en_cours', 'soumise'])
-                ->exists();
-
-            if ($hasExisting && ! $this->showRemplacer) {
-                $this->showRemplacer = true;
-
-                return;
-            }
-
+            // Bearer unique par campagne : chaque scan crée sa propre soumission,
+            // aucune vérification de doublon (voir commentaire dans render()).
             $service->creerDepuisOcrAnonyme(
                 bearer: $bearer,
                 valeursParQuestionId: $this->valeurs,
                 commentairesParQuestionId: $this->commentaires,
                 accepteContact: $this->accepteContact,
-                remplacer: $hasExisting,
             );
         }
 

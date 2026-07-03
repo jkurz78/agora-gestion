@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Enums\StatutInvitation;
-use App\Enums\StatutSubmission;
 use App\Exceptions\Questionnaire\ReponseObligatoireException;
 use App\Models\Association;
 use App\Models\QuestionnaireBearerToken;
@@ -248,10 +247,11 @@ final class QuestionnaireRepondantController extends Controller
             return view('questionnaire.repondant.indisponible', compact('campagne'));
         }
 
-        $existante = $bearer->submissions()
-            ->where('statut', StatutSubmission::Soumise->value)
-            ->first();
-        if ($existante !== null) {
+        // Bearer unique par campagne (partagé entre tous les répondants papier) : le suivi
+        // "déjà répondu" ne peut plus se faire au niveau du bearer, mais au niveau de la
+        // session du navigateur courant.
+        $sessionDoneKey = "qanon_done_{$bearer->id}";
+        if (session($sessionDoneKey)) {
             return view('questionnaire.repondant.indisponible', ['campagne' => $campagne, 'dejaRepondu' => true]);
         }
 
@@ -376,6 +376,9 @@ final class QuestionnaireRepondantController extends Controller
                 return redirect()->route('questionnaire.bearer.show', ['token' => $token, 'page' => 1])
                     ->withErrors(['reponse' => 'Une question obligatoire n\'est pas renseignée.']);
             }
+
+            session(["qanon_done_{$bearer->id}" => true]);
+            session()->forget("qanon_submission_{$bearer->id}");
 
             return redirect()->route('questionnaire.bearer.merci', ['token' => $token]);
         }

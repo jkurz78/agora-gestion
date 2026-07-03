@@ -12,6 +12,7 @@ use App\Models\QuestionnaireBearerToken;
 use App\Models\QuestionnaireCampaign;
 use App\Models\QuestionnaireCampaignQuestion;
 use App\Models\QuestionnaireInvitation;
+use App\Models\QuestionnaireSubmission;
 use App\Services\Questionnaire\QuestionnaireReponseService;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -439,6 +440,41 @@ it('non-régression : anonymise false → finaliser conserve le FK et invitation
     expect($submission->invitation_id)->not->toBeNull();
     expect($submission->statut)->toBe(StatutSubmission::Soumise);
     expect($invitation->fresh()->statut)->toBe(StatutInvitation::Soumis);
+});
+
+it('creerDepuisOcrAnonyme crée une soumission distincte à chaque appel sur le même bearer (pas de blocage doublon)', function (): void {
+    $svc = app(QuestionnaireReponseService::class);
+    $campagne = QuestionnaireCampaign::factory()->create(['anonymise' => true]);
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Note', 'type' => TypeQuestion::Satisfaction, 'ordre' => 1,
+    ]);
+    $bearer = QuestionnaireBearerToken::factory()->for($campagne, 'campaign')->create();
+
+    $sub1 = $svc->creerDepuisOcrAnonyme($bearer, [(string) $q->id => 4], accepteContact: false);
+    $sub2 = $svc->creerDepuisOcrAnonyme($bearer, [(string) $q->id => 5], accepteContact: false);
+
+    expect($sub1->id)->not->toBe($sub2->id);
+    expect($sub1->statut)->toBe(StatutSubmission::Soumise);
+    expect($sub2->statut)->toBe(StatutSubmission::Soumise);
+    expect(QuestionnaireSubmission::where('bearer_token_id', $bearer->id)->count())->toBe(2);
+});
+
+it('demarrerOuReprendreBearer : deux sessions différentes obtiennent deux soumissions distinctes', function (): void {
+    $svc = app(QuestionnaireReponseService::class);
+    $campagne = QuestionnaireCampaign::factory()->create(['anonymise' => true]);
+    QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Note', 'type' => TypeQuestion::Satisfaction, 'ordre' => 1,
+    ]);
+    $bearer = QuestionnaireBearerToken::factory()->for($campagne, 'campaign')->create();
+
+    $s1 = $svc->demarrerOuReprendreBearer($bearer);
+
+    // Simule une nouvelle session (nouveau visiteur) : on efface la clé de session.
+    session()->forget("qanon_submission_{$bearer->id}");
+
+    $s2 = $svc->demarrerOuReprendreBearer($bearer);
+
+    expect($s1->id)->not->toBe($s2->id);
 });
 
 it('finaliser bearer sans invitation ne crash pas', function (): void {
