@@ -152,7 +152,7 @@
                         request()->routeIs('banques.rapprochement.*', 'banques.virements.*', 'banques.helloasso-sync',
                             'banques.comptes.*', 'banques.remises*') => 'Banques',
                         request()->routeIs('tiers.*') => 'Tiers',
-                        request()->routeIs('operations.*') => 'Opérations',
+                        request()->routeIs('operations.*', 'questionnaires.*') => 'Opérations',
                         request()->routeIs('facturation.factures*', 'facturation.documents-en-attente*', 'devis-manuels*') => 'Facturation',
                         request()->routeIs('rapports.*') => 'Rapports',
                         request()->routeIs('exercices.*') => 'Exercices',
