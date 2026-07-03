@@ -383,7 +383,7 @@ $activeGroup = match(true) {
 
                             <li class="nav-item">
                                 <a href="{{ route('operations.index') }}"
-                                   class="nav-link {{ request()->routeIs('operations.index', 'operations.show', 'operations.participants.*', 'operations.seances.*') ? 'active' : '' }}">
+                                   class="nav-link {{ request()->routeIs('operations.index', 'operations.show', 'operations.participants.*', 'operations.seances.*', 'questionnaires.campagnes.*', 'questionnaires.resultats.*') ? 'active' : '' }}">
                                     <i class="bi bi-calendar-event me-1"></i> Liste
                                 </a>
                             </li>
@@ -404,7 +404,7 @@ $activeGroup = match(true) {
 
                             <li class="nav-item">
                                 <a href="{{ route('questionnaires.modeles.index') }}"
-                                   class="nav-link {{ request()->routeIs('questionnaires.*') ? 'active' : '' }}">
+                                   class="nav-link {{ request()->routeIs('questionnaires.modeles.*') ? 'active' : '' }}">
                                     <i class="bi bi-clipboard-check me-1"></i> Questionnaires
                                 </a>
                             </li>
