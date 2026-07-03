@@ -45,7 +45,7 @@ final class QuestionnaireScanDocumentHandler implements DocumentHandler
             token: $token,
         );
 
-        if ($scan->invitation_id === null) {
+        if ($scan->invitation_id === null && $scan->bearer_token_id === null) {
             return HandlerAttempt::failed('questionnaire_qr_unresolved', 'Token QR questionnaire non résolu');
         }
 
