@@ -12,15 +12,23 @@
         @csrf
         <input type="hidden" name="action" value="finish">
 
-        <div class="form-check mb-4">
+        <div class="form-check mb-3">
             <input class="form-check-input" type="checkbox"
                    name="accepte_contact"
                    id="accepte_contact"
-                   value="1">
+                   value="1"
+                   onchange="document.getElementById('contact-nom-group').style.display = this.checked ? 'block' : 'none'">
             <label class="form-check-label" for="accepte_contact">
                 J'accepte que mes réponses soient rattachées à mon nom pour que l'association puisse me recontacter (facultatif).
             </label>
         </div>
+        @if ($bearer ?? false)
+            <div id="contact-nom-group" class="mb-4" style="display:none;">
+                <label for="contact_nom" class="form-label">Votre prénom et nom</label>
+                <input type="text" class="form-control" name="contact_nom" id="contact_nom"
+                       placeholder="Prénom Nom">
+            </div>
+        @endif
 
         <div class="d-flex {{ $campagne->autoriser_retour ? 'justify-content-between' : 'justify-content-end' }}">
             @if ($campagne->autoriser_retour)

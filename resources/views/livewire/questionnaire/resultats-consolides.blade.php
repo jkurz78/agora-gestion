@@ -39,11 +39,28 @@
         </div>
 
         <div class="d-flex justify-content-end mb-3">
-            <a href="{{ route('questionnaires.resultats.consolides.pdf', ['campagneIds' => $campagneIds]) }}"
-               target="_blank"
-               class="btn btn-outline-danger btn-sm">
-                <i class="bi bi-file-earmark-pdf me-1"></i>Exporter en PDF
-            </a>
+            <div class="btn-group">
+                <a href="{{ route('questionnaires.resultats.consolides.pdf', ['campagneIds' => $campagneIds]) }}"
+                   target="_blank"
+                   class="btn btn-outline-danger btn-sm">
+                    <i class="bi bi-file-earmark-pdf me-1"></i>Exporter en PDF
+                </a>
+                <button type="button" class="btn btn-outline-danger btn-sm dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="visually-hidden">Options</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li>
+                        <a class="dropdown-item" href="{{ route('questionnaires.resultats.consolides.pdf', ['campagneIds' => $campagneIds]) }}" target="_blank">
+                            <i class="bi bi-file-earmark-pdf me-1 text-danger"></i>PDF complet
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item" href="{{ route('questionnaires.resultats.consolides.pdf', ['campagneIds' => $campagneIds, 'contacts' => 0]) }}" target="_blank">
+                            <i class="bi bi-shield-check me-1 text-info"></i>PDF sans contacts
+                        </a>
+                    </li>
+                </ul>
+            </div>
         </div>
 
         @include('questionnaire.resultats._resultats', ['resultats' => $resultats, 'contacts' => $contacts, 'campagne' => $campagnes->first()])

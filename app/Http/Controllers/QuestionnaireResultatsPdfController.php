@@ -16,10 +16,10 @@ use Illuminate\Support\Collection;
 
 final class QuestionnaireResultatsPdfController extends Controller
 {
-    public function campagne(QuestionnaireCampaign $campagne, QuestionnaireResultatService $service): Response
+    public function campagne(Request $request, QuestionnaireCampaign $campagne, QuestionnaireResultatService $service): Response
     {
         $resultats = $service->pourCampagne($campagne);
-        $contacts = $this->contacts(collect([$campagne]));
+        $contacts = $request->boolean('contacts', true) ? $this->contacts(collect([$campagne])) : collect();
         $titre = $campagne->titre_affiche ?: $campagne->titre;
         $sousTitre = $campagne->operation->nom;
 
@@ -35,7 +35,7 @@ final class QuestionnaireResultatsPdfController extends Controller
         abort_if($campagnes->isEmpty(), 404);
 
         $resultats = $service->pourCampagnes($campagnes);
-        $contacts = $this->contacts($campagnes);
+        $contacts = $request->boolean('contacts', true) ? $this->contacts($campagnes) : collect();
         $titre = $campagnes->first()->titre_affiche ?: $campagnes->first()->titre;
         $sousTitre = 'Consolidé — '.$campagnes->map(fn ($c) => $c->operation->nom)->join(', ');
 
@@ -52,6 +52,7 @@ final class QuestionnaireResultatsPdfController extends Controller
             'titre' => $titre,
             'sousTitre' => $sousTitre,
             'association' => $association,
+            'logoDataUri' => $association->brandingLogoDataUri(),
             'date' => now()->format('d/m/Y'),
         ])->setPaper('a4', 'portrait');
 

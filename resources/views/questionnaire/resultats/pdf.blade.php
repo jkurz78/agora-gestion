@@ -34,15 +34,34 @@
         .contacts li { padding: 3px 0; border-bottom: 1px solid #eee; font-size: 9pt; }
         .contacts li:last-child { border-bottom: none; }
 
+        .header-table { width: 100%; margin-bottom: 15px; }
+        .header-table td { vertical-align: middle; }
+        .logo-img { max-height: 60px; max-width: 120px; margin-right: 10px; }
+        .asso-name { font-size: 11pt; color: #3d5473; font-weight: bold; }
+
         .repartition-row { padding: 2px 0; border-bottom: 1px solid #f0f0f0; }
         .repartition-row:last-child { border-bottom: none; }
         .badge-count { background: #3d5473; color: #fff; border-radius: 10px; padding: 1px 8px; font-size: 8pt; float: right; }
     </style>
 </head>
 <body>
-    <h1>{{ $titre }}</h1>
-    <h2>{{ $sousTitre }}</h2>
-    <div class="meta">{{ $association->nom }} &mdash; {{ $date }}</div>
+    <table class="header-table">
+        <tr>
+            @if (!empty($logoDataUri))
+                <td style="width: 130px;">
+                    <img src="{{ $logoDataUri }}" class="logo-img" alt="{{ $association->nom }}">
+                </td>
+            @endif
+            <td>
+                <div class="asso-name">{{ $association->nom }}</div>
+                <h1 style="margin-top: 4px;">{{ $titre }}</h1>
+                <h2 style="margin-bottom: 0;">{{ $sousTitre }}</h2>
+            </td>
+            <td style="text-align: right; vertical-align: top;">
+                <div class="meta">{{ $date }}</div>
+            </td>
+        </tr>
+    </table>
 
     <table class="compteurs">
         <tr>
@@ -124,7 +143,7 @@
             <div class="contacts-header">Souhaitent être recontactés ({{ $contacts->count() }})</div>
             <ul>
                 @foreach ($contacts as $submission)
-                    <li>{{ $submission->invitation?->participant?->tiers?->displayName() ?? '—' }}</li>
+                    <li>{{ $submission->nomRepondant() }}</li>
                 @endforeach
             </ul>
         </div>

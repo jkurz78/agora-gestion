@@ -15,7 +15,7 @@ final class QuestionnaireSubmission extends TenantModel
     use HasFactory;
 
     protected $fillable = [
-        'association_id', 'campaign_id', 'invitation_id', 'bearer_token_id', 'statut', 'accepte_contact', 'source', 'submitted_at',
+        'association_id', 'campaign_id', 'invitation_id', 'bearer_token_id', 'statut', 'accepte_contact', 'contact_nom', 'source', 'submitted_at',
         'remplacee_par_id', 'active_key',
     ];
 
@@ -56,5 +56,16 @@ final class QuestionnaireSubmission extends TenantModel
     public function remplacante(): HasOne
     {
         return $this->hasOne(QuestionnaireSubmission::class, 'remplacee_par_id');
+    }
+
+    public function nomRepondant(): string
+    {
+        $viaTiers = $this->invitation?->participant?->tiers?->displayName();
+
+        if ($viaTiers !== null && $viaTiers !== '') {
+            return $viaTiers;
+        }
+
+        return $this->contact_nom ?? '—';
     }
 }

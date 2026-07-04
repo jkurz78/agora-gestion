@@ -113,7 +113,7 @@
             <ul class="list-group list-group-flush">
                 @foreach ($contacts as $submission)
                     <li class="list-group-item">
-                        {{ $submission->invitation?->participant?->tiers?->displayName() ?? '—' }}
+                        {{ $submission->nomRepondant() }}
                     </li>
                 @endforeach
             </ul>

@@ -8,12 +8,15 @@ use App\Enums\StatutInvitation;
 use App\Enums\StatutSubmission;
 use App\Enums\TypeQuestion;
 use App\Exceptions\Questionnaire\ReponseObligatoireException;
+use App\Models\Participant;
 use App\Models\QuestionnaireBearerToken;
 use App\Models\QuestionnaireCampaignQuestion;
 use App\Models\QuestionnaireInvitation;
 use App\Models\QuestionnaireSubmission;
 use App\Models\QuestionnaireTemplateQuestion;
+use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 final class QuestionnaireReponseService
 {
@@ -128,12 +131,12 @@ final class QuestionnaireReponseService
         return $payload;
     }
 
-    public function finaliser(QuestionnaireSubmission $submission, bool $accepteContact): void
+    public function finaliser(QuestionnaireSubmission $submission, bool $accepteContact, ?string $contactNom = null): void
     {
-        DB::transaction(function () use ($submission, $accepteContact): void {
+        DB::transaction(function () use ($submission, $accepteContact, $contactNom): void {
             $this->verifierObligatoires($submission);
 
-            $this->marquerSoumise($submission, $accepteContact);
+            $this->marquerSoumise($submission, $accepteContact, $contactNom);
 
             // Oubli du lien si anonymise ET pas de consentement
             $campagne = $submission->campaign;
@@ -146,10 +149,10 @@ final class QuestionnaireReponseService
         });
     }
 
-    public function finaliserSansBloquer(QuestionnaireSubmission $submission, bool $accepteContact): void
+    public function finaliserSansBloquer(QuestionnaireSubmission $submission, bool $accepteContact, ?string $contactNom = null): void
     {
-        DB::transaction(function () use ($submission, $accepteContact): void {
-            $this->marquerSoumise($submission, $accepteContact);
+        DB::transaction(function () use ($submission, $accepteContact, $contactNom): void {
+            $this->marquerSoumise($submission, $accepteContact, $contactNom);
 
             $campagne = $submission->campaign;
             if ($campagne->anonymise && ! $accepteContact && $submission->invitation_id !== null) {
@@ -161,11 +164,16 @@ final class QuestionnaireReponseService
         });
     }
 
-    private function marquerSoumise(QuestionnaireSubmission $submission, bool $accepteContact): void
+    private function marquerSoumise(QuestionnaireSubmission $submission, bool $accepteContact, ?string $contactNom = null): void
     {
+        if ($accepteContact && $contactNom !== null && $submission->bearer_token_id !== null && $submission->invitation_id === null) {
+            $this->tenterRattachementParticipant($submission, $contactNom);
+        }
+
         $submission->update([
             'statut' => StatutSubmission::Soumise,
             'accepte_contact' => $accepteContact,
+            'contact_nom' => ($accepteContact && $submission->invitation_id === null) ? $contactNom : null,
             'submitted_at' => now(),
         ]);
 
@@ -175,6 +183,68 @@ final class QuestionnaireReponseService
                 'submitted_at' => now(),
             ]);
         }
+    }
+
+    /**
+     * Tente de rattacher une soumission anonyme à un participant de l'opération
+     * en cherchant par nom. Si trouvé, crée ou récupère l'invitation et met à jour la soumission.
+     */
+    private function tenterRattachementParticipant(QuestionnaireSubmission $submission, string $contactNom, ?int $participantId = null): void
+    {
+        $campagne = $submission->campaign;
+        $operationId = (int) $campagne->operation_id;
+
+        if ($participantId !== null) {
+            $participant = Participant::where('id', $participantId)
+                ->where('operation_id', $operationId)
+                ->first();
+        } else {
+            $participant = $this->chercherParticipantParNom($operationId, $contactNom);
+        }
+
+        if ($participant === null) {
+            return;
+        }
+
+        $invitation = QuestionnaireInvitation::firstOrCreate(
+            [
+                'campaign_id' => (int) $campagne->id,
+                'participant_id' => (int) $participant->id,
+            ],
+            [
+                'association_id' => TenantContext::currentId(),
+                'token_hash' => hash('sha256', Str::random(48)),
+                'statut' => StatutInvitation::Soumis,
+                'submitted_at' => now(),
+            ]
+        );
+
+        $submission->invitation_id = (int) $invitation->id;
+    }
+
+    private function chercherParticipantParNom(int $operationId, string $nom): ?Participant
+    {
+        $normalise = Str::lower(trim($nom));
+
+        $participants = Participant::where('operation_id', $operationId)
+            ->with('tiers')
+            ->get();
+
+        foreach ($participants as $participant) {
+            $tiers = $participant->tiers;
+            if ($tiers === null) {
+                continue;
+            }
+
+            $prenomNom = Str::lower(trim(($tiers->prenom ?? '').' '.($tiers->nom ?? '')));
+            $nomPrenom = Str::lower(trim(($tiers->nom ?? '').' '.($tiers->prenom ?? '')));
+
+            if ($prenomNom === $normalise || $nomPrenom === $normalise) {
+                return $participant;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -315,9 +385,11 @@ final class QuestionnaireReponseService
         array $valeursParQuestionId,
         array $commentairesParQuestionId = [],
         bool $accepteContact = false,
+        ?string $contactNom = null,
+        ?int $participantId = null,
         bool $remplacer = false,
     ): QuestionnaireSubmission {
-        return DB::transaction(function () use ($bearer, $valeursParQuestionId, $commentairesParQuestionId, $accepteContact): QuestionnaireSubmission {
+        return DB::transaction(function () use ($bearer, $valeursParQuestionId, $commentairesParQuestionId, $accepteContact, $contactNom, $participantId): QuestionnaireSubmission {
             $nouvelle = QuestionnaireSubmission::create([
                 'campaign_id' => $bearer->campaign_id,
                 'invitation_id' => null,
@@ -337,9 +409,16 @@ final class QuestionnaireReponseService
                 $this->enregistrerReponse($nouvelle, $q, $valeur, $commentaire);
             }
 
+            if ($accepteContact && $participantId !== null) {
+                $this->tenterRattachementParticipant($nouvelle, $contactNom ?? '', $participantId);
+            } elseif ($accepteContact && $contactNom !== null) {
+                $this->tenterRattachementParticipant($nouvelle, $contactNom);
+            }
+
             $nouvelle->update([
                 'statut' => StatutSubmission::Soumise,
                 'accepte_contact' => $accepteContact,
+                'contact_nom' => ($accepteContact && $nouvelle->invitation_id === null) ? $contactNom : null,
                 'submitted_at' => now(),
             ]);
 

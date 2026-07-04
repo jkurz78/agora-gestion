@@ -59,7 +59,7 @@
         }
         .qr-cell {
             text-align: right;
-            width: 160px;
+            width: 140px;
         }
         .code-court {
             font-family: DejaVu Sans Mono, monospace;
@@ -194,7 +194,7 @@
 
                     {{-- Colonne droite : QR + code court --}}
                     <td class="qr-cell">
-                        <img src="{{ $qrDataUri }}" width="150" height="150" alt="QR code">
+                        <img src="{{ $qrDataUri }}" width="120" height="120" alt="QR code">
                         @if(!$anonyme && $invitation?->code_court)
                             <div class="code-court">{{ $invitation->code_court }}</div>
                         @endif

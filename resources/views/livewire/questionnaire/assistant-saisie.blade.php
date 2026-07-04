@@ -104,11 +104,10 @@
 
                                 @case('ressenti')
                                     <div class="d-flex align-items-center gap-2">
-                                        <span class="small text-muted">0</span>
-                                        <input type="range" class="form-range flex-grow-1" min="0" max="100"
+                                        <input type="number" class="form-control form-control-sm" min="0" max="100" step="1"
+                                               style="width: 80px;"
                                                wire:model="valeurs.{{ $qid }}">
-                                        <span class="small text-muted">100</span>
-                                        <span class="badge bg-secondary ms-1">{{ $valeurs[$qid] ?? '—' }}</span>
+                                        <span class="small text-muted">/ 100</span>
                                     </div>
                                     @break
 
@@ -135,11 +134,25 @@
 
                     {{-- Contact consent --}}
                     <div class="form-check mt-3">
-                        <input class="form-check-input" type="checkbox" wire:model="accepteContact" id="accepte-contact">
+                        <input class="form-check-input" type="checkbox" wire:model.live="accepteContact" id="accepte-contact">
                         <label class="form-check-label" for="accepte-contact">
                             Le participant accepte d'être recontacté
                         </label>
                     </div>
+                    @if ($accepteContact && $participantsListe->isNotEmpty())
+                        <div class="mt-2">
+                            <label class="form-label small text-muted mb-1">Rattacher au participant</label>
+                            <select class="form-select form-select-sm" wire:model="participantId">
+                                <option value="">— Non identifié —</option>
+                                @foreach ($participantsListe as $p)
+                                    <option value="{{ $p['id'] }}">{{ $p['nom'] }}</option>
+                                @endforeach
+                            </select>
+                            @if ($contactNom !== '')
+                                <div class="form-text">Nom transcrit : <em>{{ $contactNom }}</em></div>
+                            @endif
+                        </div>
+                    @endif
                 </div>
 
                 <div class="card-footer d-flex justify-content-between">

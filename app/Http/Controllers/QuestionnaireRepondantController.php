@@ -370,8 +370,10 @@ final class QuestionnaireRepondantController extends Controller
         }
 
         if ($action === 'finish') {
+            $contactNom = $request->boolean('accepte_contact') ? $request->string('contact_nom')->trim()->toString() : null;
+
             try {
-                $this->reponses->finaliser($submission, $request->boolean('accepte_contact'));
+                $this->reponses->finaliser($submission, $request->boolean('accepte_contact'), $contactNom ?: null);
             } catch (ReponseObligatoireException) {
                 return redirect()->route('questionnaire.bearer.show', ['token' => $token, 'page' => 1])
                     ->withErrors(['reponse' => 'Une question obligatoire n\'est pas renseignée.']);
