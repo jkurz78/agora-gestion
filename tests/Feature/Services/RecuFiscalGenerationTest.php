@@ -34,7 +34,8 @@ it('génère un reçu fiscal pour un don valide', function () {
     $recu = $service->obtenirOuGenerer($ligne);
 
     expect($recu)->toBeInstanceOf(RecuFiscalEmis::class);
-    expect($recu->numero)->toBe('2026-0001');
+    $expectedYear = $ligne->transaction->date->format('Y');
+    expect($recu->numero)->toBe("{$expectedYear}-0001");
     expect($recu->annee_civile)->toBe((int) $ligne->transaction->date->format('Y'));
     expect($recu->tiers_id)->toBe($ligne->transaction->tiers_id);
     expect($recu->transaction_ligne_id)->toBe($ligne->id);

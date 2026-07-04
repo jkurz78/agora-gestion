@@ -2,6 +2,7 @@
 
 use App\Models\Association;
 use App\Tenant\TenantContext;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Mail\Mailable;
 use Illuminate\Support\Facades\Cache;
@@ -37,20 +38,23 @@ pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
     ->use(LigneDonHelper::class)
     ->beforeEach(function () {
+        // Freeze time to a stable mid-exercice date (exercice 2025 = Sept 2025 → Aug 2026).
+        // This eliminates date-dependent test fragility: factory dates, ExerciceService::current(),
+        // whereBetween boundaries all behave consistently regardless of when tests actually run.
+        // Tests that need a specific date override this with their own setTestNow/travelTo.
+        Carbon::setTestNow('2026-01-15 10:00:00');
+
         // Boot a default tenant context so that tenant-scoped models work out of the box.
-        // Tests that manage their own context (e.g. isolation tests, explicit boot/clear)
-        // override this by calling TenantContext::clear() or TenantContext::boot() in
-        // their own beforeEach — which runs AFTER this global hook.
         $association = Association::factory()->create();
         TenantContext::boot($association);
 
         // Prime the install gate cache so tests can hit /dashboard, /login, etc.
-        // without being redirected to /setup by RedirectIfNotInstalled.
-        // Tests that exercise the install flow itself call Cache::forget('app.installed')
-        // in their own beforeEach to undo this.
         Cache::put('app.installed', true);
     })
-    ->afterEach(fn () => TenantContext::clear())
+    ->afterEach(function () {
+        TenantContext::clear();
+        Carbon::setTestNow();
+    })
     ->in('Feature', 'Livewire', 'Unit');
 
 /*

@@ -181,7 +181,8 @@ it('depot: soumission appelle bien le service (dépôt persisté en BDD)', funct
 
     $component = new Depot;
     $component->mount($this->asso);
-    $component->date_facture = '2026-03-15';
+    $dateFacture = now()->subDays(10)->format('Y-m-d');
+    $component->date_facture = $dateFacture;
     $component->numero_facture = 'FACT-SERVICE-001';
     $component->pdf = UploadedFile::fake()->create('facture.pdf', 200, 'application/pdf');
 
@@ -189,6 +190,6 @@ it('depot: soumission appelle bien le service (dépôt persisté en BDD)', funct
 
     expect(FacturePartenaireDeposee::count())->toBe(1);
     $depot = FacturePartenaireDeposee::first();
-    expect($depot->date_facture->format('Y-m-d'))->toBe('2026-03-15')
+    expect($depot->date_facture->format('Y-m-d'))->toBe($dateFacture)
         ->and($depot->numero_facture)->toBe('FACT-SERVICE-001');
 });

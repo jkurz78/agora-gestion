@@ -67,7 +67,7 @@ it('rejected workflow: saveDraft sur NDF Rejetée remet en Brouillon + vide moti
 
     $data = [
         'id' => $ndf->id,
-        'date' => '2026-04-20',
+        'date' => now()->subDays(5)->format('Y-m-d'),
         'libelle' => 'NDF corrigée',
         'lignes' => [
             [
@@ -113,7 +113,7 @@ it('rejected workflow: après édition NDF Rejetée, resoumission passe en Soumi
     // saveDraft avec les données de la ligne existante
     $data = [
         'id' => $ndf->id,
-        'date' => '2026-04-20',
+        'date' => now()->subDays(5)->format('Y-m-d'),
         'libelle' => 'NDF corrigée',
         'lignes' => [
             [
@@ -230,7 +230,7 @@ it('rejected workflow: saveDraft sur Rejetée sans submit → NDF reste en Broui
 
     $data = [
         'id' => $ndf->id,
-        'date' => '2026-04-20',
+        'date' => now()->subDays(5)->format('Y-m-d'),
         'libelle' => 'NDF sans resoumission',
         'lignes' => [
             [

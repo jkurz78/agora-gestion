@@ -8,6 +8,7 @@ use App\Enums\ModePaiement;
 use App\Enums\StatutFacture;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
+use App\Services\ExerciceService;
 use App\Traits\TenantStorage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -175,9 +176,11 @@ final class Transaction extends TenantModel
      */
     public function scopeForExercice(Builder $query, int $exercice): Builder
     {
+        $range = app(ExerciceService::class)->dateRange($exercice);
+
         return $query->whereBetween('date', [
-            "{$exercice}-09-01",
-            ($exercice + 1).'-08-31',
+            $range['start']->toDateString(),
+            $range['end']->toDateString(),
         ]);
     }
 

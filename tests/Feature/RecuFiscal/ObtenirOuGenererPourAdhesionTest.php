@@ -89,7 +89,7 @@ it('génère un reçu actif sur adhésion payée + déductible + asso éligible'
 
     expect($recu)->toBeInstanceOf(RecuFiscalEmis::class);
     expect($recu->annule_at)->toBeNull();
-    expect($recu->numero)->toStartWith((string) now()->year.'-');
+    expect($recu->numero)->toStartWith($adhesion->transaction->date->format('Y').'-');
     expect($recu->montant_centimes)->toBe(7500); // 75.00€ en centimes
     expect(Storage::disk('local')->exists($recu->pdfFullPath()))->toBeTrue();
 });
@@ -132,8 +132,10 @@ it('numérotation partagée don+cotisation : séquence continue', function () {
     $adhesion = adhesionPayeeDeductible();
     $recuCotisation = $this->service->obtenirOuGenererPourAdhesion($adhesion);
 
-    $annee = (string) now()->year;
-    expect($recuDon->numero)->toBe("{$annee}-0001");
-    expect($recuCotisation->numero)->toBe("{$annee}-0002");
+    $anneeDon = $ligne->transaction->date->format('Y');
+    $anneeCot = $adhesion->transaction->date->format('Y');
+    expect($recuDon->numero)->toBe("{$anneeDon}-0001");
+    expect($anneeDon)->toBe($anneeCot, 'Les deux transactions doivent être de la même année civile');
+    expect($recuCotisation->numero)->toBe("{$anneeCot}-0002");
     expect(RecuFiscalEmis::count())->toBe(2);
 });

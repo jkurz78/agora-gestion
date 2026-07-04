@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Services\ExerciceService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -84,9 +85,11 @@ final class VirementInterne extends TenantModel
      */
     public function scopeForExercice(Builder $query, int $exercice): Builder
     {
+        $range = app(ExerciceService::class)->dateRange($exercice);
+
         return $query->whereBetween('date', [
-            "{$exercice}-09-01",
-            ($exercice + 1).'-08-31',
+            $range['start']->toDateString(),
+            $range['end']->toDateString(),
         ]);
     }
 }
