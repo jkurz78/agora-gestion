@@ -7,6 +7,7 @@ namespace Database\Factories;
 use App\Models\CompteBancaire;
 use App\Models\User;
 use App\Models\VirementInterne;
+use App\Services\ExerciceService;
 use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -21,7 +22,7 @@ class VirementInterneFactory extends Factory
     {
         return [
             'association_id' => TenantContext::currentId() ?? 1,
-            'date' => fake()->dateTimeBetween('-1 year', 'now'),
+            'date' => app(ExerciceService::class)->defaultDate(),
             'montant' => fake()->randomFloat(2, 10, 5000),
             'compte_source_id' => CompteBancaire::factory(),
             'compte_destination_id' => CompteBancaire::factory(),

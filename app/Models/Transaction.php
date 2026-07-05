@@ -178,10 +178,9 @@ final class Transaction extends TenantModel
     {
         $range = app(ExerciceService::class)->dateRange($exercice);
 
-        return $query->whereBetween('date', [
-            $range['start']->toDateString(),
-            $range['end']->toDateString(),
-        ]);
+        return $query
+            ->whereDate('date', '>=', $range['start']->toDateString())
+            ->whereDate('date', '<=', $range['end']->toDateString());
     }
 
     /**

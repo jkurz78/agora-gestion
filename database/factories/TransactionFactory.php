@@ -11,6 +11,7 @@ use App\Models\CompteBancaire;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Services\ExerciceService;
 use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -26,7 +27,7 @@ class TransactionFactory extends Factory
         return [
             'association_id' => TenantContext::currentId() ?? 1,
             'type' => fake()->randomElement(TypeTransaction::cases()),
-            'date' => fake()->dateTimeBetween('-1 year', 'now'),
+            'date' => app(ExerciceService::class)->defaultDate(),
             'libelle' => fake()->sentence(4),
             'montant_total' => fake()->randomFloat(2, 10, 5000),
             'mode_paiement' => fake()->randomElement(ModePaiement::cases()),

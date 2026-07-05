@@ -15,18 +15,20 @@ final class RecuFiscalEmisFactory extends Factory
 
     public function definition(): array
     {
+        $annee = (int) now()->format('Y');
+
         return [
             'association_id' => TenantContext::currentId() ?? 1,
-            'numero' => '2026-'.str_pad((string) $this->faker->unique()->numberBetween(1, 9999), 4, '0', STR_PAD_LEFT),
-            'annee_civile' => 2026,
+            'numero' => $annee.'-'.str_pad((string) $this->faker->unique()->numberBetween(1, 9999), 4, '0', STR_PAD_LEFT),
+            'annee_civile' => $annee,
             'tiers_id' => Tiers::factory(),
             'transaction_ligne_id' => null,
             'montant_centimes' => 15000,
-            'date_versement' => $this->faker->date(),
+            'date_versement' => now()->subDays(30)->toDateString(),
             'mode_versement' => 'cheque',
             'forme_don' => 'numeraire',
             'article_cgi' => 'art_200',
-            'pdf_path' => 'recus_fiscaux/2026/test.pdf',
+            'pdf_path' => "recus_fiscaux/{$annee}/test.pdf",
             'pdf_hash' => str_repeat('a', 64),
             'emitted_at' => now(),
         ];
