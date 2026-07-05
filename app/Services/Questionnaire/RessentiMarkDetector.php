@@ -203,6 +203,8 @@ final class RessentiMarkDetector
             $comptes[] = $n;
         }
 
+        // Barre garantie large d'au moins FRACTION_MIN × LARGEUR_ANALYSE px
+        // (filtre de detecterBarres()) : le slice ne peut pas être vide.
         $interieur = array_slice(
             $comptes,
             self::MARGE_EXTREMITES,

@@ -5,13 +5,38 @@ declare(strict_types=1);
 use App\Services\Questionnaire\RessentiMarkDetector;
 
 /**
+ * Registre des fixtures temporaires créées par ce fichier de tests : le
+ * nettoyage ne supprime que ces chemins (sûr en exécution --parallel).
+ *
+ * @return ArrayObject<int, string>
+ */
+function registreFichiersRessenti(): ArrayObject
+{
+    static $registre = null;
+
+    return $registre ??= new ArrayObject;
+}
+
+function cheminFixtureRessenti(): string
+{
+    // uniqid(more_entropy) évite les collisions inter-processus ; le point
+    // qu'il introduit est retiré pour garder un nom de fichier propre.
+    $chemin = sys_get_temp_dir().'/ressenti-'.str_replace('.', '', uniqid('', true)).'.png';
+    registreFichiersRessenti()->append($chemin);
+
+    return $chemin;
+}
+
+/**
  * Dessine une page de questionnaire synthétique : barres ressenti (60 % de la
- * largeur, comme le gabarit papier) et lignes d'écriture pleine largeur (84 %).
+ * largeur, comme le gabarit papier), lignes d'écriture pleine largeur (84 %)
+ * et courtes lignes décoratives (20 %).
  *
  * @param  list<list<float>>  $barres  une entrée par barre = positions des traits en %
  * @param  list<int>  $lignesEcriture  ordonnées Y des lignes d'écriture
+ * @param  list<int>  $lignesCourtes  ordonnées Y des lignes courtes décoratives
  */
-function creerScanRessentiSynthetique(array $barres, array $lignesEcriture = []): string
+function creerScanRessentiSynthetique(array $barres, array $lignesEcriture = [], array $lignesCourtes = []): string
 {
     $w = 1654;
     $h = 1200;
@@ -33,8 +58,11 @@ function creerScanRessentiSynthetique(array $barres, array $lignesEcriture = [])
     foreach ($lignesEcriture as $yLigne) {
         imagefilledrectangle($img, (int) round($w * 0.08), $yLigne, (int) round($w * 0.92), $yLigne + 3, $noir);
     }
+    foreach ($lignesCourtes as $yLigne) {
+        imagefilledrectangle($img, (int) round($w * 0.10), $yLigne, (int) round($w * 0.30), $yLigne + 3, $noir);
+    }
 
-    $chemin = sys_get_temp_dir().'/ressenti-'.uniqid().'.png';
+    $chemin = cheminFixtureRessenti();
     imagepng($img, $chemin);
     imagedestroy($img);
 
@@ -42,9 +70,11 @@ function creerScanRessentiSynthetique(array $barres, array $lignesEcriture = [])
 }
 
 afterEach(function (): void {
-    foreach (glob(sys_get_temp_dir().'/ressenti-*.png') ?: [] as $fichier) {
+    $registre = registreFichiersRessenti();
+    foreach ($registre as $fichier) {
         @unlink($fichier);
     }
+    $registre->exchangeArray([]);
 });
 
 it('mesure un trait unique à la position attendue', function (): void {
@@ -99,8 +129,16 @@ it('ignore les lignes d ecriture pleine largeur', function (): void {
     expect($mesures[0]['pct'])->toEqualWithDelta(55.0, 1.0);
 });
 
+it('ignore les lignes courtes décoratives sous la longueur minimale', function (): void {
+    $chemin = creerScanRessentiSynthetique([[55.0]], [], [600, 700, 800]);
+    $mesures = (new RessentiMarkDetector)->mesurer($chemin);
+
+    expect($mesures)->toHaveCount(1);
+    expect($mesures[0]['pct'])->toEqualWithDelta(55.0, 1.0);
+});
+
 it('retourne un tableau vide pour un fichier illisible', function (): void {
-    $chemin = sys_get_temp_dir().'/ressenti-'.uniqid().'.png';
+    $chemin = cheminFixtureRessenti();
     file_put_contents($chemin, 'pas une image');
 
     expect((new RessentiMarkDetector)->mesurer($chemin))->toBe([]);
