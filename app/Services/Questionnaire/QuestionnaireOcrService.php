@@ -4,15 +4,19 @@ declare(strict_types=1);
 
 namespace App\Services\Questionnaire;
 
+use App\Enums\TypeQuestion;
 use App\Exceptions\OcrAnalysisException;
 use App\Exceptions\OcrNotConfiguredException;
 use App\Models\QuestionnaireCampaign;
 use App\Support\CurrentAssociation;
 use App\Support\Demo;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 final class QuestionnaireOcrService
 {
+    public function __construct(private readonly RessentiScanMeasurer $mesureur) {}
+
     public static function isConfigured(): bool
     {
         return CurrentAssociation::tryGet()?->anthropic_api_key !== null;
@@ -70,7 +74,9 @@ final class QuestionnaireOcrService
             throw new OcrAnalysisException('Échec OCR questionnaire : '.$response->status());
         }
 
-        return $this->parse($response->json('content.0.text', ''));
+        $reponses = $this->parse($response->json('content.0.text', ''));
+
+        return $this->fusionnerMesuresRessenti($reponses, $campagne, $path, $mime);
     }
 
     /**
@@ -83,6 +89,49 @@ final class QuestionnaireOcrService
         $data = json_decode(trim((string) $text), true);
 
         return is_array($data) ? $data : [];
+    }
+
+    /**
+     * Remplace les valeurs « ressenti » estimées par le LLM par la mesure
+     * déterministe (analyse de pixels). Fail-safe : si le document n'a pas pu
+     * être analysé ou si le nombre de barres détectées ne correspond pas au
+     * nombre de questions ressenti, les valeurs LLM sont conservées.
+     *
+     * @param  array<string, array{value: mixed, confidence: float}>  $reponses
+     * @return array<string, array{value: mixed, confidence: float}>
+     */
+    private function fusionnerMesuresRessenti(array $reponses, QuestionnaireCampaign $campagne, string $path, string $mime): array
+    {
+        $questionsRessenti = $campagne->questions
+            ->filter(fn ($q): bool => $q->type === TypeQuestion::Ressenti)
+            ->values();
+
+        if ($questionsRessenti->isEmpty()) {
+            return $reponses;
+        }
+
+        $mesures = $this->mesureur->mesurerDocument($path, $mime);
+
+        if ($mesures === null || count($mesures) !== $questionsRessenti->count()) {
+            Log::info('Mesure pixel ressenti indisponible, valeurs LLM conservées.', [
+                'campaign_id' => $campagne->id,
+                'barres_detectees' => $mesures === null ? null : count($mesures),
+                'questions_ressenti' => $questionsRessenti->count(),
+            ]);
+
+            return $reponses;
+        }
+
+        foreach ($questionsRessenti as $i => $question) {
+            $mesure = $mesures[$i];
+
+            // Barre sans trait ou trait ambigu => revue manuelle (assistant de saisie)
+            $reponses[(string) $question->id] = ($mesure['pct'] !== null && $mesure['nbTraits'] === 1)
+                ? ['value' => (int) round($mesure['pct']), 'confidence' => 0.98]
+                : ['value' => null, 'confidence' => 0.0];
+        }
+
+        return $reponses;
     }
 
     private function buildPrompt(QuestionnaireCampaign $campagne): string
@@ -107,13 +156,13 @@ final class QuestionnaireOcrService
             "Format attendu : {\"<question_id>\":{\"value\":<valeur>,\"confidence\":<0.0-1.0>}}\n\n".
             "Règles par type :\n".
             "- satisfaction / satisfaction_texte_long : value = entier 1 à 5 (note smiley). Si un commentaire texte est écrit, ajouter un champ \"text\".\n".
-            "- ressenti : value = entier 0 à 100. Le participant a tracé un trait VERTICAL sur une barre horizontale. ".
-            "Pour chaque barre de ressenti, mesure SÉPARÉMENT et INDÉPENDAMMENT : ".
-            "(1) identifie le bord gauche et le bord droit de la barre, ".
-            "(2) mesure la position en pixels du trait vertical depuis le bord gauche, ".
-            "(3) mesure la longueur totale de la barre en pixels, ".
+            '- ressenti : value = entier 0 à 100. Le participant a tracé un trait VERTICAL sur une barre horizontale. '.
+            'Pour chaque barre de ressenti, mesure SÉPARÉMENT et INDÉPENDAMMENT : '.
+            '(1) identifie le bord gauche et le bord droit de la barre, '.
+            '(2) mesure la position en pixels du trait vertical depuis le bord gauche, '.
+            '(3) mesure la longueur totale de la barre en pixels, '.
             "(4) calcule (position / longueur) × 100 arrondi à l'entier. ".
-            "Deux barres successives ont souvent des valeurs DIFFÉRENTES — ne pas copier la valeur précédente. ".
+            'Deux barres successives ont souvent des valeurs DIFFÉRENTES — ne pas copier la valeur précédente. '.
             "Ne pas arrondir à 5 ou 10. Précision au pixel.\n".
             "- case_a_cocher : value = true ou false\n".
             "- choix_unique : value = la VALEUR TECHNIQUE (le code AVANT le signe =) de l'option cochée, PAS le libellé\n".
