@@ -143,3 +143,15 @@ it('retourne un tableau vide pour un fichier illisible', function (): void {
 
     expect((new RessentiMarkDetector)->mesurer($chemin))->toBe([]);
 });
+
+it('mesure les deux barres du scan réel de recette', function (): void {
+    $mesures = (new RessentiMarkDetector)->mesurer(
+        base_path('tests/fixtures/questionnaire/ressenti-scan-bars.png'),
+    );
+
+    expect($mesures)->toHaveCount(2);
+    expect($mesures[0]['pct'])->toEqualWithDelta(17.4, 1.5);
+    expect($mesures[0]['nbTraits'])->toBe(1);
+    expect($mesures[1]['pct'])->toEqualWithDelta(21.6, 1.5);
+    expect($mesures[1]['nbTraits'])->toBe(1);
+});
