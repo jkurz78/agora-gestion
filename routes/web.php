@@ -212,7 +212,7 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
             return view('questionnaire.campagnes.envoi', compact('campagne'));
         })->name('campagnes.envoi');
         Route::get('/campagnes/{campagne}/resultats', function (QuestionnaireCampaign $campagne) {
-            return view('questionnaire.resultats.index', compact('campagne'));
+            return redirect()->route('questionnaires.campagnes.show', ['campagne' => $campagne, 'tab' => 'resultats']);
         })->name('campagnes.resultats');
         Route::get('/campagnes/{campagne}/export', QuestionnaireExportController::class)
             ->name('campagnes.export');
@@ -232,7 +232,7 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
             return app(QuestionnaireImpressionService::class)->afficherAnonyme($campagne);
         })->name('campagnes.pdf-anonyme');
         Route::get('/campagnes/{campagne}/scans', function (QuestionnaireCampaign $campagne) {
-            return view('questionnaire.scans.index', compact('campagne'));
+            return redirect()->route('questionnaires.campagnes.show', ['campagne' => $campagne, 'tab' => 'scans']);
         })->name('campagnes.scans');
         Route::get('/scans/{scan}/image', QuestionnaireScanImageController::class)
             ->name('campagnes.scans.image');

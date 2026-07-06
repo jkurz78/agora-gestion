@@ -70,13 +70,13 @@ it('affiche la page Textes avec la barre de navigation complète', function (): 
         ->assertSee('Prévisualiser');
 });
 
-it('affiche la page résultats d une campagne (host page x-app-layout)', function (): void {
+it('affiche les résultats d une campagne (fiche campagne, onglet résultats)', function (): void {
     $campagne = QuestionnaireCampaign::factory()->create([
         'titre_affiche' => 'Satisfaction parcours juin',
         'statut' => 'ouverte',
     ]);
 
-    $this->get(route('questionnaires.campagnes.resultats', $campagne))
+    $this->get(route('questionnaires.campagnes.show', ['campagne' => $campagne, 'tab' => 'resultats']))
         ->assertOk()
         ->assertSee('Satisfaction parcours juin');
 });
