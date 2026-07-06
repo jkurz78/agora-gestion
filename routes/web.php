@@ -249,6 +249,10 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
         })->name('resultats.consolides');
         Route::get('/resultats/consolides/pdf', [QuestionnaireResultatsPdfController::class, 'consolides'])
             ->name('resultats.consolides.pdf');
+
+        Route::get('/campagnes/{campagne}', function (QuestionnaireCampaign $campagne) {
+            return view('questionnaire.campagnes.show', compact('campagne'));
+        })->name('campagnes.show');
     });
 
 // ── Dashboard ──

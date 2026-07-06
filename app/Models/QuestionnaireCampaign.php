@@ -50,4 +50,9 @@ final class QuestionnaireCampaign extends TenantModel
     {
         return $this->hasMany(QuestionnaireSubmission::class, 'campaign_id');
     }
+
+    public function paperScans(): HasMany
+    {
+        return $this->hasMany(QuestionnairePaperScan::class, 'campaign_id');
+    }
 }
