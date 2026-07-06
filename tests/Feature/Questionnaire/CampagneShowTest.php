@@ -9,8 +9,11 @@ use App\Models\Association;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\QuestionnaireCampaign;
+use App\Models\QuestionnaireInvitation;
 use App\Models\User;
+use App\Services\Questionnaire\QuestionnaireTokenService;
 use App\Tenant\TenantContext;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 
 function campagnePourFiche(string $statut = 'ouverte'): QuestionnaireCampaign
@@ -102,4 +105,62 @@ it('renvoie 404 pour la fiche d une campagne d une autre association (AC11)', fu
     $this->actingAs($userB)
         ->get(route('questionnaires.campagnes.show', ['campagne' => $campagneA->id]))
         ->assertNotFound();
+});
+
+// ── Assertions migrées depuis l'ancienne liste (OperationQuestionnairesTest) ──
+
+it('affiche le bouton Lancer et pas Ouvrir sur une campagne brouillon', function (): void {
+    $campagne = campagnePourFiche('brouillon');
+
+    Livewire::test(CampagneShow::class, ['campagne' => $campagne])
+        ->assertSee('Lancer')
+        ->assertDontSee('Ouvrir');
+});
+
+it('l onglet diffusion montre les liens envoi et PDF papier (non anonyme)', function (): void {
+    $op = Operation::factory()->create();
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'statut' => 'ouverte',
+        'anonymise' => false,
+    ]);
+
+    Livewire::withQueryParams(['tab' => 'diffusion'])
+        ->test(CampagneShow::class, ['campagne' => $campagne])
+        ->assertSee(route('questionnaires.campagnes.envoi', $campagne))
+        ->assertSee(route('questionnaires.campagnes.pdf', $campagne))
+        ->assertSee('PDF papier')
+        ->assertDontSee('Imprimer (anonyme)');
+});
+
+it('l onglet diffusion d une campagne anonyme montre Imprimer (anonyme)', function (): void {
+    $op = Operation::factory()->create();
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'statut' => 'ouverte',
+        'anonymise' => true,
+    ]);
+
+    Livewire::withQueryParams(['tab' => 'diffusion'])
+        ->test(CampagneShow::class, ['campagne' => $campagne])
+        ->assertSee('Imprimer (anonyme)')
+        ->assertSee(route('questionnaires.campagnes.pdf-anonyme', $campagne));
+});
+
+it('permet à l admin de rouvrir une invitation soumise depuis la fiche', function (): void {
+    $op = Operation::factory()->create();
+    $participant = Participant::factory()->create(['operation_id' => $op->id]);
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'statut' => 'ouverte',
+        'anonymise' => false,
+    ]);
+    $clair = Str::random(48);
+    $invitation = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create([
+        'participant_id' => $participant->id,
+        'token_hash' => app(QuestionnaireTokenService::class)->hash($clair),
+        'statut' => StatutInvitation::Soumis,
+    ]);
+
+    Livewire::test(CampagneShow::class, ['campagne' => $campagne])
+        ->call('rouvrirInvitation', (int) $invitation->id);
+
+    expect($invitation->fresh()->statut->value)->toBe('commence');
 });

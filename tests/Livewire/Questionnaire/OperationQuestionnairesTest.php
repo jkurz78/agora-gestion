@@ -3,15 +3,11 @@
 declare(strict_types=1);
 
 use App\Enums\StatutCampagne;
-use App\Enums\StatutInvitation;
 use App\Livewire\Questionnaire\OperationQuestionnaires;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\QuestionnaireCampaign;
-use App\Models\QuestionnaireInvitation;
 use App\Models\QuestionnaireTemplate;
-use App\Services\Questionnaire\QuestionnaireTokenService;
-use Illuminate\Support\Str;
 use Livewire\Livewire;
 
 it('crée une campagne depuis un modèle et génère les invitations des participants choisis', function (): void {
@@ -20,7 +16,7 @@ it('crée une campagne depuis un modèle et génère les invitations des partici
     $p2 = Participant::factory()->create(['operation_id' => $op->id]);
     $modele = QuestionnaireTemplate::factory()->create();
 
-    Livewire::test(OperationQuestionnaires::class, ['operation' => $op])
+    $component = Livewire::test(OperationQuestionnaires::class, ['operation' => $op])
         ->set('selectedTemplateId', $modele->id)
         ->set('selectedParticipants', [$p1->id, $p2->id])
         ->call('creerCampagne')
@@ -31,23 +27,12 @@ it('crée une campagne depuis un modèle et génère les invitations des partici
     $campagne = $op->questionnaireCampaigns->first();
     expect($campagne->statut)->toBe(StatutCampagne::Brouillon);
     expect($campagne->invitations)->toHaveCount(2);
+
+    // La création débouche directement sur la fiche campagne.
+    $component->assertRedirect(route('questionnaires.campagnes.show', $campagne));
 });
 
-it('ouvre une campagne brouillon', function (): void {
-    $op = Operation::factory()->create();
-    $modele = QuestionnaireTemplate::factory()->create();
-    $component = Livewire::test(OperationQuestionnaires::class, ['operation' => $op])
-        ->set('selectedTemplateId', $modele->id)
-        ->set('selectedParticipants', [])
-        ->call('creerCampagne');
-
-    $campagne = $op->fresh()->questionnaireCampaigns->first();
-    $component->call('ouvrir', $campagne->id);
-
-    expect($campagne->fresh()->statut)->toBe(StatutCampagne::Ouverte);
-});
-
-it('affiche le titre_affiche de la campagne dans la liste', function (): void {
+it('affiche le titre_affiche de la campagne avec un lien vers la fiche', function (): void {
     $op = Operation::factory()->create();
     $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
         'titre_affiche' => 'Évaluation de la formation',
@@ -55,28 +40,8 @@ it('affiche le titre_affiche de la campagne dans la liste', function (): void {
     ]);
 
     Livewire::test(OperationQuestionnaires::class, ['operation' => $op])
-        ->assertSee('Évaluation de la formation');
-});
-
-it('affiche le bouton Lancer et pas Ouvrir', function (): void {
-    $op = Operation::factory()->create();
-    QuestionnaireCampaign::factory()->for($op, 'operation')->create([
-        'statut' => StatutCampagne::Brouillon,
-    ]);
-
-    Livewire::test(OperationQuestionnaires::class, ['operation' => $op])
-        ->assertSee('Lancer')
-        ->assertDontSee('Ouvrir');
-});
-
-it('affiche un lien vers la page d envoi pour une campagne ouverte', function (): void {
-    $op = Operation::factory()->create();
-    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
-        'statut' => StatutCampagne::Ouverte,
-    ]);
-
-    Livewire::test(OperationQuestionnaires::class, ['operation' => $op])
-        ->assertSee(route('questionnaires.campagnes.envoi', $campagne));
+        ->assertSee('Évaluation de la formation')
+        ->assertSee(route('questionnaires.campagnes.show', $campagne));
 });
 
 it('n expose plus toggleEnvoi dans le composant liste', function (): void {
@@ -87,65 +52,10 @@ it('n expose plus toggleEnvoi dans le composant liste', function (): void {
     expect(method_exists($component->instance(), 'toggleEnvoi'))->toBeFalse();
 });
 
-it('affiche le lien PDF vers route questionnaires.campagnes.pdf pour une campagne ouverte', function (): void {
-    $op = Operation::factory()->create();
-    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
-        'statut' => StatutCampagne::Ouverte,
-        'anonymise' => false,
-    ]);
-
-    Livewire::test(OperationQuestionnaires::class, ['operation' => $op])
-        ->assertSee(route('questionnaires.campagnes.pdf', $campagne));
-});
-
 it('n expose plus toggleImpression dans le composant liste', function (): void {
     $op = Operation::factory()->create();
 
     $component = Livewire::test(OperationQuestionnaires::class, ['operation' => $op]);
 
     expect(method_exists($component->instance(), 'toggleImpression'))->toBeFalse();
-});
-
-it('permet à l admin de rouvrir une invitation soumise', function (): void {
-    $op = Operation::factory()->create();
-    $participant = Participant::factory()->create(['operation_id' => $op->id]);
-    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
-        'statut' => StatutCampagne::Ouverte,
-        'anonymise' => false,
-    ]);
-    $clair = Str::random(48);
-    $invitation = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create([
-        'participant_id' => $participant->id,
-        'token_hash' => app(QuestionnaireTokenService::class)->hash($clair),
-        'statut' => StatutInvitation::Soumis,
-    ]);
-
-    Livewire::test(OperationQuestionnaires::class, ['operation' => $op])
-        ->call('rouvrirInvitation', $invitation->id);
-
-    expect($invitation->fresh()->statut->value)->toBe('commence');
-});
-
-it('campagne anonymise affiche Imprimer anonyme dans le dropdown avec un lien vers la route pdf-anonyme', function (): void {
-    $op = Operation::factory()->create();
-    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
-        'statut' => StatutCampagne::Ouverte,
-        'anonymise' => true,
-    ]);
-
-    Livewire::test(OperationQuestionnaires::class, ['operation' => $op])
-        ->assertSee('Imprimer anonyme')
-        ->assertSee(route('questionnaires.campagnes.pdf-anonyme', $campagne));
-});
-
-it('campagne non-anonymise ne montre pas Imprimer anonyme', function (): void {
-    $op = Operation::factory()->create();
-    QuestionnaireCampaign::factory()->for($op, 'operation')->create([
-        'statut' => StatutCampagne::Ouverte,
-        'anonymise' => false,
-    ]);
-
-    Livewire::test(OperationQuestionnaires::class, ['operation' => $op])
-        ->assertDontSee('Imprimer anonyme')
-        ->assertSee('PDF papier');
 });
