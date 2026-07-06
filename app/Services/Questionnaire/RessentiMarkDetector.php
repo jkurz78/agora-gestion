@@ -33,6 +33,8 @@ final class RessentiMarkDetector
 
     private const MARGE_EXTREMITES = 7; // px exclus aux extrémités pour le calcul d'épaisseur
 
+    private const MARGE_BORD_VERTICAL = 0.02; // fraction de hauteur : une barre collée au bord = artefact de scan
+
     /**
      * @return list<array{pct: float|null, nbTraits: int}> une entrée par barre, de haut en bas
      */
@@ -73,7 +75,6 @@ final class RessentiMarkDetector
         $w = self::LARGEUR_ANALYSE;
         $h = (int) round(imagesy($source) * $w / imagesx($source));
         $img = imagescale($source, $w, $h);
-        imagedestroy($source);
         if ($img === false) {
             return null;
         }
@@ -88,7 +89,6 @@ final class RessentiMarkDetector
             }
             $sombre[] = $rangee;
         }
-        imagedestroy($img);
 
         return $sombre;
     }
@@ -103,6 +103,8 @@ final class RessentiMarkDetector
     private function detecterBarres(array $sombre, int $w): array
     {
         $longueurMin = (int) round(self::FRACTION_MIN * $w);
+        $h = count($sombre);
+        $margeY = (int) round(self::MARGE_BORD_VERTICAL * $h);
 
         // Rangées contenant une longue plage sombre
         $rangees = [];
@@ -131,6 +133,10 @@ final class RessentiMarkDetector
 
         $barres = [];
         foreach ($lignes as $ligne) {
+            // Artefacts de bord de scan (ombre de capot) exclus
+            if ($ligne['yDebut'] < $margeY || $ligne['yFin'] > $h - 1 - $margeY) {
+                continue;
+            }
             $fraction = ($ligne['x1'] - $ligne['x0']) / $w;
             if ($fraction >= self::FRACTION_MIN && $fraction <= self::FRACTION_MAX) {
                 $barres[] = [

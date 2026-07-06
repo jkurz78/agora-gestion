@@ -35,8 +35,9 @@ function cheminFixtureRessenti(): string
  * @param  list<list<float>>  $barres  une entrée par barre = positions des traits en %
  * @param  list<int>  $lignesEcriture  ordonnées Y des lignes d'écriture
  * @param  list<int>  $lignesCourtes  ordonnées Y des lignes courtes décoratives
+ * @param  bool  $avecArtefactsBord  bandes sombres collées aux bords haut/bas de la page
  */
-function creerScanRessentiSynthetique(array $barres, array $lignesEcriture = [], array $lignesCourtes = []): string
+function creerScanRessentiSynthetique(array $barres, array $lignesEcriture = [], array $lignesCourtes = [], bool $avecArtefactsBord = false): string
 {
     $w = 1654;
     $h = 1200;
@@ -61,10 +62,14 @@ function creerScanRessentiSynthetique(array $barres, array $lignesEcriture = [],
     foreach ($lignesCourtes as $yLigne) {
         imagefilledrectangle($img, (int) round($w * 0.10), $yLigne, (int) round($w * 0.30), $yLigne + 3, $noir);
     }
+    if ($avecArtefactsBord) {
+        // Bandes sombres collées aux bords haut/bas, comme l'ombre de capot d'un scanner
+        imagefilledrectangle($img, (int) round($w * 0.30), 0, (int) round($w * 0.70), 4, $noir);
+        imagefilledrectangle($img, (int) round($w * 0.30), $h - 5, (int) round($w * 0.70), $h - 1, $noir);
+    }
 
     $chemin = cheminFixtureRessenti();
     imagepng($img, $chemin);
-    imagedestroy($img);
 
     return $chemin;
 }
@@ -131,6 +136,14 @@ it('ignore les lignes d ecriture pleine largeur', function (): void {
 
 it('ignore les lignes courtes décoratives sous la longueur minimale', function (): void {
     $chemin = creerScanRessentiSynthetique([[55.0]], [], [600, 700, 800]);
+    $mesures = (new RessentiMarkDetector)->mesurer($chemin);
+
+    expect($mesures)->toHaveCount(1);
+    expect($mesures[0]['pct'])->toEqualWithDelta(55.0, 1.0);
+});
+
+it('ignore les artefacts de bord de scan (bandes sombres collées aux bords)', function (): void {
+    $chemin = creerScanRessentiSynthetique([[55.0]], [], [], true);
     $mesures = (new RessentiMarkDetector)->mesurer($chemin);
 
     expect($mesures)->toHaveCount(1);
