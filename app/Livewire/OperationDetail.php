@@ -10,12 +10,14 @@ use App\Models\EncadrementPrevision;
 use App\Models\Operation;
 use App\Models\Reglement;
 use Illuminate\Contracts\View\View;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 final class OperationDetail extends Component
 {
     public Operation $operation;
 
+    #[Url(as: 'tab')]
     public string $activeTab = 'participants';
 
     public function mount(Operation $operation): void

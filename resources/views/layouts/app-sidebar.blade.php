@@ -168,6 +168,11 @@
                                 <span style="color: rgba(255,255,255,.6);">{{ $breadcrumbGroup }}</span>
                             </li>
                         @endif
+                        @if(isset($breadcrumbGreatGrandParent))
+                            <li class="breadcrumb-item">
+                                <a href="{{ $breadcrumbGreatGrandParent->attributes['url'] }}" style="color: rgba(255,255,255,.6); text-decoration:none;">{{ $breadcrumbGreatGrandParent }}</a>
+                            </li>
+                        @endif
                         @if(isset($breadcrumbGrandParent))
                             <li class="breadcrumb-item">
                                 <a href="{{ $breadcrumbGrandParent->attributes['url'] }}" style="color: rgba(255,255,255,.6); text-decoration:none;">{{ $breadcrumbGrandParent }}</a>
