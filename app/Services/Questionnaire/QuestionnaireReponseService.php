@@ -319,8 +319,9 @@ final class QuestionnaireReponseService
         array $commentairesParQuestionId = [],
         bool $accepteContact = false,
         bool $remplacer = false,
+        ?int $paperScanId = null,
     ): QuestionnaireSubmission {
-        return DB::transaction(function () use ($invitation, $valeursParQuestionId, $commentairesParQuestionId, $accepteContact, $remplacer): QuestionnaireSubmission {
+        return DB::transaction(function () use ($invitation, $valeursParQuestionId, $commentairesParQuestionId, $accepteContact, $remplacer, $paperScanId): QuestionnaireSubmission {
             $active = $invitation->submissions()
                 ->whereIn('statut', [StatutSubmission::EnCours->value, StatutSubmission::Soumise->value])
                 ->first();
@@ -335,6 +336,7 @@ final class QuestionnaireReponseService
                 'statut' => StatutSubmission::EnCours,
                 'source' => 'papier',
                 'active_key' => null,
+                'paper_scan_id' => $paperScanId,
             ]);
 
             // Enregistre les réponses
@@ -388,8 +390,9 @@ final class QuestionnaireReponseService
         ?string $contactNom = null,
         ?int $participantId = null,
         bool $remplacer = false,
+        ?int $paperScanId = null,
     ): QuestionnaireSubmission {
-        return DB::transaction(function () use ($bearer, $valeursParQuestionId, $commentairesParQuestionId, $accepteContact, $contactNom, $participantId): QuestionnaireSubmission {
+        return DB::transaction(function () use ($bearer, $valeursParQuestionId, $commentairesParQuestionId, $accepteContact, $contactNom, $participantId, $paperScanId): QuestionnaireSubmission {
             $nouvelle = QuestionnaireSubmission::create([
                 'campaign_id' => $bearer->campaign_id,
                 'invitation_id' => null,
@@ -397,6 +400,7 @@ final class QuestionnaireReponseService
                 'statut' => StatutSubmission::EnCours,
                 'source' => 'papier',
                 'active_key' => null,
+                'paper_scan_id' => $paperScanId,
             ]);
 
             $questions = $bearer->campaign->questions()->get()->keyBy('id');

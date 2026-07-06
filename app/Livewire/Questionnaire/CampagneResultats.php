@@ -47,17 +47,17 @@ final class CampagneResultats extends Component
             ->get();
 
         $scanParSubmission = collect();
+        $scansParId = $scans->keyBy(fn ($s) => (int) $s->id);
         $scansParInvitation = $scans->whereNotNull('invitation_id')->keyBy(fn ($s) => (int) $s->invitation_id);
-        $scansBearerRestants = $scans->whereNull('invitation_id')->whereNotNull('bearer_token_id')->values();
-        $bearerIndex = 0;
 
         foreach ($submissions->where('source', 'papier') as $sub) {
-            if ($sub->invitation_id !== null && $scansParInvitation->has((int) $sub->invitation_id)) {
+            if ($sub->paper_scan_id !== null && $scansParId->has((int) $sub->paper_scan_id)) {
+                $scanParSubmission[(int) $sub->id] = $scansParId->get((int) $sub->paper_scan_id);
+            } elseif ($sub->invitation_id !== null && $scansParInvitation->has((int) $sub->invitation_id)) {
+                // Repli fiable pour l'historique d'avant paper_scan_id (scans nominatifs)
                 $scanParSubmission[(int) $sub->id] = $scansParInvitation->get((int) $sub->invitation_id);
-            } elseif ($sub->bearer_token_id !== null && isset($scansBearerRestants[$bearerIndex])) {
-                $scanParSubmission[(int) $sub->id] = $scansBearerRestants[$bearerIndex];
-                $bearerIndex++;
             }
+            // Bearer historique sans lien : pas de badge scan (jamais d'appariement positionnel)
         }
 
         return view('livewire.questionnaire.campagne-resultats', [

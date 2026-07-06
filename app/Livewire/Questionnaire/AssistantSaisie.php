@@ -145,6 +145,7 @@ final class AssistantSaisie extends Component
                 commentairesParQuestionId: $this->commentaires,
                 accepteContact: $this->accepteContact,
                 remplacer: $hasExisting,
+                paperScanId: (int) $this->scan->id,
             );
         } else {
             $service->creerDepuisOcrAnonyme(
@@ -154,6 +155,7 @@ final class AssistantSaisie extends Component
                 accepteContact: $this->accepteContact,
                 contactNom: $nomContact,
                 participantId: $this->accepteContact ? $this->participantId : null,
+                paperScanId: (int) $this->scan->id,
             );
         }
 

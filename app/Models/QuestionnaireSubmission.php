@@ -16,7 +16,7 @@ final class QuestionnaireSubmission extends TenantModel
 
     protected $fillable = [
         'association_id', 'campaign_id', 'invitation_id', 'bearer_token_id', 'statut', 'accepte_contact', 'contact_nom', 'source', 'submitted_at',
-        'remplacee_par_id', 'active_key',
+        'remplacee_par_id', 'active_key', 'paper_scan_id',
     ];
 
     protected function casts(): array
