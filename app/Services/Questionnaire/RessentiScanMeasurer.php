@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Questionnaire;
 
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Spatie\PdfToImage\Enums\OutputFormat;
 use Spatie\PdfToImage\Pdf as PdfToImage;
@@ -16,6 +17,8 @@ use Throwable;
  */
 final class RessentiScanMeasurer
 {
+    private const MAX_PAGES = 10; // au-delà : document hors gabarit questionnaire, fail-safe
+
     public function __construct(private readonly RessentiMarkDetector $detecteur) {}
 
     /**
@@ -34,6 +37,9 @@ final class RessentiScanMeasurer
 
         try {
             $pdf = (new PdfToImage($path))->resolution(200)->format(OutputFormat::Png);
+            if ($pdf->pageCount() > self::MAX_PAGES) {
+                return null;
+            }
             $mesures = [];
             for ($page = 1; $page <= $pdf->pageCount(); $page++) {
                 $png = $prefixe.'-p'.$page.'.png';
@@ -45,7 +51,12 @@ final class RessentiScanMeasurer
             }
 
             return $mesures;
-        } catch (Throwable) {
+        } catch (Throwable $e) {
+            Log::warning('Rasterisation du scan questionnaire impossible.', [
+                'mime' => $mime,
+                'erreur' => $e->getMessage(),
+            ]);
+
             return null;
         } finally {
             foreach ($pages as $png) {

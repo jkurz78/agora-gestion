@@ -33,3 +33,19 @@ it('retourne null quand le PDF est illisible', function (): void {
     expect(app(RessentiScanMeasurer::class)->mesurerDocument($chemin, 'application/pdf'))->toBeNull();
     @unlink($chemin);
 })->skip(fn (): bool => ! extension_loaded('imagick'), 'Imagick requis pour la rasterisation PDF');
+
+it('refuse les PDF dépassant le plafond de pages', function (): void {
+    $chemin = sys_get_temp_dir().'/onze-pages-'.uniqid().'.pdf';
+    $imagick = new Imagick;
+    for ($i = 0; $i < 11; $i++) {
+        $page = new Imagick;
+        $page->newImage(200, 280, 'white');
+        $page->setImageFormat('pdf');
+        $imagick->addImage($page);
+    }
+    $imagick->setImageFormat('pdf');
+    $imagick->writeImages($chemin, true);
+
+    expect(app(RessentiScanMeasurer::class)->mesurerDocument($chemin, 'application/pdf'))->toBeNull();
+    @unlink($chemin);
+})->skip(fn (): bool => ! extension_loaded('imagick'), 'Imagick requis pour la rasterisation PDF');
