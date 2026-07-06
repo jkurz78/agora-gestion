@@ -163,7 +163,7 @@ final class AssistantSaisie extends Component
         $this->scan->update(['statut' => 'traite']);
 
         session()->flash('scan_ok', 'Réponse papier enregistrée.');
-        $this->redirect(route('questionnaires.campagnes.scans', $this->scan->campaign_id));
+        $this->redirect(route('questionnaires.campagnes.show', ['campagne' => $this->scan->campaign_id, 'tab' => 'scans']));
     }
 
     public function ignorer(): void
@@ -172,6 +172,6 @@ final class AssistantSaisie extends Component
         $this->scan->update(['statut' => 'ignore']);
 
         session()->flash('scan_ok', 'Scan ignoré.');
-        $this->redirect(route('questionnaires.campagnes.scans', $this->scan->campaign_id));
+        $this->redirect(route('questionnaires.campagnes.show', ['campagne' => $this->scan->campaign_id, 'tab' => 'scans']));
     }
 }

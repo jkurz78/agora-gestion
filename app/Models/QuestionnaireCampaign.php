@@ -36,6 +36,11 @@ final class QuestionnaireCampaign extends TenantModel
         return $this->belongsTo(Operation::class);
     }
 
+    public function template(): BelongsTo
+    {
+        return $this->belongsTo(QuestionnaireTemplate::class, 'template_id');
+    }
+
     public function questions(): HasMany
     {
         return $this->hasMany(QuestionnaireCampaignQuestion::class, 'campaign_id')->orderBy('ordre');

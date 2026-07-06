@@ -10,6 +10,7 @@ use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\QuestionnaireCampaign;
 use App\Models\QuestionnaireInvitation;
+use App\Models\QuestionnaireTemplate;
 use App\Models\User;
 use App\Services\Questionnaire\QuestionnaireTokenService;
 use App\Tenant\TenantContext;
@@ -105,6 +106,18 @@ it('renvoie 404 pour la fiche d une campagne d une autre association (AC11)', fu
     $this->actingAs($userB)
         ->get(route('questionnaires.campagnes.show', ['campagne' => $campagneA->id]))
         ->assertNotFound();
+});
+
+it('affiche le modèle source dans l en-tête de la fiche (spec D2)', function (): void {
+    $op = Operation::factory()->create();
+    $template = QuestionnaireTemplate::factory()->create(['titre_interne' => 'Satisfaction générique']);
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'statut' => 'ouverte',
+        'template_id' => $template->id,
+    ]);
+
+    Livewire::test(CampagneShow::class, ['campagne' => $campagne])
+        ->assertSee('Satisfaction générique');
 });
 
 // ── Assertions migrées depuis l'ancienne liste (OperationQuestionnairesTest) ──

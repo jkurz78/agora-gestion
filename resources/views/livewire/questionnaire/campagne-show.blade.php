@@ -16,6 +16,9 @@
             </h1>
             <div class="text-muted small">
                 Créée le {{ $campagne->created_at->format('d/m/Y') }}
+                @if ($campagne->template !== null)
+                    — modèle « {{ $campagne->template->titre_interne }} »
+                @endif
                 — opération {{ $campagne->operation->nom }}
             </div>
         </div>

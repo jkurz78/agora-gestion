@@ -18,6 +18,16 @@ it('ouvre l onglet questionnaires de la fiche opération via ?tab=', function ()
         ->assertSet('activeTab', 'questionnaires');
 });
 
+it('retombe sur participants pour un onglet opération inconnu', function (): void {
+    $op = Operation::factory()->create();
+
+    $this->actingAs(User::factory()->create());
+
+    Livewire::withQueryParams(['tab' => 'nimporte'])
+        ->test(OperationDetail::class, ['operation' => $op])
+        ->assertSet('activeTab', 'participants');
+});
+
 it('redirige l ancienne route résultats vers la fiche', function (): void {
     $op = Operation::factory()->create();
     $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['statut' => 'ouverte']);

@@ -10,6 +10,7 @@ use App\Models\QuestionnaireCampaign;
 use App\Models\QuestionnaireCampaignQuestion;
 use App\Models\QuestionnaireOcrDraft;
 use App\Models\QuestionnairePaperScan;
+use App\Models\User;
 use Livewire\Livewire;
 
 function makeAssistantFixture(): array
@@ -59,15 +60,22 @@ it('préremplie les valeurs depuis le payload OCR', function (): void {
 it('valider crée une soumission papier et marque le draft validé', function (): void {
     ['scan' => $scan, 'q1' => $q1, 'draft' => $draft, 'invitation' => $invitation] = makeAssistantFixture();
 
+    $cible = route('questionnaires.campagnes.show', ['campagne' => $scan->campaign_id, 'tab' => 'scans']);
+
+    $this->actingAs(User::factory()->create());
+
     Livewire::test(AssistantSaisie::class, ['scan' => $scan])
         ->set('valeurs.'.$q1->id, 5)
         ->set('accepteContact', false)
         ->call('valider')
-        ->assertRedirect();
+        ->assertRedirect($cible);
 
     expect($draft->fresh()->statut)->toBe('valide');
     expect($scan->fresh()->statut)->toBe('traite');
     expect($invitation->fresh()->statut)->toBe(StatutInvitation::Soumis);
+
+    // Redirect direct (sans hop 302 intermédiaire) : le flash survit jusqu'à la fiche.
+    $this->get($cible)->assertSee('Réponse papier enregistrée.');
 });
 
 it('ignorer marque le draft rejeté et le scan ignoré', function (): void {
@@ -75,7 +83,7 @@ it('ignorer marque le draft rejeté et le scan ignoré', function (): void {
 
     Livewire::test(AssistantSaisie::class, ['scan' => $scan])
         ->call('ignorer')
-        ->assertRedirect();
+        ->assertRedirect(route('questionnaires.campagnes.show', ['campagne' => $scan->campaign_id, 'tab' => 'scans']));
 
     expect($draft->fresh()->statut)->toBe('rejete');
     expect($scan->fresh()->statut)->toBe('ignore');

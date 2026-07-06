@@ -15,6 +15,11 @@ use Livewire\Component;
 
 final class OperationDetail extends Component
 {
+    private const ONGLETS = [
+        'details', 'participants', 'animateurs', 'seances',
+        'reglements', 'questionnaires', 'communication', 'compte_resultat',
+    ];
+
     public Operation $operation;
 
     #[Url(as: 'tab')]
@@ -23,6 +28,9 @@ final class OperationDetail extends Component
     public function mount(Operation $operation): void
     {
         $this->operation = $operation->loadMissing('typeOperation.sousCategorie');
+        if (! in_array($this->activeTab, self::ONGLETS, true)) {
+            $this->activeTab = 'participants';
+        }
     }
 
     public function setTab(string $tab): void
