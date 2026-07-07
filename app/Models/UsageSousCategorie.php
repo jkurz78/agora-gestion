@@ -17,6 +17,7 @@ final class UsageSousCategorie extends TenantModel
     protected $fillable = [
         'association_id',
         'sous_categorie_id',
+        'compte_id',
         'usage',
     ];
 
@@ -25,6 +26,7 @@ final class UsageSousCategorie extends TenantModel
         return [
             'association_id' => 'integer',
             'sous_categorie_id' => 'integer',
+            'compte_id' => 'integer',
             'usage' => UsageComptable::class,
         ];
     }
@@ -32,6 +34,11 @@ final class UsageSousCategorie extends TenantModel
     public function sousCategorie(): BelongsTo
     {
         return $this->belongsTo(SousCategorie::class);
+    }
+
+    public function compte(): BelongsTo
+    {
+        return $this->belongsTo(Compte::class, 'compte_id');
     }
 
     public function association(): BelongsTo

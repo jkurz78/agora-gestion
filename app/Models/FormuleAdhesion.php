@@ -26,6 +26,7 @@ final class FormuleAdhesion extends TenantModel
         'montant_par_defaut',
         'deductible_fiscal',
         'sous_categorie_id',
+        'compte_id',
         'actif',
         'est_helloasso',
         'helloasso_form_slug',
@@ -41,6 +42,7 @@ final class FormuleAdhesion extends TenantModel
         'montant_par_defaut' => 'decimal:2',
         'deductible_fiscal' => 'boolean',
         'sous_categorie_id' => 'integer',
+        'compte_id' => 'integer',
         'actif' => 'boolean',
         'est_helloasso' => 'boolean',
         'helloasso_tier_id' => 'integer',
@@ -96,6 +98,11 @@ final class FormuleAdhesion extends TenantModel
     public function sousCategorie(): BelongsTo
     {
         return $this->belongsTo(SousCategorie::class, 'sous_categorie_id');
+    }
+
+    public function compte(): BelongsTo
+    {
+        return $this->belongsTo(Compte::class, 'compte_id');
     }
 
     public function scopeActif(Builder $query): Builder

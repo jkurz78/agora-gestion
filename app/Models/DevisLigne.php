@@ -28,6 +28,7 @@ final class DevisLigne extends Model
         'quantite',
         'montant',
         'sous_categorie_id',
+        'compte_id',
     ];
 
     protected function casts(): array
@@ -40,6 +41,7 @@ final class DevisLigne extends Model
             'quantite' => 'decimal:3',
             'montant' => 'decimal:2',
             'sous_categorie_id' => 'integer',
+            'compte_id' => 'integer',
         ];
     }
 
@@ -51,5 +53,10 @@ final class DevisLigne extends Model
     public function sousCategorie(): BelongsTo
     {
         return $this->belongsTo(SousCategorie::class);
+    }
+
+    public function compte(): BelongsTo
+    {
+        return $this->belongsTo(Compte::class, 'compte_id');
     }
 }

@@ -21,6 +21,7 @@ final class Provision extends TenantModel
         'exercice',
         'type',
         'sous_categorie_id',
+        'compte_id',
         'libelle',
         'montant',
         'tiers_id',
@@ -42,6 +43,7 @@ final class Provision extends TenantModel
             'montant' => 'decimal:2',
             'exercice' => 'integer',
             'sous_categorie_id' => 'integer',
+            'compte_id' => 'integer',
             'tiers_id' => 'integer',
             'operation_id' => 'integer',
             'seance' => 'integer',
@@ -52,6 +54,11 @@ final class Provision extends TenantModel
     public function sousCategorie(): BelongsTo
     {
         return $this->belongsTo(SousCategorie::class);
+    }
+
+    public function compte(): BelongsTo
+    {
+        return $this->belongsTo(Compte::class, 'compte_id');
     }
 
     public function tiers(): BelongsTo

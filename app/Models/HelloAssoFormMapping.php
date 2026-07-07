@@ -23,6 +23,7 @@ final class HelloAssoFormMapping extends Model
         'ignore',
         'imported_at',
         'sous_categorie_id',
+        'compte_id',
     ];
 
     protected function casts(): array
@@ -35,6 +36,7 @@ final class HelloAssoFormMapping extends Model
             'ignore' => 'boolean',
             'imported_at' => 'datetime',
             'sous_categorie_id' => 'integer',
+            'compte_id' => 'integer',
         ];
     }
 
@@ -51,5 +53,10 @@ final class HelloAssoFormMapping extends Model
     public function sousCategorie(): BelongsTo
     {
         return $this->belongsTo(SousCategorie::class);
+    }
+
+    public function compte(): BelongsTo
+    {
+        return $this->belongsTo(Compte::class, 'compte_id');
     }
 }

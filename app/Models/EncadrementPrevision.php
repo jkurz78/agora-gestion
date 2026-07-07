@@ -15,6 +15,7 @@ final class EncadrementPrevision extends TenantModel
         'operation_id',
         'tiers_id',
         'sous_categorie_id',
+        'compte_id',
         'seance_id',
         'montant_prevu',
     ];
@@ -23,6 +24,8 @@ final class EncadrementPrevision extends TenantModel
     {
         return [
             'montant_prevu' => 'decimal:2',
+            'sous_categorie_id' => 'integer',
+            'compte_id' => 'integer',
         ];
     }
 
@@ -39,6 +42,11 @@ final class EncadrementPrevision extends TenantModel
     public function sousCategorie(): BelongsTo
     {
         return $this->belongsTo(SousCategorie::class);
+    }
+
+    public function compte(): BelongsTo
+    {
+        return $this->belongsTo(Compte::class, 'compte_id');
     }
 
     public function seance(): BelongsTo
