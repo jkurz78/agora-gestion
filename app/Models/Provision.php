@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\TypeTransaction;
+use App\Models\Concerns\SyncCompteDepuisSousCategorie;
 use App\Traits\TenantStorage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 final class Provision extends TenantModel
 {
-    use HasFactory, SoftDeletes, TenantStorage;
+    use HasFactory, SoftDeletes, SyncCompteDepuisSousCategorie, TenantStorage;
 
     protected $fillable = [
         'association_id',

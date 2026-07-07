@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\TypeLigneDevis;
+use App\Models\Concerns\SyncCompteDepuisSousCategorie;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 final class DevisLigne extends Model
 {
     use HasFactory;
+    use SyncCompteDepuisSousCategorie;
 
     /**
      * DevisLigne n'a pas de timestamps — c'est une ligne de document,

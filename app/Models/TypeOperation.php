@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Concerns\SyncCompteDepuisSousCategorie;
 use App\Support\CurrentAssociation;
 use App\Traits\TenantStorage;
 use Illuminate\Database\Eloquent\Builder;
@@ -14,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 final class TypeOperation extends TenantModel
 {
     use HasFactory;
+    use SyncCompteDepuisSousCategorie;
     use TenantStorage;
 
     protected $fillable = [

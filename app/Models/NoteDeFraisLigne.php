@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\NoteDeFraisLigneType;
+use App\Models\Concerns\SyncCompteDepuisSousCategorie;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,6 +14,7 @@ use Illuminate\Support\Facades\Storage;
 final class NoteDeFraisLigne extends Model
 {
     use HasFactory;
+    use SyncCompteDepuisSousCategorie;
 
     protected $table = 'notes_de_frais_lignes';
 

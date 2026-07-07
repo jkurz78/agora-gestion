@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Concerns\SyncCompteDepuisSousCategorie;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,6 +14,7 @@ final class FormuleAdhesion extends TenantModel
 {
     use HasFactory;
     use SoftDeletes;
+    use SyncCompteDepuisSousCategorie;
 
     protected $table = 'formules_adhesion';
 

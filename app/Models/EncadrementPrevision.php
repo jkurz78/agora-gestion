@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Concerns\SyncCompteDepuisSousCategorie;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 final class EncadrementPrevision extends TenantModel
 {
     use HasFactory;
+    use SyncCompteDepuisSousCategorie;
 
     protected $fillable = [
         'operation_id',

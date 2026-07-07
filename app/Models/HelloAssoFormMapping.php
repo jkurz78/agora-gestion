@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Concerns\SyncCompteDepuisSousCategorie;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 final class HelloAssoFormMapping extends Model
 {
+    use SyncCompteDepuisSousCategorie;
+
     protected $table = 'helloasso_form_mappings';
 
     protected $fillable = [

@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\UsageComptable;
+use App\Models\Concerns\SyncCompteDepuisSousCategorie;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 final class UsageSousCategorie extends TenantModel
 {
     use HasFactory;
+    use SyncCompteDepuisSousCategorie;
 
     protected $table = 'usages_sous_categories';
 

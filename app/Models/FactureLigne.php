@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\TypeLigneFacture;
+use App\Models\Concerns\SyncCompteDepuisSousCategorie;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 final class FactureLigne extends Model
 {
+    use SyncCompteDepuisSousCategorie;
+
     protected $table = 'facture_lignes';
 
     public $timestamps = false;

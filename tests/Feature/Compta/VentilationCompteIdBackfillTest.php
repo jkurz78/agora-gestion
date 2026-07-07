@@ -51,18 +51,23 @@ it('remplit compte_id sur budget_lines (cas représentatif)', function () {
     $associationId = TenantContext::currentId();
     $sousCategorie = creerSousCategorieEtCompte($associationId);
 
-    $budgetLine = BudgetLine::factory()->create([
+    // Insertion minimale via DB::table pour simuler une ligne "legacy" créée
+    // avant DC-3 (le trait SyncCompteDepuisSousCategorie synchroniserait
+    // compte_id dès la création si on passait par Eloquent).
+    $budgetLineId = DB::table('budget_lines')->insertGetId([
         'association_id' => $associationId,
         'sous_categorie_id' => $sousCategorie->id,
+        'exercice' => 2025,
+        'montant_prevu' => 100,
+        'created_at' => now(),
+        'updated_at' => now(),
     ]);
 
     $resultat = VentilationCompteIdBackfiller::backfill();
 
-    $budgetLine->refresh();
-
     $compte = Compte::where('numero_pcg', '706A')->where('association_id', $associationId)->first();
 
-    expect((int) $budgetLine->compte_id)->toBe((int) $compte->id)
+    expect((int) DB::table('budget_lines')->where('id', $budgetLineId)->value('compte_id'))->toBe((int) $compte->id)
         ->and($resultat['budget_lines'])->toBe(1);
 });
 
@@ -71,10 +76,15 @@ it('couvre les 10 tables de ventilation', function () {
     $sousCategorie = creerSousCategorieEtCompte($associationId);
     $scId = $sousCategorie->id;
 
-    // budget_lines
-    $budgetLine = BudgetLine::factory()->create([
+    // budget_lines (pas de factory ici — insertion minimale via DB::table pour
+    // simuler une ligne "legacy" créée avant DC-3, cf. commentaire ci-dessus)
+    $budgetLineId = DB::table('budget_lines')->insertGetId([
         'association_id' => $associationId,
         'sous_categorie_id' => $scId,
+        'exercice' => 2025,
+        'montant_prevu' => 100,
+        'created_at' => now(),
+        'updated_at' => now(),
     ]);
 
     // facture_lignes (pas de factory — insertion minimale via DB::table)
@@ -156,7 +166,7 @@ it('couvre les 10 tables de ventilation', function () {
     $compte = Compte::where('numero_pcg', '706A')->where('association_id', $associationId)->first();
     $compteId = (int) $compte->id;
 
-    expect((int) $budgetLine->refresh()->compte_id)->toBe($compteId)
+    expect((int) DB::table('budget_lines')->where('id', $budgetLineId)->value('compte_id'))->toBe($compteId)
         ->and((int) DB::table('facture_lignes')->where('id', $factureLigneId)->value('compte_id'))->toBe($compteId)
         ->and((int) $devisLigne->refresh()->compte_id)->toBe($compteId)
         ->and((int) $formule->refresh()->compte_id)->toBe($compteId)
@@ -191,9 +201,14 @@ it('est idempotent : un second passage ne modifie plus rien', function () {
     $associationId = TenantContext::currentId();
     $sousCategorie = creerSousCategorieEtCompte($associationId);
 
-    BudgetLine::factory()->create([
+    // Insertion minimale via DB::table pour simuler une ligne "legacy" (cf. plus haut).
+    DB::table('budget_lines')->insert([
         'association_id' => $associationId,
         'sous_categorie_id' => $sousCategorie->id,
+        'exercice' => 2025,
+        'montant_prevu' => 100,
+        'created_at' => now(),
+        'updated_at' => now(),
     ]);
 
     $premierPassage = VentilationCompteIdBackfiller::backfill();
