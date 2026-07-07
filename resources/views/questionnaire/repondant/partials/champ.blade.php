@@ -301,4 +301,99 @@
             </select>
         @endif
         @break
+
+    @case('date')
+        <input type="date"
+               class="form-control"
+               name="{{ $fieldName }}"
+               value="{{ $oldValue }}">
+        @break
+
+    @case('choix_multiple')
+        @php
+            $options = $question->options();
+            $selected = is_array($oldValue) ? $oldValue : (is_string($oldValue) ? json_decode($oldValue, true) ?? [] : []);
+        @endphp
+        <div class="d-flex flex-column gap-2">
+            <div class="small text-muted fst-italic mb-1">Cochez une ou plusieurs réponses</div>
+            @foreach ($options as $opt)
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox"
+                           name="{{ $fieldName }}[]"
+                           id="{{ $fieldName }}_{{ $loop->index }}"
+                           value="{{ $opt['valeur'] }}"
+                           {{ in_array($opt['valeur'], $selected, true) ? 'checked' : '' }}>
+                    <label class="form-check-label" for="{{ $fieldName }}_{{ $loop->index }}">
+                        {{ $opt['libelle'] }}
+                    </label>
+                </div>
+            @endforeach
+        </div>
+        @break
+
+    @case('nombre')
+        <input type="number"
+               step="any"
+               class="form-control"
+               name="{{ $fieldName }}"
+               value="{{ $oldValue }}"
+               @if (isset($question->config['min'])) min="{{ $question->config['min'] }}" @endif
+               @if (isset($question->config['max'])) max="{{ $question->config['max'] }}" @endif>
+        @break
+
+    @case('email')
+        @php $emailFieldId = preg_replace('/[^a-z0-9_-]/i', '_', $fieldName); @endphp
+        <input type="email"
+               class="form-control mb-2"
+               name="{{ $fieldName }}"
+               id="email_{{ $emailFieldId }}"
+               value="{{ $oldValue }}"
+               placeholder="Adresse email">
+        <input type="email"
+               class="form-control"
+               id="email_confirm_{{ $emailFieldId }}"
+               placeholder="Confirmez votre adresse email">
+        <div class="invalid-feedback" id="email_error_{{ $emailFieldId }}" style="display:none;">
+            Les adresses ne correspondent pas.
+        </div>
+        <script>
+        (function () {
+            var e1 = document.getElementById('email_{{ $emailFieldId }}');
+            var e2 = document.getElementById('email_confirm_{{ $emailFieldId }}');
+            var err = document.getElementById('email_error_{{ $emailFieldId }}');
+            if (!e1 || !e2) return;
+            function check() {
+                var mismatch = e2.value !== '' && e1.value !== e2.value;
+                e2.classList.toggle('is-invalid', mismatch);
+                err.style.display = mismatch ? 'block' : 'none';
+            }
+            e2.addEventListener('input', check);
+            e1.addEventListener('input', check);
+            var form = e1.closest('form');
+            if (form) {
+                form.addEventListener('submit', function (ev) {
+                    if (e2.value !== '' && e1.value !== e2.value) {
+                        ev.preventDefault();
+                        e2.classList.add('is-invalid');
+                        err.style.display = 'block';
+                        e2.focus();
+                    }
+                });
+            }
+        })();
+        </script>
+        @break
+
+    @case('selection_numerique')
+        @php
+            $selMin = (int) ($question->config['min'] ?? 0);
+            $selMax = (int) ($question->config['max'] ?? 100);
+        @endphp
+        <select class="form-select" name="{{ $fieldName }}">
+            <option value="">— Choisir —</option>
+            @for ($i = $selMin; $i <= $selMax; $i++)
+                <option value="{{ $i }}" {{ (string) $oldValue === (string) $i ? 'selected' : '' }}>{{ $i }}</option>
+            @endfor
+        </select>
+        @break
 @endswitch
