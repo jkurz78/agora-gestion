@@ -97,10 +97,11 @@ final class QuestionnaireExcelExporter
         }
 
         return match ($type) {
-            TypeQuestion::TexteCourt, TypeQuestion::TexteLong => $answer->value_text ?? '',
-            TypeQuestion::Satisfaction, TypeQuestion::SatisfactionTexteLong, TypeQuestion::Ressenti => $answer->value_integer ?? '',
+            TypeQuestion::TexteCourt, TypeQuestion::TexteLong, TypeQuestion::Date, TypeQuestion::Nombre, TypeQuestion::Email => $answer->value_text ?? '',
+            TypeQuestion::Satisfaction, TypeQuestion::SatisfactionTexteLong, TypeQuestion::Ressenti, TypeQuestion::SelectionNumerique => $answer->value_integer ?? '',
             TypeQuestion::CaseACocher => $answer->value_boolean ? 'Oui' : 'Non',
             TypeQuestion::ChoixUnique => $question->libelleOption((string) $answer->value_option) ?? ($answer->value_option ?? ''),
+            TypeQuestion::ChoixMultiple => implode(', ', (array) ($answer->value_meta['libelles'] ?? json_decode((string) ($answer->value_option ?? '[]'), true))),
         };
     }
 }

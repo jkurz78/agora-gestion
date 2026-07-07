@@ -166,7 +166,12 @@ final class QuestionnaireOcrService
             "Ne pas arrondir à 5 ou 10. Précision au pixel.\n".
             "- case_a_cocher : value = true ou false\n".
             "- choix_unique : value = la VALEUR TECHNIQUE (le code AVANT le signe =) de l'option cochée, PAS le libellé\n".
-            "- texte_court / texte_long : value = transcription du texte manuscrit\n\n".
+            "- texte_court / texte_long : value = transcription du texte manuscrit\n".
+            "- date : value = date au format AAAA-MM-JJ\n".
+            "- choix_multiple : value = tableau JSON des VALEURS TECHNIQUES cochées (les codes AVANT le signe =)\n".
+            "- nombre : value = nombre (entier ou décimal)\n".
+            "- email : value = adresse email\n".
+            "- selection_numerique : value = entier entre les bornes indiquées dans le libellé de la question\n\n".
             "Si une question n'a pas de réponse lisible, mets confidence à 0 et value à null.\n\n".
             "En plus des questions, cherche une case cochée {$consentementTexte} ".
             "(souvent en bas du formulaire). Ajoute une clé \"_accepte_contact\" avec value true/false.\n".
@@ -186,6 +191,11 @@ final class QuestionnaireOcrService
                     'satisfaction', 'satisfaction_texte_long' => 4,
                     'ressenti' => 65,
                     'case_a_cocher' => true,
+                    'date' => '2026-01-15',
+                    'choix_multiple' => $q->options() !== [] ? [$q->options()[0]['valeur']] : ['opt_1'],
+                    'nombre' => 42,
+                    'email' => 'exemple@email.fr',
+                    'selection_numerique' => intdiv(($q->config['min'] ?? 1) + ($q->config['max'] ?? 10), 2),
                     default => 'exemple',
                 }, 'confidence' => 0.75],
             ])->all();

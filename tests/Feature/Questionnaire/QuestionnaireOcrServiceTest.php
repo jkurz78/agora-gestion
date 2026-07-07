@@ -138,3 +138,41 @@ it('ne modifie pas le payload quand la campagne n a pas de question ressenti', f
     expect($resultat[(string) $q1->id]['value'])->toBe(4);
     expect($resultat[(string) $q1->id]['confidence'])->toBe(0.9);
 });
+
+it('demoStub retourne des valeurs pour les 5 nouveaux types', function (): void {
+    $op = Operation::factory()->create();
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['statut' => 'ouverte']);
+
+    QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Date', 'type' => 'date', 'ordre' => 1,
+    ]);
+    QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Choix', 'type' => 'choix_multiple', 'ordre' => 2,
+        'config' => ['options' => [['valeur' => 'a', 'libelle' => 'Option A'], ['valeur' => 'b', 'libelle' => 'Option B']]],
+    ]);
+    QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Nombre', 'type' => 'nombre', 'ordre' => 3,
+    ]);
+    QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Email', 'type' => 'email', 'ordre' => 4,
+    ]);
+    QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Sélection', 'type' => 'selection_numerique', 'ordre' => 5,
+        'config' => ['min' => 1, 'max' => 99],
+    ]);
+
+    app()->detectEnvironment(fn (): string => 'demo');
+
+    $result = app(QuestionnaireOcrService::class)->analyzeFromPath('/tmp/fake.png', 'image/png', $campagne->fresh());
+
+    expect($result)->toHaveCount(5);
+
+    $values = array_column($result, 'value');
+    expect($values)->toContain('2026-01-15');    // date
+    expect($values)->toContain(['a']);            // choix_multiple = first option
+    expect($values)->toContain(42);              // nombre
+    expect($values)->toContain('exemple@email.fr'); // email
+    expect($values)->toContain(50);              // selection_numerique midpoint (1+99)/2=50
+
+    app()->detectEnvironment(fn (): string => 'testing');
+});

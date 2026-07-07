@@ -146,3 +146,90 @@ it('export Excel : soumission anonymisée → colonne identité vide', function 
     expect($ligne[7])->toBe(''); // colonne Participant vide
     expect($ligne[8])->toBe(4);  // la note est présente
 });
+
+it('exporte une date dans la colonne value_text', function (): void {
+    $campagne = QuestionnaireCampaign::factory()->create(['statut' => 'ouverte']);
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Date de naissance', 'type' => TypeQuestion::Date, 'ordre' => 1,
+    ]);
+    $svc = app(QuestionnaireReponseService::class);
+    $inv = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create();
+    $sub = $svc->demarrerOuReprendre($inv);
+    $svc->enregistrerReponse($sub, $q, '2000-05-15');
+    $svc->finaliser($sub, accepteContact: false);
+
+    $rows = app(QuestionnaireExcelExporter::class)->lignes($campagne->fresh());
+
+    expect($rows[0])->toContain('Date de naissance');
+    expect($rows[1][8])->toBe('2000-05-15');
+});
+
+it('exporte les choix multiples en libellés séparés par virgule', function (): void {
+    $campagne = QuestionnaireCampaign::factory()->create(['statut' => 'ouverte']);
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Centres d intérêt', 'type' => TypeQuestion::ChoixMultiple, 'ordre' => 1,
+        'config' => ['options' => [
+            ['valeur' => 'sport', 'libelle' => 'Sport'],
+            ['valeur' => 'musique', 'libelle' => 'Musique'],
+            ['valeur' => 'lecture', 'libelle' => 'Lecture'],
+        ]],
+    ]);
+    $svc = app(QuestionnaireReponseService::class);
+    $inv = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create();
+    $sub = $svc->demarrerOuReprendre($inv);
+    $svc->enregistrerReponse($sub, $q, ['sport', 'lecture']);
+    $svc->finaliser($sub, accepteContact: false);
+
+    $rows = app(QuestionnaireExcelExporter::class)->lignes($campagne->fresh());
+
+    expect($rows[1][8])->toBe('Sport, Lecture');
+});
+
+it('exporte un nombre dans la colonne value_text', function (): void {
+    $campagne = QuestionnaireCampaign::factory()->create(['statut' => 'ouverte']);
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Âge', 'type' => TypeQuestion::Nombre, 'ordre' => 1,
+    ]);
+    $svc = app(QuestionnaireReponseService::class);
+    $inv = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create();
+    $sub = $svc->demarrerOuReprendre($inv);
+    $svc->enregistrerReponse($sub, $q, '42');
+    $svc->finaliser($sub, accepteContact: false);
+
+    $rows = app(QuestionnaireExcelExporter::class)->lignes($campagne->fresh());
+
+    expect($rows[1][8])->toBe('42');
+});
+
+it('exporte un email dans la colonne value_text', function (): void {
+    $campagne = QuestionnaireCampaign::factory()->create(['statut' => 'ouverte']);
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Email', 'type' => TypeQuestion::Email, 'ordre' => 1,
+    ]);
+    $svc = app(QuestionnaireReponseService::class);
+    $inv = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create();
+    $sub = $svc->demarrerOuReprendre($inv);
+    $svc->enregistrerReponse($sub, $q, 'test@example.com');
+    $svc->finaliser($sub, accepteContact: false);
+
+    $rows = app(QuestionnaireExcelExporter::class)->lignes($campagne->fresh());
+
+    expect($rows[1][8])->toBe('test@example.com');
+});
+
+it('exporte une sélection numérique dans la colonne value_integer', function (): void {
+    $campagne = QuestionnaireCampaign::factory()->create(['statut' => 'ouverte']);
+    $q = QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Nombre de personnes', 'type' => TypeQuestion::SelectionNumerique, 'ordre' => 1,
+        'config' => ['min' => 1, 'max' => 10],
+    ]);
+    $svc = app(QuestionnaireReponseService::class);
+    $inv = QuestionnaireInvitation::factory()->for($campagne, 'campaign')->create();
+    $sub = $svc->demarrerOuReprendre($inv);
+    $svc->enregistrerReponse($sub, $q, '7');
+    $svc->finaliser($sub, accepteContact: false);
+
+    $rows = app(QuestionnaireExcelExporter::class)->lignes($campagne->fresh());
+
+    expect($rows[1][8])->toBe(7);
+});
