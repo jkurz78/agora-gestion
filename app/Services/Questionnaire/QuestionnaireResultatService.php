@@ -76,7 +76,7 @@ final class QuestionnaireResultatService
     private function agreger(TypeQuestion $type, Collection $answers, QuestionnaireCampaignQuestion $question): array
     {
         return match ($type) {
-            TypeQuestion::Satisfaction, TypeQuestion::Ressenti => [
+            TypeQuestion::Satisfaction, TypeQuestion::Ressenti, TypeQuestion::SelectionNumerique => [
                 'moyenne' => $answers->isNotEmpty()
                     ? round((float) $answers->avg('value_integer'), 1)
                     : null,
@@ -106,7 +106,31 @@ final class QuestionnaireResultatService
                 ])->values()->all(),
                 'n' => $answers->count(),
             ],
-            TypeQuestion::TexteCourt, TypeQuestion::TexteLong => [
+            TypeQuestion::ChoixMultiple => [
+                'repartition' => collect($question->options())->map(function (array $opt) use ($answers): array {
+                    $count = $answers->filter(function ($a) use ($opt): bool {
+                        $selected = json_decode($a->value_option ?? '[]', true);
+
+                        return is_array($selected) && in_array($opt['valeur'], $selected, true);
+                    })->count();
+
+                    return ['libelle' => $opt['libelle'], 'count' => $count];
+                })->all(),
+                'n' => $answers->count(),
+            ],
+            TypeQuestion::Nombre => [
+                'moyenne' => $answers->isNotEmpty()
+                    ? round((float) $answers->avg(fn ($a) => (float) $a->value_text), 2)
+                    : null,
+                'min' => $answers->isNotEmpty()
+                    ? (float) $answers->min(fn ($a) => (float) $a->value_text)
+                    : null,
+                'max' => $answers->isNotEmpty()
+                    ? (float) $answers->max(fn ($a) => (float) $a->value_text)
+                    : null,
+                'n' => $answers->count(),
+            ],
+            TypeQuestion::TexteCourt, TypeQuestion::TexteLong, TypeQuestion::Date, TypeQuestion::Email => [
                 'verbatims' => $answers->pluck('value_text')->filter()->values()->all(),
                 'n' => $answers->count(),
             ],

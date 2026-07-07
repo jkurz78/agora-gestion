@@ -34,11 +34,13 @@
             <span class="badge bg-secondary">{{ $q['type']->label() }}</span>
         </div>
         <div class="card-body">
-            @if ($q['type'] === \App\Enums\TypeQuestion::Satisfaction || $q['type'] === \App\Enums\TypeQuestion::Ressenti || $q['type'] === \App\Enums\TypeQuestion::SatisfactionTexteLong)
+            @if ($q['type'] === \App\Enums\TypeQuestion::Satisfaction || $q['type'] === \App\Enums\TypeQuestion::Ressenti || $q['type'] === \App\Enums\TypeQuestion::SatisfactionTexteLong || $q['type'] === \App\Enums\TypeQuestion::SelectionNumerique)
                 @if ($q['moyenne'] !== null)
                     <div class="mb-2">
                         <span class="fs-4 fw-bold">{{ number_format($q['moyenne'], 1, ',', '') }}</span>
-                        <span class="text-muted small ms-1">/ {{ $q['type'] === \App\Enums\TypeQuestion::Ressenti ? '100' : '5' }}</span>
+                        @if ($q['type'] !== \App\Enums\TypeQuestion::SelectionNumerique)
+                            <span class="text-muted small ms-1">/ {{ $q['type'] === \App\Enums\TypeQuestion::Ressenti ? '100' : '5' }}</span>
+                        @endif
                         <span class="text-muted small ms-2">({{ $q['n'] }} réponse{{ $q['n'] > 1 ? 's' : '' }})</span>
                     </div>
                     @if (!empty($q['distribution']))
@@ -88,7 +90,32 @@
                 @endforelse
                 <div class="text-muted small mt-1">{{ $q['n'] }} réponse{{ $q['n'] > 1 ? 's' : '' }}</div>
 
-            @elseif ($q['type'] === \App\Enums\TypeQuestion::TexteCourt || $q['type'] === \App\Enums\TypeQuestion::TexteLong)
+            @elseif ($q['type'] === \App\Enums\TypeQuestion::ChoixMultiple)
+                @forelse ($q['repartition'] as $item)
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span>{{ $item['libelle'] }}</span>
+                        <span class="badge bg-primary rounded-pill">{{ $item['count'] }}</span>
+                    </div>
+                @empty
+                    <span class="text-muted">Aucune réponse.</span>
+                @endforelse
+                <div class="text-muted small mt-1">{{ $q['n'] }} réponse{{ $q['n'] > 1 ? 's' : '' }}</div>
+
+            @elseif ($q['type'] === \App\Enums\TypeQuestion::Nombre)
+                @if ($q['moyenne'] !== null)
+                    <div class="mb-2">
+                        <span class="fs-4 fw-bold">{{ number_format($q['moyenne'], 2, ',', '') }}</span>
+                        <span class="text-muted small ms-2">({{ $q['n'] }} réponse{{ $q['n'] > 1 ? 's' : '' }})</span>
+                    </div>
+                    <div class="d-flex gap-3">
+                        <span class="badge bg-light text-dark border">Min : {{ $q['min'] }}</span>
+                        <span class="badge bg-light text-dark border">Max : {{ $q['max'] }}</span>
+                    </div>
+                @else
+                    <span class="text-muted">Aucune réponse.</span>
+                @endif
+
+            @elseif ($q['type'] === \App\Enums\TypeQuestion::TexteCourt || $q['type'] === \App\Enums\TypeQuestion::TexteLong || $q['type'] === \App\Enums\TypeQuestion::Date || $q['type'] === \App\Enums\TypeQuestion::Email)
                 @forelse ($q['verbatims'] as $verbatim)
                     <blockquote class="blockquote border-start border-3 ps-3 mb-2">
                         <p class="mb-0 fst-italic text-muted small">&laquo; {{ $verbatim }} &raquo;</p>

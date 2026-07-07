@@ -127,6 +127,39 @@
                                                             @case(TypeQuestion::TexteLong)
                                                                 {{ $answer->value_text ?? '—' }}
                                                                 @break
+
+                                                            @case(TypeQuestion::Date)
+                                                                @if ($answer->value_text)
+                                                                    {{ \Carbon\Carbon::parse($answer->value_text)->format('d/m/Y') }}
+                                                                @endif
+                                                                @break
+
+                                                            @case(TypeQuestion::ChoixMultiple)
+                                                                @php
+                                                                    $selectedValues = json_decode($answer->value_option ?? '[]', true) ?? [];
+                                                                    $libelles = $answer->value_meta['libelles'] ?? [];
+                                                                @endphp
+                                                                @foreach ($libelles as $lib)
+                                                                    <span class="badge bg-primary me-1">{{ $lib }}</span>
+                                                                @endforeach
+                                                                @if (empty($libelles) && !empty($selectedValues))
+                                                                    @foreach ($selectedValues as $val)
+                                                                        <span class="badge bg-secondary me-1">{{ $q->libelleOption($val) ?? $val }}</span>
+                                                                    @endforeach
+                                                                @endif
+                                                                @break
+
+                                                            @case(TypeQuestion::Nombre)
+                                                                {{ $answer->value_text ?? '—' }}
+                                                                @break
+
+                                                            @case(TypeQuestion::Email)
+                                                                {{ $answer->value_text ?? '—' }}
+                                                                @break
+
+                                                            @case(TypeQuestion::SelectionNumerique)
+                                                                {{ $answer->value_integer ?? '—' }}
+                                                                @break
                                                         @endswitch
                                                     @endif
                                                 </td>
