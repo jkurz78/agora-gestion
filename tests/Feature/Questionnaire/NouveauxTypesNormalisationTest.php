@@ -91,3 +91,78 @@ it('normalise une sélection numérique dans value_integer', function (): void {
     $answer = $sub->answers()->first();
     expect($answer->value_integer)->toBe(42);
 });
+
+it('convertit une date d/m/Y en ISO', function (): void {
+    [$campagne, $question, $bearer] = campagneAvecQuestionTypee('date');
+
+    $sub = app(QuestionnaireReponseService::class)->creerDepuisOcrAnonyme(
+        bearer: $bearer,
+        valeursParQuestionId: [(string) $question->id => '15/03/2026'],
+    );
+
+    expect($sub->answers()->first()->value_text)->toBe('2026-03-15');
+});
+
+it('rejette une date invalide ou à débordement (stockage null)', function (): void {
+    [$campagne, $question, $bearer] = campagneAvecQuestionTypee('date');
+    $svc = app(QuestionnaireReponseService::class);
+
+    $sub = $svc->creerDepuisOcrAnonyme(
+        bearer: $bearer,
+        valeursParQuestionId: [(string) $question->id => 'illisible'],
+    );
+    expect($sub->answers()->first()->value_text)->toBeNull();
+
+    $sub2 = $svc->creerDepuisOcrAnonyme(
+        bearer: $bearer,
+        valeursParQuestionId: [(string) $question->id => '2026-13-45'],
+    );
+    expect($sub2->answers()->first()->value_text)->toBeNull();
+});
+
+it('normalise un nombre à virgule française et rejette le non-numérique', function (): void {
+    [$campagne, $question, $bearer] = campagneAvecQuestionTypee('nombre');
+    $svc = app(QuestionnaireReponseService::class);
+
+    $sub = $svc->creerDepuisOcrAnonyme(
+        bearer: $bearer,
+        valeursParQuestionId: [(string) $question->id => '3,5'],
+    );
+    expect($sub->answers()->first()->value_text)->toBe('3.5');
+
+    $sub2 = $svc->creerDepuisOcrAnonyme(
+        bearer: $bearer,
+        valeursParQuestionId: [(string) $question->id => 'abc'],
+    );
+    expect($sub2->answers()->first()->value_text)->toBeNull();
+});
+
+it('accepte un nombre float du payload OCR sans TypeError', function (): void {
+    [$campagne, $question, $bearer] = campagneAvecQuestionTypee('nombre');
+
+    $sub = app(QuestionnaireReponseService::class)->creerDepuisOcrAnonyme(
+        bearer: $bearer,
+        valeursParQuestionId: [(string) $question->id => 42.5],
+    );
+
+    expect($sub->answers()->first()->value_text)->toBe('42.5');
+});
+
+it('normalise un choix multiple avec valeurs entières du payload OCR', function (): void {
+    [$campagne, $question, $bearer] = campagneAvecQuestionTypee('choix_multiple', [
+        'options' => [
+            ['valeur' => '1', 'libelle' => 'Un', 'ordre' => 1],
+            ['valeur' => '2', 'libelle' => 'Deux', 'ordre' => 2],
+        ],
+    ]);
+
+    // Le LLM peut renvoyer des entiers JSON pour des valeurs techniques numériques
+    $sub = app(QuestionnaireReponseService::class)->creerDepuisOcrAnonyme(
+        bearer: $bearer,
+        valeursParQuestionId: [(string) $question->id => [1, 2]],
+    );
+
+    $answer = $sub->answers()->first();
+    expect(json_decode($answer->value_option, true))->toBe(['1', '2'])
+        ->and($answer->value_meta['libelles'])->toBe(['Un', 'Deux']);
+});

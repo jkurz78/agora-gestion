@@ -102,6 +102,7 @@ final class ModeleEditor extends Component
         ]);
 
         $type = TypeQuestion::from($this->type);
+        $this->validerBornes($type);
         $ordre = (int) $this->template->questions()->max('ordre') + 1;
 
         $obligatoire = $type === TypeQuestion::Information ? false : $this->obligatoire;
@@ -128,6 +129,7 @@ final class ModeleEditor extends Component
 
         $question = $this->template->questions()->findOrFail($this->editingQuestionId);
         $type = TypeQuestion::from($this->type);
+        $this->validerBornes($type);
         $obligatoire = $type === TypeQuestion::Information ? false : $this->obligatoire;
 
         $question->update([
@@ -144,6 +146,26 @@ final class ModeleEditor extends Component
     public function annulerEdition(): void
     {
         $this->resetFormulaire();
+    }
+
+    /** Bornes : requises et ordonnées pour SelectionNumerique, ordonnées pour Nombre. */
+    private function validerBornes(TypeQuestion $type): void
+    {
+        if ($type === TypeQuestion::SelectionNumerique) {
+            $this->validate(
+                ['selectionMin' => 'required|integer', 'selectionMax' => 'required|integer|gt:selectionMin'],
+                [],
+                ['selectionMin' => 'minimum', 'selectionMax' => 'maximum'],
+            );
+        }
+
+        if ($type === TypeQuestion::Nombre && $this->nombreMin !== '' && $this->nombreMax !== '') {
+            $this->validate(
+                ['nombreMin' => 'numeric', 'nombreMax' => 'numeric|gt:nombreMin'],
+                [],
+                ['nombreMin' => 'minimum', 'nombreMax' => 'maximum'],
+            );
+        }
     }
 
     private function resetFormulaire(): void

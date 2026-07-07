@@ -357,6 +357,46 @@ it('crée une question selection_numerique avec min et max', function (): void {
         ->and($q->config['max'])->toBe(99);
 });
 
+it('refuse une selection_numerique sans bornes', function (): void {
+    $t = QuestionnaireTemplate::factory()->create();
+
+    Livewire::test(ModeleEditor::class, ['template' => $t])
+        ->set('libelle', 'Votre âge')
+        ->set('type', TypeQuestion::SelectionNumerique->value)
+        ->call('ajouterQuestion')
+        ->assertHasErrors(['selectionMin', 'selectionMax']);
+
+    expect($t->questions()->count())->toBe(0);
+});
+
+it('refuse une selection_numerique avec min supérieur ou égal à max', function (): void {
+    $t = QuestionnaireTemplate::factory()->create();
+
+    Livewire::test(ModeleEditor::class, ['template' => $t])
+        ->set('libelle', 'Votre âge')
+        ->set('type', TypeQuestion::SelectionNumerique->value)
+        ->set('selectionMin', '10')
+        ->set('selectionMax', '5')
+        ->call('ajouterQuestion')
+        ->assertHasErrors(['selectionMax']);
+
+    expect($t->questions()->count())->toBe(0);
+});
+
+it('refuse un nombre avec min supérieur ou égal à max quand les deux sont renseignés', function (): void {
+    $t = QuestionnaireTemplate::factory()->create();
+
+    Livewire::test(ModeleEditor::class, ['template' => $t])
+        ->set('libelle', 'Distance')
+        ->set('type', TypeQuestion::Nombre->value)
+        ->set('nombreMin', '10')
+        ->set('nombreMax', '2')
+        ->call('ajouterQuestion')
+        ->assertHasErrors(['nombreMax']);
+
+    expect($t->questions()->count())->toBe(0);
+});
+
 // ── Date ──────────────────────────────────────────────────────────────────────
 
 it('crée une question date sans config', function (): void {

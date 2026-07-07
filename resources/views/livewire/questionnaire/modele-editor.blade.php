@@ -93,11 +93,13 @@
                         <input type="number" step="any" class="form-control"
                                placeholder="Min (optionnel)"
                                wire:model="nombreMin">
+                        @error('nombreMin') <div class="text-danger small">{{ $message }}</div> @enderror
                     </div>
                     <div class="col-md-6">
                         <input type="number" step="any" class="form-control"
                                placeholder="Max (optionnel)"
                                wire:model="nombreMax">
+                        @error('nombreMax') <div class="text-danger small">{{ $message }}</div> @enderror
                     </div>
                 @endif
                 @if ($type === 'selection_numerique')
@@ -105,11 +107,13 @@
                         <input type="number" class="form-control"
                                placeholder="Min (requis)"
                                wire:model="selectionMin">
+                        @error('selectionMin') <div class="text-danger small">{{ $message }}</div> @enderror
                     </div>
                     <div class="col-md-6">
                         <input type="number" class="form-control"
                                placeholder="Max (requis)"
                                wire:model="selectionMax">
+                        @error('selectionMax') <div class="text-danger small">{{ $message }}</div> @enderror
                     </div>
                 @endif
                 @if ($type === 'satisfaction')

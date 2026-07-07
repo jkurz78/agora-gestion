@@ -129,9 +129,12 @@
                                                                 @break
 
                                                             @case(TypeQuestion::Date)
-                                                                @if ($answer->value_text)
-                                                                    {{ \Carbon\Carbon::parse($answer->value_text)->format('d/m/Y') }}
-                                                                @endif
+                                                                @php
+                                                                    $dateIso = $answer->value_text !== null
+                                                                        ? \DateTimeImmutable::createFromFormat('!Y-m-d', $answer->value_text)
+                                                                        : false;
+                                                                @endphp
+                                                                {{ $dateIso !== false ? $dateIso->format('d/m/Y') : ($answer->value_text ?? '—') }}
                                                                 @break
 
                                                             @case(TypeQuestion::ChoixMultiple)

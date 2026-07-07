@@ -85,7 +85,7 @@ final class QuestionnaireReponseService
     public function enregistrerReponse(
         QuestionnaireSubmission $submission,
         QuestionnaireCampaignQuestion $question,
-        int|string|bool|array|null $valeurBrute,
+        int|float|string|bool|array|null $valeurBrute,
         ?string $commentaire = null,
     ): void {
         $payload = $this->normaliser($question, $valeurBrute, $commentaire);
@@ -97,7 +97,7 @@ final class QuestionnaireReponseService
     }
 
     /** @return array<string, mixed> */
-    private function normaliser(QuestionnaireCampaignQuestion $question, int|string|bool|array|null $v, ?string $commentaire = null): array
+    private function normaliser(QuestionnaireCampaignQuestion $question, int|float|string|bool|array|null $v, ?string $commentaire = null): array
     {
         $base = [
             'value_text' => null, 'value_integer' => null,
@@ -105,7 +105,9 @@ final class QuestionnaireReponseService
         ];
 
         $payload = match ($question->type) {
-            TypeQuestion::TexteCourt, TypeQuestion::TexteLong, TypeQuestion::Date, TypeQuestion::Email, TypeQuestion::Nombre => ($v === null || $v === '') ? $base : [...$base, 'value_text' => (string) $v],
+            TypeQuestion::TexteCourt, TypeQuestion::TexteLong, TypeQuestion::Email => ($v === null || $v === '') ? $base : [...$base, 'value_text' => (string) $v],
+            TypeQuestion::Date => [...$base, 'value_text' => $this->normaliserDate($v)],
+            TypeQuestion::Nombre => [...$base, 'value_text' => $this->normaliserNombre($v)],
             TypeQuestion::Satisfaction, TypeQuestion::SatisfactionTexteLong, TypeQuestion::Ressenti, TypeQuestion::SelectionNumerique => ($v === null || $v === '') ? $base : [...$base, 'value_integer' => (int) $v],
             TypeQuestion::CaseACocher => ($v === null || $v === '') ? $base : [...$base, 'value_boolean' => (bool) $v],
             TypeQuestion::ChoixUnique => ($v === null || $v === '') ? $base : [
@@ -115,12 +117,7 @@ final class QuestionnaireReponseService
             ],
             TypeQuestion::ChoixMultiple => ($v === null || $v === '' || $v === []) ? $base : [
                 ...$base,
-                'value_option' => json_encode(is_array($v) ? $v : [$v]),
-                'value_meta' => ['libelles' => collect(is_array($v) ? $v : [$v])
-                    ->map(fn (string $val): ?string => $question->libelleOption($val))
-                    ->filter()
-                    ->values()
-                    ->all()],
+                ...$this->normaliserChoixMultiple($question, is_array($v) ? $v : [$v]),
             ],
         };
 
@@ -138,6 +135,62 @@ final class QuestionnaireReponseService
         }
 
         return $payload;
+    }
+
+    /**
+     * Valide et convertit une date vers l'ISO Y-m-d. Le round-trip de formatage
+     * rejette les débordements (2026-13-45) que createFromFormat corrigerait en silence.
+     */
+    private function normaliserDate(int|float|string|bool|array|null $v): ?string
+    {
+        if (! is_string($v) || trim($v) === '') {
+            return null;
+        }
+
+        $v = trim($v);
+        foreach (['Y-m-d', 'd/m/Y', 'j/n/Y'] as $format) {
+            $date = \DateTimeImmutable::createFromFormat('!'.$format, $v);
+            if ($date !== false && $date->format($format) === $v) {
+                return $date->format('Y-m-d');
+            }
+        }
+
+        return null;
+    }
+
+    /** Valide un nombre (virgule française acceptée) — null si non numérique. */
+    private function normaliserNombre(int|float|string|bool|array|null $v): ?string
+    {
+        if (is_int($v) || is_float($v)) {
+            return (string) $v;
+        }
+        if (! is_string($v)) {
+            return null;
+        }
+
+        $s = str_replace(',', '.', trim($v));
+
+        return is_numeric($s) ? $s : null;
+    }
+
+    /**
+     * Valeurs coercées en string : le payload OCR peut contenir des entiers JSON.
+     *
+     * @param  array<int|string, mixed>  $valeurs
+     * @return array{value_option: string|false, value_meta: array{libelles: list<string>}}
+     */
+    private function normaliserChoixMultiple(QuestionnaireCampaignQuestion $question, array $valeurs): array
+    {
+        $vals = array_values(array_map(fn ($val): string => (string) $val, $valeurs));
+
+        return [
+            'value_option' => json_encode($vals),
+            'value_meta' => ['libelles' => collect($vals)
+                ->map(fn (string $val): ?string => $question->libelleOption($val))
+                ->filter()
+                ->values()
+                ->all()],
+        ];
     }
 
     public function finaliser(QuestionnaireSubmission $submission, bool $accepteContact, ?string $contactNom = null): void
@@ -317,10 +370,10 @@ final class QuestionnaireReponseService
      * Crée une soumission papier depuis un payload OCR validé.
      * Supersede non destructif : l'ancienne soumission passe en "remplacee", la nouvelle prend la clé active.
      *
-     * @param  array<string|int, int|string|bool|array|null>  $valeursParQuestionId  question_id => valeur brute
+     * @param  array<string|int, int|float|string|bool|array|null>  $valeursParQuestionId  question_id => valeur brute
      */
     /**
-     * @param  array<string|int, int|string|bool|array|null>  $valeursParQuestionId
+     * @param  array<string|int, int|float|string|bool|array|null>  $valeursParQuestionId
      * @param  array<string|int, string>  $commentairesParQuestionId
      */
     public function creerDepuisOcr(
@@ -389,7 +442,7 @@ final class QuestionnaireReponseService
      * Bearer unique par campagne (réutilisé pour tous les tirages papier) : chaque scan
      * crée systématiquement sa propre soumission, sans vérification de doublon actif.
      *
-     * @param  array<string|int, int|string|bool|array|null>  $valeursParQuestionId
+     * @param  array<string|int, int|float|string|bool|array|null>  $valeursParQuestionId
      * @param  array<string|int, string>  $commentairesParQuestionId
      */
     public function creerDepuisOcrAnonyme(
