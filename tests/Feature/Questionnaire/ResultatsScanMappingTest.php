@@ -7,6 +7,7 @@ use App\Models\Operation;
 use App\Models\QuestionnaireBearerToken;
 use App\Models\QuestionnaireCampaign;
 use App\Models\QuestionnaireCampaignQuestion;
+use App\Models\QuestionnaireOcrDraft;
 use App\Models\QuestionnairePaperScan;
 use App\Services\Questionnaire\QuestionnaireReponseService;
 use App\Tenant\TenantContext;
@@ -85,7 +86,30 @@ it('associe chaque réponse papier bearer à SON scan même avec des ordres oppo
         });
 });
 
-it('n associe aucun scan aux soumissions bearer historiques sans lien', function (): void {
+it('retrouve le scan bearer historique via le draft OCR validé', function (): void {
+    [$campagne, $question, $bearer] = campagneAvecQuestionTexte();
+
+    $scan = scanTraite($campagne, $bearer, 'scan-a.pdf');
+    $sub = app(QuestionnaireReponseService::class)->creerDepuisOcrAnonyme(
+        bearer: $bearer,
+        valeursParQuestionId: [(string) $question->id => 'Réponse'],
+    );
+    $sub->update(['paper_scan_id' => null]);
+
+    // Draft validé = pont scan↔soumission (scénario pré-paper_scan_id)
+    QuestionnaireOcrDraft::create([
+        'association_id' => TenantContext::currentId(),
+        'scan_id' => (int) $scan->id,
+        'bearer_token_id' => (int) $bearer->id,
+        'payload' => [],
+        'statut' => 'valide',
+    ]);
+
+    Livewire::test(CampagneResultats::class, ['campagne' => $campagne->fresh()])
+        ->assertViewHas('scanParSubmission', fn ($mapping): bool => (int) ($mapping[(int) $sub->id]?->id ?? 0) === (int) $scan->id);
+});
+
+it('n associe aucun scan aux soumissions bearer sans draft OCR', function (): void {
     [$campagne, $question, $bearer] = campagneAvecQuestionTexte();
 
     scanTraite($campagne, $bearer, 'scan-a.pdf');

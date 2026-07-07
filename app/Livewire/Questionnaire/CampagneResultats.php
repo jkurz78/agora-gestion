@@ -6,6 +6,7 @@ namespace App\Livewire\Questionnaire;
 
 use App\Enums\StatutSubmission;
 use App\Models\QuestionnaireCampaign;
+use App\Models\QuestionnaireOcrDraft;
 use App\Models\QuestionnairePaperScan;
 use App\Services\Questionnaire\QuestionnaireResultatService;
 use Illuminate\View\View;
@@ -50,14 +51,30 @@ final class CampagneResultats extends Component
         $scansParId = $scans->keyBy(fn ($s) => (int) $s->id);
         $scansParInvitation = $scans->whereNotNull('invitation_id')->keyBy(fn ($s) => (int) $s->invitation_id);
 
+        // Drafts validés = pont scan↔soumission pour les données d'avant paper_scan_id
+        $draftsValides = $scans->isNotEmpty()
+            ? QuestionnaireOcrDraft::where('statut', 'valide')
+                ->whereIn('scan_id', $scans->pluck('id'))
+                ->get()
+                ->keyBy(fn ($d) => (int) $d->scan_id)
+            : collect();
+
         foreach ($submissions->where('source', 'papier') as $sub) {
             if ($sub->paper_scan_id !== null && $scansParId->has((int) $sub->paper_scan_id)) {
                 $scanParSubmission[(int) $sub->id] = $scansParId->get((int) $sub->paper_scan_id);
             } elseif ($sub->invitation_id !== null && $scansParInvitation->has((int) $sub->invitation_id)) {
-                // Repli fiable pour l'historique d'avant paper_scan_id (scans nominatifs)
                 $scanParSubmission[(int) $sub->id] = $scansParInvitation->get((int) $sub->invitation_id);
+            } elseif ($sub->bearer_token_id !== null) {
+                // Bearer historique : retrouver le scan via le draft OCR validé (corrélation temporelle)
+                $bestScan = $draftsValides
+                    ->filter(fn ($d) => (int) $d->bearer_token_id === (int) $sub->bearer_token_id
+                        && ! $scanParSubmission->contains(fn ($s) => (int) $s->id === (int) $d->scan_id))
+                    ->sortBy(fn ($d) => abs($d->updated_at->diffInSeconds($sub->submitted_at)))
+                    ->first();
+                if ($bestScan !== null && $scansParId->has((int) $bestScan->scan_id)) {
+                    $scanParSubmission[(int) $sub->id] = $scansParId->get((int) $bestScan->scan_id);
+                }
             }
-            // Bearer historique sans lien : pas de badge scan (jamais d'appariement positionnel)
         }
 
         return view('livewire.questionnaire.campagne-resultats', [
