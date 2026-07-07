@@ -127,7 +127,43 @@
                     @endforeach
                     <div class="sur" style="margin-top:3px;">{{ $q['n'] }} rép.</div>
 
-                @elseif ($q['type'] === \App\Enums\TypeQuestion::TexteCourt || $q['type'] === \App\Enums\TypeQuestion::TexteLong)
+                @elseif ($q['type'] === \App\Enums\TypeQuestion::ChoixMultiple)
+                    @foreach ($q['repartition'] as $item)
+                        <div class="repartition-row">
+                            {{ $item['libelle'] }}
+                            <span class="badge-count">{{ $item['count'] }}</span>
+                        </div>
+                    @endforeach
+                    <div class="sur" style="margin-top:3px;">{{ $q['n'] }} rép.</div>
+
+                @elseif ($q['type'] === \App\Enums\TypeQuestion::Nombre)
+                    @if ($q['moyenne'] !== null)
+                        <span class="moyenne">{{ number_format($q['moyenne'], 1, ',', '') }}</span>
+                        <span class="sur">({{ $q['n'] }} rép.)</span>
+                        <div class="distrib" style="margin-top:4px;">
+                            <span>Min : {{ $q['min'] }}</span>
+                            <span>Max : {{ $q['max'] }}</span>
+                        </div>
+                    @else
+                        <em style="color:#999;">Aucune réponse.</em>
+                    @endif
+
+                @elseif ($q['type'] === \App\Enums\TypeQuestion::SelectionNumerique)
+                    @if ($q['moyenne'] !== null)
+                        <span class="moyenne">{{ number_format($q['moyenne'], 1, ',', '') }}</span>
+                        <span class="sur">({{ $q['n'] }} rép.)</span>
+                        @if (!empty($q['distribution']))
+                            <div class="distrib">
+                                @foreach ($q['distribution'] as $note => $nb)
+                                    <span>{{ $note }} &rarr; {{ $nb }}&times;</span>
+                                @endforeach
+                            </div>
+                        @endif
+                    @else
+                        <em style="color:#999;">Aucune réponse.</em>
+                    @endif
+
+                @elseif ($q['type'] === \App\Enums\TypeQuestion::TexteCourt || $q['type'] === \App\Enums\TypeQuestion::TexteLong || $q['type'] === \App\Enums\TypeQuestion::Date || $q['type'] === \App\Enums\TypeQuestion::Email)
                     @forelse ($q['verbatims'] as $verbatim)
                         <blockquote>&laquo; {{ $verbatim }} &raquo;</blockquote>
                     @empty
