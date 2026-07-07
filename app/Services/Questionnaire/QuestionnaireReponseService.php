@@ -261,7 +261,7 @@ final class QuestionnaireReponseService
      *
      * @return array<string, string> erreurs par nom de champ (q_{id} et/ou q_{id}_commentaire)
      */
-    public function champsManquants(QuestionnaireCampaignQuestion|QuestionnaireTemplateQuestion $q, ?string $note, ?string $texte): array
+    public function champsManquants(QuestionnaireCampaignQuestion|QuestionnaireTemplateQuestion $q, string|array|null $note, ?string $texte): array
     {
         if ($q->type === TypeQuestion::SatisfactionTexteLong) {
             $erreurs = [];
@@ -278,7 +278,8 @@ final class QuestionnaireReponseService
         }
 
         // Tous les autres types réponse : validation standard sur la colonne primaire.
-        if ($q->type->estReponse() && $q->obligatoire && ($note === null || $note === '')) {
+        $vide = is_array($note) ? $note === [] : ($note === null || $note === '');
+        if ($q->type->estReponse() && $q->obligatoire && $vide) {
             return ["q_{$q->id}" => 'Cette question est obligatoire.'];
         }
 
