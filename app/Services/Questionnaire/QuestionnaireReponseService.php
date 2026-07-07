@@ -85,7 +85,7 @@ final class QuestionnaireReponseService
     public function enregistrerReponse(
         QuestionnaireSubmission $submission,
         QuestionnaireCampaignQuestion $question,
-        int|string|bool|null $valeurBrute,
+        int|string|bool|array|null $valeurBrute,
         ?string $commentaire = null,
     ): void {
         $payload = $this->normaliser($question, $valeurBrute, $commentaire);
@@ -97,7 +97,7 @@ final class QuestionnaireReponseService
     }
 
     /** @return array<string, mixed> */
-    private function normaliser(QuestionnaireCampaignQuestion $question, int|string|bool|null $v, ?string $commentaire = null): array
+    private function normaliser(QuestionnaireCampaignQuestion $question, int|string|bool|array|null $v, ?string $commentaire = null): array
     {
         $base = [
             'value_text' => null, 'value_integer' => null,
@@ -105,13 +105,22 @@ final class QuestionnaireReponseService
         ];
 
         $payload = match ($question->type) {
-            TypeQuestion::TexteCourt, TypeQuestion::TexteLong => ($v === null || $v === '') ? $base : [...$base, 'value_text' => (string) $v],
-            TypeQuestion::Satisfaction, TypeQuestion::SatisfactionTexteLong, TypeQuestion::Ressenti => ($v === null || $v === '') ? $base : [...$base, 'value_integer' => (int) $v],
+            TypeQuestion::TexteCourt, TypeQuestion::TexteLong, TypeQuestion::Date, TypeQuestion::Email, TypeQuestion::Nombre => ($v === null || $v === '') ? $base : [...$base, 'value_text' => (string) $v],
+            TypeQuestion::Satisfaction, TypeQuestion::SatisfactionTexteLong, TypeQuestion::Ressenti, TypeQuestion::SelectionNumerique => ($v === null || $v === '') ? $base : [...$base, 'value_integer' => (int) $v],
             TypeQuestion::CaseACocher => ($v === null || $v === '') ? $base : [...$base, 'value_boolean' => (bool) $v],
             TypeQuestion::ChoixUnique => ($v === null || $v === '') ? $base : [
                 ...$base,
                 'value_option' => (string) $v,
                 'value_meta' => ['libelle' => $question->libelleOption((string) $v)],
+            ],
+            TypeQuestion::ChoixMultiple => ($v === null || $v === '' || $v === []) ? $base : [
+                ...$base,
+                'value_option' => json_encode(is_array($v) ? $v : [$v]),
+                'value_meta' => ['libelles' => collect(is_array($v) ? $v : [$v])
+                    ->map(fn (string $val): ?string => $question->libelleOption($val))
+                    ->filter()
+                    ->values()
+                    ->all()],
             ],
         };
 
@@ -307,10 +316,10 @@ final class QuestionnaireReponseService
      * Crée une soumission papier depuis un payload OCR validé.
      * Supersede non destructif : l'ancienne soumission passe en "remplacee", la nouvelle prend la clé active.
      *
-     * @param  array<string|int, int|string|bool|null>  $valeursParQuestionId  question_id => valeur brute
+     * @param  array<string|int, int|string|bool|array|null>  $valeursParQuestionId  question_id => valeur brute
      */
     /**
-     * @param  array<string|int, int|string|bool|null>  $valeursParQuestionId
+     * @param  array<string|int, int|string|bool|array|null>  $valeursParQuestionId
      * @param  array<string|int, string>  $commentairesParQuestionId
      */
     public function creerDepuisOcr(
@@ -379,7 +388,7 @@ final class QuestionnaireReponseService
      * Bearer unique par campagne (réutilisé pour tous les tirages papier) : chaque scan
      * crée systématiquement sa propre soumission, sans vérification de doublon actif.
      *
-     * @param  array<string|int, int|string|bool|null>  $valeursParQuestionId
+     * @param  array<string|int, int|string|bool|array|null>  $valeursParQuestionId
      * @param  array<string|int, string>  $commentairesParQuestionId
      */
     public function creerDepuisOcrAnonyme(
