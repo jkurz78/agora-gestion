@@ -1,9 +1,44 @@
 # Roadmap Compta V5 — chantiers ordonnés
 
 **Date** : 2026-06-03 (restructurée le 2026-06-03 après l'audit des flux métier).
+**Vision cible réconciliée le 2026-06-22** — voir la section ci-dessous (nord du programme).
 **Branche** : `feat/compta-v5` (NON mergée — `main` reste en v4.3.x).
 **Mémoire liée** : [[project-compta-v5-flux-bancaires-live-pd]] et les sous-slices 1a→1d / cutover.
 **Audit des flux** : `docs/audits/2026-06-03-audit-flux-compta-v5.md` (5 flux : dons, cotisations, NDF, NDF par abandon de créance, HelloAsso + virement).
+
+---
+
+## Vision cible — réconciliée 2026-06-22
+
+> **Statut** : nord du programme. Remplace l'orientation « cash basis enrichie » de la mémoire `project_compta_partie_double.md` (2026-05-02), désormais **obsolète sur l'orientation** mais conservée pour sa valeur de référence (frontière fiscale FEC, briques TVA/immo, connecteur paye « integrate not build », précédents marché). La **partie double uniforme** a tranché (ADR-003 + `docs/compta-partie-double.md`).
+
+**Au cutover prod, compta-v5 est un vrai logiciel comptable** : des écritures sur des comptes dont les **soldes sont consultables via des balances**, **justifiés par des grands livres**. Les comptes de tiers (411 clients / 401 fournisseurs) sont **lettrables et lettrés le plus automatiquement possible**.
+
+### Deux modes produit
+
+| Mode | IHM | Écritures | Modules |
+|---|---|---|---|
+| **Recettes-dépenses** | Identique à l'actuelle (nouvelle dépense / recette, marquer reçu, remise bancaire, rapprochement) | Générées, journalisées, lettrées, équilibrées **en arrière-boutique** (invisibles à l'utilisateur) | — |
+| **Partie double** | La **même** IHM continue de fonctionner, mais **chaque transaction montre ses écritures, et elles sont modifiables** | Visibles + éditables | **Activables** : TVA, immobilisations ; **saisie d'OD** ; **clôtures mensuelles** ; **clôture annuelle** (à-nouveaux + reprise des écritures non lettrées) |
+
+Dans **les deux modes** : les écrans **Règlement** et **Encadrants** (montants prévisionnels portés sur les opérations) sont traduits en **écritures « prévisionnelles »**, consommées par les états pour calculer des prévisions **quand le toggle prévision correspondant est activé**.
+
+### Vocabulaire fixé (piège à éviter)
+
+- **`use_partie_double`** (`config/compta.php`) = **flag de cutover technique** : décide si les *rapports* lisent les colonnes PD ou legacy. **Voué à disparaître** post-cutover. **Ce n'est PAS** le mode produit.
+- **Mode produit** (Recettes-dépenses vs Partie double) = réglage **par association** qui décide la **visibilité / édition des écritures** + l'accès OD / modules. **À modéliser** (probable réglage `Association`, distinct du flag de cutover).
+
+### Décision 2026-06-22 — dissolution `sous_categories` → `comptes` en FONDATION
+
+`sous_categories` (notion V4, classes 6/7 seulement) est **dissoute dans `comptes`** (source de vérité unique, toutes classes 1-7). Exécutée **avant P1** (états), par **choix de propreté assumé** — pour ne rien bâtir de neuf sur le modèle dual alors qu'« on a beaucoup à construire par-dessus ce socle ».
+
+> **Caveat tracé (décision en connaissance de cause)** : P1 (balance, grand livre, affichage des écritures) lit **déjà** le ledger PD (`transaction_lignes.compte_id + comptes`), **pas** `sous_categorie_id` — il n'exige donc **pas techniquement** la dissolution. Le déclencheur *strict* reste le **mode OD** (chemin unique de création de compte, au lieu de « sous-cat IHM → observer matérialise » + « OD crée direct ») **+** le **retrait des rapports legacy**. On l'avance en fondation **par décision, pas par contrainte**. Effet de bord acquis : ferme **structurellement l'angle mort HelloAsso** (enrichissement PD best-effort, invisible à la garde). **Cette décision remplace le positionnement « fin de parcours » de l'item 10 (Phase 3) et du §8 de `docs/compta-partie-double.md`.**
+
+### Cible élargie — à séquencer (prochaine étape : roadmap)
+
+Au-delà des états (P1), le programme comprend : **saisie d'OD**, **clôtures mensuelles**, **clôture annuelle** (à-nouveaux + reprise des écritures non lettrées), module **TVA**, module **immobilisations**, **écritures prévisionnelles** (Règlement / Encadrants + toggle prévision). **L'ordonnancement détaillé de ces slices est l'objet de la prochaine session** (séquencement complet de la roadmap). La présente section fixe la *cible* ; elle n'ordonne pas encore ces chantiers.
+
+---
 
 ## Principe d'exécution
 
@@ -107,8 +142,9 @@ Activer le **garde-fou bloquant** de non-échappement PD (chantier **G**, volet 
 ### 7. Numérotation des transactions par journal
 **Intention** : chaque **journal × exercice** a sa séquence ; poser la **référence métier** (T4 remise = n° de bordereau `RBC-xxxxx`, T2 = n° du journal de banque). **Aujourd'hui les transactions banque n'ont pas de référence.** (= Slice 2 du journal de banque, différée.)
 
-### 8. Virements internes en V5 — écriture `512 → 512`
+### 8. Virements internes en V5 — écriture `512 → 512` — ✅ LIVRÉ 2026-06-17
 **Intention** : convertir `VirementInterne` (modèle **parallèle**, hors ledger PD) en vraies **écritures du journal de banque** (`512 → 512`). Complétude du ledger + **cohérence du rapprochement**. Déjà sollicité par **FX-HelloAsso** (cash-out HelloAsso = un `VirementInterne` sans lignes PD).
+**Livré** : `EcritureGenerator::pourVirementInterne()` (512 source C / 512 dest D, journal Banque), câblé dans `VirementInterneService` create/update/delete. 17 tests. Voir `project_compta_v5_priorites_phase3`.
 
 ### 9. Ventilation sur pièce pointée — **brainstorm à venir**
 **Intention** : **trou de conception V5**. En **V4**, la ventilation vit dans une **table d'affectations séparée** → non bloquée par le pointage. En **V5**, elle devient un **vrai jeu d'écritures** (découper la ligne `7x/6x` en N lignes, même total, même imputation). Le **verrou de rapprochement bloque à tort** (le `4x/5x` banque est inchangé). À **brainstormer → spec** (modèle : ventiler le côté produit/charge d'une pièce déjà pointée, total + 512X gelés).
@@ -117,8 +153,9 @@ Activer le **garde-fou bloquant** de non-échappement PD (chantier **G**, volet 
 **Intention** : l'UI qui montre le **grand livre par journal** (Ventes / Achats / Banque / OD), remplaçant la présentation recettes/dépenses, et bascule le **vocabulaire visible**.
 **Dépendances** : **APRÈS 5** (lettrage lisible) **+ 7** (numérotation) **+** idéalement **6** (états).
 
-### 10. Drop du legacy (SousCategorie + colonnes legacy)
-**Intention** : une fois le PD **source de vérité partout** (et la garantie de non-échappement active), retirer les structures parallèles (Steps 39/40 parqués). **Fin de parcours.**
+### 10. ~~Drop du legacy (SousCategorie + colonnes legacy) — « fin de parcours »~~ → **REPOSITIONNÉ EN FONDATION (décision 2026-06-22)**
+**Ancien positionnement (caduc)** : drop des structures parallèles en toute fin, une fois le PD source de vérité partout.
+**Nouveau** : la **dissolution `sous_categories` → `comptes`** (source de vérité unique) est promue **slice fondation, avant P1** — voir la section **« Vision cible » → Décision 2026-06-22** en tête de ce document. Le drop des colonnes legacy résiduelles (`transactions.type`, `transaction_lignes.montant`) et le retrait des rapports legacy restent, eux, en fin de parcours (gardés par le flag `use_partie_double` jusqu'au cutover).
 
 ---
 
