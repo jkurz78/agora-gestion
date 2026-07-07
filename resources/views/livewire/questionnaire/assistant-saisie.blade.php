@@ -128,6 +128,46 @@
                                         @endforeach
                                     </select>
                                     @break
+
+                                @case('date')
+                                    <input type="date" class="form-control form-control-sm"
+                                           wire:model="valeurs.{{ $qid }}">
+                                    @break
+
+                                @case('choix_multiple')
+                                    @foreach ($q->options() as $opt)
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox"
+                                                   value="{{ $opt['valeur'] }}"
+                                                   wire:model="valeurs.{{ $qid }}"
+                                                   id="q_{{ $qid }}_{{ $opt['valeur'] }}">
+                                            <label class="form-check-label" for="q_{{ $qid }}_{{ $opt['valeur'] }}">
+                                                {{ $opt['libelle'] }}
+                                            </label>
+                                        </div>
+                                    @endforeach
+                                    @break
+
+                                @case('nombre')
+                                    <input type="number" step="any" class="form-control form-control-sm"
+                                           @if (isset($q->config['min'])) min="{{ $q->config['min'] }}" @endif
+                                           @if (isset($q->config['max'])) max="{{ $q->config['max'] }}" @endif
+                                           wire:model="valeurs.{{ $qid }}">
+                                    @break
+
+                                @case('email')
+                                    <input type="email" class="form-control form-control-sm"
+                                           wire:model="valeurs.{{ $qid }}">
+                                    @break
+
+                                @case('selection_numerique')
+                                    <select class="form-select form-select-sm" wire:model="valeurs.{{ $qid }}">
+                                        <option value="">— Choisir —</option>
+                                        @for ($i = (int) ($q->config['min'] ?? 1); $i <= (int) ($q->config['max'] ?? 10); $i++)
+                                            <option value="{{ $i }}">{{ $i }}</option>
+                                        @endfor
+                                    </select>
+                                    @break
                             @endswitch
                         </div>
                     @endforeach

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Questionnaire;
 
+use App\Enums\TypeQuestion;
 use App\Models\Participant;
 use App\Models\QuestionnaireCampaign;
 use App\Models\QuestionnaireOcrDraft;
@@ -52,6 +53,15 @@ final class AssistantSaisie extends Component
             $this->valeurs[(string) $qid] = $entry['value'] ?? '';
             if (isset($entry['text']) && $entry['text'] !== null) {
                 $this->commentaires[(string) $qid] = (string) $entry['text'];
+            }
+        }
+
+        foreach ($scan->campaign->questions as $q) {
+            if ($q->type === TypeQuestion::ChoixMultiple) {
+                $qid = (string) $q->id;
+                if (! is_array($this->valeurs[$qid] ?? null)) {
+                    $this->valeurs[$qid] = [];
+                }
             }
         }
 
