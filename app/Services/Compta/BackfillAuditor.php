@@ -35,10 +35,13 @@ final class BackfillAuditor
         $dateFin = ($annee + 1).'-08-31';
 
         // -- Nb transactions à convertir (equilibree=FALSE ou NULL) --
+        // Les transactions à 0 € ne sont jamais convertibles (skip par design
+        // dans TransactionConverter::convertir()) : on ne les compte pas.
         $nbAConvertir = DB::table('transactions')
             ->where('association_id', $associationId)
             ->whereNull('deleted_at')
             ->whereBetween('date', [$dateDebut, $dateFin])
+            ->where('montant_total', '!=', 0)
             ->where(function ($q) {
                 $q->where('equilibree', false)
                     ->orWhereNull('equilibree');

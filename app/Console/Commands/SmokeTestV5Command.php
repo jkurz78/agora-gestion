@@ -294,10 +294,14 @@ final class SmokeTestV5Command extends Command
         $dateFin = ($annee + 1).'-08-31';
 
         // Toutes les transactions de l'exercice qui ont au moins une ligne legacy…
+        // Les transactions à 0 € sont exemptées par design (miroir de
+        // TransactionConverter::convertir() : cotisation offerte par code promo
+        // HelloAsso etc. — aucune écriture PD possible ni souhaitable).
         $txAvecLegacy = DB::table('transactions')
             ->join('transaction_lignes', 'transactions.id', '=', 'transaction_lignes.transaction_id')
             ->where('transactions.association_id', (int) TenantContext::currentId())
             ->whereBetween('transactions.date', [$dateDebut, $dateFin])
+            ->where('transactions.montant_total', '!=', 0)
             ->whereNull('transaction_lignes.deleted_at')
             ->whereNotNull('transaction_lignes.sous_categorie_id')
             ->groupBy('transactions.id')

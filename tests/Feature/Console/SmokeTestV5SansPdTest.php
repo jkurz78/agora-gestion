@@ -239,3 +239,23 @@ test('[I] smoke-test-v5 : --detail affiche le tableau avec ID et libellé', func
         ->assertExitCode(1)
         ->expectsOutputToContain('Ma transaction test orpheline');
 })->group('smoke_v5', 'chantier_g');
+
+// ---------------------------------------------------------------------------
+// Test [J] — Tx à 0 € (cotisation offerte par code promo) → hors périmètre PD
+// ---------------------------------------------------------------------------
+
+test('[J] smoke-test-v5 : Tx à 0 € sans PD → exemptée par design, exit 0', function (): void {
+    $asso = setupSansPdTenant();
+
+    // Miroir de l'exemption TransactionConverter::convertir() : montant_total = 0
+    // (ex. cotisation HelloAsso offerte par code promo) → aucune écriture PD possible
+    // ni souhaitable. Le smoke test ne doit pas la compter comme échappée.
+    creerTxLegacySansPd($asso, [
+        'montant_total' => 0.00,
+        'helloasso_order_id' => 99999,
+        'libelle' => 'HelloAsso — cotisation offerte par code promo',
+    ]);
+
+    $this->artisan('compta:smoke-test-v5', ['--asso' => [$asso->id]])
+        ->assertExitCode(0);
+})->group('smoke_v5', 'chantier_g');
