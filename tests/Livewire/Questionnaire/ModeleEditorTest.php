@@ -286,3 +286,143 @@ it('la création satisfaction standard reste inchangée après l ajout du nouvea
     expect($q->config['commentaire'])->toBeTrue();
     expect($q->config['commentaire_libelle'])->toBe('Pourquoi ?');
 });
+
+// ── ChoixMultiple ─────────────────────────────────────────────────────────────
+
+it('crée une question choix_multiple avec options', function (): void {
+    $t = QuestionnaireTemplate::factory()->create();
+
+    Livewire::test(ModeleEditor::class, ['template' => $t])
+        ->set('libelle', 'Langues parlées')
+        ->set('type', TypeQuestion::ChoixMultiple->value)
+        ->set('optionsBrut', "Français\nAnglais\nEspagnol")
+        ->call('ajouterQuestion')
+        ->assertHasNoErrors();
+
+    $q = $t->questions()->first();
+    expect($q->type)->toBe(TypeQuestion::ChoixMultiple)
+        ->and($q->config['options'])->toHaveCount(3)
+        ->and($q->config['rendu'])->toBe('auto');
+});
+
+// ── Nombre ────────────────────────────────────────────────────────────────────
+
+it('crée une question nombre avec min et max', function (): void {
+    $t = QuestionnaireTemplate::factory()->create();
+
+    Livewire::test(ModeleEditor::class, ['template' => $t])
+        ->set('libelle', 'Distance (km)')
+        ->set('type', TypeQuestion::Nombre->value)
+        ->set('nombreMin', '0')
+        ->set('nombreMax', '500')
+        ->call('ajouterQuestion')
+        ->assertHasNoErrors();
+
+    $q = $t->questions()->first();
+    expect($q->type)->toBe(TypeQuestion::Nombre)
+        ->and((float) $q->config['min'])->toBe(0.0)
+        ->and((float) $q->config['max'])->toBe(500.0);
+});
+
+it('crée une question nombre sans bornes donne config null', function (): void {
+    $t = QuestionnaireTemplate::factory()->create();
+
+    Livewire::test(ModeleEditor::class, ['template' => $t])
+        ->set('libelle', 'Un nombre')
+        ->set('type', TypeQuestion::Nombre->value)
+        ->call('ajouterQuestion')
+        ->assertHasNoErrors();
+
+    $q = $t->questions()->first();
+    expect($q->type)->toBe(TypeQuestion::Nombre)
+        ->and($q->config)->toBeNull();
+});
+
+// ── SelectionNumerique ────────────────────────────────────────────────────────
+
+it('crée une question selection_numerique avec min et max', function (): void {
+    $t = QuestionnaireTemplate::factory()->create();
+
+    Livewire::test(ModeleEditor::class, ['template' => $t])
+        ->set('libelle', 'Votre âge')
+        ->set('type', TypeQuestion::SelectionNumerique->value)
+        ->set('selectionMin', '18')
+        ->set('selectionMax', '99')
+        ->call('ajouterQuestion')
+        ->assertHasNoErrors();
+
+    $q = $t->questions()->first();
+    expect($q->type)->toBe(TypeQuestion::SelectionNumerique)
+        ->and($q->config['min'])->toBe(18)
+        ->and($q->config['max'])->toBe(99);
+});
+
+// ── Date ──────────────────────────────────────────────────────────────────────
+
+it('crée une question date sans config', function (): void {
+    $t = QuestionnaireTemplate::factory()->create();
+
+    Livewire::test(ModeleEditor::class, ['template' => $t])
+        ->set('libelle', 'Date de naissance')
+        ->set('type', TypeQuestion::Date->value)
+        ->call('ajouterQuestion')
+        ->assertHasNoErrors();
+
+    $q = $t->questions()->first();
+    expect($q->type)->toBe(TypeQuestion::Date)
+        ->and($q->config)->toBeNull();
+});
+
+// ── Email ─────────────────────────────────────────────────────────────────────
+
+it('crée une question email sans config', function (): void {
+    $t = QuestionnaireTemplate::factory()->create();
+
+    Livewire::test(ModeleEditor::class, ['template' => $t])
+        ->set('libelle', 'Adresse email')
+        ->set('type', TypeQuestion::Email->value)
+        ->call('ajouterQuestion')
+        ->assertHasNoErrors();
+
+    $q = $t->questions()->first();
+    expect($q->type)->toBe(TypeQuestion::Email)
+        ->and($q->config)->toBeNull();
+});
+
+// ── editerQuestion recharge les nouvelles props ───────────────────────────────
+
+it('editerQuestion recharge nombreMin et nombreMax depuis config Nombre', function (): void {
+    $t = QuestionnaireTemplate::factory()->create();
+    $q = QuestionnaireTemplateQuestion::factory()->for($t, 'template')->create([
+        'type' => TypeQuestion::Nombre,
+        'libelle' => 'Score',
+        'config' => ['min' => 0.0, 'max' => 100.0],
+        'ordre' => 1,
+    ]);
+
+    $component = Livewire::test(ModeleEditor::class, ['template' => $t])
+        ->call('editerQuestion', $q->id);
+
+    $component->assertSet('nombreMin', '0');
+    $component->assertSet('nombreMax', '100');
+    $component->assertSet('selectionMin', '');
+    $component->assertSet('selectionMax', '');
+});
+
+it('editerQuestion recharge selectionMin et selectionMax depuis config SelectionNumerique', function (): void {
+    $t = QuestionnaireTemplate::factory()->create();
+    $q = QuestionnaireTemplateQuestion::factory()->for($t, 'template')->create([
+        'type' => TypeQuestion::SelectionNumerique,
+        'libelle' => 'Âge',
+        'config' => ['min' => 18, 'max' => 99],
+        'ordre' => 1,
+    ]);
+
+    $component = Livewire::test(ModeleEditor::class, ['template' => $t])
+        ->call('editerQuestion', $q->id);
+
+    $component->assertSet('selectionMin', '18');
+    $component->assertSet('selectionMax', '99');
+    $component->assertSet('nombreMin', '');
+    $component->assertSet('nombreMax', '');
+});

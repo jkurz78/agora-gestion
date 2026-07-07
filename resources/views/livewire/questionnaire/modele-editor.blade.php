@@ -82,6 +82,36 @@
                         <textarea class="form-control" rows="3" wire:model="optionsBrut"></textarea>
                     </div>
                 @endif
+                @if ($type === 'choix_multiple')
+                    <div class="col-md-12">
+                        <label class="form-label small text-muted">Options (une par ligne)</label>
+                        <textarea class="form-control" rows="3" wire:model="optionsBrut"></textarea>
+                    </div>
+                @endif
+                @if ($type === 'nombre')
+                    <div class="col-md-6">
+                        <input type="number" step="any" class="form-control"
+                               placeholder="Min (optionnel)"
+                               wire:model="nombreMin">
+                    </div>
+                    <div class="col-md-6">
+                        <input type="number" step="any" class="form-control"
+                               placeholder="Max (optionnel)"
+                               wire:model="nombreMax">
+                    </div>
+                @endif
+                @if ($type === 'selection_numerique')
+                    <div class="col-md-6">
+                        <input type="number" class="form-control"
+                               placeholder="Min (requis)"
+                               wire:model="selectionMin">
+                    </div>
+                    <div class="col-md-6">
+                        <input type="number" class="form-control"
+                               placeholder="Max (requis)"
+                               wire:model="selectionMax">
+                    </div>
+                @endif
                 @if ($type === 'satisfaction')
                     <div class="col-md-12 d-flex align-items-center gap-3 flex-wrap">
                         <div class="form-check">

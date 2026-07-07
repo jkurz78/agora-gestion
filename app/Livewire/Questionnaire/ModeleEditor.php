@@ -39,6 +39,16 @@ final class ModeleEditor extends Component
 
     public string $labelDroite = '';
 
+    /** Bornes nombre (optionnelles). */
+    public string $nombreMin = '';
+
+    public string $nombreMax = '';
+
+    /** Bornes sélection numérique (requises). */
+    public string $selectionMin = '';
+
+    public string $selectionMax = '';
+
     public ?int $editingQuestionId = null;
 
     public function mount(QuestionnaireTemplate $template): void
@@ -70,6 +80,10 @@ final class ModeleEditor extends Component
         $this->labelGauche = $config['label_gauche'] ?? '';
         $this->labelDroite = $config['label_droite'] ?? '';
         $this->texteObligatoire = (bool) ($config['texte_obligatoire'] ?? false);
+        $this->nombreMin = isset($config['min']) && $question->type === TypeQuestion::Nombre ? (string) $config['min'] : '';
+        $this->nombreMax = isset($config['max']) && $question->type === TypeQuestion::Nombre ? (string) $config['max'] : '';
+        $this->selectionMin = isset($config['min']) && $question->type === TypeQuestion::SelectionNumerique ? (string) $config['min'] : '';
+        $this->selectionMax = isset($config['max']) && $question->type === TypeQuestion::SelectionNumerique ? (string) $config['max'] : '';
 
         // Options (choix unique)
         if ($question->type->aDesOptions()) {
@@ -135,7 +149,7 @@ final class ModeleEditor extends Component
     private function resetFormulaire(): void
     {
         $this->editingQuestionId = null;
-        $this->reset(['libelle', 'aide', 'obligatoire', 'optionsBrut', 'commentaire', 'commentaireLibelle', 'labelGauche', 'labelDroite', 'texteObligatoire']);
+        $this->reset(['libelle', 'aide', 'obligatoire', 'optionsBrut', 'commentaire', 'commentaireLibelle', 'labelGauche', 'labelDroite', 'texteObligatoire', 'nombreMin', 'nombreMax', 'selectionMin', 'selectionMax']);
         $this->type = 'texte_court';
     }
 
@@ -200,6 +214,25 @@ final class ModeleEditor extends Component
             }
 
             return $config !== [] ? $config : null;
+        }
+
+        if ($type === TypeQuestion::Nombre) {
+            $config = [];
+            if ($this->nombreMin !== '') {
+                $config['min'] = (float) $this->nombreMin;
+            }
+            if ($this->nombreMax !== '') {
+                $config['max'] = (float) $this->nombreMax;
+            }
+
+            return $config !== [] ? $config : null;
+        }
+
+        if ($type === TypeQuestion::SelectionNumerique) {
+            return [
+                'min' => (int) $this->selectionMin,
+                'max' => (int) $this->selectionMax,
+            ];
         }
 
         if (! $type->aDesOptions()) {
