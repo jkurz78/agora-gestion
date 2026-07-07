@@ -44,6 +44,36 @@ beforeEach(function (): void {
     ]);
 });
 
+it('affiche la raison sociale d\'un tiers entreprise dans les prévisions par tiers', function (): void {
+    $entreprise = Tiers::factory()->entreprise()->pourDepenses()->create([
+        'entreprise' => 'EPONA',
+        'nom' => null,
+        'prenom' => null,
+    ]);
+
+    EncadrementPrevision::create([
+        'operation_id' => $this->operation->id,
+        'tiers_id' => $entreprise->id,
+        'sous_categorie_id' => $this->scDep->id,
+        'seance_id' => $this->seance->id,
+        'montant_prevu' => 100,
+    ]);
+
+    $data = app(CompteResultatBuilder::class)->compteDeResultatOperations(
+        exercice: 2026,
+        operationIds: [$this->operation->id],
+        parSeances: false,
+        parTiers: true,
+        previsionnel: true,
+    );
+
+    $labels = collect($data['previsions_charges'])
+        ->flatMap(fn ($cat) => collect($cat['sous_categories'])
+            ->flatMap(fn ($sc) => collect($sc['tiers'])->pluck('label')));
+
+    expect($labels)->toContain('EPONA');
+});
+
 it('retourne previsions_charges quand previsionnel=true', function (): void {
     EncadrementPrevision::create([
         'operation_id' => $this->operation->id,

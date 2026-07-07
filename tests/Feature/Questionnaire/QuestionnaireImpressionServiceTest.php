@@ -1,0 +1,313 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Enums\TypeQuestion;
+use App\Models\Operation;
+use App\Models\Participant;
+use App\Models\QuestionnaireBearerToken;
+use App\Models\QuestionnaireCampaign;
+use App\Models\QuestionnaireCampaignQuestion;
+use App\Models\Tiers;
+use App\Services\Questionnaire\QuestionnaireImpressionService;
+use Illuminate\Http\Response;
+use setasign\Fpdi\Fpdi;
+use setasign\Fpdi\PdfParser\StreamReader;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+
+/**
+ * Construit une campagne avec questions et participants pour les tests d'impression.
+ *
+ * @return array{campagne: QuestionnaireCampaign, participantIds: list<int>}
+ */
+function buildImpressionFixture(): array
+{
+    $op = Operation::factory()->create();
+
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'titre_affiche' => 'Enquête test impression',
+        'statut' => 'ouverte',
+    ]);
+
+    // Deux questions dans deux écrans distincts.
+    QuestionnaireCampaignQuestion::factory()
+        ->for($campagne, 'campaign')
+        ->create([
+            'libelle' => 'Question 1',
+            'type' => 'texte_court',
+            'ordre' => 1,
+            'grouper_avec_precedente' => false,
+        ]);
+
+    QuestionnaireCampaignQuestion::factory()
+        ->for($campagne, 'campaign')
+        ->create([
+            'libelle' => 'Question 2',
+            'type' => 'texte_court',
+            'ordre' => 2,
+            'grouper_avec_precedente' => false,
+        ]);
+
+    $p1 = Participant::factory()->create(['operation_id' => $op->id]);
+    $p2 = Participant::factory()->create(['operation_id' => $op->id]);
+
+    return [
+        'campagne' => $campagne,
+        'participantIds' => [(int) $p1->id, (int) $p2->id],
+    ];
+}
+
+it('génère une invitation par participant lors du premier appel à construireDonnees', function (): void {
+    ['campagne' => $campagne, 'participantIds' => $pids] = buildImpressionFixture();
+
+    expect($campagne->invitations()->count())->toBe(0);
+
+    app(QuestionnaireImpressionService::class)->construireDonnees($campagne, $pids);
+
+    expect($campagne->invitations()->count())->toBe(2);
+});
+
+it('chaque invitation générée a un code_court non vide et un token chiffré', function (): void {
+    ['campagne' => $campagne, 'participantIds' => $pids] = buildImpressionFixture();
+
+    app(QuestionnaireImpressionService::class)->construireDonnees($campagne, $pids);
+
+    $invitations = $campagne->invitations()->get();
+    foreach ($invitations as $inv) {
+        expect($inv->code_court)->not->toBeEmpty();
+        expect($inv->token_chiffre)->not->toBeEmpty();
+    }
+});
+
+it('construireDonnees est idempotent : un second appel ne duplique pas les invitations', function (): void {
+    ['campagne' => $campagne, 'participantIds' => $pids] = buildImpressionFixture();
+
+    $svc = app(QuestionnaireImpressionService::class);
+    $svc->construireDonnees($campagne, $pids);
+    $svc->construireDonnees($campagne, $pids);
+
+    expect($campagne->invitations()->count())->toBe(2);
+});
+
+it('construireDonnees retourne une page par participant sélectionné', function (): void {
+    ['campagne' => $campagne, 'participantIds' => $pids] = buildImpressionFixture();
+
+    $données = app(QuestionnaireImpressionService::class)->construireDonnees($campagne, $pids);
+
+    expect($données['pages'])->toHaveCount(2);
+});
+
+it('chaque page contient un QR code data-URI PNG', function (): void {
+    ['campagne' => $campagne, 'participantIds' => $pids] = buildImpressionFixture();
+
+    $données = app(QuestionnaireImpressionService::class)->construireDonnees($campagne, $pids);
+
+    foreach ($données['pages'] as $page) {
+        expect($page['qr'])->toStartWith('data:image/png;base64,');
+    }
+});
+
+it('construireDonnees retourne un tableau non-vide de groupes correspondant aux écrans', function (): void {
+    ['campagne' => $campagne, 'participantIds' => $pids] = buildImpressionFixture();
+
+    $données = app(QuestionnaireImpressionService::class)->construireDonnees($campagne, $pids);
+
+    // 2 questions avec grouper_avec_precedente=false => 2 écrans
+    expect($données['groupes'])->toBeArray()->not->toBeEmpty();
+    expect(count($données['groupes']))->toBe(2);
+});
+
+it('telecharger retourne une StreamedResponse HTTP', function (): void {
+    ['campagne' => $campagne, 'participantIds' => $pids] = buildImpressionFixture();
+
+    $response = app(QuestionnaireImpressionService::class)->telecharger($campagne, $pids);
+
+    expect($response)->toBeInstanceOf(StreamedResponse::class);
+});
+
+it('le contenu du PDF commence par %PDF (rendu DomPDF réel)', function (): void {
+    ['campagne' => $campagne, 'participantIds' => $pids] = buildImpressionFixture();
+
+    $response = app(QuestionnaireImpressionService::class)->telecharger($campagne, $pids);
+
+    // StreamedResponse n'expose pas getContent() — on capture le flux.
+    ob_start();
+    $response->sendContent();
+    $content = ob_get_clean();
+
+    expect($content)->toStartWith('%PDF');
+});
+
+it('afficher retourne un Response HTTP avec Content-Type application/pdf', function (): void {
+    ['campagne' => $campagne, 'participantIds' => $pids] = buildImpressionFixture();
+
+    $response = app(QuestionnaireImpressionService::class)->afficher($campagne, $pids);
+
+    expect($response)->toBeInstanceOf(Response::class);
+    expect($response->headers->get('Content-Type'))->toBe('application/pdf');
+});
+
+it('afficher retourne un PDF inline (Content-Disposition contient inline)', function (): void {
+    ['campagne' => $campagne, 'participantIds' => $pids] = buildImpressionFixture();
+
+    $response = app(QuestionnaireImpressionService::class)->afficher($campagne, $pids);
+
+    expect($response->headers->get('Content-Disposition'))->toContain('inline');
+});
+
+it('afficher retourne un contenu débutant par %PDF', function (): void {
+    ['campagne' => $campagne, 'participantIds' => $pids] = buildImpressionFixture();
+
+    $response = app(QuestionnaireImpressionService::class)->afficher($campagne, $pids);
+
+    expect($response->getContent())->toStartWith('%PDF');
+});
+
+// -----------------------------------------------------------------------
+// Tests intro/remerciement résolus par invitation
+// -----------------------------------------------------------------------
+
+it('construireDonnees retourne introHtml et remerciementHtml par page', function (): void {
+    ['campagne' => $campagne, 'participantIds' => $pids] = buildImpressionFixture();
+
+    // Injecter une intro avec variable {prenom}
+    $campagne->update(['intro' => 'Bonjour {prenom}', 'remerciement' => 'Merci {prenom} !']);
+
+    $données = app(QuestionnaireImpressionService::class)->construireDonnees($campagne, $pids);
+
+    foreach ($données['pages'] as $page) {
+        expect($page)->toHaveKey('introHtml');
+        expect($page)->toHaveKey('remerciementHtml');
+    }
+});
+
+// -----------------------------------------------------------------------
+// Tests FPDI fusion : pagination par répondant + recto-verso
+// -----------------------------------------------------------------------
+
+it('le PDF fusionné a un nombre pair de pages grâce au padding recto-verso', function (): void {
+    ['campagne' => $campagne, 'participantIds' => $pids] = buildImpressionFixture();
+
+    $response = app(QuestionnaireImpressionService::class)->afficher($campagne, $pids);
+    $pdfContent = $response->getContent();
+
+    $reader = new Fpdi;
+    $pageCount = $reader->setSourceFile(StreamReader::createByString($pdfContent));
+
+    expect($pageCount % 2)->toBe(0);
+});
+
+it('un répondant unique produit un PDF de 2 pages (1 contenu + 1 blanche recto-verso)', function (): void {
+    $op = Operation::factory()->create();
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'titre_affiche' => 'Test footer nom',
+        'statut' => 'ouverte',
+    ]);
+
+    QuestionnaireCampaignQuestion::factory()
+        ->for($campagne, 'campaign')
+        ->create(['libelle' => 'Q', 'type' => 'texte_court', 'ordre' => 1]);
+
+    $tiers = Tiers::factory()->create(['prenom' => 'Sylvie', 'nom' => 'Martin']);
+    $participant = Participant::factory()->create([
+        'operation_id' => $op->id,
+        'tiers_id' => $tiers->id,
+    ]);
+
+    $response = app(QuestionnaireImpressionService::class)
+        ->afficher($campagne, [(int) $participant->id]);
+
+    $pdfContent = $response->getContent();
+    expect($pdfContent)->toStartWith('%PDF');
+
+    $reader = new Fpdi;
+    $pageCount = $reader->setSourceFile(StreamReader::createByString($pdfContent));
+    expect($pageCount)->toBe(2);
+});
+
+it('construireDonnees résout {prenom} dans introHtml avec le prénom du participant', function (): void {
+    $op = Operation::factory()->create();
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create([
+        'titre_affiche' => 'Test résolution',
+        'statut' => 'ouverte',
+        'intro' => 'Bonjour {prenom}',
+        'remerciement' => 'Au revoir {prenom}',
+    ]);
+
+    QuestionnaireCampaignQuestion::factory()
+        ->for($campagne, 'campaign')
+        ->create(['libelle' => 'Q', 'type' => 'texte_court', 'ordre' => 1]);
+
+    // Participant avec un prénom connu
+    $tiers = Tiers::factory()->create(['prenom' => 'Élisabeth', 'nom' => 'Dupont']);
+    $participant = Participant::factory()->create([
+        'operation_id' => $op->id,
+        'tiers_id' => $tiers->id,
+    ]);
+
+    $données = app(QuestionnaireImpressionService::class)
+        ->construireDonnees($campagne, [(int) $participant->id]);
+
+    $page = $données['pages'][0];
+
+    expect($page['introHtml'])
+        ->toContain('Élisabeth')
+        ->not->toContain('{prenom}');
+
+    expect($page['remerciementHtml'])
+        ->toContain('Élisabeth')
+        ->not->toContain('{prenom}');
+});
+
+// -----------------------------------------------------------------------
+// Tests impression anonyme simplifiée (un seul bearer token + une page + QR)
+// -----------------------------------------------------------------------
+
+it('construireDonneesAnonyme génère un seul bearer token et une seule page sans nom', function (): void {
+    $op = Operation::factory()->create();
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['anonymise' => true]);
+    QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Note', 'type' => TypeQuestion::Satisfaction, 'ordre' => 1,
+    ]);
+
+    $service = app(QuestionnaireImpressionService::class);
+    $donnees = $service->construireDonneesAnonyme($campagne);
+
+    expect($donnees['pages'])->toHaveCount(1);
+    expect(QuestionnaireBearerToken::where('campaign_id', $campagne->id)->count())->toBe(1);
+
+    $page = $donnees['pages'][0];
+    expect($page['bearer'])->toBeInstanceOf(QuestionnaireBearerToken::class);
+    expect($page['qr'])->toContain('data:image/png;base64');
+    expect($page)->not->toHaveKey('invitation');
+});
+
+it('construireDonneesAnonyme est idempotent : réutilise le même bearer sur appels successifs', function (): void {
+    $op = Operation::factory()->create();
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['anonymise' => true]);
+    QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Note', 'type' => TypeQuestion::Satisfaction, 'ordre' => 1,
+    ]);
+
+    $service = app(QuestionnaireImpressionService::class);
+    $premier = $service->construireDonneesAnonyme($campagne);
+    $second = $service->construireDonneesAnonyme($campagne);
+
+    expect(QuestionnaireBearerToken::where('campaign_id', $campagne->id)->count())->toBe(1);
+    expect($second['pages'][0]['bearer']->id)->toBe($premier['pages'][0]['bearer']->id);
+});
+
+it('afficherAnonyme retourne un Response HTTP PDF inline', function (): void {
+    $op = Operation::factory()->create();
+    $campagne = QuestionnaireCampaign::factory()->for($op, 'operation')->create(['anonymise' => true]);
+    QuestionnaireCampaignQuestion::factory()->for($campagne, 'campaign')->create([
+        'libelle' => 'Note', 'type' => TypeQuestion::Satisfaction, 'ordre' => 1,
+    ]);
+
+    $response = app(QuestionnaireImpressionService::class)->afficherAnonyme($campagne);
+
+    expect($response)->toBeInstanceOf(Response::class);
+    expect($response->headers->get('Content-Type'))->toBe('application/pdf');
+    expect($response->headers->get('Content-Disposition'))->toContain('inline');
+    expect($response->getContent())->toStartWith('%PDF');
+});

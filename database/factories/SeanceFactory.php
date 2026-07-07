@@ -6,6 +6,7 @@ namespace Database\Factories;
 
 use App\Models\Operation;
 use App\Models\Seance;
+use App\Services\ExerciceService;
 use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -22,7 +23,7 @@ final class SeanceFactory extends Factory
             'association_id' => TenantContext::currentId() ?? 1,
             'operation_id' => Operation::factory(),
             'numero' => $this->faker->unique()->numberBetween(1, 99999),
-            'date' => fake()->dateTimeBetween('-1 year', '+1 year'),
+            'date' => app(ExerciceService::class)->defaultDate(),
             'titre' => null,
         ];
     }

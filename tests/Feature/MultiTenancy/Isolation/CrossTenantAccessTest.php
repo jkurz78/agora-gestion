@@ -74,6 +74,8 @@ final class CrossTenantAccessTest extends TestCase
         Operation::factory()->create([
             'association_id' => $this->tenantB->id,
             'nom' => 'OP-SECRET-B',
+            'date_debut' => now()->subMonth(),
+            'date_fin' => now()->addMonth(),
         ]);
         TenantContext::clear();
 
@@ -237,6 +239,8 @@ final class CrossTenantAccessTest extends TestCase
         Operation::factory()->create([
             'association_id' => $this->tenantA->id,
             'nom' => 'TENANTA-PRIVATE-OP',
+            'date_debut' => now()->subMonth(),
+            'date_fin' => now()->addMonth(),
         ]);
         TenantContext::clear();
 
@@ -267,6 +271,8 @@ final class CrossTenantAccessTest extends TestCase
         $opB = Operation::factory()->create([
             'association_id' => $this->tenantB->id,
             'nom' => 'OP-B',
+            'date_debut' => now()->subMonth(),
+            'date_fin' => now()->addMonth(),
         ]);
         TenantContext::clear();
 

@@ -48,6 +48,7 @@ final class Association extends Model
         'facture_compte_bancaire_id',
         'anthropic_api_key',
         'invoice_ocr_model',
+        'questionnaire_ocr_model',
         'email_from',
         'email_from_name',
         'exercice_mois_debut',

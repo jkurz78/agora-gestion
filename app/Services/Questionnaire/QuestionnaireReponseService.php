@@ -1,0 +1,518 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services\Questionnaire;
+
+use App\Enums\StatutInvitation;
+use App\Enums\StatutSubmission;
+use App\Enums\TypeQuestion;
+use App\Exceptions\Questionnaire\ReponseObligatoireException;
+use App\Models\Participant;
+use App\Models\QuestionnaireBearerToken;
+use App\Models\QuestionnaireCampaignQuestion;
+use App\Models\QuestionnaireInvitation;
+use App\Models\QuestionnaireSubmission;
+use App\Models\QuestionnaireTemplateQuestion;
+use App\Tenant\TenantContext;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+
+final class QuestionnaireReponseService
+{
+    /** Invariant ≤1 active : récupère la soumission active ou en crée une. */
+    public function demarrerOuReprendre(QuestionnaireInvitation $invitation): QuestionnaireSubmission
+    {
+        return DB::transaction(function () use ($invitation): QuestionnaireSubmission {
+            $submission = $invitation->submissions()
+                ->whereIn('statut', [StatutSubmission::EnCours->value, StatutSubmission::Soumise->value])
+                ->first();
+
+            if ($submission === null) {
+                $submission = $invitation->submissions()->create([
+                    'campaign_id' => $invitation->campaign_id,
+                    'statut' => StatutSubmission::EnCours,
+                    'source' => 'en_ligne',
+                    'active_key' => $invitation->id,
+                ]);
+            }
+
+            if ($invitation->statut === StatutInvitation::NonOuvert) {
+                $invitation->update(['statut' => StatutInvitation::Commence, 'opened_at' => now()]);
+            }
+
+            return $submission;
+        });
+    }
+
+    /**
+     * Bearer unique par campagne : le suivi ≤1 soumission active ne peut plus se faire
+     * par bearer (partagé entre tous les répondants papier). On bascule sur la session
+     * HTTP du navigateur : chaque nouveau visiteur (nouvelle session) qui scanne le QR
+     * démarre sa propre soumission.
+     */
+    public function demarrerOuReprendreBearer(QuestionnaireBearerToken $bearer): QuestionnaireSubmission
+    {
+        return DB::transaction(function () use ($bearer): QuestionnaireSubmission {
+            $sessionKey = "qanon_submission_{$bearer->id}";
+            $submissionId = session($sessionKey);
+
+            if ($submissionId !== null) {
+                $submission = QuestionnaireSubmission::where('id', (int) $submissionId)
+                    ->where('statut', StatutSubmission::EnCours->value)
+                    ->first();
+                if ($submission !== null) {
+                    return $submission;
+                }
+            }
+
+            $submission = QuestionnaireSubmission::create([
+                'campaign_id' => $bearer->campaign_id,
+                'invitation_id' => null,
+                'bearer_token_id' => $bearer->id,
+                'statut' => StatutSubmission::EnCours,
+                'source' => 'en_ligne',
+                'active_key' => null,
+            ]);
+
+            session([$sessionKey => $submission->id]);
+
+            return $submission;
+        });
+    }
+
+    /** Persiste/écrase la réponse d'UNE question (upsert par (submission, question)). */
+    public function enregistrerReponse(
+        QuestionnaireSubmission $submission,
+        QuestionnaireCampaignQuestion $question,
+        int|float|string|bool|array|null $valeurBrute,
+        ?string $commentaire = null,
+    ): void {
+        $payload = $this->normaliser($question, $valeurBrute, $commentaire);
+
+        $submission->answers()->updateOrCreate(
+            ['campaign_question_id' => $question->id],
+            $payload,
+        );
+    }
+
+    /** @return array<string, mixed> */
+    private function normaliser(QuestionnaireCampaignQuestion $question, int|float|string|bool|array|null $v, ?string $commentaire = null): array
+    {
+        $base = [
+            'value_text' => null, 'value_integer' => null,
+            'value_boolean' => null, 'value_option' => null, 'value_meta' => null,
+        ];
+
+        $payload = match ($question->type) {
+            TypeQuestion::TexteCourt, TypeQuestion::TexteLong, TypeQuestion::Email => ($v === null || $v === '') ? $base : [...$base, 'value_text' => (string) $v],
+            TypeQuestion::Date => [...$base, 'value_text' => $this->normaliserDate($v)],
+            TypeQuestion::Nombre => [...$base, 'value_text' => $this->normaliserNombre($v)],
+            TypeQuestion::Satisfaction, TypeQuestion::SatisfactionTexteLong, TypeQuestion::Ressenti, TypeQuestion::SelectionNumerique => ($v === null || $v === '') ? $base : [...$base, 'value_integer' => (int) $v],
+            TypeQuestion::CaseACocher => ($v === null || $v === '') ? $base : [...$base, 'value_boolean' => (bool) $v],
+            TypeQuestion::ChoixUnique => ($v === null || $v === '') ? $base : [
+                ...$base,
+                'value_option' => (string) $v,
+                'value_meta' => ['libelle' => $question->libelleOption((string) $v)],
+            ],
+            TypeQuestion::ChoixMultiple => ($v === null || $v === '' || $v === []) ? $base : [
+                ...$base,
+                ...$this->normaliserChoixMultiple($question, is_array($v) ? $v : [$v]),
+            ],
+        };
+
+        // Commentaire optionnel (satisfaction) : stocké dans value_text, indépendamment de la note.
+        if ($question->type === TypeQuestion::Satisfaction
+            && ($question->config['commentaire'] ?? false)
+            && $commentaire !== null && $commentaire !== '') {
+            $payload['value_text'] = $commentaire;
+        }
+
+        // Texte long compound (SatisfactionTexteLong) : value_text toujours stocké quand non vide.
+        if ($question->type === TypeQuestion::SatisfactionTexteLong
+            && $commentaire !== null && $commentaire !== '') {
+            $payload['value_text'] = $commentaire;
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Valide et convertit une date vers l'ISO Y-m-d. Le round-trip de formatage
+     * rejette les débordements (2026-13-45) que createFromFormat corrigerait en silence.
+     */
+    private function normaliserDate(int|float|string|bool|array|null $v): ?string
+    {
+        if (! is_string($v) || trim($v) === '') {
+            return null;
+        }
+
+        $v = trim($v);
+        foreach (['Y-m-d', 'd/m/Y', 'j/n/Y'] as $format) {
+            $date = \DateTimeImmutable::createFromFormat('!'.$format, $v);
+            if ($date !== false && $date->format($format) === $v) {
+                return $date->format('Y-m-d');
+            }
+        }
+
+        return null;
+    }
+
+    /** Valide un nombre (virgule française acceptée) — null si non numérique. */
+    private function normaliserNombre(int|float|string|bool|array|null $v): ?string
+    {
+        if (is_int($v) || is_float($v)) {
+            return (string) $v;
+        }
+        if (! is_string($v)) {
+            return null;
+        }
+
+        $s = str_replace(',', '.', trim($v));
+
+        return is_numeric($s) ? $s : null;
+    }
+
+    /**
+     * Valeurs coercées en string : le payload OCR peut contenir des entiers JSON.
+     *
+     * @param  array<int|string, mixed>  $valeurs
+     * @return array{value_option: string|false, value_meta: array{libelles: list<string>}}
+     */
+    private function normaliserChoixMultiple(QuestionnaireCampaignQuestion $question, array $valeurs): array
+    {
+        $vals = array_values(array_map(fn ($val): string => (string) $val, $valeurs));
+
+        return [
+            'value_option' => json_encode($vals),
+            'value_meta' => ['libelles' => collect($vals)
+                ->map(fn (string $val): ?string => $question->libelleOption($val))
+                ->filter()
+                ->values()
+                ->all()],
+        ];
+    }
+
+    public function finaliser(QuestionnaireSubmission $submission, bool $accepteContact, ?string $contactNom = null): void
+    {
+        DB::transaction(function () use ($submission, $accepteContact, $contactNom): void {
+            $this->verifierObligatoires($submission);
+
+            $this->marquerSoumise($submission, $accepteContact, $contactNom);
+
+            // Oubli du lien si anonymise ET pas de consentement
+            $campagne = $submission->campaign;
+            if ($campagne->anonymise && ! $accepteContact && $submission->invitation_id !== null) {
+                $submission->update([
+                    'invitation_id' => null,
+                    'active_key' => null,
+                ]);
+            }
+        });
+    }
+
+    public function finaliserSansBloquer(QuestionnaireSubmission $submission, bool $accepteContact, ?string $contactNom = null): void
+    {
+        DB::transaction(function () use ($submission, $accepteContact, $contactNom): void {
+            $this->marquerSoumise($submission, $accepteContact, $contactNom);
+
+            $campagne = $submission->campaign;
+            if ($campagne->anonymise && ! $accepteContact && $submission->invitation_id !== null) {
+                $submission->update([
+                    'invitation_id' => null,
+                    'active_key' => null,
+                ]);
+            }
+        });
+    }
+
+    private function marquerSoumise(QuestionnaireSubmission $submission, bool $accepteContact, ?string $contactNom = null): void
+    {
+        if ($accepteContact && $contactNom !== null && $submission->bearer_token_id !== null && $submission->invitation_id === null) {
+            $this->tenterRattachementParticipant($submission, $contactNom);
+        }
+
+        $submission->update([
+            'statut' => StatutSubmission::Soumise,
+            'accepte_contact' => $accepteContact,
+            'contact_nom' => ($accepteContact && $submission->invitation_id === null) ? $contactNom : null,
+            'submitted_at' => now(),
+        ]);
+
+        if ($submission->invitation_id !== null) {
+            $submission->invitation->update([
+                'statut' => StatutInvitation::Soumis,
+                'submitted_at' => now(),
+            ]);
+        }
+    }
+
+    /**
+     * Tente de rattacher une soumission anonyme à un participant de l'opération
+     * en cherchant par nom. Si trouvé, crée ou récupère l'invitation et met à jour la soumission.
+     */
+    private function tenterRattachementParticipant(QuestionnaireSubmission $submission, string $contactNom, ?int $participantId = null): void
+    {
+        $campagne = $submission->campaign;
+        $operationId = (int) $campagne->operation_id;
+
+        if ($participantId !== null) {
+            $participant = Participant::where('id', $participantId)
+                ->where('operation_id', $operationId)
+                ->first();
+        } else {
+            $participant = $this->chercherParticipantParNom($operationId, $contactNom);
+        }
+
+        if ($participant === null) {
+            return;
+        }
+
+        $invitation = QuestionnaireInvitation::firstOrCreate(
+            [
+                'campaign_id' => (int) $campagne->id,
+                'participant_id' => (int) $participant->id,
+            ],
+            [
+                'association_id' => TenantContext::currentId(),
+                'token_hash' => hash('sha256', Str::random(48)),
+                'statut' => StatutInvitation::Soumis,
+                'submitted_at' => now(),
+            ]
+        );
+
+        $submission->invitation_id = (int) $invitation->id;
+    }
+
+    private function chercherParticipantParNom(int $operationId, string $nom): ?Participant
+    {
+        $normalise = Str::lower(trim($nom));
+
+        $participants = Participant::where('operation_id', $operationId)
+            ->with('tiers')
+            ->get();
+
+        foreach ($participants as $participant) {
+            $tiers = $participant->tiers;
+            if ($tiers === null) {
+                continue;
+            }
+
+            $prenomNom = Str::lower(trim(($tiers->prenom ?? '').' '.($tiers->nom ?? '')));
+            $nomPrenom = Str::lower(trim(($tiers->nom ?? '').' '.($tiers->prenom ?? '')));
+
+            if ($prenomNom === $normalise || $nomPrenom === $normalise) {
+                return $participant;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Retourne les erreurs de validation pour une question donnée.
+     *
+     * @return array<string, string> erreurs par nom de champ (q_{id} et/ou q_{id}_commentaire)
+     */
+    public function champsManquants(QuestionnaireCampaignQuestion|QuestionnaireTemplateQuestion $q, string|array|null $note, ?string $texte): array
+    {
+        if ($q->type === TypeQuestion::SatisfactionTexteLong) {
+            $erreurs = [];
+
+            if ($q->obligatoire && ($note === null || $note === '')) {
+                $erreurs["q_{$q->id}"] = 'Veuillez indiquer votre satisfaction.';
+            }
+
+            if (($q->config['texte_obligatoire'] ?? false) && ($texte === null || $texte === '')) {
+                $erreurs["q_{$q->id}_commentaire"] = 'Ce texte est obligatoire.';
+            }
+
+            return $erreurs;
+        }
+
+        // Tous les autres types réponse : validation standard sur la colonne primaire.
+        $vide = is_array($note) ? $note === [] : ($note === null || $note === '');
+        if ($q->type->estReponse() && $q->obligatoire && $vide) {
+            return ["q_{$q->id}" => 'Cette question est obligatoire.'];
+        }
+
+        return [];
+    }
+
+    private function verifierObligatoires(QuestionnaireSubmission $submission): void
+    {
+        $answers = $submission->answers()->get()->keyBy('campaign_question_id');
+
+        $manquante = $submission->campaign->questions()
+            ->get()
+            ->first(function (QuestionnaireCampaignQuestion $q) use ($answers): bool {
+                if (! $q->type->estReponse()) {
+                    return false;
+                }
+
+                $a = $answers->get($q->id);
+
+                // Extraire la valeur primaire selon la colonne du type.
+                $colonne = $q->type->valueColumn();
+                $valeurPrimaire = $a === null ? null : $a->{$colonne};
+                $note = $valeurPrimaire === null ? null : (string) $valeurPrimaire;
+                $texte = $a?->value_text;
+
+                return $this->champsManquants($q, $note, $texte) !== [];
+            });
+
+        if ($manquante !== null) {
+            throw new ReponseObligatoireException('Une question obligatoire n\'est pas renseignée.');
+        }
+    }
+
+    /**
+     * Crée une soumission papier depuis un payload OCR validé.
+     * Supersede non destructif : l'ancienne soumission passe en "remplacee", la nouvelle prend la clé active.
+     *
+     * @param  array<string|int, int|float|string|bool|array|null>  $valeursParQuestionId  question_id => valeur brute
+     */
+    /**
+     * @param  array<string|int, int|float|string|bool|array|null>  $valeursParQuestionId
+     * @param  array<string|int, string>  $commentairesParQuestionId
+     */
+    public function creerDepuisOcr(
+        QuestionnaireInvitation $invitation,
+        array $valeursParQuestionId,
+        array $commentairesParQuestionId = [],
+        bool $accepteContact = false,
+        bool $remplacer = false,
+        ?int $paperScanId = null,
+    ): QuestionnaireSubmission {
+        return DB::transaction(function () use ($invitation, $valeursParQuestionId, $commentairesParQuestionId, $accepteContact, $remplacer, $paperScanId): QuestionnaireSubmission {
+            $active = $invitation->submissions()
+                ->whereIn('statut', [StatutSubmission::EnCours->value, StatutSubmission::Soumise->value])
+                ->first();
+
+            if ($active !== null) {
+                abort_unless($remplacer, 422, 'Une réponse existe déjà (choisir Ignorer ou Remplacer).');
+            }
+
+            // Crée la nouvelle soumission SANS active_key (sera fixée après le supersede)
+            $nouvelle = $invitation->submissions()->create([
+                'campaign_id' => $invitation->campaign_id,
+                'statut' => StatutSubmission::EnCours,
+                'source' => 'papier',
+                'active_key' => null,
+                'paper_scan_id' => $paperScanId,
+            ]);
+
+            // Enregistre les réponses
+            $questions = $invitation->campaign->questions()->get()->keyBy('id');
+            foreach ($valeursParQuestionId as $qid => $valeur) {
+                $q = $questions->get((int) $qid);
+                if ($q === null || ! $q->type->estReponse()) {
+                    continue;
+                }
+                $commentaire = $commentairesParQuestionId[(string) $qid] ?? ($commentairesParQuestionId[(int) $qid] ?? null);
+                $this->enregistrerReponse($nouvelle, $q, $valeur, $commentaire);
+            }
+
+            // Supersede : libère l'active_key AVANT de la revendiquer sur la nouvelle soumission
+            if ($active !== null) {
+                $active->update([
+                    'statut' => StatutSubmission::Remplacee,
+                    'active_key' => null,
+                    'remplacee_par_id' => $nouvelle->id,
+                ]);
+            }
+
+            // Finalise la nouvelle soumission
+            $nouvelle->update([
+                'statut' => StatutSubmission::Soumise,
+                'accepte_contact' => $accepteContact,
+                'submitted_at' => now(),
+                'active_key' => $invitation->id,
+            ]);
+
+            $invitation->update(['statut' => StatutInvitation::Soumis, 'submitted_at' => now()]);
+
+            return $nouvelle;
+        });
+    }
+
+    /**
+     * Crée une soumission papier anonyme depuis un payload OCR validé.
+     *
+     * Bearer unique par campagne (réutilisé pour tous les tirages papier) : chaque scan
+     * crée systématiquement sa propre soumission, sans vérification de doublon actif.
+     *
+     * @param  array<string|int, int|float|string|bool|array|null>  $valeursParQuestionId
+     * @param  array<string|int, string>  $commentairesParQuestionId
+     */
+    public function creerDepuisOcrAnonyme(
+        QuestionnaireBearerToken $bearer,
+        array $valeursParQuestionId,
+        array $commentairesParQuestionId = [],
+        bool $accepteContact = false,
+        ?string $contactNom = null,
+        ?int $participantId = null,
+        bool $remplacer = false,
+        ?int $paperScanId = null,
+    ): QuestionnaireSubmission {
+        return DB::transaction(function () use ($bearer, $valeursParQuestionId, $commentairesParQuestionId, $accepteContact, $contactNom, $participantId, $paperScanId): QuestionnaireSubmission {
+            $nouvelle = QuestionnaireSubmission::create([
+                'campaign_id' => $bearer->campaign_id,
+                'invitation_id' => null,
+                'bearer_token_id' => $bearer->id,
+                'statut' => StatutSubmission::EnCours,
+                'source' => 'papier',
+                'active_key' => null,
+                'paper_scan_id' => $paperScanId,
+            ]);
+
+            $questions = $bearer->campaign->questions()->get()->keyBy('id');
+            foreach ($valeursParQuestionId as $qid => $valeur) {
+                $q = $questions->get((int) $qid);
+                if ($q === null || ! $q->type->estReponse()) {
+                    continue;
+                }
+                $commentaire = $commentairesParQuestionId[(string) $qid] ?? ($commentairesParQuestionId[(int) $qid] ?? null);
+                $this->enregistrerReponse($nouvelle, $q, $valeur, $commentaire);
+            }
+
+            if ($accepteContact && $participantId !== null) {
+                $this->tenterRattachementParticipant($nouvelle, $contactNom ?? '', $participantId);
+            } elseif ($accepteContact && $contactNom !== null) {
+                $this->tenterRattachementParticipant($nouvelle, $contactNom);
+            }
+
+            $nouvelle->update([
+                'statut' => StatutSubmission::Soumise,
+                'accepte_contact' => $accepteContact,
+                'contact_nom' => ($accepteContact && $nouvelle->invitation_id === null) ? $contactNom : null,
+                'submitted_at' => now(),
+            ]);
+
+            return $nouvelle;
+        });
+    }
+
+    /** Réouverture admin (D4) : symétrique invitation + soumission, réponses conservées. */
+    public function rouvrir(QuestionnaireInvitation $invitation): void
+    {
+        DB::transaction(function () use ($invitation): void {
+            $fresh = $invitation->fresh();
+
+            $submission = $invitation->submissions()
+                ->where('statut', StatutSubmission::Soumise->value)
+                ->first();
+
+            // Campagne anonymisée + invitation soumise sans soumission liée = réponse oubliée
+            if ($submission === null && $fresh?->campaign->anonymise && $fresh->statut === StatutInvitation::Soumis) {
+                abort(422, 'Soumission anonymisée : réouverture impossible.');
+            }
+
+            if ($submission !== null) {
+                $submission->update(['statut' => StatutSubmission::EnCours, 'submitted_at' => null]);
+            }
+
+            $fresh?->update(['statut' => StatutInvitation::Commence, 'submitted_at' => null]);
+        });
+    }
+}

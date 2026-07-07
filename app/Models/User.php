@@ -68,6 +68,11 @@ final class User extends Authenticatable implements MustVerifyEmail
         ];
     }
 
+    public function setEmailAttribute(?string $value): void
+    {
+        $this->attributes['email'] = $value !== null ? trim($value) : null;
+    }
+
     public function associations(): BelongsToMany
     {
         return $this->belongsToMany(Association::class, 'association_user')

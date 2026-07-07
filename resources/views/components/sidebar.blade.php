@@ -114,7 +114,7 @@ $activeGroup = match(true) {
     request()->routeIs('banques.rapprochement.*', 'banques.virements.*', 'banques.helloasso-sync',
         'banques.comptes.*', 'banques.remises*') => 'banques',
     request()->routeIs('tiers.*') => 'tiers',
-    request()->routeIs('operations.*') => 'operations',
+    request()->routeIs('operations.*', 'questionnaires.*') => 'operations',
     request()->routeIs('facturation.factures*', 'devis-manuels*') => 'facturation',
     request()->routeIs('rapports.*') => 'rapports',
     request()->routeIs('exercices.*') => 'exercices',
@@ -383,7 +383,7 @@ $activeGroup = match(true) {
 
                             <li class="nav-item">
                                 <a href="{{ route('operations.index') }}"
-                                   class="nav-link {{ request()->routeIs('operations.index', 'operations.show', 'operations.participants.*', 'operations.seances.*') ? 'active' : '' }}">
+                                   class="nav-link {{ request()->routeIs('operations.index', 'operations.show', 'operations.participants.*', 'operations.seances.*', 'questionnaires.campagnes.*', 'questionnaires.resultats.*') ? 'active' : '' }}">
                                     <i class="bi bi-calendar-event me-1"></i> Liste
                                 </a>
                             </li>
@@ -399,6 +399,13 @@ $activeGroup = match(true) {
                                 <a href="{{ route('operations.analyse') }}"
                                    class="nav-link {{ request()->routeIs('operations.analyse') ? 'active' : '' }}">
                                     <i class="bi bi-graph-up me-1"></i> Analyse pivot
+                                </a>
+                            </li>
+
+                            <li class="nav-item">
+                                <a href="{{ route('questionnaires.modeles.index') }}"
+                                   class="nav-link {{ request()->routeIs('questionnaires.modeles.*') ? 'active' : '' }}">
+                                    <i class="bi bi-clipboard-check me-1"></i> Modèles de questionnaires
                                 </a>
                             </li>
 

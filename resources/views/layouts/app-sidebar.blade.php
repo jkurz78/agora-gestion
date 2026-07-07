@@ -152,7 +152,7 @@
                         request()->routeIs('banques.rapprochement.*', 'banques.virements.*', 'banques.helloasso-sync',
                             'banques.comptes.*', 'banques.remises*') => 'Banques',
                         request()->routeIs('tiers.*') => 'Tiers',
-                        request()->routeIs('operations.*') => 'Opérations',
+                        request()->routeIs('operations.*', 'questionnaires.*') => 'Opérations',
                         request()->routeIs('facturation.factures*', 'facturation.documents-en-attente*', 'devis-manuels*') => 'Facturation',
                         request()->routeIs('rapports.*') => 'Rapports',
                         request()->routeIs('exercices.*') => 'Exercices',
@@ -166,6 +166,11 @@
                         @if($breadcrumbGroup)
                             <li class="breadcrumb-item">
                                 <span style="color: rgba(255,255,255,.6);">{{ $breadcrumbGroup }}</span>
+                            </li>
+                        @endif
+                        @if(isset($breadcrumbGreatGrandParent))
+                            <li class="breadcrumb-item">
+                                <a href="{{ $breadcrumbGreatGrandParent->attributes['url'] }}" style="color: rgba(255,255,255,.6); text-decoration:none;">{{ $breadcrumbGreatGrandParent }}</a>
                             </li>
                         @endif
                         @if(isset($breadcrumbGrandParent))

@@ -26,6 +26,11 @@ use App\Http\Controllers\ParticipantExportController;
 use App\Http\Controllers\ParticipantFichePdfController;
 use App\Http\Controllers\ParticipantImportTemplateController;
 use App\Http\Controllers\ParticipantPdfController;
+use App\Http\Controllers\QuestionnaireApercuController;
+use App\Http\Controllers\QuestionnaireExportController;
+use App\Http\Controllers\QuestionnaireRepondantController;
+use App\Http\Controllers\QuestionnaireResultatsPdfController;
+use App\Http\Controllers\QuestionnaireScanImageController;
 use App\Http\Controllers\RapportExportController;
 use App\Http\Controllers\RapprochementPdfController;
 use App\Http\Controllers\RapprochementPieceJointeController;
@@ -61,10 +66,14 @@ use App\Models\CompteBancaire;
 use App\Models\Facture;
 use App\Models\Operation;
 use App\Models\Participant;
+use App\Models\QuestionnaireCampaign;
+use App\Models\QuestionnairePaperScan;
+use App\Models\QuestionnaireTemplate;
 use App\Models\RapprochementBancaire;
 use App\Models\RemiseBancaire;
 use App\Models\Tiers;
 use App\Models\TypeOperation;
+use App\Services\Questionnaire\QuestionnaireImpressionService;
 use Illuminate\Support\Facades\Route;
 
 // ── Installation (fresh-install wizard) ──
@@ -180,6 +189,72 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
         Route::get('/{operation}', function (Operation $operation) {
             return view('gestion.operations.show', compact('operation'));
         })->name('show');
+    });
+
+// ── Questionnaires (catalogue de modèles ; campagnes = depuis la fiche opération) ──
+Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
+    ->prefix('questionnaires')
+    ->name('questionnaires.')
+    ->group(function (): void {
+        Route::view('/modeles', 'questionnaire.modeles.index')->name('modeles.index');
+        Route::get('/modeles/{template}/infos', function (QuestionnaireTemplate $template) {
+            return view('questionnaire.modeles.infos', compact('template'));
+        })->name('modeles.infos');
+        Route::get('/modeles/{template}', function (QuestionnaireTemplate $template) {
+            return view('questionnaire.modeles.editor', compact('template'));
+        })->name('modeles.editor');
+        Route::get('/modeles/{template}/textes', function (QuestionnaireTemplate $template) {
+            return view('questionnaire.modeles.textes', compact('template'));
+        })->name('modeles.textes');
+        Route::get('/modeles/{template}/apercu', [QuestionnaireApercuController::class, 'modele'])->name('modeles.apercu');
+        Route::post('/modeles/{template}/apercu', [QuestionnaireApercuController::class, 'storeModele'])->name('modeles.apercu.store');
+        Route::get('/campagnes/{campagne}/apercu', [QuestionnaireApercuController::class, 'campagne'])->name('campagnes.apercu');
+        Route::post('/campagnes/{campagne}/apercu', [QuestionnaireApercuController::class, 'storeCampagne'])->name('campagnes.apercu.store');
+        Route::get('/campagnes/{campagne}/envoi', function (QuestionnaireCampaign $campagne) {
+            return view('questionnaire.campagnes.envoi', compact('campagne'));
+        })->name('campagnes.envoi');
+        Route::get('/campagnes/{campagne}/resultats', function (QuestionnaireCampaign $campagne) {
+            return redirect()->route('questionnaires.campagnes.show', ['campagne' => $campagne, 'tab' => 'resultats']);
+        })->name('campagnes.resultats');
+        Route::get('/campagnes/{campagne}/export', QuestionnaireExportController::class)
+            ->name('campagnes.export');
+        Route::get('/campagnes/{campagne}/pdf', function (QuestionnaireCampaign $campagne) {
+            $participantIds = $campagne->operation
+                ->participants()
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            return app(QuestionnaireImpressionService::class)
+                ->afficher($campagne, $participantIds);
+        })->name('campagnes.pdf');
+        Route::get('/campagnes/{campagne}/pdf-anonyme', function (QuestionnaireCampaign $campagne) {
+            abort_unless($campagne->anonymise, 404);
+
+            return app(QuestionnaireImpressionService::class)->afficherAnonyme($campagne);
+        })->name('campagnes.pdf-anonyme');
+        Route::get('/campagnes/{campagne}/scans', function (QuestionnaireCampaign $campagne) {
+            return redirect()->route('questionnaires.campagnes.show', ['campagne' => $campagne, 'tab' => 'scans']);
+        })->name('campagnes.scans');
+        Route::get('/scans/{scan}/image', QuestionnaireScanImageController::class)
+            ->name('campagnes.scans.image');
+        Route::get('/scans/{scan}/valider', function (QuestionnairePaperScan $scan) {
+            abort_unless($scan->ocrDraft !== null && $scan->ocrDraft->statut === 'brouillon', 404);
+
+            return view('questionnaire.scans.valider', compact('scan'));
+        })->name('campagnes.scans.valider');
+
+        Route::get('/campagnes/{campagne}/resultats/pdf', [QuestionnaireResultatsPdfController::class, 'campagne'])
+            ->name('campagnes.resultats.pdf');
+        Route::get('/resultats/consolides', function () {
+            return view('questionnaire.resultats.consolides');
+        })->name('resultats.consolides');
+        Route::get('/resultats/consolides/pdf', [QuestionnaireResultatsPdfController::class, 'consolides'])
+            ->name('resultats.consolides.pdf');
+
+        Route::get('/campagnes/{campagne}', function (QuestionnaireCampaign $campagne) {
+            return view('questionnaire.campagnes.show', compact('campagne'));
+        })->name('campagnes.show');
     });
 
 // ── Dashboard ──
@@ -424,6 +499,30 @@ Route::middleware(['auth', 'super-admin'])
         Route::post('/support/exit', [SupportModeController::class, 'exit'])
             ->name('support.exit');
     });
+
+// ── Questionnaire public (sans auth ; le token hashé porte le contexte tenant) ──
+Route::prefix('q')->middleware('throttle:30,1')->group(function (): void {
+    Route::get('/{token}/consentement', [QuestionnaireRepondantController::class, 'consentement'])
+        ->name('questionnaire.consentement');
+    Route::get('/{token}/merci', [QuestionnaireRepondantController::class, 'merci'])
+        ->name('questionnaire.merci');
+    Route::get('/{token}', [QuestionnaireRepondantController::class, 'show'])
+        ->name('questionnaire.show');
+    Route::post('/{token}', [QuestionnaireRepondantController::class, 'store'])
+        ->name('questionnaire.store');
+});
+
+// ── Questionnaire public — canal bearer anonyme (QR papier sans invitation) ──
+Route::prefix('q-anon')->middleware('throttle:30,1')->group(function (): void {
+    Route::get('/{token}/consentement', [QuestionnaireRepondantController::class, 'consentementBearer'])
+        ->name('questionnaire.bearer.consentement');
+    Route::get('/{token}/merci', [QuestionnaireRepondantController::class, 'merciBearer'])
+        ->name('questionnaire.bearer.merci');
+    Route::get('/{token}', [QuestionnaireRepondantController::class, 'showBearer'])
+        ->name('questionnaire.bearer.show');
+    Route::post('/{token}', [QuestionnaireRepondantController::class, 'storeBearer'])
+        ->name('questionnaire.bearer.store');
+});
 
 // ── Newsletter public (no auth, no tenant middleware — token embeds tenant context) ──
 Route::get('/newsletter/confirm/{token}', [NewsletterSubscriptionController::class, 'confirm'])

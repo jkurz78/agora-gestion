@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\Association;
 use App\Models\Operation;
 use App\Models\User;
+use App\Services\ExerciceService;
 use App\Tenant\TenantContext;
 
 beforeEach(function () {
@@ -27,9 +28,17 @@ test('gestion operations page loads with operation list', function (): void {
 });
 
 test('operations are listed in table', function (): void {
+    // La liste filtre par exercice courant (OperationList::render). Le défaut de
+    // OperationFactory (date_debut jusqu'à +3 mois) peut tomber hors exercice et
+    // exclure l'opération → test flaky. On ancre les dates dans l'exercice courant.
+    // Cf. feedback_sqlite_date_boundary (dater à l'intérieur de la fenêtre).
+    $range = app(ExerciceService::class)->dateRange(app(ExerciceService::class)->current());
+
     $op = Operation::factory()->create([
         'nom' => 'Art-thérapie test',
         'association_id' => $this->association->id,
+        'date_debut' => $range['start'],
+        'date_fin' => $range['end'],
     ]);
     $this->get('/operations')
         ->assertSee('Art-thérapie test');

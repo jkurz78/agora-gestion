@@ -97,7 +97,13 @@ final class RapportExportController extends Controller
         string $filename,
     ): StreamedResponse {
         $spreadsheet = match ($rapport) {
-            'compte-resultat' => $this->xlsxCompteResultat($rapportService, $exercice, $label),
+            'compte-resultat' => $this->xlsxCompteResultat(
+                $rapportService,
+                $exercice,
+                $label,
+                $request->boolean('n1', true),
+                $request->boolean('budget', true),
+            ),
             'operations' => $this->xlsxOperations($rapportService, $exercice, $request),
             'flux-tresorerie' => $this->xlsxFluxTresorerie($rapportService, $exercice),
             'analyse-financier' => $this->xlsxAnalyse('financier', $exercice, $exerciceService),
@@ -116,8 +122,13 @@ final class RapportExportController extends Controller
         ]);
     }
 
-    private function xlsxCompteResultat(RapportService $rapportService, int $exercice, string $label): Spreadsheet
-    {
+    private function xlsxCompteResultat(
+        RapportService $rapportService,
+        int $exercice,
+        string $label,
+        bool $compareN1 = true,
+        bool $compareBudget = true,
+    ): Spreadsheet {
         $data = $rapportService->compteDeResultat($exercice);
 
         $totalChargesN = collect($data['charges'])->sum('montant_n');
@@ -289,6 +300,14 @@ final class RapportExportController extends Controller
 
         // Format number columns (covers all rows including provisions/extournes)
         $sheet->getStyle('D2:G'.$row)->getNumberFormat()->setFormatCode('#,##0.00');
+
+        // Colonnes : A Type | B Catégorie | C Sous-catégorie | D N-1 | E N | F Budget | G Écart
+        if (! $compareBudget) {
+            $sheet->removeColumn('F', 2); // Budget + Écart
+        }
+        if (! $compareN1) {
+            $sheet->removeColumn('D', 1); // N-1
+        }
 
         return $spreadsheet;
     }
@@ -1096,7 +1115,7 @@ final class RapportExportController extends Controller
         $subtitle = 'Exercice '.$label;
 
         $viewData = match ($rapport) {
-            'compte-resultat' => $this->pdfCompteResultatData($rapportService, $exercice, $label),
+            'compte-resultat' => $this->pdfCompteResultatData($rapportService, $exercice, $label, $request),
             'operations' => $this->pdfOperationsData($rapportService, $exercice, $request),
             'flux-tresorerie' => $this->pdfFluxTresorerieData($rapportService, $exercice),
         };
@@ -1129,7 +1148,7 @@ final class RapportExportController extends Controller
         return $pdf->stream($filename);
     }
 
-    private function pdfCompteResultatData(RapportService $rapportService, int $exercice, string $label): array
+    private function pdfCompteResultatData(RapportService $rapportService, int $exercice, string $label, Request $request): array
     {
         $data = $rapportService->compteDeResultat($exercice);
         $totalChargesN = collect($data['charges'])->sum('montant_n');
@@ -1175,6 +1194,8 @@ final class RapportExportController extends Controller
             'resultatBrutN1' => $resultatBrutN1,
             'resultatNet' => $resultatNet,
             'resultatNetN1' => $resultatNetN1,
+            'compareN1' => $request->boolean('n1', true),
+            'compareBudget' => $request->boolean('budget', true),
         ];
     }
 

@@ -31,7 +31,7 @@ it('form edit: brouillon existant pré-remplit le formulaire', function () {
         'association_id' => $this->asso->id,
         'tiers_id' => $this->tiers->id,
         'libelle' => 'Frais Paris Mars',
-        'date' => '2026-04-10',
+        'date' => now()->subDays(5)->format('Y-m-d'),
     ]);
 
     $this->get("/{$this->asso->slug}/portail/notes-de-frais/{$ndf->id}/edit")
@@ -84,7 +84,7 @@ it('form submit: brouillon valide soumis passe à statut Soumise', function () {
         'association_id' => $this->asso->id,
         'tiers_id' => $this->tiers->id,
         'libelle' => 'Frais valides',
-        'date' => '2026-04-10',
+        'date' => now()->subDays(5)->format('Y-m-d'),
     ]);
     $ligne = NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
@@ -159,7 +159,7 @@ it('form submit: ligne sans pièce jointe retourne erreur', function () {
         'association_id' => $this->asso->id,
         'tiers_id' => $this->tiers->id,
         'libelle' => 'Frais sans PJ',
-        'date' => '2026-04-10',
+        'date' => now()->subDays(5)->format('Y-m-d'),
     ]);
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,

@@ -8,6 +8,7 @@ use App\Enums\TypeTransaction;
 use App\Models\Provision;
 use App\Models\SousCategorie;
 use App\Models\User;
+use App\Services\ExerciceService;
 use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -18,9 +19,12 @@ final class ProvisionFactory extends Factory
 {
     public function definition(): array
     {
+        $exerciceService = app(ExerciceService::class);
+        $exercice = $exerciceService->current();
+
         return [
             'association_id' => TenantContext::currentId() ?? 1,
-            'exercice' => 2025,
+            'exercice' => $exercice,
             'type' => fake()->randomElement(TypeTransaction::cases()),
             'sous_categorie_id' => SousCategorie::factory(),
             'libelle' => 'Provision '.fake()->word(),
@@ -28,7 +32,7 @@ final class ProvisionFactory extends Factory
             'tiers_id' => null,
             'operation_id' => null,
             'seance' => null,
-            'date' => '2026-08-31',
+            'date' => $exerciceService->dateRange($exercice)['end']->toDateString(),
             'notes' => null,
             'piece_jointe_path' => null,
             'piece_jointe_nom' => null,

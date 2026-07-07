@@ -10,6 +10,7 @@ use App\Models\Participant;
 use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Models\User;
+use App\Services\ExerciceService;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
@@ -95,6 +96,8 @@ test('unauthenticated user is redirected from operation detail', function (): vo
 });
 
 test('niveau 1: opérations listées dans le tableau', function (): void {
+    $range = app(ExerciceService::class)->dateRange(app(ExerciceService::class)->current());
+
     $type = TypeOperation::factory()->create([
         'nom' => 'Equithérapie',
         'actif' => true,
@@ -103,8 +106,8 @@ test('niveau 1: opérations listées dans le tableau', function (): void {
     $op = Operation::factory()->create([
         'nom' => 'Parcours Cheval Bleu',
         'type_operation_id' => $type->id,
-        'date_debut' => now()->addDays(14),
-        'date_fin' => now()->addMonths(9),
+        'date_debut' => $range['start'],
+        'date_fin' => $range['end'],
         'association_id' => $this->association->id,
     ]);
     $tiers1 = Tiers::factory()->create(['association_id' => $this->association->id]);
@@ -121,6 +124,8 @@ test('niveau 1: opérations listées dans le tableau', function (): void {
 });
 
 test('niveau 1: filtre par type fonctionne', function (): void {
+    $range = app(ExerciceService::class)->dateRange(app(ExerciceService::class)->current());
+
     $type1 = TypeOperation::factory()->create([
         'nom' => 'Type A',
         'actif' => true,
@@ -134,11 +139,15 @@ test('niveau 1: filtre par type fonctionne', function (): void {
     Operation::factory()->create([
         'nom' => 'Op A',
         'type_operation_id' => $type1->id,
+        'date_debut' => $range['start'],
+        'date_fin' => $range['end'],
         'association_id' => $this->association->id,
     ]);
     Operation::factory()->create([
         'nom' => 'Op B',
         'type_operation_id' => $type2->id,
+        'date_debut' => $range['start'],
+        'date_fin' => $range['end'],
         'association_id' => $this->association->id,
     ]);
 
@@ -149,10 +158,13 @@ test('niveau 1: filtre par type fonctionne', function (): void {
 });
 
 test('niveau 1: opérations clôturées affichées en opacité réduite', function (): void {
+    $range = app(ExerciceService::class)->dateRange(app(ExerciceService::class)->current());
+
     $op = Operation::factory()->create([
         'nom' => 'Op Clôturée',
         'statut' => StatutOperation::Cloturee,
-        'date_debut' => now(),
+        'date_debut' => $range['start'],
+        'date_fin' => $range['end'],
         'association_id' => $this->association->id,
     ]);
 

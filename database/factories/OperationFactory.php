@@ -7,6 +7,7 @@ namespace Database\Factories;
 use App\Enums\StatutOperation;
 use App\Models\Operation;
 use App\Models\TypeOperation;
+use App\Services\ExerciceService;
 use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -19,8 +20,9 @@ class OperationFactory extends Factory
 
     public function definition(): array
     {
-        $start = fake()->dateTimeBetween('-6 months', '+3 months');
-        $end = fake()->dateTimeBetween($start, '+6 months');
+        $range = app(ExerciceService::class)->dateRange(app(ExerciceService::class)->current());
+        $start = fake()->dateTimeBetween($range['start']->toDateString(), $range['end']->subMonth()->toDateString());
+        $end = fake()->dateTimeBetween($start, $range['end']->toDateString());
 
         return [
             'association_id' => TenantContext::currentId() ?? 1,
