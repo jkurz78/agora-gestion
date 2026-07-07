@@ -157,4 +157,20 @@ final class Compte extends TenantModel
     {
         return $this->belongsTo(CompteBancaire::class, 'compte_bancaire_id');
     }
+
+    // -------------------------------------------------------------------------
+    // Famille (DC-1 — dissolution sous_categories → comptes)
+    // -------------------------------------------------------------------------
+
+    /** Préfixe famille (2 premiers caractères du numéro PCG). */
+    public function getCodeFamilleAttribute(): string
+    {
+        return substr($this->numero_pcg, 0, 2);
+    }
+
+    /** Famille du compte (dérivée par préfixe — pas de FK). */
+    public function famille(): ?Famille
+    {
+        return Famille::where('code', $this->code_famille)->first();
+    }
 }

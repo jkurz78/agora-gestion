@@ -26,6 +26,7 @@ use App\Observers\AdhesionObserver;
 use App\Observers\AdhesionRecuFiscalObserver;
 use App\Observers\AdhesionTransactionLigneObserver;
 use App\Observers\AssociationObserver;
+use App\Observers\CompteObserver;
 use App\Observers\ImmutableSlugObserver;
 use App\Observers\SousCategorieCompteObserver;
 use App\Observers\TransactionLigneObserver;
@@ -76,6 +77,7 @@ final class AppServiceProvider extends ServiceProvider
         Adhesion::observe(AdhesionRecuFiscalObserver::class);
         User::observe(UserRoleObserver::class);
         SousCategorie::observe(SousCategorieCompteObserver::class);
+        Compte::observe(CompteObserver::class);
 
         // Rate limiter pour l'API newsletter publique : 5 requêtes / IP / heure.
         // Réponse 429 normalisée {"error": "rate_limit"} pour le contrat API.
