@@ -14,6 +14,11 @@ enum TypeQuestion: string
     case CaseACocher = 'case_a_cocher';
     case ChoixUnique = 'choix_unique';
     case Information = 'information';
+    case Date = 'date';
+    case ChoixMultiple = 'choix_multiple';
+    case Nombre = 'nombre';
+    case Email = 'email';
+    case SelectionNumerique = 'selection_numerique';
 
     public function label(): string
     {
@@ -26,6 +31,11 @@ enum TypeQuestion: string
             self::CaseACocher => 'Case à cocher (oui/non)',
             self::ChoixUnique => 'Choix unique',
             self::Information => 'Information / intertitre',
+            self::Date => 'Date',
+            self::ChoixMultiple => 'Choix multiple',
+            self::Nombre => 'Nombre',
+            self::Email => 'Adresse email',
+            self::SelectionNumerique => 'Sélection numérique',
         };
     }
 
@@ -41,12 +51,15 @@ enum TypeQuestion: string
             self::Satisfaction, self::SatisfactionTexteLong, self::Ressenti => 'value_integer',
             self::CaseACocher => 'value_boolean',
             self::ChoixUnique => 'value_option',
+            self::Date, self::Nombre, self::Email => 'value_text',
+            self::ChoixMultiple => 'value_option',
+            self::SelectionNumerique => 'value_integer',
         };
     }
 
     public function aDesOptions(): bool
     {
-        return $this === self::ChoixUnique;
+        return $this === self::ChoixUnique || $this === self::ChoixMultiple;
     }
 
     /** Vrai pour tous les types qui stockent une réponse (faux pour Information). */
