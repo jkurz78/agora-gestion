@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Services\Rapports;
 
+use App\Models\Famille;
 use App\Models\Operation;
 use App\Models\Tiers;
+use App\Services\Compta\CompteVentilationResolver;
 use App\Tenant\TenantContext;
+use Illuminate\Contracts\Database\Query\Expression;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Config;
@@ -205,6 +208,81 @@ final class CompteResultatBuilder
         return ["{$exercice}-09-01", ($exercice + 1).'-08-31'];
     }
 
+    // ── DC-4 : lecture compte_id + familles (dissolution sous_categories → categories) ──
+
+    /**
+     * Ajoute au query builder les JOIN vers `comptes` (résolu depuis la sous-catégorie
+     * `sc` déjà jointe, via `code_cerfa` = `numero_pcg` — même mapping que
+     * {@see CompteVentilationResolver}) puis `familles` (résolu par
+     * préfixe à 2 chiffres du `numero_pcg`, cf. {@see Famille}).
+     *
+     * Passe par `sous_categories.code_cerfa` plutôt que par `transaction_lignes.compte_id`
+     * directement : la colonne `compte_id` n'est fiable que sur les lignes ayant traversé le
+     * pipeline d'écriture (TransactionService). Le mapping code_cerfa = numero_pcg est lui
+     * garanti 1:1 pour toute ligne de ventilation valide (y compris les fixtures de test créées
+     * directement via `TransactionLigne::factory()`), donc strictement équivalent à la lecture
+     * legacy en catégorie/sous-catégorie sans dépendre d'un backfill physique déjà passé.
+     *
+     * `familles` est joint en LEFT JOIN par défense (l'observer CompteObserver matérialise
+     * toujours une famille de secours à la création d'un compte 6/7, donc ce cas ne devrait
+     * jamais se présenter en pratique).
+     *
+     * Suppose que l'alias `sc` (sous_categories) est déjà joint sur la requête.
+     */
+    private function joinCompteEtFamille(Builder $query): void
+    {
+        $query
+            ->join('comptes as cpt', function ($join): void {
+                $join->on('cpt.numero_pcg', '=', 'sc.code_cerfa')
+                    ->on('cpt.association_id', '=', 'sc.association_id');
+            })
+            ->leftJoin('familles as f', function ($join): void {
+                $join->on('f.code', '=', DB::raw('SUBSTR(cpt.numero_pcg, 1, 2)'))
+                    ->on('f.association_id', '=', 'cpt.association_id');
+            });
+    }
+
+    /**
+     * Colonnes SELECT pour la hiérarchie famille/compte, mêmes alias que l'ancien
+     * catégorie/sous-catégorie (categorie_id, categorie_nom, sous_categorie_id,
+     * sous_categorie_nom) pour ne rien changer côté consommateurs (Livewire, exports).
+     *
+     * @param  Expression|null  $seance  Colonne séance optionnelle (COALESCE(..., 0) as seance)
+     * @return list<Expression>
+     */
+    private function selectCompteFamilleColonnes(Expression $montant, ?Expression $seance = null): array
+    {
+        $cols = [
+            DB::raw('COALESCE(f.id, 0) as categorie_id'),
+            DB::raw("COALESCE(CONCAT(f.code, ' — ', f.nom), cpt.numero_pcg) as categorie_nom"),
+            DB::raw('cpt.id as sous_categorie_id'),
+            DB::raw('cpt.intitule as sous_categorie_nom'),
+        ];
+
+        if ($seance !== null) {
+            $cols[] = $seance;
+        }
+
+        $cols[] = $montant;
+
+        return $cols;
+    }
+
+    /**
+     * @param  Expression|null  $seance  Expression GROUP BY séance optionnelle
+     * @return list<string|Expression>
+     */
+    private function groupByCompteFamilleColonnes(?Expression $seance = null): array
+    {
+        $cols = ['f.id', 'f.code', 'f.nom', 'cpt.numero_pcg', 'cpt.id', 'cpt.intitule'];
+
+        if ($seance !== null) {
+            $cols[] = $seance;
+        }
+
+        return $cols;
+    }
+
     /**
      * Agrégation des dépenses par (catégorie, sous-catégorie).
      *
@@ -236,7 +314,6 @@ final class CompteResultatBuilder
         // Partie 1 : lignes sans affectations
         $q1 = DB::table('transaction_lignes')
             ->join('sous_categories as sc', 'transaction_lignes.sous_categorie_id', '=', 'sc.id')
-            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
             ->join('transactions as d', 'd.id', '=', 'transaction_lignes.transaction_id')
             ->where('d.type', 'depense')
             ->leftJoin('transaction_ligne_affectations as tla', 'tla.transaction_ligne_id', '=', 'transaction_lignes.id')
@@ -244,13 +321,10 @@ final class CompteResultatBuilder
             ->whereNull('d.deleted_at')
             ->whereNull('tla.id')
             ->whereBetween('d.date', [$start, $end])
-            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('d.association_id', TenantContext::currentId()))
-            ->select([
-                'c.id as categorie_id', 'c.nom as categorie_nom',
-                'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom',
-                DB::raw('SUM(transaction_lignes.montant) as montant'),
-            ])
-            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom');
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('d.association_id', TenantContext::currentId()));
+        $this->joinCompteEtFamille($q1);
+        $q1 = $q1->select($this->selectCompteFamilleColonnes(DB::raw('SUM(transaction_lignes.montant) as montant')))
+            ->groupBy(...$this->groupByCompteFamilleColonnes());
 
         if ($operationIds !== null) {
             $q1->whereIn('transaction_lignes.operation_id', $operationIds);
@@ -260,19 +334,15 @@ final class CompteResultatBuilder
         $q2 = DB::table('transaction_ligne_affectations as tla')
             ->join('transaction_lignes', 'transaction_lignes.id', '=', 'tla.transaction_ligne_id')
             ->join('sous_categories as sc', 'transaction_lignes.sous_categorie_id', '=', 'sc.id')
-            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
             ->join('transactions as d', 'd.id', '=', 'transaction_lignes.transaction_id')
             ->where('d.type', 'depense')
             ->whereNull('transaction_lignes.deleted_at')
             ->whereNull('d.deleted_at')
             ->whereBetween('d.date', [$start, $end])
-            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('d.association_id', TenantContext::currentId()))
-            ->select([
-                'c.id as categorie_id', 'c.nom as categorie_nom',
-                'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom',
-                DB::raw('SUM(tla.montant) as montant'),
-            ])
-            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom');
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('d.association_id', TenantContext::currentId()));
+        $this->joinCompteEtFamille($q2);
+        $q2 = $q2->select($this->selectCompteFamilleColonnes(DB::raw('SUM(tla.montant) as montant')))
+            ->groupBy(...$this->groupByCompteFamilleColonnes());
 
         if ($operationIds !== null) {
             $q2->whereIn('tla.operation_id', $operationIds);
@@ -345,9 +415,8 @@ final class CompteResultatBuilder
     private function accumulerDepensesSeancesResolues(string $start, string $end, array $operationIds, array &$map): void
     {
         // Lignes sans affectations (seance=NULL → 0 = "Hors séance")
-        $rows1 = DB::table('transaction_lignes')
+        $q1 = DB::table('transaction_lignes')
             ->join('sous_categories as sc', 'transaction_lignes.sous_categorie_id', '=', 'sc.id')
-            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
             ->join('transactions as d', 'd.id', '=', 'transaction_lignes.transaction_id')
             ->where('d.type', 'depense')
             ->leftJoin('transaction_ligne_affectations as tla', 'tla.transaction_ligne_id', '=', 'transaction_lignes.id')
@@ -355,25 +424,28 @@ final class CompteResultatBuilder
             ->whereNull('tla.id')
             ->whereIn('transaction_lignes.operation_id', $operationIds)
             ->whereBetween('d.date', [$start, $end])
-            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('d.association_id', TenantContext::currentId()))
-            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('COALESCE(transaction_lignes.seance, 0) as seance'), DB::raw('SUM(transaction_lignes.montant) as montant')])
-            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', DB::raw('COALESCE(transaction_lignes.seance, 0)'))
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('d.association_id', TenantContext::currentId()));
+        $this->joinCompteEtFamille($q1);
+        $rows1 = $q1
+            ->select($this->selectCompteFamilleColonnes(DB::raw('SUM(transaction_lignes.montant) as montant'), DB::raw('COALESCE(transaction_lignes.seance, 0) as seance')))
+            ->groupBy(...$this->groupByCompteFamilleColonnes(DB::raw('COALESCE(transaction_lignes.seance, 0)')))
             ->get();
 
         // Lignes avec affectations (seance=NULL → 0 = "Hors séance")
-        $rows2 = DB::table('transaction_ligne_affectations as tla')
+        $q2 = DB::table('transaction_ligne_affectations as tla')
             ->join('transaction_lignes', 'transaction_lignes.id', '=', 'tla.transaction_ligne_id')
             ->join('sous_categories as sc', 'transaction_lignes.sous_categorie_id', '=', 'sc.id')
-            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
             ->join('transactions as d', 'd.id', '=', 'transaction_lignes.transaction_id')
             ->where('d.type', 'depense')
             ->whereNull('transaction_lignes.deleted_at')->whereNull('d.deleted_at')
             ->whereNotNull('tla.operation_id')
             ->whereIn('tla.operation_id', $operationIds)
             ->whereBetween('d.date', [$start, $end])
-            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('d.association_id', TenantContext::currentId()))
-            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('COALESCE(tla.seance, 0) as seance'), DB::raw('SUM(tla.montant) as montant')])
-            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', DB::raw('COALESCE(tla.seance, 0)'))
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('d.association_id', TenantContext::currentId()));
+        $this->joinCompteEtFamille($q2);
+        $rows2 = $q2
+            ->select($this->selectCompteFamilleColonnes(DB::raw('SUM(tla.montant) as montant'), DB::raw('COALESCE(tla.seance, 0) as seance')))
+            ->groupBy(...$this->groupByCompteFamilleColonnes(DB::raw('COALESCE(tla.seance, 0)')))
             ->get();
 
         foreach ([$rows1, $rows2] as $rows) {
@@ -402,16 +474,16 @@ final class CompteResultatBuilder
         // Partie 1 : lignes sans affectations
         $rq1 = DB::table('transaction_lignes')
             ->join('sous_categories as sc', 'transaction_lignes.sous_categorie_id', '=', 'sc.id')
-            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
             ->join('transactions as r', 'r.id', '=', 'transaction_lignes.transaction_id')
             ->where('r.type', 'recette')
             ->leftJoin('transaction_ligne_affectations as tla', 'tla.transaction_ligne_id', '=', 'transaction_lignes.id')
             ->whereNull('transaction_lignes.deleted_at')->whereNull('r.deleted_at')
             ->whereNull('tla.id')
             ->whereBetween('r.date', [$start, $end])
-            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('r.association_id', TenantContext::currentId()))
-            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('SUM(transaction_lignes.montant) as montant')])
-            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom');
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('r.association_id', TenantContext::currentId()));
+        $this->joinCompteEtFamille($rq1);
+        $rq1 = $rq1->select($this->selectCompteFamilleColonnes(DB::raw('SUM(transaction_lignes.montant) as montant')))
+            ->groupBy(...$this->groupByCompteFamilleColonnes());
         if ($operationIds !== null) {
             $rq1->whereIn('transaction_lignes.operation_id', $operationIds);
         }
@@ -420,14 +492,14 @@ final class CompteResultatBuilder
         $rq2 = DB::table('transaction_ligne_affectations as tla')
             ->join('transaction_lignes', 'transaction_lignes.id', '=', 'tla.transaction_ligne_id')
             ->join('sous_categories as sc', 'transaction_lignes.sous_categorie_id', '=', 'sc.id')
-            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
             ->join('transactions as r', 'r.id', '=', 'transaction_lignes.transaction_id')
             ->where('r.type', 'recette')
             ->whereNull('transaction_lignes.deleted_at')->whereNull('r.deleted_at')
             ->whereBetween('r.date', [$start, $end])
-            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('r.association_id', TenantContext::currentId()))
-            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('SUM(tla.montant) as montant')])
-            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom');
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('r.association_id', TenantContext::currentId()));
+        $this->joinCompteEtFamille($rq2);
+        $rq2 = $rq2->select($this->selectCompteFamilleColonnes(DB::raw('SUM(tla.montant) as montant')))
+            ->groupBy(...$this->groupByCompteFamilleColonnes());
         if ($operationIds !== null) {
             $rq2->whereIn('tla.operation_id', $operationIds);
         }
@@ -457,9 +529,8 @@ final class CompteResultatBuilder
     private function accumulerRecettesSeancesResolues(string $start, string $end, array $operationIds, array &$map): void
     {
         // Lignes sans affectations (seance=NULL → 0 = "Hors séance")
-        $rows1 = DB::table('transaction_lignes')
+        $q1 = DB::table('transaction_lignes')
             ->join('sous_categories as sc', 'transaction_lignes.sous_categorie_id', '=', 'sc.id')
-            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
             ->join('transactions as r', 'r.id', '=', 'transaction_lignes.transaction_id')
             ->where('r.type', 'recette')
             ->leftJoin('transaction_ligne_affectations as tla', 'tla.transaction_ligne_id', '=', 'transaction_lignes.id')
@@ -467,25 +538,28 @@ final class CompteResultatBuilder
             ->whereNull('tla.id')
             ->whereIn('transaction_lignes.operation_id', $operationIds)
             ->whereBetween('r.date', [$start, $end])
-            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('r.association_id', TenantContext::currentId()))
-            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('COALESCE(transaction_lignes.seance, 0) as seance'), DB::raw('SUM(transaction_lignes.montant) as montant')])
-            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', DB::raw('COALESCE(transaction_lignes.seance, 0)'))
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('r.association_id', TenantContext::currentId()));
+        $this->joinCompteEtFamille($q1);
+        $rows1 = $q1
+            ->select($this->selectCompteFamilleColonnes(DB::raw('SUM(transaction_lignes.montant) as montant'), DB::raw('COALESCE(transaction_lignes.seance, 0) as seance')))
+            ->groupBy(...$this->groupByCompteFamilleColonnes(DB::raw('COALESCE(transaction_lignes.seance, 0)')))
             ->get();
 
         // Lignes avec affectations (seance=NULL → 0 = "Hors séance")
-        $rows2 = DB::table('transaction_ligne_affectations as tla')
+        $q2 = DB::table('transaction_ligne_affectations as tla')
             ->join('transaction_lignes', 'transaction_lignes.id', '=', 'tla.transaction_ligne_id')
             ->join('sous_categories as sc', 'transaction_lignes.sous_categorie_id', '=', 'sc.id')
-            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
             ->join('transactions as r', 'r.id', '=', 'transaction_lignes.transaction_id')
             ->where('r.type', 'recette')
             ->whereNull('transaction_lignes.deleted_at')->whereNull('r.deleted_at')
             ->whereNotNull('tla.operation_id')
             ->whereIn('tla.operation_id', $operationIds)
             ->whereBetween('r.date', [$start, $end])
-            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('r.association_id', TenantContext::currentId()))
-            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('COALESCE(tla.seance, 0) as seance'), DB::raw('SUM(tla.montant) as montant')])
-            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', DB::raw('COALESCE(tla.seance, 0)'))
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('r.association_id', TenantContext::currentId()));
+        $this->joinCompteEtFamille($q2);
+        $rows2 = $q2
+            ->select($this->selectCompteFamilleColonnes(DB::raw('SUM(tla.montant) as montant'), DB::raw('COALESCE(tla.seance, 0) as seance')))
+            ->groupBy(...$this->groupByCompteFamilleColonnes(DB::raw('COALESCE(tla.seance, 0)')))
             ->get();
 
         foreach ([$rows1, $rows2] as $rows) {
@@ -549,10 +623,12 @@ final class CompteResultatBuilder
         bool $withOperation = false,
     ): array {
         $baseCols = [
-            'c.id as categorie_id', 'c.nom as categorie_nom',
-            'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom',
+            DB::raw('COALESCE(f.id, 0) as categorie_id'),
+            DB::raw("COALESCE(CONCAT(f.code, ' — ', f.nom), cpt.numero_pcg) as categorie_nom"),
+            DB::raw('cpt.id as sous_categorie_id'),
+            DB::raw('cpt.intitule as sous_categorie_nom'),
         ];
-        $baseGroup = ['c.id', 'c.nom', 'sc.id', 'sc.nom'];
+        $baseGroup = ['f.id', 'f.code', 'f.nom', 'cpt.numero_pcg', 'cpt.id', 'cpt.intitule'];
 
         if ($withTiers) {
             $baseCols = array_merge($baseCols, [
@@ -580,7 +656,6 @@ final class CompteResultatBuilder
 
         $q1 = DB::table('transaction_lignes')
             ->join('sous_categories as sc', 'transaction_lignes.sous_categorie_id', '=', 'sc.id')
-            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
             ->join('transactions as tx', 'tx.id', '=', 'transaction_lignes.transaction_id')
             ->where('tx.type', $type)
             ->leftJoin('transaction_ligne_affectations as tla', 'tla.transaction_ligne_id', '=', 'transaction_lignes.id')
@@ -589,8 +664,9 @@ final class CompteResultatBuilder
             ->whereNull('tla.id')
             ->whereIn('transaction_lignes.operation_id', $operationIds)
             ->whereBetween('tx.date', [$start, $end])
-            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('tx.association_id', TenantContext::currentId()))
-            ->select($q1Cols)
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('tx.association_id', TenantContext::currentId()));
+        $this->joinCompteEtFamille($q1);
+        $q1 = $q1->select($q1Cols)
             ->groupBy($q1Group);
 
         if ($withTiers) {
@@ -613,15 +689,15 @@ final class CompteResultatBuilder
         $q2 = DB::table('transaction_ligne_affectations as tla2')
             ->join('transaction_lignes', 'transaction_lignes.id', '=', 'tla2.transaction_ligne_id')
             ->join('sous_categories as sc', 'transaction_lignes.sous_categorie_id', '=', 'sc.id')
-            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
             ->join('transactions as tx', 'tx.id', '=', 'transaction_lignes.transaction_id')
             ->where('tx.type', $type)
             ->whereNull('transaction_lignes.deleted_at')
             ->whereNull('tx.deleted_at')
             ->whereIn('tla2.operation_id', $operationIds)
             ->whereBetween('tx.date', [$start, $end])
-            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('tx.association_id', TenantContext::currentId()))
-            ->select($q2Cols)
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('tx.association_id', TenantContext::currentId()));
+        $this->joinCompteEtFamille($q2);
+        $q2 = $q2->select($q2Cols)
             ->groupBy($q2Group);
 
         if ($withTiers) {
@@ -869,35 +945,13 @@ final class CompteResultatBuilder
     }
 
     /**
-     * Budget alloué par sous-catégorie pour un exercice.
+     * Budget alloué par COMPTE pour un exercice.
      *
-     * En mode partie double, le compte de résultat agrège les montants par
-     * compte_id (cf. fetchClasseRowsPD : sous_categorie_id = compte.id). La clé
-     * budget est donc re-mappée sur compte_id pour rester alignée avec les rows
-     * du rapport — sinon la colonne budget ne s'affiche jamais (clé legacy
-     * sous_categorie_id ≠ compte_id du rapport).
-     *
-     * @return array<int, float> [sous_categorie_id (legacy) | compte_id (PD) => montant_prevu]
-     */
-    private function fetchBudgetMap(int $exercice): array
-    {
-        if (Config::get('compta.use_partie_double', false)) {
-            return $this->fetchBudgetMapPD($exercice);
-        }
-
-        return DB::table('budget_lines')
-            ->where('exercice', $exercice)
-            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('budget_lines.association_id', TenantContext::currentId()))
-            ->select('sous_categorie_id', DB::raw('SUM(montant_prevu) as budget'))
-            ->groupBy('sous_categorie_id')
-            ->get()
-            ->keyBy('sous_categorie_id')
-            ->map(fn ($row) => (float) $row->budget)
-            ->all();
-    }
-
-    /**
-     * Budget alloué par COMPTE pour un exercice (mode partie double).
+     * DC-4 : legacy et partie double agrègent désormais tous les deux les montants du
+     * compte de résultat par compte_id (cf. joinCompteEtFamille / fetchClasseRowsPD :
+     * la clé 'sous_categorie_id' du rapport porte en réalité le compte_id résolu). La
+     * clé budget suit donc la même résolution dans les deux modes — sinon la colonne
+     * budget ne s'affiche jamais (clé sous_categorie_id ≠ compte_id du rapport).
      *
      * Suit la même correspondance que le backfill compte_id (Step 36) :
      *   budget_lines.sous_categorie_id → sous_categories.code_cerfa → comptes.numero_pcg → comptes.id
@@ -906,11 +960,11 @@ final class CompteResultatBuilder
      * seul compte → leurs budgets sont sommés (cohérent avec l'agrégation des
      * montants par compte). Une sous-catégorie sans code_cerfa, ou dont le
      * code_cerfa ne correspond à aucun compte, est silencieusement ignorée
-     * (pas de compte cible → pas de ligne dans le rapport PD non plus).
+     * (pas de compte cible → pas de ligne dans le rapport non plus).
      *
      * @return array<int, float> [compte_id => montant_prevu]
      */
-    private function fetchBudgetMapPD(int $exercice): array
+    private function fetchBudgetMap(int $exercice): array
     {
         return DB::table('budget_lines as bl')
             ->join('sous_categories as sc', 'sc.id', '=', 'bl.sous_categorie_id')
@@ -1117,7 +1171,9 @@ final class CompteResultatBuilder
     /**
      * Construit la requête DB pour les lignes PD d'une classe PCG donnée (6 ou 7).
      *
-     * Lecture : transaction_lignes JOIN comptes (classe = $classe) + JOIN categories via comptes.categorie_id.
+     * Lecture : transaction_lignes JOIN comptes (classe = $classe) + JOIN familles via le
+     * préfixe à 2 chiffres de comptes.numero_pcg (DC-4 : la famille remplace la catégorie
+     * comme regroupement de premier niveau, cf. App\Models\Famille).
      * Filtre exercice via transactions.date (entre $start et $end).
      * Multi-tenant : filtre sur comptes.association_id (le JOIN garantit l'isolation).
      *
@@ -1134,7 +1190,7 @@ final class CompteResultatBuilder
      *   Ce scénario sera couvert par PartieDoubleEquivalenceTest au Step 28.
      *
      * @param  array<int>|null  $operationIds  null = pas de filtre opération
-     * @return Collection<int, object> Colonnes : categorie_id, categorie_nom, sous_categorie_id, sous_categorie_nom, montant
+     * @return Collection<int, object> Colonnes : categorie_id (id famille), categorie_nom (libellé famille), sous_categorie_id (id compte), sous_categorie_nom, montant
      */
     private function fetchClasseRowsPD(string $start, string $end, int $classe, ?array $operationIds = null): Collection
     {
@@ -1146,7 +1202,10 @@ final class CompteResultatBuilder
         $q = DB::table('transaction_lignes as tl')
             ->join('comptes as c', 'tl.compte_id', '=', 'c.id')
             ->join('transactions as t', 'tl.transaction_id', '=', 't.id')
-            ->leftJoin('categories as cat', 'c.categorie_id', '=', 'cat.id')
+            ->leftJoin('familles as f', function ($join): void {
+                $join->on('f.code', '=', DB::raw('SUBSTR(c.numero_pcg, 1, 2)'))
+                    ->on('f.association_id', '=', 'c.association_id');
+            })
             ->where('c.classe', $classe)
             ->whereNotNull('tl.compte_id')
             ->whereNull('tl.deleted_at')
@@ -1154,14 +1213,14 @@ final class CompteResultatBuilder
             ->whereBetween('t.date', [$start, $end])
             ->when(TenantContext::hasBooted(), fn ($q) => $q->where('c.association_id', TenantContext::currentId()))
             ->select([
-                DB::raw('COALESCE(cat.id, 0) as categorie_id'),
-                DB::raw("COALESCE(cat.nom, '(sans catégorie)') as categorie_nom"),
+                DB::raw('COALESCE(f.id, 0) as categorie_id'),
+                DB::raw("COALESCE(CONCAT(f.code, ' — ', f.nom), '(sans famille)') as categorie_nom"),
                 // En mode PD, sous_categorie_id = compte_id (mapping transparent pour les builders hiérarchie)
                 DB::raw('c.id as sous_categorie_id'),
                 DB::raw('c.intitule as sous_categorie_nom'),
                 $montantExpr,
             ])
-            ->groupBy('c.id', 'c.intitule', 'cat.id', 'cat.nom');
+            ->groupBy('c.id', 'c.intitule', 'f.id', 'f.code', 'f.nom');
 
         if ($operationIds !== null) {
             $q->whereIn('tl.operation_id', $operationIds);
@@ -1233,7 +1292,10 @@ final class CompteResultatBuilder
         return DB::table('transaction_lignes as tl')
             ->join('comptes as c', 'tl.compte_id', '=', 'c.id')
             ->join('transactions as t', 'tl.transaction_id', '=', 't.id')
-            ->leftJoin('categories as cat', 'c.categorie_id', '=', 'cat.id')
+            ->leftJoin('familles as f', function ($join): void {
+                $join->on('f.code', '=', DB::raw('SUBSTR(c.numero_pcg, 1, 2)'))
+                    ->on('f.association_id', '=', 'c.association_id');
+            })
             ->where('c.classe', $classe)
             ->whereNotNull('tl.compte_id')
             ->whereNull('tl.deleted_at')
@@ -1242,14 +1304,14 @@ final class CompteResultatBuilder
             ->whereIn('tl.operation_id', $operationIds)
             ->when(TenantContext::hasBooted(), fn ($q) => $q->where('c.association_id', TenantContext::currentId()))
             ->select([
-                DB::raw('COALESCE(cat.id, 0) as categorie_id'),
-                DB::raw("COALESCE(cat.nom, '(sans catégorie)') as categorie_nom"),
+                DB::raw('COALESCE(f.id, 0) as categorie_id'),
+                DB::raw("COALESCE(CONCAT(f.code, ' — ', f.nom), '(sans famille)') as categorie_nom"),
                 DB::raw('c.id as sous_categorie_id'),
                 DB::raw('c.intitule as sous_categorie_nom'),
                 DB::raw('COALESCE(tl.seance, 0) as seance'),
                 $montantExpr,
             ])
-            ->groupBy('c.id', 'c.intitule', 'cat.id', 'cat.nom', DB::raw('COALESCE(tl.seance, 0)'))
+            ->groupBy('c.id', 'c.intitule', 'f.id', 'f.code', 'f.nom', DB::raw('COALESCE(tl.seance, 0)'))
             ->get();
     }
 
@@ -1281,12 +1343,12 @@ final class CompteResultatBuilder
         $isSigne7 = $classe === 7;
 
         $baseCols = [
-            DB::raw('COALESCE(cat.id, 0) as categorie_id'),
-            DB::raw("COALESCE(cat.nom, '(sans catégorie)') as categorie_nom"),
+            DB::raw('COALESCE(f.id, 0) as categorie_id'),
+            DB::raw("COALESCE(CONCAT(f.code, ' — ', f.nom), '(sans famille)') as categorie_nom"),
             DB::raw('c.id as sous_categorie_id'),
             DB::raw('c.intitule as sous_categorie_nom'),
         ];
-        $baseGroup = ['c.id', 'c.intitule', 'cat.id', 'cat.nom'];
+        $baseGroup = ['c.id', 'c.intitule', 'f.id', 'f.code', 'f.nom'];
 
         if ($withTiers) {
             $baseCols = array_merge($baseCols, [
@@ -1318,7 +1380,10 @@ final class CompteResultatBuilder
         $q1 = DB::table('transaction_lignes as tl')
             ->join('comptes as c', 'tl.compte_id', '=', 'c.id')
             ->join('transactions as tx', 'tl.transaction_id', '=', 'tx.id')
-            ->leftJoin('categories as cat', 'c.categorie_id', '=', 'cat.id')
+            ->leftJoin('familles as f', function ($join): void {
+                $join->on('f.code', '=', DB::raw('SUBSTR(c.numero_pcg, 1, 2)'))
+                    ->on('f.association_id', '=', 'c.association_id');
+            })
             ->leftJoin('transaction_ligne_affectations as tla', 'tla.transaction_ligne_id', '=', 'tl.id')
             ->where('c.classe', $classe)
             ->whereNotNull('tl.compte_id')
@@ -1353,7 +1418,10 @@ final class CompteResultatBuilder
             ->join('transaction_lignes as tl', 'tl.id', '=', 'tla2.transaction_ligne_id')
             ->join('comptes as c', 'tl.compte_id', '=', 'c.id')
             ->join('transactions as tx', 'tl.transaction_id', '=', 'tx.id')
-            ->leftJoin('categories as cat', 'c.categorie_id', '=', 'cat.id')
+            ->leftJoin('familles as f', function ($join): void {
+                $join->on('f.code', '=', DB::raw('SUBSTR(c.numero_pcg, 1, 2)'))
+                    ->on('f.association_id', '=', 'c.association_id');
+            })
             ->where('c.classe', $classe)
             ->whereNotNull('tl.compte_id')
             ->whereNull('tl.deleted_at')
@@ -1491,16 +1559,20 @@ final class CompteResultatBuilder
     {
         $q = DB::table('encadrement_previsions as ep')
             ->join('sous_categories as sc', 'sc.id', '=', 'ep.sous_categorie_id')
-            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
             ->join('seances as s', 's.id', '=', 'ep.seance_id')
             ->leftJoin('tiers as t', 't.id', '=', 'ep.tiers_id')
             ->whereIn('ep.operation_id', $operationIds)
             ->when(TenantContext::hasBooted(), fn ($x) => $x->where('ep.association_id', TenantContext::currentId()));
+        $this->joinCompteEtFamille($q);
 
-        $selects = ['c.id as categorie_id', 'c.nom as categorie_nom',
-            'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom',
-            DB::raw('SUM(ep.montant_prevu) as montant')];
-        $groupBy = ['c.id', 'c.nom', 'sc.id', 'sc.nom'];
+        $selects = [
+            DB::raw('COALESCE(f.id, 0) as categorie_id'),
+            DB::raw("COALESCE(CONCAT(f.code, ' — ', f.nom), cpt.numero_pcg) as categorie_nom"),
+            DB::raw('cpt.id as sous_categorie_id'),
+            DB::raw('cpt.intitule as sous_categorie_nom'),
+            DB::raw('SUM(ep.montant_prevu) as montant'),
+        ];
+        $groupBy = ['f.id', 'f.code', 'f.nom', 'cpt.numero_pcg', 'cpt.id', 'cpt.intitule'];
 
         if ($parSeances) {
             $selects[] = 's.numero as seance';
@@ -1538,17 +1610,21 @@ final class CompteResultatBuilder
             ->join('operations as op', 'op.id', '=', 'p.operation_id')
             ->join('type_operations as to_', 'to_.id', '=', 'op.type_operation_id')
             ->join('sous_categories as sc', 'sc.id', '=', 'to_.sous_categorie_id')
-            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
             ->join('seances as s', 's.id', '=', 'r.seance_id')
             ->leftJoin('tiers as t', 't.id', '=', 'p.tiers_id')
             ->whereIn('p.operation_id', $operationIds)
             ->where('r.montant_prevu', '>', 0)
             ->when(TenantContext::hasBooted(), fn ($x) => $x->where('op.association_id', TenantContext::currentId()));
+        $this->joinCompteEtFamille($q);
 
-        $selects = ['c.id as categorie_id', 'c.nom as categorie_nom',
-            'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom',
-            DB::raw('SUM(r.montant_prevu) as montant')];
-        $groupBy = ['c.id', 'c.nom', 'sc.id', 'sc.nom'];
+        $selects = [
+            DB::raw('COALESCE(f.id, 0) as categorie_id'),
+            DB::raw("COALESCE(CONCAT(f.code, ' — ', f.nom), cpt.numero_pcg) as categorie_nom"),
+            DB::raw('cpt.id as sous_categorie_id'),
+            DB::raw('cpt.intitule as sous_categorie_nom'),
+            DB::raw('SUM(r.montant_prevu) as montant'),
+        ];
+        $groupBy = ['f.id', 'f.code', 'f.nom', 'cpt.numero_pcg', 'cpt.id', 'cpt.intitule'];
 
         if ($parSeances) {
             $selects[] = 's.numero as seance';
@@ -1758,25 +1834,32 @@ final class CompteResultatBuilder
     }
 
     /**
-     * Prévisions charges (encadrement_previsions) au grain plat : [sc][tiers][séance][op] = montant.
+     * Prévisions charges (encadrement_previsions) au grain plat : [compte_id][tiers][séance][op] = montant.
+     *
+     * Clé de grain alignée sur {@see fetchOperationRows} (DC-4 : compte_id, résolu depuis
+     * sous_categorie_id via code_cerfa = numero_pcg) — indispensable pour que
+     * {@see computeProjections} puisse fusionner réel et prévu sur la même clé.
      *
      * @param  array<int>  $operationIds
      * @return array<int, array<int, array<int, array<int, float>>>>
      */
     private function fetchFlatPrevisionsCharges(array $operationIds): array
     {
-        $rows = DB::table('encadrement_previsions as ep')
+        $q = DB::table('encadrement_previsions as ep')
+            ->join('sous_categories as sc', 'sc.id', '=', 'ep.sous_categorie_id')
             ->join('seances as s', 's.id', '=', 'ep.seance_id')
             ->whereIn('ep.operation_id', $operationIds)
-            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('ep.association_id', TenantContext::currentId()))
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('ep.association_id', TenantContext::currentId()));
+        $this->joinCompteEtFamille($q);
+        $rows = $q
             ->select([
-                'ep.sous_categorie_id',
+                DB::raw('cpt.id as sous_categorie_id'),
                 DB::raw('COALESCE(ep.tiers_id, 0) as tiers_id'),
                 's.numero as seance',
                 'ep.operation_id',
                 DB::raw('SUM(ep.montant_prevu) as montant'),
             ])
-            ->groupBy('ep.sous_categorie_id', 'ep.tiers_id', 's.numero', 'ep.operation_id')
+            ->groupBy('cpt.id', 'ep.tiers_id', 's.numero', 'ep.operation_id')
             ->get();
 
         $grid = [];
@@ -1789,14 +1872,17 @@ final class CompteResultatBuilder
     }
 
     /**
-     * Prévisions produits (reglements.montant_prevu) au grain plat : [sc][tiers][séance][op] = montant.
+     * Prévisions produits (reglements.montant_prevu) au grain plat : [compte_id][tiers][séance][op] = montant.
+     *
+     * Clé de grain alignée sur {@see fetchOperationRows} (DC-4), même raison que
+     * {@see fetchFlatPrevisionsCharges}.
      *
      * @param  array<int>  $operationIds
      * @return array<int, array<int, array<int, array<int, float>>>>
      */
     private function fetchFlatPrevisionsProduits(array $operationIds): array
     {
-        $rows = DB::table('reglements as r')
+        $q = DB::table('reglements as r')
             ->join('participants as p', 'p.id', '=', 'r.participant_id')
             ->join('operations as op', 'op.id', '=', 'p.operation_id')
             ->join('type_operations as to_', 'to_.id', '=', 'op.type_operation_id')
@@ -1804,15 +1890,17 @@ final class CompteResultatBuilder
             ->join('seances as s', 's.id', '=', 'r.seance_id')
             ->whereIn('p.operation_id', $operationIds)
             ->where('r.montant_prevu', '>', 0)
-            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('op.association_id', TenantContext::currentId()))
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('op.association_id', TenantContext::currentId()));
+        $this->joinCompteEtFamille($q);
+        $rows = $q
             ->select([
-                'sc.id as sous_categorie_id',
+                DB::raw('cpt.id as sous_categorie_id'),
                 DB::raw('COALESCE(p.tiers_id, 0) as tiers_id'),
                 's.numero as seance',
                 'p.operation_id',
                 DB::raw('SUM(r.montant_prevu) as montant'),
             ])
-            ->groupBy('sc.id', 'p.tiers_id', 's.numero', 'p.operation_id')
+            ->groupBy('cpt.id', 'p.tiers_id', 's.numero', 'p.operation_id')
             ->get();
 
         $grid = [];
@@ -1825,12 +1913,17 @@ final class CompteResultatBuilder
     }
 
     /**
-     * Lookup catégorie pour une sous-catégorie (fallback pour SC prévision-only).
+     * Lookup famille (compte_id retourné par fetchOperationRows/fetchFlatPrevisions*) pour un
+     * compte sans ligne réalisée (fallback pour compte prévision-only).
      */
     private function lookupCategoryForSc(int $scId): int
     {
-        return (int) DB::table('sous_categories')
-            ->where('id', $scId)
-            ->value('categorie_id');
+        return (int) DB::table('comptes')
+            ->leftJoin('familles', function ($join): void {
+                $join->on('familles.code', '=', DB::raw('SUBSTR(comptes.numero_pcg, 1, 2)'))
+                    ->on('familles.association_id', '=', 'comptes.association_id');
+            })
+            ->where('comptes.id', $scId)
+            ->value('familles.id');
     }
 }

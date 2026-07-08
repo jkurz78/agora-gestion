@@ -15,7 +15,8 @@ uses(RefreshDatabase::class);
 
 it('includes don-type recettes in produits', function () {
     $cat = Categorie::factory()->create(['type' => TypeCategorie::Recette]);
-    $scDon = SousCategorie::factory()->pourDons()->create(['categorie_id' => $cat->id, 'nom' => 'Dons manuels']);
+    // DC-4 : code_cerfa déclenche la matérialisation Compte/Famille nécessaire à CompteResultatBuilder.
+    $scDon = SousCategorie::factory()->pourDons()->create(['categorie_id' => $cat->id, 'nom' => 'Dons manuels', 'code_cerfa' => '754']);
 
     $compte = CompteBancaire::factory()->create();
     $tx = Transaction::factory()->asRecette()->create([
@@ -41,7 +42,8 @@ it('includes don-type recettes in produits', function () {
 
 it('includes cotisation-type recettes in produits', function () {
     $cat = Categorie::factory()->create(['type' => TypeCategorie::Recette]);
-    $scCot = SousCategorie::factory()->pourCotisations()->create(['categorie_id' => $cat->id, 'nom' => 'Cotisations']);
+    // DC-4 : code_cerfa déclenche la matérialisation Compte/Famille nécessaire à CompteResultatBuilder.
+    $scCot = SousCategorie::factory()->pourCotisations()->create(['categorie_id' => $cat->id, 'nom' => 'Cotisations', 'code_cerfa' => '756']);
 
     $compte = CompteBancaire::factory()->create();
     $tx = Transaction::factory()->asRecette()->create([

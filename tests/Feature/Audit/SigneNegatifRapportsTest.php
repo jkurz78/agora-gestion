@@ -51,10 +51,13 @@ beforeEach(function () {
     $this->actingAs($this->user);
 
     // Catégorie / sous-catégorie de recette
+    // DC-4 : code_cerfa déclenche SousCategorieCompteObserver → matérialise le Compte
+    // (puis CompteObserver la Famille), nécessaire pour CompteResultatBuilder.
     $this->categorie = Categorie::factory()->create(['association_id' => $this->association->id]);
     $this->sc = SousCategorie::factory()->create([
         'categorie_id' => $this->categorie->id,
         'association_id' => $this->association->id,
+        'code_cerfa' => '706',
     ]);
 
     // Compte bancaire réel

@@ -38,7 +38,8 @@ it('fluxTresorerie returns structure with zero balances when no data', function 
 it('compteDeResultat handles negative transaction amounts correctly', function () {
     $compte = CompteBancaire::factory()->create();
     $cat = Categorie::factory()->create(['type' => TypeCategorie::Depense]);
-    $sc = SousCategorie::factory()->create(['categorie_id' => $cat->id]);
+    // DC-4 : code_cerfa déclenche la matérialisation Compte/Famille nécessaire à CompteResultatBuilder.
+    $sc = SousCategorie::factory()->create(['categorie_id' => $cat->id, 'code_cerfa' => '606']);
 
     $tx = Transaction::factory()->create([
         'type' => TypeTransaction::Depense,
@@ -97,7 +98,8 @@ it('toCsv handles empty rows', function () {
 it('compteDeResultat exercice boundaries are correct (sept-aug)', function () {
     $compte = CompteBancaire::factory()->create();
     $cat = Categorie::factory()->create(['type' => TypeCategorie::Depense]);
-    $sc = SousCategorie::factory()->create(['categorie_id' => $cat->id]);
+    // DC-4 : code_cerfa déclenche la matérialisation Compte/Famille nécessaire à CompteResultatBuilder.
+    $sc = SousCategorie::factory()->create(['categorie_id' => $cat->id, 'code_cerfa' => '606']);
 
     // Transaction in September 2025 = exercice 2025
     $tx = Transaction::factory()->create([

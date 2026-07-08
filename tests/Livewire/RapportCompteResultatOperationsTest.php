@@ -43,7 +43,8 @@ it('affiche un message si aucune opération sélectionnée', function () {
 it('affiche les données filtrées par opération', function () {
     $op = Operation::factory()->create(['association_id' => $this->association->id]);
     $cat = Categorie::factory()->depense()->create(['association_id' => $this->association->id, 'nom' => 'Frais']);
-    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $cat->id, 'nom' => 'Transport']);
+    // DC-4 : code_cerfa déclenche la matérialisation Compte/Famille nécessaire à CompteResultatBuilder.
+    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $cat->id, 'nom' => 'Transport', 'code_cerfa' => '625']);
 
     $d = Transaction::factory()->asDepense()->create(['association_id' => $this->association->id, 'date' => '2025-10-01', 'saisi_par' => $this->user->id]);
     $d->lignes()->forceDelete();
@@ -72,7 +73,8 @@ it('supporte parTiers via query string', function () {
 it('passe les données tiers quand parTiers est actif', function () {
     $op = Operation::factory()->create(['association_id' => $this->association->id]);
     $cat = Categorie::factory()->depense()->create(['association_id' => $this->association->id, 'nom' => 'Frais']);
-    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $cat->id, 'nom' => 'Transport']);
+    // DC-4 : code_cerfa déclenche la matérialisation Compte/Famille nécessaire à CompteResultatBuilder.
+    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $cat->id, 'nom' => 'Transport', 'code_cerfa' => '625']);
     $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'type' => 'particulier', 'nom' => 'dupont', 'prenom' => 'Jean']);
 
     $d = Transaction::factory()->asDepense()->create(['association_id' => $this->association->id, 'date' => '2025-10-01', 'tiers_id' => $tiers->id, 'saisi_par' => $this->user->id]);

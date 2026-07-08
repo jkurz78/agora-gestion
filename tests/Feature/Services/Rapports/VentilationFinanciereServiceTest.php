@@ -22,7 +22,9 @@ beforeEach(function () {
     $this->actingAs($this->user);
 
     $this->compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
-    $this->sousCategorie = SousCategorie::factory()->create(['association_id' => $this->association->id]);
+    // DC-4 : code_cerfa déclenche la matérialisation Compte/Famille — nécessaire pour que
+    // VentilationFinancièreService (lecture compte_id/familles) retrouve la ligne.
+    $this->sousCategorie = SousCategorie::factory()->create(['association_id' => $this->association->id, 'code_cerfa' => '706']);
 });
 
 afterEach(function () {

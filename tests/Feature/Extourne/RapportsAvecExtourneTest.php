@@ -10,6 +10,7 @@ use App\Enums\StatutReglement;
 use App\Enums\TypeRapprochement;
 use App\Enums\TypeTransaction;
 use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
 use App\Models\SousCategorie;
@@ -57,8 +58,10 @@ test('compte de résultat — recette nette zéro avec extourne dans même sous-
     rapportsActAsComptable();
 
     // Setup catégorie + sous-catégorie recette dans l'exercice 2025 (Sept 2025 → Aug 2026)
+    // DC-4 : code_cerfa déclenche SousCategorieCompteObserver, qui matérialise le Compte —
+    // nécessaire pour que CompteResultatBuilder (lecture compte_id/familles) trouve la ligne.
     $cat = Categorie::create(['nom' => 'Cotisations', 'type' => 'recette']);
-    $sc = SousCategorie::create(['categorie_id' => $cat->id, 'nom' => 'Cotisations séance', 'libelle_article' => 'des cotisations séance']);
+    $sc = SousCategorie::create(['categorie_id' => $cat->id, 'nom' => 'Cotisations séance', 'libelle_article' => 'des cotisations séance', 'code_cerfa' => '706']);
     $compte = CompteBancaire::factory()->create();
 
     // Recette +80€ dans l'exercice 2025
@@ -70,11 +73,13 @@ test('compte de résultat — recette nette zéro avec extourne dans même sous-
 
     $result = app(CompteResultatBuilder::class)->compteDeResultat(2025);
 
-    // Le détail au niveau sous-catégorie doit refléter la somme nette = 0
+    // Le détail au niveau sous-catégorie doit refléter la somme nette = 0.
+    // DC-4 : 'sous_categorie_id' porte désormais le compte_id résolu (mapping code_cerfa = numero_pcg).
+    $compteResolu = Compte::where('numero_pcg', $sc->code_cerfa)->first();
     $produits = collect($result['produits'])->flatMap(fn ($cat) => $cat['sous_categories'] ?? []);
-    $souscat = $produits->firstWhere('sous_categorie_id', $sc->id);
+    $souscat = $produits->firstWhere('sous_categorie_id', $compteResolu->id);
 
-    expect($souscat)->not->toBeNull('Sous-catégorie absente du compte de résultat');
+    expect($souscat)->not->toBeNull('Compte absent du compte de résultat');
     expect((float) $souscat['montant_n'])->toBe(0.0);
 });
 

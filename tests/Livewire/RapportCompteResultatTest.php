@@ -34,15 +34,19 @@ it('se rend sans erreur', function () {
         ->assertSee('Exporter');
 });
 
-it('affiche les catégories et sous-catégories', function () {
+it('affiche les familles et comptes', function () {
+    // DC-4 : le regroupement de 1er niveau est désormais la famille (préfixe 2 chiffres
+    // du numero_pcg) et non plus la catégorie. code_cerfa déclenche la matérialisation
+    // Compte (intitulé = nom de la sous-catégorie) + Famille (nom = code, fallback
+    // CompteObserver) — d'où le libellé "60 — 60".
     $cat = Categorie::factory()->depense()->create(['association_id' => $this->association->id, 'nom' => 'Charges admin']);
-    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $cat->id, 'nom' => 'Fournitures']);
+    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $cat->id, 'nom' => 'Fournitures', 'code_cerfa' => '606']);
     $d = Transaction::factory()->asDepense()->create(['association_id' => $this->association->id, 'date' => '2025-11-15', 'saisi_par' => $this->user->id]);
     $d->lignes()->forceDelete();
     TransactionLigne::factory()->create(['transaction_id' => $d->id, 'sous_categorie_id' => $sc->id, 'montant' => 250.00]);
 
     Livewire::test(RapportCompteResultat::class)
-        ->assertSee('Charges admin')
+        ->assertSee('60 — 60')
         ->assertSee('Fournitures')
         ->assertSee('250,00');
 });
@@ -50,8 +54,8 @@ it('affiche les catégories et sous-catégories', function () {
 it('affiche le résultat avec couleur verte quand excédent', function () {
     $catD = Categorie::factory()->depense()->create(['association_id' => $this->association->id]);
     $catR = Categorie::factory()->recette()->create(['association_id' => $this->association->id]);
-    $scD = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $catD->id, 'nom' => 'Frais']);
-    $scR = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $catR->id, 'nom' => 'Adhésions']);
+    $scD = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $catD->id, 'nom' => 'Frais', 'code_cerfa' => '616']);
+    $scR = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $catR->id, 'nom' => 'Adhésions', 'code_cerfa' => '716']);
 
     $d = Transaction::factory()->asDepense()->create(['association_id' => $this->association->id, 'date' => '2025-11-01', 'saisi_par' => $this->user->id]);
     $d->lignes()->forceDelete();
@@ -68,7 +72,7 @@ it('affiche le résultat avec couleur verte quand excédent', function () {
 
 it('affiche le résultat avec couleur rouge quand déficit', function () {
     $cat = Categorie::factory()->depense()->create(['association_id' => $this->association->id]);
-    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $cat->id, 'nom' => 'Lourdes charges']);
+    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $cat->id, 'nom' => 'Lourdes charges', 'code_cerfa' => '626']);
     $d = Transaction::factory()->asDepense()->create(['association_id' => $this->association->id, 'date' => '2025-11-01', 'saisi_par' => $this->user->id]);
     $d->lignes()->forceDelete();
     TransactionLigne::factory()->create(['transaction_id' => $d->id, 'sous_categorie_id' => $sc->id, 'montant' => 5000.00]);
@@ -80,7 +84,7 @@ it('affiche le résultat avec couleur rouge quand déficit', function () {
 
 it('affiche la barre de budget quand un budget existe', function () {
     $cat = Categorie::factory()->depense()->create(['association_id' => $this->association->id]);
-    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $cat->id, 'nom' => 'Salle']);
+    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $cat->id, 'nom' => 'Salle', 'code_cerfa' => '636']);
     BudgetLine::factory()->create(['association_id' => $this->association->id, 'sous_categorie_id' => $sc->id, 'exercice' => 2025, 'montant_prevu' => 1000.00]);
     $d = Transaction::factory()->asDepense()->create(['association_id' => $this->association->id, 'date' => '2025-11-01', 'saisi_par' => $this->user->id]);
     $d->lignes()->forceDelete();
@@ -92,7 +96,7 @@ it('affiche la barre de budget quand un budget existe', function () {
 it('barre budget recette au-dessus de l\'objectif → verte (et non rouge)', function () {
     // Recette à 120 % de son budget → la barre doit être VERTE (plus que prévu = bien).
     $catR = Categorie::factory()->recette()->create(['association_id' => $this->association->id]);
-    $scR = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $catR->id, 'nom' => 'Cotisations']);
+    $scR = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $catR->id, 'nom' => 'Cotisations', 'code_cerfa' => '746']);
     BudgetLine::factory()->create(['association_id' => $this->association->id, 'sous_categorie_id' => $scR->id, 'exercice' => 2025, 'montant_prevu' => 1000.00]);
     $r = Transaction::factory()->asRecette()->create(['association_id' => $this->association->id, 'date' => '2025-11-01', 'saisi_par' => $this->user->id]);
     $r->lignes()->forceDelete();
@@ -100,7 +104,7 @@ it('barre budget recette au-dessus de l\'objectif → verte (et non rouge)', fun
 
     // Grosse dépense sans budget → résultat déficitaire (rouge) : le SEUL vert possible est la barre recette.
     $catD = Categorie::factory()->depense()->create(['association_id' => $this->association->id]);
-    $scD = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $catD->id, 'nom' => 'Frais']);
+    $scD = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $catD->id, 'nom' => 'Frais', 'code_cerfa' => '646']);
     $d = Transaction::factory()->asDepense()->create(['association_id' => $this->association->id, 'date' => '2025-11-01', 'saisi_par' => $this->user->id]);
     $d->lignes()->forceDelete();
     TransactionLigne::factory()->create(['transaction_id' => $d->id, 'sous_categorie_id' => $scD->id, 'montant' => 5000.00]);
@@ -134,7 +138,7 @@ it('propage l\'état des toggles dans exportUrl', function () {
 
 it('masque la colonne N-1 quand compareN1 est false', function () {
     $cat = Categorie::factory()->depense()->create(['association_id' => $this->association->id]);
-    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $cat->id, 'nom' => 'Frais']);
+    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $cat->id, 'nom' => 'Frais', 'code_cerfa' => '656']);
     // Une dépense datée dans l'exercice N-1 (2024-2025) pour produire un montant_n1 distinct.
     $d = Transaction::factory()->asDepense()->create(['association_id' => $this->association->id, 'date' => '2024-10-01', 'saisi_par' => $this->user->id]);
     $d->lignes()->forceDelete();
@@ -148,7 +152,7 @@ it('masque la colonne N-1 quand compareN1 est false', function () {
 
 it('masque budget/écart/barre quand compareBudget est false', function () {
     $cat = Categorie::factory()->depense()->create(['association_id' => $this->association->id]);
-    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $cat->id, 'nom' => 'Salle']);
+    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $cat->id, 'nom' => 'Salle', 'code_cerfa' => '666']);
     BudgetLine::factory()->create(['association_id' => $this->association->id, 'sous_categorie_id' => $sc->id, 'exercice' => 2025, 'montant_prevu' => 1000.00]);
     $d = Transaction::factory()->asDepense()->create(['association_id' => $this->association->id, 'date' => '2025-11-01', 'saisi_par' => $this->user->id]);
     $d->lignes()->forceDelete();

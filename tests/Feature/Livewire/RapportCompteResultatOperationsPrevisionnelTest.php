@@ -65,10 +65,10 @@ it('exportUrl contient mode=projection quand mode projection activé', function 
 
 it('affiche les montants projetés quand mode projection ON', function (): void {
     $categorieDep = Categorie::factory()->depense()->create();
-    $sc = SousCategorie::factory()->create(['categorie_id' => $categorieDep->id, 'nom' => 'Encadrement']);
+    $sc = SousCategorie::factory()->create(['categorie_id' => $categorieDep->id, 'nom' => 'Encadrement', 'code_cerfa' => '622']);
 
     $catRec = Categorie::factory()->recette()->create();
-    $scRec = SousCategorie::factory()->create(['categorie_id' => $catRec->id]);
+    $scRec = SousCategorie::factory()->create(['categorie_id' => $catRec->id, 'code_cerfa' => '722']);
     $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $scRec->id]);
     $op = Operation::factory()->create([
         'type_operation_id' => $typeOp->id,
@@ -93,10 +93,10 @@ it('affiche les montants projetés quand mode projection ON', function (): void 
 
 it('affiche un tiers prévision-only avec son montant projeté (mode simple)', function (): void {
     $categorieDep = Categorie::factory()->depense()->create();
-    $sc = SousCategorie::factory()->create(['categorie_id' => $categorieDep->id, 'nom' => 'Encadrement']);
+    $sc = SousCategorie::factory()->create(['categorie_id' => $categorieDep->id, 'nom' => 'Encadrement', 'code_cerfa' => '622']);
 
     $catRec = Categorie::factory()->recette()->create();
-    $scRec = SousCategorie::factory()->create(['categorie_id' => $catRec->id]);
+    $scRec = SousCategorie::factory()->create(['categorie_id' => $catRec->id, 'code_cerfa' => '722']);
     $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $scRec->id]);
     $op = Operation::factory()->create([
         'type_operation_id' => $typeOp->id,
@@ -125,10 +125,10 @@ it('affiche un tiers prévision-only avec son montant projeté (mode simple)', f
 
 it('affiche un tiers prévision-only avec ses opérations projetées', function (): void {
     $categorieDep = Categorie::factory()->depense()->create();
-    $sc = SousCategorie::factory()->create(['categorie_id' => $categorieDep->id, 'nom' => 'Encadrement']);
+    $sc = SousCategorie::factory()->create(['categorie_id' => $categorieDep->id, 'nom' => 'Encadrement', 'code_cerfa' => '622']);
 
     $catRec = Categorie::factory()->recette()->create();
-    $scRec = SousCategorie::factory()->create(['categorie_id' => $catRec->id]);
+    $scRec = SousCategorie::factory()->create(['categorie_id' => $catRec->id, 'code_cerfa' => '722']);
     $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $scRec->id]);
     $op1 = Operation::factory()->create([
         'type_operation_id' => $typeOp->id,
@@ -169,10 +169,10 @@ it('affiche un tiers prévision-only avec ses opérations projetées', function 
 
 it('affiche un tiers prévision-only avec ses séances projetées', function (): void {
     $categorieDep = Categorie::factory()->depense()->create();
-    $sc = SousCategorie::factory()->create(['categorie_id' => $categorieDep->id, 'nom' => 'Encadrement']);
+    $sc = SousCategorie::factory()->create(['categorie_id' => $categorieDep->id, 'nom' => 'Encadrement', 'code_cerfa' => '622']);
 
     $catRec = Categorie::factory()->recette()->create();
-    $scRec = SousCategorie::factory()->create(['categorie_id' => $catRec->id]);
+    $scRec = SousCategorie::factory()->create(['categorie_id' => $catRec->id, 'code_cerfa' => '722']);
     $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $scRec->id]);
     $op = Operation::factory()->create([
         'type_operation_id' => $typeOp->id,
@@ -201,10 +201,10 @@ it('affiche un tiers prévision-only avec ses séances projetées', function ():
 
 it('exporte le PDF avec tiers prévision-only sans erreur', function (): void {
     $categorieDep = Categorie::factory()->depense()->create();
-    $sc = SousCategorie::factory()->create(['categorie_id' => $categorieDep->id]);
+    $sc = SousCategorie::factory()->create(['categorie_id' => $categorieDep->id, 'code_cerfa' => '622']);
 
     $catRec = Categorie::factory()->recette()->create();
-    $scRec = SousCategorie::factory()->create(['categorie_id' => $catRec->id]);
+    $scRec = SousCategorie::factory()->create(['categorie_id' => $catRec->id, 'code_cerfa' => '722']);
     $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $scRec->id]);
     $op = Operation::factory()->create([
         'type_operation_id' => $typeOp->id,
@@ -245,10 +245,10 @@ it('exporte le PDF avec tiers prévision-only sans erreur', function (): void {
 
 it('affiche le mode combiné séances × opérations avec projection', function (): void {
     $categorieDep = Categorie::factory()->depense()->create();
-    $sc = SousCategorie::factory()->create(['categorie_id' => $categorieDep->id, 'nom' => 'Encadrement']);
+    $sc = SousCategorie::factory()->create(['categorie_id' => $categorieDep->id, 'nom' => 'Encadrement', 'code_cerfa' => '622']);
 
     $catRec = Categorie::factory()->recette()->create();
-    $scRec = SousCategorie::factory()->create(['categorie_id' => $catRec->id]);
+    $scRec = SousCategorie::factory()->create(['categorie_id' => $catRec->id, 'code_cerfa' => '722']);
     $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $scRec->id]);
     $op1 = Operation::factory()->create([
         'type_operation_id' => $typeOp->id,
@@ -291,10 +291,10 @@ it('affiche le mode combiné séances × opérations avec projection', function 
 
 it('exporte PDF et Excel en mode combiné séances × opérations', function (): void {
     $categorieDep = Categorie::factory()->depense()->create();
-    $sc = SousCategorie::factory()->create(['categorie_id' => $categorieDep->id]);
+    $sc = SousCategorie::factory()->create(['categorie_id' => $categorieDep->id, 'code_cerfa' => '622']);
 
     $catRec = Categorie::factory()->recette()->create();
-    $scRec = SousCategorie::factory()->create(['categorie_id' => $catRec->id]);
+    $scRec = SousCategorie::factory()->create(['categorie_id' => $catRec->id, 'code_cerfa' => '722']);
     $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $scRec->id]);
     $op1 = Operation::factory()->create(['type_operation_id' => $typeOp->id, 'date_debut' => Carbon::create(2026, 9, 5)]);
     $op2 = Operation::factory()->create(['type_operation_id' => $typeOp->id, 'date_debut' => Carbon::create(2026, 9, 12)]);

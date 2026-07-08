@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\Association;
 use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\EncadrementPrevision;
 use App\Models\Operation;
 use App\Models\Participant;
@@ -21,11 +22,14 @@ beforeEach(function (): void {
     $this->association = Association::factory()->create();
     TenantContext::boot($this->association);
 
+    // DC-4 : code_cerfa déclenche SousCategorieCompteObserver, qui matérialise le Compte
+    // (puis CompteObserver matérialise la Famille) — nécessaire pour que
+    // CompteResultatBuilder (lecture compte_id/familles) retrouve ces lignes.
     $this->categorieDep = Categorie::factory()->depense()->create();
-    $this->scDep = SousCategorie::factory()->create(['categorie_id' => $this->categorieDep->id, 'nom' => 'Encadrement']);
+    $this->scDep = SousCategorie::factory()->create(['categorie_id' => $this->categorieDep->id, 'nom' => 'Encadrement', 'code_cerfa' => '606']);
 
     $this->categorieRec = Categorie::factory()->recette()->create();
-    $this->scRec = SousCategorie::factory()->create(['categorie_id' => $this->categorieRec->id, 'nom' => 'Cotisations']);
+    $this->scRec = SousCategorie::factory()->create(['categorie_id' => $this->categorieRec->id, 'nom' => 'Cotisations', 'code_cerfa' => '706']);
 
     $this->typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $this->scRec->id]);
     $this->operation = Operation::factory()->create([
@@ -281,7 +285,9 @@ it('ProjectionMatrix contient les valeurs projetées au grain tiers', function (
     /** @var ProjectionMatrix $projCharges */
     $projCharges = $data['proj_charges'];
 
-    $scId = (int) $this->scDep->id;
+    // DC-4 : la ProjectionMatrix est désormais indexée par compte_id (résolu depuis
+    // sous_categorie_id via code_cerfa = numero_pcg), pas par sous_categorie_id.
+    $scId = (int) Compte::where('numero_pcg', $this->scDep->code_cerfa)->first()->id;
     $tiersId = (int) $this->tiersEnc->id;
 
     $tiersTotal = $projCharges->byScTiers($scId)[$tiersId] ?? 0;

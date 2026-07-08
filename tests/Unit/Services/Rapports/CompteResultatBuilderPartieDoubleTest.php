@@ -183,7 +183,10 @@ it('[PD1] compteDeResultat — produit classe 7 agrégé par compte en mode PD',
     expect($produits)->toHaveCount(1);
 
     $cat = $produits[0];
-    expect($cat['label'])->toBe('Prestations');
+    // DC-4 : le regroupement de 1er niveau est la famille (préfixe 2 chiffres du numero_pcg),
+    // plus la catégorie. CompteObserver matérialise une famille de secours (nom = code) à la
+    // création du compte 706 — d'où le libellé "70 — 70" (Famille::libelle()).
+    expect($cat['label'])->toBe('70 — 70');
     // En mode PD, le montant agrégé = SUM(credit) - SUM(debit) = 500
     expect((float) $cat['montant_n'])->toBe(500.0);
     expect($cat['sous_categories'])->toHaveCount(1);
@@ -208,7 +211,8 @@ it('[PD2] compteDeResultat — charge classe 6 agrégée par compte en mode PD',
     expect($charges)->toHaveCount(1);
 
     $cat = $charges[0];
-    expect($cat['label'])->toBe('Charges générales');
+    // DC-4 : idem PD1 — famille de secours "60 — 60" pour le compte 606.
+    expect($cat['label'])->toBe('60 — 60');
     expect((float) $cat['montant_n'])->toBe(150.0);
 });
 

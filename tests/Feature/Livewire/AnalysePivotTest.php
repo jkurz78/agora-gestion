@@ -98,7 +98,9 @@ it('returns participants data with correct fields', function () {
 it('returns financier data with correct fields including temporal dimensions', function () {
     $compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
     $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Fournisseur', 'pour_depenses' => true]);
-    $sousCategorie = SousCategorie::factory()->create(['association_id' => $this->association->id]);
+    // DC-4 : code_cerfa déclenche la matérialisation Compte/Famille nécessaire à
+    // VentilationFinancièreService (source du mode financier de l'Analyse pivot).
+    $sousCategorie = SousCategorie::factory()->create(['association_id' => $this->association->id, 'code_cerfa' => '606']);
     $transaction = Transaction::create([
         'association_id' => $this->association->id,
         'tiers_id' => $tiers->id,
