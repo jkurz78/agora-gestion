@@ -106,9 +106,12 @@ final class HelloAssoSyncService
             return $result;
         }
 
-        // Skip si form Membership/Donation sans sous_categorie_id configurée
+        // Skip si form Membership/Donation sans ventilation configurée.
+        // DC-5 — lit compte_id (rempli par le trait de double écriture DC-3) en
+        // priorité ; repli sur sous_categorie_id pour une fixture pré-DC-2.
         if ($formMapping !== null
             && in_array($formMapping->form_type, ['Membership', 'Donation'], true)
+            && $formMapping->compte_id === null
             && $formMapping->sous_categorie_id === null) {
             $result['skipped']++;
 

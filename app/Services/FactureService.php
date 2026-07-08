@@ -1051,14 +1051,28 @@ XML;
             // 3. Lie la FactureLigne à sa TransactionLigne
             $factureLigne->update(['transaction_ligne_id' => $transactionLigne->id]);
 
-            // 4. Résolution sous_categorie → Compte (classe 7 attendue pour recette)
+            // 4. Résolution du Compte (classe 7 attendue pour recette).
+            // DC-5 — lit compte_id sur la FactureLigne (rempli par le trait de double
+            // écriture DC-3) en priorité ; retombe sur le resolver sous_categorie_id
+            // si absent (fixture pré-DC-2, ou sous-catégorie sans code_cerfa).
             if (! $skipPartieDouble) {
-                $compte = CompteVentilationResolver::resoudre(
-                    sousCategorieId: $transactionLigne->sous_categorie_id !== null ? (int) $transactionLigne->sous_categorie_id : null,
-                    classeAttendue: 7,
-                    contextLog: 'FactureService',
-                    contextLogData: ['transaction_id' => (int) $transaction->id],
-                );
+                $compte = $factureLigne->compte_id !== null
+                    ? $factureLigne->compte
+                    : CompteVentilationResolver::resoudre(
+                        sousCategorieId: $transactionLigne->sous_categorie_id !== null ? (int) $transactionLigne->sous_categorie_id : null,
+                        classeAttendue: 7,
+                        contextLog: 'FactureService',
+                        contextLogData: ['transaction_id' => (int) $transaction->id],
+                    );
+
+                if ($compte !== null && (int) $compte->classe !== 7) {
+                    Log::warning('[PartieDouble][FactureService] — skip : compte_id porté par la ligne invalide (classe ≠ 7)', [
+                        'transaction_id' => (int) $transaction->id,
+                        'facture_ligne_id' => (int) $factureLigne->id,
+                        'compte_id' => $factureLigne->compte_id,
+                    ]);
+                    $compte = null;
+                }
 
                 if ($compte !== null) {
                     // Enrichir la ligne legacy avec les colonnes partie double (recette → C credit)

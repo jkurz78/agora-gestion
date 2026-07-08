@@ -124,29 +124,48 @@ final class TransactionService
         $skipDoubleEcriture = false;
 
         foreach ($lignesCreees as $ligne) {
-            $sousCatId = $ligne->sous_categorie_id;
+            // DC-5 — chemin rapide : une ligne qui porte déjà compte_id (caller post-DC-8,
+            // ou ligne resynchronisée par le trait sur un autre modèle) évite la résolution
+            // via sous_categorie_id. On revalide quand même la classe attendue (même contrat
+            // que le resolver) pour ne pas relâcher la garde G4.
+            if ($ligne->compte_id !== null) {
+                $compte = Compte::find((int) $ligne->compte_id);
 
-            if ($sousCatId === null) {
-                // Ligne sans sous-catégorie (ex. ajout manuel) — skip total
-                Log::info('[PartieDouble][TransactionService] — skip : ligne sans sous_categorie_id', [
-                    'transaction_id' => $transaction->id,
-                    'transaction_ligne_id' => $ligne->id,
-                ]);
-                $skipDoubleEcriture = true;
-                break;
-            }
+                if ($compte === null || (int) $compte->classe !== $classeAttendue) {
+                    Log::warning('[PartieDouble][TransactionService] — skip : compte_id porté par la ligne invalide', [
+                        'transaction_id' => $transaction->id,
+                        'transaction_ligne_id' => $ligne->id,
+                        'compte_id' => $ligne->compte_id,
+                        'classe_attendue' => $classeAttendue,
+                    ]);
+                    $skipDoubleEcriture = true;
+                    break;
+                }
+            } else {
+                $sousCatId = $ligne->sous_categorie_id;
 
-            // Résolution sous_categorie → Compte (classe 6 ou 7) via CompteVentilationResolver.
-            $compte = CompteVentilationResolver::resoudre(
-                sousCategorieId: (int) $sousCatId,
-                classeAttendue: $classeAttendue,
-                contextLog: 'TransactionService',
-                contextLogData: ['transaction_id' => $transaction->id],
-            );
+                if ($sousCatId === null) {
+                    // Ligne sans sous-catégorie (ex. ajout manuel) — skip total
+                    Log::info('[PartieDouble][TransactionService] — skip : ligne sans sous_categorie_id', [
+                        'transaction_id' => $transaction->id,
+                        'transaction_ligne_id' => $ligne->id,
+                    ]);
+                    $skipDoubleEcriture = true;
+                    break;
+                }
 
-            if ($compte === null) {
-                $skipDoubleEcriture = true;
-                break;
+                // Résolution sous_categorie → Compte (classe 6 ou 7) via CompteVentilationResolver.
+                $compte = CompteVentilationResolver::resoudre(
+                    sousCategorieId: (int) $sousCatId,
+                    classeAttendue: $classeAttendue,
+                    contextLog: 'TransactionService',
+                    contextLogData: ['transaction_id' => $transaction->id],
+                );
+
+                if ($compte === null) {
+                    $skipDoubleEcriture = true;
+                    break;
+                }
             }
 
             // Enrichir la ligne legacy avec compte_id + debit/credit partie double

@@ -67,8 +67,12 @@ final class ReglementOperationService
         $seance->load('operation.typeOperation');
         $operation = $seance->operation;
         $sousCategorieId = $operation->typeOperation?->sous_categorie_id;
+        // DC-5 — lit compte_id sur le typeOperation (rempli par le trait de double
+        // écriture DC-3) en priorité ; repli sur sous_categorie_id pour une fixture
+        // pré-DC-2 (voir enrichirCreancePartieDouble).
+        $compteId = $operation->typeOperation?->compte_id;
 
-        if ($sousCategorieId === null) {
+        if ($sousCategorieId === null && $compteId === null) {
             Log::warning('[PartieDouble][ReglementOperationService] — skip total : typeOperation sans sous_categorie_id', [
                 'seance_id' => (int) $seance->id,
                 'operation_id' => (int) $operation->id,
@@ -90,7 +94,7 @@ final class ReglementOperationService
             return;
         }
 
-        DB::transaction(function () use ($reglements, $seance, $operation, $sousCategorieId, $compteBancaireId, $date): void {
+        DB::transaction(function () use ($reglements, $seance, $operation, $sousCategorieId, $compteId, $compteBancaireId, $date): void {
             foreach ($reglements as $reglement) {
                 $tiers = $reglement->participant->tiers;
                 $libelle = "Règlement {$tiers->displayName()} — {$operation->nom} S{$seance->numero}";
@@ -111,7 +115,9 @@ final class ReglementOperationService
                     'saisi_par' => auth()->id(),
                 ]);
 
-                // 2. Crée la TransactionLigne legacy
+                // 2. Crée la TransactionLigne legacy (compte_id posé plus tard par
+                // enrichirCreancePartieDouble — pas ici, sinon l'invariant XOR de
+                // TransactionLigneObserver se déclenche avant que debit/credit soient posés).
                 $ligne = TransactionLigne::create([
                     'transaction_id' => (int) $tx->id,
                     'sous_categorie_id' => $sousCategorieId,
@@ -121,7 +127,7 @@ final class ReglementOperationService
                 ]);
 
                 // 3. Enrichit partie double (best-effort — n'annule pas la création legacy)
-                $this->enrichirCreancePartieDouble($tx, $ligne, $tiers, $operation, $seance, $sousCategorieId);
+                $this->enrichirCreancePartieDouble($tx, $ligne, $tiers, $operation, $seance, $sousCategorieId, $compteId);
             }
         });
     }
@@ -442,7 +448,8 @@ final class ReglementOperationService
      * Enrichit la Transaction créée par comptabiliserSeance avec les écritures partie double.
      *
      * Pattern Step 23 (FactureService::genererTransactionDepuisLignesManuelles) :
-     * — résout la SousCategorie → Compte classe 7
+     * — résout le Compte classe 7 (DC-5 — via compte_id du typeOperation en priorité,
+     *   repli sur CompteVentilationResolver/sous_categorie_id sinon)
      * — enrichit la ligne legacy (compte_id / debit / credit)
      * — délègue à EcritureGenerator::pourRecetteACredit(existingTransaction: $tx)
      *
@@ -454,18 +461,34 @@ final class ReglementOperationService
         Tiers $tiers,
         Operation $operation,
         Seance $seance,
-        int $sousCategorieId,
+        ?int $sousCategorieId,
+        ?int $compteId = null,
     ): void {
-        // --- Résolution SousCategorie → Compte classe 7 ---
-        $compte = CompteVentilationResolver::resoudre(
-            sousCategorieId: $sousCategorieId,
-            classeAttendue: 7,
-            contextLog: 'ReglementOperationService',
-            contextLogData: ['transaction_id' => (int) $tx->id],
-        );
+        // --- Résolution du Compte classe 7 ---
+        if ($compteId !== null) {
+            $compte = Compte::find($compteId);
 
-        if ($compte === null) {
-            // Garde loggée dans CompteVentilationResolver::resoudre
+            if ($compte === null || (int) $compte->classe !== 7) {
+                Log::warning('[PartieDouble][ReglementOperationService] — skip : compte_id du typeOperation invalide (classe ≠ 7)', [
+                    'transaction_id' => (int) $tx->id,
+                    'compte_id' => $compteId,
+                ]);
+
+                return;
+            }
+        } elseif ($sousCategorieId !== null) {
+            $compte = CompteVentilationResolver::resoudre(
+                sousCategorieId: $sousCategorieId,
+                classeAttendue: 7,
+                contextLog: 'ReglementOperationService',
+                contextLogData: ['transaction_id' => (int) $tx->id],
+            );
+
+            if ($compte === null) {
+                // Garde loggée dans CompteVentilationResolver::resoudre
+                return;
+            }
+        } else {
             return;
         }
 

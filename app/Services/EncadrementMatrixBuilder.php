@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\TypeTransaction;
+use App\Models\Compte;
 use App\Models\EncadrementPrevision;
 use App\Models\Operation;
 use App\Models\Seance;
@@ -56,7 +57,11 @@ final class EncadrementMatrixBuilder
         $orphanRealiseHorsSeance = [];
 
         // 1) Charger les prévisions
-        $previsions = EncadrementPrevision::with(['tiers', 'sousCategorie'])
+        // DC-5 — lit compte/compte_id (dissolution sous_categories → comptes) pour le
+        // libellé affiché ; la clé de regroupement (scId) reste sous_categorie_id — seule
+        // clé stable garantie sur les deux sources (prévisions ET lignes legacy non encore
+        // enrichies partie double, cf. repli plus bas). Clés de sortie (scId/scName) conservées.
+        $previsions = EncadrementPrevision::with(['tiers', 'sousCategorie', 'compte'])
             ->where('operation_id', $operation->id)
             ->get();
 
@@ -67,7 +72,7 @@ final class EncadrementMatrixBuilder
             $montant = (float) $p->montant_prevu;
 
             $this->ensureAnimateur($animateurs, $p->tiers);
-            $this->ensureSousCategorie($animateurs, $tId, $p->sousCategorie);
+            $this->ensureCompte($animateurs, $tId, $scId, $p->compte, $p->sousCategorie);
 
             $animateurs[$tId]['sousCategories'][$scId]['previsionIds'][$sId] = (int) $p->id;
             $animateurs[$tId]['sousCategories'][$scId]['prevuParSeance'][$sId] = $montant;
@@ -78,10 +83,13 @@ final class EncadrementMatrixBuilder
         }
 
         // 2) Charger les réalisés (transaction_lignes Dépense sur l'opération)
+        // DC-5 — lit compte/compte_id pour le libellé ; la clé de regroupement (scId)
+        // reste sous_categorie_id, seule clé garantie présente y compris sur les lignes
+        // legacy pas encore enrichies partie double (compte_id NULL).
         $lignes = TransactionLigne::query()
             ->whereHas('transaction', fn ($q) => $q->where('type', TypeTransaction::Depense))
             ->where('operation_id', $operation->id)
-            ->with(['transaction.tiers', 'sousCategorie'])
+            ->with(['transaction.tiers', 'sousCategorie', 'compte'])
             ->get();
 
         foreach ($lignes as $ligne) {
@@ -114,7 +122,7 @@ final class EncadrementMatrixBuilder
                 continue;
             }
 
-            $this->ensureSousCategorie($animateurs, $tId, $ligne->sousCategorie);
+            $this->ensureCompte($animateurs, $tId, $scId, $ligne->compte, $ligne->sousCategorie);
             $animateurs[$tId]['sousCategories'][$scId]['realiseParSeance'][$sId] = ($animateurs[$tId]['sousCategories'][$scId]['realiseParSeance'][$sId] ?? 0.0) + $montant;
             $animateurs[$tId]['sousCategories'][$scId]['transactionIdsParSeance'][$sId][] = (int) $tx->id;
             if ($tx->numero_piece) {
@@ -162,21 +170,27 @@ final class EncadrementMatrixBuilder
     }
 
     /**
+     * DC-5 — libellé lu depuis le Compte (compte_id, rempli par le trait de double
+     * écriture DC-3) en priorité ; repli sur la SousCategorie pour une ligne/prévision
+     * pas encore enrichie partie double. La clé de regroupement (scId, passée par
+     * l'appelant) reste sous_categorie_id — seule clé stable garantie sur les deux sources.
+     *
      * @param  array<int, array<string, mixed>>  $animateurs
      */
-    private function ensureSousCategorie(array &$animateurs, int $tiersId, ?SousCategorie $sousCategorie): void
+    private function ensureCompte(array &$animateurs, int $tiersId, int $scId, ?Compte $compte, ?SousCategorie $sousCategorie): void
     {
-        if ($sousCategorie === null) {
+        if ($compte === null && $sousCategorie === null) {
             return;
         }
-        $scId = (int) $sousCategorie->id;
         if (isset($animateurs[$tiersId]['sousCategories'][$scId])) {
             return;
         }
 
+        $scName = $compte->intitule ?? $sousCategorie->nom;
+
         $animateurs[$tiersId]['sousCategories'][$scId] = [
             'scId' => $scId,
-            'scName' => $sousCategorie->nom,
+            'scName' => $scName,
             'previsionIds' => [],
             'prevuParSeance' => [],
             'realiseParSeance' => [],

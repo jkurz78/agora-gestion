@@ -138,7 +138,13 @@ final class AdhesionService
             }
         }
 
-        // Priorité 2 : sous-cat → formule active
+        // Priorité 2 : compte → formule active (DC-5 — lit compte_id quand la ligne est
+        // déjà enrichie partie double), repli sur sous-cat → formule active sinon
+        // (ligne pas encore enrichie, ou fixture pré-DC-2).
+        if ($ligneCotisation->compte_id !== null) {
+            return $this->formuleResolver->resolveParCompte((int) $ligneCotisation->compte_id);
+        }
+
         if ($ligneCotisation->sous_categorie_id !== null) {
             return $this->formuleResolver->resolve((int) $ligneCotisation->sous_categorie_id);
         }
