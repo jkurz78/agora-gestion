@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\HelloAssoEnvironnement;
 use App\Livewire\Banques\HelloassoSyncWizard;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\HelloAssoFormMapping;
 use App\Models\HelloAssoParametres;
@@ -24,7 +25,10 @@ beforeEach(function (): void {
 
     $this->user = User::factory()->create();
     $this->user->associations()->attach(1, ['role' => 'admin', 'joined_at' => now()]);
-    $this->scCotisation = SousCategorie::factory()->pourCotisations()->create();
+    // DC-8 : les actions souscat: portent des ids de comptes — code_cerfa
+    // classe 7 matérialise le Compte miroir.
+    $this->scCotisation = SousCategorie::factory()->pourCotisations()->create(['code_cerfa' => '756']);
+    $this->compteCotisation = Compte::where('numero_pcg', '756')->firstOrFail();
 
     $compte = CompteBancaire::factory()->create();
     $this->parametres = HelloAssoParametres::factory()->create([
@@ -69,12 +73,14 @@ it('sauvegarderEtSuite persiste souscat: pour Membership', function (): void {
     Livewire::actingAs($this->user)
         ->test(HelloassoSyncWizard::class)
         ->set('formsLoaded', true)
-        ->call('mettreAJourAction', $this->formMembership->id, 'souscat:'.$this->scCotisation->id)
+        ->call('mettreAJourAction', $this->formMembership->id, 'souscat:'.$this->compteCotisation->id)
         ->call('sauvegarderEtSuite');
 
     $this->formMembership->refresh();
     expect($this->formMembership->ignore)->toBeFalse();
-    expect($this->formMembership->sous_categorie_id)->toBe($this->scCotisation->id);
+    // DC-8 : écrit compte_id, le trait remplit le miroir sous_categorie_id.
+    expect((int) $this->formMembership->compte_id)->toBe((int) $this->compteCotisation->id);
+    expect((int) $this->formMembership->sous_categorie_id)->toBe((int) $this->scCotisation->id);
 });
 
 it('sauvegarderEtSuite persiste operation: pour Event (form d\'inscription HelloAsso)', function (): void {

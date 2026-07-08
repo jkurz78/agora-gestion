@@ -272,12 +272,10 @@
                                            wire:model="nouvelleLigneQuantite">
                                 </div>
                                 <div class="col-md-2">
-                                    <label class="form-label form-label-sm">Sous-catégorie</label>
+                                    <label class="form-label form-label-sm">Compte</label>
                                     <select class="form-select form-select-sm" wire:model="nouvelleLigneSousCategorieId">
-                                        <option value="">— Aucune —</option>
-                                        @foreach ($sousCategoriesDisponibles as $sc)
-                                            <option value="{{ $sc->id }}">{{ $sc->nom }}</option>
-                                        @endforeach
+                                        <option value="">— Aucun —</option>
+                                        @include('partials.select-compte-options', ['groupes' => $groupesComptesRecette])
                                     </select>
                                 </div>
                                 <div class="col-md-1">

@@ -149,12 +149,10 @@
                                                 @if ($ligne->type === \App\Enums\TypeLigneFacture::MontantManuel)
                                                     <div class="row g-2 mt-1 ps-4">
                                                         <div class="col-md-4">
-                                                            <select class="form-select form-select-sm @if ($ligne->sous_categorie_id === null) is-invalid @endif"
+                                                            <select class="form-select form-select-sm @if ($ligne->compte_id === null) is-invalid @endif"
                                                                     wire:change="updateSousCategorie({{ $ligne->id }}, $event.target.value)">
-                                                                <option value="">— Sous-catégorie (requise) —</option>
-                                                                @foreach ($sousCategoriesRecettes as $sc)
-                                                                    <option value="{{ $sc->id }}" @selected((int) $ligne->sous_categorie_id === (int) $sc->id)>{{ $sc->nom }}</option>
-                                                                @endforeach
+                                                                <option value="">— Compte (requis) —</option>
+                                                                @include('partials.select-compte-options', ['groupes' => $groupesComptesRecette, 'selectedId' => $ligne->compte_id])
                                                             </select>
                                                         </div>
                                                         <div class="col-md-4">

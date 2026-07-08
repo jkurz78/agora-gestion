@@ -75,7 +75,7 @@
                                     <i class="bi bi-people me-1"></i> Adhésions et dons
                                 </h6>
                                 <p class="text-muted small mb-2">
-                                    Sélectionnez la sous-catégorie qui recevra les recettes de chaque
+                                    Sélectionnez le compte qui recevra les recettes de chaque
                                     formulaire. Les paliers HelloAsso (formules d'adhésion) seront
                                     auto-créés à la synchronisation.
                                 </p>
@@ -86,7 +86,7 @@
                                             <th>Type</th>
                                             <th>Période</th>
                                             <th>Statut</th>
-                                            <th>Sous-catégorie cible</th>
+                                            <th>Compte cible</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -127,27 +127,28 @@
                                                         <div class="d-flex align-items-center gap-2">
                                                             <span class="badge text-bg-success"><i class="bi bi-lock-fill"></i> Importé</span>
                                                             <span class="small text-muted">
-                                                                @if ($fm->sous_categorie_id)
-                                                                    dans {{ $fm->sousCategorie?->nom ?? '—' }}
+                                                                {{-- DC-8 : lecture compte-first, repli sous-catégorie miroir --}}
+                                                                @if ($fm->compte_id || $fm->sous_categorie_id)
+                                                                    dans {{ $fm->compte?->intitule ?? $fm->sousCategorie?->nom ?? '—' }}
                                                                 @endif
                                                             </span>
                                                         </div>
                                                     @else
                                                         @php
-                                                            $scs = $fm->form_type === 'Membership'
-                                                                ? ($sousCategoriesParUsage['Cotisation'] ?? collect())
-                                                                : ($sousCategoriesParUsage['Don'] ?? collect());
+                                                            $comptesCibles = $fm->form_type === 'Membership'
+                                                                ? ($comptesParUsage['Cotisation'] ?? collect())
+                                                                : ($comptesParUsage['Don'] ?? collect());
                                                         @endphp
                                                         <select wire:change="mettreAJourAction({{ $fm->id }}, $event.target.value)"
                                                                 class="form-select form-select-sm">
                                                             <option value="">— À configurer —</option>
                                                             <option value="ignore" @selected(($formActions[$fm->id] ?? '') === 'ignore')>Ignorer ce formulaire</option>
-                                                            @if ($scs->isNotEmpty())
-                                                                <optgroup label="Importer dans la sous-catégorie">
-                                                                    @foreach ($scs as $sc)
-                                                                        <option value="souscat:{{ $sc->id }}"
-                                                                            @selected(($formActions[$fm->id] ?? '') === 'souscat:'.$sc->id)>
-                                                                            {{ $sc->nom }}
+                                                            @if ($comptesCibles->isNotEmpty())
+                                                                <optgroup label="Importer dans le compte">
+                                                                    @foreach ($comptesCibles as $compte)
+                                                                        <option value="souscat:{{ $compte->id }}"
+                                                                            @selected(($formActions[$fm->id] ?? '') === 'souscat:'.$compte->id)>
+                                                                            {{ $compte->numero_pcg }} — {{ $compte->intitule }}
                                                                         </option>
                                                                     @endforeach
                                                                 </optgroup>

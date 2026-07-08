@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\StatutExercice;
 use App\Livewire\Provisions\ProvisionIndex;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\Exercice;
 use App\Models\Provision;
 use App\Models\SousCategorie;
@@ -63,12 +64,14 @@ it('upload PJ dans ProvisionIndex place le fichier sous associations/{aid}/provi
     $component = Livewire\Livewire::test(ProvisionIndex::class);
 
     // On prépare les données du formulaire
-    $sc = SousCategorie::factory()->create();
+    // DC-8 : le sélecteur porte un id de compte — code_cerfa matérialise le miroir.
+    $sc = SousCategorie::factory()->create(['code_cerfa' => '606']);
+    $compte = Compte::where('numero_pcg', '606')->firstOrFail();
     $file = UploadedFile::fake()->create('contrat.pdf', 100, 'application/pdf');
 
     $component
         ->set('libelle', 'Provision test')
-        ->set('sous_categorie_id', (string) $sc->id)
+        ->set('sous_categorie_id', (string) $compte->id)
         ->set('type', 'depense')
         ->set('montant', '500')
         ->set('piece_jointe', $file)
@@ -88,11 +91,12 @@ it('upload PJ dans ProvisionIndex place le fichier sous associations/{aid}/provi
 });
 
 it('piece_jointe_path sans PJ reste null', function () {
-    $sc = SousCategorie::factory()->create();
+    $sc = SousCategorie::factory()->create(['code_cerfa' => '706']);
+    $compte = Compte::where('numero_pcg', '706')->firstOrFail();
 
     Livewire\Livewire::test(ProvisionIndex::class)
         ->set('libelle', 'Provision sans PJ')
-        ->set('sous_categorie_id', (string) $sc->id)
+        ->set('sous_categorie_id', (string) $compte->id)
         ->set('type', 'recette')
         ->set('montant', '200')
         ->call('save');

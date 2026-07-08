@@ -388,12 +388,15 @@ final class FactureService
     }
 
     /**
-     * Mise à jour de la sous-catégorie d'une ligne manuelle (MontantManuel).
+     * Mise à jour du compte de ventilation d'une ligne manuelle (MontantManuel).
+     *
+     * DC-8 : écrit compte_id — le trait SyncCompteDepuisSousCategorie resynchronise
+     * le miroir sous_categorie_id. Nom de méthode conservé jusqu'à DC-10.
      *
      * @throws \RuntimeException si la facture n'est pas brouillon, si le tenant ne correspond pas,
      *                           ou si la ligne n'est pas de type MontantManuel
      */
-    public function majSousCategorieLigne(Facture $facture, int $ligneId, ?int $sousCategorieId): void
+    public function majSousCategorieLigne(Facture $facture, int $ligneId, ?int $compteId): void
     {
         $this->assertBrouillon($facture);
         $this->assertTenantOwnership($facture);
@@ -401,10 +404,10 @@ final class FactureService
         $ligne = $facture->lignes()->findOrFail($ligneId);
 
         if ($ligne->type !== TypeLigneFacture::MontantManuel) {
-            throw new \RuntimeException('La sous-catégorie ne peut être modifiée que sur une ligne manuelle.');
+            throw new \RuntimeException('Le compte ne peut être modifié que sur une ligne manuelle.');
         }
 
-        $ligne->update(['sous_categorie_id' => $sousCategorieId]);
+        $ligne->update(['compte_id' => $compteId]);
     }
 
     /**
@@ -842,7 +845,8 @@ XML;
                 'quantite' => $quantite,
                 'montant' => $montant,
                 'transaction_ligne_id' => null,
-                'sous_categorie_id' => $attrs['sous_categorie_id'] ?? null,
+                // DC-8 : compte_id — le trait remplit le miroir sous_categorie_id.
+                'compte_id' => $attrs['compte_id'] ?? null,
                 'operation_id' => $attrs['operation_id'] ?? null,
                 'seance' => $attrs['seance'] ?? null,
                 'ordre' => $maxOrdre + 1,

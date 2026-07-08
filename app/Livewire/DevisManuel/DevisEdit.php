@@ -8,11 +8,10 @@ use App\Enums\StatutDevis;
 use App\Models\Devis;
 use App\Models\DevisLigne;
 use App\Models\Facture;
-use App\Models\SousCategorie;
+use App\Services\Compta\PlanComptableSelecteur;
 use App\Services\DevisService;
 use App\Support\FlashMessages;
 use Illuminate\Contracts\View\View;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\View\ComponentSlot;
 use Livewire\Component;
 use RuntimeException;
@@ -43,11 +42,6 @@ final class DevisEdit extends Component
 
     public string $nouveauLigneTexte = '';
 
-    // ── Cached queries (loaded once in mount) ─────────────────────────────────
-
-    /** @var Collection<int, SousCategorie> */
-    public $sousCategoriesDisponibles;
-
     // ── Email modal ───────────────────────────────────────────────────────────
 
     public bool $showEnvoyerEmailModal = false;
@@ -64,10 +58,6 @@ final class DevisEdit extends Component
         $this->libelle = (string) ($devis->libelle ?? '');
         $this->dateEmission = $devis->date_emission->format('Y-m-d');
         $this->dateValidite = $devis->date_validite->format('Y-m-d');
-        $this->sousCategoriesDisponibles = SousCategorie::whereHas(
-            'categorie',
-            fn ($q) => $q->where('type', 'recette')
-        )->orderBy('nom')->get();
     }
 
     // ── Computed helpers ──────────────────────────────────────────────────────
@@ -149,7 +139,8 @@ final class DevisEdit extends Component
                 'libelle' => $this->nouvelleLigneLibelle,
                 'prix_unitaire' => $this->nouvelleLignePrixUnitaire !== '' ? $this->nouvelleLignePrixUnitaire : '0',
                 'quantite' => $this->nouvelleLigneQuantite !== '' ? $this->nouvelleLigneQuantite : '1',
-                'sous_categorie_id' => $this->nouvelleLigneSousCategorieId,
+                // DC-8 : la propriété (nom conservé jusqu'à DC-10) porte un id de compte.
+                'compte_id' => $this->nouvelleLigneSousCategorieId,
             ]);
 
             $this->nouvelleLigneLibelle = '';
@@ -350,7 +341,8 @@ final class DevisEdit extends Component
 
         return view('livewire.devis-manuel.devis-edit', [
             'lignes' => $lignes,
-            'sousCategoriesDisponibles' => $this->sousCategoriesDisponibles,
+            // DC-8 : sélecteur de ventilation sur comptes (classe 7), groupés par famille.
+            'groupesComptesRecette' => PlanComptableSelecteur::groupesPourType('recette'),
         ])->layout('layouts.app-sidebar', [
             'title' => $this->devis->numero ?? 'Brouillon de devis',
             'breadcrumbParent' => new ComponentSlot('Liste des devis', ['url' => route('devis-manuels.index')]),

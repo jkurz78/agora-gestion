@@ -6,6 +6,7 @@ namespace App\Livewire\Parametres\Adhesions;
 
 use App\Enums\UsageComptable;
 use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\FormuleAdhesion;
 use App\Models\SousCategorie;
 use App\Models\UsageSousCategorie;
@@ -78,7 +79,8 @@ final class FormulesList extends Component
         }
         $this->montantParDefaut = $formule->montant_par_defaut !== null ? (float) $formule->montant_par_defaut : null;
         $this->deductibleFiscal = $formule->deductible_fiscal;
-        $this->sousCategorieId = $formule->sous_categorie_id;
+        // DC-8 : le sélecteur porte un id de compte (nom de propriété conservé jusqu'à DC-10).
+        $this->sousCategorieId = $formule->compte_id;
         $this->actif = $formule->actif;
         $this->errorMessage = null;
         $this->showModal = true;
@@ -122,7 +124,7 @@ final class FormulesList extends Component
             'nom' => ['required', 'string', 'max:120'],
             'description' => ['nullable', 'string', 'max:1000'],
             'mode' => ['required', 'in:exercice,duree,illimite'],
-            'sousCategorieId' => ['required', 'integer', 'exists:sous_categories,id'],
+            'sousCategorieId' => ['required', 'integer', 'exists:comptes,id'],
             'montantParDefaut' => ['nullable', 'numeric', 'min:0'],
             'actif' => ['boolean'],
         ];
@@ -135,10 +137,10 @@ final class FormulesList extends Component
         }
         $this->validate($rules);
 
-        // Validation métier : sous-cat doit être en usage Cotisation
-        $sc = SousCategorie::findOrFail($this->sousCategorieId);
-        if (! $sc->hasUsage(UsageComptable::Cotisation)) {
-            $this->addError('sousCategorieId', "La sous-catégorie sélectionnée n'a pas l'usage \"Cotisation\".");
+        // Validation métier : le compte doit être en usage Cotisation
+        $compte = Compte::findOrFail($this->sousCategorieId);
+        if (! $compte->hasUsage(UsageComptable::Cotisation)) {
+            $this->addError('sousCategorieId', "Le compte sélectionné n'a pas l'usage \"Cotisation\".");
 
             return;
         }
@@ -151,7 +153,8 @@ final class FormulesList extends Component
             'duree_jours' => ($this->mode === 'duree' && $this->uniteDuree === 'jours') ? $this->dureeJours : null,
             'montant_par_defaut' => $this->montantParDefaut,
             'deductible_fiscal' => $this->deductibleFiscal,
-            'sous_categorie_id' => $this->sousCategorieId,
+            // DC-8 : écrit compte_id, le trait remplit le miroir sous_categorie_id.
+            'compte_id' => $this->sousCategorieId,
             'actif' => $this->actif,
         ];
 
@@ -205,9 +208,11 @@ final class FormulesList extends Component
 
     public function saveNewSousCat(): void
     {
+        // DC-8 : numéro de compte requis — sans lui, pas de Compte miroir, donc
+        // la nouvelle entrée serait invisible dans le sélecteur (liste de comptes).
         $this->validate([
             'newSousCatNom' => ['required', 'string', 'max:255'],
-            'newSousCatCodeCerfa' => ['nullable', 'string', 'max:10'],
+            'newSousCatCodeCerfa' => ['required', 'string', 'max:10'],
             'newSousCatCategorieId' => ['required', 'integer', 'exists:categories,id'],
         ]);
 
@@ -222,7 +227,9 @@ final class FormulesList extends Component
             'usage' => UsageComptable::Cotisation->value,
         ]);
 
-        $this->sousCategorieId = $sc->id;
+        // Sélectionne le Compte miroir matérialisé par l'observer DC-7.
+        $compte = Compte::ofNumero((string) $sc->code_cerfa);
+        $this->sousCategorieId = $compte?->id;
         $this->showCreateSousCat = false;
     }
 
@@ -244,12 +251,13 @@ final class FormulesList extends Component
         };
         $formules = $query->orderBy('est_helloasso')->orderBy('nom')->get();
 
-        $sousCategoriesCotisation = SousCategorie::forUsage(UsageComptable::Cotisation)
-            ->orderBy('nom')
+        // DC-8 : le sélecteur liste les comptes en usage Cotisation.
+        $comptesCotisation = Compte::forUsage(UsageComptable::Cotisation)
+            ->orderBy('numero_pcg')
             ->get();
 
         $categories = Categorie::orderBy('nom')->get();
 
-        return view('livewire.parametres.adhesions.formules-list', compact('formules', 'sousCategoriesCotisation', 'categories'));
+        return view('livewire.parametres.adhesions.formules-list', compact('formules', 'comptesCotisation', 'categories'));
     }
 }

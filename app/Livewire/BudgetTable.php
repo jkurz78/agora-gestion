@@ -6,12 +6,12 @@ namespace App\Livewire;
 
 use App\Enums\Espace;
 use App\Enums\RoleAssociation;
-use App\Enums\TypeCategorie;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\BudgetLine;
-use App\Models\Categorie;
+use App\Models\SousCategorie;
 use App\Services\BudgetImportService;
 use App\Services\BudgetService;
+use App\Services\Compta\PlanComptableSelecteur;
 use App\Services\ExerciceService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
@@ -59,7 +59,7 @@ final class BudgetTable extends Component
 
     // ── Actions édition ───────────────────────────────────────────────────────
 
-    public function addLine(int $sousCategorieId): void
+    public function addLine(int $compteId): void
     {
         if (! $this->canEdit) {
             return;
@@ -67,8 +67,10 @@ final class BudgetTable extends Component
 
         app(ExerciceService::class)->assertOuvert(app(ExerciceService::class)->current());
 
+        // DC-8 : la ligne budgétaire est clé par compte — le trait
+        // SyncCompteDepuisSousCategorie remplit le miroir sous_categorie_id.
         BudgetLine::create([
-            'sous_categorie_id' => $sousCategorieId,
+            'compte_id' => $compteId,
             'exercice' => app(ExerciceService::class)->current(),
             'montant_prevu' => 0,
         ]);
@@ -190,29 +192,32 @@ final class BudgetTable extends Component
         $budgetService = app(BudgetService::class);
         $exercice = app(ExerciceService::class)->current();
 
-        $depenseCategories = Categorie::where('type', TypeCategorie::Depense)
-            ->with(['sousCategories' => fn ($q) => $q->orderBy('nom')])
-            ->orderBy('nom')
-            ->get();
+        // DC-8 : comptes de résultat groupés par famille (remplace Categorie →
+        // sousCategories comme structure d'affichage).
+        $depenseGroupes = PlanComptableSelecteur::groupesPourType('depense');
+        $recetteGroupes = PlanComptableSelecteur::groupesPourType('recette');
 
-        $recetteCategories = Categorie::where('type', TypeCategorie::Recette)
-            ->with(['sousCategories' => fn ($q) => $q->orderBy('nom')])
-            ->orderBy('nom')
-            ->get();
+        $budgetLines = BudgetLine::forExercice($exercice)->get()->keyBy('compte_id');
 
-        $budgetLines = BudgetLine::forExercice($exercice)->get()->keyBy('sous_categorie_id');
+        // Échafaudage DC-8 — BudgetService::realise() reste sous_categorie_id-first
+        // (hors périmètre : appelé aussi par Dashboard et BudgetExportService),
+        // conversion en lecture via le miroir ici, disparaît en DC-10.
+        $tousComptes = $depenseGroupes->flatMap(fn (array $g) => $g['comptes'])
+            ->merge($recetteGroupes->flatMap(fn (array $g) => $g['comptes']));
+        $miroirs = SousCategorie::whereIn('code_cerfa', $tousComptes->pluck('numero_pcg'))
+            ->pluck('id', 'code_cerfa');
 
         $realiseData = [];
-        $allSousCategories = $depenseCategories->flatMap->sousCategories
-            ->merge($recetteCategories->flatMap->sousCategories);
-
-        foreach ($allSousCategories as $sc) {
-            $realiseData[$sc->id] = $budgetService->realise($sc->id, $exercice);
+        foreach ($tousComptes as $compte) {
+            $sousCategorieId = $miroirs->get($compte->numero_pcg);
+            $realiseData[$compte->id] = $sousCategorieId !== null
+                ? $budgetService->realise((int) $sousCategorieId, $exercice)
+                : 0.0;
         }
 
         return view('livewire.budget-table', [
-            'depenseCategories' => $depenseCategories,
-            'recetteCategories' => $recetteCategories,
+            'depenseGroupes' => $depenseGroupes,
+            'recetteGroupes' => $recetteGroupes,
             'budgetLines' => $budgetLines,
             'realiseData' => $realiseData,
             'exerciceLabel' => app(ExerciceService::class)->label($exercice),

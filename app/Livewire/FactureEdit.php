@@ -14,8 +14,8 @@ use App\Livewire\Concerns\MontantValidation;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
 use App\Models\Operation;
-use App\Models\SousCategorie;
 use App\Models\Transaction;
+use App\Services\Compta\PlanComptableSelecteur;
 use App\Services\FactureService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
@@ -233,10 +233,11 @@ final class FactureEdit extends Component
             return;
         }
 
-        $sousCategorieId = ($value === '' || $value === null) ? null : (int) $value;
+        // DC-8 : $value est un id de compte (classe 7) — le service écrit compte_id.
+        $compteId = ($value === '' || $value === null) ? null : (int) $value;
 
         try {
-            app(FactureService::class)->majSousCategorieLigne($this->facture, $ligneId, $sousCategorieId);
+            app(FactureService::class)->majSousCategorieLigne($this->facture, $ligneId, $compteId);
             $this->facture->refresh();
         } catch (\RuntimeException $e) {
             session()->flash('error', $e->getMessage());
@@ -361,7 +362,8 @@ final class FactureEdit extends Component
                 'libelle' => $this->nouvelleLigneMontantLibelle,
                 'prix_unitaire' => $prixUnitaire,
                 'quantite' => $quantite,
-                'sous_categorie_id' => $this->nouvelleLigneMontantSousCategorieId,
+                // DC-8 : la propriété (nom conservé jusqu'à DC-10) porte un id de compte.
+                'compte_id' => $this->nouvelleLigneMontantSousCategorieId,
                 'operation_id' => $this->nouvelleLigneMontantOperationId,
                 'seance' => $this->nouvelleLigneMontantSeance !== null ? (int) $this->nouvelleLigneMontantSeance : null,
             ]);
@@ -465,10 +467,8 @@ final class FactureEdit extends Component
             ->orderBy('nom')
             ->get();
 
-        $sousCategoriesRecettes = SousCategorie::whereHas(
-            'categorie',
-            fn ($q) => $q->where('type', 'recette')
-        )->orderBy('nom')->get();
+        // DC-8 : sélecteur de ventilation sur comptes (classe 7), groupés par famille.
+        $groupesComptesRecette = PlanComptableSelecteur::groupesPourType('recette');
 
         $operations = Operation::orderBy('nom')->get();
 
@@ -480,7 +480,7 @@ final class FactureEdit extends Component
             'lignes' => $lignes,
             'totalLignes' => $totalLignes,
             'comptesBancaires' => $comptesBancaires,
-            'sousCategoriesRecettes' => $sousCategoriesRecettes,
+            'groupesComptesRecette' => $groupesComptesRecette,
             'operations' => $operations,
             'aLignesMontantManuel' => $aLignesMontantManuel,
             'modesPaiement' => ModePaiement::cases(),

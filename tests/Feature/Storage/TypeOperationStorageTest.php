@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Livewire\TypeOperationShow;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\SousCategorie;
 use App\Models\TypeOperation;
 use App\Models\User;
@@ -20,9 +21,14 @@ beforeEach(function () {
     TenantContext::boot($this->association);
     session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
+    // DC-8 : le sélecteur porte des ids de comptes — code_cerfa classe 7
+    // matérialise le Compte miroir utilisé par les wire sets.
     $this->sousCategorie = SousCategorie::factory()->pourInscriptions()->create([
         'association_id' => $this->association->id,
+        'code_cerfa' => '706',
     ]);
+    $this->compte = Compte::where('association_id', $this->association->id)
+        ->where('numero_pcg', '706')->firstOrFail();
 });
 
 afterEach(function () {
@@ -35,7 +41,7 @@ it('upload logo via TypeOperationShow places file under associations/{aid}/type-
 
     Livewire::test(TypeOperationShow::class)
         ->set('nom', 'Type avec logo')
-        ->set('sous_categorie_id', $this->sousCategorie->id)
+        ->set('sous_categorie_id', $this->compte->id)
         ->set('logo', $file)
         ->call('save')
         ->assertHasNoErrors();
@@ -54,7 +60,7 @@ it('upload attestation via TypeOperationShow places file under associations/{aid
 
     Livewire::test(TypeOperationShow::class)
         ->set('nom', 'Type avec attestation')
-        ->set('sous_categorie_id', $this->sousCategorie->id)
+        ->set('sous_categorie_id', $this->compte->id)
         ->set('attestationMedicale', $file)
         ->call('save')
         ->assertHasNoErrors();
@@ -127,7 +133,7 @@ it('delete logo removes the file from local disk and sets logo_path to null', fu
 
     Livewire::test(TypeOperationShow::class, ['typeOperation' => $type])
         ->set('nom', $type->nom)
-        ->set('sous_categorie_id', $type->sous_categorie_id)
+        ->set('sous_categorie_id', $type->compte_id)
         ->call('save')
         ->assertHasNoErrors();
 

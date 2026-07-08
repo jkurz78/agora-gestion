@@ -7,11 +7,11 @@ namespace App\Livewire\Banques;
 use App\Enums\StatutOperation;
 use App\Enums\UsageComptable;
 use App\Livewire\Concerns\RespectsExerciceCloture;
+use App\Models\Compte;
 use App\Models\HelloAssoFormMapping;
 use App\Models\HelloAssoNotification;
 use App\Models\HelloAssoParametres;
 use App\Models\Operation;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Services\ExerciceService;
@@ -151,8 +151,9 @@ final class HelloassoSyncWizard extends Component
         foreach ($p->formMappings()->get() as $m) {
             if ($m->ignore) {
                 $this->formActions[$m->id] = 'ignore';
-            } elseif ($m->sous_categorie_id !== null) {
-                $this->formActions[$m->id] = 'souscat:'.$m->sous_categorie_id;
+            } elseif ($m->compte_id !== null) {
+                // DC-8 : l'action encode un id de compte (préfixe conservé jusqu'à DC-10).
+                $this->formActions[$m->id] = 'souscat:'.$m->compte_id;
             } elseif ($m->operation_id !== null) {
                 $this->formActions[$m->id] = 'operation:'.$m->operation_id;
             } else {
@@ -227,20 +228,23 @@ final class HelloassoSyncWizard extends Component
             if ($action === 'ignore') {
                 $mapping->update([
                     'ignore' => true,
+                    'compte_id' => null,
                     'sous_categorie_id' => null,
                     'operation_id' => null,
                 ]);
             } elseif (str_starts_with($action, 'souscat:')) {
-                $scId = (int) substr($action, 8);
+                // DC-8 : écrit compte_id, le trait remplit le miroir sous_categorie_id.
+                $compteId = (int) substr($action, 8);
                 $mapping->update([
                     'ignore' => false,
-                    'sous_categorie_id' => $scId,
+                    'compte_id' => $compteId,
                     'operation_id' => null,
                 ]);
             } elseif (str_starts_with($action, 'operation:')) {
                 $opId = (int) substr($action, 10);
                 $mapping->update([
                     'ignore' => false,
+                    'compte_id' => null,
                     'sous_categorie_id' => null,
                     'operation_id' => $opId,
                 ]);
@@ -592,9 +596,10 @@ final class HelloassoSyncWizard extends Component
             'autresForms' => $autresForms,
             'operations' => Operation::with('typeOperation')->orderBy('nom')->get(),
             'typeOperations' => TypeOperation::actif()->orderBy('nom')->get(),
-            'sousCategoriesParUsage' => [
-                'Cotisation' => SousCategorie::forUsage(UsageComptable::Cotisation)->orderBy('nom')->get(),
-                'Don' => SousCategorie::forUsage(UsageComptable::Don)->orderBy('nom')->get(),
+            // DC-8 : les sélecteurs de mapping listent des comptes par usage.
+            'comptesParUsage' => [
+                'Cotisation' => Compte::forUsage(UsageComptable::Cotisation)->orderBy('numero_pcg')->get(),
+                'Don' => Compte::forUsage(UsageComptable::Don)->orderBy('numero_pcg')->get(),
             ],
         ]);
     }

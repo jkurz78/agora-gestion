@@ -6,6 +6,7 @@ use App\Enums\StatutExercice;
 use App\Enums\TypeTransaction;
 use App\Livewire\Provisions\ProvisionIndex;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\Exercice;
 use App\Models\Provision;
 use App\Models\SousCategorie;
@@ -53,13 +54,15 @@ it('renders the provision list', function () {
 });
 
 it('creates a provision via modal', function () {
-    $sousCategorie = SousCategorie::factory()->create(['association_id' => $this->association->id]);
+    // DC-8 : le sélecteur porte un id de compte — code_cerfa matérialise le miroir.
+    $sousCategorie = SousCategorie::factory()->create(['association_id' => $this->association->id, 'code_cerfa' => '606']);
+    $compte = Compte::where('numero_pcg', '606')->firstOrFail();
 
     Livewire::test(ProvisionIndex::class)
         ->call('openCreate')
         ->assertSet('showModal', true)
         ->set('libelle', 'Provision loyer')
-        ->set('sous_categorie_id', (string) $sousCategorie->id)
+        ->set('sous_categorie_id', (string) $compte->id)
         ->set('type', 'depense')
         ->set('montant', '500')
         ->call('save')
@@ -77,7 +80,9 @@ it('creates a provision via modal', function () {
 });
 
 it('edits a provision via modal', function () {
-    $sousCategorie = SousCategorie::factory()->create(['association_id' => $this->association->id]);
+    // DC-8 : code_cerfa matérialise le miroir — le trait remplit compte_id
+    // sur la provision, hydraté par openEdit.
+    $sousCategorie = SousCategorie::factory()->create(['association_id' => $this->association->id, 'code_cerfa' => '606']);
 
     $provision = Provision::factory()->create([
         'association_id' => $this->association->id,
@@ -124,13 +129,14 @@ it('deletes a provision', function () {
 it('blocks editing when exercice is closed', function () {
     $this->exercice->update(['statut' => StatutExercice::Cloture]);
 
-    $sousCategorie = SousCategorie::factory()->create(['association_id' => $this->association->id]);
+    $sousCategorie = SousCategorie::factory()->create(['association_id' => $this->association->id, 'code_cerfa' => '606']);
+    $compteBloque = Compte::where('numero_pcg', '606')->firstOrFail();
 
     Livewire::test(ProvisionIndex::class)
         ->assertSee('clôturé')
         ->call('openCreate')
         ->set('libelle', 'Provision bloquée')
-        ->set('sous_categorie_id', (string) $sousCategorie->id)
+        ->set('sous_categorie_id', (string) $compteBloque->id)
         ->set('type', 'depense')
         ->set('montant', '100')
         ->call('save')

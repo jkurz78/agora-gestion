@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\StatutFacture;
 use App\Enums\TypeLigneFacture;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\Facture;
 use App\Models\FactureLigne;
 use App\Models\SousCategorie;
@@ -26,7 +27,9 @@ beforeEach(function () {
     TenantContext::boot($this->association);
     $this->actingAs($this->user);
     $this->tiers = Tiers::factory()->create();
-    $this->sousCategorie = SousCategorie::factory()->create();
+    // DC-8 : le service écrit compte_id — code_cerfa classe 7 matérialise le miroir.
+    $this->sousCategorie = SousCategorie::factory()->create(['code_cerfa' => '706A']);
+    $this->compte = Compte::where('numero_pcg', '706A')->firstOrFail();
     $this->service = app(FactureService::class);
     $this->facture = $this->service->creerManuelleVierge($this->tiers->id);
 });
@@ -39,12 +42,12 @@ afterEach(function () {
 
 describe('ajouterLigneManuelle()', function () {
 
-    it('happy path — crée une ligne MontantManuel avec les bons attributs (PU=800, qty=3, sous_cat fournie)', function () {
+    it('happy path — crée une ligne MontantManuel avec les bons attributs (PU=800, qty=3, compte fourni)', function () {
         $ligne = $this->service->ajouterLigneManuelle($this->facture, [
             'libelle' => 'Mission audit',
             'prix_unitaire' => 800,
             'quantite' => 3,
-            'sous_categorie_id' => $this->sousCategorie->id,
+            'compte_id' => $this->compte->id,
         ]);
 
         expect($ligne)->toBeInstanceOf(FactureLigne::class)
@@ -53,6 +56,8 @@ describe('ajouterLigneManuelle()', function () {
             ->and((float) $ligne->montant)->toBe(2400.0)
             ->and($ligne->ordre)->toBe(1)
             ->and($ligne->transaction_ligne_id)->toBeNull()
+            ->and((int) $ligne->compte_id)->toBe((int) $this->compte->id)
+            // Miroir rempli par le trait SyncCompteDepuisSousCategorie.
             ->and((int) $ligne->sous_categorie_id)->toBe((int) $this->sousCategorie->id);
 
         $this->facture->refresh();

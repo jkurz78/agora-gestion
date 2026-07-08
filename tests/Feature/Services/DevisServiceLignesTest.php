@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\StatutDevis;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\Devis;
 use App\Models\DevisLigne;
 use App\Models\SousCategorie;
@@ -92,18 +93,22 @@ describe('ajouterLigne()', function () {
         expect($ligne->sous_categorie_id)->toBeNull();
     });
 
-    it('accepte sous_categorie_id réel', function () {
+    it('accepte compte_id réel', function () {
         $devis = Devis::factory()->brouillon()->create();
-        $sousCategorie = SousCategorie::factory()->create();
+        // DC-8 : le service écrit compte_id — code_cerfa classe 7 matérialise le miroir.
+        $sousCategorie = SousCategorie::factory()->create(['code_cerfa' => '706A']);
+        $compte = Compte::where('numero_pcg', '706A')->firstOrFail();
 
         $ligne = $this->service->ajouterLigne($devis, [
-            'libelle' => 'Ligne avec catégorie',
+            'libelle' => 'Ligne avec compte',
             'prix_unitaire' => 150.00,
             'quantite' => 2.0,
-            'sous_categorie_id' => $sousCategorie->id,
+            'compte_id' => $compte->id,
         ]);
 
-        expect((int) $ligne->sous_categorie_id)->toBe((int) $sousCategorie->id);
+        expect((int) $ligne->compte_id)->toBe((int) $compte->id)
+            // Miroir rempli par le trait SyncCompteDepuisSousCategorie.
+            ->and((int) $ligne->sous_categorie_id)->toBe((int) $sousCategorie->id);
     });
 
     it('additionne correctement plusieurs lignes dans montant_total', function () {

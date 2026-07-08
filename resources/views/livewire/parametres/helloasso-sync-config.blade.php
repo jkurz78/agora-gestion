@@ -55,7 +55,7 @@
             </div>
 
             {{-- Fallback Don additionnel --}}
-            <h6 class="mt-4">Sous-catégorie de fallback</h6>
+            <h6 class="mt-4">Compte de fallback</h6>
             <p class="text-muted small mb-2">
                 Utilisée pour les <strong>dons additionnels</strong> (montant libre ajouté au paiement
                 d'une cotisation). Pas nécessaire si tes adhérents ne peuvent pas ajouter de don sur tes
@@ -66,8 +66,8 @@
                     <label class="form-label small">Don additionnel (Donation libre)</label>
                     <select wire:model="sousCategorieDonId" class="form-select form-select-sm">
                         <option value="">— Aucun —</option>
-                        @foreach($sousCategoriesDon as $sc)
-                            <option value="{{ $sc->id }}">{{ $sc->nom }}@if($sc->code_cerfa) ({{ $sc->code_cerfa }})@endif</option>
+                        @foreach($comptesDon as $compte)
+                            <option value="{{ $compte->id }}">{{ $compte->numero_pcg }} — {{ $compte->intitule }}</option>
                         @endforeach
                     </select>
                 </div>

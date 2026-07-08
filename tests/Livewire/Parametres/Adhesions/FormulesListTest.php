@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\UsageComptable;
 use App\Livewire\Parametres\Adhesions\FormulesList;
 use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\FormuleAdhesion;
 use App\Models\SousCategorie;
 use App\Models\User;
@@ -14,7 +15,10 @@ use Livewire\Livewire;
 beforeEach(function (): void {
     $this->user = User::factory()->create();
     $this->user->associations()->attach(TenantContext::currentId(), ['role' => 'admin', 'joined_at' => now()]);
-    $this->sc = SousCategorie::factory()->pourCotisations()->create();
+    // DC-8 : le sélecteur porte des ids de comptes — code_cerfa classe 7
+    // matérialise le Compte miroir utilisé par les tests.
+    $this->sc = SousCategorie::factory()->pourCotisations()->create(['code_cerfa' => '756']);
+    $this->compte = Compte::where('numero_pcg', '756')->firstOrFail();
 });
 
 it('affiche la liste des formules', function (): void {
@@ -34,7 +38,7 @@ it('crée une formule mode exercice via la modale', function (): void {
         ->assertSet('showModal', true)
         ->set('nom', 'Nouvelle formule')
         ->set('mode', 'exercice')
-        ->set('sousCategorieId', $this->sc->id)
+        ->set('sousCategorieId', $this->compte->id)
         ->set('montantParDefaut', 30.00)
         ->set('actif', true)
         ->call('save')
@@ -51,7 +55,7 @@ it('crée une formule mode durée avec duree_mois', function (): void {
         ->set('nom', 'Adhésion 12 mois')
         ->set('mode', 'duree')
         ->set('dureeMois', 12)
-        ->set('sousCategorieId', $this->sc->id)
+        ->set('sousCategorieId', $this->compte->id)
         ->call('save');
 
     $formule = FormuleAdhesion::first();
@@ -77,7 +81,7 @@ it('refuse mode durée sans duree_mois', function (): void {
         ->set('nom', 'Test')
         ->set('mode', 'duree')
         ->set('dureeMois', null)
-        ->set('sousCategorieId', $this->sc->id)
+        ->set('sousCategorieId', $this->compte->id)
         ->call('save')
         ->assertHasErrors(['dureeMois']);
 });
@@ -90,7 +94,7 @@ it('refuse une 2e formule active sur la même sous-cat (contrainte applicative r
         ->call('openCreate')
         ->set('nom', 'Doublon')
         ->set('mode', 'exercice')
-        ->set('sousCategorieId', $this->sc->id)
+        ->set('sousCategorieId', $this->compte->id)
         ->set('actif', true)
         ->call('save')
         ->assertSee('déjà une formule active');
@@ -121,15 +125,16 @@ it('soft-delete une formule', function (): void {
     expect(FormuleAdhesion::withTrashed()->find($formule->id))->not->toBeNull();
 });
 
-it('refuse une sous-cat dont l\'usage n\'est pas Cotisation', function (): void {
-    $scDon = SousCategorie::factory()->pourDons()->create();
+it('refuse un compte dont l\'usage n\'est pas Cotisation', function (): void {
+    SousCategorie::factory()->pourDons()->create(['code_cerfa' => '754A']);
+    $compteDon = Compte::where('numero_pcg', '754A')->firstOrFail();
 
     Livewire::actingAs($this->user)
         ->test(FormulesList::class)
         ->call('openCreate')
         ->set('nom', 'Test')
         ->set('mode', 'exercice')
-        ->set('sousCategorieId', $scDon->id)
+        ->set('sousCategorieId', $compteDon->id)
         ->call('save')
         ->assertHasErrors(['sousCategorieId']);
 });
@@ -165,7 +170,7 @@ it('création d\'une formule mode illimite OK', function (): void {
         ->call('openCreate')
         ->set('nom', 'Membre à vie')
         ->set('mode', 'illimite')
-        ->set('sousCategorieId', $this->sc->id)
+        ->set('sousCategorieId', $this->compte->id)
         ->set('actif', true)
         ->call('save')
         ->assertSet('showModal', false);
@@ -227,7 +232,7 @@ it('crée une formule mode duree avec unité jours (duree_jours=10)', function (
         ->set('mode', 'duree')
         ->set('uniteDuree', 'jours')
         ->set('dureeJours', 10)
-        ->set('sousCategorieId', $this->sc->id)
+        ->set('sousCategorieId', $this->compte->id)
         ->call('save')
         ->assertSet('showModal', false);
 
@@ -282,7 +287,7 @@ it('validation refuse mode=duree sans valeur (uniteDuree=jours, dureeJours=null)
         ->set('mode', 'duree')
         ->set('uniteDuree', 'jours')
         ->set('dureeJours', null)
-        ->set('sousCategorieId', $this->sc->id)
+        ->set('sousCategorieId', $this->compte->id)
         ->call('save')
         ->assertHasErrors(['dureeJours']);
 });

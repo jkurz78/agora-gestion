@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Livewire\TypeOperationList;
 use App\Livewire\TypeOperationShow;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\SousCategorie;
@@ -25,9 +26,14 @@ beforeEach(function () {
     TenantContext::boot($this->association);
     session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
+    // DC-8 : le sélecteur porte des ids de comptes — code_cerfa classe 7
+    // matérialise le Compte miroir utilisé par les wire sets.
     $this->sousCategorie = SousCategorie::factory()->pourInscriptions()->create([
         'association_id' => $this->association->id,
+        'code_cerfa' => '706',
     ]);
+    $this->compte = Compte::where('association_id', $this->association->id)
+        ->where('numero_pcg', '706')->firstOrFail();
 });
 
 afterEach(function () {
@@ -48,7 +54,7 @@ it('displays the type operations list', function () {
 it('creates a new type operation', function () {
     Livewire::test(TypeOperationShow::class)
         ->set('nom', 'Nouveau type')
-        ->set('sous_categorie_id', $this->sousCategorie->id)
+        ->set('sous_categorie_id', $this->compte->id)
         ->call('save');
 
     expect(TypeOperation::where('nom', 'Nouveau type')->exists())->toBeTrue();
@@ -57,7 +63,7 @@ it('creates a new type operation', function () {
 it('creates a type operation with tarifs', function () {
     Livewire::test(TypeOperationShow::class)
         ->set('nom', 'Yoga thérapeutique')
-        ->set('sous_categorie_id', $this->sousCategorie->id)
+        ->set('sous_categorie_id', $this->compte->id)
         ->set('nombre_seances', '10')
         ->set('formulaireParcoursTherapeutique', true)
         ->set('formulaireActif', true)
@@ -166,7 +172,7 @@ it('uploads a logo', function () {
 
     Livewire::test(TypeOperationShow::class)
         ->set('nom', 'Test logo')
-        ->set('sous_categorie_id', $this->sousCategorie->id)
+        ->set('sous_categorie_id', $this->compte->id)
         ->set('logo', $file)
         ->call('save');
 
@@ -215,7 +221,7 @@ it('enforces unique nom', function () {
 
     Livewire::test(TypeOperationShow::class)
         ->set('nom', 'Nom dupliqué')
-        ->set('sous_categorie_id', $this->sousCategorie->id)
+        ->set('sous_categorie_id', $this->compte->id)
         ->call('save')
         ->assertHasErrors(['nom']);
 });

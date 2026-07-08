@@ -80,7 +80,8 @@ final class DevisService
      * son numéro (rebascule). Le statut résultant est Brouillon dans les deux cas.
      *
      * Clés acceptées dans $data : libelle (requis), prix_unitaire (requis),
-     * quantite (défaut 1), sous_categorie_id (nullable).
+     * quantite (défaut 1), compte_id (nullable — DC-8, le trait remplit le
+     * miroir sous_categorie_id).
      *
      * @param  array<string, mixed>  $data
      *
@@ -111,7 +112,7 @@ final class DevisService
                 'prix_unitaire' => $prixUnitaire,
                 'quantite' => $quantite,
                 'montant' => $montant,
-                'sous_categorie_id' => $data['sous_categorie_id'] ?? null,
+                'compte_id' => $data['compte_id'] ?? null,
             ]);
 
             $this->rebasculerSiEnvoye($locked);

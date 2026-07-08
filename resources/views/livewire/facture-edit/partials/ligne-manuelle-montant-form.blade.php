@@ -39,13 +39,11 @@
             @enderror
         </div>
         <div class="col-md-3">
-            <label class="form-label form-label-sm">Sous-catégorie</label>
+            <label class="form-label form-label-sm">Compte</label>
             <select class="form-select form-select-sm"
                     wire:model="nouvelleLigneMontantSousCategorieId">
-                <option value="">— Aucune —</option>
-                @foreach ($sousCategoriesRecettes as $sc)
-                    <option value="{{ $sc->id }}">{{ $sc->nom }}</option>
-                @endforeach
+                <option value="">— Aucun —</option>
+                @include('partials.select-compte-options', ['groupes' => $groupesComptesRecette])
             </select>
         </div>
     </div>

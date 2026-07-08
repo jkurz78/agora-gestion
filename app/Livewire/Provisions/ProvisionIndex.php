@@ -6,9 +6,9 @@ namespace App\Livewire\Provisions;
 
 use App\Enums\TypeTransaction;
 use App\Exceptions\ExerciceCloturedException;
-use App\Models\Categorie;
 use App\Models\Operation;
 use App\Models\Provision;
+use App\Services\Compta\PlanComptableSelecteur;
 use App\Services\Compta\ProvisionPDService;
 use App\Services\ExerciceService;
 use Illuminate\Support\Facades\Storage;
@@ -60,14 +60,15 @@ final class ProvisionIndex extends Component
         $exerciceModel = $exerciceService->exerciceAffiche();
         $isCloture = $exerciceModel !== null && $exerciceModel->isCloture();
 
-        $provisions = Provision::with(['sousCategorie.categorie', 'tiers', 'operation'])
+        $provisions = Provision::with(['compte', 'sousCategorie.categorie', 'tiers', 'operation'])
             ->forExercice($exercice)
             ->orderBy('libelle')
             ->get();
 
-        $categories = Categorie::with('sousCategories')
-            ->orderBy('nom')
-            ->get();
+        // DC-8 : sélecteur de ventilation sur comptes (classes 6 et 7), groupés par famille.
+        $groupesComptes = PlanComptableSelecteur::groupesPourType('depense')
+            ->union(PlanComptableSelecteur::groupesPourType('recette'))
+            ->sortKeys();
 
         $operations = Operation::forExercice($exercice)
             ->orderBy('nom')
@@ -83,7 +84,7 @@ final class ProvisionIndex extends Component
 
         return view('livewire.provisions.provision-index', [
             'provisions' => $provisions,
-            'categories' => $categories,
+            'groupesComptes' => $groupesComptes,
             'operations' => $operations,
             'isCloture' => $isCloture,
             'exerciceLabel' => $exerciceLabel,
@@ -107,7 +108,8 @@ final class ProvisionIndex extends Component
 
         $this->editingId = $provision->id;
         $this->libelle = $provision->libelle;
-        $this->sous_categorie_id = (string) $provision->sous_categorie_id;
+        // DC-8 : le sélecteur porte un id de compte (nom de propriété conservé jusqu'à DC-10).
+        $this->sous_categorie_id = (string) $provision->compte_id;
         $this->type = $provision->type->value;
         $this->montant = (string) $provision->montant;
         $this->tiers_id = $provision->tiers_id ? (int) $provision->tiers_id : null;
@@ -136,7 +138,7 @@ final class ProvisionIndex extends Component
 
         $this->validate([
             'libelle' => 'required|string|max:255',
-            'sous_categorie_id' => 'required|exists:sous_categories,id',
+            'sous_categorie_id' => 'required|exists:comptes,id',
             'type' => 'required|in:depense,recette',
             'montant' => 'required|numeric',
             'tiers_id' => 'nullable|exists:tiers,id',
@@ -151,7 +153,8 @@ final class ProvisionIndex extends Component
         $data = [
             'exercice' => $exercice,
             'libelle' => $this->libelle,
-            'sous_categorie_id' => (int) $this->sous_categorie_id,
+            // DC-8 : écrit compte_id, le trait remplit le miroir sous_categorie_id.
+            'compte_id' => (int) $this->sous_categorie_id,
             'type' => $this->type,
             'montant' => (float) $this->montant,
             'tiers_id' => $this->tiers_id,

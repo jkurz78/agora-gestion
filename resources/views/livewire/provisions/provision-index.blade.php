@@ -34,7 +34,7 @@
             <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                 <tr>
                     <th class="sortable" data-col="0" style="cursor:pointer;user-select:none">Libellé <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
-                    <th class="sortable" data-col="1" style="cursor:pointer;user-select:none">Sous-catégorie <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
+                    <th class="sortable" data-col="1" style="cursor:pointer;user-select:none">Compte <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
                     <th class="sortable" data-col="2" style="cursor:pointer;user-select:none">Type <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
                     <th class="sortable text-end" data-col="3" style="cursor:pointer;user-select:none">Montant <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
                     <th class="sortable" data-col="4" style="cursor:pointer;user-select:none">Tiers <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
@@ -48,7 +48,8 @@
                 @forelse ($provisions as $provision)
                     <tr wire:key="prov-{{ $provision->id }}">
                         <td>{{ $provision->libelle }}</td>
-                        <td>{{ $provision->sousCategorie?->nom ?? '—' }}</td>
+                        {{-- DC-8 : lecture compte-first, repli sous-catégorie miroir --}}
+                        <td>{{ $provision->compte?->intitule ?? $provision->sousCategorie?->nom ?? '—' }}</td>
                         <td>
                             @if($provision->type === \App\Enums\TypeTransaction::Depense)
                                 <span class="badge bg-danger">Dépense</span>
@@ -128,20 +129,14 @@
                     @error('libelle') <div class="invalid-feedback">{{ $message }}</div> @enderror
                 </div>
 
-                {{-- Sous-catégorie + Type --}}
+                {{-- Compte + Type --}}
                 <div class="row g-2 mb-3">
                     <div class="col-md-8">
-                        <label class="form-label small">Sous-catégorie <span class="text-danger">*</span></label>
+                        <label class="form-label small">Compte <span class="text-danger">*</span></label>
                         <select wire:model="sous_categorie_id"
                                 class="form-select form-select-sm @error('sous_categorie_id') is-invalid @enderror">
                             <option value="">— Choisir —</option>
-                            @foreach ($categories as $cat)
-                                <optgroup label="{{ $cat->nom }} ({{ $cat->type->label() }})">
-                                    @foreach ($cat->sousCategories as $sc)
-                                        <option value="{{ $sc->id }}">{{ $sc->nom }}</option>
-                                    @endforeach
-                                </optgroup>
-                            @endforeach
+                            @include('partials.select-compte-options', ['groupes' => $groupesComptes])
                         </select>
                         @error('sous_categorie_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
                     </div>
