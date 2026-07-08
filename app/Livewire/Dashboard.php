@@ -9,6 +9,7 @@ use App\Enums\UsageComptable;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\BudgetLine;
 use App\Models\CompteBancaire;
+use App\Models\Famille;
 use App\Models\Operation;
 use App\Models\SousCategorie;
 use App\Models\Transaction;
@@ -17,6 +18,7 @@ use App\Services\BudgetService;
 use App\Services\ExerciceService;
 use App\Services\SoldeService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Livewire\Component;
 
 final class Dashboard extends Component
@@ -38,22 +40,29 @@ final class Dashboard extends Component
         $totalDepenses = (float) Transaction::where('type', 'depense')->operationnel()->forExercice($exercice)->sum('montant_total');
         $soldeGeneral = $totalRecettes - $totalDepenses;
 
-        // Budget résumé — agrégation par catégorie pour sous-totaux
+        // Budget résumé — agrégation par famille (DC-6 : lecture compte + famille,
+        // repli sur sousCategorie.categorie si le compte n'est pas encore renseigné)
         $budgetLines = BudgetLine::forExercice($exercice)
-            ->with('sousCategorie.categorie')
+            ->with(['compte', 'sousCategorie.categorie'])
             ->get();
+
+        $familles = Famille::pourComptes(EloquentCollection::make($budgetLines->pluck('compte')->filter()));
 
         $totalPrevu = (float) $budgetLines->sum('montant_prevu');
         $totalRealise = 0.0;
-        $budgetParCategorie = []; // ['categorieNom' => ['type' => 'depense|recette', 'prevu' => float, 'realise' => float]]
+        $budgetParCategorie = []; // ['nomGroupe' => ['type' => 'depense|recette', 'prevu' => float, 'realise' => float]]
         foreach ($budgetLines as $line) {
             $r = (float) $budgetService->realise($line->sous_categorie_id, $exercice);
             $totalRealise += $r;
+
+            $compte = $line->compte;
+            $famille = $compte !== null ? $familles->get(substr($compte->numero_pcg, 0, 2)) : null;
             $cat = $line->sousCategorie?->categorie;
-            $catKey = $cat?->nom ?? '—';
+
+            $catKey = $famille?->nom ?? $cat?->nom ?? '—';
             if (! isset($budgetParCategorie[$catKey])) {
                 $budgetParCategorie[$catKey] = [
-                    'type' => $cat?->type ?? 'depense',
+                    'type' => $famille !== null ? ($famille->estDepense() ? 'depense' : 'recette') : ($cat?->type ?? 'depense'),
                     'prevu' => 0.0,
                     'realise' => 0.0,
                 ];
@@ -90,7 +99,7 @@ final class Dashboard extends Component
         $derniersDons = TransactionLigne::query()
             ->whereIn('transaction_lignes.sous_categorie_id', $donSousCategorieIds)
             ->whereHas('transaction', fn ($q) => $q->where('type', 'recette')->forExercice($exercice))
-            ->with(['transaction.tiers', 'sousCategorie'])
+            ->with(['transaction.tiers', 'compte', 'sousCategorie'])
             ->join('transactions', 'transactions.id', '=', 'transaction_lignes.transaction_id')
             ->orderByDesc('transactions.date')
             ->orderByDesc('transaction_lignes.id')
@@ -114,7 +123,7 @@ final class Dashboard extends Component
         // Opérations de l'exercice (hors terminées)
         $range = $exerciceService->dateRange($exercice);
         $operations = Operation::query()
-            ->with(['typeOperation.sousCategorie.categorie'])
+            ->with(['typeOperation.compte', 'typeOperation.sousCategorie.categorie'])
             ->withCount('participants')
             ->where('statut', '!=', StatutOperation::Cloturee)
             ->where(function ($q) use ($range): void {
@@ -132,7 +141,7 @@ final class Dashboard extends Component
             })
             ->get()
             ->sortBy([
-                fn ($a, $b) => ($a->typeOperation?->sousCategorie?->nom ?? '') <=> ($b->typeOperation?->sousCategorie?->nom ?? ''),
+                fn ($a, $b) => ($a->typeOperation?->compte?->intitule ?? $a->typeOperation?->sousCategorie?->nom ?? '') <=> ($b->typeOperation?->compte?->intitule ?? $b->typeOperation?->sousCategorie?->nom ?? ''),
                 fn ($a, $b) => ($a->typeOperation?->nom ?? '') <=> ($b->typeOperation?->nom ?? ''),
                 fn ($a, $b) => $a->nom <=> $b->nom,
             ])->values();

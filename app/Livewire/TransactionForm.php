@@ -309,9 +309,10 @@ final class TransactionForm extends Component
             abort(403);
         }
 
-        $ligne = TransactionLigne::with('affectations', 'sousCategorie')->findOrFail($ligneId);
+        $ligne = TransactionLigne::with('affectations', 'compte', 'sousCategorie')->findOrFail($ligneId);
         $this->ventilationLigneId = $ligneId;
-        $this->ventilationLigneSousCategorie = $ligne->sousCategorie->nom ?? '';
+        // DC-6 : libellé lu depuis compte (repli sousCategorie si non renseigné).
+        $this->ventilationLigneSousCategorie = $ligne->compte?->intitule ?? $ligne->sousCategorie->nom ?? '';
         $this->ventilationLigneMontant = (string) $ligne->montant;
         $this->ventilationHasAffectations = $ligne->affectations->isNotEmpty();
 

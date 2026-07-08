@@ -283,7 +283,7 @@ final class TransactionUniverselle extends Component
     {
         // Filtre ventilation() : exclut les lignes PD-only (411/5121/etc.) — UI utilisateur.
         $tx = Transaction::with([
-            'lignes' => fn ($q) => $q->ventilation()->with(['sousCategorie.categorie', 'operation']),
+            'lignes' => fn ($q) => $q->ventilation()->with(['compte', 'sousCategorie.categorie', 'operation']),
             'factures',
         ])->find($id);
         if (! $tx) {
@@ -291,9 +291,11 @@ final class TransactionUniverselle extends Component
         }
 
         return [
+            // DC-6 : libellé lu depuis compte (repli sousCategorie si non renseigné) —
+            // clé de payload 'sous_categorie' conservée (consommée par la blade).
             'lignes' => $tx->lignes->map(fn ($l) => [
                 'id' => $l->id,
-                'sous_categorie' => $l->sousCategorie?->nom,
+                'sous_categorie' => $l->compte?->intitule ?? $l->sousCategorie?->nom,
                 'operation' => $l->operation?->nom,
                 'operation_id' => $l->operation_id,
                 'seance' => $l->seance,
