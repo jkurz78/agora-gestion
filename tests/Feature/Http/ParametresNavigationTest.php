@@ -24,15 +24,22 @@ test('GET /parametres/categories retourne 200', function () {
     $response->assertStatus(200);
 });
 
-test('GET /parametres/comptes retourne 200', function () {
-    $response = $this->get('/parametres/comptes');
+test('GET /parametres/plan-comptable retourne 200', function () {
+    $response = $this->get('/parametres/plan-comptable');
     $response->assertStatus(200);
 });
 
-test('GET /parametres/sous-categories redirige 301 vers /parametres/comptes', function () {
+// DC-7 : les anciennes URLs Comptes / Sous-catégories redirigent vers le Plan comptable
+test('GET /parametres/comptes redirige 301 vers /parametres/plan-comptable', function () {
+    $response = $this->get('/parametres/comptes');
+    $response->assertStatus(301);
+    $response->assertRedirect('/parametres/plan-comptable');
+});
+
+test('GET /parametres/sous-categories redirige 301 vers /parametres/plan-comptable', function () {
     $response = $this->get('/parametres/sous-categories');
     $response->assertStatus(301);
-    $response->assertRedirect('/parametres/comptes');
+    $response->assertRedirect('/parametres/plan-comptable');
 });
 
 test('GET /banques/comptes retourne 200', function () {

@@ -628,11 +628,11 @@ $activeGroup = match(true) {
                             </li>
                             @endif
 
-                            @if (Route::has('parametres.comptes.index'))
+                            @if (Route::has('parametres.plan-comptable'))
                             <li class="nav-item">
-                                <a href="{{ route('parametres.comptes.index') }}"
-                                   class="nav-link {{ request()->routeIs('parametres.comptes.*') ? 'active' : '' }}">
-                                    <i class="bi bi-tag me-1"></i> Comptes
+                                <a href="{{ route('parametres.plan-comptable') }}"
+                                   class="nav-link {{ request()->routeIs('parametres.plan-comptable') ? 'active' : '' }}">
+                                    <i class="bi bi-tag me-1"></i> Plan comptable
                                 </a>
                             </li>
                             @endif

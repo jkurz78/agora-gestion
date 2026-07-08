@@ -547,11 +547,11 @@
                                 </a>
                             </li>
                             @endif
-                            @if (Route::has('parametres.comptes.index'))
+                            @if (Route::has('parametres.plan-comptable'))
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs('parametres.comptes.*') ? 'active' : '' }}"
-                                   href="{{ route('parametres.comptes.index') }}">
-                                    <i class="bi bi-tag"></i> Comptes
+                                <a class="dropdown-item {{ request()->routeIs('parametres.plan-comptable') ? 'active' : '' }}"
+                                   href="{{ route('parametres.plan-comptable') }}">
+                                    <i class="bi bi-tag"></i> Plan comptable
                                 </a>
                             </li>
                             @endif

@@ -24,6 +24,19 @@ use App\Models\SousCategorie;
  *
  * Périmètre : classes 6 et 7 uniquement (comptes de résultat). Les comptes de
  * bilan (4xx/5xx) n'ont pas d'équivalent sous-catégorie — ils relèvent du mode OD.
+ *
+ * ⇄ Miroir bidirectionnel avec `CompteObserver` (DC-7) : depuis DC-7, créer un
+ * Compte classe 6/7 non-système matérialise en retour une SousCategorie
+ * (`Compte::created` → `CompteObserver` → `SousCategorie::create`), ce qui
+ * re-déclenche CET observer (`SousCategorie::created` → `materialiserCompte`).
+ * La convergence (pas de boucle, pas de crash sur l'index unique
+ * `comptes_asso_numero_pcg_unique`) repose entièrement sur le garde-fou
+ * `$existe` ci-dessous : au moment où cet observer retraite la SousCategorie
+ * fraîchement créée par le miroir retour, le Compte d'origine est déjà commité
+ * (Eloquent insère la ligne AVANT de déclencher l'événement `created` — voir
+ * `Model::performInsert()`), donc `$existe` vaut déjà `true` et on sort sans
+ * recréer ni planter. Ce garde-fou est donc la pierre angulaire des DEUX sens
+ * du miroir, pas seulement de l'idempotence intra-SousCategorie.
  */
 final class SousCategorieCompteObserver
 {

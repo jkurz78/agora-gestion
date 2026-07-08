@@ -7,7 +7,6 @@ use App\Http\Controllers\BackOffice\NoteDeFraisPieceJointeController;
 use App\Http\Controllers\BudgetExportController;
 use App\Http\Controllers\CategorieController;
 use App\Http\Controllers\CompteBancaireController;
-use App\Http\Controllers\CompteParametreController;
 use App\Http\Controllers\CsvImportController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DevisManuelPdfController;
@@ -26,6 +25,7 @@ use App\Http\Controllers\ParticipantExportController;
 use App\Http\Controllers\ParticipantFichePdfController;
 use App\Http\Controllers\ParticipantImportTemplateController;
 use App\Http\Controllers\ParticipantPdfController;
+use App\Http\Controllers\PlanComptableController;
 use App\Http\Controllers\QuestionnaireApercuController;
 use App\Http\Controllers\QuestionnaireExportController;
 use App\Http\Controllers\QuestionnaireRepondantController;
@@ -39,7 +39,6 @@ use App\Http\Controllers\RemiseBancairePdfController;
 use App\Http\Controllers\SeanceExportController;
 use App\Http\Controllers\SeanceFeuilleController;
 use App\Http\Controllers\SeancePdfController;
-use App\Http\Controllers\SousCategorieController;
 use App\Http\Controllers\SuperAdmin\SupportModeController;
 use App\Http\Controllers\SwitchAssociationController;
 use App\Http\Controllers\TenantAssetController;
@@ -94,8 +93,10 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class, CheckEspaceAccess
         Route::view('/reception-documents', 'parametres.reception-documents')->name('reception-documents');
         Route::view('/smtp', 'parametres.smtp')->name('smtp');
         Route::resource('categories', CategorieController::class)->except(['show']);
-        Route::get('comptes', [CompteParametreController::class, 'index'])->name('comptes.index');
-        Route::get('sous-categories', [SousCategorieController::class, 'index'])->name('sous-categories.index');
+        // DC-7 : l'écran « Plan comptable » (table comptes) remplace l'écran
+        // « Sous-catégories » — les anciennes URLs redirigent en 301 (voir la
+        // section « Redirections legacy » en fin de fichier).
+        Route::get('plan-comptable', [PlanComptableController::class, 'index'])->name('plan-comptable');
         Route::get('/comptabilite/usages', UsagesComptables::class)
             ->name('comptabilite.usages');
         Route::view('/adhesions/formules', 'parametres.adhesions.formules')
@@ -454,9 +455,10 @@ Route::middleware('auth')->group(function (): void {
     Route::permanentRedirect('/gestion/parametres/reception-documents', '/parametres/reception-documents');
     Route::permanentRedirect('/compta/parametres/categories', '/parametres/categories');
     Route::permanentRedirect('/gestion/parametres/categories', '/parametres/categories');
-    Route::permanentRedirect('/compta/parametres/sous-categories', '/parametres/comptes');
-    Route::permanentRedirect('/gestion/parametres/sous-categories', '/parametres/comptes');
-    Route::permanentRedirect('/parametres/sous-categories', '/parametres/comptes');
+    Route::permanentRedirect('/compta/parametres/sous-categories', '/parametres/plan-comptable');
+    Route::permanentRedirect('/gestion/parametres/sous-categories', '/parametres/plan-comptable');
+    Route::permanentRedirect('/parametres/sous-categories', '/parametres/plan-comptable');
+    Route::permanentRedirect('/parametres/comptes', '/parametres/plan-comptable');
     Route::permanentRedirect('/compta/parametres/utilisateurs', '/parametres/utilisateurs');
     Route::permanentRedirect('/gestion/parametres/utilisateurs', '/parametres/utilisateurs');
     Route::permanentRedirect('/gestion/operations', '/operations');

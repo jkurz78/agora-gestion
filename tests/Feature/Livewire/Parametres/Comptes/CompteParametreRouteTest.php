@@ -2,11 +2,15 @@
 
 declare(strict_types=1);
 
-use App\Livewire\SousCategorieList;
 use App\Models\Association;
 use App\Models\User;
 use App\Tenant\TenantContext;
 
+/**
+ * DC-7 : l'écran « Plan comptable » (/parametres/plan-comptable) remplace
+ * l'ancien écran Comptes/Sous-catégories — les deux anciennes URLs
+ * redirigent désormais en 301 vers la nouvelle.
+ */
 beforeEach(function (): void {
     $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
@@ -20,18 +24,16 @@ afterEach(function (): void {
     TenantContext::clear();
 });
 
-// Test [D] : /parametres/comptes répond 200 avec le composant SousCategorieList monté
-it('[D] route /parametres/comptes répond 200', function (): void {
-    $response = $this->get(route('parametres.comptes.index'));
+it('[D] route /parametres/comptes redirige 301 vers /parametres/plan-comptable', function (): void {
+    $response = $this->get('/parametres/comptes');
 
-    $response->assertStatus(200);
-    $response->assertSeeLivewire(SousCategorieList::class);
+    $response->assertStatus(301);
+    $response->assertRedirect('/parametres/plan-comptable');
 });
 
-// Test [E] : /parametres/sous-categories redirige 301 vers /parametres/comptes
-it('[E] route /parametres/sous-categories redirige 301 vers /parametres/comptes', function (): void {
+it('[E] route /parametres/sous-categories redirige 301 vers /parametres/plan-comptable', function (): void {
     $response = $this->get('/parametres/sous-categories');
 
     $response->assertStatus(301);
-    $response->assertRedirect('/parametres/comptes');
+    $response->assertRedirect('/parametres/plan-comptable');
 });
