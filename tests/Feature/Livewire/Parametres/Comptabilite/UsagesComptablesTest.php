@@ -9,6 +9,7 @@ use App\Livewire\Parametres\Comptabilite\UsagesComptables;
 use App\Models\Association;
 use App\Models\AssociationUser;
 use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\SousCategorie;
 use App\Models\User;
 use App\Services\UsagesComptablesService;
@@ -38,46 +39,56 @@ it('renders 4 usage cards', function () {
         ->assertSee('Comptabilisation des Dons');
 });
 
+// DC-8 : l'écran liste des comptes — les fixtures créent la SousCategorie avec
+// code_cerfa pour matérialiser le Compte miroir (observer DC-7), et les appels
+// passent l'id du compte.
+
 it('toggleDon persists through service', function () {
-    $sc = SousCategorie::factory()->for($this->asso, 'association')->for($this->catR)->create();
+    SousCategorie::factory()->for($this->asso, 'association')->for($this->catR)->create(['code_cerfa' => '754A']);
+    $compte = Compte::where('numero_pcg', '754A')->firstOrFail();
     Livewire::test(UsagesComptables::class)
-        ->call('toggleDon', $sc->id, true);
-    expect($sc->fresh()->hasUsage(UsageComptable::Don))->toBeTrue();
+        ->call('toggleDon', $compte->id, true);
+    expect($compte->fresh()->hasUsage(UsageComptable::Don))->toBeTrue();
 });
 
 it('setFraisKilometriques switches mono link', function () {
-    $sc1 = SousCategorie::factory()->for($this->asso, 'association')->for($this->catD)->create();
-    $sc2 = SousCategorie::factory()->for($this->asso, 'association')->for($this->catD)->create();
+    SousCategorie::factory()->for($this->asso, 'association')->for($this->catD)->create(['code_cerfa' => '625A']);
+    SousCategorie::factory()->for($this->asso, 'association')->for($this->catD)->create(['code_cerfa' => '625B']);
+    $compte1 = Compte::where('numero_pcg', '625A')->firstOrFail();
+    $compte2 = Compte::where('numero_pcg', '625B')->firstOrFail();
     Livewire::test(UsagesComptables::class)
-        ->set('fraisKmSelectedId', $sc1->id)
+        ->set('fraisKmSelectedId', $compte1->id)
         ->call('saveFraisKilometriques');
-    expect($sc1->fresh()->hasUsage(UsageComptable::FraisKilometriques))->toBeTrue();
+    expect($compte1->fresh()->hasUsage(UsageComptable::FraisKilometriques))->toBeTrue();
     Livewire::test(UsagesComptables::class)
-        ->set('fraisKmSelectedId', $sc2->id)
+        ->set('fraisKmSelectedId', $compte2->id)
         ->call('saveFraisKilometriques');
-    expect($sc1->fresh()->hasUsage(UsageComptable::FraisKilometriques))->toBeFalse();
-    expect($sc2->fresh()->hasUsage(UsageComptable::FraisKilometriques))->toBeTrue();
+    expect($compte1->fresh()->hasUsage(UsageComptable::FraisKilometriques))->toBeFalse();
+    expect($compte2->fresh()->hasUsage(UsageComptable::FraisKilometriques))->toBeTrue();
 });
 
 it('abandonCreanceCandidates lists only Dons', function () {
-    $scDon = SousCategorie::factory()->for($this->asso, 'association')->for($this->catR)->create(['nom' => 'Don A']);
-    $scAutre = SousCategorie::factory()->for($this->asso, 'association')->for($this->catR)->create(['nom' => 'Autre']);
-    app(UsagesComptablesService::class)->toggleDon($scDon->id, true);
+    SousCategorie::factory()->for($this->asso, 'association')->for($this->catR)->create(['nom' => 'Don A', 'code_cerfa' => '754A']);
+    SousCategorie::factory()->for($this->asso, 'association')->for($this->catR)->create(['nom' => 'Autre', 'code_cerfa' => '706A']);
+    $compteDon = Compte::where('numero_pcg', '754A')->firstOrFail();
+    $compteAutre = Compte::where('numero_pcg', '706A')->firstOrFail();
+    app(UsagesComptablesService::class)->toggleDon($compteDon->id, true);
 
     $comp = Livewire::test(UsagesComptables::class);
     $candidates = collect($comp->instance()->abandonCreanceCandidates);
-    expect($candidates->pluck('id'))->toContain($scDon->id);
-    expect($candidates->pluck('id'))->not->toContain($scAutre->id);
+    expect($candidates->pluck('id'))->toContain($compteDon->id);
+    expect($candidates->pluck('id'))->not->toContain($compteAutre->id);
 });
 
 it('toggleDon false cascades AbandonCreance', function () {
-    $sc = SousCategorie::factory()->for($this->asso, 'association')->for($this->catR)->create();
+    SousCategorie::factory()->for($this->asso, 'association')->for($this->catR)->create(['code_cerfa' => '754A']);
+    $compte = Compte::where('numero_pcg', '754A')->firstOrFail();
     $svc = app(UsagesComptablesService::class);
-    $svc->toggleDon($sc->id, true);
-    $svc->setAbandonCreance($sc->id);
+    $svc->toggleDon($compte->id, true);
+    $svc->setAbandonCreance($compte->id);
 
-    Livewire::test(UsagesComptables::class)->call('toggleDon', $sc->id, false);
-    expect($sc->fresh()->hasUsage(UsageComptable::AbandonCreance))->toBeFalse();
+    Livewire::test(UsagesComptables::class)->call('toggleDon', $compte->id, false);
+    expect($compte->fresh()->hasUsage(UsageComptable::AbandonCreance))->toBeFalse();
 });
 
 it('submitInline creates sous-cat and flags it', function () {

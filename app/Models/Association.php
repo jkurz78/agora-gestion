@@ -184,4 +184,14 @@ final class Association extends Model
     {
         return SousCategorie::forUsage($usage)->where('association_id', $this->id)->orderBy('nom')->get();
     }
+
+    /**
+     * Équivalent compte-first de sousCategoriesFor() — DC-8.
+     *
+     * @return Collection<int, Compte>
+     */
+    public function comptesFor(UsageComptable $usage): Collection
+    {
+        return Compte::forUsage($usage)->where('association_id', $this->id)->orderBy('numero_pcg')->get();
+    }
 }

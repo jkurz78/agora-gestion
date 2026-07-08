@@ -35,14 +35,14 @@
                     Le tiers propose un don par abandon de créance de
                     <strong>{{ number_format((float) $ndf->lignes->sum('montant'), 2, ',', ' ') }} €</strong>.
                 </p>
-                @if ($sousCatAbandon)
+                @if ($compteAbandon)
                     <small class="text-muted">
-                        Sous-catégorie désignée : {{ $sousCatAbandon->nom }}
+                        Compte désigné : {{ $compteAbandon->numero_pcg }} — {{ $compteAbandon->intitule }}
                     </small>
                 @else
                     <small class="text-warning">
                         <i class="bi bi-exclamation-triangle"></i>
-                        Aucune sous-catégorie n'est désignée pour l'usage Abandon de créance.
+                        Aucun compte n'est désigné pour l'usage Abandon de créance.
                         <a href="{{ route('parametres.comptabilite.usages') }}">Configurer l'usage</a>.
                     </small>
                 @endif
@@ -150,7 +150,7 @@
                             <tr>
                                 <th>#</th>
                                 <th>Libellé</th>
-                                <th>Sous-catégorie</th>
+                                <th>Compte</th>
                                 <th>Opération</th>
                                 <th>Séance</th>
                                 <th class="text-end">Montant</th>
@@ -172,7 +172,8 @@
                                             ]
                                         ])
                                     </td>
-                                    <td>{{ $ligne->sousCategorie?->nom ?? '—' }}</td>
+                                    {{-- DC-8 : lecture compte-first, repli sous-catégorie miroir --}}
+                                    <td>{{ $ligne->compte?->intitule ?? $ligne->sousCategorie?->nom ?? '—' }}</td>
                                     <td>{{ $ligne->operation?->nom ?? '—' }}</td>
                                     <td>{{ $ligne->seance ?? '—' }}</td>
                                     <td class="text-end" data-sort="{{ number_format((float) $ligne->montant, 2, '.', '') }}">
@@ -236,12 +237,12 @@
                             <div class="form-check">
                                 <input class="form-check-input" type="radio" id="choix-abandon"
                                        name="choixValidation" wire:model.live="choixValidation" value="abandon"
-                                       @if (! $sousCatAbandon) disabled @endif>
+                                       @if (! $compteAbandon) disabled @endif>
                                 <label class="form-check-label" for="choix-abandon">
                                     Accepter l'abandon de créance (don)
-                                    @if (! $sousCatAbandon)
+                                    @if (! $compteAbandon)
                                         <small class="text-muted d-block">
-                                            Désignation d'une sous-catégorie requise dans
+                                            Désignation d'un compte requise dans
                                             <a href="{{ route('parametres.comptabilite.usages') }}">Paramètres → Comptabilité → Usages</a>.
                                         </small>
                                     @endif

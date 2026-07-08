@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\UsageComptable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -117,6 +118,14 @@ final class Compte extends TenantModel
             ->where('numero_pcg', 'LIKE', '512_%');
     }
 
+    /**
+     * Filter to comptes flagged for the given usage comptable (DC-8).
+     */
+    public function scopeForUsage(Builder $query, UsageComptable $usage): Builder
+    {
+        return $query->whereHas('usages', fn (Builder $q) => $q->where('usage', $usage->value));
+    }
+
     // -------------------------------------------------------------------------
     // Prédicats métier
     // -------------------------------------------------------------------------
@@ -156,6 +165,26 @@ final class Compte extends TenantModel
     public function compteBancaire(): BelongsTo
     {
         return $this->belongsTo(CompteBancaire::class, 'compte_bancaire_id');
+    }
+
+    // -------------------------------------------------------------------------
+    // Usages comptables (DC-8 — dissolution sous_categories → comptes)
+    // -------------------------------------------------------------------------
+
+    /**
+     * The usage-comptable pivot rows flagging this compte (Don, Cotisation…).
+     */
+    public function usages(): HasMany
+    {
+        return $this->hasMany(UsageSousCategorie::class, 'compte_id');
+    }
+
+    /**
+     * Returns true if this compte is flagged for the given usage comptable.
+     */
+    public function hasUsage(UsageComptable $usage): bool
+    {
+        return $this->usages()->where('usage', $usage->value)->exists();
     }
 
     // -------------------------------------------------------------------------

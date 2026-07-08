@@ -9,6 +9,7 @@ use App\Events\Portail\FactureDeposeeComptabilisee;
 use App\Livewire\TransactionForm;
 use App\Models\Association;
 use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Exercice;
 use App\Models\FacturePartenaireDeposee;
@@ -38,9 +39,14 @@ beforeEach(function () {
     $this->tiers = Tiers::factory()->pourDepenses()->create(['association_id' => $this->association->id]);
 
     $this->categorie = Categorie::factory()->depense()->create(['association_id' => $this->association->id]);
+    // DC-8 : code_cerfa classe 6 matérialise le Compte miroir — TransactionForm
+    // attend désormais un id de compte dans lignes.*.sous_categorie_id.
     $this->sousCategorie = SousCategorie::factory()
         ->for($this->categorie)
-        ->create(['association_id' => $this->association->id]);
+        ->create(['association_id' => $this->association->id, 'code_cerfa' => '606']);
+    $this->compteVentilation = Compte::where('association_id', $this->association->id)
+        ->where('numero_pcg', '606')
+        ->firstOrFail();
 
     $this->compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
 });
@@ -81,7 +87,7 @@ it('save IA-off : crée la transaction, comptabilise le dépôt, attache le PDF'
         ->set('compte_id', $this->compte->id)
         ->set('lignes', [[
             'id' => null,
-            'sous_categorie_id' => (string) $this->sousCategorie->id,
+            'sous_categorie_id' => (string) $this->compteVentilation->id,
             'operation_id' => '',
             'seance' => '',
             'montant' => '150.00',
@@ -198,7 +204,7 @@ it('exercice clôturé : aucune transaction, dépôt reste Soumise, fichier inta
         ->set('compte_id', $this->compte->id)
         ->set('lignes', [[
             'id' => null,
-            'sous_categorie_id' => (string) $this->sousCategorie->id,
+            'sous_categorie_id' => (string) $this->compteVentilation->id,
             'operation_id' => '',
             'seance' => '',
             'montant' => '150.00',
@@ -255,7 +261,7 @@ it('flash erreur système si le déplacement du PDF échoue pendant la comptabil
     $instance->compte_id = $this->compte->id;
     $instance->lignes = [[
         'id' => null,
-        'sous_categorie_id' => (string) $this->sousCategorie->id,
+        'sous_categorie_id' => (string) $this->compteVentilation->id,
         'operation_id' => '',
         'seance' => '',
         'montant' => '100.00',

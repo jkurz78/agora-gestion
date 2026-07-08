@@ -121,6 +121,102 @@ it('laisse compte_id null si la sous-catégorie n a pas de code_cerfa', function
     expect($budgetLine->compte_id)->toBeNull();
 });
 
+it('remplit sous_categorie_id à la création quand seul le compte est fourni', function () {
+    $associationId = TenantContext::currentId();
+    creerSousCategorieAvecCompte($associationId);
+    $compte = compteMappe($associationId, '706A');
+
+    $devis = Devis::factory()->create(['association_id' => $associationId]);
+    $devisLigne = DevisLigne::factory()->create([
+        'devis_id' => $devis->id,
+        'sous_categorie_id' => null,
+        'compte_id' => $compte->id,
+    ]);
+
+    $sousCategorie = SousCategorie::where('association_id', $associationId)
+        ->where('code_cerfa', '706A')
+        ->firstOrFail();
+
+    expect((int) $devisLigne->sous_categorie_id)->toBe((int) $sousCategorie->id);
+});
+
+it('ne remplace pas un sous_categorie_id posé explicitement', function () {
+    $associationId = TenantContext::currentId();
+    $sousCategorie = creerSousCategorieAvecCompte($associationId, '706A');
+    compteMappe($associationId, '706A');
+
+    creerSousCategorieAvecCompte($associationId, '707A');
+    $autreCompte = compteMappe($associationId, '707A');
+
+    $devis = Devis::factory()->create(['association_id' => $associationId]);
+    $devisLigne = DevisLigne::factory()->create([
+        'devis_id' => $devis->id,
+        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $autreCompte->id,
+    ]);
+
+    expect((int) $devisLigne->sous_categorie_id)->toBe((int) $sousCategorie->id);
+});
+
+it('resynchronise sous_categorie_id quand le compte change', function () {
+    $associationId = TenantContext::currentId();
+    creerSousCategorieAvecCompte($associationId, '706A');
+    $compteA = compteMappe($associationId, '706A');
+
+    creerSousCategorieAvecCompte($associationId, '707A');
+    $compteB = compteMappe($associationId, '707A');
+
+    $devis = Devis::factory()->create(['association_id' => $associationId]);
+    $devisLigne = DevisLigne::factory()->create([
+        'devis_id' => $devis->id,
+        'sous_categorie_id' => null,
+        'compte_id' => $compteA->id,
+    ]);
+
+    $sousCategorieA = SousCategorie::where('association_id', $associationId)
+        ->where('code_cerfa', '706A')
+        ->firstOrFail();
+
+    expect((int) $devisLigne->sous_categorie_id)->toBe((int) $sousCategorieA->id);
+
+    $devisLigne->sous_categorie_id = null;
+    $devisLigne->compte_id = $compteB->id;
+    $devisLigne->save();
+
+    $sousCategorieB = SousCategorie::where('association_id', $associationId)
+        ->where('code_cerfa', '707A')
+        ->firstOrFail();
+
+    expect((int) $devisLigne->refresh()->sous_categorie_id)->toBe((int) $sousCategorieB->id);
+});
+
+it('laisse sous_categorie_id null si le compte n a pas de sous-catégorie miroir', function () {
+    $associationId = TenantContext::currentId();
+
+    // est_systeme = true court-circuite CompteObserver::materialiserSousCategorie
+    // (voir sa docblock) : ce compte n'a donc volontairement aucune SousCategorie
+    // miroir, ce qui permet de tester le cas « lookup inverse sans résultat ».
+    $compte = Compte::create([
+        'association_id' => $associationId,
+        'numero_pcg' => '709Z',
+        'intitule' => 'Compte test sans miroir',
+        'classe' => 7,
+        'actif' => true,
+        'est_systeme' => true,
+        'pour_inscriptions' => false,
+        'lettrable' => false,
+    ]);
+
+    $devis = Devis::factory()->create(['association_id' => $associationId]);
+    $devisLigne = DevisLigne::factory()->create([
+        'devis_id' => $devis->id,
+        'sous_categorie_id' => null,
+        'compte_id' => $compte->id,
+    ]);
+
+    expect($devisLigne->sous_categorie_id)->toBeNull();
+});
+
 it('couvre les 10 modèles', function () {
     $associationId = TenantContext::currentId();
     $sousCategorie = creerSousCategorieAvecCompte($associationId);

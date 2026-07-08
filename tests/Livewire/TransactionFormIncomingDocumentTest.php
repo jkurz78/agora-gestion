@@ -26,9 +26,12 @@ beforeEach(function () {
     $this->actingAs($this->user);
     session(['exercice_actif' => 2025]);
 
+    // DC-8 : code_cerfa classe 6 matérialise le Compte miroir — les payloads OCR
+    // ci-dessous portent des ids sous_categories (contrat InvoiceOcrService inchangé),
+    // convertis en id compte par applyOcrResult() puis reconvertis au save().
     $this->sousCategorie = SousCategorie::factory()
         ->for(Categorie::factory()->depense()->create(['association_id' => $this->association->id]))
-        ->create(['association_id' => $this->association->id]);
+        ->create(['association_id' => $this->association->id, 'code_cerfa' => '606']);
 });
 
 afterEach(function () {

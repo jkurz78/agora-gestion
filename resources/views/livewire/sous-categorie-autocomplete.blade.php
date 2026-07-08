@@ -14,7 +14,7 @@
     @if($sousCategorieId)
         {{-- Selected state --}}
         <div class="d-flex align-items-center gap-2 px-3 py-2 border rounded" style="background:#f0e8f5;border-color:#c9a8d8!important">
-            <span class="text-muted small">{{ $selectedCategorieLabel }}</span>
+            <span class="text-muted small">{{ $selectedFamilleLabel }}</span>
             <span class="text-muted">/</span>
             <span class="fw-medium">{{ $selectedLabel }}</span>
             <button type="button" class="btn-close btn-close-sm ms-auto" wire:click="clearSousCategorie" aria-label="Effacer"></button>
@@ -25,7 +25,7 @@
             x-ref="searchInput"
             type="text"
             class="form-control"
-            placeholder="Tapez pour rechercher une catégorie…"
+            placeholder="Tapez pour rechercher un compte…"
             wire:model.live.debounce.300ms="search"
             autocomplete="off"
             x-on:input="highlighted = -1; updateDropPos()"
@@ -72,7 +72,7 @@
 
                 @foreach($results as $group)
                     <div class="px-3 py-1 fw-semibold" style="background:#f3f0f7;font-size:.75rem;color:#722281;letter-spacing:.03em;text-transform:uppercase">
-                        {{ $group['categorie_nom'] }}
+                        {{ $group['famille_label'] }}
                     </div>
 
                     @foreach($group['items'] as $item)
@@ -85,10 +85,8 @@
                             x-on:mouseout="highlighted = -1"
                             :style="highlighted === {{ $navIndex }} ? 'background:#f0e8f5' : ''"
                         >
-                            <span>{{ $item['nom'] }}</span>
-                            @if($item['code_cerfa'])
-                                <span class="ms-auto text-muted small">{{ $item['code_cerfa'] }}</span>
-                            @endif
+                            <span class="text-muted small">{{ $item['numero_pcg'] }}</span>
+                            <span>{{ $item['intitule'] }}</span>
                         </div>
                         @php $navIndex++; @endphp
                     @endforeach
@@ -115,10 +113,10 @@
     @if($showCreateModal)
         <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style="background:rgba(0,0,0,.4);z-index:10000" wire:click.self="$set('showCreateModal', false)">
             <div class="bg-white rounded p-4" style="width:420px;max-width:95vw">
-                <h6 class="fw-bold mb-3" style="color:#722281">Créer une nouvelle sous-catégorie</h6>
+                <h6 class="fw-bold mb-3" style="color:#722281">Créer un nouveau compte</h6>
 
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">Nom <span class="text-danger">*</span></label>
+                    <label class="form-label fw-semibold">Intitulé <span class="text-danger">*</span></label>
                     <input type="text" class="form-control" wire:model="newNom">
                     @error('newNom') <div class="text-danger small">{{ $message }}</div> @enderror
                 </div>
@@ -135,8 +133,8 @@
                 </div>
 
                 <div class="mb-4">
-                    <label class="form-label fw-semibold">Compte comptable <span class="text-muted fw-normal">(optionnel)</span></label>
-                    <input type="text" class="form-control" wire:model="newCodeCerfa" placeholder="ex : 641">
+                    <label class="form-label fw-semibold">Numéro de compte <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" wire:model="newCodeCerfa" placeholder="ex : 706A">
                     @error('newCodeCerfa') <div class="text-danger small">{{ $message }}</div> @enderror
                 </div>
 

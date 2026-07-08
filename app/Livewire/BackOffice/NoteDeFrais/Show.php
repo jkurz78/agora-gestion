@@ -8,9 +8,9 @@ use App\Enums\ModePaiement;
 use App\Enums\StatutNoteDeFrais;
 use App\Enums\UsageComptable;
 use App\Exceptions\ExerciceCloturedException;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\NoteDeFrais;
-use App\Models\SousCategorie;
 use App\Services\NoteDeFrais\NoteDeFraisValidationService;
 use App\Services\NoteDeFrais\ValidationData;
 use DomainException;
@@ -184,10 +184,11 @@ final class Show extends Component
             ->get();
     }
 
-    private function sousCatAbandon(): ?SousCategorie
+    /** DC-8 : lecture compte-first du compte désigné « abandon de créance ». */
+    private function compteAbandon(): ?Compte
     {
         return $this->ndf->association
-            ->sousCategoriesFor(UsageComptable::AbandonCreance)
+            ->comptesFor(UsageComptable::AbandonCreance)
             ->first();
     }
 
@@ -201,7 +202,7 @@ final class Show extends Component
             'statutSoumise' => StatutNoteDeFrais::Soumise,
             'statutValidee' => StatutNoteDeFrais::Validee,
             'statutRejetee' => StatutNoteDeFrais::Rejetee,
-            'sousCatAbandon' => $this->sousCatAbandon(),
+            'compteAbandon' => $this->compteAbandon(),
         ])->layout('layouts.app-sidebar', ['title' => 'Note de frais — Détail']);
     }
 }

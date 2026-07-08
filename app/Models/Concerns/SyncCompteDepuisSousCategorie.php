@@ -7,12 +7,20 @@ namespace App\Models\Concerns;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Double écriture transitoire DC-3 (programme dissolution sous_categories → comptes).
+ * Double écriture transitoire DC-3/DC-8 (programme dissolution sous_categories → comptes).
  *
- * Tant que les écrans écrivent encore sous_categorie_id (bascule en DC-8), ce hook
- * remplit compte_id automatiquement au saving via le mapping
- * code_cerfa = numero_pcg (même association). Il ne remplace JAMAIS un compte_id
- * déjà posé, et se resynchronise si sous_categorie_id change.
+ * Tant que les écrans peuvent encore écrire sous_categorie_id OU compte_id
+ * séparément (bascule en DC-8), ce hook synchronise les deux colonnes au
+ * saving dans les DEUX sens, via le même mapping bijectif
+ * code_cerfa = numero_pcg (même association) :
+ *   - sous_categorie_id renseigné, compte_id absent → dérive compte_id ;
+ *   - compte_id renseigné, sous_categorie_id absent → dérive sous_categorie_id
+ *     (lookup inverse).
+ *
+ * Il ne remplace JAMAIS une colonne cible déjà posée explicitement, et se
+ * resynchronise (colonne cible remise à null pour re-dérivation) quand la
+ * colonne source change sur un enregistrement existant sans que l'autre
+ * colonne n'ait été touchée en même temps — symétrique dans les deux sens.
  *
  * ⚠ Ne PAS poser sur TransactionLigne : son compte_id est géré par le pipeline PD
  * (EcritureGenerator / TransactionService) et un remplissage au saving déclencherait
@@ -30,11 +38,20 @@ trait SyncCompteDepuisSousCategorie
                 $model->compte_id = null;
             }
 
-            if ($model->sous_categorie_id === null || $model->compte_id !== null) {
+            // Resync symétrique si compte_id a changé (édition côté compte)
+            if ($model->isDirty('compte_id') && ! $model->isDirty('sous_categorie_id')) {
+                $model->sous_categorie_id = null;
+            }
+
+            if ($model->sous_categorie_id !== null && $model->compte_id === null) {
+                $model->compte_id = self::resoudreCompteId((int) $model->sous_categorie_id);
+
                 return;
             }
 
-            $model->compte_id = self::resoudreCompteId((int) $model->sous_categorie_id);
+            if ($model->compte_id !== null && $model->sous_categorie_id === null) {
+                $model->sous_categorie_id = self::resoudreSousCategorieId((int) $model->compte_id);
+            }
         });
     }
 
@@ -55,5 +72,24 @@ trait SyncCompteDepuisSousCategorie
             ->value('id');
 
         return $compteId !== null ? (int) $compteId : null;
+    }
+
+    /** Mapping inverse compte → sous_categorie (numero_pcg = code_cerfa, même association). */
+    private static function resoudreSousCategorieId(int $compteId): ?int
+    {
+        $compte = DB::table('comptes')
+            ->where('id', $compteId)
+            ->first(['association_id', 'numero_pcg']);
+
+        if ($compte === null || $compte->numero_pcg === null) {
+            return null;
+        }
+
+        $sousCategorieId = DB::table('sous_categories')
+            ->where('association_id', (int) $compte->association_id)
+            ->where('code_cerfa', (string) $compte->numero_pcg)
+            ->value('id');
+
+        return $sousCategorieId !== null ? (int) $sousCategorieId : null;
     }
 }

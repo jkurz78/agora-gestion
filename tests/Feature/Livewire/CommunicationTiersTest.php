@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Livewire\CommunicationTiers;
 use App\Models\Association;
 use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\MessageTemplate;
 use App\Models\Newsletter\SubscriptionRequest;
 use App\Models\SousCategorie;
@@ -106,11 +107,15 @@ it('filters by clients', function () {
 
 it('filters by donateurs tous exercices', function () {
     $cat = Categorie::create(['association_id' => $this->association->id, 'nom' => 'Recettes', 'type' => 'recette']);
-    $sc = SousCategorie::factory()->pourDons()->create(['association_id' => $this->association->id, 'categorie_id' => $cat->id, 'nom' => 'Dons']);
+    // DC-8 : le filtre lit compte_id sur les lignes — code_cerfa classe 7
+    // matérialise le Compte miroir, posé explicitement sur la ligne (comme
+    // le fait le pipeline PD en production).
+    $sc = SousCategorie::factory()->pourDons()->create(['association_id' => $this->association->id, 'categorie_id' => $cat->id, 'nom' => 'Dons', 'code_cerfa' => '754A']);
+    $compteDon = Compte::where('association_id', $this->association->id)->where('numero_pcg', '754A')->firstOrFail();
 
     $donateur = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Donateur', 'email' => 'd@e.com']);
     $tx = Transaction::factory()->create(['association_id' => $this->association->id, 'tiers_id' => $donateur->id, 'type' => 'recette', 'date' => '2025-10-15']);
-    TransactionLigne::factory()->create(['transaction_id' => $tx->id, 'sous_categorie_id' => $sc->id]);
+    TransactionLigne::factory()->create(['transaction_id' => $tx->id, 'sous_categorie_id' => $sc->id, 'compte_id' => $compteDon->id, 'montant' => 50, 'credit' => 50]);
 
     $nonDonateur = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'NonDon', 'email' => 'n@e.com']);
 

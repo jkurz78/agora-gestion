@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\UsageComptable;
+use App\Models\Compte;
 use App\Models\Operation;
-use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Services\ExerciceService;
 use Illuminate\Contracts\View\View;
@@ -38,23 +38,24 @@ final class GestionDashboard extends Component
             ->orderBy('date_debut')
             ->get();
 
-        // Dernières adhésions (cotisations)
-        $cotSousCategorieIds = SousCategorie::forUsage(UsageComptable::Cotisation)->pluck('id');
+        // Dernières adhésions (cotisations) — DC-8 : filtre par compte_id
+        // (posé par le pipeline PD sur toutes les lignes de ventilation).
+        $cotCompteIds = Compte::forUsage(UsageComptable::Cotisation)->pluck('id');
         $dernieresAdhesions = Transaction::where('type', 'recette')
             ->operationnel()
             ->forExercice($exercice)
-            ->whereHas('lignes', fn ($q) => $q->whereIn('sous_categorie_id', $cotSousCategorieIds))
+            ->whereHas('lignes', fn ($q) => $q->whereIn('compte_id', $cotCompteIds))
             ->with('tiers')
             ->latest('date')->latest('id')
             ->take(10)
             ->get();
 
         // Derniers dons
-        $donSousCategorieIds = SousCategorie::forUsage(UsageComptable::Don)->pluck('id');
+        $donCompteIds = Compte::forUsage(UsageComptable::Don)->pluck('id');
         $derniersDons = Transaction::where('type', 'recette')
             ->operationnel()
             ->forExercice($exercice)
-            ->whereHas('lignes', fn ($q) => $q->whereIn('sous_categorie_id', $donSousCategorieIds))
+            ->whereHas('lignes', fn ($q) => $q->whereIn('compte_id', $donCompteIds))
             ->with('tiers')
             ->latest('date')->latest('id')
             ->take(10)

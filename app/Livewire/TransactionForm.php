@@ -17,6 +17,7 @@ use App\Exceptions\OcrAnalysisException;
 use App\Exceptions\OcrNotConfiguredException;
 use App\Livewire\Concerns\MontantValidation;
 use App\Livewire\Concerns\RespectsExerciceCloture;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\FacturePartenaireDeposee;
 use App\Models\IncomingDocument;
@@ -26,6 +27,8 @@ use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\TransactionLigneAffectation;
+use App\Models\UsageSousCategorie;
+use App\Services\Compta\PlanComptableSelecteur;
 use App\Services\ExerciceService;
 use App\Services\InvoiceOcrService;
 use App\Services\Portail\FacturePartenaireService;
@@ -72,7 +75,17 @@ final class TransactionForm extends Component
 
     public ?string $notes = null;
 
-    /** @var array<int, array{sous_categorie_id: string, operation_id: string, seance: string, montant: string, notes: string}> */
+    /**
+     * DC-8 : la clé `sous_categorie_id` (nom conservé pour minimiser le blast
+     * radius) contient désormais un id `comptes.id` — pas un id
+     * `sous_categories.id`. Le composant `sous-categorie-autocomplete` lié à
+     * ce champ (wire:model) sélectionne un compte de la classe 6/7. La
+     * conversion vers un véritable `sous_categorie_id` (attendu par
+     * `TransactionService`) se fait juste avant l'appel au service — voir
+     * `resoudreSousCategorieIdDepuisCompte()`.
+     *
+     * @var array<int, array{sous_categorie_id: string, operation_id: string, seance: string, montant: string, notes: string}>
+     */
     public array $lignes = [];
 
     public bool $showForm = false;
@@ -434,6 +447,7 @@ final class TransactionForm extends Component
         // les lignes de ventilation métier (classe 6/7).
         $transaction = Transaction::with([
             'lignes' => fn ($q) => $q->ventilation(),
+            'lignes.sousCategorie',
             'noteDeFrais',
         ])->findOrFail($id);
 
@@ -450,7 +464,10 @@ final class TransactionForm extends Component
 
         $this->lignes = $transaction->lignes->map(fn ($ligne) => [
             'id' => $ligne->id,
-            'sous_categorie_id' => (string) $ligne->sous_categorie_id,
+            // Échafaudage DC-8, disparaît en DC-10 : le sélecteur de ventilation affiche
+            // désormais des comptes. compte_id est normalement déjà posé par le pipeline
+            // PD ; repli défensif via le miroir code_cerfa si jamais absent.
+            'sous_categorie_id' => (string) ($ligne->compte_id ?? Compte::ofNumero((string) $ligne->sousCategorie?->code_cerfa)?->id ?? ''),
             'operation_id' => (string) ($ligne->operation_id ?? ''),
             'seance' => (string) ($ligne->seance ?? ''),
             'montant' => (string) $ligne->montant,
@@ -573,7 +590,9 @@ final class TransactionForm extends Component
                 'tiers_id' => ['nullable', 'exists:tiers,id'],
                 'compte_id' => ['nullable', 'exists:comptes_bancaires,id'],
                 'lignes' => ['required', 'array', 'min:1'],
-                'lignes.*.sous_categorie_id' => ['required', 'exists:sous_categories,id'],
+                // DC-8 : le wire property `sous_categorie_id` contient un id de compte
+                // (classe 6/7) depuis la bascule du sélecteur de ventilation.
+                'lignes.*.sous_categorie_id' => ['required', 'exists:comptes,id'],
                 'lignes.*.montant' => ['required', 'numeric', MontantValidation::RULE],
                 'lignes.*.operation_id' => ['nullable'],
                 'lignes.*.seance' => ['nullable', 'integer', 'min:1'],
@@ -649,18 +668,40 @@ final class TransactionForm extends Component
                 : StatutReglement::EnAttente->value;
         }
 
-        $lignes = collect($this->lignes)->map(fn ($l) => [
-            'id' => isset($l['id']) ? (int) $l['id'] : null,
-            'sous_categorie_id' => (int) $l['sous_categorie_id'],
-            'operation_id' => $l['operation_id'] !== '' ? (int) $l['operation_id'] : null,
-            'seance' => $l['seance'] !== '' ? (int) $l['seance'] : null,
-            'montant' => $l['montant'],
-            'notes' => $l['notes'] ?: null,
-        ])->toArray();
+        // Échafaudage DC-8, disparaît en DC-10 : le wire property `sous_categorie_id`
+        // contient désormais un id de compte (sélecteur ventilation). TransactionService
+        // attend toujours un vrai `sous_categories.id` dans le contrat `$lignes[]` — on
+        // reconvertit ici via le miroir DC-7. Une conversion introuvable est bloquante
+        // (pas de ligne silencieusement droppée).
+        $lignes = [];
+        foreach ($this->lignes as $index => $l) {
+            $sousCategorieId = $this->resoudreSousCategorieIdDepuisCompte((int) $l['sous_categorie_id']);
+            if ($sousCategorieId === null) {
+                $this->addError("lignes.{$index}.sous_categorie_id", 'Ce compte n\'a pas de sous-catégorie correspondante.');
 
-        $inscriptionIds = SousCategorie::forUsage(UsageComptable::Inscription)->pluck('id')->toArray();
+                return;
+            }
+
+            $lignes[] = [
+                'id' => isset($l['id']) ? (int) $l['id'] : null,
+                'sous_categorie_id' => $sousCategorieId,
+                'operation_id' => $l['operation_id'] !== '' ? (int) $l['operation_id'] : null,
+                'seance' => $l['seance'] !== '' ? (int) $l['seance'] : null,
+                'montant' => $l['montant'],
+                'notes' => $l['notes'] ?: null,
+            ];
+        }
+
+        // DC-8 : Compte::forUsage() n'existe pas encore (item 9, tâche parallèle).
+        // On lit l'id de compte déjà mirroré sur usages_sous_categories.compte_id
+        // (colonne tenue à jour par SyncCompteDepuisSousCategorie) plutôt que de créer
+        // le scope nous-mêmes, pour éviter tout conflit d'édition concurrente.
+        $inscriptionCompteIds = UsageSousCategorie::where('usage', UsageComptable::Inscription->value)
+            ->whereNotNull('compte_id')
+            ->pluck('compte_id')
+            ->toArray();
         foreach ($this->lignes as $index => $ligne) {
-            if (in_array((int) ($ligne['sous_categorie_id'] ?? 0), $inscriptionIds, true)
+            if (in_array((int) ($ligne['sous_categorie_id'] ?? 0), $inscriptionCompteIds, true)
                 && empty($ligne['operation_id'])) {
                 $this->addError("lignes.{$index}.operation_id", "L'opération est obligatoire pour une inscription.");
 
@@ -1009,7 +1050,13 @@ final class TransactionForm extends Component
 
     private function applyOcrResult(InvoiceOcrResult $result): void
     {
-        $validScIds = SousCategorie::whereHas('categorie', fn ($q) => $q->where('type', 'depense'))->pluck('id')->toArray();
+        // Échafaudage DC-8, disparaît en DC-10 : InvoiceOcrService::analyze() renvoie
+        // toujours un id sous_categories.id (hors scope de cette bascule — voir
+        // consigne). On garde la validation sur les ids sous-catégorie d'origine, puis
+        // on convertit vers l'id compte miroir attendu par le sélecteur de ventilation.
+        $sousCategoriesDepense = SousCategorie::whereHas('categorie', fn ($q) => $q->where('type', 'depense'))
+            ->get(['id', 'code_cerfa'])
+            ->keyBy('id');
         $validOpIds = Operation::pluck('id')->toArray();
 
         if ($result->date !== null) {
@@ -1040,9 +1087,20 @@ final class TransactionForm extends Component
         if (! empty($result->lignes)) {
             $this->lignes = [];
             foreach ($result->lignes as $ligne) {
+                $sousCategorieCompteId = '';
+                if ($ligne->sous_categorie_id !== null) {
+                    $sc = $sousCategoriesDepense->get($ligne->sous_categorie_id);
+                    if ($sc !== null && $sc->code_cerfa !== null) {
+                        $compte = Compte::ofNumero((string) $sc->code_cerfa);
+                        if ($compte !== null) {
+                            $sousCategorieCompteId = (string) $compte->id;
+                        }
+                    }
+                }
+
                 $this->lignes[] = [
                     'id' => null,
-                    'sous_categorie_id' => $ligne->sous_categorie_id !== null && in_array($ligne->sous_categorie_id, $validScIds, true) ? (string) $ligne->sous_categorie_id : '',
+                    'sous_categorie_id' => $sousCategorieCompteId,
                     'operation_id' => $ligne->operation_id !== null && in_array($ligne->operation_id, $validOpIds, true) ? (string) $ligne->operation_id : '',
                     'seance' => $ligne->seance !== null ? (string) $ligne->seance : '',
                     'montant' => (string) $ligne->montant,
@@ -1087,24 +1145,56 @@ final class TransactionForm extends Component
         return $date;
     }
 
+    /**
+     * Échafaudage DC-8, disparaît en DC-10 : convertit un id de compte
+     * (classe 6/7, tel que choisi dans le sélecteur de ventilation) vers
+     * l'id `sous_categories.id` miroir attendu par `TransactionService`.
+     *
+     * Le mirroir DC-7 (`CompteObserver::materialiserSousCategorie`) garantit
+     * qu'une SousCategorie miroir existe pour tout compte non-système de
+     * classe 6/7 — c'est-à-dire tout compte listé par `PlanComptableSelecteur`.
+     * On reste défensif : si la résolution échoue (ex. compte système qui
+     * aurait fui dans le sélecteur), on log et on retourne null pour laisser
+     * l'appelant bloquer la sauvegarde plutôt que d'écrire une ligne invalide.
+     */
+    private function resoudreSousCategorieIdDepuisCompte(int $compteId): ?int
+    {
+        $compte = Compte::find($compteId);
+        if ($compte === null) {
+            Log::warning('transaction-form.compte-introuvable', ['compte_id' => $compteId]);
+
+            return null;
+        }
+
+        $sousCategorie = SousCategorie::where('code_cerfa', $compte->numero_pcg)
+            ->where('association_id', $compte->association_id)
+            ->first();
+
+        if ($sousCategorie === null) {
+            Log::warning('transaction-form.sous-categorie-miroir-introuvable', [
+                'compte_id' => $compteId,
+                'numero_pcg' => $compte->numero_pcg,
+            ]);
+
+            return null;
+        }
+
+        return (int) $sousCategorie->id;
+    }
+
     public function render(): View
     {
-        $flagToUsage = [
-            'pour_dons' => UsageComptable::Don,
-            'pour_cotisations' => UsageComptable::Cotisation,
-            'pour_inscriptions' => UsageComptable::Inscription,
-        ];
-        $scUsage = $flagToUsage[$this->sousCategorieFilter] ?? null;
-
-        $sousCategories = SousCategorie::with('categorie')
-            ->when($this->type !== '', fn ($q) => $q->whereHas('categorie', fn ($q2) => $q2->where('type', $this->type)))
-            ->when($scUsage !== null, fn ($q) => $q->forUsage($scUsage))
-            ->orderBy('nom')
-            ->get();
+        // DC-8 : source des options de ventilation (comptes classe 6/7, groupés par
+        // famille) — remplace l'ex-liste `sousCategories` (déjà morte côté blade, le
+        // select vit dans <livewire:sous-categorie-autocomplete>, gardé pour tout
+        // futur consommateur direct de ce render()).
+        $groupesComptesVentilation = $this->type !== ''
+            ? PlanComptableSelecteur::groupesPourType($this->type)
+            : collect();
 
         return view('livewire.transaction-form', [
             'comptes' => CompteBancaire::saisieManuelle()->orderBy('nom')->get(),
-            'sousCategories' => $sousCategories,
+            'groupesComptesVentilation' => $groupesComptesVentilation,
             'operations' => Operation::with('typeOperation')
                 ->forExercice(app(ExerciceService::class)->current())
                 ->where('statut', StatutOperation::EnCours)

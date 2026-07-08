@@ -6,6 +6,8 @@ namespace App\Livewire;
 
 use App\Enums\UsageComptable;
 use App\Models\Categorie;
+use App\Models\Compte;
+use App\Models\Famille;
 use App\Models\SousCategorie;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\View\View;
@@ -27,7 +29,7 @@ final class SousCategorieAutocomplete extends Component
 
     public ?string $selectedLabel = null;
 
-    public ?string $selectedCategorieLabel = null;
+    public ?string $selectedFamilleLabel = null;
 
     public bool $showCreateModal = false;
 
@@ -38,7 +40,7 @@ final class SousCategorieAutocomplete extends Component
     public string $newCodeCerfa = '';
 
     /**
-     * @var array<int, array{categorie_id: int, categorie_nom: string, items: array<int, array{id: int, nom: string, code_cerfa: string|null}>}>
+     * @var array<int, array{famille_code: string, famille_label: string, items: array<int, array{id: int, numero_pcg: string, intitule: string}>}>
      */
     public array $results = [];
 
@@ -51,9 +53,9 @@ final class SousCategorieAutocomplete extends Component
         $this->sousCategorieId = $id;
 
         if ($id !== null) {
-            $sc = SousCategorie::with('categorie')->find($id);
-            $this->selectedLabel = $sc?->nom;
-            $this->selectedCategorieLabel = $sc?->categorie?->nom;
+            $compte = Compte::find($id);
+            $this->selectedLabel = $compte?->intitule;
+            $this->selectedFamilleLabel = $compte?->famille()?->libelle();
         }
     }
 
@@ -76,35 +78,43 @@ final class SousCategorieAutocomplete extends Component
         ];
         $usage = isset($flagToUsage[$this->sousCategorieFlag]) ? $flagToUsage[$this->sousCategorieFlag] : null;
 
-        $query = SousCategorie::with('categorie')
-            ->whereHas('categorie', function ($q): void {
-                if ($this->filtre !== 'tous') {
-                    $q->where('type', $this->filtre);
-                }
-            })
-            ->when($usage, fn ($q) => $q->forUsage($usage));
+        $classes = match ($this->filtre) {
+            'depense' => [6],
+            'recette' => [7],
+            default => [6, 7],
+        };
+
+        $query = Compte::whereIn('classe', $classes)
+            ->where('actif', true)
+            ->when($usage, fn ($q) => $q->whereIn('id', $this->compteIdsPourUsage($usage)));
 
         if ($this->search !== '') {
             $query->where(function ($q): void {
-                $q->where('nom', 'like', '%'.$this->search.'%')
-                    ->orWhereHas('categorie', fn ($q) => $q->where('nom', 'like', '%'.$this->search.'%'));
+                $q->where('numero_pcg', 'like', '%'.$this->search.'%')
+                    ->orWhere('intitule', 'like', '%'.$this->search.'%');
             });
         }
 
-        $this->results = $query
-            ->orderBy('categorie_id')
-            ->orderBy('nom')
+        $comptes = $query
+            ->orderBy('numero_pcg')
             ->limit(30)
-            ->get()
-            ->groupBy('categorie_id')
-            ->map(function (Collection $items): array {
+            ->get();
+
+        $familles = Famille::pourComptes($comptes);
+
+        $this->results = $comptes
+            ->groupBy(fn (Compte $c): string => $c->code_famille)
+            ->sortKeys()
+            ->map(function (Collection $items, string $code) use ($familles): array {
+                $famille = $familles->get($code);
+
                 return [
-                    'categorie_id' => (int) $items->first()->categorie_id,
-                    'categorie_nom' => $items->first()->categorie->nom,
-                    'items' => $items->map(fn (SousCategorie $sc): array => [
-                        'id' => $sc->id,
-                        'nom' => $sc->nom,
-                        'code_cerfa' => $sc->code_cerfa,
+                    'famille_code' => $code,
+                    'famille_label' => $famille?->libelle() ?? $code,
+                    'items' => $items->map(fn (Compte $c): array => [
+                        'id' => $c->id,
+                        'numero_pcg' => $c->numero_pcg,
+                        'intitule' => $c->intitule,
                     ])->toArray(),
                 ];
             })
@@ -114,12 +124,28 @@ final class SousCategorieAutocomplete extends Component
         $this->open = true;
     }
 
+    /**
+     * Résout les IDs de comptes ayant l'usage comptable demandé, via le
+     * mirroir sous_categories.code_cerfa = comptes.numero_pcg.
+     *
+     * Échafaudage — remplacer par Compte::forUsage() si/quand disponible
+     * (item 9 du programme DC-8).
+     *
+     * @return array<int, int>
+     */
+    private function compteIdsPourUsage(UsageComptable $usage): array
+    {
+        $codesCerfa = SousCategorie::forUsage($usage)->pluck('code_cerfa')->filter()->values();
+
+        return Compte::whereIn('numero_pcg', $codesCerfa)->pluck('id')->all();
+    }
+
     public function selectSousCategorie(int $id): void
     {
-        $sc = SousCategorie::with('categorie')->findOrFail($id);
-        $this->sousCategorieId = $sc->id;
-        $this->selectedLabel = $sc->nom;
-        $this->selectedCategorieLabel = $sc->categorie->nom;
+        $compte = Compte::findOrFail($id);
+        $this->sousCategorieId = $compte->id;
+        $this->selectedLabel = $compte->intitule;
+        $this->selectedFamilleLabel = $compte->famille()?->libelle();
         $this->search = '';
         $this->open = false;
         $this->results = [];
@@ -129,7 +155,7 @@ final class SousCategorieAutocomplete extends Component
     {
         $this->sousCategorieId = null;
         $this->selectedLabel = null;
-        $this->selectedCategorieLabel = null;
+        $this->selectedFamilleLabel = null;
         $this->search = '';
         $this->open = false;
         $this->results = [];
@@ -149,16 +175,18 @@ final class SousCategorieAutocomplete extends Component
         $this->validate([
             'newNom' => ['required', 'string', 'max:150'],
             'newCategorieId' => ['required', 'integer', 'exists:categories,id'],
-            'newCodeCerfa' => ['nullable', 'string', 'max:20'],
+            'newCodeCerfa' => ['required', 'string', 'max:20'],
         ]);
 
         $sc = SousCategorie::create([
             'categorie_id' => $this->newCategorieId,
             'nom' => $this->newNom,
-            'code_cerfa' => $this->newCodeCerfa !== '' ? $this->newCodeCerfa : null,
+            'code_cerfa' => $this->newCodeCerfa,
         ]);
 
-        $this->selectSousCategorie($sc->id);
+        $compte = Compte::where('numero_pcg', $sc->code_cerfa)->firstOrFail();
+
+        $this->selectSousCategorie($compte->id);
         $this->showCreateModal = false;
         $this->newNom = '';
         $this->newCodeCerfa = '';

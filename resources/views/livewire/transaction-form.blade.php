@@ -304,7 +304,7 @@
                         <table class="table table-sm table-bordered align-middle">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Sous-catégorie <span class="text-danger">*</span></th>
+                                    <th>Compte <span class="text-danger">*</span></th>
                                     <th>Opération</th>
                                     <th style="width: 100px;">Séance</th>
                                     <th style="width: 130px;">Montant <span class="text-danger">*</span></th>
@@ -317,8 +317,10 @@
                                     <tr wire:key="ligne-{{ $index }}">
                                         <td style="min-width:220px">
                                             @if ($isLockedByFacture || $isExtourneMiroir)
-                                                @php $sc = \App\Models\SousCategorie::find($ligne['sous_categorie_id']); @endphp
-                                                <span class="form-control-plaintext">{{ $sc?->nom ?? '—' }}</span>
+                                                {{-- Échafaudage DC-8, disparaît en DC-10 : $ligne['sous_categorie_id'] contient
+                                                     désormais un id de compte (sélecteur de ventilation basé comptes). --}}
+                                                @php $compteLigne = \App\Models\Compte::find($ligne['sous_categorie_id']); @endphp
+                                                <span class="form-control-plaintext">{{ $compteLigne?->intitule ?? '—' }}</span>
                                             @else
                                                 <livewire:sous-categorie-autocomplete
                                                     :key="'sc-tx-'.$index.'-'.($sousCategorieFilter ?? 'all')"

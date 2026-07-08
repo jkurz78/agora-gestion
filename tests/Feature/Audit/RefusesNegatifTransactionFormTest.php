@@ -16,6 +16,7 @@ use App\Livewire\Concerns\MontantValidation;
 use App\Livewire\TransactionForm;
 use App\Models\Association;
 use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Exercice;
 use App\Models\SousCategorie;
@@ -38,10 +39,17 @@ beforeEach(function (): void {
         'association_id' => $this->association->id,
         'type' => 'recette',
     ]);
+    // DC-8 : code_cerfa classe 7 (recette) déclenche le miroir SousCategorieCompteObserver
+    // qui matérialise le Compte correspondant — TransactionForm attend désormais un id
+    // de compte dans lignes.*.sous_categorie_id.
     $this->sc = SousCategorie::factory()->create([
         'categorie_id' => $this->categorie->id,
         'association_id' => $this->association->id,
+        'code_cerfa' => '706',
     ]);
+    $this->compteVentilation = Compte::where('association_id', $this->association->id)
+        ->where('numero_pcg', '706')
+        ->firstOrFail();
     $this->compte = CompteBancaire::factory()->create([
         'association_id' => $this->association->id,
         'solde_initial' => 0.0,
@@ -69,7 +77,7 @@ it('transaction_form_refuse_montant_negatif_sur_ligne', function (): void {
     $component->set('date', '2025-10-15')
         ->set('mode_paiement', 'virement')
         ->set('compte_id', $this->compte->id)
-        ->set('lignes.0.sous_categorie_id', (string) $this->sc->id)
+        ->set('lignes.0.sous_categorie_id', (string) $this->compteVentilation->id)
         ->set('lignes.0.montant', '-50')
         ->call('save');
 
@@ -89,7 +97,7 @@ it('transaction_form_accepte_montant_positif_sur_ligne', function (): void {
     $component->set('date', '2025-10-15')
         ->set('mode_paiement', 'virement')
         ->set('compte_id', $this->compte->id)
-        ->set('lignes.0.sous_categorie_id', (string) $this->sc->id)
+        ->set('lignes.0.sous_categorie_id', (string) $this->compteVentilation->id)
         ->set('lignes.0.montant', '50')
         ->call('save');
 

@@ -19,6 +19,7 @@ use App\Enums\StatutReglement;
 use App\Livewire\TransactionForm;
 use App\Models\Association;
 use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\SousCategorie;
 use App\Models\Transaction;
@@ -44,13 +45,19 @@ beforeEach(function () {
     ]);
 
     // Sous-catégorie recette (sans usage spécial pour rester hors inscription-guard)
+    // DC-8 : code_cerfa classe 7 matérialise le Compte miroir — TransactionForm
+    // attend désormais un id de compte dans lignes.*.sous_categorie_id.
     $categorieRecette = Categorie::factory()->recette()->create([
         'association_id' => $this->association->id,
     ]);
     $this->scRecette = SousCategorie::factory()->create([
         'association_id' => $this->association->id,
         'categorie_id' => $categorieRecette->id,
+        'code_cerfa' => '706',
     ]);
+    $this->compteRecette = Compte::where('association_id', $this->association->id)
+        ->where('numero_pcg', '706')
+        ->firstOrFail();
 });
 
 afterEach(function () {
@@ -80,7 +87,7 @@ it('[QF-B] une recette comptant (paiementRecu=true) est créée avec statut_regl
         ->set('mode_paiement', 'cheque')
         ->set('compte_id', $this->compte->id)
         ->set('lignes', [[
-            'sous_categorie_id' => (string) $this->scRecette->id,
+            'sous_categorie_id' => (string) $this->compteRecette->id,
             'operation_id' => '',
             'seance' => '',
             'montant' => '50.00',
@@ -112,7 +119,7 @@ it('une recette créance (paiementRecu=false) est créée avec statut_reglement 
         ->set('mode_paiement', '') // pas de mode pour une créance
         ->set('compte_id', $this->compte->id)
         ->set('lignes', [[
-            'sous_categorie_id' => (string) $this->scRecette->id,
+            'sous_categorie_id' => (string) $this->compteRecette->id,
             'operation_id' => '',
             'seance' => '',
             'montant' => '75.00',
@@ -179,7 +186,7 @@ it('une recette comptant créée via TransactionForm a statut_reglement->isEncai
         ->set('mode_paiement', 'virement')
         ->set('compte_id', $this->compte->id)
         ->set('lignes', [[
-            'sous_categorie_id' => (string) $this->scRecette->id,
+            'sous_categorie_id' => (string) $this->compteRecette->id,
             'operation_id' => '',
             'seance' => '',
             'montant' => '120.00',
