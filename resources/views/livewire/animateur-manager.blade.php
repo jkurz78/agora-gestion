@@ -68,7 +68,7 @@
                         <td style="text-align:center;padding:2px 6px;color:#2E7D32;font-weight:700;font-size:11px">{{ $fmt($anim['totalRealise']) }}</td>
                     </tr>
 
-                    {{-- Sous-lignes par sous-catégorie : 2 rangées (Prévu / Réalisé) --}}
+                    {{-- Sous-lignes par compte : 2 rangées (Prévu / Réalisé) --}}
                     @foreach($anim['sousCategories'] as $scId => $sc)
                         <tr>
                             <td rowspan="2" style="position:sticky;left:0;z-index:1;background:#fff;padding:2px 8px 2px 20px;font-size:11px;color:#6c757d;white-space:nowrap;vertical-align:middle">
@@ -145,14 +145,14 @@
                         </tr>
                     @endforeach
 
-                    {{-- Bouton + Ajouter une ligne sous-catégorie --}}
+                    {{-- Bouton + Ajouter une ligne compte --}}
                     @if($this->canEdit)
                     <tr>
                         <td colspan="{{ $colCount + 2 }}" style="padding:2px 8px 6px 20px;font-size:11px">
                             @if($addingScForTiersId === $tiersId)
                                 <div x-data="{ scId: null }" class="d-flex gap-2 align-items-center">
                                     <select x-model.number="scId" class="form-select form-select-sm" style="max-width:240px;font-size:11px">
-                                        <option :value="null">Choisir une sous-catégorie…</option>
+                                        <option :value="null">Choisir un compte…</option>
                                         @foreach($sousCategoriesDepense as $sc)
                                             @if(! isset($anim['sousCategories'][$sc['id']]))
                                                 <option value="{{ $sc['id'] }}">{{ $sc['nom'] }}</option>
@@ -207,7 +207,7 @@
         </table>
     </div>
 
-    {{-- Ajouter un encadrant : 2 étapes (sélection tiers puis sous-catégorie) --}}
+    {{-- Ajouter un encadrant : 2 étapes (sélection tiers puis compte) --}}
     <div class="mt-3 p-3 border rounded" style="max-width:520px;background:#fafafa">
         <label class="form-label fw-medium" style="font-size:13px">
             <i class="bi bi-plus-circle me-1"></i>Ajouter un encadrant
@@ -216,7 +216,7 @@
             <livewire:tiers-autocomplete wire:model="newTiersId" filtre="depenses" :key="'anim-tiers-'.$operation->id" />
         @else
             <div x-data="{ scId: null }" class="d-flex gap-2 align-items-center">
-                <div class="text-muted small">Sous-catégorie :</div>
+                <div class="text-muted small">Compte :</div>
                 <select x-model.number="scId" class="form-select form-select-sm" style="max-width:240px;font-size:12px" x-init="$el.focus()">
                     <option :value="null">Choisir…</option>
                     @foreach($sousCategoriesDepense as $sc)

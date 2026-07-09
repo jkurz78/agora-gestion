@@ -243,7 +243,7 @@ final class Form extends Component
         $this->validateOnly('draftLigne.sous_categorie_id', [
             'draftLigne.sous_categorie_id' => ['required'],
         ], [
-            'draftLigne.sous_categorie_id.required' => 'La sous-catégorie est obligatoire.',
+            'draftLigne.sous_categorie_id.required' => 'La nature de la dépense est obligatoire.',
         ]);
 
         $this->lignes[] = [

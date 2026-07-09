@@ -87,6 +87,15 @@ it('allows editing notes on HelloAsso transaction', function () {
         'date' => '2025-10-01',
     ]);
 
+    // DC-8 : l'hydratation du formulaire mappe chaque ligne vers son compte miroir —
+    // matérialiser les miroirs des sous-catégories factory (codes distincts).
+    $tx->lignes->load('sousCategorie');
+    foreach ($tx->lignes->pluck('sousCategorie')->filter()->unique('id')->values() as $i => $sc) {
+        if ($sc->code_cerfa === null) {
+            $sc->update(['code_cerfa' => '608'.($i + 1)]);
+        }
+    }
+
     Livewire::test(TransactionForm::class)
         ->call('edit', $tx->id)
         ->set('notes', 'nouvelle note')

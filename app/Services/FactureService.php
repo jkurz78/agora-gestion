@@ -845,8 +845,10 @@ XML;
                 'quantite' => $quantite,
                 'montant' => $montant,
                 'transaction_ligne_id' => null,
-                // DC-8 : compte_id — le trait remplit le miroir sous_categorie_id.
+                // DC-8 : compte_id en principal ; sous_categorie_id encore accepté
+                // (appelants legacy) — le trait synchronise la colonne manquante.
                 'compte_id' => $attrs['compte_id'] ?? null,
+                'sous_categorie_id' => $attrs['sous_categorie_id'] ?? null,
                 'operation_id' => $attrs['operation_id'] ?? null,
                 'seance' => $attrs['seance'] ?? null,
                 'ordre' => $maxOrdre + 1,
@@ -992,13 +994,14 @@ XML;
             );
         }
 
-        $lignesSansSousCat = $lignesManuelles->filter(
-            fn (FactureLigne $l) => $l->sous_categorie_id === null
+        // DC-8 : ventilation compte-first (repli sous_categorie_id legacy jusqu'à DC-10)
+        $lignesSansVentilation = $lignesManuelles->filter(
+            fn (FactureLigne $l) => $l->compte_id === null && $l->sous_categorie_id === null
         );
 
-        if ($lignesSansSousCat->isNotEmpty()) {
+        if ($lignesSansVentilation->isNotEmpty()) {
             throw new \RuntimeException(
-                'La sous-catégorie est requise sur chaque ligne montant pour valider la facture.'
+                'Le compte est requis sur chaque ligne montant pour valider la facture.'
             );
         }
     }

@@ -289,10 +289,13 @@ final class ReglementTable extends Component
 
         $seance = Seance::with('operation.typeOperation')->findOrFail((int) $this->comptabiliserSeanceId);
         $operation = $seance->operation;
-        $sousCategorieId = $operation->typeOperation?->sous_categorie_id;
+        // DC-8 : garde compte-first (repli sous_categorie_id legacy jusqu'à DC-10) —
+        // aligné sur ReglementOperationService::comptabiliserSeance().
+        $ventilationId = $operation->typeOperation?->compte_id
+            ?? $operation->typeOperation?->sous_categorie_id;
 
-        if ($sousCategorieId === null) {
-            $this->addError('comptabiliserCompteId', "Le type d'opération n'a pas de sous-catégorie configurée.");
+        if ($ventilationId === null) {
+            $this->addError('comptabiliserCompteId', "Le type d'opération n'a pas de compte configuré.");
 
             return;
         }

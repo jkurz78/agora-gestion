@@ -56,7 +56,7 @@
                     <tr>
                         <th>#</th>
                         <th>Libellé</th>
-                        <th>Sous-catégorie</th>
+                        <th>Nature</th>
                         <th class="text-end">Montant</th>
                         <th>Justificatif</th>
                         <th></th>
@@ -266,7 +266,7 @@
                             {{-- Étape 3 : Catégorisation --}}
                             <div class="mb-3">
                                 <label class="form-label fw-semibold">
-                                    Sous-catégorie <span class="text-danger">*</span>
+                                    Nature de la dépense <span class="text-danger">*</span>
                                 </label>
                                 <select wire:model.live="draftLigne.sous_categorie_id"
                                         class="form-select @error('draftLigne.sous_categorie_id') is-invalid @enderror">

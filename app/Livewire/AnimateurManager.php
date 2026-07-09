@@ -290,15 +290,23 @@ final class AnimateurManager extends Component
     }
 
     /**
+     * Options du sélecteur : comptes de charge (classe 6), affichés « numéro — intitulé ».
+     * DC-8 : l'id émis reste celui du miroir sous_categorie (clé de la matrice
+     * EncadrementMatrixBuilder + plomberie wire jusqu'à DC-10) — échafaudage transitoire.
+     *
      * @return array<int, array{id: int, nom: string}>
      */
     public function getSousCategoriesDepenseProperty(): array
     {
         return SousCategorie::query()
-            ->whereHas('categorie', fn ($q) => $q->where('type', 'depense'))
-            ->orderBy('nom')
-            ->get(['id', 'nom'])
-            ->map(fn ($sc) => ['id' => (int) $sc->id, 'nom' => $sc->nom])
+            ->join('comptes', function ($join): void {
+                $join->on('comptes.numero_pcg', '=', 'sous_categories.code_cerfa')
+                    ->on('comptes.association_id', '=', 'sous_categories.association_id');
+            })
+            ->where('comptes.classe', 6)
+            ->orderBy('comptes.numero_pcg')
+            ->get(['sous_categories.id', 'comptes.numero_pcg', 'comptes.intitule'])
+            ->map(fn ($sc) => ['id' => (int) $sc->id, 'nom' => $sc->numero_pcg.' — '.$sc->intitule])
             ->toArray();
     }
 

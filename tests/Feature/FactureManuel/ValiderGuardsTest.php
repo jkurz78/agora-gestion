@@ -123,7 +123,7 @@ describe('Guard sous_categorie_id requise sur chaque ligne MontantManuel', funct
         expect(fn () => $this->service->valider($facture))
             ->toThrow(
                 RuntimeException::class,
-                'sous-catégorie'
+                'compte'
             );
     });
 
@@ -181,7 +181,7 @@ describe('Guard sous_categorie_id requise sur chaque ligne MontantManuel', funct
         $facture->refresh();
 
         expect(fn () => $this->service->valider($facture))
-            ->toThrow(RuntimeException::class, 'sous-catégorie');
+            ->toThrow(RuntimeException::class, 'compte');
     });
 });
 
