@@ -24,11 +24,9 @@ use App\Enums\StatutRapprochement;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Models\Association;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -74,17 +72,7 @@ beforeEach(function () {
         ->where('association_id', $this->association->id)
         ->firstOrFail();
 
-    // Compte 606 (classe 6) pour les dépenses
-    $categorieDep = Categorie::factory()->depense()->create([
-        'association_id' => $this->association->id,
-        'nom' => 'Charges diverses',
-    ]);
-    $this->sc606 = SousCategorie::create([
-        'association_id' => $this->association->id,
-        'categorie_id' => $categorieDep->id,
-        'nom' => 'Achats fournitures',
-        'code_cerfa' => '606',
-    ]);
+    // Compte 606 (classe 6) pour les dépenses — DC-10a : compte-first, plus de miroir.
     $this->compte606 = Compte::firstOrCreate(
         ['association_id' => $this->association->id, 'numero_pcg' => '606'],
         [
@@ -123,7 +111,7 @@ function depenseVirementLiveData(object $ctx, float $montant = 200.0): array
             'compte_id' => $ctx->compteBancaire->id,
         ],
         'lignes' => [[
-            'sous_categorie_id' => $ctx->sc606->id,
+            'compte_id' => $ctx->compte606->id,
             'montant' => (string) $montant,
             'operation_id' => null,
             'seance' => null,
@@ -162,12 +150,11 @@ it('[3a-1] dépense comptant live produit T1 (Achat, 60xD/401C) + T2 séparée (
     expect((float) $ligne401C_T1->credit)->toBe(200.0);
     expect((int) $ligne401C_T1->tiers_id)->toBe((int) $this->tiers->id, 'Ligne 401 C doit avoir tiers_id');
 
-    // 1 ligne 606 D (ventilation enrichie)
+    // 1 ligne 606 D (ventilation compte-first, debit posé à la création)
     $ligneVentilation = TransactionLigne::where('transaction_id', $t1->id)
-        ->where('sous_categorie_id', $this->sc606->id)
+        ->where('compte_id', $this->compte606->id)
         ->first();
-    expect($ligneVentilation)->not()->toBeNull('La ligne legacy doit exister');
-    expect($ligneVentilation->compte_id)->toBe($this->compte606->id, 'La ligne legacy est enrichie avec compte_id 606');
+    expect($ligneVentilation)->not()->toBeNull('La ligne de ventilation doit exister');
     expect((float) $ligneVentilation->debit)->toBe(200.0, 'La ligne 606 est débitée (charge)');
 
     // ---- T2 séparée doit exister ----

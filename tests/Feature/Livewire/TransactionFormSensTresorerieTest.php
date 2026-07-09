@@ -7,8 +7,8 @@ use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Livewire\TransactionForm;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
-use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
@@ -144,7 +144,13 @@ test('blade affiche "Paiement déjà reçu ?" pour miroir extourne de dépense (
 });
 
 test('save miroir extourne de recette met à jour mode_paiement et notes sans blocage gt:0', function () {
-    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id]);
+    $compteVentilation = Compte::create([
+        'association_id' => $this->association->id,
+        'numero_pcg' => '706M',
+        'intitule' => 'Prestations',
+        'classe' => 7,
+        'actif' => true,
+    ]);
     $compte2 = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
 
     $miroir = Transaction::factory()->create([
@@ -157,10 +163,13 @@ test('save miroir extourne de recette met à jour mode_paiement et notes sans bl
         'statut_reglement' => StatutReglement::EnAttente,
     ]);
     $miroir->lignes()->forceDelete();
+    // Ligne miroir signée (brèche du signe) : credit négatif, XOR satisfait.
     TransactionLigne::create([
         'transaction_id' => $miroir->id,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $compteVentilation->id,
         'montant' => -150.00,
+        'debit' => 0,
+        'credit' => -150.00,
     ]);
 
     Livewire::test(TransactionForm::class)
@@ -181,7 +190,13 @@ test('save miroir extourne de recette met à jour mode_paiement et notes sans bl
 });
 
 test('save miroir extourne de dépense met à jour mode_paiement sans blocage gt:0', function () {
-    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id]);
+    $compteVentilation = Compte::create([
+        'association_id' => $this->association->id,
+        'numero_pcg' => '606M',
+        'intitule' => 'Fournitures',
+        'classe' => 6,
+        'actif' => true,
+    ]);
 
     $miroir = Transaction::factory()->create([
         'association_id' => $this->association->id,
@@ -193,10 +208,13 @@ test('save miroir extourne de dépense met à jour mode_paiement sans blocage gt
         'statut_reglement' => StatutReglement::EnAttente,
     ]);
     $miroir->lignes()->forceDelete();
+    // Ligne miroir signée (brèche du signe) : debit négatif, XOR satisfait.
     TransactionLigne::create([
         'transaction_id' => $miroir->id,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $compteVentilation->id,
         'montant' => -200.00,
+        'debit' => -200.00,
+        'credit' => 0,
     ]);
 
     Livewire::test(TransactionForm::class)

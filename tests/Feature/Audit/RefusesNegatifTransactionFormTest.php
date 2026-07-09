@@ -77,7 +77,7 @@ it('transaction_form_refuse_montant_negatif_sur_ligne', function (): void {
     $component->set('date', '2025-10-15')
         ->set('mode_paiement', 'virement')
         ->set('compte_id', $this->compte->id)
-        ->set('lignes.0.sous_categorie_id', (string) $this->compteVentilation->id)
+        ->set('lignes.0.compte_id', (string) $this->compteVentilation->id)
         ->set('lignes.0.montant', '-50')
         ->call('save');
 
@@ -97,7 +97,7 @@ it('transaction_form_accepte_montant_positif_sur_ligne', function (): void {
     $component->set('date', '2025-10-15')
         ->set('mode_paiement', 'virement')
         ->set('compte_id', $this->compte->id)
-        ->set('lignes.0.sous_categorie_id', (string) $this->compteVentilation->id)
+        ->set('lignes.0.compte_id', (string) $this->compteVentilation->id)
         ->set('lignes.0.montant', '50')
         ->call('save');
 
@@ -113,7 +113,7 @@ it('save_ventilation_refuse_montant_negatif_avec_message_standard', function ():
 
     // Simuler une ligne existante avec ID 999 (ne doit pas exister en DB pour ce test)
     $component->set('lignes', [
-        ['id' => 999, 'sous_categorie_id' => '', 'operation_id' => '', 'seance' => '', 'montant' => '50', 'notes' => ''],
+        ['id' => 999, 'compte_id' => '', 'operation_id' => '', 'seance' => '', 'montant' => '50', 'notes' => ''],
     ]);
     $component->set('ventilationLigneId', 999);
     $component->set('affectations', [

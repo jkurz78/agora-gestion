@@ -87,7 +87,7 @@ it('save IA-off : crée la transaction, comptabilise le dépôt, attache le PDF'
         ->set('compte_id', $this->compte->id)
         ->set('lignes', [[
             'id' => null,
-            'sous_categorie_id' => (string) $this->compteVentilation->id,
+            'compte_id' => (string) $this->compteVentilation->id,
             'operation_id' => '',
             'seance' => '',
             'montant' => '150.00',
@@ -146,7 +146,7 @@ it('save IA-on : même résultat qu\'IA-off — PDF toujours attaché, dépôt T
                     'lignes' => [
                         [
                             'description' => 'Prestation',
-                            'sous_categorie_id' => $this->sousCategorie->id,
+                            'compte_id' => $this->compteVentilation->id,
                             'operation_id' => null,
                             'seance' => null,
                             'montant' => 150.00,
@@ -204,7 +204,7 @@ it('exercice clôturé : aucune transaction, dépôt reste Soumise, fichier inta
         ->set('compte_id', $this->compte->id)
         ->set('lignes', [[
             'id' => null,
-            'sous_categorie_id' => (string) $this->compteVentilation->id,
+            'compte_id' => (string) $this->compteVentilation->id,
             'operation_id' => '',
             'seance' => '',
             'montant' => '150.00',
@@ -261,7 +261,7 @@ it('flash erreur système si le déplacement du PDF échoue pendant la comptabil
     $instance->compte_id = $this->compte->id;
     $instance->lignes = [[
         'id' => null,
-        'sous_categorie_id' => (string) $this->compteVentilation->id,
+        'compte_id' => (string) $this->compteVentilation->id,
         'operation_id' => '',
         'seance' => '',
         'montant' => '100.00',

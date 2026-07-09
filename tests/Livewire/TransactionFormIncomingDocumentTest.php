@@ -5,10 +5,9 @@ declare(strict_types=1);
 use App\Enums\Espace;
 use App\Livewire\TransactionForm;
 use App\Models\Association;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\IncomingDocument;
-use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Tenant\TenantContext;
@@ -26,12 +25,14 @@ beforeEach(function () {
     $this->actingAs($this->user);
     session(['exercice_actif' => 2025]);
 
-    // DC-8 : code_cerfa classe 6 matérialise le Compte miroir — les payloads OCR
-    // ci-dessous portent des ids sous_categories (contrat InvoiceOcrService inchangé),
-    // convertis en id compte par applyOcrResult() puis reconvertis au save().
-    $this->sousCategorie = SousCategorie::factory()
-        ->for(Categorie::factory()->depense()->create(['association_id' => $this->association->id]))
-        ->create(['association_id' => $this->association->id, 'code_cerfa' => '606']);
+    // DC-10a : les payloads OCR portent directement des ids comptes.id (classe 6).
+    $this->compteCharge = Compte::create([
+        'association_id' => $this->association->id,
+        'numero_pcg' => '606',
+        'intitule' => 'Fournitures',
+        'classe' => 6,
+        'actif' => true,
+    ]);
 });
 
 afterEach(function () {
@@ -57,7 +58,7 @@ function createInboxDocument(string $content = '%PDF-1.4 fake'): IncomingDocumen
 }
 
 it('open-transaction-form-from-incoming charge le document et lance l\'OCR', function () {
-    $scId = $this->sousCategorie->id;
+    $scId = $this->compteCharge->id;
     Http::fake([
         'api.anthropic.com/*' => Http::response([
             'content' => [[
@@ -69,7 +70,7 @@ it('open-transaction-form-from-incoming charge le document et lance l\'OCR', fun
                     'tiers_nom' => 'EDF',
                     'montant_total' => 123.45,
                     'lignes' => [
-                        ['description' => 'Élec', 'sous_categorie_id' => $scId, 'operation_id' => null, 'seance' => null, 'montant' => 123.45],
+                        ['description' => 'Élec', 'compte_id' => $scId, 'operation_id' => null, 'seance' => null, 'montant' => 123.45],
                     ],
                     'warnings' => [],
                 ]),
@@ -94,7 +95,7 @@ it('open-transaction-form-from-incoming charge le document et lance l\'OCR', fun
 });
 
 it('construit l\'URL de prévisu vers la route facturation quel que soit l\'espace', function () {
-    $scId = $this->sousCategorie->id;
+    $scId = $this->compteCharge->id;
     Http::fake([
         'api.anthropic.com/*' => Http::response([
             'content' => [[
@@ -106,7 +107,7 @@ it('construit l\'URL de prévisu vers la route facturation quel que soit l\'espa
                     'tiers_nom' => 'EDF',
                     'montant_total' => 50.0,
                     'lignes' => [
-                        ['description' => 'X', 'sous_categorie_id' => $scId, 'operation_id' => null, 'seance' => null, 'montant' => 50.0],
+                        ['description' => 'X', 'compte_id' => $scId, 'operation_id' => null, 'seance' => null, 'montant' => 50.0],
                     ],
                     'warnings' => [],
                 ]),
@@ -151,7 +152,7 @@ it('open-transaction-form-from-incoming flash une erreur si le fichier disque ma
 });
 
 it('save transfère le fichier inbox vers transactions/{tid} et supprime l\'IncomingDocument', function () {
-    $scId = $this->sousCategorie->id;
+    $scId = $this->compteCharge->id;
     Http::fake([
         'api.anthropic.com/*' => Http::response([
             'content' => [[
@@ -163,7 +164,7 @@ it('save transfère le fichier inbox vers transactions/{tid} et supprime l\'Inco
                     'tiers_nom' => 'EDF',
                     'montant_total' => 123.45,
                     'lignes' => [
-                        ['description' => 'Élec', 'sous_categorie_id' => $scId, 'operation_id' => null, 'seance' => null, 'montant' => 123.45],
+                        ['description' => 'Élec', 'compte_id' => $scId, 'operation_id' => null, 'seance' => null, 'montant' => 123.45],
                     ],
                     'warnings' => [],
                 ]),
@@ -198,7 +199,7 @@ it('save transfère le fichier inbox vers transactions/{tid} et supprime l\'Inco
 });
 
 it('save conserve l\'IncomingDocument si la validation échoue', function () {
-    $scId = $this->sousCategorie->id;
+    $scId = $this->compteCharge->id;
     Http::fake([
         'api.anthropic.com/*' => Http::response([
             'content' => [[
@@ -210,7 +211,7 @@ it('save conserve l\'IncomingDocument si la validation échoue', function () {
                     'tiers_nom' => 'EDF',
                     'montant_total' => 123.45,
                     'lignes' => [
-                        ['description' => 'Élec', 'sous_categorie_id' => $scId, 'operation_id' => null, 'seance' => null, 'montant' => 123.45],
+                        ['description' => 'Élec', 'compte_id' => $scId, 'operation_id' => null, 'seance' => null, 'montant' => 123.45],
                     ],
                     'warnings' => [],
                 ]),
@@ -248,7 +249,7 @@ it('openFormFromIncoming flash une erreur pour un utilisateur Gestionnaire (sans
 });
 
 it('save flash un warning et crée la dépense sans justificatif si le fichier inbox disparaît', function () {
-    $scId = $this->sousCategorie->id;
+    $scId = $this->compteCharge->id;
     Http::fake([
         'api.anthropic.com/*' => Http::response([
             'content' => [[
@@ -260,7 +261,7 @@ it('save flash un warning et crée la dépense sans justificatif si le fichier i
                     'tiers_nom' => 'EDF',
                     'montant_total' => 10.00,
                     'lignes' => [
-                        ['description' => 'X', 'sous_categorie_id' => $scId, 'operation_id' => null, 'seance' => null, 'montant' => 10.00],
+                        ['description' => 'X', 'compte_id' => $scId, 'operation_id' => null, 'seance' => null, 'montant' => 10.00],
                     ],
                     'warnings' => [],
                 ]),
@@ -294,7 +295,7 @@ it('save flash un warning et crée la dépense sans justificatif si le fichier i
 });
 
 it('retryOcr en mode inbox relance analyzeFromPath sur le fichier disque', function () {
-    $scId = $this->sousCategorie->id;
+    $scId = $this->compteCharge->id;
     // Première réponse : erreur API. Seconde réponse : succès.
     Http::fakeSequence()
         ->push(['error' => 'boom'], 500)
@@ -308,7 +309,7 @@ it('retryOcr en mode inbox relance analyzeFromPath sur le fichier disque', funct
                     'tiers_nom' => 'EDF',
                     'montant_total' => 50.00,
                     'lignes' => [
-                        ['description' => 'Retry', 'sous_categorie_id' => $scId, 'operation_id' => null, 'seance' => null, 'montant' => 50.00],
+                        ['description' => 'Retry', 'compte_id' => $scId, 'operation_id' => null, 'seance' => null, 'montant' => 50.00],
                     ],
                     'warnings' => [],
                 ]),

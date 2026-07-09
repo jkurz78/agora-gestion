@@ -87,7 +87,7 @@ it('[QF-B] une recette comptant (paiementRecu=true) est créée avec statut_regl
         ->set('mode_paiement', 'cheque')
         ->set('compte_id', $this->compte->id)
         ->set('lignes', [[
-            'sous_categorie_id' => (string) $this->compteRecette->id,
+            'compte_id' => (string) $this->compteRecette->id,
             'operation_id' => '',
             'seance' => '',
             'montant' => '50.00',
@@ -119,7 +119,7 @@ it('une recette créance (paiementRecu=false) est créée avec statut_reglement 
         ->set('mode_paiement', '') // pas de mode pour une créance
         ->set('compte_id', $this->compte->id)
         ->set('lignes', [[
-            'sous_categorie_id' => (string) $this->compteRecette->id,
+            'compte_id' => (string) $this->compteRecette->id,
             'operation_id' => '',
             'seance' => '',
             'montant' => '75.00',
@@ -155,8 +155,10 @@ it('éditer une transaction déjà Pointe ne rétrograde pas le statut_reglement
     // On supprime les lignes factory et on crée une ligne conforme (ventilation)
     $txPointe->lignes()->forceDelete();
     $txPointe->lignes()->create([
-        'sous_categorie_id' => $this->scRecette->id,
+        'compte_id' => $this->compteRecette->id,
         'montant' => '100.00',
+        'debit' => 0,
+        'credit' => 100.00,
     ]);
 
     // Éditer via TransactionForm
@@ -186,7 +188,7 @@ it('une recette comptant créée via TransactionForm a statut_reglement->isEncai
         ->set('mode_paiement', 'virement')
         ->set('compte_id', $this->compte->id)
         ->set('lignes', [[
-            'sous_categorie_id' => (string) $this->compteRecette->id,
+            'compte_id' => (string) $this->compteRecette->id,
             'operation_id' => '',
             'seance' => '',
             'montant' => '120.00',

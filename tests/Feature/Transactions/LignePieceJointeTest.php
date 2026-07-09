@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 use App\Livewire\TransactionForm;
 use App\Models\Association;
-use App\Models\Categorie;
 use App\Models\Compte;
-use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Tenant\TenantContext;
@@ -31,14 +29,22 @@ beforeEach(function () {
     // Prendre la première ligne créée par la factory
     $this->ligne = $this->tx->lignes()->first();
 
-    // DC-8 : le sélecteur émet des ids de compte — matérialiser le miroir de
-    // chaque sous-catégorie factory (code_cerfa → l'observer crée le compte),
-    // codes distincts pour respecter l'unicité (association, numero_pcg).
-    $this->tx->lignes->load('sousCategorie');
-    foreach ($this->tx->lignes->pluck('sousCategorie')->filter()->unique('id')->values() as $i => $sc) {
-        if ($sc->code_cerfa === null) {
-            $sc->update(['code_cerfa' => '609'.($i + 1)]);
-        }
+    // DC-10a : les lignes de ventilation portent compte_id + debit/credit dès la
+    // création (contrat compte-first) — enrichir les lignes factory (dépense →
+    // debit = montant) pour que scopeVentilation (compte classe 6/7) les voie.
+    foreach ($this->tx->lignes()->get()->values() as $i => $ligne) {
+        $compte = Compte::create([
+            'association_id' => $this->association->id,
+            'numero_pcg' => '609'.($i + 1),
+            'intitule' => 'Compte test 609'.($i + 1),
+            'classe' => 6,
+            'actif' => true,
+        ]);
+        $ligne->fill([
+            'compte_id' => $compte->id,
+            'debit' => (float) $ligne->montant,
+            'credit' => 0,
+        ])->save();
     }
 });
 
@@ -135,12 +141,14 @@ it('controller retourne 404 pour une transaction hors tenant (TenantScope)', fun
 // 5. Form : upload d'une PJ ligne au create → path persisté + fichier stocké
 // ─────────────────────────────────────────────────────────────────────────────
 it('persiste la PJ de ligne lors du create', function () {
-    $sousCategorie = SousCategorie::factory()
-        ->for(Categorie::factory()->depense()->create(['association_id' => $this->association->id]), 'categorie')
-        ->create(['association_id' => $this->association->id, 'code_cerfa' => '607']);
-    // DC-8 : le sélecteur émet l'id du compte miroir (matérialisé par l'observer)
-    $compteVentilation = Compte::where('association_id', $this->association->id)
-        ->where('numero_pcg', '607')->firstOrFail();
+    // DC-10a : le sélecteur émet directement un id comptes.id (classe 6).
+    $compteVentilation = Compte::create([
+        'association_id' => $this->association->id,
+        'numero_pcg' => '607',
+        'intitule' => 'Achats de marchandises',
+        'classe' => 6,
+        'actif' => true,
+    ]);
 
     $file = UploadedFile::fake()->create('recu.pdf', 100, 'application/pdf');
 
@@ -149,7 +157,7 @@ it('persiste la PJ de ligne lors du create', function () {
         ->set('date', '2025-10-01')
         ->set('libelle', 'Test create PJ ligne')
         ->set('mode_paiement', 'virement')
-        ->set('lignes.0.sous_categorie_id', (string) $compteVentilation->id)
+        ->set('lignes.0.compte_id', (string) $compteVentilation->id)
         ->set('lignes.0.montant', '50')
         ->set('lignes.0.notes', 'recu-achat')
         ->set('lignes.0.piece_jointe_upload', $file)

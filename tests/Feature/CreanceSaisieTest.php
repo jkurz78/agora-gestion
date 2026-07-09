@@ -89,7 +89,7 @@ it('recette avec paiementRecu=false crée une transaction avec mode_paiement nul
         ->set('tiers_id', $this->tiers->id)
         ->set('lignes', [[
             'id' => null,
-            'sous_categorie_id' => (string) $this->compteVentilation->id, // DC-8 : id de compte
+            'compte_id' => (string) $this->compteVentilation->id,
             'operation_id' => '',
             'seance' => '',
             'montant' => '100.00',
@@ -131,7 +131,7 @@ it('recette avec paiementRecu=true exige le mode_paiement (comportement actuel i
         ->set('tiers_id', $this->tiers->id)
         ->set('lignes', [[
             'id' => null,
-            'sous_categorie_id' => (string) $this->compteVentilation->id, // DC-8 : id de compte
+            'compte_id' => (string) $this->compteVentilation->id,
             'operation_id' => '',
             'seance' => '',
             'montant' => '100.00',
@@ -161,7 +161,7 @@ it('marquerRecu avec mode capture le mode_paiement et génère la T2 encaissemen
         ->set('tiers_id', $this->tiers->id)
         ->set('lignes', [[
             'id' => null,
-            'sous_categorie_id' => (string) $this->compteVentilation->id, // DC-8 : id de compte
+            'compte_id' => (string) $this->compteVentilation->id,
             'operation_id' => '',
             'seance' => '',
             'montant' => '150.00',
@@ -219,7 +219,7 @@ it('marquerRecu sans mode sur une créance reste rétro-compatible (skip T2 sile
         ->set('tiers_id', $this->tiers->id)
         ->set('lignes', [[
             'id' => null,
-            'sous_categorie_id' => (string) $this->compteVentilation->id, // DC-8 : id de compte
+            'compte_id' => (string) $this->compteVentilation->id,
             'operation_id' => '',
             'seance' => '',
             'montant' => '50.00',
@@ -264,7 +264,7 @@ it('éditer une recette reçue en « non reçu » supprime la T2 (pas de chèque
         ->set('tiers_id', $this->tiers->id)
         ->set('lignes', [[
             'id' => null,
-            'sous_categorie_id' => (string) $this->compteVentilation->id, // DC-8 : id de compte
+            'compte_id' => (string) $this->compteVentilation->id,
             'operation_id' => '',
             'seance' => '',
             'montant' => '120.00',

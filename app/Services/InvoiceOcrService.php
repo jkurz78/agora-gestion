@@ -8,8 +8,8 @@ use App\DTOs\InvoiceOcrLigne;
 use App\DTOs\InvoiceOcrResult;
 use App\Exceptions\OcrAnalysisException;
 use App\Exceptions\OcrNotConfiguredException;
+use App\Models\Compte;
 use App\Models\Operation;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Support\CurrentAssociation;
 use App\Support\Demo;
@@ -141,7 +141,7 @@ final class InvoiceOcrService
             lignes: [
                 new InvoiceOcrLigne(
                     description: self::DEMO_STUB_DESCRIPTION,
-                    sous_categorie_id: null,
+                    compte_id: null,
                     operation_id: null,
                     seance: null,
                     montant: self::DEMO_STUB_MONTANT,
@@ -208,11 +208,12 @@ final class InvoiceOcrService
             ->map(fn (Tiers $t) => $t->id.': '.$t->displayName())
             ->implode("\n");
 
-        $sousCategories = SousCategorie::with('categorie')
-            ->whereHas('categorie', fn ($q) => $q->where('type', 'depense'))
-            ->orderBy('nom')
+        // DC-10a : les comptes de charge (classe 6) remplacent les sous-catégories dépense.
+        $comptes = Compte::where('classe', 6)
+            ->where('actif', true)
+            ->orderBy('numero_pcg')
             ->get()
-            ->map(fn (SousCategorie $s) => $s->id.': '.$s->nom.' ('.$s->categorie->nom.')')
+            ->map(fn (Compte $c) => $c->id.': '.$c->numero_pcg.' — '.$c->intitule)
             ->implode("\n");
 
         $exercice = app(ExerciceService::class)->current();
@@ -233,22 +234,22 @@ Date du jour : {$today}. Exercice comptable en cours : {$exerciceLabel} (du 01/0
 
 Extrais les informations de cette facture au format JSON suivant :
 
-{"date": "YYYY-MM-DD", "reference": "numéro de facture", "tiers_id": null, "tiers_nom": "nom fournisseur", "montant_total": 0.00, "lignes": [{"description": "...", "sous_categorie_id": null, "operation_id": null, "seance": null, "montant": 0.00}], "warnings": []}
+{"date": "YYYY-MM-DD", "reference": "numéro de facture", "tiers_id": null, "tiers_nom": "nom fournisseur", "montant_total": 0.00, "lignes": [{"description": "...", "compte_id": null, "operation_id": null, "seance": null, "montant": 0.00}], "warnings": []}
 
 Règles :
 - Pour la date, lis EXACTEMENT ce qui est écrit sur la facture. Ne corrige pas l'année.
 - L'association n'est PAS assujettie à la TVA et ne la récupère pas. Utilise TOUJOURS les montants TTC. Si la facture affiche des montants HT avec TVA, calcule le TTC pour chaque ligne (montant HT × (1 + taux TVA)). Pour montant_total, utilise le "Net à payer" ou "Total TTC".
 - Respecte les lignes telles qu'elles apparaissent sur la facture. Si la facture indique quantité 2 à 70€ pour un montant de 140€, c'est UNE SEULE ligne à 140€. Ne ventile jamais.
 - Pour tiers_id, cherche le tiers le plus proche dans la liste ci-dessous. Si aucun ne correspond, mets null.
-- Pour sous_categorie_id, choisis la sous-catégorie la plus pertinente. Si aucune ne correspond, mets null.
+- Pour compte_id, choisis le compte de charge le plus pertinent. Si aucun ne correspond, mets null.
 - Pour operation_id, cherche l'opération la plus proche si la facture mentionne une activité. Sinon mets null.
 - Pour seance, extrais le numéro de séance si identifiable dans la description. Sinon mets null.
 
 TIERS EXISTANTS :
 {$tiers}
 
-SOUS-CATEGORIES DEPENSE :
-{$sousCategories}
+COMPTES DE CHARGE (classe 6) :
+{$comptes}
 
 OPERATIONS EN COURS :
 {$operations}
@@ -328,7 +329,7 @@ BLOCK;
         foreach ($data['lignes'] ?? [] as $l) {
             $lignes[] = new InvoiceOcrLigne(
                 description: $l['description'] ?? null,
-                sous_categorie_id: isset($l['sous_categorie_id']) && $l['sous_categorie_id'] !== null ? (int) $l['sous_categorie_id'] : null,
+                compte_id: isset($l['compte_id']) && $l['compte_id'] !== null ? (int) $l['compte_id'] : null,
                 operation_id: isset($l['operation_id']) && $l['operation_id'] !== null ? (int) $l['operation_id'] : null,
                 seance: isset($l['seance']) && $l['seance'] !== null ? (int) $l['seance'] : null,
                 montant: (float) ($l['montant'] ?? 0),

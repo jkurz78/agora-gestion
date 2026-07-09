@@ -59,8 +59,8 @@ it('analyze parse correctement la réponse API', function () {
                     'tiers_nom' => 'Anne KURZ',
                     'montant_total' => 390.00,
                     'lignes' => [
-                        ['description' => 'Séance 4', 'sous_categorie_id' => 1, 'operation_id' => null, 'seance' => 4, 'montant' => 250.00],
-                        ['description' => 'Suivi', 'sous_categorie_id' => 1, 'operation_id' => null, 'seance' => null, 'montant' => 140.00],
+                        ['description' => 'Séance 4', 'compte_id' => 1, 'operation_id' => null, 'seance' => 4, 'montant' => 250.00],
+                        ['description' => 'Suivi', 'compte_id' => 1, 'operation_id' => null, 'seance' => null, 'montant' => 140.00],
                     ],
                     'warnings' => [],
                 ]),
@@ -219,7 +219,7 @@ it('analyzeFromPath parse correctement la réponse API depuis un fichier sur dis
                     'tiers_nom' => 'EDF',
                     'montant_total' => 123.45,
                     'lignes' => [
-                        ['description' => 'Électricité', 'sous_categorie_id' => 1, 'operation_id' => null, 'seance' => null, 'montant' => 123.45],
+                        ['description' => 'Électricité', 'compte_id' => 1, 'operation_id' => null, 'seance' => null, 'montant' => 123.45],
                     ],
                     'warnings' => [],
                 ]),

@@ -54,7 +54,7 @@ test('une recette accepte une PJ header au save', function () {
         ->set('date', '2025-10-15')
         ->set('mode_paiement', 'cheque')
         ->set('compte_id', $this->compte->id)
-        ->set('lignes.0.sous_categorie_id', (string) $this->compteRecette->id)
+        ->set('lignes.0.compte_id', (string) $this->compteRecette->id)
         ->set('lignes.0.montant', '100.00')
         ->set('pieceJointe', UploadedFile::fake()->create('justificatif.pdf', 100, 'application/pdf'))
         ->call('save');

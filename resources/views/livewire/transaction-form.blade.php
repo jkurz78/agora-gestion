@@ -317,19 +317,17 @@
                                     <tr wire:key="ligne-{{ $index }}">
                                         <td style="min-width:220px">
                                             @if ($isLockedByFacture || $isExtourneMiroir)
-                                                {{-- Échafaudage DC-8, disparaît en DC-10 : $ligne['sous_categorie_id'] contient
-                                                     désormais un id de compte (sélecteur de ventilation basé comptes). --}}
-                                                @php $compteLigne = \App\Models\Compte::find($ligne['sous_categorie_id']); @endphp
+                                                @php $compteLigne = \App\Models\Compte::find($ligne['compte_id']); @endphp
                                                 <span class="form-control-plaintext">{{ $compteLigne?->intitule ?? '—' }}</span>
                                             @else
                                                 <livewire:sous-categorie-autocomplete
                                                     :key="'sc-tx-'.$index.'-'.($sousCategorieFilter ?? 'all')"
-                                                    wire:model="lignes.{{ $index }}.sous_categorie_id"
+                                                    wire:model="lignes.{{ $index }}.compte_id"
                                                     filtre="{{ $type }}"
                                                     :sousCategorieFlag="$sousCategorieFilter"
                                                 />
                                             @endif
-                                            @error('lignes.' . $index . '.sous_categorie_id')
+                                            @error('lignes.' . $index . '.compte_id')
                                                 <div class="text-danger small mt-1">{{ $message }}</div>
                                             @enderror
                                         </td>
@@ -489,7 +487,7 @@
                         <div class="border border-primary border-2 rounded p-3 mb-3" style="background:#f0f7ff">
                             <div class="fw-bold text-primary mb-2">
                                 <i class="bi bi-scissors"></i>
-                                Ventilation — {{ $ventilationLigneSousCategorie }} ({{ number_format((float) $ventilationLigneMontant, 2, ',', ' ') }} €)
+                                Ventilation — {{ $ventilationLigneCompteLabel }} ({{ number_format((float) $ventilationLigneMontant, 2, ',', ' ') }} €)
                             </div>
 
                             <table class="table table-sm mb-2">
