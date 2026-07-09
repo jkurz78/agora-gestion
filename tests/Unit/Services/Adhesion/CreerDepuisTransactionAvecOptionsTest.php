@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 use App\Models\Association;
 use App\Models\FormuleAdhesion;
-use App\Models\SousCategorie;
+use App\Enums\UsageComptable;
+use App\Models\Compte;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -16,7 +17,14 @@ beforeEach(function (): void {
     TenantContext::boot($asso);
 
     $this->service = app(AdhesionService::class);
-    $this->scCotisation = SousCategorie::factory()->pourCotisations()->create();
+    $this->scCotisation = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '756OP',
+        'intitule' => 'Cotisations',
+        'classe' => 7,
+        'actif' => true,
+    ]);
+    $this->scCotisation->usages()->create(['usage' => UsageComptable::Cotisation->value]);
     $this->tiers = Tiers::factory()->create();
 });
 
@@ -31,7 +39,7 @@ it('creerDepuisTransaction : adhésion créée depuis ligne parent (option_id IS
     // L'adhésion doit être créée depuis la ligne parent (montant_facial=0)
     // et non depuis la ligne option.
     $formule = FormuleAdhesion::factory()->helloasso('mon-form', 18595)->create([
-        'sous_categorie_id' => $this->scCotisation->id,
+        'compte_id' => $this->scCotisation->id,
     ]);
 
     $tx = Transaction::factory()->create([
@@ -43,10 +51,13 @@ it('creerDepuisTransaction : adhésion créée depuis ligne parent (option_id IS
     // Supprimer les lignes auto-créées par Transaction::configure()
     TransactionLigne::where('transaction_id', $tx->id)->delete();
 
-    // Ligne parent cotisation (montant=0)
+    // Ligne parent cotisation (montant=0) — DC-10a : une ligne à 0 € ne porte pas
+    // de compte (invariant XOR) ; la détection cotisation passe par la paire
+    // HelloAsso (form_slug + tier_id).
     $ligneParent = TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $this->scCotisation->id,
+        'compte_id' => null,
+        'sous_categorie_id' => null,
         'montant' => 0.00,
         'helloasso_item_id' => 87070,
         'helloasso_option_id' => null,
@@ -56,8 +67,10 @@ it('creerDepuisTransaction : adhésion créée depuis ligne parent (option_id IS
     // Ligne option (montant=12€) — même sous-cat que le parent
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $this->scCotisation->id,
+        'compte_id' => $this->scCotisation->id,
         'montant' => 12.00,
+        'debit' => 0,
+        'credit' => 12.00,
         'helloasso_item_id' => 87070,
         'helloasso_option_id' => 18596,
         'helloasso_tier_id' => null,
@@ -90,8 +103,10 @@ it('creerDepuisTransaction : pas d\'adhésion si seule une ligne option cotisati
     // Seulement une ligne option, pas de ligne parent
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $this->scCotisation->id,
+        'compte_id' => $this->scCotisation->id,
         'montant' => 12.00,
+        'debit' => 0,
+        'credit' => 12.00,
         'helloasso_item_id' => 87070,
         'helloasso_option_id' => 18596,
     ]);
@@ -113,8 +128,10 @@ it('creerDepuisTransaction : adhésion créée normalement si 1 ligne sans optio
 
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $this->scCotisation->id,
+        'compte_id' => $this->scCotisation->id,
         'montant' => 35.00,
+        'debit' => 0,
+        'credit' => 35.00,
         'helloasso_item_id' => null,
         'helloasso_option_id' => null,
     ]);

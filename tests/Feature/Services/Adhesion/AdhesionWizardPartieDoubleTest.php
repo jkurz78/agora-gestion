@@ -21,7 +21,6 @@ use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Exercice;
 use App\Models\FormuleAdhesion;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -65,8 +64,8 @@ beforeEach(function (): void {
         'compte_bancaire_id' => (int) $this->compteBancaire->id,
     ]);
 
-    // Sous-catégorie cotisation avec code_cerfa → compte 756
-    Compte::forceCreate([
+    // DC-10a : compte cotisation 756 (compte-first), flaggé Cotisation.
+    $this->compteCotisation = Compte::forceCreate([
         'association_id' => (int) $this->asso->id,
         'numero_pcg' => '756',
         'intitule' => 'Cotisations',
@@ -76,15 +75,11 @@ beforeEach(function (): void {
         'lettrable' => false,
         'pour_inscriptions' => false,
     ]);
-
-    $this->sousCat = SousCategorie::factory()->pourCotisations()->create([
-        'association_id' => (int) $this->asso->id,
-        'code_cerfa' => '756',
-    ]);
+    $this->compteCotisation->usages()->create(['usage' => \App\Enums\UsageComptable::Cotisation->value]);
 
     $this->formule = FormuleAdhesion::factory()->create([
         'association_id' => (int) $this->asso->id,
-        'sous_categorie_id' => (int) $this->sousCat->id,
+        'compte_id' => (int) $this->compteCotisation->id,
         'mode' => 'exercice',
     ]);
 

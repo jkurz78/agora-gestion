@@ -8,7 +8,8 @@ use App\Models\CompteBancaire;
 use App\Models\HelloAssoFormMapping;
 use App\Models\HelloAssoParametres;
 use App\Models\Operation;
-use App\Models\SousCategorie;
+use App\Enums\UsageComptable;
+use App\Models\Compte;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TypeOperation;
@@ -24,8 +25,23 @@ beforeEach(function (): void {
     TenantContext::boot($association);
 
     $compte = CompteBancaire::factory()->create();
-    $this->scCotisation = SousCategorie::factory()->pourCotisations()->create();
-    $this->scDon = SousCategorie::factory()->pourDons()->create();
+    // DC-10a : comptes classe 7 flaggés (compte-first).
+    $this->scCotisation = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '756FB',
+        'intitule' => 'Cotisations',
+        'classe' => 7,
+        'actif' => true,
+    ]);
+    $this->scCotisation->usages()->create(['usage' => UsageComptable::Cotisation->value]);
+    $this->scDon = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '754FB',
+        'intitule' => 'Dons',
+        'classe' => 7,
+        'actif' => true,
+    ]);
+    $this->scDon->usages()->create(['usage' => UsageComptable::Don->value]);
 
     $this->parametres = HelloAssoParametres::factory()->create([
         'association_id' => 1,
@@ -35,7 +51,7 @@ beforeEach(function (): void {
         'organisation_slug' => 'mon-asso',
         'compte_helloasso_id' => $compte->id,
         'compte_versement_id' => $compte->id,
-        'sous_categorie_don_id' => $this->scDon->id,
+        'compte_don_id' => $this->scDon->id,
     ]);
 
     $this->tiers = Tiers::factory()->create([
@@ -49,7 +65,7 @@ beforeEach(function (): void {
         'form_slug' => 'cotisation-2025',
         'form_type' => 'Membership',
         'form_title' => 'Cotisation 2025',
-        'sous_categorie_id' => $this->scCotisation->id,
+        'compte_id' => $this->scCotisation->id,
     ]);
 });
 
@@ -89,20 +105,26 @@ it('un don additionnel dans un order Membership tombe dans la sous-cat fallback 
     expect($tx->lignes()->count())->toBe(2);
 
     $ligneCotisation = $tx->lignes()->where('helloasso_item_id', 1234)->first();
-    expect((int) $ligneCotisation->sous_categorie_id)->toBe((int) $this->scCotisation->id);
+    expect((int) $ligneCotisation->compte_id)->toBe((int) $this->scCotisation->id);
 
     $ligneDon = $tx->lignes()->where('helloasso_item_id', 1235)->first();
-    expect((int) $ligneDon->sous_categorie_id)->toBe((int) $this->scDon->id);
+    expect((int) $ligneDon->compte_id)->toBe((int) $this->scDon->id);
 });
 
 it('un don additionnel dans un order Event tombe dans la sous-cat fallback Don (pas formation) tout en restant rattaché à l\'opération pour la traçabilité', function (): void {
     // Reproduit le bug observé sur HA-52045 : un don de 20€ joint à une inscription
     // formation tombait dans la sous-cat de l'opération (formation), alors qu'il
-    // devrait suivre la sous-cat fallback Don. La catégorisation fiscale est portée
-    // par sous_categorie_id ; operation_id reste setté pour conserver la traçabilité
+    // devrait suivre le compte fallback Don. La catégorisation fiscale est portée
+    // par compte_id ; operation_id reste setté pour conserver la traçabilité
     // (le don est venu via cette opération).
-    $scFormation = SousCategorie::factory()->create();
-    $typeFormation = TypeOperation::factory()->create(['sous_categorie_id' => $scFormation->id]);
+    $scFormation = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '706FB',
+        'intitule' => 'Formations',
+        'classe' => 7,
+        'actif' => true,
+    ]);
+    $typeFormation = TypeOperation::factory()->create(['compte_id' => $scFormation->id]);
     $operation = Operation::factory()->create(['type_operation_id' => $typeFormation->id]);
 
     $formEvent = HelloAssoFormMapping::create([
@@ -134,16 +156,16 @@ it('un don additionnel dans un order Event tombe dans la sous-cat fallback Don (
     expect($tx->lignes()->count())->toBe(2);
 
     $ligneInscription = $tx->lignes()->where('helloasso_item_id', 2001)->first();
-    expect((int) $ligneInscription->sous_categorie_id)->toBe((int) $scFormation->id)
+    expect((int) $ligneInscription->compte_id)->toBe((int) $scFormation->id)
         ->and((int) $ligneInscription->operation_id)->toBe((int) $operation->id);
 
     $ligneDon = $tx->lignes()->where('helloasso_item_id', 2002)->first();
-    expect((int) $ligneDon->sous_categorie_id)->toBe((int) $this->scDon->id) // fallback Don
+    expect((int) $ligneDon->compte_id)->toBe((int) $this->scDon->id) // fallback Don
         ->and((int) $ligneDon->operation_id)->toBe((int) $operation->id); // traçabilité conservée
 });
 
 it('échoue si fallback Don non configuré et un don additionnel apparaît sans sous-cat form', function (): void {
-    $this->parametres->update(['sous_categorie_don_id' => null]);
+    $this->parametres->update(['compte_don_id' => null]);
 
     Http::fake([
         '*api.helloasso-sandbox.com/oauth2/token' => Http::response(['access_token' => 'tok', 'expires_in' => 3600]),
@@ -154,8 +176,8 @@ it('échoue si fallback Don non configuré et un don additionnel apparaît sans 
     ]);
 
     // Order avec uniquement un item Donation (pas de Membership)
-    // → le form_mapping.sous_categorie_id (Cotisations) ne s'applique pas au Donation
-    // et sous_categorie_don_id est null → exception
+    // → le form_mapping.compte_id (Cotisations) ne s'applique pas au Donation
+    // et compte_don_id est null → exception
     $order = [
         'id' => 9002,
         'date' => '2025-10-15T10:00:00Z',
@@ -169,12 +191,12 @@ it('échoue si fallback Don non configuré et un don additionnel apparaît sans 
         ],
     ];
 
-    // Changer la sous_categorie_id du form mapping à null pour que le fallback final échoue aussi
-    $this->formMembership->update(['sous_categorie_id' => null]);
+    // Changer le compte_id du form mapping à null pour que le fallback final échoue aussi
+    $this->formMembership->update(['compte_id' => null]);
 
     $service = new HelloAssoSyncService($this->parametres);
     $result = $service->synchroniser([$order], 2025);
 
-    // L'order est skipped car sous_categorie_id = null sur le form ET pas de fallback don
+    // L'order est skipped car compte_id = null sur le form ET pas de fallback don
     expect(Transaction::count())->toBe(0);
 });

@@ -3,11 +3,13 @@
 declare(strict_types=1);
 
 use App\Models\FormuleAdhesion;
-use App\Models\SousCategorie;
+use App\Enums\UsageComptable;
+use App\Models\Compte;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\AdhesionService;
+use App\Tenant\TenantContext;
 
 // Régression : un palier HelloAsso à 0€ ("Cotisation offerte") n'a pas de
 // helloasso_payment_id côté API HA. La résolution prio 1 ne doit PAS
@@ -16,7 +18,15 @@ use App\Services\AdhesionService;
 it('résolveFormule prio 1 HelloAsso même sans helloasso_payment_id (palier HA à 0€)', function (): void {
     $service = app(AdhesionService::class);
 
-    $sc = SousCategorie::factory()->pourCotisations()->create();
+    // DC-10a : compte classe 7 flaggé Cotisation (compte-first).
+    $sc = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '756RF',
+        'intitule' => 'Cotisations',
+        'classe' => 7,
+        'actif' => true,
+    ]);
+    $sc->usages()->create(['usage' => UsageComptable::Cotisation->value]);
     $tiers = Tiers::factory()->create([
         'helloasso_nom' => 'SAND',
         'helloasso_prenom' => 'Georges',
@@ -25,7 +35,7 @@ it('résolveFormule prio 1 HelloAsso même sans helloasso_payment_id (palier HA 
 
     // Formule manuelle active sur la sous-cat (le piège)
     $formuleManuelle = FormuleAdhesion::factory()->create([
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $sc->id,
         'nom' => 'Cotisation annuelle',
         'mode' => 'exercice',
         'deductible_fiscal' => true,
@@ -35,7 +45,7 @@ it('résolveFormule prio 1 HelloAsso même sans helloasso_payment_id (palier HA 
 
     // Formule HelloAsso pour le palier "Cotisation offerte"
     $formuleHA = FormuleAdhesion::factory()->create([
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $sc->id,
         'nom' => 'Un an glissant — Cotisation offerte',
         'mode' => 'duree',
         'duree_mois' => 12,
@@ -55,9 +65,12 @@ it('résolveFormule prio 1 HelloAsso même sans helloasso_payment_id (palier HA 
         'helloasso_payment_id' => null, // ← le cas du palier offert
     ]);
     TransactionLigne::where('transaction_id', $tx->id)->delete();
+    // Ligne à 0 € : pas de compte (invariant XOR) — la détection cotisation
+    // passe par la paire HelloAsso (form_slug + tier_id).
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => null,
+        'sous_categorie_id' => null,
         'helloasso_tier_id' => 18597,
         'montant' => 0,
     ]);

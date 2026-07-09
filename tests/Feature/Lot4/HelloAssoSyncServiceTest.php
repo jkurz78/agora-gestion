@@ -9,7 +9,8 @@ use App\Models\HelloAssoFormMapping;
 use App\Models\HelloAssoParametres;
 use App\Models\Operation;
 use App\Models\Participant;
-use App\Models\SousCategorie;
+use App\Enums\UsageComptable;
+use App\Models\Compte;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -30,8 +31,23 @@ beforeEach(function () {
     $this->actingAs($user);
 
     $this->compte = CompteBancaire::factory()->create(['nom' => 'HelloAsso']);
-    $this->scDon = SousCategorie::factory()->pourDons()->create(['nom' => 'Don']);
-    $this->scCot = SousCategorie::factory()->pourCotisations()->create(['nom' => 'Cotisation']);
+    // DC-10a : ventilation compte-first — comptes classe 7 flaggés par usage.
+    $this->scDon = Compte::create([
+        'association_id' => $this->association->id,
+        'numero_pcg' => '754H',
+        'intitule' => 'Don',
+        'classe' => 7,
+        'actif' => true,
+    ]);
+    $this->scDon->usages()->create(['usage' => UsageComptable::Don->value]);
+    $this->scCot = Compte::create([
+        'association_id' => $this->association->id,
+        'numero_pcg' => '756H',
+        'intitule' => 'Cotisation',
+        'classe' => 7,
+        'actif' => true,
+    ]);
+    $this->scCot->usages()->create(['usage' => UsageComptable::Cotisation->value]);
 
     $this->parametres = HelloAssoParametres::create([
         'association_id' => $this->association->id,
@@ -48,14 +64,14 @@ beforeEach(function () {
         'form_slug' => 'dons-libres',
         'form_type' => 'Donation',
         'form_title' => 'Dons libres',
-        'sous_categorie_id' => $this->scDon->id,
+        'compte_id' => $this->scDon->id,
     ]);
     HelloAssoFormMapping::create([
         'helloasso_parametres_id' => $this->parametres->id,
         'form_slug' => 'adhesion-2025',
         'form_type' => 'Membership',
         'form_title' => 'Adhésion 2025',
-        'sous_categorie_id' => $this->scCot->id,
+        'compte_id' => $this->scCot->id,
     ]);
 
     $this->tiers = Tiers::factory()->avecHelloasso()->create([
@@ -106,7 +122,7 @@ it('imports a simple donation order', function () {
     $ligne = $tx->lignes()->first();
     expect($ligne->helloasso_item_id)->toBe(1001);
     expect((float) $ligne->montant)->toBe(50.00);
-    expect($ligne->sous_categorie_id)->toBe($this->scDon->id);
+    expect((int) $ligne->compte_id)->toBe((int) $this->scDon->id);
 });
 
 it('imports a membership order', function () {
@@ -134,7 +150,7 @@ it('imports a membership order', function () {
     expect($result->transactionsCreated)->toBe(1);
 
     $ligne = TransactionLigne::where('helloasso_item_id', 1002)->first();
-    expect($ligne->sous_categorie_id)->toBe($this->scCot->id);
+    expect((int) $ligne->compte_id)->toBe((int) $this->scCot->id);
 });
 
 it('groups items by beneficiary into one transaction', function () {
@@ -223,9 +239,16 @@ it('is idempotent — re-importing same order updates instead of duplicating', f
 });
 
 it('resolves operation from form mapping for Registration items', function () {
-    $scInscr = SousCategorie::factory()->pourInscriptions()->create(['nom' => 'Inscription']);
+    $scInscr = Compte::create([
+        'association_id' => $this->association->id,
+        'numero_pcg' => '706H',
+        'intitule' => 'Inscription',
+        'classe' => 7,
+        'actif' => true,
+    ]);
+    $scInscr->usages()->create(['usage' => UsageComptable::Inscription->value]);
 
-    $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $scInscr->id]);
+    $typeOp = TypeOperation::factory()->create(['compte_id' => $scInscr->id]);
     $operation = Operation::factory()->create(['nom' => 'Stage été 2026', 'type_operation_id' => $typeOp->id]);
     HelloAssoFormMapping::create([
         'helloasso_parametres_id' => $this->parametres->id,
@@ -257,7 +280,7 @@ it('resolves operation from form mapping for Registration items', function () {
     expect($result->transactionsCreated)->toBe(1);
     expect($result->participantsCreated)->toBe(1);
     $ligne = TransactionLigne::where('helloasso_item_id', 1007)->first();
-    expect($ligne->sous_categorie_id)->toBe($scInscr->id);
+    expect((int) $ligne->compte_id)->toBe((int) $scInscr->id);
     expect($ligne->operation_id)->toBe($operation->id);
 
     $participant = Participant::where('tiers_id', $this->tiers->id)
@@ -532,7 +555,7 @@ it('preserves helloasso_item_id through TransactionService::update so re-sync do
         [
             [
                 'id' => $ligne->id,
-                'sous_categorie_id' => $ligne->sous_categorie_id,
+                'compte_id' => $ligne->compte_id,
                 'montant' => (string) $ligne->montant,
                 'operation_id' => $ligne->operation_id,
                 'seance' => null,

@@ -6,16 +6,26 @@ use App\Enums\ModePaiement;
 use App\Models\Adhesion;
 use App\Models\CompteBancaire;
 use App\Models\FormuleAdhesion;
-use App\Models\SousCategorie;
+use App\Enums\UsageComptable;
+use App\Models\Compte;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\Adhesion\NouvelleAdhesionDTO;
 use App\Services\AdhesionService;
+use App\Tenant\TenantContext;
 use Illuminate\Support\Carbon;
 
 beforeEach(function (): void {
-    $this->sc = SousCategorie::factory()->pourCotisations()->create();
+    // DC-10a : compte classe 7 flaggé Cotisation (compte-first).
+    $this->sc = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '756WZ',
+        'intitule' => 'Cotisations',
+        'classe' => 7,
+        'actif' => true,
+    ]);
+    $this->sc->usages()->create(['usage' => UsageComptable::Cotisation->value]);
     $this->tiers = Tiers::factory()->create();
     $this->user = User::factory()->create();
     $this->compte = CompteBancaire::factory()->create();
@@ -23,7 +33,7 @@ beforeEach(function (): void {
 
 it('crée une adhésion gratuite (montant=0, pas de transaction)', function (): void {
     $formule = FormuleAdhesion::factory()->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'mode' => 'exercice',
     ]);
 
@@ -52,7 +62,7 @@ it('crée une adhésion gratuite (montant=0, pas de transaction)', function (): 
 
 it('crée une adhésion payée (montant > 0, transaction créée)', function (): void {
     $formule = FormuleAdhesion::factory()->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'mode' => 'exercice',
     ]);
 
@@ -81,12 +91,12 @@ it('crée une adhésion payée (montant > 0, transaction créée)', function ():
 
     $ligne = $tx->lignes()->first();
     expect($ligne)->not->toBeNull();
-    expect((int) $ligne->sous_categorie_id)->toBe((int) $this->sc->id);
+    expect((int) $ligne->compte_id)->toBe((int) $this->sc->id);
 });
 
 it('crée une adhésion mode durée avec date_debut/date_fin calculées', function (): void {
     $formule = FormuleAdhesion::factory()->modeDuree(12)->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
     ]);
 
     $dto = new NouvelleAdhesionDTO(
@@ -112,7 +122,7 @@ it('crée une adhésion mode durée avec date_debut/date_fin calculées', functi
 
 it('refuse un doublon en mode exercice', function (): void {
     $formule = FormuleAdhesion::factory()->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'mode' => 'exercice',
     ]);
 
@@ -138,7 +148,7 @@ it('refuse un doublon en mode exercice', function (): void {
 
 it('refuse un recouvrement en mode durée', function (): void {
     $formule = FormuleAdhesion::factory()->modeDuree(12)->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
     ]);
 
     $service = app(AdhesionService::class);
@@ -178,7 +188,7 @@ it('refuse un recouvrement en mode durée', function (): void {
 
 it('création atomique : si la transaction échoue, pas d\'adhésion orpheline', function (): void {
     $formule = FormuleAdhesion::factory()->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'mode' => 'exercice',
     ]);
 
@@ -206,7 +216,7 @@ it('création atomique : si la transaction échoue, pas d\'adhésion orpheline',
 
 it('lève une InvalidArgumentException si montant > 0 et datePaiement est null', function (): void {
     $formule = FormuleAdhesion::factory()->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
     ]);
 
     $dto = new NouvelleAdhesionDTO(
@@ -228,7 +238,7 @@ it('lève une InvalidArgumentException si montant > 0 et datePaiement est null',
 
 it('crée une adhésion mode illimite (permanente)', function (): void {
     $formule = FormuleAdhesion::factory()->modeIllimite()->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'nom' => 'Membre à vie',
     ]);
 
@@ -255,7 +265,7 @@ it('crée une adhésion mode illimite (permanente)', function (): void {
 
 it('refuse une adhésion si une adhésion soft-deleted existe pour le même exercice', function (): void {
     $formule = FormuleAdhesion::factory()->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
     ]);
 
     // Créer puis soft-deleter une adhésion sur 2025

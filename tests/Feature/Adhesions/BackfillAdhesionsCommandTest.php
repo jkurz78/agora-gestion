@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 use App\Models\Adhesion;
 use App\Models\Association;
-use App\Models\SousCategorie;
+use App\Enums\UsageComptable;
+use App\Models\Compte;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -17,7 +18,14 @@ use Illuminate\Support\Facades\DB;
  */
 function createCotisationTxSansAdhesion(array $txAttrs = []): Transaction
 {
-    $sc = SousCategorie::factory()->pourCotisations()->create();
+    $sc = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '756BF',
+        'intitule' => 'Cotisations',
+        'classe' => 7,
+        'actif' => true,
+    ]);
+    $sc->usages()->create(['usage' => UsageComptable::Cotisation->value]);
 
     /** @var Transaction $tx */
     $tx = null;
@@ -30,8 +38,11 @@ function createCotisationTxSansAdhesion(array $txAttrs = []): Transaction
             // Add the cotisation ligne
             TransactionLigne::factory()->create([
                 'transaction_id' => $tx->id,
-                'sous_categorie_id' => $sc->id,
-            ]);
+                'compte_id' => $sc->id,
+        'montant' => 50.00,
+        'debit' => 0,
+        'credit' => 50.00,
+    ]);
         });
     });
 

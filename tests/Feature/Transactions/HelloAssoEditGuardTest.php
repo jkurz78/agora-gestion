@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Livewire\TransactionForm;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Transaction;
 use App\Models\User;
@@ -87,13 +88,21 @@ it('allows editing notes on HelloAsso transaction', function () {
         'date' => '2025-10-01',
     ]);
 
-    // DC-8 : l'hydratation du formulaire mappe chaque ligne vers son compte miroir —
-    // matérialiser les miroirs des sous-catégories factory (codes distincts).
-    $tx->lignes->load('sousCategorie');
-    foreach ($tx->lignes->pluck('sousCategorie')->filter()->unique('id')->values() as $i => $sc) {
-        if ($sc->code_cerfa === null) {
-            $sc->update(['code_cerfa' => '608'.($i + 1)]);
-        }
+    // DC-10a : l'hydratation du formulaire lit compte_id (classe 6/7 via
+    // scopeVentilation) — enrichir les lignes factory compte-first.
+    foreach ($tx->lignes()->get()->values() as $i => $ligne) {
+        $compte = Compte::create([
+            'association_id' => $this->association->id,
+            'numero_pcg' => '608'.($i + 1),
+            'intitule' => 'Compte test 608'.($i + 1),
+            'classe' => 6,
+            'actif' => true,
+        ]);
+        $ligne->fill([
+            'compte_id' => $compte->id,
+            'debit' => (float) $ligne->montant,
+            'credit' => 0,
+        ])->save();
     }
 
     Livewire::test(TransactionForm::class)

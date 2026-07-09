@@ -31,6 +31,7 @@ final class HelloAssoParametres extends Model
         'compte_helloasso_id',
         'compte_versement_id',
         'sous_categorie_don_id',
+        'compte_don_id',
     ];
 
     protected function casts(): array
@@ -43,6 +44,7 @@ final class HelloAssoParametres extends Model
             'compte_helloasso_id' => 'integer',
             'compte_versement_id' => 'integer',
             'sous_categorie_don_id' => 'integer',
+            'compte_don_id' => 'integer',
         ];
     }
 

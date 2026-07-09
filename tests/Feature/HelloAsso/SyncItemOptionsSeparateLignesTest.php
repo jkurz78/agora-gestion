@@ -7,7 +7,8 @@ use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\HelloAssoFormMapping;
 use App\Models\HelloAssoParametres;
-use App\Models\SousCategorie;
+use App\Enums\UsageComptable;
+use App\Models\Compte;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -26,7 +27,14 @@ beforeEach(function (): void {
     TenantContext::boot($association);
 
     $compte = CompteBancaire::factory()->create();
-    $this->scCotisation = SousCategorie::factory()->pourCotisations()->create();
+    $this->scCotisation = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '756SL',
+        'intitule' => 'Cotisations',
+        'classe' => 7,
+        'actif' => true,
+    ]);
+    $this->scCotisation->usages()->create(['usage' => UsageComptable::Cotisation->value]);
 
     $this->parametres = HelloAssoParametres::factory()->create([
         'association_id' => 1,
@@ -49,7 +57,7 @@ beforeEach(function (): void {
         'form_slug' => 'un-an-glissant',
         'form_type' => 'Membership',
         'form_title' => 'Un an glissant',
-        'sous_categorie_id' => $this->scCotisation->id,
+        'compte_id' => $this->scCotisation->id,
     ]);
 
     Http::fake([

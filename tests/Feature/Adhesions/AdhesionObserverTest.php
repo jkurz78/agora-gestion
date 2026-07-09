@@ -3,10 +3,12 @@
 declare(strict_types=1);
 
 use App\Models\Adhesion;
-use App\Models\SousCategorie;
+use App\Enums\UsageComptable;
+use App\Models\Compte;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Tenant\TenantContext;
 
 /**
  * Helper: create a Transaction + one explicit ligne without firing observers,
@@ -17,7 +19,7 @@ use App\Models\TransactionLigne;
  * - TransactionLigne::withoutEvents prevents the TransactionLigne saved observer
  *   triggered by the factory's afterCreating hook (random lignes)
  */
-function createTxWithoutObservers(array $txAttrs, ?int $scId = null): Transaction
+function createTxWithoutObservers(array $txAttrs, ?int $compteId = null): Transaction
 {
     /** @var Transaction $tx */
     $tx = null;
@@ -30,13 +32,16 @@ function createTxWithoutObservers(array $txAttrs, ?int $scId = null): Transactio
         });
     });
 
-    if ($scId !== null) {
+    if ($compteId !== null) {
         // Add the desired ligne WITHOUT firing observer (observer fires separately in tests)
-        TransactionLigne::withoutEvents(function () use ($tx, $scId): void {
+        TransactionLigne::withoutEvents(function () use ($tx, $compteId): void {
             TransactionLigne::factory()->create([
                 'transaction_id' => $tx->id,
-                'sous_categorie_id' => $scId,
-            ]);
+                'compte_id' => $compteId,
+            'montant' => 50.00,
+            'debit' => 0,
+            'credit' => 50.00,
+        ]);
         });
     }
 
@@ -44,7 +49,15 @@ function createTxWithoutObservers(array $txAttrs, ?int $scId = null): Transactio
 }
 
 beforeEach(function (): void {
-    $this->sc = SousCategorie::factory()->pourCotisations()->create();
+    // DC-10a : compte classe 7 flaggé Cotisation (compte-first).
+    $this->sc = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '756AO',
+        'intitule' => 'Cotisations',
+        'classe' => 7,
+        'actif' => true,
+    ]);
+    $this->sc->usages()->create(['usage' => UsageComptable::Cotisation->value]);
     $this->tiers = Tiers::factory()->create();
 });
 
@@ -60,8 +73,11 @@ it('créer une transaction recette avec ligne cotisation crée une adhésion aut
     // Now add cotisation ligne — fires TransactionLigne::saved → AdhesionTransactionLigneObserver
     TransactionLigne::factory()->create([
         'transaction_id' => $this->tx->id,
-        'sous_categorie_id' => $this->sc->id,
-    ]);
+        'compte_id' => $this->sc->id,
+            'montant' => 50.00,
+            'debit' => 0,
+            'credit' => 50.00,
+        ]);
 
     expect(Adhesion::count())->toBe(1);
     $adhesion = Adhesion::first();
@@ -79,8 +95,11 @@ it('soft-deleter la transaction soft-delete l\'adhésion miroir', function (): v
 
     TransactionLigne::factory()->create([
         'transaction_id' => $this->tx->id,
-        'sous_categorie_id' => $this->sc->id,
-    ]);
+        'compte_id' => $this->sc->id,
+            'montant' => 50.00,
+            'debit' => 0,
+            'credit' => 50.00,
+        ]);
 
     expect(Adhesion::count())->toBe(1);
 
@@ -98,8 +117,11 @@ it('restore la transaction restore l\'adhésion miroir', function (): void {
 
     TransactionLigne::factory()->create([
         'transaction_id' => $this->tx->id,
-        'sous_categorie_id' => $this->sc->id,
-    ]);
+        'compte_id' => $this->sc->id,
+            'montant' => 50.00,
+            'debit' => 0,
+            'credit' => 50.00,
+        ]);
 
     $this->tx->delete();
     expect(Adhesion::count())->toBe(0);
@@ -111,7 +133,14 @@ it('restore la transaction restore l\'adhésion miroir', function (): void {
 });
 
 it('créer une transaction recette avec ligne don (pas cotisation) ne crée PAS d\'adhésion', function (): void {
-    $scDon = SousCategorie::factory()->pourDons()->create();
+    $scDon = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '754AO',
+        'intitule' => 'Dons',
+        'classe' => 7,
+        'actif' => true,
+    ]);
+    $scDon->usages()->create(['usage' => UsageComptable::Don->value]);
 
     $this->tx = createTxWithoutObservers([
         'tiers_id' => $this->tiers->id,
@@ -121,8 +150,11 @@ it('créer une transaction recette avec ligne don (pas cotisation) ne crée PAS 
     // Adding a don ligne should NOT trigger adhesion creation
     TransactionLigne::factory()->create([
         'transaction_id' => $this->tx->id,
-        'sous_categorie_id' => $scDon->id,
-    ]);
+        'compte_id' => $scDon->id,
+            'montant' => 50.00,
+            'debit' => 0,
+            'credit' => 50.00,
+        ]);
 
     expect(Adhesion::count())->toBe(0);
 });
@@ -135,8 +167,11 @@ it('mettre à jour la transaction sans changement de cotisation ne duplique pas 
 
     TransactionLigne::factory()->create([
         'transaction_id' => $this->tx->id,
-        'sous_categorie_id' => $this->sc->id,
-    ]);
+        'compte_id' => $this->sc->id,
+            'montant' => 50.00,
+            'debit' => 0,
+            'credit' => 50.00,
+        ]);
 
     expect(Adhesion::count())->toBe(1);
 
@@ -147,7 +182,14 @@ it('mettre à jour la transaction sans changement de cotisation ne duplique pas 
 });
 
 it('transaction avec plusieurs lignes (cotisation + don) ne crée qu\'une seule adhésion', function (): void {
-    $scDon = SousCategorie::factory()->pourDons()->create();
+    $scDon = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '754AO',
+        'intitule' => 'Dons',
+        'classe' => 7,
+        'actif' => true,
+    ]);
+    $scDon->usages()->create(['usage' => UsageComptable::Don->value]);
 
     $this->tx = createTxWithoutObservers([
         'tiers_id' => $this->tiers->id,
@@ -157,14 +199,20 @@ it('transaction avec plusieurs lignes (cotisation + don) ne crée qu\'une seule 
     // Add cotisation ligne — creates adhesion
     TransactionLigne::factory()->create([
         'transaction_id' => $this->tx->id,
-        'sous_categorie_id' => $this->sc->id,
-    ]);
+        'compte_id' => $this->sc->id,
+            'montant' => 50.00,
+            'debit' => 0,
+            'credit' => 50.00,
+        ]);
 
     // Add don ligne — creerDepuisTransaction idempotent: still 1 adhesion
     TransactionLigne::factory()->create([
         'transaction_id' => $this->tx->id,
-        'sous_categorie_id' => $scDon->id,
-    ]);
+        'compte_id' => $scDon->id,
+            'montant' => 50.00,
+            'debit' => 0,
+            'credit' => 50.00,
+        ]);
 
     expect(Adhesion::count())->toBe(1);
 });

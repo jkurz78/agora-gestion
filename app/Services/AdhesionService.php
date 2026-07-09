@@ -39,12 +39,29 @@ final class AdhesionService
             return null;
         }
 
+        // DC-10a : la détection cotisation lit l'usage porté par le compte de la
+        // ligne (compte_id, source unique) — plus de traversée sous_categories.
         $ligneCotisation = $tx->lignes()
             ->whereNull('helloasso_option_id')  // exclure les lignes options HA (B1)
-            ->whereHas('sousCategorie.usages', function ($q): void {
+            ->whereHas('compte.usages', function ($q): void {
                 $q->where('usage', UsageComptable::Cotisation->value);
             })
             ->first();
+
+        // Palier HelloAsso à 0 € (cotisation offerte par code promo) : la ligne ne
+        // porte pas de compte (l'invariant XOR interdit compte_id sans debit/credit,
+        // et une écriture nulle n'a pas de valeur comptable) — détection via la
+        // formule HelloAsso auto-créée (paire form_slug + tier_id).
+        if ($ligneCotisation === null && $tx->helloasso_form_slug !== null) {
+            $ligneCotisation = $tx->lignes()
+                ->whereNull('helloasso_option_id')
+                ->whereNotNull('helloasso_tier_id')
+                ->get()
+                ->first(fn (TransactionLigne $l) => FormuleAdhesion::query()
+                    ->where('helloasso_form_slug', $tx->helloasso_form_slug)
+                    ->where('helloasso_tier_id', $l->helloasso_tier_id)
+                    ->exists());
+        }
 
         if ($ligneCotisation === null) {
             return null;
@@ -421,7 +438,8 @@ final class AdhesionService
                 ],
                 lignes: [
                     [
-                        'sous_categorie_id' => $formule->sous_categorie_id,
+                        // DC-10a : la formule porte le compte de ventilation (compte_id).
+                        'compte_id' => $formule->compte_id,
                         'montant' => $dto->montant,
                     ],
                 ],
