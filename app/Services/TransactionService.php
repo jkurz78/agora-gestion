@@ -9,12 +9,10 @@ use App\Enums\Sens;
 use App\Enums\TypeTransaction;
 use App\Enums\UsageComptable;
 use App\Models\Compte;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\Compta\CompteTresorerieResolver;
-use App\Services\Compta\CompteVentilationResolver;
 use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\EtatReglementResolver;
 use App\Services\Compta\LettrageService;
@@ -55,10 +53,14 @@ final class TransactionService
             $data['numero_piece'] = app(NumeroPieceService::class)->assign(Carbon::parse($data['date']));
             $transaction = Transaction::create($data);
 
-            // Créer les lignes legacy et les enrichir avec les colonnes partie double
+            // DC-10a — les lignes arrivent avec compte_id (contrat) : debit/credit sont
+            // calculés ici même, à la création, plutôt que d'être enrichis a posteriori
+            // par enrichirPartieDouble (voir docblock de cette méthode).
             $lignesCreees = [];
             foreach ($lignes as $ligne) {
-                $ligneCreee = $transaction->lignes()->create($ligne);
+                $ligneCreee = $transaction->lignes()->create(
+                    $this->avecDebitCredit($ligne, $transaction->type)
+                );
                 $lignesCreees[] = $ligneCreee;
             }
 
@@ -76,28 +78,31 @@ final class TransactionService
     }
 
     /**
-     * Enrichit une transaction créée via le formulaire legacy en générant les écritures
-     * partie double (école 411 systématique, spec §4.3 amendée 2026-05-22).
+     * Enrichit une transaction en générant les écritures partie double (école 411
+     * systématique, spec §4.3 amendée 2026-05-22).
      *
-     * Stratégie de coexistence (Step 21) :
-     * - Les lignes legacy (sous_categorie_id + montant) sont conservées et enrichies
-     *   en place avec compte_id / debit / credit correspondants.
-     * - Les lignes PD-only (411/401 D, portage, 411/401 C) sont ajoutées sur la même Tx.
-     * - Les rapports existants (CompteResultatBuilder, RapprochementBancaireService) lisent
-     *   toujours sous_categorie_id + montant — ils basculeront sur compte_id au Step 27.
+     * DC-10a — contrat compte_id : les lignes passées par $lignesCreees arrivent
+     * déjà avec compte_id + debit/credit posés à la création (voir create()/update()
+     * et avecDebitCredit()). Cette méthode :
+     * - valide que compte_id est non-null et résout vers un Compte de la classe
+     *   attendue (6 dépense / 7 recette) — garde défensive contre un mauvais caller ;
+     * - est idempotente : si la ligne porte déjà debit/credit > 0, elle n'est PAS
+     *   ré-enregistrée (pas de fill/save inutile) mais est tout de même collectée
+     *   dans $ventilations pour EcritureGenerator ;
+     * - ne recalcule/ré-enregistre debit/credit qu'en repli défensif, si un caller
+     *   n'a pas encore posé ces valeurs (compte_id présent mais debit=credit=0).
      *
      * Skip silencieux si :
      * - tiers_id est null sur la Tx (saisie libre sans tiers)
-     * - une ventilation n'a pas de code_cerfa (sous-catégorie mal configurée)
+     * - une ligne n'a pas de compte_id
      * - le compte résolu n'a pas la bonne classe (6 ou 7 selon le type de Tx)
      *
-     * Cas hors périmètre Step 21 (DONE_WITH_CONCERNS) :
-     * - Transactions liées à une facture validée → Step 23
-     * - Transactions liées à une remise bancaire → Step 25
-     * - update() → Step ultérieur
+     * Cas hors périmètre (DONE_WITH_CONCERNS historique, toujours valable) :
+     * - Transactions liées à une facture validée → traitées par FactureService
+     * - Transactions liées à une remise bancaire → traitées par RemiseBancaireService
      *
-     * @param  Transaction  $transaction  Transaction créée (header + lignes legacy déjà en base)
-     * @param  TransactionLigne[]  $lignesCreees  Lignes legacy fraîchement créées
+     * @param  Transaction  $transaction  Transaction créée (header + lignes déjà en base)
+     * @param  TransactionLigne[]  $lignesCreees  Lignes de ventilation fraîchement créées
      */
     private function enrichirPartieDouble(Transaction $transaction, array $lignesCreees): void
     {
@@ -118,73 +123,59 @@ final class TransactionService
         // englobant rollback proprement.
         $tiers = Tiers::findOrFail($transaction->tiers_id);
 
-        // --- Résolution des ventilations (sous_categorie → Compte) ---
+        // --- Validation des ventilations (compte_id déjà posé sur la ligne) ---
         $classeAttendue = $transaction->type === TypeTransaction::Recette ? 7 : 6;
         $ventilations = [];
         $skipDoubleEcriture = false;
 
         foreach ($lignesCreees as $ligne) {
-            // DC-5 — chemin rapide : une ligne qui porte déjà compte_id (caller post-DC-8,
-            // ou ligne resynchronisée par le trait sur un autre modèle) évite la résolution
-            // via sous_categorie_id. On revalide quand même la classe attendue (même contrat
-            // que le resolver) pour ne pas relâcher la garde G4.
-            if ($ligne->compte_id !== null) {
-                $compte = Compte::find((int) $ligne->compte_id);
-
-                if ($compte === null || (int) $compte->classe !== $classeAttendue) {
-                    Log::warning('[PartieDouble][TransactionService] — skip : compte_id porté par la ligne invalide', [
-                        'transaction_id' => $transaction->id,
-                        'transaction_ligne_id' => $ligne->id,
-                        'compte_id' => $ligne->compte_id,
-                        'classe_attendue' => $classeAttendue,
-                    ]);
-                    $skipDoubleEcriture = true;
-                    break;
-                }
-            } else {
-                $sousCatId = $ligne->sous_categorie_id;
-
-                if ($sousCatId === null) {
-                    // Ligne sans sous-catégorie (ex. ajout manuel) — skip total
-                    Log::info('[PartieDouble][TransactionService] — skip : ligne sans sous_categorie_id', [
-                        'transaction_id' => $transaction->id,
-                        'transaction_ligne_id' => $ligne->id,
-                    ]);
-                    $skipDoubleEcriture = true;
-                    break;
-                }
-
-                // Résolution sous_categorie → Compte (classe 6 ou 7) via CompteVentilationResolver.
-                $compte = CompteVentilationResolver::resoudre(
-                    sousCategorieId: (int) $sousCatId,
-                    classeAttendue: $classeAttendue,
-                    contextLog: 'TransactionService',
-                    contextLogData: ['transaction_id' => $transaction->id],
-                );
-
-                if ($compte === null) {
-                    $skipDoubleEcriture = true;
-                    break;
-                }
+            if ($ligne->compte_id === null) {
+                // Ligne sans compte_id (ex. ajout manuel, caller non encore migré) — skip total
+                Log::info('[PartieDouble][TransactionService] — skip : ligne sans compte_id', [
+                    'transaction_id' => $transaction->id,
+                    'transaction_ligne_id' => $ligne->id,
+                ]);
+                $skipDoubleEcriture = true;
+                break;
             }
 
-            // Enrichir la ligne legacy avec compte_id + debit/credit partie double
-            $montant = (float) $ligne->montant;
-            $debit = $transaction->type === TypeTransaction::Depense ? $montant : 0.0;
-            $credit = $transaction->type === TypeTransaction::Recette ? $montant : 0.0;
+            $compte = Compte::find((int) $ligne->compte_id);
 
-            // Fix #1 — passer par le chemin Eloquent (fill + save) pour déclencher
-            // l'observer 'saving' et activer l'invariant XOR de TransactionLigneObserver.
-            // update() Query Builder bypasse silencieusement les observers Eloquent.
-            $ligne->fill([
-                'compte_id' => $compte->id,
-                'debit' => $debit,
-                'credit' => $credit,
-            ])->save();
+            if ($compte === null || (int) $compte->classe !== $classeAttendue) {
+                Log::warning('[PartieDouble][TransactionService] — skip : compte_id porté par la ligne invalide', [
+                    'transaction_id' => $transaction->id,
+                    'transaction_ligne_id' => $ligne->id,
+                    'compte_id' => $ligne->compte_id,
+                    'classe_attendue' => $classeAttendue,
+                ]);
+                $skipDoubleEcriture = true;
+                break;
+            }
+
+            // Idempotence : si la ligne porte déjà debit/credit > 0 (posé à la création
+            // par create()/update()), ne pas la ré-enregistrer — juste la collecter.
+            $debitActuel = (float) $ligne->debit;
+            $creditActuel = (float) $ligne->credit;
+
+            if ($debitActuel <= 0.0 && $creditActuel <= 0.0) {
+                // Repli défensif — caller n'ayant pas encore posé debit/credit.
+                $montant = (float) $ligne->montant;
+                $debit = $transaction->type === TypeTransaction::Depense ? $montant : 0.0;
+                $credit = $transaction->type === TypeTransaction::Recette ? $montant : 0.0;
+
+                // Fix #1 — passer par le chemin Eloquent (fill + save) pour déclencher
+                // l'observer 'saving' et activer l'invariant XOR de TransactionLigneObserver.
+                // update() Query Builder bypasse silencieusement les observers Eloquent.
+                $ligne->fill([
+                    'compte_id' => $compte->id,
+                    'debit' => $debit,
+                    'credit' => $credit,
+                ])->save();
+            }
 
             $ventilations[] = [
                 'compte' => $compte,
-                'montant' => $montant,
+                'montant' => (float) $ligne->montant,
                 'operation_id' => $ligne->operation_id,
                 'seance' => $ligne->seance,
                 'notes' => $ligne->notes,
@@ -313,6 +304,33 @@ final class TransactionService
         PartieDoubleGuard::assertComplete($transaction->fresh());
     }
 
+    /**
+     * Complète un tableau de ligne (contrat compte_id, DC-10a) avec debit/credit
+     * calculés à la création — recette → credit=montant/debit=0, dépense →
+     * debit=montant/credit=0 — de sorte que l'invariant XOR de
+     * TransactionLigneObserver soit satisfait dès l'insertion, sans dépendre d'un
+     * enrichissement a posteriori.
+     *
+     * Si compte_id est absent (ligne sans mapping — cas légitime : ventilation
+     * non encore résolue, ajout manuel), debit/credit restent à 0 : l'observer
+     * n'applique pas l'invariant XOR sur les lignes sans compte_id.
+     *
+     * @param  array<string, mixed>  $ligne
+     * @return array<string, mixed>
+     */
+    private function avecDebitCredit(array $ligne, TypeTransaction $type): array
+    {
+        if (! isset($ligne['compte_id']) || $ligne['compte_id'] === null || $ligne['compte_id'] === '') {
+            return $ligne;
+        }
+
+        $montant = (float) ($ligne['montant'] ?? 0);
+        $ligne['debit'] = $type === TypeTransaction::Depense ? $montant : 0.0;
+        $ligne['credit'] = $type === TypeTransaction::Recette ? $montant : 0.0;
+
+        return $ligne;
+    }
+
     public function update(Transaction $transaction, array $data, array $lignes): Transaction
     {
         $this->exerciceService->assertOuvert(
@@ -355,20 +373,32 @@ final class TransactionService
                     ]);
                 }
             } elseif ($transaction->isLockedByRapprochement()) {
+                // DC-10a — compte_id arrive pré-résolu dans $ligneData (contrat) : plus besoin
+                // de résoudre sous_categorie_id → compte via un resolver dédié (l'ancienne
+                // méthode patcherComptesVentilationRapproLocked est supprimée). Si compte_id
+                // change, on recalcule debit/credit au passage — le montant reste gelé (pièce
+                // rapprochée), seule la ventilation (compte) peut changer.
                 foreach ($lignes as $ligneData) {
-                    $transaction->lignes()->where('id', $ligneData['id'])->update([
-                        'sous_categorie_id' => $ligneData['sous_categorie_id'],
+                    $ligneExistante = $transaction->lignes()->where('id', $ligneData['id'])->first();
+
+                    $update = [
+                        'compte_id' => $ligneData['compte_id'],
                         'operation_id' => $ligneData['operation_id'],
                         'seance' => $ligneData['seance'],
                         'notes' => $ligneData['notes'],
-                    ]);
-                }
+                    ];
 
-                // Step 31 — Patch ciblé : si sous_categorie_id a changé sur une ligne de ventilation
-                // (identifiée par sous_categorie_id non null ET compte_id de classe 6 ou 7),
-                // recalculer le compte_id PD correspondant.
-                // Les lignes PD-only (411/401, 512X) sont intactes — montant gelé sur pièce rappro.
-                $this->patcherComptesVentilationRapproLocked($transaction, $lignes);
+                    $compteIdInchange = $ligneExistante !== null
+                        && (string) $ligneExistante->compte_id === (string) $ligneData['compte_id'];
+
+                    if (! $compteIdInchange && $ligneData['compte_id'] !== null && $ligneData['compte_id'] !== '') {
+                        $montant = (float) ($ligneExistante->montant ?? $ligneData['montant'] ?? 0);
+                        $update['debit'] = $transaction->type === TypeTransaction::Depense ? $montant : 0.0;
+                        $update['credit'] = $transaction->type === TypeTransaction::Recette ? $montant : 0.0;
+                    }
+
+                    $transaction->lignes()->where('id', $ligneData['id'])->update($update);
+                }
             } else {
                 $affectationsSnapshot = [];
                 $helloAssoItemIds = [];
@@ -419,7 +449,11 @@ final class TransactionService
                     if ($oldId !== null && isset($helloAssoItemIds[$oldId])) {
                         $ligneData['helloasso_item_id'] = $helloAssoItemIds[$oldId];
                     }
-                    $newLigne = $transaction->lignes()->create($ligneData);
+                    // DC-10a — compte_id connu à la création : debit/credit calculés ici même
+                    // (voir avecDebitCredit / design decision), plutôt qu'enrichis a posteriori.
+                    $newLigne = $transaction->lignes()->create(
+                        $this->avecDebitCredit($ligneData, $transaction->type)
+                    );
                     $lignesCreees[] = $newLigne;
                     if ($oldId !== null && isset($affectationsSnapshot[$oldId])) {
                         foreach ($affectationsSnapshot[$oldId] as $affData) {
@@ -833,15 +867,20 @@ final class TransactionService
 
     private function validateInscriptionRequiresOperation(array $lignes): void
     {
-        $inscriptionSousCategorieIds = SousCategorie::forUsage(UsageComptable::Inscription)
+        $inscriptionCompteIds = Compte::forUsage(UsageComptable::Inscription)
             ->pluck('id')
             ->toArray();
 
         foreach ($lignes as $index => $ligne) {
-            if (in_array((int) $ligne['sous_categorie_id'], $inscriptionSousCategorieIds, true)
+            // Ligne sans compte_id (ventilation absente) : jamais une inscription.
+            if (! isset($ligne['compte_id']) || $ligne['compte_id'] === null || $ligne['compte_id'] === '') {
+                continue;
+            }
+
+            if (in_array((int) $ligne['compte_id'], $inscriptionCompteIds, true)
                 && empty($ligne['operation_id'])) {
                 throw new \InvalidArgumentException(
-                    "La ligne {$index} utilise une sous-catégorie d'inscription : operation_id est obligatoire."
+                    "La ligne {$index} utilise un compte d'inscription : operation_id est obligatoire."
                 );
             }
         }
@@ -867,7 +906,7 @@ final class TransactionService
             if ((int) round((float) $existing->montant * 100) !== (int) round((float) $ligneData['montant'] * 100)) {
                 throw new \RuntimeException('Le montant d\'une ligne ne peut pas être modifié sur une transaction facturée.');
             }
-            if ((int) $existing->sous_categorie_id !== (int) $ligneData['sous_categorie_id']) {
+            if ((int) $existing->compte_id !== (int) $ligneData['compte_id']) {
                 throw new \RuntimeException('La sous-catégorie ne peut pas être modifiée sur une transaction facturée.');
             }
             $existingOpId = $existing->operation_id;
@@ -923,78 +962,5 @@ final class TransactionService
     {
         $motif = "Auto-délettrage suite à update de TX#{$transaction->id}";
         $this->lettrageService->autoDelettrerLignesDe($transaction, $motif);
-    }
-
-    /**
-     * Step 31 — Patch ciblé compte_id sur les lignes de ventilation (classe 6 ou 7)
-     * d'une transaction Rappro-locked.
-     *
-     * Après le foreach de mise à jour (sous_categorie_id, operation_id, seance, notes),
-     * les lignes de ventilation ont leur sous_categorie_id à jour en base mais leur
-     * compte_id PD n'a pas été recalculé. Ce patch résout le nouveau sous_categorie_id
-     * vers le compte correspondant et met à jour compte_id.
-     *
-     * Les lignes PD-only (411/401 lettrées, 512X) sont intentionnellement laissées
-     * intactes : montants gelés sur pièce rapprochée, dé-lettrage non souhaité ici.
-     * Les lignes de ventilation sont identifiées par sous_categorie_id IS NOT NULL.
-     *
-     * Skip silencieux si le compte ne peut pas être résolu (sous-catégorie sans code_cerfa,
-     * compte introuvable, classe inattendue) — cohérent avec enrichirPartieDouble.
-     */
-    private function patcherComptesVentilationRapproLocked(Transaction $transaction, array $lignes): void
-    {
-        $classeAttendue = $transaction->type === TypeTransaction::Recette ? 7 : 6;
-
-        // Collecter les IDs de lignes valides (avec sous_categorie_id non null dans la requête)
-        $ids = collect($lignes)
-            ->filter(fn ($l) => isset($l['id']) && $l['id'] !== null && isset($l['sous_categorie_id']) && $l['sous_categorie_id'] !== null)
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->values()
-            ->all();
-
-        if (empty($ids)) {
-            return;
-        }
-
-        // Précharger toutes les lignes en une seule requête (N+1 fix)
-        $lignesDb = $transaction->lignes()
-            ->whereIn('id', $ids)
-            ->whereNotNull('sous_categorie_id')
-            ->get()
-            ->keyBy(fn ($l) => (int) $l->id);
-
-        // Indexer les lignesData par id pour accès O(1)
-        $lignesDataById = collect($lignes)
-            ->filter(fn ($l) => isset($l['id']) && $l['id'] !== null)
-            ->keyBy(fn ($l) => (int) $l['id']);
-
-        foreach ($lignesDb as $id => $ligne) {
-            $ligneData = $lignesDataById->get($id);
-            if ($ligneData === null) {
-                continue;
-            }
-
-            $sousCatId = isset($ligneData['sous_categorie_id']) && $ligneData['sous_categorie_id'] !== null
-                ? (int) $ligneData['sous_categorie_id']
-                : null;
-
-            if ($sousCatId === null) {
-                continue;
-            }
-
-            // Ligne de ventilation identifiée par sous_categorie_id non null.
-            // Toujours recalculer compte_id (idempotent, même si sous-cat inchangée).
-            $compte = CompteVentilationResolver::resoudre(
-                sousCategorieId: $sousCatId,
-                classeAttendue: $classeAttendue,
-                contextLog: 'TransactionService::patcherComptesVentilationRapproLocked',
-                contextLogData: ['transaction_id' => $transaction->id, 'ligne_id' => $id],
-            );
-
-            if ($compte !== null) {
-                $ligne->fill(['compte_id' => $compte->id])->save();
-            }
-        }
     }
 }

@@ -82,13 +82,16 @@ final class TransactionLigne extends Model
      * qui sont des écritures techniques du grand livre, invisibles dans les
      * écrans de saisie/édition côté utilisateur.
      *
-     * Critère actuel : `sous_categorie_id NOT NULL` (les lignes legacy en ont,
-     * les PD-only n'en ont pas). Au Step 40 (drop colonne legacy), basculer
-     * sur `whereHas('compte', fn ($q) => $q->whereIn('classe', [6, 7]))`.
+     * Critère (DC-10a) : le compte pointé par `compte_id` est de classe 6 ou 7.
+     * Les lignes PD-only pointent toujours vers des comptes système de classe
+     * 4 (411/401) ou 5 (512X/5112/530) — jamais 6/7 — donc ce critère les
+     * exclut par construction, indépendamment de `sous_categorie_id` (colonne
+     * legacy conservée jusqu'au drop DC-10b, mais qui n'est plus la source
+     * de vérité de la ventilation).
      */
     public function scopeVentilation(Builder $q): Builder
     {
-        return $q->whereNotNull('sous_categorie_id');
+        return $q->whereHas('compte', fn (Builder $q) => $q->whereIn('classe', [6, 7]));
     }
 
     // -------------------------------------------------------------------------
