@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Models\Compte;
+use App\Models\Famille;
+use App\Models\SousCategorie;
+use App\Observers\SousCategorieCompteObserver;
 use App\Support\Demo;
 use App\Support\Demo\SnapshotLoader;
 use Illuminate\Console\Command;
@@ -114,6 +118,18 @@ final class DemoResetCommand extends Command
             if (is_array($filesEntries) && $filesEntries !== []) {
                 $filesCopied = $this->syncStorage($filesEntries);
             }
+
+            // DC-9 (programme « dissolution sous_categories → comptes») : le
+            // replay ci-dessus est un INSERT brut par table (SnapshotLoader),
+            // qui ne déclenche AUCUN évènement Eloquent — le miroir
+            // SousCategorieCompteObserver ne tourne donc jamais pendant le
+            // reset. Un snapshot capturé avant les tables `comptes`/`familles`
+            // (ex. l'actuel database/demo/snapshot.yaml, capturé 2026-04-29)
+            // laisserait ces deux tables vides après reset, cassant tout
+            // écran partie-double de la démo. On rejoue donc explicitement la
+            // matérialisation ici, une fois pour toutes les sous-catégories
+            // rechargées.
+            $this->materialiserComptesDepuisSousCategories();
         } finally {
             Artisan::call('up');
         }
@@ -187,5 +203,41 @@ final class DemoResetCommand extends Command
         }
 
         return $copied;
+    }
+
+    /**
+     * Rejoue le miroir SousCategorie → Compte/Famille pour toutes les
+     * sous-catégories rechargées par le snapshot (DC-9).
+     *
+     * SnapshotLoader::load() insère par INSERT brut (DB::table()->insert()),
+     * ce qui ne déclenche jamais l'évènement Eloquent `created`/`updated` — le
+     * miroir bidirectionnel (SousCategorieCompteObserver) reste donc muet
+     * pendant un reset. On appelle directement sa méthode publique `created()`
+     * pour chaque sous-catégorie : elle est idempotente (garde `$existe` sur
+     * numero_pcg) donc un rejeu répété — ou un snapshot qui contient déjà
+     * `comptes`/`familles` cohérents — est un no-op sûr.
+     */
+    private function materialiserComptesDepuisSousCategories(): void
+    {
+        $sousCategories = SousCategorie::withoutGlobalScopes()->get();
+
+        if ($sousCategories->isEmpty()) {
+            return;
+        }
+
+        $observer = new SousCategorieCompteObserver;
+        $avantComptes = Compte::withoutGlobalScopes()->count();
+        $avantFamilles = Famille::withoutGlobalScopes()->count();
+
+        foreach ($sousCategories as $sousCategorie) {
+            $observer->created($sousCategorie);
+        }
+
+        $comptesCreated = Compte::withoutGlobalScopes()->count() - $avantComptes;
+        $famillesCreated = Famille::withoutGlobalScopes()->count() - $avantFamilles;
+
+        if ($comptesCreated > 0 || $famillesCreated > 0) {
+            $this->info("Miroir plan comptable rejoué : {$comptesCreated} compte(s), {$famillesCreated} famille(s) matérialisé(s) depuis les sous-catégories du snapshot.");
+        }
     }
 }

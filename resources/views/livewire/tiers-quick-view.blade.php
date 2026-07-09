@@ -343,7 +343,7 @@
                             <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                                 <tr>
                                     <th>Date</th>
-                                    <th>Sous-catégorie</th>
+                                    <th>Compte</th>
                                     <th>Mode</th>
                                     <th class="text-end">Montant</th>
                                     <th>Reçu fiscal</th>

@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Models\Association;
+use App\Models\Compte;
+use App\Models\Famille;
 use App\Models\User;
 use App\Support\Demo\DateDelta;
 use App\Support\Demo\SnapshotConfig;
@@ -312,4 +314,98 @@ it('round-trips data through demo:capture then demo:reset', function (): void {
     expect(Hash::check('demo', $restoredUser->password))->toBeTrue();
 
     @unlink($snapPath);
+});
+
+// ---------------------------------------------------------------------------
+// T6 — DC-9 : un snapshot pré-comptes (contient sous_categories mais pas
+// comptes/familles, comme l'actuel database/demo/snapshot.yaml capturé
+// 2026-04-29) doit voir son miroir plan comptable matérialisé après reset —
+// le replay est un INSERT brut qui ne déclenche jamais SousCategorieCompteObserver.
+// ---------------------------------------------------------------------------
+it('materializes comptes/familles from sous_categories on reset of a pre-comptes snapshot', function (): void {
+    app()->detectEnvironment(fn (): string => 'demo');
+    config(['app.url' => 'https://demo.agoragestion.org']);
+
+    $ref = Carbon::parse('2026-04-15T10:00:00+00:00');
+    $minus1 = DateDelta::toDelta($ref->copy()->subDay(), $ref);
+
+    $snapshotPath = buildMinimalSnapshot($ref, [
+        'tables' => [
+            'association' => [
+                [
+                    'id' => 1,
+                    'nom' => 'Démo AgoraGestion',
+                    'slug' => 'demo',
+                    'adresse' => '1 rue de la Démo',
+                    'code_postal' => '69001',
+                    'ville' => 'Lyon',
+                    'statut' => 'actif',
+                    'exercice_mois_debut' => 9,
+                    'devis_validite_jours' => 30,
+                    'wizard_completed_at' => $minus1,
+                    'created_at' => $minus1,
+                    'updated_at' => $minus1,
+                ],
+            ],
+            'users' => [
+                [
+                    'id' => 1,
+                    'derniere_association_id' => 1,
+                    'email' => 'admin@demo.fr',
+                    'password' => SnapshotConfig::DEMO_USER_PASSWORD_HASH,
+                    'nom' => 'ADMIN Demo',
+                    'role_systeme' => 'user',
+                    'peut_voir_donnees_sensibles' => 1,
+                    'email_verified_at' => $minus1,
+                    'created_at' => $minus1,
+                    'updated_at' => $minus1,
+                ],
+            ],
+            'categories' => [
+                [
+                    'id' => 1,
+                    'association_id' => 1,
+                    'nom' => '75 - Cotisations et dons',
+                    'type' => 'recette',
+                    'created_at' => $minus1,
+                    'updated_at' => $minus1,
+                ],
+            ],
+            'sous_categories' => [
+                [
+                    'id' => 1,
+                    'association_id' => 1,
+                    'categorie_id' => 1,
+                    'nom' => 'Cotisations',
+                    'code_cerfa' => '751',
+                    'created_at' => $minus1,
+                    'updated_at' => $minus1,
+                ],
+            ],
+        ],
+    ]);
+
+    TenantContext::clear();
+    DB::statement('PRAGMA foreign_keys = OFF');
+    DB::table('association_user')->delete();
+    DB::table('users')->delete();
+    DB::table('association')->delete();
+    DB::statement('PRAGMA foreign_keys = ON');
+
+    $exitCode = $this->artisan('demo:reset', [
+        '--snapshot' => $snapshotPath,
+        '--skip-migrate' => true,
+    ])->execute();
+
+    expect($exitCode)->toBe(0);
+
+    // The snapshot itself never contained comptes/familles rows — only the
+    // post-replay materialization pass can have created them.
+    $compte = Compte::withoutGlobalScopes()->where('numero_pcg', '751')->first();
+    expect($compte)->not->toBeNull();
+    expect((int) $compte->association_id)->toBe(1);
+    expect($compte->classe)->toBe(7);
+
+    $famille = Famille::withoutGlobalScopes()->where('code', '75')->first();
+    expect($famille)->not->toBeNull();
 });

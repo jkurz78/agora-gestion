@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Livewire\Onboarding;
 
 use App\Models\Association;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
+use App\Models\Famille;
 use App\Models\HelloAssoParametres;
 use App\Models\IncomingMailParametres;
 use App\Models\SmtpParametres;
@@ -145,7 +146,7 @@ final class Wizard extends Component
     #[Validate('required|in:default,empty')]
     public string $planComptableChoix = 'default';
 
-    public ?int $planComptableCategoriesCount = null;
+    public ?int $planComptableComptesCount = null;
 
     public function mount(): void
     {
@@ -208,8 +209,8 @@ final class Wizard extends Component
             $this->imapPasswordDejaEnregistre = $imap->imap_password !== null;
         }
 
-        if (isset($this->state['plan_comptable_categories_count'])) {
-            $this->planComptableCategoriesCount = (int) $this->state['plan_comptable_categories_count'];
+        if (isset($this->state['plan_comptable_comptes_count'])) {
+            $this->planComptableComptesCount = (int) $this->state['plan_comptable_comptes_count'];
         }
     }
 
@@ -521,9 +522,9 @@ final class Wizard extends Component
 
         if ($this->planComptableChoix === 'default' && ! ($this->state['plan_comptable_applied'] ?? false)) {
             $result = app(DefaultChartOfAccountsService::class)->applyTo($asso);
-            $this->planComptableCategoriesCount = $result['categories'];
+            $this->planComptableComptesCount = $result['comptes'];
             $this->state['plan_comptable_applied'] = true;
-            $this->state['plan_comptable_categories_count'] = $result['categories'];
+            $this->state['plan_comptable_comptes_count'] = $result['comptes'];
             $asso->update(['wizard_state' => $this->state]);
         }
 
@@ -537,7 +538,7 @@ final class Wizard extends Component
         }
 
         // Provisionne les comptes (partie double) du nouveau tenant maintenant
-        // que sous-catégories et comptes bancaires sont saisis. Idempotent.
+        // que le plan comptable et les comptes bancaires sont saisis. Idempotent.
         app(ComptesProvisioningService::class)->provisionAll();
 
         $this->currentAssociation()->update([
@@ -548,7 +549,7 @@ final class Wizard extends Component
     }
 
     /**
-     * @return array{association: Association, compte: ?CompteBancaire, smtp: ?SmtpParametres, helloasso: ?HelloAssoParametres, imap: ?IncomingMailParametres, nb_categories: int}
+     * @return array{association: Association, compte: ?CompteBancaire, smtp: ?SmtpParametres, helloasso: ?HelloAssoParametres, imap: ?IncomingMailParametres, nb_comptes: int, nb_familles: int}
      */
     public function getRecapProperty(): array
     {
@@ -560,7 +561,8 @@ final class Wizard extends Component
             'smtp' => SmtpParametres::first(),
             'helloasso' => HelloAssoParametres::first(),
             'imap' => IncomingMailParametres::first(),
-            'nb_categories' => Categorie::count(),
+            'nb_comptes' => Compte::count(),
+            'nb_familles' => Famille::count(),
         ];
     }
 

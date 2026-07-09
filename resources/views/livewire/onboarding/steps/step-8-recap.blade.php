@@ -50,7 +50,7 @@
     <dd class="col-sm-8">{{ $imap?->imap_host ?: 'non configurée' }}</dd>
 
     <dt class="col-sm-4">Plan comptable</dt>
-    <dd class="col-sm-8">{{ $recap['nb_categories'] }} catégorie(s) créée(s)</dd>
+    <dd class="col-sm-8">{{ $recap['nb_comptes'] }} compte(s) créé(s) sur {{ $recap['nb_familles'] }} famille(s)</dd>
 </dl>
 
 <div class="alert alert-info small mb-3">

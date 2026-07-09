@@ -28,7 +28,7 @@
                 <tr>
                     <th>Logo</th>
                     <th class="sortable" data-col="nom" style="cursor:pointer">Nom <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
-                    <th>Sous-catégorie</th>
+                    <th>Compte</th>
                     <th class="text-center">Séances</th>
                     <th class="text-center">Formulaire</th>
                     <th class="text-center">Adhérents</th>

@@ -690,7 +690,7 @@
                                 <table class="table table-sm align-middle mb-0" style="margin-left:1.5rem;width:calc(100% - 1.5rem);--bs-table-bg:#f8f9fa;font-size:.78rem;--bs-table-cell-padding-y:.2rem">
                                     <thead style="background:#8fa8c4;color:#fff;--bs-table-bg:#8fa8c4;--bs-table-border-color:#9fb5cc">
                                         <tr>
-                                            <th>Sous-catégorie</th>
+                                            <th>Compte</th>
                                             <th>Opération</th>
                                             <th class="text-center">Séance</th>
                                             <th class="text-end">Montant</th>

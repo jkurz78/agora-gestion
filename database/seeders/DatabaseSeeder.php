@@ -88,7 +88,7 @@ class DatabaseSeeder extends Seeder
             'saisie_automatisee' => true,
         ]);
 
-        $this->call(CategoriesSeeder::class);
+        $this->call(PlanComptableSeeder::class);
         $this->call(TypeOperationSeeder::class);
         $this->call(EmailTemplateSeeder::class);
         $this->call(MessageTemplateSeeder::class);
