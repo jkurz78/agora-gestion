@@ -84,7 +84,7 @@ it('create() avec PD active et SousCategorie correctement mappée → guard pass
         'compte_id' => $this->compteBancaire->id,
         'tiers_id' => $tiers->id,
     ];
-    $lignes = [['sous_categorie_id' => $this->sc706->id, 'montant' => '200.00']];
+    $lignes = [['compte_id' => $this->compte706->id, 'montant' => '200.00']];
 
     $transaction = $service->create($data, $lignes);
 

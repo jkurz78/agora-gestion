@@ -29,7 +29,7 @@ beforeEach(function () {
 
     $typeOp = TypeOperation::factory()->create([
         'association_id' => $this->association->id,
-        'sous_categorie_id' => $this->sc706->id,
+        'compte_id' => $this->compte706->id,
     ]);
     $this->operation = Operation::factory()->create([
         'association_id' => $this->association->id,

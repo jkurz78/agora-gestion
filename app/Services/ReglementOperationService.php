@@ -17,7 +17,6 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\Compta\CompteTresorerieResolver;
-use App\Services\Compta\CompteVentilationResolver;
 use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\EtatReglementResolver;
 use App\Services\Compta\PartieDoubleGuard;
@@ -66,19 +65,27 @@ final class ReglementOperationService
     ): void {
         $seance->load('operation.typeOperation');
         $operation = $seance->operation;
-        $sousCategorieId = $operation->typeOperation?->sous_categorie_id;
-        // DC-5 — lit compte_id sur le typeOperation (rempli par le trait de double
-        // écriture DC-3) en priorité ; repli sur sous_categorie_id pour une fixture
-        // pré-DC-2 (voir enrichirCreancePartieDouble).
+        // DC-10a — la ventilation est portée par typeOperation.compte_id (source unique).
         $compteId = $operation->typeOperation?->compte_id;
 
-        if ($sousCategorieId === null && $compteId === null) {
-            Log::warning('[PartieDouble][ReglementOperationService] — skip total : typeOperation sans sous_categorie_id', [
+        if ($compteId === null) {
+            Log::warning('[PartieDouble][ReglementOperationService] — skip total : typeOperation sans compte_id', [
                 'seance_id' => (int) $seance->id,
                 'operation_id' => (int) $operation->id,
             ]);
 
             return;
+        }
+
+        // Validation unique du compte de ventilation (classe 7 attendue pour une recette).
+        // Best-effort préservé : compte invalide → lignes créées sans PD (skip loggué).
+        $compteVentilation = Compte::find((int) $compteId);
+        if ($compteVentilation === null || (int) $compteVentilation->classe !== 7) {
+            Log::warning('[PartieDouble][ReglementOperationService] — compte_id du typeOperation invalide (classe ≠ 7), PD skippée', [
+                'operation_id' => (int) $operation->id,
+                'compte_id' => (int) $compteId,
+            ]);
+            $compteVentilation = null;
         }
 
         // Règlements sans transaction existante, avec montant > 0.
@@ -94,7 +101,7 @@ final class ReglementOperationService
             return;
         }
 
-        DB::transaction(function () use ($reglements, $seance, $operation, $sousCategorieId, $compteId, $compteBancaireId, $date): void {
+        DB::transaction(function () use ($reglements, $seance, $operation, $compteVentilation, $compteBancaireId, $date): void {
             foreach ($reglements as $reglement) {
                 $tiers = $reglement->participant->tiers;
                 $libelle = "Règlement {$tiers->displayName()} — {$operation->nom} S{$seance->numero}";
@@ -115,19 +122,21 @@ final class ReglementOperationService
                     'saisi_par' => auth()->id(),
                 ]);
 
-                // 2. Crée la TransactionLigne legacy (compte_id posé plus tard par
-                // enrichirCreancePartieDouble — pas ici, sinon l'invariant XOR de
-                // TransactionLigneObserver se déclenche avant que debit/credit soient posés).
+                // 2. Crée la ligne de ventilation compte-first : compte_id + debit/credit
+                // posés à la création (recette → crédit), invariant XOR satisfait d'emblée.
+                // Compte invalide → ligne sans compte (PD skippée, best-effort).
                 $ligne = TransactionLigne::create([
                     'transaction_id' => (int) $tx->id,
-                    'sous_categorie_id' => $sousCategorieId,
+                    'compte_id' => $compteVentilation?->id,
                     'operation_id' => (int) $operation->id,
                     'seance' => $seance->numero,
                     'montant' => $reglement->montant_prevu,
+                    'debit' => 0,
+                    'credit' => $compteVentilation !== null ? (float) $reglement->montant_prevu : 0,
                 ]);
 
-                // 3. Enrichit partie double (best-effort — n'annule pas la création legacy)
-                $this->enrichirCreancePartieDouble($tx, $ligne, $tiers, $operation, $seance, $sousCategorieId, $compteId);
+                // 3. Enrichit partie double (best-effort — n'annule pas la création de la ligne)
+                $this->enrichirCreancePartieDouble($tx, $ligne, $tiers, $operation, $seance, $compteVentilation);
             }
         });
     }
@@ -447,13 +456,12 @@ final class ReglementOperationService
     /**
      * Enrichit la Transaction créée par comptabiliserSeance avec les écritures partie double.
      *
-     * Pattern Step 23 (FactureService::genererTransactionDepuisLignesManuelles) :
-     * — résout le Compte classe 7 (DC-5 — via compte_id du typeOperation en priorité,
-     *   repli sur CompteVentilationResolver/sous_categorie_id sinon)
-     * — enrichit la ligne legacy (compte_id / debit / credit)
-     * — délègue à EcritureGenerator::pourRecetteACredit(existingTransaction: $tx)
+     * DC-10a — la ligne de ventilation arrive déjà compte-first (compte_id + credit
+     * posés à la création par comptabiliserSeance). Cette méthode collecte la
+     * ventilation et délègue à EcritureGenerator::pourRecetteACredit(existingTransaction: $tx)
+     * pour ajouter la ligne 411 D tiers.
      *
-     * Skippe silencieusement (Log::warning) si un prérequis est absent.
+     * Skippe silencieusement si $compte est null (compte invalide, loggué en amont).
      */
     private function enrichirCreancePartieDouble(
         Transaction $tx,
@@ -461,50 +469,17 @@ final class ReglementOperationService
         Tiers $tiers,
         Operation $operation,
         Seance $seance,
-        ?int $sousCategorieId,
-        ?int $compteId = null,
+        ?Compte $compte,
     ): void {
-        // --- Résolution du Compte classe 7 ---
-        if ($compteId !== null) {
-            $compte = Compte::find($compteId);
-
-            if ($compte === null || (int) $compte->classe !== 7) {
-                Log::warning('[PartieDouble][ReglementOperationService] — skip : compte_id du typeOperation invalide (classe ≠ 7)', [
-                    'transaction_id' => (int) $tx->id,
-                    'compte_id' => $compteId,
-                ]);
-
-                return;
-            }
-        } elseif ($sousCategorieId !== null) {
-            $compte = CompteVentilationResolver::resoudre(
-                sousCategorieId: $sousCategorieId,
-                classeAttendue: 7,
-                contextLog: 'ReglementOperationService',
-                contextLogData: ['transaction_id' => (int) $tx->id],
-            );
-
-            if ($compte === null) {
-                // Garde loggée dans CompteVentilationResolver::resoudre
-                return;
-            }
-        } else {
+        if ($compte === null) {
             return;
         }
-
-        // --- Enrichir la ligne legacy avec colonnes partie double (recette → crédit) ---
-        $montant = (float) $ligne->montant;
-        $ligne->fill([
-            'compte_id' => $compte->id,
-            'debit' => 0.0,
-            'credit' => $montant,
-        ])->save();
 
         // --- Ventilation pour EcritureGenerator ---
         $ventilations = [
             [
                 'compte' => $compte,
-                'montant' => $montant,
+                'montant' => (float) $ligne->montant,
                 'operation_id' => (int) $operation->id,
                 'seance' => $seance->numero,
                 'notes' => null,

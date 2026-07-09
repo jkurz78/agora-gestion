@@ -27,7 +27,7 @@ it('marquerRecu chèque sur créance → statut dérivé EnMain', function () {
         'tiers_id' => $this->tiers->id,
         'compte_id' => null,
     ], [[
-        'sous_categorie_id' => $this->sc706->id,
+        'compte_id' => $this->compte706->id,
         'montant' => '100.00',
         'operation_id' => null, 'seance' => null, 'notes' => null,
     ]]);
@@ -50,7 +50,7 @@ it('marquerRecu virement sur créance → statut dérivé Recu', function () {
         'tiers_id' => $this->tiers->id,
         'compte_id' => null,
     ], [[
-        'sous_categorie_id' => $this->sc706->id,
+        'compte_id' => $this->compte706->id,
         'montant' => '100.00',
         'operation_id' => null, 'seance' => null, 'notes' => null,
     ]]);
@@ -72,7 +72,7 @@ it('marquerPaye virement sur dette → statut dérivé Recu (réglé)', function
         'tiers_id' => $this->tiers->id,
         'compte_id' => null,
     ], [[
-        'sous_categorie_id' => $this->sc606->id,
+        'compte_id' => $this->compte606->id,
         'montant' => '50.00',
         'operation_id' => null, 'seance' => null, 'notes' => null,
     ]]);

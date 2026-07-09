@@ -26,7 +26,7 @@ it('détecte une divergence miroir↔ledger en --check (exit non nul)', function
         'tiers_id' => $this->tiers->id,
         'compte_id' => $this->compteBancaire->id,
     ], [[
-        'sous_categorie_id' => $this->sc706->id,
+        'compte_id' => $this->compte706->id,
         'montant' => '100.00',
         'operation_id' => null, 'seance' => null, 'notes' => null,
     ]]);
@@ -48,7 +48,7 @@ it('corrige les divergences sans --check (exit 0, miroir resynchronisé)', funct
         'tiers_id' => $this->tiers->id,
         'compte_id' => $this->compteBancaire->id,
     ], [[
-        'sous_categorie_id' => $this->sc706->id,
+        'compte_id' => $this->compte706->id,
         'montant' => '100.00',
         'operation_id' => null, 'seance' => null, 'notes' => null,
     ]]);
@@ -70,7 +70,7 @@ it('ne signale rien quand le miroir est aligné (exit 0)', function () {
         'tiers_id' => $this->tiers->id,
         'compte_id' => $this->compteBancaire->id,
     ], [[
-        'sous_categorie_id' => $this->sc706->id,
+        'compte_id' => $this->compte706->id,
         'montant' => '100.00',
         'operation_id' => null, 'seance' => null, 'notes' => null,
     ]]);

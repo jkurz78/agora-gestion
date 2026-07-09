@@ -37,7 +37,7 @@ function recetteData(object $ctx, ?string $mode): array
             'compte_id' => $mode === null ? null : $ctx->compteBancaire->id,
         ],
         'lignes' => [[
-            'sous_categorie_id' => $ctx->sc706->id,
+            'compte_id' => $ctx->compte706->id,
             'montant' => '100.00',
             'operation_id' => null,
             'seance' => null,
@@ -91,7 +91,7 @@ function depenseData(object $ctx, ?string $mode): array
             'compte_id' => $mode === null ? null : $ctx->compteBancaire->id,
         ],
         'lignes' => [[
-            'sous_categorie_id' => $ctx->sc606->id,
+            'compte_id' => $ctx->compte606->id,
             'montant' => '50.00',
             'operation_id' => null,
             'seance' => null,

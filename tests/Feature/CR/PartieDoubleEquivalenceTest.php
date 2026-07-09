@@ -218,7 +218,7 @@ beforeEach(function () {
     // ── TypeOperation + Opération + Séances pour les tests ReglementOperationService
     $this->typeOp = TypeOperation::factory()->create([
         'association_id' => $this->association->id,
-        'sous_categorie_id' => $this->sc706->id,
+        'compte_id' => $this->compte706->id,
     ]);
     $this->operation = Operation::factory()->create([
         'association_id' => $this->association->id,
@@ -270,7 +270,7 @@ function creerFixtureExerciceComplet(object $ctx): array
         'tiers_id' => $ctx->tiersA->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
-        ['sous_categorie_id' => $ctx->sc706->id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte706->id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
     $txIds[] = $tx1a->id;
 
@@ -284,7 +284,7 @@ function creerFixtureExerciceComplet(object $ctx): array
         'tiers_id' => $ctx->tiersB->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
-        ['sous_categorie_id' => $ctx->sc758->id, 'montant' => '250.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte758->id, 'montant' => '250.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
     $txIds[] = $tx1b->id;
 
@@ -299,8 +299,8 @@ function creerFixtureExerciceComplet(object $ctx): array
         'tiers_id' => $ctx->tiersA->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
-        ['sous_categorie_id' => $ctx->sc706->id, 'montant' => '60.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
-        ['sous_categorie_id' => $ctx->sc758->id, 'montant' => '40.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte706->id, 'montant' => '60.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte758->id, 'montant' => '40.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
     $txIds[] = $tx1c->id;
 
@@ -314,7 +314,7 @@ function creerFixtureExerciceComplet(object $ctx): array
         'tiers_id' => $ctx->tiersB->id,
         'compte_id' => null,
     ], [
-        ['sous_categorie_id' => $ctx->sc706->id, 'montant' => '180.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte706->id, 'montant' => '180.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
     $txIds[] = $tx1d->id;
 
@@ -329,7 +329,7 @@ function creerFixtureExerciceComplet(object $ctx): array
         'tiers_id' => $ctx->tiersB->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
-        ['sous_categorie_id' => $ctx->sc706->id, 'montant' => '180.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte706->id, 'montant' => '180.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
     $txIds[] = $tx2d->id;
 
@@ -343,7 +343,7 @@ function creerFixtureExerciceComplet(object $ctx): array
         'tiers_id' => $ctx->tiersA->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
-        ['sous_categorie_id' => $ctx->sc606->id, 'montant' => '75.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte606->id, 'montant' => '75.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
     $txIds[] = $tx3a->id;
 
@@ -357,8 +357,8 @@ function creerFixtureExerciceComplet(object $ctx): array
         'tiers_id' => $ctx->tiersB->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
-        ['sous_categorie_id' => $ctx->sc606->id, 'montant' => '120.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
-        ['sous_categorie_id' => $ctx->sc616->id, 'montant' => '80.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte606->id, 'montant' => '120.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte616->id, 'montant' => '80.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
     $txIds[] = $tx3b->id;
 
@@ -372,7 +372,7 @@ function creerFixtureExerciceComplet(object $ctx): array
         'tiers_id' => $ctx->tiersA->id,
         'compte_id' => null,
     ], [
-        ['sous_categorie_id' => $ctx->sc616->id, 'montant' => '150.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte616->id, 'montant' => '150.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
     $txIds[] = $tx3c->id;
 
@@ -390,7 +390,7 @@ function creerFixtureExerciceComplet(object $ctx): array
     FactureLigne::create([
         'facture_id' => $facture->id,
         'type' => TypeLigneFacture::MontantManuel->value,
-        'sous_categorie_id' => $ctx->sc706->id,
+        'compte_id' => $ctx->compte706->id,
         'libelle' => 'Formation hiver',
         'montant' => 300.00,
         'ordre' => 1,
@@ -398,7 +398,7 @@ function creerFixtureExerciceComplet(object $ctx): array
     FactureLigne::create([
         'facture_id' => $facture->id,
         'type' => TypeLigneFacture::MontantManuel->value,
-        'sous_categorie_id' => $ctx->sc758->id,
+        'compte_id' => $ctx->compte758->id,
         'libelle' => 'Subvention intégrée',
         'montant' => 100.00,
         'ordre' => 2,
@@ -1019,7 +1019,7 @@ it('une recette comptant saisie au formulaire est marquée équilibrée (pas de 
         'tiers_id' => $this->tiersA->id,
         'compte_id' => $this->compteBancaire->id,
     ], [
-        ['sous_categorie_id' => $this->sc706->id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $this->compte706->id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 
     expect($tx->fresh()->equilibree)->toBeTrue();
@@ -1055,7 +1055,7 @@ it('[E8] EtatReglementResolver — statut dérivé identique live vs backfill (v
         'tiers_id' => $this->tiersA->id,
         'compte_id' => $this->compteBancaire->id,
     ], [
-        ['sous_categorie_id' => $this->sc706->id, 'montant' => '200.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $this->compte706->id, 'montant' => '200.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 
     // ── Structure "backfill" : simuler une tx legacy (equilibree=FALSE, statut=Recu)

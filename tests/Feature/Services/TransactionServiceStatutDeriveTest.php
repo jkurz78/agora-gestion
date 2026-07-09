@@ -28,7 +28,7 @@ it('réversion recette reçue→non-reçue : le statut dérivé repasse EnAttent
         'compte_id' => $this->compteBancaire->id,
     ];
     $lignes = [[
-        'sous_categorie_id' => $this->sc706->id,
+        'compte_id' => $this->compte706->id,
         'montant' => '100.00',
         'operation_id' => null, 'seance' => null, 'notes' => null,
     ]];
@@ -39,7 +39,7 @@ it('réversion recette reçue→non-reçue : le statut dérivé repasse EnAttent
     // Réversion : repasser en mode null (non reçue).
     $this->service->update($t1, [...$data, 'mode_paiement' => null, 'compte_id' => null], [[
         'id' => null,
-        'sous_categorie_id' => $this->sc706->id,
+        'compte_id' => $this->compte706->id,
         'montant' => '100.00',
         'operation_id' => null, 'seance' => null, 'notes' => null,
     ]]);
@@ -59,7 +59,7 @@ it('réversion dépense réglée→non-payée : le statut dérivé repasse EnAtt
     ];
 
     $t1 = $this->service->create($data, [[
-        'sous_categorie_id' => $this->sc606->id,
+        'compte_id' => $this->compte606->id,
         'montant' => '50.00',
         'operation_id' => null, 'seance' => null, 'notes' => null,
     ]]);
@@ -67,7 +67,7 @@ it('réversion dépense réglée→non-payée : le statut dérivé repasse EnAtt
 
     $this->service->update($t1, [...$data, 'mode_paiement' => null, 'compte_id' => null], [[
         'id' => null,
-        'sous_categorie_id' => $this->sc606->id,
+        'compte_id' => $this->compte606->id,
         'montant' => '50.00',
         'operation_id' => null, 'seance' => null, 'notes' => null,
     ]]);

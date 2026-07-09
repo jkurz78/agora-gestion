@@ -18,10 +18,8 @@ use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Livewire\TransactionUniverselle;
 use App\Models\Association;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -68,17 +66,7 @@ beforeEach(function () {
         ->where('association_id', $this->association->id)
         ->firstOrFail();
 
-    // Compte 606 (classe 6) pour les dépenses
-    $categorieDep = Categorie::factory()->depense()->create([
-        'association_id' => $this->association->id,
-        'nom' => 'Charges diverses',
-    ]);
-    $this->sc606 = SousCategorie::create([
-        'association_id' => $this->association->id,
-        'categorie_id' => $categorieDep->id,
-        'nom' => 'Achats fournitures',
-        'code_cerfa' => '606',
-    ]);
+    // Compte 606 (classe 6) pour les dépenses — DC-10a : compte-first, plus de miroir.
     $this->compte606 = Compte::firstOrCreate(
         ['association_id' => $this->association->id, 'numero_pcg' => '606'],
         [
@@ -118,7 +106,7 @@ function depenseNonPayeeData(object $ctx, float $montant = 150.0): array
             'statut_reglement' => StatutReglement::EnAttente->value,
         ],
         'lignes' => [[
-            'sous_categorie_id' => $ctx->sc606->id,
+            'compte_id' => $ctx->compte606->id,
             'montant' => (string) $montant,
             'operation_id' => null,
             'seance' => null,
@@ -148,10 +136,9 @@ it('[3b-1] dépense non payée produit T1 (60x D / 401 C, journal=Achat), pas de
 
     // T1 doit avoir une ligne 60x D (ventilation enrichie)
     $ligneVentilation = TransactionLigne::where('transaction_id', $t1->id)
-        ->where('sous_categorie_id', $this->sc606->id)
+        ->where('compte_id', $this->compte606->id)
         ->first();
     expect($ligneVentilation)->not()->toBeNull('La ligne de ventilation 606 doit exister');
-    expect($ligneVentilation->compte_id)->toBe($this->compte606->id, 'Ligne legacy enrichie avec compte_id 606');
     expect((float) $ligneVentilation->debit)->toBe(150.0, 'Ligne 606 est débitée (charge)');
 
     // T1 doit avoir une ligne 401 C (dette fournisseur)
@@ -239,7 +226,7 @@ it('[3b-3] réversion paye→non-paye (mode null via update) supprime T2 et dél
 
     // Retrouver la ligne de ventilation pour l'update
     $ligneVentilation = TransactionLigne::where('transaction_id', $t1->id)
-        ->where('sous_categorie_id', $this->sc606->id)
+        ->where('compte_id', $this->compte606->id)
         ->firstOrFail();
 
     $compte401 = compteSysteme('401');
@@ -260,7 +247,7 @@ it('[3b-3] réversion paye→non-paye (mode null via update) supprime T2 et dél
     ];
     $updateLignes = [[
         'id' => (int) $ligneVentilation->id,
-        'sous_categorie_id' => $this->sc606->id,
+        'compte_id' => $this->compte606->id,
         'montant' => '150.00',
         'operation_id' => null,
         'seance' => null,

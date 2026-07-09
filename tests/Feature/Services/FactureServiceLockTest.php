@@ -7,7 +7,7 @@ use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
 use App\Models\Operation;
-use App\Models\SousCategorie;
+use App\Models\Compte;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -46,11 +46,19 @@ function makeFactureLockedTransaction(CompteBancaire $compte): Transaction
         'montant_total' => 200.00,
     ]);
     $transaction->lignes()->forceDelete();
-    $sc = SousCategorie::factory()->create();
+    $compteVentilation = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '706F'.random_int(10, 99),
+        'intitule' => 'Compte ventilation facture',
+        'classe' => 7,
+        'actif' => true,
+    ]);
     TransactionLigne::factory()->create([
         'transaction_id' => $transaction->id,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $compteVentilation->id,
         'montant' => 200.00,
+        'debit' => 0,
+        'credit' => 200.00,
     ]);
 
     // Create validated facture linked to this transaction
@@ -82,11 +90,19 @@ function makeBrouillonFactureTransaction(CompteBancaire $compte): Transaction
         'montant_total' => 200.00,
     ]);
     $transaction->lignes()->forceDelete();
-    $sc = SousCategorie::factory()->create();
+    $compteVentilation = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '706F'.random_int(10, 99),
+        'intitule' => 'Compte ventilation facture',
+        'classe' => 7,
+        'actif' => true,
+    ]);
     TransactionLigne::factory()->create([
         'transaction_id' => $transaction->id,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $compteVentilation->id,
         'montant' => 200.00,
+        'debit' => 0,
+        'credit' => 200.00,
     ]);
 
     // Create brouillon facture linked to this transaction
@@ -119,7 +135,7 @@ it('update autorise la modification de date sur transaction facturée', function
         'reference' => $transaction->reference,
     ], [[
         'id' => $ligne->id,
-        'sous_categorie_id' => $ligne->sous_categorie_id,
+        'compte_id' => $ligne->compte_id,
         'montant' => '200.00',
         'operation_id' => $ligne->operation_id,
         'seance' => $ligne->seance,
@@ -142,7 +158,7 @@ it('update autorise la modification de libelle sur transaction facturée', funct
         'reference' => $transaction->reference,
     ], [[
         'id' => $ligne->id,
-        'sous_categorie_id' => $ligne->sous_categorie_id,
+        'compte_id' => $ligne->compte_id,
         'montant' => '200.00',
         'operation_id' => $ligne->operation_id,
         'seance' => $ligne->seance,
@@ -165,7 +181,7 @@ it('update autorise la modification de notes sur une ligne de transaction factur
         'reference' => $transaction->reference,
     ], [[
         'id' => $ligne->id,
-        'sous_categorie_id' => $ligne->sous_categorie_id,
+        'compte_id' => $ligne->compte_id,
         'montant' => '200.00',
         'operation_id' => $ligne->operation_id,
         'seance' => $ligne->seance,
@@ -190,7 +206,7 @@ it('update rejette la modification de montant_total sur transaction facturée', 
         'reference' => $transaction->reference,
     ], [[
         'id' => $ligne->id,
-        'sous_categorie_id' => $ligne->sous_categorie_id,
+        'compte_id' => $ligne->compte_id,
         'montant' => '200.00',
         'operation_id' => $ligne->operation_id,
         'seance' => $ligne->seance,
@@ -210,8 +226,8 @@ it('update rejette la modification du nombre de lignes sur transaction facturée
         'compte_id' => $transaction->compte_id,
         'reference' => $transaction->reference,
     ], [
-        ['id' => $ligne->id, 'sous_categorie_id' => $ligne->sous_categorie_id, 'montant' => '100.00', 'operation_id' => $ligne->operation_id, 'seance' => $ligne->seance, 'notes' => null],
-        ['sous_categorie_id' => $ligne->sous_categorie_id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['id' => $ligne->id, 'compte_id' => $ligne->compte_id, 'montant' => '100.00', 'operation_id' => $ligne->operation_id, 'seance' => $ligne->seance, 'notes' => null],
+        ['compte_id' => $ligne->compte_id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]))->toThrow(RuntimeException::class, 'nombre de lignes');
 });
 
@@ -228,7 +244,7 @@ it('update rejette la modification du montant d\'une ligne sur transaction factu
         'reference' => $transaction->reference,
     ], [[
         'id' => $ligne->id,
-        'sous_categorie_id' => $ligne->sous_categorie_id,
+        'compte_id' => $ligne->compte_id,
         'montant' => '150.00',
         'operation_id' => $ligne->operation_id,
         'seance' => $ligne->seance,
@@ -236,10 +252,16 @@ it('update rejette la modification du montant d\'une ligne sur transaction factu
     ]]))->toThrow(RuntimeException::class, 'montant d\'une ligne');
 });
 
-it('update rejette la modification de sous_categorie_id sur transaction facturée', function () {
+it('update rejette la modification du compte de ventilation sur transaction facturée', function () {
     $transaction = makeFactureLockedTransaction($this->compte);
     $ligne = $transaction->lignes->first();
-    $autreSousCategorie = SousCategorie::factory()->create();
+    $autreCompte = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '758F',
+        'intitule' => 'Autre compte ventilation',
+        'classe' => 7,
+        'actif' => true,
+    ]);
 
     expect(fn () => $this->service->update($transaction, [
         'date' => $transaction->date->format('Y-m-d'),
@@ -250,7 +272,7 @@ it('update rejette la modification de sous_categorie_id sur transaction facturé
         'reference' => $transaction->reference,
     ], [[
         'id' => $ligne->id,
-        'sous_categorie_id' => $autreSousCategorie->id,
+        'compte_id' => $autreCompte->id,
         'montant' => '200.00',
         'operation_id' => $ligne->operation_id,
         'seance' => $ligne->seance,
@@ -272,7 +294,7 @@ it('update rejette la modification de operation_id sur transaction facturée', f
         'reference' => $transaction->reference,
     ], [[
         'id' => $ligne->id,
-        'sous_categorie_id' => $ligne->sous_categorie_id,
+        'compte_id' => $ligne->compte_id,
         'montant' => '200.00',
         'operation_id' => $operation->id,
         'seance' => $ligne->seance,
@@ -312,10 +334,16 @@ it('supprimerAffectations rejette sur transaction facturée', function () {
 it('toutes les opérations sont autorisées sur transaction liée à une facture brouillon', function () {
     $transaction = makeBrouillonFactureTransaction($this->compte);
     $ligne = $transaction->lignes->first();
-    $autreSousCategorie = SousCategorie::factory()->create();
+    $autreCompte = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '758B',
+        'intitule' => 'Autre compte brouillon',
+        'classe' => 7,
+        'actif' => true,
+    ]);
     $operation = Operation::factory()->create();
 
-    // Update with changed sous_categorie, operation, montant_total should all work
+    // Update with changed compte, operation, montant_total should all work
     $result = $this->service->update($transaction, [
         'date' => '2025-10-20',
         'libelle' => 'Libellé brouillon modifié',
@@ -325,7 +353,7 @@ it('toutes les opérations sont autorisées sur transaction liée à une facture
         'reference' => $transaction->reference,
     ], [[
         'id' => $ligne->id,
-        'sous_categorie_id' => $autreSousCategorie->id,
+        'compte_id' => $autreCompte->id,
         'montant' => '300.00',
         'operation_id' => $operation->id,
         'seance' => null,

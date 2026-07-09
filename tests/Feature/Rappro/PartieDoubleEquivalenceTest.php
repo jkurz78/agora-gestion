@@ -209,7 +209,7 @@ function creerFixtureRappro(object $ctx): array
         'tiers_id' => $ctx->tiersA->id,
         'compte_id' => $ctx->compteBnp->id,
     ], [
-        ['sous_categorie_id' => $ctx->sc706->id, 'montant' => '300.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte706->id, 'montant' => '300.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 
     // ── R2 : Recette chèque BNP 150€ (créé via service → lignes 411D/706C/5112D/411C)
@@ -222,7 +222,7 @@ function creerFixtureRappro(object $ctx): array
         'tiers_id' => $ctx->tiersA->id,
         'compte_id' => $ctx->compteBnp->id,
     ], [
-        ['sous_categorie_id' => $ctx->sc706->id, 'montant' => '150.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte706->id, 'montant' => '150.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 
     // ── D1 : Dépense virement BNP 200€ (créé via service → lignes 606D/401C/401D/512XC)
@@ -235,7 +235,7 @@ function creerFixtureRappro(object $ctx): array
         'tiers_id' => $ctx->tiersB->id,
         'compte_id' => $ctx->compteBnp->id,
     ], [
-        ['sous_categorie_id' => $ctx->sc606->id, 'montant' => '200.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte606->id, 'montant' => '200.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 
     // ── D2 : Dépense chèque BNP 75€
@@ -248,7 +248,7 @@ function creerFixtureRappro(object $ctx): array
         'tiers_id' => $ctx->tiersB->id,
         'compte_id' => $ctx->compteBnp->id,
     ], [
-        ['sous_categorie_id' => $ctx->sc606->id, 'montant' => '75.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte606->id, 'montant' => '75.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 
     // ── REMISE : 2 chèques (R2 = 150€ + un 3ème chèque C1 = 100€) déposés en remise
@@ -262,7 +262,7 @@ function creerFixtureRappro(object $ctx): array
         'tiers_id' => $ctx->tiersB->id,
         'compte_id' => $ctx->compteBnp->id,
     ], [
-        ['sous_categorie_id' => $ctx->sc706->id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte706->id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 
     // C2 : 3ème chèque pour tester une remise à 3 sources
@@ -275,7 +275,7 @@ function creerFixtureRappro(object $ctx): array
         'tiers_id' => $ctx->tiersA->id,
         'compte_id' => $ctx->compteBnp->id,
     ], [
-        ['sous_categorie_id' => $ctx->sc706->id, 'montant' => '80.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte706->id, 'montant' => '80.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 
     // Comptabiliser la remise avec les 3 chèques : crée T4 avec ligne 512X D total (330€)
@@ -300,7 +300,7 @@ function creerFixtureRappro(object $ctx): array
     FactureLigne::create([
         'facture_id' => $facture->id,
         'type' => TypeLigneFacture::MontantManuel->value,
-        'sous_categorie_id' => $ctx->sc706->id,
+        'compte_id' => $ctx->compte706->id,
         'libelle' => 'Formation octobre',
         'montant' => 400.00,
         'ordre' => 1,
@@ -334,7 +334,7 @@ function creerFixtureRappro(object $ctx): array
         'tiers_id' => $ctx->tiersA->id,
         'compte_id' => $ctx->compteCl->id,
     ], [
-        ['sous_categorie_id' => $ctx->sc706->id, 'montant' => '500.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte706->id, 'montant' => '500.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 
     return [

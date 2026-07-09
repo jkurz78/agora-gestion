@@ -79,7 +79,7 @@ function creerEtValiderFacture(
         FactureLigne::create([
             'facture_id' => $facture->id,
             'type' => TypeLigneFacture::MontantManuel->value,
-            'sous_categorie_id' => $spec['sous_categorie_id'],
+            'compte_id' => $spec['compte_id'] ?? null,
             'libelle' => $spec['libelle'] ?? 'Ligne '.($i + 1),
             'montant' => $spec['montant'],
             'ordre' => $i + 1,
@@ -97,7 +97,7 @@ function creerEtValiderFacture(
 
 it('facture 1 ligne MontantManuel → Transaction avec 2 lignes PD (706 C + 411 D tiers)', function () {
     $facture = creerEtValiderFacture($this, [
-        ['sous_categorie_id' => $this->sc706->id, 'montant' => 150.00, 'libelle' => 'Cotisation annuelle'],
+        ['compte_id' => $this->compte706->id, 'montant' => 150.00, 'libelle' => 'Cotisation annuelle'],
     ], ModePaiement::Cheque);
 
     // 1 Transaction générée et attachée
@@ -140,8 +140,8 @@ it('facture 1 ligne MontantManuel → Transaction avec 2 lignes PD (706 C + 411 
 
 it('facture 2 lignes MontantManuel → 3 lignes PD (2 ventilations + 1 ligne 411 D agrégée)', function () {
     $facture = creerEtValiderFacture($this, [
-        ['sous_categorie_id' => $this->sc706->id, 'montant' => 100.00, 'libelle' => 'Cotisation'],
-        ['sous_categorie_id' => $this->sc758->id, 'montant' => 50.00, 'libelle' => 'Produit divers'],
+        ['compte_id' => $this->compte706->id, 'montant' => 100.00, 'libelle' => 'Cotisation'],
+        ['compte_id' => $this->compte758->id, 'montant' => 50.00, 'libelle' => 'Produit divers'],
     ]);
 
     $tx = $facture->transactions()->first();
@@ -181,7 +181,7 @@ it('facture 2 lignes MontantManuel → 3 lignes PD (2 ventilations + 1 ligne 411
 
 it('solde ouvert 411 du tiers = montant_total facture (créance non lettrée)', function () {
     $facture = creerEtValiderFacture($this, [
-        ['sous_categorie_id' => $this->sc706->id, 'montant' => 200.00],
+        ['compte_id' => $this->compte706->id, 'montant' => 200.00],
     ]);
 
     $compte411 = compteSysteme('411');
@@ -201,21 +201,22 @@ it('solde ouvert 411 du tiers = montant_total facture (créance non lettrée)', 
 // Scénario 4 : Lignes legacy conservées intactes + lien FactureLigne::transaction_ligne_id
 // ---------------------------------------------------------------------------
 
-it('lignes legacy conservées intactes avec sous_categorie_id, montant, notes et transaction_ligne_id', function () {
+it('lignes de ventilation conservées intactes avec compte_id, montant, notes et transaction_ligne_id', function () {
     $facture = creerEtValiderFacture($this, [
-        ['sous_categorie_id' => $this->sc706->id, 'montant' => 75.50, 'libelle' => 'Cotisation sportive'],
-        ['sous_categorie_id' => $this->sc758->id, 'montant' => 24.50, 'libelle' => 'Produit secondaire'],
+        ['compte_id' => $this->compte706->id, 'montant' => 75.50, 'libelle' => 'Cotisation sportive'],
+        ['compte_id' => $this->compte758->id, 'montant' => 24.50, 'libelle' => 'Produit secondaire'],
     ]);
 
     $tx = $facture->transactions()->first();
-    $lignesLegacy = TransactionLigne::where('transaction_id', $tx->id)
-        ->whereNotNull('sous_categorie_id') // les lignes legacy ont un sous_categorie_id
+    // DC-10a : les lignes de ventilation portent compte_id classe 7 (compte-first).
+    $lignesVentilation = TransactionLigne::where('transaction_id', $tx->id)
+        ->ventilation()
         ->get();
 
-    expect($lignesLegacy)->toHaveCount(2);
+    expect($lignesVentilation)->toHaveCount(2);
 
-    foreach ($lignesLegacy as $ligne) {
-        expect($ligne->sous_categorie_id)->not->toBeNull();
+    foreach ($lignesVentilation as $ligne) {
+        expect($ligne->compte_id)->not->toBeNull();
         expect((float) $ligne->montant)->toBeGreaterThan(0.0);
     }
 
@@ -265,8 +266,10 @@ it('facture sans ligne MontantManuel → aucune Transaction générée', functio
 
     $txLigne = TransactionLigne::create([
         'transaction_id' => $txExistante->id,
-        'sous_categorie_id' => $this->sc706->id,
+        'compte_id' => $this->compte706->id,
         'montant' => 80.00,
+        'debit' => 0,
+        'credit' => 80.00,
     ]);
 
     $this->service->ajouterTransactions($facture, [$txExistante->id]);
@@ -288,7 +291,7 @@ it('facture sans ligne MontantManuel → aucune Transaction générée', functio
 it('FEC-conformité : aucune ligne classe 5 créée (créance pure, pas de trésorerie)', function () {
     // Même avec un mode_paiement_prevu renseigné, la validation crée une créance pure
     $facture = creerEtValiderFacture($this, [
-        ['sous_categorie_id' => $this->sc706->id, 'montant' => 300.00],
+        ['compte_id' => $this->compte706->id, 'montant' => 300.00],
     ], ModePaiement::Virement);
 
     $tx = $facture->transactions()->first();
@@ -316,7 +319,7 @@ it('FEC-conformité : aucune ligne classe 5 créée (créance pure, pas de trés
 
 it('aucun lettrage auto créé lors de la validation (la créance reste ouverte)', function () {
     $facture = creerEtValiderFacture($this, [
-        ['sous_categorie_id' => $this->sc706->id, 'montant' => 120.00],
+        ['compte_id' => $this->compte706->id, 'montant' => 120.00],
     ]);
 
     $tx = $facture->transactions()->first();
@@ -328,22 +331,27 @@ it('aucun lettrage auto créé lors de la validation (la créance reste ouverte)
 });
 
 // ---------------------------------------------------------------------------
-// Scénario 8 : Skip silencieux si sous-catégorie sans code_cerfa (I2 couverture)
+// Scénario 8 : Skip silencieux si compte de ventilation de classe invalide (≠ 7)
 // ---------------------------------------------------------------------------
 
-it('facture ligne MontantManuel avec SC sans code_cerfa — Transaction créée, skip gracieux, pas de ligne 411', function () {
+it('facture ligne MontantManuel avec compte de classe invalide — Transaction créée, skip gracieux, pas de ligne 411', function () {
     Log::spy();
 
-    // SC sans code_cerfa (skip attendu)
-    $scSansCode = SousCategorie::create([
-        'association_id' => $this->association->id,
-        'categorie_id' => Categorie::where('association_id', $this->association->id)->first()->id,
-        'nom' => 'Divers sans code cerfa',
-        'code_cerfa' => null,
-    ]);
+    // Compte classe 6 (invalide pour une recette — skip attendu)
+    $compteClasse6 = Compte::firstOrCreate(
+        ['association_id' => $this->association->id, 'numero_pcg' => '606'],
+        [
+            'intitule' => 'Achats non stockés',
+            'classe' => 6,
+            'lettrable' => false,
+            'actif' => true,
+            'est_systeme' => false,
+            'pour_inscriptions' => false,
+        ]
+    );
 
     $facture = creerEtValiderFacture($this, [
-        ['sous_categorie_id' => $scSansCode->id, 'montant' => 60.00, 'libelle' => 'Ligne sans code cerfa'],
+        ['compte_id' => $compteClasse6->id, 'montant' => 60.00, 'libelle' => 'Ligne compte invalide'],
     ]);
 
     // La facture passe bien en statut Validee (skip gracieux)
@@ -354,25 +362,25 @@ it('facture ligne MontantManuel avec SC sans code_cerfa — Transaction créée,
     $tx = $facture->transactions()->first();
     expect($tx)->not->toBeNull();
 
-    // La ligne legacy est créée avec sous_categorie_id et montant intacts
+    // La ligne est créée sans compte ni crédit (PD skippée, montant intact)
     $ligneVent = TransactionLigne::where('transaction_id', $tx->id)
-        ->where('sous_categorie_id', $scSansCode->id)
+        ->whereNull('compte_id')
         ->first();
     expect($ligneVent)->not->toBeNull();
-    expect($ligneVent->compte_id)->toBeNull('Pas d\'enrichissement compte_id sans code_cerfa');
-    expect((float) $ligneVent->credit)->toBe(0.0, 'Pas de crédit enrichi sans code_cerfa');
+    expect((float) $ligneVent->montant)->toBe(60.0);
+    expect((float) $ligneVent->credit)->toBe(0.0, 'Pas de crédit posé si compte invalide');
 
     // Aucune ligne 411 PD-only (le skip arrête toute la double écriture)
     $compte411 = compteSysteme('411');
     $count411 = TransactionLigne::where('transaction_id', $tx->id)
         ->where('compte_id', $compte411->id)
         ->count();
-    expect($count411)->toBe(0, 'Aucune ligne 411 si résolution compte échoue');
+    expect($count411)->toBe(0, 'Aucune ligne 411 si le compte de ventilation est invalide');
 
     // Le Log::warning a été émis (comportement documenté du skip)
     Log::shouldHaveReceived('warning')
         ->once()
         ->withArgs(function (string $message): bool {
-            return str_contains($message, '[PartieDouble]') && str_contains($message, 'code_cerfa');
+            return str_contains($message, '[PartieDouble]') && str_contains($message, 'classe');
         });
 });

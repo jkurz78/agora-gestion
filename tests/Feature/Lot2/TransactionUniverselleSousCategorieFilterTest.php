@@ -2,20 +2,41 @@
 
 declare(strict_types=1);
 
+use App\Enums\UsageComptable;
 use App\Livewire\TransactionUniverselle;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
-use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
+// DC-10a : le filtre par usage lit usages_sous_categories.compte_id — les
+// fixtures créent des comptes (classe 7) flaggés, plus de sous-catégories.
+function compteRecetteFiltreTest(string $numeroPcg, ?UsageComptable $usage = null): Compte
+{
+    $compte = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => $numeroPcg,
+        'intitule' => 'Compte test '.$numeroPcg,
+        'classe' => 7,
+        'actif' => true,
+    ]);
+
+    if ($usage !== null) {
+        $compte->usages()->create(['usage' => $usage->value]);
+    }
+
+    return $compte;
+}
+
 it('filters transactions by sous-categorie pour_dons flag', function () {
     $compte = CompteBancaire::factory()->create();
-    $scDon = SousCategorie::factory()->pourDons()->create();
-    $scAutre = SousCategorie::factory()->create();
+    $compteDon = compteRecetteFiltreTest('754T', UsageComptable::Don);
+    $compteAutre = compteRecetteFiltreTest('706T');
 
     $today = now()->toDateString();
 
@@ -28,8 +49,10 @@ it('filters transactions by sous-categorie pour_dons flag', function () {
     TransactionLigne::where('transaction_id', $txDon->id)->delete();
     TransactionLigne::factory()->create([
         'transaction_id' => $txDon->id,
-        'sous_categorie_id' => $scDon->id,
+        'compte_id' => $compteDon->id,
         'montant' => 100,
+        'debit' => 0,
+        'credit' => 100,
     ]);
 
     $txAutre = Transaction::factory()->asRecette()->create([
@@ -40,8 +63,10 @@ it('filters transactions by sous-categorie pour_dons flag', function () {
     TransactionLigne::where('transaction_id', $txAutre->id)->delete();
     TransactionLigne::factory()->create([
         'transaction_id' => $txAutre->id,
-        'sous_categorie_id' => $scAutre->id,
+        'compte_id' => $compteAutre->id,
         'montant' => 50,
+        'debit' => 0,
+        'credit' => 50,
     ]);
 
     Livewire::test(TransactionUniverselle::class, [
@@ -53,8 +78,8 @@ it('filters transactions by sous-categorie pour_dons flag', function () {
 
 it('filters transactions by sous-categorie pour_cotisations flag', function () {
     $compte = CompteBancaire::factory()->create();
-    $scCot = SousCategorie::factory()->pourCotisations()->create();
-    $scAutre = SousCategorie::factory()->create();
+    $compteCot = compteRecetteFiltreTest('756T', UsageComptable::Cotisation);
+    $compteAutre = compteRecetteFiltreTest('706U');
 
     $today = now()->toDateString();
 
@@ -66,8 +91,10 @@ it('filters transactions by sous-categorie pour_cotisations flag', function () {
     TransactionLigne::where('transaction_id', $txCot->id)->delete();
     TransactionLigne::factory()->create([
         'transaction_id' => $txCot->id,
-        'sous_categorie_id' => $scCot->id,
+        'compte_id' => $compteCot->id,
         'montant' => 80,
+        'debit' => 0,
+        'credit' => 80,
     ]);
 
     $txAutre = Transaction::factory()->asRecette()->create([
@@ -78,8 +105,10 @@ it('filters transactions by sous-categorie pour_cotisations flag', function () {
     TransactionLigne::where('transaction_id', $txAutre->id)->delete();
     TransactionLigne::factory()->create([
         'transaction_id' => $txAutre->id,
-        'sous_categorie_id' => $scAutre->id,
+        'compte_id' => $compteAutre->id,
         'montant' => 30,
+        'debit' => 0,
+        'credit' => 30,
     ]);
 
     Livewire::test(TransactionUniverselle::class, [

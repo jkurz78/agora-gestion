@@ -21,7 +21,6 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\Compta\CompteTresorerieResolver;
-use App\Services\Compta\CompteVentilationResolver;
 use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\EtatReglementResolver;
 use App\Services\Compta\PartieDoubleGuard;
@@ -390,8 +389,8 @@ final class FactureService
     /**
      * Mise à jour du compte de ventilation d'une ligne manuelle (MontantManuel).
      *
-     * DC-8 : écrit compte_id — le trait SyncCompteDepuisSousCategorie resynchronise
-     * le miroir sous_categorie_id. Nom de méthode conservé jusqu'à DC-10.
+     * DC-10a : écrit compte_id (source unique de la ventilation).
+     * Nom de méthode conservé jusqu'au drop DC-10b (rename différé).
      *
      * @throws \RuntimeException si la facture n'est pas brouillon, si le tenant ne correspond pas,
      *                           ou si la ligne n'est pas de type MontantManuel
@@ -811,7 +810,7 @@ XML;
      * Ajoute une ligne manuelle de type MontantManuel à une facture brouillon.
      *
      * $attrs accepte : libelle (requis), prix_unitaire (requis, > 0), quantite (requis, > 0),
-     * sous_categorie_id (optionnel), operation_id (optionnel), seance (optionnel).
+     * compte_id (optionnel), operation_id (optionnel), seance (optionnel).
      *
      * @param  array<string, mixed>  $attrs
      *
@@ -845,10 +844,8 @@ XML;
                 'quantite' => $quantite,
                 'montant' => $montant,
                 'transaction_ligne_id' => null,
-                // DC-8 : compte_id en principal ; sous_categorie_id encore accepté
-                // (appelants legacy) — le trait synchronise la colonne manquante.
+                // DC-10a : la ventilation est portée par compte_id (source unique).
                 'compte_id' => $attrs['compte_id'] ?? null,
-                'sous_categorie_id' => $attrs['sous_categorie_id'] ?? null,
                 'operation_id' => $attrs['operation_id'] ?? null,
                 'seance' => $attrs['seance'] ?? null,
                 'ordre' => $maxOrdre + 1,
@@ -883,7 +880,7 @@ XML;
                 'quantite' => null,
                 'montant' => null,
                 'transaction_ligne_id' => null,
-                'sous_categorie_id' => null,
+                'compte_id' => null,
                 'operation_id' => null,
                 'seance' => null,
                 'ordre' => $maxOrdre + 1,
@@ -971,7 +968,7 @@ XML;
      * Exécutés AVANT toute mutation et AVANT l'attribution du numéro.
      *
      * 1. mode_paiement_prevu doit être non-null.
-     * 2. Chaque ligne MontantManuel doit avoir sous_categorie_id non-null.
+     * 2. Chaque ligne MontantManuel doit avoir compte_id non-null.
      *
      * Si la facture ne porte aucune ligne MontantManuel, cette méthode est no-op
      * (les factures classiques ne sont pas impactées).
@@ -994,9 +991,9 @@ XML;
             );
         }
 
-        // DC-8 : ventilation compte-first (repli sous_categorie_id legacy jusqu'à DC-10)
+        // DC-10a : ventilation compte-first (source unique).
         $lignesSansVentilation = $lignesManuelles->filter(
-            fn (FactureLigne $l) => $l->compte_id === null && $l->sous_categorie_id === null
+            fn (FactureLigne $l) => $l->compte_id === null
         );
 
         if ($lignesSansVentilation->isNotEmpty()) {
@@ -1046,50 +1043,38 @@ XML;
         $skipPartieDouble = false;
 
         foreach ($lignesManuelles as $factureLigne) {
+            // 4. Résolution du Compte (classe 7 attendue pour recette).
+            // DC-10a — compte_id de la FactureLigne est la source unique de ventilation.
+            $compte = $factureLigne->compte_id !== null ? $factureLigne->compte : null;
+
+            if ($compte !== null && (int) $compte->classe !== 7) {
+                Log::warning('[PartieDouble][FactureService] — skip : compte_id porté par la ligne invalide (classe ≠ 7)', [
+                    'transaction_id' => (int) $transaction->id,
+                    'facture_ligne_id' => (int) $factureLigne->id,
+                    'compte_id' => $factureLigne->compte_id,
+                ]);
+                $compte = null;
+            }
+
+            // 2. Crée la TransactionLigne compte-first : compte_id + credit posés à la
+            // création (recette), invariant XOR satisfait d'emblée. Compte invalide →
+            // ligne sans compte (PD skippée, best-effort).
             $transactionLigne = TransactionLigne::create([
                 'transaction_id' => $transaction->id,
-                'sous_categorie_id' => $factureLigne->sous_categorie_id,
+                'compte_id' => $compte?->id,
                 'operation_id' => $factureLigne->operation_id,
                 'seance' => $factureLigne->seance,
                 'montant' => $factureLigne->montant,
                 'notes' => $factureLigne->libelle,
+                'debit' => 0,
+                'credit' => $compte !== null ? (float) $factureLigne->montant : 0,
             ]);
 
             // 3. Lie la FactureLigne à sa TransactionLigne
             $factureLigne->update(['transaction_ligne_id' => $transactionLigne->id]);
 
-            // 4. Résolution du Compte (classe 7 attendue pour recette).
-            // DC-5 — lit compte_id sur la FactureLigne (rempli par le trait de double
-            // écriture DC-3) en priorité ; retombe sur le resolver sous_categorie_id
-            // si absent (fixture pré-DC-2, ou sous-catégorie sans code_cerfa).
             if (! $skipPartieDouble) {
-                $compte = $factureLigne->compte_id !== null
-                    ? $factureLigne->compte
-                    : CompteVentilationResolver::resoudre(
-                        sousCategorieId: $transactionLigne->sous_categorie_id !== null ? (int) $transactionLigne->sous_categorie_id : null,
-                        classeAttendue: 7,
-                        contextLog: 'FactureService',
-                        contextLogData: ['transaction_id' => (int) $transaction->id],
-                    );
-
-                if ($compte !== null && (int) $compte->classe !== 7) {
-                    Log::warning('[PartieDouble][FactureService] — skip : compte_id porté par la ligne invalide (classe ≠ 7)', [
-                        'transaction_id' => (int) $transaction->id,
-                        'facture_ligne_id' => (int) $factureLigne->id,
-                        'compte_id' => $factureLigne->compte_id,
-                    ]);
-                    $compte = null;
-                }
-
                 if ($compte !== null) {
-                    // Enrichir la ligne legacy avec les colonnes partie double (recette → C credit)
-                    // Passe par fill+save pour déclencher l'observer XOR (même pattern que Step 21).
-                    $transactionLigne->fill([
-                        'compte_id' => $compte->id,
-                        'debit' => 0.0,
-                        'credit' => (float) $factureLigne->montant,
-                    ])->save();
-
                     $ventilations[] = [
                         'compte' => $compte,
                         'montant' => (float) $factureLigne->montant,

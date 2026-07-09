@@ -63,7 +63,7 @@ function creerRecetteZombie(object $ctx, float $montant = 100.0): Transaction
         'compte_id' => $ctx->compteBancaire->id,
     ];
     $lignes = [[
-        'sous_categorie_id' => $ctx->sc706->id,
+        'compte_id' => $ctx->compte706->id,
         'montant' => (string) $montant,
         'operation_id' => null,
         'seance' => null,
@@ -89,7 +89,7 @@ function creerDepenseZombie(object $ctx, float $montant = 100.0): Transaction
         'compte_id' => $ctx->compteBancaire->id,
     ];
     $lignes = [[
-        'sous_categorie_id' => $ctx->sc606->id,
+        'compte_id' => $ctx->compte606->id,
         'montant' => (string) $montant,
         'operation_id' => null,
         'seance' => null,
@@ -127,7 +127,7 @@ test('update montant T1 recette supprime ancien T2 et recrée avec nouveau monta
         'compte_id' => $this->compteBancaire->id,
     ], [[
         'id' => null,
-        'sous_categorie_id' => $this->sc706->id,
+        'compte_id' => $this->compte706->id,
         'montant' => '150.00',
         'operation_id' => null,
         'seance' => null,
@@ -192,7 +192,7 @@ test('update montant T1 dépense supprime ancien T2 et recrée', function () {
         'compte_id' => $this->compteBancaire->id,
     ], [[
         'id' => null,
-        'sous_categorie_id' => $this->sc606->id,
+        'compte_id' => $this->compte606->id,
         'montant' => '250.00',
         'operation_id' => null,
         'seance' => null,
@@ -265,7 +265,7 @@ test('update mode paiement T1 recrée T2 avec nouveau mode', function () {
         'compte_id' => $this->compteBancaire->id,
     ], [[
         'id' => null,
-        'sous_categorie_id' => $this->sc706->id,
+        'compte_id' => $this->compte706->id,
         'montant' => '100.00',
         'operation_id' => null,
         'seance' => null,

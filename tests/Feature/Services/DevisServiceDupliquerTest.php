@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 use App\Enums\StatutDevis;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\Devis;
 use App\Models\DevisLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\User;
 use App\Services\DevisService;
@@ -171,10 +171,16 @@ describe('dupliquer() — champs du nouveau devis', function () {
 // ─── Copie des lignes ──────────────────────────────────────────────────────────
 
 describe('dupliquer() — lignes recopiées', function () {
-    it('recopie 3 lignes avec libelle, prix_unitaire, quantite, montant, sous_categorie_id et ordre', function () {
+    it('recopie 3 lignes avec libelle, prix_unitaire, quantite, montant, compte_id et ordre', function () {
         $source = Devis::factory()->brouillon()->create(['montant_total' => 0]);
 
-        $sous_cat = SousCategorie::factory()->create();
+        $compteVentilation = Compte::create([
+            'association_id' => TenantContext::currentId(),
+            'numero_pcg' => '706D',
+            'intitule' => 'Prestations devis',
+            'classe' => 7,
+            'actif' => true,
+        ]);
 
         DevisLigne::factory()->create([
             'devis_id' => $source->id,
@@ -183,7 +189,7 @@ describe('dupliquer() — lignes recopiées', function () {
             'prix_unitaire' => 100.00,
             'quantite' => 2.0,
             'montant' => 200.00,
-            'sous_categorie_id' => $sous_cat->id,
+            'compte_id' => $compteVentilation->id,
         ]);
 
         DevisLigne::factory()->create([
@@ -193,7 +199,7 @@ describe('dupliquer() — lignes recopiées', function () {
             'prix_unitaire' => 50.50,
             'quantite' => 3.0,
             'montant' => 151.50,
-            'sous_categorie_id' => null,
+            'compte_id' => null,
         ]);
 
         DevisLigne::factory()->create([
@@ -203,7 +209,7 @@ describe('dupliquer() — lignes recopiées', function () {
             'prix_unitaire' => 25.00,
             'quantite' => 1.0,
             'montant' => 25.00,
-            'sous_categorie_id' => $sous_cat->id,
+            'compte_id' => $compteVentilation->id,
         ]);
 
         $nouveau = $this->service->dupliquer($source);
@@ -216,21 +222,21 @@ describe('dupliquer() — lignes recopiées', function () {
             ->and((float) $lignesNouveau[0]->prix_unitaire)->toBe(100.0)
             ->and((float) $lignesNouveau[0]->quantite)->toBe(2.0)
             ->and((float) $lignesNouveau[0]->montant)->toBe(200.0)
-            ->and((int) $lignesNouveau[0]->sous_categorie_id)->toBe((int) $sous_cat->id)
+            ->and((int) $lignesNouveau[0]->compte_id)->toBe((int) $compteVentilation->id)
             ->and((int) $lignesNouveau[0]->ordre)->toBe(1);
 
         expect($lignesNouveau[1]->libelle)->toBe('Prestation B')
             ->and((float) $lignesNouveau[1]->prix_unitaire)->toBe(50.5)
             ->and((float) $lignesNouveau[1]->quantite)->toBe(3.0)
             ->and((float) $lignesNouveau[1]->montant)->toBe(151.5)
-            ->and($lignesNouveau[1]->sous_categorie_id)->toBeNull()
+            ->and($lignesNouveau[1]->compte_id)->toBeNull()
             ->and((int) $lignesNouveau[1]->ordre)->toBe(2);
 
         expect($lignesNouveau[2]->libelle)->toBe('Frais divers')
             ->and((float) $lignesNouveau[2]->prix_unitaire)->toBe(25.0)
             ->and((float) $lignesNouveau[2]->quantite)->toBe(1.0)
             ->and((float) $lignesNouveau[2]->montant)->toBe(25.0)
-            ->and((int) $lignesNouveau[2]->sous_categorie_id)->toBe((int) $sous_cat->id)
+            ->and((int) $lignesNouveau[2]->compte_id)->toBe((int) $compteVentilation->id)
             ->and((int) $lignesNouveau[2]->ordre)->toBe(3);
     });
 
@@ -244,7 +250,7 @@ describe('dupliquer() — lignes recopiées', function () {
             'prix_unitaire' => 200.00,
             'quantite' => 1.0,
             'montant' => 200.00,
-            'sous_categorie_id' => null,
+            'compte_id' => null,
         ]);
 
         DevisLigne::factory()->create([
@@ -254,7 +260,7 @@ describe('dupliquer() — lignes recopiées', function () {
             'prix_unitaire' => 150.00,
             'quantite' => 1.0,
             'montant' => 150.00,
-            'sous_categorie_id' => null,
+            'compte_id' => null,
         ]);
 
         $nouveau = $this->service->dupliquer($source);

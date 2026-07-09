@@ -47,7 +47,7 @@ it('valider() avec lignes MontantManuel et PD active → Transaction.equilibree 
     FactureLigne::create([
         'facture_id' => $facture->id,
         'type' => TypeLigneFacture::MontantManuel->value,
-        'sous_categorie_id' => $this->sc706->id,
+        'compte_id' => $this->compte706->id,
         'libelle' => 'Cotisation annuelle',
         'montant' => 150.00,
         'ordre' => 1,

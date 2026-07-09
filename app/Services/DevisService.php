@@ -80,8 +80,7 @@ final class DevisService
      * son numéro (rebascule). Le statut résultant est Brouillon dans les deux cas.
      *
      * Clés acceptées dans $data : libelle (requis), prix_unitaire (requis),
-     * quantite (défaut 1), compte_id (nullable — DC-8, le trait remplit le
-     * miroir sous_categorie_id).
+     * quantite (défaut 1), compte_id (nullable).
      *
      * @param  array<string, mixed>  $data
      *
@@ -128,7 +127,7 @@ final class DevisService
      * Ajoute une ligne de type texte (commentaire / titre de section) au devis.
      *
      * Une ligne texte porte uniquement un libellé ; prix_unitaire, quantite, montant
-     * et sous_categorie_id sont nuls. Elle n'impacte pas le montant_total.
+     * et compte_id sont nuls. Elle n'impacte pas le montant_total.
      *
      * Mêmes guards que ajouterLigne : refuse si statut verrouillé (Accepte/Refuse/Annule).
      * Si le devis est au statut Valide, le repasse en Brouillon (rebascule).
@@ -156,7 +155,7 @@ final class DevisService
                 'prix_unitaire' => null,
                 'quantite' => null,
                 'montant' => null,
-                'sous_categorie_id' => null,
+                'compte_id' => null,
             ]);
 
             $this->rebasculerSiEnvoye($locked);
@@ -229,7 +228,7 @@ final class DevisService
      * son numéro (rebascule). Le statut résultant est Brouillon dans les deux cas.
      *
      * Seuls les champs fournis dans $data sont mis à jour.
-     * Clés acceptées : libelle, prix_unitaire, quantite, sous_categorie_id.
+     * Clés acceptées : libelle, prix_unitaire, quantite, compte_id.
      *
      * @param  array<string, mixed>  $data
      *
@@ -254,8 +253,8 @@ final class DevisService
                 $updates['libelle'] = $data['libelle'];
             }
 
-            if (array_key_exists('sous_categorie_id', $data)) {
-                $updates['sous_categorie_id'] = $data['sous_categorie_id'];
+            if (array_key_exists('compte_id', $data)) {
+                $updates['compte_id'] = $data['compte_id'];
             }
 
             if (array_key_exists('prix_unitaire', $data)) {
@@ -526,7 +525,7 @@ final class DevisService
      *   tiers_id et libelle copiés depuis la source, association_id hérité de TenantModel,
      *   saisi_par_user_id = auth()->id(), aucune trace accepte/refuse/annule
      * - Lignes recopiées à l'identique (libelle, prix_unitaire, quantite, montant,
-     *   sous_categorie_id, ordre)
+     *   compte_id, ordre)
      * - montant_total = somme des montants des lignes copiées
      * - Aucun lien retour vers le devis source (pas de parent_id)
      */
@@ -571,7 +570,7 @@ final class DevisService
                     'prix_unitaire' => $ligne->prix_unitaire,
                     'quantite' => $ligne->quantite,
                     'montant' => $ligne->montant,
-                    'sous_categorie_id' => $ligne->sous_categorie_id,
+                    'compte_id' => $ligne->compte_id,
                 ]);
             }
 
@@ -589,7 +588,7 @@ final class DevisService
      *
      * Mapping des lignes :
      * - DevisLigne type Montant → FactureLigne type MontantManuel
-     *   (libelle, prix_unitaire, quantite, montant = PU × Qté, sous_categorie_id recopiés)
+     *   (libelle, prix_unitaire, quantite, montant = PU × Qté, compte_id recopiés)
      * - DevisLigne type Texte → FactureLigne type Texte (libelle seul, reste null)
      *
      * L'ordre des lignes est préservé. Le devis source reste à l'état Accepté.
@@ -698,7 +697,7 @@ final class DevisService
                 'quantite' => null,
                 'montant' => null,
                 'transaction_ligne_id' => null,
-                'sous_categorie_id' => null,
+                'compte_id' => null,
                 'operation_id' => null,
                 'seance' => null,
             ]);
@@ -716,7 +715,7 @@ final class DevisService
             'quantite' => (float) $ligne->quantite,
             'montant' => $montant,
             'transaction_ligne_id' => null,
-            'sous_categorie_id' => $ligne->sous_categorie_id !== null ? (int) $ligne->sous_categorie_id : null,
+            'compte_id' => $ligne->compte_id !== null ? (int) $ligne->compte_id : null,
             'operation_id' => null,
             'seance' => null,
         ]);

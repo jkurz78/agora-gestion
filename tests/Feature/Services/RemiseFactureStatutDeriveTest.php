@@ -105,7 +105,7 @@ function sdCreerFactureT1(object $ctx): array
     FactureLigne::create([
         'facture_id' => $facture->id,
         'type' => TypeLigneFacture::MontantManuel->value,
-        'sous_categorie_id' => $ctx->sc706->id,
+        'compte_id' => $ctx->compte706->id,
         'libelle' => 'Cotisation test SD',
         'montant' => 150.00,
         'ordre' => 1,

@@ -176,8 +176,8 @@ final class TransactionUniverselleService
                 t.type as tiers_type,
                 tx.tiers_id,
                 tx.libelle,
-                (SELECT sc.nom FROM transaction_lignes tl
-                 JOIN sous_categories sc ON sc.id = tl.sous_categorie_id
+                (SELECT c.intitule FROM transaction_lignes tl
+                 JOIN comptes c ON c.id = tl.compte_id AND c.classe IN (6, 7)
                  WHERE tl.transaction_id = tx.id ORDER BY tl.id LIMIT 1) as categorie_label,
                 (SELECT COUNT(*) FROM transaction_lignes WHERE transaction_id = tx.id) as nb_lignes,
                 tx.compte_id,
@@ -209,7 +209,7 @@ final class TransactionUniverselleService
             ->when($usageFilter !== null, fn ($q) => $q->whereExists(function ($sub) use ($usageFilter) {
                 $sub->select(DB::raw(1))
                     ->from('transaction_lignes as tl_filter')
-                    ->join('usages_sous_categories as usc_filter', 'usc_filter.sous_categorie_id', '=', 'tl_filter.sous_categorie_id')
+                    ->join('usages_sous_categories as usc_filter', 'usc_filter.compte_id', '=', 'tl_filter.compte_id')
                     ->whereColumn('tl_filter.transaction_id', 'tx.id')
                     ->where('usc_filter.usage', $usageFilter->value);
             }))
@@ -242,8 +242,8 @@ final class TransactionUniverselleService
                 t.type as tiers_type,
                 tx.tiers_id,
                 tx.libelle,
-                (SELECT sc.nom FROM transaction_lignes tl
-                 JOIN sous_categories sc ON sc.id = tl.sous_categorie_id
+                (SELECT c.intitule FROM transaction_lignes tl
+                 JOIN comptes c ON c.id = tl.compte_id AND c.classe IN (6, 7)
                  WHERE tl.transaction_id = tx.id ORDER BY tl.id LIMIT 1) as categorie_label,
                 (SELECT COUNT(*) FROM transaction_lignes WHERE transaction_id = tx.id) as nb_lignes,
                 tx.compte_id,
@@ -275,7 +275,7 @@ final class TransactionUniverselleService
             ->when($usageFilter !== null, fn ($q) => $q->whereExists(function ($sub) use ($usageFilter) {
                 $sub->select(DB::raw(1))
                     ->from('transaction_lignes as tl_filter')
-                    ->join('usages_sous_categories as usc_filter', 'usc_filter.sous_categorie_id', '=', 'tl_filter.sous_categorie_id')
+                    ->join('usages_sous_categories as usc_filter', 'usc_filter.compte_id', '=', 'tl_filter.compte_id')
                     ->whereColumn('tl_filter.transaction_id', 'tx.id')
                     ->where('usc_filter.usage', $usageFilter->value);
             }))

@@ -31,7 +31,7 @@ it('pointage d\'une recette virement → statut dérivé Pointe ; dépointage �
         'tiers_id' => $this->tiers->id,
         'compte_id' => $this->compteBancaire->id,
     ], [[
-        'sous_categorie_id' => $this->sc706->id,
+        'compte_id' => $this->compte706->id,
         'montant' => '100.00',
         'operation_id' => null, 'seance' => null, 'notes' => null,
     ]]);
@@ -56,7 +56,7 @@ it('comptabilisation d\'une remise chèque → statut miroir passe EnMain à Rec
         'tiers_id' => $this->tiers->id,
         'compte_id' => $this->compteBancaire->id,
     ], [[
-        'sous_categorie_id' => $this->sc706->id,
+        'compte_id' => $this->compte706->id,
         'montant' => '100.00',
         'operation_id' => null, 'seance' => null, 'notes' => null,
     ]]);
@@ -84,7 +84,7 @@ it('supprimer un rapprochement → le statut dérivé de la source repasse Recu 
         'tiers_id' => $this->tiers->id,
         'compte_id' => $this->compteBancaire->id,
     ], [[
-        'sous_categorie_id' => $this->sc706->id,
+        'compte_id' => $this->compte706->id,
         'montant' => '100.00',
         'operation_id' => null, 'seance' => null, 'notes' => null,
     ]]);
@@ -114,7 +114,7 @@ it('pointer une remise chèque → sources dérivées Pointe ; dépointer → Re
         'tiers_id' => $this->tiers->id,
         'compte_id' => $this->compteBancaire->id,
     ], [[
-        'sous_categorie_id' => $this->sc706->id,
+        'compte_id' => $this->compte706->id,
         'montant' => '100.00',
         'operation_id' => null, 'seance' => null, 'notes' => null,
     ]]);

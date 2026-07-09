@@ -52,7 +52,7 @@ function recetteChequeLiveData(object $ctx): array
             'compte_id' => $ctx->compteBancaire->id,
         ],
         'lignes' => [[
-            'sous_categorie_id' => $ctx->sc706->id,
+            'compte_id' => $ctx->compte706->id,
             'montant' => '100.00',
             'operation_id' => null,
             'seance' => null,
