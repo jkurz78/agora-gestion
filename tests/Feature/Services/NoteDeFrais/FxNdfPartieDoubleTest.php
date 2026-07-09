@@ -24,7 +24,7 @@ use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
-use App\Models\SousCategorie;
+use App\Enums\UsageComptable;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -81,19 +81,14 @@ beforeEach(function (): void {
         'pour_inscriptions' => false,
     ]);
 
-    $this->catDepense = Categorie::factory()->create([
-        'association_id' => (int) $this->asso->id,
-        'type' => TypeCategorie::Depense->value,
-    ]);
-    $this->scDepense = SousCategorie::factory()->create([
-        'association_id' => (int) $this->asso->id,
-        'categorie_id' => (int) $this->catDepense->id,
-        'nom' => 'Frais divers',
-        'code_cerfa' => '606',
-    ]);
+    // DC-10a : compte de charge (classe 6) pour les lignes NDF
+    $this->scDepense = Compte::firstOrCreate(
+        ['association_id' => (int) $this->asso->id, 'numero_pcg' => '606'],
+        ['intitule' => 'Frais divers', 'classe' => 6, 'lettrable' => false, 'actif' => true, 'est_systeme' => false, 'pour_inscriptions' => false]
+    );
 
-    // Sous-catégorie AbandonCreance avec code_cerfa → compte 754
-    Compte::forceCreate([
+    // Compte AbandonCreance (classe 7) flaggé
+    $this->scAbandon = Compte::forceCreate([
         'association_id' => (int) $this->asso->id,
         'numero_pcg' => '754',
         'intitule' => 'Abandon de créance',
@@ -103,17 +98,7 @@ beforeEach(function (): void {
         'lettrable' => false,
         'pour_inscriptions' => false,
     ]);
-
-    $this->catRecette = Categorie::factory()->create([
-        'association_id' => (int) $this->asso->id,
-        'type' => TypeCategorie::Recette->value,
-    ]);
-    $this->scAbandon = SousCategorie::factory()->pourAbandonCreance()->create([
-        'association_id' => (int) $this->asso->id,
-        'categorie_id' => (int) $this->catRecette->id,
-        'nom' => 'Abandon de créance',
-        'code_cerfa' => '754',
-    ]);
+    $this->scAbandon->usages()->create(['usage' => UsageComptable::AbandonCreance->value]);
 
     $this->tiers = Tiers::factory()->create(['association_id' => (int) $this->asso->id]);
 
@@ -136,7 +121,7 @@ afterEach(function (): void {
 function makeNdfSoumisePd(
     Association $asso,
     Tiers $tiers,
-    SousCategorie $sc,
+    Compte $sc,
     int $count = 1,
     float $montantParLigne = 100.0,
 ): NoteDeFrais {
@@ -151,7 +136,7 @@ function makeNdfSoumisePd(
         NoteDeFraisLigne::factory()->create([
             'note_de_frais_id' => (int) $ndf->id,
             'type' => NoteDeFraisLigneType::Standard->value,
-            'sous_categorie_id' => (int) $sc->id,
+            'compte_id' => (int) $sc->id,
             'libelle' => "Ligne $i",
             'montant' => $montantParLigne,
             'piece_jointe_path' => null,
@@ -233,10 +218,9 @@ test('[C] abandon de créance : T1-don est une recette avec tiers + sous-cat, pa
     expect($txDon->type)->toBe(TypeTransaction::Recette);
     expect((int) $txDon->tiers_id)->toBe((int) $this->tiers->id);
 
-    // Lignes métier du don utilisent la sous-cat AbandonCreance
-    $ligneDon = $txDon->lignes()->whereNotNull('sous_categorie_id')->first();
+    // Lignes métier du don utilisent le compte AbandonCreance
+    $ligneDon = $txDon->lignes()->where('compte_id', (int) $this->scAbandon->id)->first();
     expect($ligneDon)->not->toBeNull();
-    expect((int) $ligneDon->sous_categorie_id)->toBe((int) $this->scAbandon->id);
 
     // Aucune ligne 512X nulle part (pas de mouvement bancaire)
     $compte512 = Compte::where('association_id', (int) $this->asso->id)

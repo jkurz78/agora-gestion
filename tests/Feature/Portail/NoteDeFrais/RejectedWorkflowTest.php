@@ -5,16 +5,31 @@ declare(strict_types=1);
 use App\Enums\StatutNoteDeFrais;
 use App\Livewire\Portail\NoteDeFrais\Index;
 use App\Livewire\Portail\NoteDeFrais\Show;
+use App\Models\Compte;
 use App\Models\Association;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Services\Portail\NoteDeFrais\NoteDeFraisService;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
+
+// DC-10a : helper compte-first — compte de charge (classe 6) pour les lignes NDF.
+function compteChargeNdfRW(int $assoId): \App\Models\Compte
+{
+    static $seq = 0;
+    $seq++;
+
+    return \App\Models\Compte::create([
+        'association_id' => $assoId,
+        'numero_pcg' => '627'.$seq,
+        'intitule' => 'Charge NDF '.$seq,
+        'classe' => 6,
+        'actif' => true,
+    ]);
+}
 
 beforeEach(function () {
     TenantContext::clear();
@@ -35,12 +50,12 @@ it('rejected workflow: tiers peut supprimer une NDF Rejetée (softdelete)', func
         'tiers_id' => $this->tiers->id,
     ]);
 
-    $sc = SousCategorie::factory()->create(['association_id' => $this->asso->id]);
+    $sc = compteChargeNdfRW($this->asso->id);
     $path = "associations/{$this->asso->id}/notes-de-frais/{$ndf->id}/ligne-1.pdf";
     Storage::disk('local')->put($path, 'contenu fake');
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $sc->id,
         'piece_jointe_path' => $path,
     ]);
 
@@ -57,7 +72,7 @@ it('rejected workflow: tiers peut supprimer une NDF Rejetée (softdelete)', func
 // ---------------------------------------------------------------------------
 
 it('rejected workflow: saveDraft sur NDF Rejetée remet en Brouillon + vide motif_rejet', function () {
-    $sc = SousCategorie::factory()->create(['association_id' => $this->asso->id]);
+    $sc = compteChargeNdfRW($this->asso->id);
     $ndf = NoteDeFrais::factory()->rejetee('Justificatif illisible')->create([
         'association_id' => $this->asso->id,
         'tiers_id' => $this->tiers->id,
@@ -73,7 +88,7 @@ it('rejected workflow: saveDraft sur NDF Rejetée remet en Brouillon + vide moti
             [
                 'libelle' => 'Repas',
                 'montant' => 15.00,
-                'sous_categorie_id' => $sc->id,
+                'compte_id' => $sc->id,
                 'piece_jointe_path' => null,
             ],
         ],
@@ -93,7 +108,7 @@ it('rejected workflow: saveDraft sur NDF Rejetée remet en Brouillon + vide moti
 // ---------------------------------------------------------------------------
 
 it('rejected workflow: après édition NDF Rejetée, resoumission passe en Soumise', function () {
-    $sc = SousCategorie::factory()->create(['association_id' => $this->asso->id]);
+    $sc = compteChargeNdfRW($this->asso->id);
     $ndf = NoteDeFrais::factory()->rejetee()->create([
         'association_id' => $this->asso->id,
         'tiers_id' => $this->tiers->id,
@@ -103,7 +118,7 @@ it('rejected workflow: après édition NDF Rejetée, resoumission passe en Soumi
     Storage::disk('local')->put($path, 'contenu fake');
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $sc->id,
         'piece_jointe_path' => $path,
         'montant' => 25.00,
     ]);
@@ -119,7 +134,7 @@ it('rejected workflow: après édition NDF Rejetée, resoumission passe en Soumi
             [
                 'libelle' => 'Repas',
                 'montant' => 25.00,
-                'sous_categorie_id' => $sc->id,
+                'compte_id' => $sc->id,
                 'piece_jointe_path' => $path,
             ],
         ],
@@ -221,7 +236,7 @@ it('rejected workflow: Index affiche bouton Modifier sur NDF Rejetée', function
 // ---------------------------------------------------------------------------
 
 it('rejected workflow: saveDraft sur Rejetée sans submit → NDF reste en Brouillon', function () {
-    $sc = SousCategorie::factory()->create(['association_id' => $this->asso->id]);
+    $sc = compteChargeNdfRW($this->asso->id);
     $ndf = NoteDeFrais::factory()->rejetee()->create([
         'association_id' => $this->asso->id,
         'tiers_id' => $this->tiers->id,
@@ -236,7 +251,7 @@ it('rejected workflow: saveDraft sur Rejetée sans submit → NDF reste en Broui
             [
                 'libelle' => 'Repas',
                 'montant' => 12.00,
-                'sous_categorie_id' => $sc->id,
+                'compte_id' => $sc->id,
                 'piece_jointe_path' => null,
             ],
         ],

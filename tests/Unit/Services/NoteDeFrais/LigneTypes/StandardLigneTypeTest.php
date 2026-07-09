@@ -31,9 +31,9 @@ it('renderDescription renvoie chaine vide', function () {
     expect($this->strategy->renderDescription([]))->toBe('');
 });
 
-it('resolveSousCategorieId renvoie l\'id saisi inchange', function () {
-    expect($this->strategy->resolveSousCategorieId(7))->toBe(7);
-    expect($this->strategy->resolveSousCategorieId(null))->toBeNull();
+it('resolveCompteId renvoie l\'id saisi inchange', function () {
+    expect($this->strategy->resolveCompteId(7))->toBe(7);
+    expect($this->strategy->resolveCompteId(null))->toBeNull();
 });
 
 it('validate ne leve pas pour un draft minimal valide', function () {

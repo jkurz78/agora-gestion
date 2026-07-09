@@ -6,6 +6,7 @@ use App\Enums\StatutNoteDeFrais;
 use App\Enums\StatutOperation;
 use App\Enums\TypeCategorie;
 use App\Livewire\Portail\NoteDeFrais\Form;
+use App\Models\Compte;
 use App\Models\Association;
 use App\Models\Categorie;
 use App\Models\NoteDeFrais;
@@ -22,6 +23,21 @@ use Illuminate\Support\Facades\Storage;
 // Setup: portail test pattern — use HTTP requests (Livewire::test() bypasses
 // the BootTenantFromSlug middleware which shares $portailAssociation).
 // ---------------------------------------------------------------------------
+
+// DC-10a : helper compte-first — compte de charge (classe 6) pour les lignes NDF.
+function compteChargeNdfFC(int $assoId): \App\Models\Compte
+{
+    static $seq = 0;
+    $seq++;
+
+    return \App\Models\Compte::create([
+        'association_id' => $assoId,
+        'numero_pcg' => '626'.$seq,
+        'intitule' => 'Charge NDF '.$seq,
+        'classe' => 6,
+        'actif' => true,
+    ]);
+}
 
 beforeEach(function () {
     TenantContext::clear();
@@ -74,7 +90,7 @@ it('form create: addLigne ajoute une ligne vide', function () {
     expect($component->lignes[0])->toMatchArray([
         'id' => null,
         'montant' => null,
-        'sous_categorie_id' => null,
+        'compte_id' => null,
     ]);
 });
 
@@ -102,7 +118,7 @@ it('form create: removeLigne supprime une ligne', function () {
 // ---------------------------------------------------------------------------
 
 it('form create: saveDraft crée un brouillon lié au tiers et à l\'asso', function () {
-    $sc = SousCategorie::factory()->create(['association_id' => $this->asso->id]);
+    $sc = compteChargeNdfFC($this->asso->id);
 
     TenantContext::boot($this->asso);
     Auth::guard('tiers-portail')->login($this->tiers);
@@ -115,7 +131,7 @@ it('form create: saveDraft crée un brouillon lié au tiers et à l\'asso', func
         'id' => null,
         'libelle' => 'Train',
         'montant' => '45.50',
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $sc->id,
         'operation_id' => null,
         'seance' => null,
         'piece_jointe_path' => null,
@@ -168,10 +184,12 @@ it('form create: sous-catégories accessibles via le composant', function () {
         'association_id' => $this->asso->id,
         'type' => TypeCategorie::Depense,
     ]);
-    SousCategorie::factory()->create([
+    Compte::create([
         'association_id' => $this->asso->id,
-        'categorie_id' => $catDepense->id,
-        'nom' => 'Transport',
+        'numero_pcg' => '625T',
+        'intitule' => 'Transport',
+        'classe' => 6,
+        'actif' => true,
     ]);
     Operation::factory()->create([
         'association_id' => $this->asso->id,
@@ -192,7 +210,7 @@ it('form create: sous-catégories accessibles via le composant', function () {
     $view = $component->render();
     $data = $view->getData();
 
-    expect($data['sousCategories']->pluck('nom')->toArray())->toContain('Transport');
+    expect($data['sousCategories']->pluck('intitule')->toArray())->toContain('Transport');
     expect($data['operations']->pluck('nom')->toArray())->toContain('Op Active');
     expect($data['operations']->pluck('nom')->toArray())->not->toContain('Op Clôturée');
 });
@@ -202,7 +220,7 @@ it('form create: sous-catégories accessibles via le composant', function () {
 // ---------------------------------------------------------------------------
 
 it('form create: upload justificatif stocké dans storage tenant', function () {
-    $sc = SousCategorie::factory()->create(['association_id' => $this->asso->id]);
+    $sc = compteChargeNdfFC($this->asso->id);
     $file = UploadedFile::fake()->create('recu.pdf', 100, 'application/pdf');
 
     TenantContext::boot($this->asso);
@@ -214,7 +232,7 @@ it('form create: upload justificatif stocké dans storage tenant', function () {
     $component->libelle = 'Frais avec PJ';
     $component->addLigne();
     $component->lignes[0]['montant'] = '50.00';
-    $component->lignes[0]['sous_categorie_id'] = $sc->id;
+    $component->lignes[0]['compte_id'] = $sc->id;
 
     // Simulate the justif being a TemporaryUploadedFile by storing the file
     // and updating piece_jointe_path directly (as the saveDraft flow would do)
@@ -237,7 +255,7 @@ it('form create: upload justificatif stocké dans storage tenant', function () {
 // Test 9 : render() filtre les sous-catégories sur type=Depense uniquement
 // ---------------------------------------------------------------------------
 
-it('form create: render filtre les sous-catégories de type Depense uniquement', function () {
+it('form create: render filtre les comptes de charge (classe 6) uniquement', function () {
     $catDepense = Categorie::factory()->create([
         'association_id' => $this->asso->id,
         'type' => TypeCategorie::Depense,
@@ -247,15 +265,19 @@ it('form create: render filtre les sous-catégories de type Depense uniquement',
         'type' => TypeCategorie::Recette,
     ]);
 
-    $scDepense = SousCategorie::factory()->create([
+    $compteDepense = Compte::create([
         'association_id' => $this->asso->id,
-        'categorie_id' => $catDepense->id,
-        'nom' => 'Frais kilométriques',
+        'numero_pcg' => '625FK',
+        'intitule' => 'Frais kilométriques',
+        'classe' => 6,
+        'actif' => true,
     ]);
-    $scRecette = SousCategorie::factory()->create([
+    $compteRecette = Compte::create([
         'association_id' => $this->asso->id,
-        'categorie_id' => $catRecette->id,
-        'nom' => 'Cotisation membre',
+        'numero_pcg' => '756CM',
+        'intitule' => 'Cotisation membre',
+        'classe' => 7,
+        'actif' => true,
     ]);
 
     TenantContext::boot($this->asso);
@@ -265,7 +287,7 @@ it('form create: render filtre les sous-catégories de type Depense uniquement',
     $view = $component->render();
     $data = $view->getData();
 
-    expect($data['sousCategories']->pluck('nom')->toArray())
+    expect($data['sousCategories']->pluck('intitule')->toArray())
         ->toContain('Frais kilométriques')
         ->not->toContain('Cotisation membre');
 });

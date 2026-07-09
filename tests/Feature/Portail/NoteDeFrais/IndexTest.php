@@ -173,7 +173,7 @@ it('index: une NDF avec 2 lignes (standard + km) n\'apparaît qu\'une seule fois
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
         'type' => 'kilometrique',
-        'sous_categorie_id' => null,
+        'compte_id' => null,
         'montant' => 50.00,
     ]);
 

@@ -3,14 +3,29 @@
 declare(strict_types=1);
 
 use App\Livewire\Portail\NoteDeFrais\Form;
+use App\Models\Compte;
 use App\Models\Association;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+
+// DC-10a : helper compte-first — compte de charge (classe 6) pour les lignes NDF.
+function compteChargeNdfAC(int $assoId): \App\Models\Compte
+{
+    static $seq = 0;
+    $seq++;
+
+    return \App\Models\Compte::create([
+        'association_id' => $assoId,
+        'numero_pcg' => '629'.$seq,
+        'intitule' => 'Charge NDF '.$seq,
+        'classe' => 6,
+        'actif' => true,
+    ]);
+}
 
 beforeEach(function () {
     TenantContext::clear();
@@ -26,7 +41,7 @@ beforeEach(function () {
 // ---------------------------------------------------------------------------
 
 it('submit: abandonCreanceProposed=true persiste abandon_creance_propose=true', function () {
-    $sc = SousCategorie::factory()->create(['association_id' => $this->asso->id]);
+    $sc = compteChargeNdfAC($this->asso->id);
     $assoId = (int) $this->asso->id;
 
     $ndf = NoteDeFrais::factory()->brouillon()->create([
@@ -38,7 +53,7 @@ it('submit: abandonCreanceProposed=true persiste abandon_creance_propose=true', 
     ]);
     $ligne = NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $sc->id,
         'montant' => 50.00,
         'piece_jointe_path' => "associations/{$assoId}/notes-de-frais/{$ndf->id}/ligne-1.pdf",
     ]);
@@ -62,7 +77,7 @@ it('submit: abandonCreanceProposed=true persiste abandon_creance_propose=true', 
 // ---------------------------------------------------------------------------
 
 it('submit: abandonCreanceProposed=false persiste abandon_creance_propose=false', function () {
-    $sc = SousCategorie::factory()->create(['association_id' => $this->asso->id]);
+    $sc = compteChargeNdfAC($this->asso->id);
     $assoId = (int) $this->asso->id;
 
     $ndf = NoteDeFrais::factory()->brouillon()->create([
@@ -74,7 +89,7 @@ it('submit: abandonCreanceProposed=false persiste abandon_creance_propose=false'
     ]);
     $ligne = NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $sc->id,
         'montant' => 50.00,
         'piece_jointe_path' => "associations/{$assoId}/notes-de-frais/{$ndf->id}/ligne-1.pdf",
     ]);
@@ -98,7 +113,7 @@ it('submit: abandonCreanceProposed=false persiste abandon_creance_propose=false'
 // ---------------------------------------------------------------------------
 
 it('saveDraft: abandonCreanceProposed=true persiste abandon_creance_propose=true', function () {
-    $sc = SousCategorie::factory()->create(['association_id' => $this->asso->id]);
+    $sc = compteChargeNdfAC($this->asso->id);
 
     $component = new Form;
     $component->mount($this->asso);
@@ -108,7 +123,7 @@ it('saveDraft: abandonCreanceProposed=true persiste abandon_creance_propose=true
     $component->lignes = [[
         'id' => null,
         'type' => 'standard',
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $sc->id,
         'operation_id' => null,
         'seance' => null,
         'libelle' => 'Repas',

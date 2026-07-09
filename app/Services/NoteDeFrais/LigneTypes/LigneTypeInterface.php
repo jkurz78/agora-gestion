@@ -40,7 +40,8 @@ interface LigneTypeInterface
     public function renderDescription(array $metadata): string;
 
     /**
-     * Résolution de la sous-catégorie. Peut forcer une valeur côté stratégie (km) ou conserver celle saisie (standard).
+     * Résolution du compte de ventilation. Peut forcer une valeur côté stratégie (km)
+     * ou conserver celle saisie (standard).
      */
-    public function resolveSousCategorieId(?int $requestedId): ?int;
+    public function resolveCompteId(?int $requestedId): ?int;
 }

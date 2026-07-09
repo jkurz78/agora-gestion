@@ -71,7 +71,7 @@
                             </td>
                             <td>
                                 @php
-                                    $scNom = $sousCategories->find($ligne['sous_categorie_id'])?->nom ?? '—';
+                                    $scNom = $sousCategories->find($ligne['compte_id'])?->intitule ?? '—';
                                 @endphp
                                 {{ $scNom }}
                             </td>
@@ -268,14 +268,14 @@
                                 <label class="form-label fw-semibold">
                                     Nature de la dépense <span class="text-danger">*</span>
                                 </label>
-                                <select wire:model.live="draftLigne.sous_categorie_id"
-                                        class="form-select @error('draftLigne.sous_categorie_id') is-invalid @enderror">
+                                <select wire:model.live="draftLigne.compte_id"
+                                        class="form-select @error('draftLigne.compte_id') is-invalid @enderror">
                                     <option value="">— choisir —</option>
                                     @foreach ($sousCategories as $sc)
-                                        <option value="{{ $sc->id }}">{{ $sc->nom }}</option>
+                                        <option value="{{ $sc->id }}">{{ $sc->intitule }}</option>
                                     @endforeach
                                 </select>
-                                @error('draftLigne.sous_categorie_id')
+                                @error('draftLigne.compte_id')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
                             </div>

@@ -12,9 +12,10 @@ use App\Models\CompteBancaire;
 use App\Models\Exercice;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
-use App\Models\SousCategorie;
+use App\Models\Compte;
 use App\Models\Tiers;
 use App\Models\Transaction;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\NoteDeFrais\NoteDeFraisValidationService;
 use App\Services\NoteDeFrais\ValidationData;
 use App\Tenant\TenantContext;
@@ -24,6 +25,9 @@ use Illuminate\Support\Facades\Storage;
 beforeEach(function (): void {
     Storage::fake('local');
     $this->service = app(NoteDeFraisValidationService::class);
+
+    // DC-10a : lignes compte-first → la PD s'exécute (401 système requis).
+    SystemeSeeder::seed();
 
     $this->compte = CompteBancaire::factory()->create();
     $this->validationData = new ValidationData(
@@ -43,10 +47,16 @@ it('creates a Transaction of type Depense when validating a soumise NDF', functi
         'tiers_id' => $tiers->id,
         'libelle' => 'Frais déplacement Paris',
     ]);
-    $sousCategorie = SousCategorie::factory()->create();
+    $sousCategorie = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '61BO1',
+        'intitule' => 'Charge NDF 1',
+        'classe' => 6,
+        'actif' => true,
+    ]);
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $sousCategorie->id,
         'libelle' => 'Billet train',
         'montant' => '45.00',
         'piece_jointe_path' => null,
@@ -68,12 +78,24 @@ it('creates a Transaction of type Depense when validating a soumise NDF', functi
 it('creates one TransactionLigne per NDF ligne with correct values', function (): void {
     $tiers = Tiers::factory()->create();
     $ndf = NoteDeFrais::factory()->soumise()->create(['tiers_id' => $tiers->id]);
-    $sousCategorie1 = SousCategorie::factory()->create();
-    $sousCategorie2 = SousCategorie::factory()->create();
+    $sousCategorie1 = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '61BO2',
+        'intitule' => 'Charge NDF 2',
+        'classe' => 6,
+        'actif' => true,
+    ]);
+    $sousCategorie2 = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '61BO3',
+        'intitule' => 'Charge NDF 3',
+        'classe' => 6,
+        'actif' => true,
+    ]);
 
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sousCategorie1->id,
+        'compte_id' => $sousCategorie1->id,
         'libelle' => 'Train Paris',
         'montant' => '89.50',
         'seance' => 3,
@@ -81,7 +103,7 @@ it('creates one TransactionLigne per NDF ligne with correct values', function ()
     ]);
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sousCategorie2->id,
+        'compte_id' => $sousCategorie2->id,
         'libelle' => 'Hotel nuit',
         'montant' => '120.00',
         'seance' => null,
@@ -89,34 +111,41 @@ it('creates one TransactionLigne per NDF ligne with correct values', function ()
     ]);
 
     $transaction = $this->service->valider($ndf, $this->validationData);
-    $transaction->load('lignes');
+    // DC-10a : la PD s'exécute → ne compter que les lignes de ventilation (classe 6).
+    $lignesVentilation = $transaction->lignes()->ventilation()->get();
 
-    expect($transaction->lignes)->toHaveCount(2);
+    expect($lignesVentilation)->toHaveCount(2);
 
-    $ligne1 = $transaction->lignes->firstWhere('montant', '89.50');
+    $ligne1 = $lignesVentilation->firstWhere('montant', '89.50');
     expect($ligne1)->not->toBeNull();
-    expect((int) $ligne1->sous_categorie_id)->toBe((int) $sousCategorie1->id);
+    expect((int) $ligne1->compte_id)->toBe((int) $sousCategorie1->id);
     expect($ligne1->notes)->toBe('Train Paris');
     expect($ligne1->seance)->toBe(3);
 
-    $ligne2 = $transaction->lignes->firstWhere('montant', '120.00');
+    $ligne2 = $lignesVentilation->firstWhere('montant', '120.00');
     expect($ligne2)->not->toBeNull();
-    expect((int) $ligne2->sous_categorie_id)->toBe((int) $sousCategorie2->id);
+    expect((int) $ligne2->compte_id)->toBe((int) $sousCategorie2->id);
     expect($ligne2->seance)->toBeNull();
 });
 
 it('sets montant_total to sum of all NDF lignes', function (): void {
     $ndf = NoteDeFrais::factory()->soumise()->create();
-    $sousCategorie = SousCategorie::factory()->create();
+    $sousCategorie = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '61BO4',
+        'intitule' => 'Charge NDF 4',
+        'classe' => 6,
+        'actif' => true,
+    ]);
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $sousCategorie->id,
         'montant' => '50.00',
         'piece_jointe_path' => null,
     ]);
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $sousCategorie->id,
         'montant' => '75.50',
         'piece_jointe_path' => null,
     ]);
@@ -128,10 +157,16 @@ it('sets montant_total to sum of all NDF lignes', function (): void {
 
 it('updates NDF to Validee with transaction_id and validee_at', function (): void {
     $ndf = NoteDeFrais::factory()->soumise()->create();
-    $sousCategorie = SousCategorie::factory()->create();
+    $sousCategorie = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '61BO5',
+        'intitule' => 'Charge NDF 5',
+        'classe' => 6,
+        'actif' => true,
+    ]);
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $sousCategorie->id,
         'montant' => '30.00',
         'piece_jointe_path' => null,
     ]);
@@ -150,7 +185,13 @@ it('updates NDF to Validee with transaction_id and validee_at', function (): voi
 
 it('copies PJ from NDF ligne to transaction ligne path', function (): void {
     $ndf = NoteDeFrais::factory()->soumise()->create();
-    $sousCategorie = SousCategorie::factory()->create();
+    $sousCategorie = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '61BO6',
+        'intitule' => 'Charge NDF 6',
+        'classe' => 6,
+        'actif' => true,
+    ]);
 
     // Create a fake source file
     $assocId = TenantContext::currentId();
@@ -159,7 +200,7 @@ it('copies PJ from NDF ligne to transaction ligne path', function (): void {
 
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $sousCategorie->id,
         'libelle' => 'Billet avion',
         'montant' => '200.00',
         'piece_jointe_path' => $sourcePath,
@@ -182,7 +223,13 @@ it('copies PJ from NDF ligne to transaction ligne path', function (): void {
 
 it('copies multiple PJs with correct 1-based index in path', function (): void {
     $ndf = NoteDeFrais::factory()->soumise()->create();
-    $sousCategorie = SousCategorie::factory()->create();
+    $sousCategorie = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '61BO7',
+        'intitule' => 'Charge NDF 7',
+        'classe' => 6,
+        'actif' => true,
+    ]);
     $assocId = TenantContext::currentId();
 
     $source1 = "associations/{$assocId}/notes-de-frais/{$ndf->id}/ligne-1.pdf";
@@ -192,14 +239,14 @@ it('copies multiple PJs with correct 1-based index in path', function (): void {
 
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $sousCategorie->id,
         'libelle' => 'Repas client',
         'montant' => '45.00',
         'piece_jointe_path' => $source1,
     ]);
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $sousCategorie->id,
         'libelle' => 'Parking',
         'montant' => '12.00',
         'piece_jointe_path' => $source2,
@@ -215,10 +262,16 @@ it('copies multiple PJs with correct 1-based index in path', function (): void {
 
 it('leaves piece_jointe_path null on transaction ligne when NDF ligne has no PJ', function (): void {
     $ndf = NoteDeFrais::factory()->soumise()->create();
-    $sousCategorie = SousCategorie::factory()->create();
+    $sousCategorie = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '61BO8',
+        'intitule' => 'Charge NDF 8',
+        'classe' => 6,
+        'actif' => true,
+    ]);
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $sousCategorie->id,
         'montant' => '30.00',
         'piece_jointe_path' => null,
     ]);
@@ -250,10 +303,16 @@ it('throws DomainException when NDF is already Validee', function (): void {
 it('throws ExerciceCloturedException when date falls in closed exercice', function (): void {
     $assocId = TenantContext::currentId();
     $ndf = NoteDeFrais::factory()->soumise()->create();
-    $sousCategorie = SousCategorie::factory()->create();
+    $sousCategorie = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '61BO9',
+        'intitule' => 'Charge NDF 9',
+        'classe' => 6,
+        'actif' => true,
+    ]);
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $sousCategorie->id,
         'montant' => '30.00',
         'piece_jointe_path' => null,
     ]);
@@ -281,13 +340,19 @@ it('throws ExerciceCloturedException when date falls in closed exercice', functi
 
 it('rolls back entirely when source PJ file is missing', function (): void {
     $ndf = NoteDeFrais::factory()->soumise()->create();
-    $sousCategorie = SousCategorie::factory()->create();
+    $sousCategorie = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '61BO10',
+        'intitule' => 'Charge NDF 10',
+        'classe' => 6,
+        'actif' => true,
+    ]);
     $assocId = TenantContext::currentId();
 
     // Reference a source that does NOT exist in Storage::fake
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $sousCategorie->id,
         'libelle' => 'Repas',
         'montant' => '55.00',
         'piece_jointe_path' => "associations/{$assocId}/notes-de-frais/{$ndf->id}/missing.pdf",
@@ -314,10 +379,16 @@ it('rolls back entirely when source PJ file is missing', function (): void {
 
 it('emits comptabilite.ndf.validated log with correct context', function (): void {
     $ndf = NoteDeFrais::factory()->soumise()->create();
-    $sousCategorie = SousCategorie::factory()->create();
+    $sousCategorie = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '61BO11',
+        'intitule' => 'Charge NDF 11',
+        'classe' => 6,
+        'actif' => true,
+    ]);
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $sousCategorie->id,
         'montant' => '80.00',
         'piece_jointe_path' => null,
     ]);
@@ -346,12 +417,18 @@ it('emits comptabilite.ndf.validated log with correct context', function (): voi
 // ---------------------------------------------------------------------------
 
 it('validates the targeted NDF without touching the other NDF in the same tenant', function (): void {
-    $sousCategorie = SousCategorie::factory()->create();
+    $sousCategorie = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '61BO12',
+        'intitule' => 'Charge NDF 12',
+        'classe' => 6,
+        'actif' => true,
+    ]);
 
     $ndf1 = NoteDeFrais::factory()->soumise()->create();
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf1->id,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $sousCategorie->id,
         'montant' => '10.00',
         'piece_jointe_path' => null,
     ]);
@@ -359,7 +436,7 @@ it('validates the targeted NDF without touching the other NDF in the same tenant
     $ndf2 = NoteDeFrais::factory()->soumise()->create();
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf2->id,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $sousCategorie->id,
         'montant' => '20.00',
         'piece_jointe_path' => null,
     ]);

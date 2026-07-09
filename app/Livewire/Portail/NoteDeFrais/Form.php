@@ -6,14 +6,13 @@ namespace App\Livewire\Portail\NoteDeFrais;
 
 use App\Enums\NoteDeFraisLigneType;
 use App\Enums\StatutOperation;
-use App\Enums\TypeCategorie;
 use App\Livewire\Concerns\MontantValidation;
 use App\Livewire\Portail\Concerns\WithPortailTenant;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
 use App\Models\Operation;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Services\ExerciceService;
 use App\Services\NoteDeFrais\LigneTypes\LigneTypeRegistry;
@@ -57,12 +56,12 @@ final class Form extends Component
     /** 'standard' | 'kilometrique' | null */
     public ?string $wizardType = null;
 
-    /** @var array{justif: mixed, libelle: string, montant: string, sous_categorie_id: int|null, operation_id: int|null, seance: int|null, cv_fiscaux: int|null, distance_km: string|null, bareme_eur_km: string|null} */
+    /** @var array{justif: mixed, libelle: string, montant: string, compte_id: int|null, operation_id: int|null, seance: int|null, cv_fiscaux: int|null, distance_km: string|null, bareme_eur_km: string|null} */
     public array $draftLigne = [
         'justif' => null,
         'libelle' => '',
         'montant' => '',
-        'sous_categorie_id' => null,
+        'compte_id' => null,
         'operation_id' => null,
         'seance' => null,
         'cv_fiscaux' => null,
@@ -85,7 +84,7 @@ final class Form extends Component
             $this->lignes = $noteDeFrais->lignes->map(fn (NoteDeFraisLigne $l) => [
                 'id' => $l->id,
                 'type' => $l->type->value,
-                'sous_categorie_id' => $l->sous_categorie_id,
+                'compte_id' => $l->compte_id,
                 'operation_id' => $l->operation_id,
                 'seance' => $l->seance,
                 'libelle' => $l->libelle,
@@ -219,7 +218,7 @@ final class Form extends Component
             $this->lignes[] = [
                 'id' => null,
                 'type' => 'kilometrique',
-                'sous_categorie_id' => null,
+                'compte_id' => null,
                 'operation_id' => $this->draftLigne['operation_id'] ?? null,
                 'seance' => $this->draftLigne['seance'] ?? null,
                 'libelle' => $this->draftLigne['libelle'],
@@ -240,16 +239,16 @@ final class Form extends Component
         }
 
         // Flux standard existant
-        $this->validateOnly('draftLigne.sous_categorie_id', [
-            'draftLigne.sous_categorie_id' => ['required'],
+        $this->validateOnly('draftLigne.compte_id', [
+            'draftLigne.compte_id' => ['required'],
         ], [
-            'draftLigne.sous_categorie_id.required' => 'La nature de la dépense est obligatoire.',
+            'draftLigne.compte_id.required' => 'La nature de la dépense est obligatoire.',
         ]);
 
         $this->lignes[] = [
             'id' => null,
             'type' => 'standard',
-            'sous_categorie_id' => $this->draftLigne['sous_categorie_id'],
+            'compte_id' => $this->draftLigne['compte_id'],
             'operation_id' => $this->draftLigne['operation_id'],
             'seance' => $this->draftLigne['seance'],
             'libelle' => $this->draftLigne['libelle'],
@@ -273,7 +272,7 @@ final class Form extends Component
         $this->lignes[] = [
             'id' => null,
             'type' => 'standard',
-            'sous_categorie_id' => null,
+            'compte_id' => null,
             'operation_id' => null,
             'seance' => null,
             'libelle' => null,
@@ -392,8 +391,10 @@ final class Form extends Component
     {
         $exerciceCourant = app(ExerciceService::class)->current();
 
-        $sousCategories = SousCategorie::whereHas('categorie', fn ($q) => $q->where('type', TypeCategorie::Depense))
-            ->orderBy('nom')
+        // DC-10a : comptes de charge (classe 6) — libellé seul côté portail (D1).
+        $sousCategories = Compte::where('classe', 6)
+            ->where('actif', true)
+            ->orderBy('intitule')
             ->get();
 
         $operations = Operation::where('statut', '!=', StatutOperation::Cloturee->value)
@@ -426,7 +427,7 @@ final class Form extends Component
                 'montant' => $ligne['montant'] !== null && $ligne['montant'] !== ''
                     ? (float) str_replace(',', '.', (string) $ligne['montant'])
                     : 0,
-                'sous_categorie_id' => $ligne['sous_categorie_id'] ? (int) $ligne['sous_categorie_id'] : null,
+                'compte_id' => $ligne['compte_id'] ? (int) $ligne['compte_id'] : null,
                 'operation_id' => $ligne['operation_id'] ? (int) $ligne['operation_id'] : null,
                 'seance' => $ligne['seance'] ? (int) $ligne['seance'] : null,
                 'piece_jointe_path' => $ligne['piece_jointe_path'] ?? null,
@@ -488,7 +489,7 @@ final class Form extends Component
             'justif' => null,
             'libelle' => '',
             'montant' => '',
-            'sous_categorie_id' => null,
+            'compte_id' => null,
             'operation_id' => null,
             'seance' => null,
             'cv_fiscaux' => null,

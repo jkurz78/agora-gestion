@@ -8,8 +8,8 @@ use App\Enums\StatutNoteDeFrais;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Enums\UsageComptable;
+use App\Models\Compte;
 use App\Models\NoteDeFrais;
-use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\EtatReglementResolver;
@@ -155,25 +155,25 @@ final class NoteDeFraisValidationService
 
             $this->assertStatutSoumise($ndf);
 
-            // Résoudre la sous-catégorie AbandonCreance (cardinalité mono)
-            $sousCatsAbandon = $ndf->association->sousCategoriesFor(UsageComptable::AbandonCreance);
+            // Résoudre le compte AbandonCreance (cardinalité mono) — DC-10a : compte-first.
+            $comptesAbandon = $ndf->association->comptesFor(UsageComptable::AbandonCreance);
 
-            if ($sousCatsAbandon->count() === 0) {
+            if ($comptesAbandon->count() === 0) {
                 throw new DomainException(
-                    "Aucune sous-categorie n'est designee pour l'usage 'Abandon de creance'. "
-                    .'Configure-la dans Parametres -> Comptabilite -> Usages.'
+                    "Aucun compte n'est designe pour l'usage 'Abandon de creance'. "
+                    .'Configure-le dans Parametres -> Comptabilite -> Usages.'
                 );
             }
 
-            if ($sousCatsAbandon->count() > 1) {
+            if ($comptesAbandon->count() > 1) {
                 throw new DomainException(
-                    "Plusieurs sous-categories designees pour 'Abandon de creance' — cas anormal."
+                    "Plusieurs comptes designes pour 'Abandon de creance' — cas anormal."
                 );
             }
 
-            $sousCatAbandon = $sousCatsAbandon->first();
+            $compteAbandon = $comptesAbandon->first();
 
-            [$txDepense, $txDon] = $this->abandonCreancePd($ndf, $data, $dateDon, $sousCatAbandon);
+            [$txDepense, $txDon] = $this->abandonCreancePd($ndf, $data, $dateDon, $compteAbandon);
 
             // Mettre à jour la NDF
             $ndf->update([
@@ -268,7 +268,7 @@ final class NoteDeFraisValidationService
                 : $ligne->libelle;
 
             return [
-                'sous_categorie_id' => $ligne->sous_categorie_id,
+                'compte_id' => $ligne->compte_id,
                 'operation_id' => $ligne->operation_id,
                 'seance' => $ligne->seance,
                 'notes' => $notes,
@@ -328,7 +328,7 @@ final class NoteDeFraisValidationService
      *   T1 Dépense (6xx D / 401 C) + T1 Don (411 D / 7xx C)
      *   + 2 OD compensation via 467 (401→467, 467→411)
      *
-     * Le don est une vraie transaction recette (tiers, sous-cat, n° pièce)
+     * Le don est une vraie transaction recette (tiers, compte, n° pièce)
      * → visible dans Comptabilité/Dons et historique tiers.
      *
      * @return array{Transaction, Transaction} [$txDepense, $txDon]
@@ -337,7 +337,7 @@ final class NoteDeFraisValidationService
         NoteDeFrais $ndf,
         ValidationData $data,
         string $dateDon,
-        SousCategorie $sousCatAbandon,
+        Compte $compteAbandon,
     ): array {
         // 1. Créer la Transaction Dépense (T1 : 6xx D / 401 C, pas de T2)
         $txDepense = $this->createTransactionDepenseFromNdf($ndf, $data, StatutReglement::EnAttente);
@@ -359,11 +359,11 @@ final class NoteDeFraisValidationService
             'association_id' => TenantContext::currentId(),
         ];
 
-        // Filtrer les lignes métier (exclure les lignes PD pures : 401C, 6xxD)
-        $txDonLignes = $txDepense->lignes
-            ->filter(fn ($l) => $l->sous_categorie_id !== null && (float) $l->montant > 0)
+        // Filtrer les lignes métier (ventilation classe 6) — exclure les lignes PD pures (401 C)
+        $txDonLignes = $txDepense->lignes()->ventilation()->get()
+            ->filter(fn ($l) => (float) $l->montant > 0)
             ->map(fn ($ligne) => [
-                'sous_categorie_id' => (int) $sousCatAbandon->id,
+                'compte_id' => (int) $compteAbandon->id,
                 'operation_id' => $ligne->operation_id,
                 'seance' => $ligne->seance,
                 'notes' => $ligne->notes,
@@ -399,7 +399,7 @@ final class NoteDeFraisValidationService
         NoteDeFrais $ndf,
         ValidationData $data,
         string $dateDon,
-        SousCategorie $sousCatAbandon,
+        Compte $compteAbandon,
     ): array {
         // 1. Créer la Transaction Dépense (réglée — pas de flux de tréso à attendre)
         $txDepense = $this->createTransactionDepenseFromNdf($ndf, $data, StatutReglement::Recu);
@@ -420,8 +420,8 @@ final class NoteDeFraisValidationService
             'association_id' => TenantContext::currentId(),
         ];
 
-        $txDonLignes = $txDepense->lignes->map(fn ($ligne) => [
-            'sous_categorie_id' => (int) $sousCatAbandon->id,
+        $txDonLignes = $txDepense->lignes()->ventilation()->get()->map(fn ($ligne) => [
+            'compte_id' => (int) $compteAbandon->id,
             'operation_id' => $ligne->operation_id,
             'seance' => $ligne->seance,
             'notes' => $ligne->notes,

@@ -4,14 +4,29 @@ declare(strict_types=1);
 
 use App\Enums\StatutNoteDeFrais;
 use App\Livewire\Portail\NoteDeFrais\Form;
+use App\Models\Compte;
 use App\Models\Association;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+
+// DC-10a : helper compte-first — compte de charge (classe 6) pour les lignes NDF.
+function compteChargeNdfFS(int $assoId): \App\Models\Compte
+{
+    static $seq = 0;
+    $seq++;
+
+    return \App\Models\Compte::create([
+        'association_id' => $assoId,
+        'numero_pcg' => '625'.$seq,
+        'intitule' => 'Charge NDF '.$seq,
+        'classe' => 6,
+        'actif' => true,
+    ]);
+}
 
 beforeEach(function () {
     TenantContext::clear();
@@ -76,7 +91,7 @@ it('form edit: NDF d\'un autre tiers retourne 403', function () {
 // ---------------------------------------------------------------------------
 
 it('form submit: brouillon valide soumis passe à statut Soumise', function () {
-    $sc = SousCategorie::factory()->create(['association_id' => $this->asso->id]);
+    $sc = compteChargeNdfFS($this->asso->id);
     $assoId = (int) $this->asso->id;
 
     // Create a brouillon with a valid ligne + PJ
@@ -88,7 +103,7 @@ it('form submit: brouillon valide soumis passe à statut Soumise', function () {
     ]);
     $ligne = NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $sc->id,
         'montant' => 50.00,
         'piece_jointe_path' => "associations/{$assoId}/notes-de-frais/{$ndf->id}/ligne-1.pdf",
     ]);
@@ -116,7 +131,7 @@ it('form submit: brouillon valide soumis passe à statut Soumise', function () {
 // ---------------------------------------------------------------------------
 
 it('form submit: date future retourne erreur et laisse en brouillon', function () {
-    $sc = SousCategorie::factory()->create(['association_id' => $this->asso->id]);
+    $sc = compteChargeNdfFS($this->asso->id);
     $assoId = (int) $this->asso->id;
 
     $ndf = NoteDeFrais::factory()->brouillon()->create([
@@ -127,7 +142,7 @@ it('form submit: date future retourne erreur et laisse en brouillon', function (
     ]);
     $ligne = NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $sc->id,
         'montant' => 50.00,
         'piece_jointe_path' => "associations/{$assoId}/notes-de-frais/{$ndf->id}/ligne-1.pdf",
     ]);
@@ -153,7 +168,7 @@ it('form submit: date future retourne erreur et laisse en brouillon', function (
 // ---------------------------------------------------------------------------
 
 it('form submit: ligne sans pièce jointe retourne erreur', function () {
-    $sc = SousCategorie::factory()->create(['association_id' => $this->asso->id]);
+    $sc = compteChargeNdfFS($this->asso->id);
 
     $ndf = NoteDeFrais::factory()->brouillon()->create([
         'association_id' => $this->asso->id,
@@ -163,7 +178,7 @@ it('form submit: ligne sans pièce jointe retourne erreur', function () {
     ]);
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $sc->id,
         'montant' => 50.00,
         'piece_jointe_path' => null, // No PJ
     ]);
@@ -185,7 +200,7 @@ it('form submit: ligne sans pièce jointe retourne erreur', function () {
 // ---------------------------------------------------------------------------
 
 it('removeLigne: fonctionne sur une NDF existante chargée par noteDeFraisId', function () {
-    $sc = SousCategorie::factory()->create(['association_id' => $this->asso->id]);
+    $sc = compteChargeNdfFS($this->asso->id);
 
     $ndf = NoteDeFrais::factory()->brouillon()->create([
         'association_id' => $this->asso->id,
@@ -193,7 +208,7 @@ it('removeLigne: fonctionne sur une NDF existante chargée par noteDeFraisId', f
     ]);
     $ligne = NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $sc->id,
         'montant' => 30.00,
     ]);
 
@@ -229,12 +244,12 @@ it('submit: ne crée pas de doublon si submit échoue puis est retenté', functi
     $component = new Form;
     $component->mount($this->asso);
 
-    // Prépare une ligne standard sans sous_categorie_id pour forcer l'échec du submit
-    // (la validation métier exige sous_categorie_id sur les lignes standard)
+    // Prépare une ligne standard sans compte_id pour forcer l'échec du submit
+    // (la validation métier exige compte_id sur les lignes standard)
     $component->lignes = [[
         'id' => null,
         'type' => 'standard',
-        'sous_categorie_id' => null,
+        'compte_id' => null,
         'operation_id' => null,
         'seance' => null,
         'libelle' => 'Repas client',
@@ -248,7 +263,7 @@ it('submit: ne crée pas de doublon si submit échoue puis est retenté', functi
     $component->libelle = 'NDF non-doublon';
     $component->dateInput = now()->subDay()->format('Y-m-d');
 
-    // Premier submit → échoue (sous_categorie_id manquant)
+    // Premier submit → échoue (compte_id manquant)
     $component->submit();
 
     expect($component->getErrorBag()->has('submit'))->toBeTrue();

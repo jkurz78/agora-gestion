@@ -32,7 +32,7 @@ final class NoteDeFraisService
      *         type?: string,
      *         libelle: string|null,
      *         montant: float|int,
-     *         sous_categorie_id: int|null,
+     *         compte_id: int|null,
      *         operation_id?: int|null,
      *         seance?: int|null,
      *         piece_jointe_path: string|null,
@@ -101,8 +101,8 @@ final class NoteDeFraisService
 
                 $montant = $strategy->computeMontant($ligneData);
                 $metadata = $strategy->metadata($ligneData);
-                $sousCategorieId = $strategy->resolveSousCategorieId(
-                    isset($ligneData['sous_categorie_id']) ? (int) $ligneData['sous_categorie_id'] : null
+                $compteId = $strategy->resolveCompteId(
+                    isset($ligneData['compte_id']) ? (int) $ligneData['compte_id'] : null
                 );
 
                 NoteDeFraisLigne::create([
@@ -111,7 +111,7 @@ final class NoteDeFraisService
                     'libelle' => $ligneData['libelle'] ?? null,
                     'montant' => $montant,
                     'metadata' => $metadata !== [] ? $metadata : null,
-                    'sous_categorie_id' => $sousCategorieId,
+                    'compte_id' => $compteId,
                     'operation_id' => $ligneData['operation_id'] ?? null,
                     'seance' => $ligneData['seance'] ?? null,
                     'piece_jointe_path' => $ligneData['piece_jointe_path'] ?? null,
@@ -183,8 +183,8 @@ final class NoteDeFraisService
         // Pour les lignes kilométriques, elle peut être null (le comptable tranchera).
         $validator->after(function ($v) use ($lignes): void {
             foreach ($lignes as $index => $ligne) {
-                if ($ligne->type === NoteDeFraisLigneType::Standard && empty($ligne->sous_categorie_id)) {
-                    $v->errors()->add("lignes.{$index}.sous_categorie_id", 'La sous-catégorie est obligatoire.');
+                if ($ligne->type === NoteDeFraisLigneType::Standard && empty($ligne->compte_id)) {
+                    $v->errors()->add("lignes.{$index}.compte_id", 'La nature de la dépense est obligatoire.');
                 }
             }
         });

@@ -3,11 +3,11 @@
 declare(strict_types=1);
 
 use App\Livewire\Portail\NoteDeFrais\Form;
+use App\Models\Compte;
 use App\Models\Association;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
 use App\Models\Operation;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Auth;
@@ -136,7 +136,7 @@ it('wizard: à l\'étape 2, montant valide passe à l\'étape 3', function () {
 it('wizard: wizardConfirm sans sous-catégorie produit une erreur', function () {
     $component = makeForm($this->asso);
     $component->wizardStep = 3;
-    $component->draftLigne['sous_categorie_id'] = null;
+    $component->draftLigne['compte_id'] = null;
 
     expect(fn () => $component->wizardConfirm())
         ->toThrow(ValidationException::class);
@@ -147,7 +147,13 @@ it('wizard: wizardConfirm sans sous-catégorie produit une erreur', function () 
 // ---------------------------------------------------------------------------
 
 it('wizard: wizardConfirm ajoute la ligne à $lignes, reset draftLigne, wizardStep = 0', function () {
-    $sc = SousCategorie::factory()->create(['association_id' => $this->asso->id]);
+    $sc = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '61FW'.random_int(100, 999),
+        'intitule' => 'Charge NDF',
+        'classe' => 6,
+        'actif' => true,
+    ]);
 
     $component = makeForm($this->asso);
     $component->wizardStep = 3;
@@ -158,7 +164,7 @@ it('wizard: wizardConfirm ajoute la ligne à $lignes, reset draftLigne, wizardSt
         'justif' => $tmpFile,
         'libelle' => 'Déplacement Lyon',
         'montant' => '45.00',
-        'sous_categorie_id' => (string) $sc->id,
+        'compte_id' => (string) $sc->id,
         'operation_id' => null,
         'seance' => null,
     ];
@@ -170,7 +176,7 @@ it('wizard: wizardConfirm ajoute la ligne à $lignes, reset draftLigne, wizardSt
     expect($component->lignes)->toHaveCount(1)
         ->and($component->lignes[0]['libelle'])->toBe('Déplacement Lyon')
         ->and($component->lignes[0]['montant'])->toBe('45.00')
-        ->and($component->lignes[0]['sous_categorie_id'])->toBe((string) $sc->id)
+        ->and($component->lignes[0]['compte_id'])->toBe((string) $sc->id)
         ->and($component->wizardStep)->toBe(0)
         ->and($component->draftLigne['libelle'])->toBe('')
         ->and($component->draftLigne['montant'])->toBe('')
@@ -253,7 +259,13 @@ it('wizard: selectedOperation est null dans render quand aucune opération chois
 // ---------------------------------------------------------------------------
 
 it('removeLigne: supprime une ligne persistée sans exception, même si storage absent', function () {
-    $sc = SousCategorie::factory()->create(['association_id' => $this->asso->id]);
+    $sc = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '61FW'.random_int(100, 999),
+        'intitule' => 'Charge NDF',
+        'classe' => 6,
+        'actif' => true,
+    ]);
 
     $ndf = NoteDeFrais::factory()->create([
         'association_id' => $this->asso->id,
@@ -263,7 +275,7 @@ it('removeLigne: supprime une ligne persistée sans exception, même si storage 
 
     $ligne = NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $sc->id,
         'montant' => 25.00,
         // piece_jointe_path null → pas de fichier à supprimer
     ]);
@@ -284,7 +296,13 @@ it('removeLigne: supprime une ligne persistée sans exception, même si storage 
 });
 
 it('removeLigne: supprime une ligne avec piece_jointe_path sans exception si fichier absent', function () {
-    $sc = SousCategorie::factory()->create(['association_id' => $this->asso->id]);
+    $sc = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '61FW'.random_int(100, 999),
+        'intitule' => 'Charge NDF',
+        'classe' => 6,
+        'actif' => true,
+    ]);
 
     $ndf = NoteDeFrais::factory()->create([
         'association_id' => $this->asso->id,
@@ -295,7 +313,7 @@ it('removeLigne: supprime une ligne avec piece_jointe_path sans exception si fic
     // Ligne avec un chemin de fichier qui n'existe pas sur le disk fake
     $ligne = NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $sc->id,
         'montant' => 15.00,
         'piece_jointe_path' => 'associations/1/notes-de-frais/999/ligne-1.pdf',
     ]);

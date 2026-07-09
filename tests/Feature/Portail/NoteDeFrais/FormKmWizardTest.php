@@ -5,11 +5,11 @@ declare(strict_types=1);
 use App\Enums\NoteDeFraisLigneType;
 use App\Enums\StatutNoteDeFrais;
 use App\Livewire\Portail\NoteDeFrais\Form;
+use App\Models\Compte;
 use App\Models\Association;
 use App\Models\Categorie;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Auth;
@@ -139,11 +139,18 @@ it('étape 2 km valide CV + km + bareme + libellé', function () {
 
 it('confirme la ligne km et l\'ajoute au tableau des lignes', function () {
     $cat = Categorie::factory()->create(['association_id' => $this->asso->id]);
-    SousCategorie::factory()->pourFraisKilometriques()->create([
-        'association_id' => $this->asso->id,
-        'categorie_id' => $cat->id,
-        'nom' => 'Déplacements',
-    ]);
+    (function () {
+        $c = Compte::create([
+            'association_id' => TenantContext::currentId(),
+            'numero_pcg' => '62FK'.random_int(100, 999),
+            'intitule' => 'Frais kilométriques',
+            'classe' => 6,
+            'actif' => true,
+        ]);
+        $c->usages()->create(['usage' => \App\Enums\UsageComptable::FraisKilometriques->value]);
+
+        return $c;
+    })();
 
     $component = makeKmForm($this->asso);
     $component->openKilometriqueWizard();
