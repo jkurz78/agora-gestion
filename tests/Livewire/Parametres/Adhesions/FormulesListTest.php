@@ -38,7 +38,7 @@ it('crée une formule mode exercice via la modale', function (): void {
         ->assertSet('showModal', true)
         ->set('nom', 'Nouvelle formule')
         ->set('mode', 'exercice')
-        ->set('sousCategorieId', $this->compte->id)
+        ->set('compteId', $this->compte->id)
         ->set('montantParDefaut', 30.00)
         ->set('actif', true)
         ->call('save')
@@ -55,7 +55,7 @@ it('crée une formule mode durée avec duree_mois', function (): void {
         ->set('nom', 'Adhésion 12 mois')
         ->set('mode', 'duree')
         ->set('dureeMois', 12)
-        ->set('sousCategorieId', $this->compte->id)
+        ->set('compteId', $this->compte->id)
         ->call('save');
 
     $formule = FormuleAdhesion::first();
@@ -69,9 +69,9 @@ it('valide les champs obligatoires', function (): void {
         ->call('openCreate')
         ->set('nom', '')
         ->set('mode', 'exercice')
-        ->set('sousCategorieId', null)
+        ->set('compteId', null)
         ->call('save')
-        ->assertHasErrors(['nom', 'sousCategorieId']);
+        ->assertHasErrors(['nom', 'compteId']);
 });
 
 it('refuse mode durée sans duree_mois', function (): void {
@@ -81,7 +81,7 @@ it('refuse mode durée sans duree_mois', function (): void {
         ->set('nom', 'Test')
         ->set('mode', 'duree')
         ->set('dureeMois', null)
-        ->set('sousCategorieId', $this->compte->id)
+        ->set('compteId', $this->compte->id)
         ->call('save')
         ->assertHasErrors(['dureeMois']);
 });
@@ -94,7 +94,7 @@ it('refuse une 2e formule active sur la même sous-cat (contrainte applicative r
         ->call('openCreate')
         ->set('nom', 'Doublon')
         ->set('mode', 'exercice')
-        ->set('sousCategorieId', $this->compte->id)
+        ->set('compteId', $this->compte->id)
         ->set('actif', true)
         ->call('save')
         ->assertSee('déjà une formule active');
@@ -134,9 +134,9 @@ it('refuse un compte dont l\'usage n\'est pas Cotisation', function (): void {
         ->call('openCreate')
         ->set('nom', 'Test')
         ->set('mode', 'exercice')
-        ->set('sousCategorieId', $compteDon->id)
+        ->set('compteId', $compteDon->id)
         ->call('save')
-        ->assertHasErrors(['sousCategorieId']);
+        ->assertHasErrors(['compteId']);
 });
 
 it('édition d\'une formule HelloAsso : seul le flag actif est modifiable', function (): void {
@@ -170,7 +170,7 @@ it('création d\'une formule mode illimite OK', function (): void {
         ->call('openCreate')
         ->set('nom', 'Membre à vie')
         ->set('mode', 'illimite')
-        ->set('sousCategorieId', $this->compte->id)
+        ->set('compteId', $this->compte->id)
         ->set('actif', true)
         ->call('save')
         ->assertSet('showModal', false);
@@ -232,7 +232,7 @@ it('crée une formule mode duree avec unité jours (duree_jours=10)', function (
         ->set('mode', 'duree')
         ->set('uniteDuree', 'jours')
         ->set('dureeJours', 10)
-        ->set('sousCategorieId', $this->compte->id)
+        ->set('compteId', $this->compte->id)
         ->call('save')
         ->assertSet('showModal', false);
 
@@ -287,7 +287,7 @@ it('validation refuse mode=duree sans valeur (uniteDuree=jours, dureeJours=null)
         ->set('mode', 'duree')
         ->set('uniteDuree', 'jours')
         ->set('dureeJours', null)
-        ->set('sousCategorieId', $this->compte->id)
+        ->set('compteId', $this->compte->id)
         ->call('save')
         ->assertHasErrors(['dureeJours']);
 });

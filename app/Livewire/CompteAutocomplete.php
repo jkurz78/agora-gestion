@@ -8,20 +8,20 @@ use App\Enums\UsageComptable;
 use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\Famille;
-use App\Models\SousCategorie;
+use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\View\View;
 use Livewire\Attributes\Modelable;
 use Livewire\Component;
 
-final class SousCategorieAutocomplete extends Component
+final class CompteAutocomplete extends Component
 {
     #[Modelable]
-    public int|string|null $sousCategorieId = null;
+    public int|string|null $compteId = null;
 
     public string $filtre = 'tous'; // 'depense' | 'recette' | 'tous'
 
-    public ?string $sousCategorieFlag = null; // 'pour_dons' | 'pour_cotisations' | 'pour_inscriptions' — external string API, converted internally to UsageComptable
+    public ?string $usageFlag = null; // 'pour_dons' | 'pour_cotisations' | 'pour_inscriptions' — external string API, converted internally to UsageComptable
 
     public string $search = '';
 
@@ -33,11 +33,11 @@ final class SousCategorieAutocomplete extends Component
 
     public bool $showCreateModal = false;
 
-    public string $newNom = '';
+    public string $newIntitule = '';
 
     public ?int $newCategorieId = null;
 
-    public string $newCodeCerfa = '';
+    public string $newNumeroPcg = '';
 
     /**
      * @var array<int, array{famille_code: string, famille_label: string, items: array<int, array{id: int, numero_pcg: string, intitule: string}>}>
@@ -47,10 +47,10 @@ final class SousCategorieAutocomplete extends Component
     public function mount(): void
     {
         // Normalise: empty string from lignes array → null
-        $id = ($this->sousCategorieId !== '' && $this->sousCategorieId !== null)
-            ? (int) $this->sousCategorieId
+        $id = ($this->compteId !== '' && $this->compteId !== null)
+            ? (int) $this->compteId
             : null;
-        $this->sousCategorieId = $id;
+        $this->compteId = $id;
 
         if ($id !== null) {
             $compte = Compte::find($id);
@@ -59,9 +59,9 @@ final class SousCategorieAutocomplete extends Component
         }
     }
 
-    public function updatedSousCategorieId(mixed $value): void
+    public function updatedCompteId(mixed $value): void
     {
-        $this->sousCategorieId = ($value !== '' && $value !== null) ? (int) $value : null;
+        $this->compteId = ($value !== '' && $value !== null) ? (int) $value : null;
     }
 
     public function updatedSearch(): void
@@ -76,7 +76,7 @@ final class SousCategorieAutocomplete extends Component
             'pour_cotisations' => UsageComptable::Cotisation,
             'pour_inscriptions' => UsageComptable::Inscription,
         ];
-        $usage = isset($flagToUsage[$this->sousCategorieFlag]) ? $flagToUsage[$this->sousCategorieFlag] : null;
+        $usage = isset($flagToUsage[$this->usageFlag]) ? $flagToUsage[$this->usageFlag] : null;
 
         $classes = match ($this->filtre) {
             'depense' => [6],
@@ -124,10 +124,10 @@ final class SousCategorieAutocomplete extends Component
         $this->open = true;
     }
 
-    public function selectSousCategorie(int $id): void
+    public function selectCompte(int $id): void
     {
         $compte = Compte::findOrFail($id);
-        $this->sousCategorieId = $compte->id;
+        $this->compteId = $compte->id;
         $this->selectedLabel = $compte->intitule;
         $this->selectedFamilleLabel = $compte->famille()?->libelle();
         $this->search = '';
@@ -135,9 +135,9 @@ final class SousCategorieAutocomplete extends Component
         $this->results = [];
     }
 
-    public function clearSousCategorie(): void
+    public function clearCompte(): void
     {
-        $this->sousCategorieId = null;
+        $this->compteId = null;
         $this->selectedLabel = null;
         $this->selectedFamilleLabel = null;
         $this->search = '';
@@ -147,9 +147,9 @@ final class SousCategorieAutocomplete extends Component
 
     public function openCreateModal(): void
     {
-        $this->newNom = $this->search;
+        $this->newIntitule = $this->search;
         $this->newCategorieId = null;
-        $this->newCodeCerfa = '';
+        $this->newNumeroPcg = '';
         $this->showCreateModal = true;
         $this->open = false;
     }
@@ -157,23 +157,54 @@ final class SousCategorieAutocomplete extends Component
     public function confirmCreate(): void
     {
         $this->validate([
-            'newNom' => ['required', 'string', 'max:150'],
+            'newIntitule' => ['required', 'string', 'max:150'],
             'newCategorieId' => ['required', 'integer', 'exists:categories,id'],
-            'newCodeCerfa' => ['required', 'string', 'max:20'],
+            'newNumeroPcg' => ['required', 'string', 'max:20'],
         ]);
 
-        $sc = SousCategorie::create([
-            'categorie_id' => $this->newCategorieId,
-            'nom' => $this->newNom,
-            'code_cerfa' => $this->newCodeCerfa,
-        ]);
+        $numero = trim($this->newNumeroPcg);
+        $classesAttendues = match ($this->filtre) {
+            'depense' => [6],
+            'recette' => [7],
+            default => [6, 7],
+        };
 
-        $compte = Compte::where('numero_pcg', $sc->code_cerfa)->firstOrFail();
+        $classe = $numero !== '' ? (int) substr($numero, 0, 1) : 0;
+        if (! in_array($classe, $classesAttendues, true)) {
+            $this->addError(
+                'newNumeroPcg',
+                'Le numéro de compte doit être de classe '.implode(' ou ', $classesAttendues).' pour ce type d\'écriture.'
+            );
 
-        $this->selectSousCategorie($compte->id);
+            return;
+        }
+
+        $associationId = TenantContext::currentId();
+
+        // Réutilise un compte existant plutôt que de heurter l'unicité
+        // (association_id, numero_pcg) — plus accueillant qu'une violation SQL.
+        $compte = Compte::withoutGlobalScopes()
+            ->where('association_id', $associationId)
+            ->where('numero_pcg', $numero)
+            ->first();
+
+        if ($compte === null) {
+            $compte = Compte::create([
+                'association_id' => $associationId,
+                'numero_pcg' => $numero,
+                'intitule' => $this->newIntitule,
+                'classe' => $classe,
+                'categorie_id' => $this->newCategorieId,
+                'actif' => true,
+                'est_systeme' => false,
+                'lettrable' => false,
+            ]);
+        }
+
+        $this->selectCompte($compte->id);
         $this->showCreateModal = false;
-        $this->newNom = '';
-        $this->newCodeCerfa = '';
+        $this->newIntitule = '';
+        $this->newNumeroPcg = '';
     }
 
     public function render(): View
@@ -184,6 +215,6 @@ final class SousCategorieAutocomplete extends Component
                 ->get()
             : collect();
 
-        return view('livewire.sous-categorie-autocomplete', compact('categories'));
+        return view('livewire.compte-autocomplete', compact('categories'));
     }
 }

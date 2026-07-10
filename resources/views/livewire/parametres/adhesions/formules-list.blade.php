@@ -159,8 +159,8 @@
                                 <label class="form-label fw-semibold" for="formule-souscat">Compte (usage Cotisation)</label>
                                 <div class="d-flex gap-1">
                                     <select id="formule-souscat"
-                                            class="form-select form-select-sm @error('sousCategorieId') is-invalid @enderror"
-                                            wire:model="sousCategorieId"
+                                            class="form-select form-select-sm @error('compteId') is-invalid @enderror"
+                                            wire:model="compteId"
                                             @if($this->isEditingHelloasso()) disabled @endif>
                                         <option value="">— Choisir —</option>
                                         @foreach($comptesCotisation as $compte)
@@ -177,7 +177,7 @@
                                         </button>
                                     @endif
                                 </div>
-                                @error('sousCategorieId')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                                @error('compteId')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
 
                                 {{-- Sub-bloc inline : création nouvelle sous-cat --}}
                                 @if($showCreateSousCat)

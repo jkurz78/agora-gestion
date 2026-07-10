@@ -36,7 +36,7 @@ final class FormulesList extends Component
 
     public bool $deductibleFiscal = false;
 
-    public ?int $sousCategorieId = null;
+    public ?int $compteId = null;
 
     public bool $actif = true;
 
@@ -79,8 +79,7 @@ final class FormulesList extends Component
         }
         $this->montantParDefaut = $formule->montant_par_defaut !== null ? (float) $formule->montant_par_defaut : null;
         $this->deductibleFiscal = $formule->deductible_fiscal;
-        // DC-8 : le sélecteur porte un id de compte (nom de propriété conservé jusqu'à DC-10).
-        $this->sousCategorieId = $formule->compte_id;
+        $this->compteId = $formule->compte_id;
         $this->actif = $formule->actif;
         $this->errorMessage = null;
         $this->showModal = true;
@@ -124,7 +123,7 @@ final class FormulesList extends Component
             'nom' => ['required', 'string', 'max:120'],
             'description' => ['nullable', 'string', 'max:1000'],
             'mode' => ['required', 'in:exercice,duree,illimite'],
-            'sousCategorieId' => ['required', 'integer', 'exists:comptes,id'],
+            'compteId' => ['required', 'integer', 'exists:comptes,id'],
             'montantParDefaut' => ['nullable', 'numeric', 'min:0'],
             'actif' => ['boolean'],
         ];
@@ -138,9 +137,9 @@ final class FormulesList extends Component
         $this->validate($rules);
 
         // Validation métier : le compte doit être en usage Cotisation
-        $compte = Compte::findOrFail($this->sousCategorieId);
+        $compte = Compte::findOrFail($this->compteId);
         if (! $compte->hasUsage(UsageComptable::Cotisation)) {
-            $this->addError('sousCategorieId', "Le compte sélectionné n'a pas l'usage \"Cotisation\".");
+            $this->addError('compteId', "Le compte sélectionné n'a pas l'usage \"Cotisation\".");
 
             return;
         }
@@ -154,7 +153,7 @@ final class FormulesList extends Component
             'montant_par_defaut' => $this->montantParDefaut,
             'deductible_fiscal' => $this->deductibleFiscal,
             // DC-8 : écrit compte_id, le trait remplit le miroir sous_categorie_id.
-            'compte_id' => $this->sousCategorieId,
+            'compte_id' => $this->compteId,
             'actif' => $this->actif,
         ];
 
@@ -229,13 +228,13 @@ final class FormulesList extends Component
 
         // Sélectionne le Compte miroir matérialisé par l'observer DC-7.
         $compte = Compte::ofNumero((string) $sc->code_cerfa);
-        $this->sousCategorieId = $compte?->id;
+        $this->compteId = $compte?->id;
         $this->showCreateSousCat = false;
     }
 
     private function resetForm(): void
     {
-        $this->reset(['editingId', 'nom', 'description', 'dureeMois', 'dureeJours', 'montantParDefaut', 'deductibleFiscal', 'sousCategorieId', 'errorMessage']);
+        $this->reset(['editingId', 'nom', 'description', 'dureeMois', 'dureeJours', 'montantParDefaut', 'deductibleFiscal', 'compteId', 'errorMessage']);
         $this->mode = 'exercice';
         $this->uniteDuree = 'mois';
         $this->actif = true;

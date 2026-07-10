@@ -70,7 +70,7 @@ it('filters transactions by sous-categorie pour_dons flag', function () {
     ]);
 
     Livewire::test(TransactionUniverselle::class, [
-        'sousCategorieFilter' => 'pour_dons',
+        'usageFilter' => 'pour_dons',
     ])
         ->assertSee('Don transaction visible')
         ->assertDontSee('Autre transaction cachée');
@@ -112,7 +112,7 @@ it('filters transactions by sous-categorie pour_cotisations flag', function () {
     ]);
 
     Livewire::test(TransactionUniverselle::class, [
-        'sousCategorieFilter' => 'pour_cotisations',
+        'usageFilter' => 'pour_cotisations',
     ])
         ->assertSee('Cotisation transaction visible')
         ->assertDontSee('Autre cotisation cachée');

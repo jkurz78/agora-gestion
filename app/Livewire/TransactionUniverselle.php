@@ -48,7 +48,7 @@ final class TransactionUniverselle extends Component
     public bool $showImport = false;      // affiche les boutons import CSV dans le header
 
     #[Locked]
-    public ?string $sousCategorieFilter = null; // filtre sous-catégorie par usage (dons, cotisations, inscriptions)
+    public ?string $usageFilter = null; // filtre comptes par usage (dons, cotisations, inscriptions)
 
     // === Filtres libres (manipulables par l'utilisateur) ===
     /** @var array<string> */
@@ -105,7 +105,7 @@ final class TransactionUniverselle extends Component
         ?string $pageTitle = null,
         string $pageTitleIcon = 'list-ul',
         bool $showImport = false,
-        ?string $sousCategorieFilter = null,
+        ?string $usageFilter = null,
     ): void {
         $this->compteId = $compteId;
         $this->tiersId = $tiersId;
@@ -114,7 +114,7 @@ final class TransactionUniverselle extends Component
         $this->pageTitle = $pageTitle;
         $this->pageTitleIcon = $pageTitleIcon;
         $this->showImport = $showImport;
-        $this->sousCategorieFilter = $sousCategorieFilter;
+        $this->usageFilter = $usageFilter;
 
         // Initialiser plage dates sur l'exercice courant
         $exerciceService = app(ExerciceService::class);
@@ -254,7 +254,7 @@ final class TransactionUniverselle extends Component
             return;
         }
         match ($sourceType) {
-            'depense', 'recette' => $this->dispatch('open-transaction-form', type: $sourceType, id: $id, sousCategorieFilter: $this->sousCategorieFilter),
+            'depense', 'recette' => $this->dispatch('open-transaction-form', type: $sourceType, id: $id, usageFilter: $this->usageFilter),
             'virement_sortant', 'virement_entrant' => $this->dispatch('open-virement-form', id: $id),
         };
     }
@@ -291,11 +291,10 @@ final class TransactionUniverselle extends Component
         }
 
         return [
-            // DC-10a : libellé lu depuis le compte (source unique) —
-            // clé de payload 'sous_categorie' conservée (consommée par la blade).
+            // DC-10a : libellé lu depuis le compte (source unique).
             'lignes' => $tx->lignes->map(fn ($l) => [
                 'id' => $l->id,
-                'sous_categorie' => $l->compte?->intitule,
+                'compte' => $l->compte?->intitule,
                 'operation' => $l->operation?->nom,
                 'operation_id' => $l->operation_id,
                 'seance' => $l->seance,
@@ -528,7 +527,7 @@ final class TransactionUniverselle extends Component
             searchNumeroPiece: $this->filterNumeroPiece ?: null,
             modePaiement: $this->filterModePaiement ?: null,
             statutReglement: $this->filterStatut ?: null,
-            sousCategorieFilter: $this->sousCategorieFilter,
+            usageFilter: $this->usageFilter,
             computeSolde: $showSolde,
             sortColumn: $this->sortColumn,
             sortDirection: $sortDirection,
@@ -573,7 +572,7 @@ final class TransactionUniverselle extends Component
             'comptesBancaires' => $comptesBancairesSaisie, // pour la modale marquer reçu (saisie manuelle uniquement)
             'modesPaiement' => ModePaiement::cases(),
             'availableTypes' => $this->lockedTypes ?? ['depense', 'recette', 'virement'],
-            'sousCategorieFilter' => $this->sousCategorieFilter,
+            'usageFilter' => $this->usageFilter,
             'showCompteCol' => $this->compteId === null,
             'showTiersCol' => $this->tiersId === null,
             'ndfByTransactionId' => $ndfByTransactionId,

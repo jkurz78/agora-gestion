@@ -30,7 +30,7 @@ final class TransactionUniverselleService
         ?string $searchNumeroPiece,
         ?string $modePaiement,
         ?string $statutReglement,
-        ?string $sousCategorieFilter = null,
+        ?string $usageFilter = null,
         bool $computeSolde = false,
         string $sortColumn = 'date',
         string $sortDirection = 'desc',
@@ -46,7 +46,7 @@ final class TransactionUniverselleService
         }
         $sortDirection = $sortDirection === 'asc' ? 'asc' : 'desc';
 
-        $union = $this->buildUnion($compteId, $tiersId, $types, $dateDebut, $dateFin, $sousCategorieFilter, $ndfUniquement);
+        $union = $this->buildUnion($compteId, $tiersId, $types, $dateDebut, $dateFin, $usageFilter, $ndfUniquement);
 
         $outer = DB::query()->fromSub($union, 't')
             ->when($searchTiers, fn ($q) => $q->where('t.tiers', 'like', "%{$searchTiers}%"))
@@ -76,7 +76,7 @@ final class TransactionUniverselleService
                 $offset = ($paginator->currentPage() - 1) * $perPage;
                 $sumAvant = 0.0;
                 if ($offset > 0) {
-                    $unionForSolde = $this->buildUnion($compteId, $tiersId, $types, $dateDebut, $dateFin, $sousCategorieFilter, $ndfUniquement);
+                    $unionForSolde = $this->buildUnion($compteId, $tiersId, $types, $dateDebut, $dateFin, $usageFilter, $ndfUniquement);
                     $inner = DB::query()->fromSub($unionForSolde, 'u')
                         ->select('montant')
                         ->orderBy("u.{$sortColumn}", $sortDirection)
@@ -104,7 +104,7 @@ final class TransactionUniverselleService
         ?array $types,
         ?string $dateDebut,
         ?string $dateFin,
-        ?string $sousCategorieFilter = null,
+        ?string $usageFilter = null,
         bool $ndfUniquement = false,
     ): Builder {
         // Map external string filter to UsageComptable (preserves external API, eliminates column interpolation)
@@ -113,7 +113,7 @@ final class TransactionUniverselleService
             'pour_cotisations' => UsageComptable::Cotisation,
             'pour_inscriptions' => UsageComptable::Inscription,
         ];
-        $usageFilter = $flagToUsage[$sousCategorieFilter] ?? null;
+        $usage = $flagToUsage[$usageFilter] ?? null;
 
         $include = [
             'depense' => $types === null || in_array('depense', $types, true),
@@ -123,12 +123,12 @@ final class TransactionUniverselleService
 
         $queries = [];
         if ($include['depense']) {
-            $queries[] = $this->brancheDepense($compteId, $tiersId, $dateDebut, $dateFin, $usageFilter, $ndfUniquement);
+            $queries[] = $this->brancheDepense($compteId, $tiersId, $dateDebut, $dateFin, $usage, $ndfUniquement);
         }
         if ($include['recette']) {
-            $queries[] = $this->brancheRecette($compteId, $tiersId, $dateDebut, $dateFin, $usageFilter, $ndfUniquement);
+            $queries[] = $this->brancheRecette($compteId, $tiersId, $dateDebut, $dateFin, $usage, $ndfUniquement);
         }
-        if ($include['virement'] && $usageFilter === null && ! $ndfUniquement) {
+        if ($include['virement'] && $usage === null && ! $ndfUniquement) {
             $queries[] = $this->brancheVirementSortant($compteId, $tiersId, $dateDebut, $dateFin);
             $queries[] = $this->brancheVirementEntrant($compteId, $tiersId, $dateDebut, $dateFin);
         }

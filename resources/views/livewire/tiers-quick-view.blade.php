@@ -186,7 +186,7 @@
                                            class="text-decoration-none text-muted">
                                             <i class="bi bi-link-45deg"></i>{{ $op['operation_nom'] }}
                                         </a>
-                                        @if($op['sous_categorie']) — {{ $op['sous_categorie'] }}@endif
+                                        @if($op['compte']) — {{ $op['compte'] }}@endif
                                         : {{ number_format((float)$op['total'], 2, ',', ' ') }} € ({{ $op['count'] }})
                                     </li>
                                 @endforeach

@@ -11,13 +11,13 @@
              this.dropWidth = r.width;
          }
      }">
-    @if($sousCategorieId)
+    @if($compteId)
         {{-- Selected state --}}
         <div class="d-flex align-items-center gap-2 px-3 py-2 border rounded" style="background:#f0e8f5;border-color:#c9a8d8!important">
             <span class="text-muted small">{{ $selectedFamilleLabel }}</span>
             <span class="text-muted">/</span>
             <span class="fw-medium">{{ $selectedLabel }}</span>
-            <button type="button" class="btn-close btn-close-sm ms-auto" wire:click="clearSousCategorie" aria-label="Effacer"></button>
+            <button type="button" class="btn-close btn-close-sm ms-auto" wire:click="clearCompte" aria-label="Effacer"></button>
         </div>
     @else
         {{-- Search input --}}
@@ -80,7 +80,7 @@
                             class="px-4 py-2 d-flex align-items-center gap-2"
                             data-sc-nav-{{ $this->getId() }}
                             style="cursor:pointer"
-                            wire:click="selectSousCategorie({{ $item['id'] }})"
+                            wire:click="selectCompte({{ $item['id'] }})"
                             x-on:mouseover="highlighted = {{ $navIndex }}"
                             x-on:mouseout="highlighted = -1"
                             :style="highlighted === {{ $navIndex }} ? 'background:#f0e8f5' : ''"
@@ -117,8 +117,8 @@
 
                 <div class="mb-3">
                     <label class="form-label fw-semibold">Intitulé <span class="text-danger">*</span></label>
-                    <input type="text" class="form-control" wire:model="newNom">
-                    @error('newNom') <div class="text-danger small">{{ $message }}</div> @enderror
+                    <input type="text" class="form-control" wire:model="newIntitule">
+                    @error('newIntitule') <div class="text-danger small">{{ $message }}</div> @enderror
                 </div>
 
                 <div class="mb-3">
@@ -134,8 +134,8 @@
 
                 <div class="mb-4">
                     <label class="form-label fw-semibold">Numéro de compte <span class="text-danger">*</span></label>
-                    <input type="text" class="form-control" wire:model="newCodeCerfa" placeholder="ex : 706A">
-                    @error('newCodeCerfa') <div class="text-danger small">{{ $message }}</div> @enderror
+                    <input type="text" class="form-control" wire:model="newNumeroPcg" placeholder="ex : 706A">
+                    @error('newNumeroPcg') <div class="text-danger small">{{ $message }}</div> @enderror
                 </div>
 
                 <div class="d-flex gap-2 justify-content-end">

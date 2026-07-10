@@ -82,20 +82,20 @@ it('la page /tiers/{id}/transactions rend TransactionUniverselle avec tiersId', 
         ->assertSeeLivewire(TransactionUniverselle::class);
 });
 
-it('la page /dons rend TransactionUniverselle avec sousCategorieFilter pour_dons', function () {
+it('la page /dons rend TransactionUniverselle avec usageFilter pour_dons', function () {
     $this->get('/comptabilite/dons')
         ->assertStatus(200)
         ->assertSeeLivewire(TransactionUniverselle::class);
 
-    Livewire::test(TransactionUniverselle::class, ['sousCategorieFilter' => 'pour_dons'])
-        ->assertSet('sousCategorieFilter', 'pour_dons');
+    Livewire::test(TransactionUniverselle::class, ['usageFilter' => 'pour_dons'])
+        ->assertSet('usageFilter', 'pour_dons');
 });
 
-it('la page /cotisations rend TransactionUniverselle avec sousCategorieFilter pour_cotisations', function () {
+it('la page /cotisations rend TransactionUniverselle avec usageFilter pour_cotisations', function () {
     $this->get('/comptabilite/cotisations')
         ->assertStatus(200)
         ->assertSeeLivewire(TransactionUniverselle::class);
 
-    Livewire::test(TransactionUniverselle::class, ['sousCategorieFilter' => 'pour_cotisations'])
-        ->assertSet('sousCategorieFilter', 'pour_cotisations');
+    Livewire::test(TransactionUniverselle::class, ['usageFilter' => 'pour_cotisations'])
+        ->assertSet('usageFilter', 'pour_cotisations');
 });

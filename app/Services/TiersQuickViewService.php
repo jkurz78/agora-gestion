@@ -114,20 +114,20 @@ final class TiersQuickViewService
         $parOperation = DB::table('transactions as tx')
             ->join('transaction_lignes as tl', 'tl.transaction_id', '=', 'tx.id')
             ->leftJoin('operations as op', 'op.id', '=', 'tl.operation_id')
-            ->leftJoin('sous_categories as sc', 'sc.id', '=', 'tl.sous_categorie_id')
+            ->leftJoin('comptes as cpt', 'cpt.id', '=', 'tl.compte_id')
             ->where('tx.tiers_id', $tiers->id)
             ->where('tx.type', TypeTransaction::Depense->value)
             ->whereBetween('tx.date', [$dateDebut, $dateFin])
             ->whereNull('tx.deleted_at')
             ->whereNull('tl.deleted_at')
             ->whereNotNull('tl.operation_id')
-            ->selectRaw('tl.operation_id, op.nom as operation_nom, sc.nom as sous_categorie, COUNT(DISTINCT tx.id) as count, SUM(tl.montant) as total')
-            ->groupBy('tl.operation_id', 'op.nom', 'sc.nom')
+            ->selectRaw('tl.operation_id, op.nom as operation_nom, cpt.intitule as compte, COUNT(DISTINCT tx.id) as count, SUM(tl.montant) as total')
+            ->groupBy('tl.operation_id', 'op.nom', 'cpt.intitule')
             ->get()
             ->map(fn (object $r): array => [
                 'operation_id' => (int) $r->operation_id,
                 'operation_nom' => $r->operation_nom,
-                'sous_categorie' => $r->sous_categorie,
+                'compte' => $r->compte,
                 'count' => (int) $r->count,
                 'total' => $r->total,
             ])
@@ -156,7 +156,9 @@ final class TiersQuickViewService
 
         $row = DB::table('transactions as tx')
             ->join('transaction_lignes as tl', 'tl.transaction_id', '=', 'tx.id')
-            ->join('sous_categories as sc', 'sc.id', '=', 'tl.sous_categorie_id')
+            ->join('comptes as cpt', function ($join): void {
+                $join->on('cpt.id', '=', 'tl.compte_id')->whereIn('cpt.classe', [6, 7]);
+            })
             ->where('tx.tiers_id', $tiers->id)
             ->where('tx.type', TypeTransaction::Recette->value)
             ->whereBetween('tx.date', [$dateDebut, $dateFin])
@@ -164,7 +166,7 @@ final class TiersQuickViewService
             ->whereNull('tl.deleted_at')
             ->whereNotExists(function ($q): void {
                 $q->from('usages_sous_categories as usc')
-                    ->whereColumn('usc.sous_categorie_id', 'sc.id')
+                    ->whereColumn('usc.compte_id', 'tl.compte_id')
                     ->whereIn('usc.usage', [
                         UsageComptable::Don->value,
                         UsageComptable::Cotisation->value,
@@ -193,7 +195,6 @@ final class TiersQuickViewService
 
         $row = DB::table('transactions as tx')
             ->join('transaction_lignes as tl', 'tl.transaction_id', '=', 'tx.id')
-            ->join('sous_categories as sc', 'sc.id', '=', 'tl.sous_categorie_id')
             ->where('tx.tiers_id', $tiers->id)
             ->where('tx.type', TypeTransaction::Recette->value)
             ->whereBetween('tx.date', [$dateDebut, $dateFin])
@@ -201,7 +202,7 @@ final class TiersQuickViewService
             ->whereNull('tl.deleted_at')
             ->whereExists(function ($q): void {
                 $q->from('usages_sous_categories as usc')
-                    ->whereColumn('usc.sous_categorie_id', 'sc.id')
+                    ->whereColumn('usc.compte_id', 'tl.compte_id')
                     ->where('usc.usage', UsageComptable::Don->value);
             })
             ->selectRaw('COUNT(DISTINCT tx.id) as count, SUM(tl.montant) as total')
@@ -227,7 +228,6 @@ final class TiersQuickViewService
 
         $row = DB::table('transactions as tx')
             ->join('transaction_lignes as tl', 'tl.transaction_id', '=', 'tx.id')
-            ->join('sous_categories as sc', 'sc.id', '=', 'tl.sous_categorie_id')
             ->where('tx.tiers_id', $tiers->id)
             ->where('tx.type', TypeTransaction::Recette->value)
             ->whereBetween('tx.date', [$dateDebut, $dateFin])
@@ -235,7 +235,7 @@ final class TiersQuickViewService
             ->whereNull('tl.deleted_at')
             ->whereExists(function ($q): void {
                 $q->from('usages_sous_categories as usc')
-                    ->whereColumn('usc.sous_categorie_id', 'sc.id')
+                    ->whereColumn('usc.compte_id', 'tl.compte_id')
                     ->where('usc.usage', UsageComptable::Cotisation->value);
             })
             ->selectRaw('COUNT(DISTINCT tx.id) as count, SUM(tl.montant) as total')

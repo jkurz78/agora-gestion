@@ -6,7 +6,7 @@
         <div class="container py-4">
         <div class="card mb-4">
             @php
-                $formEntityLabel = match($sousCategorieFilter) {
+                $formEntityLabel = match($usageFilter) {
                     'pour_dons'         => 'don',
                     'pour_cotisations'  => 'cotisation',
                     'pour_inscriptions' => 'inscription',
@@ -92,7 +92,7 @@
                     </div>
                 @endif
 
-                @if(!$sousCategorieFilter)
+                @if(!$usageFilter)
                 <div class="mb-3">
                     @if ($sensTresorerie === 'depense')
                         <span class="badge bg-danger fs-6">Dépense</span>
@@ -320,11 +320,11 @@
                                                 @php $compteLigne = \App\Models\Compte::find($ligne['compte_id']); @endphp
                                                 <span class="form-control-plaintext">{{ $compteLigne?->intitule ?? '—' }}</span>
                                             @else
-                                                <livewire:sous-categorie-autocomplete
-                                                    :key="'sc-tx-'.$index.'-'.($sousCategorieFilter ?? 'all')"
+                                                <livewire:compte-autocomplete
+                                                    :key="'sc-tx-'.$index.'-'.($usageFilter ?? 'all')"
                                                     wire:model="lignes.{{ $index }}.compte_id"
                                                     filtre="{{ $type }}"
-                                                    :sousCategorieFlag="$sousCategorieFilter"
+                                                    :usageFlag="$usageFilter"
                                                 />
                                             @endif
                                             @error('lignes.' . $index . '.compte_id')

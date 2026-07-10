@@ -100,7 +100,7 @@ final class TransactionForm extends Component
      */
     public string $sensTresorerie = '';
 
-    public ?string $sousCategorieFilter = null;
+    public ?string $usageFilter = null;
 
     /** @var TemporaryUploadedFile|null */
     public $pieceJointe = null;
@@ -177,9 +177,9 @@ final class TransactionForm extends Component
     }
 
     #[On('open-transaction-form')]
-    public function openForm(string $type, ?int $id = null, ?string $sousCategorieFilter = null): void
+    public function openForm(string $type, ?int $id = null, ?string $usageFilter = null): void
     {
-        $this->sousCategorieFilter = $sousCategorieFilter;
+        $this->usageFilter = $usageFilter;
         if ($id !== null) {
             $this->edit($id);
         } else {
@@ -1118,7 +1118,7 @@ final class TransactionForm extends Component
     {
         // DC-8 : source des options de ventilation (comptes classe 6/7, groupés par
         // famille) — remplace l'ex-liste `sousCategories` (déjà morte côté blade, le
-        // select vit dans <livewire:sous-categorie-autocomplete>, gardé pour tout
+        // select vit dans <livewire:compte-autocomplete>, gardé pour tout
         // futur consommateur direct de ce render()).
         $groupesComptesVentilation = $this->type !== ''
             ? PlanComptableSelecteur::groupesPourType($this->type)

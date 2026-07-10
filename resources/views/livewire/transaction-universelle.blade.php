@@ -33,7 +33,7 @@
     @if($pageTitle)
         {{-- Ligne unique : toggles (gauche) + import & nouveau (droite) --}}
         <div class="mb-3 d-flex align-items-center gap-2 flex-wrap">
-            @if(!$sousCategorieFilter && count($availableTypes) > 1)
+            @if(!$usageFilter && count($availableTypes) > 1)
                 <button type="button" wire:click="$set('filterTypes', [])"
                         class="btn btn-sm {{ empty($filterTypes) ? 'btn-secondary' : 'btn-outline-secondary' }}">
                     Toutes
@@ -66,9 +66,9 @@
                     <livewire:import-csv type="recette" />
                 @endif
                 @if (! $exerciceCloture)
-                    @if($sousCategorieFilter)
+                    @if($usageFilter)
                         @php
-                            $filterLabel = match($sousCategorieFilter) {
+                            $filterLabel = match($usageFilter) {
                                 'pour_dons'          => 'Nouveau don',
                                 'pour_cotisations'   => 'Nouvelle cotisation',
                                 'pour_inscriptions'  => 'Nouvelle inscription',
@@ -76,7 +76,7 @@
                             };
                         @endphp
                         <button type="button"
-                                @click="$dispatch('open-transaction-form', { id: null, type: 'recette', sousCategorieFilter: '{{ $sousCategorieFilter }}' })"
+                                @click="$dispatch('open-transaction-form', { id: null, type: 'recette', usageFilter: '{{ $usageFilter }}' })"
                                 class="btn btn-sm btn-primary">
                             <i class="bi bi-plus-lg"></i> {{ $filterLabel }}
                         </button>
@@ -122,7 +122,7 @@
         {{-- Layout standard : ligne 1 = Nouveau ; ligne 2 = toggles --}}
         @if (! $exerciceCloture)
         <div class="mb-3 d-flex align-items-center gap-2 flex-wrap">
-            @if(!$sousCategorieFilter && count($availableTypes) > 1)
+            @if(!$usageFilter && count($availableTypes) > 1)
                 <button type="button" wire:click="$set('filterTypes', [])"
                         class="btn btn-sm {{ empty($filterTypes) ? 'btn-secondary' : 'btn-outline-secondary' }}">
                     Toutes
@@ -151,9 +151,9 @@
             </div>
 
             <div class="ms-auto">
-                @if($sousCategorieFilter)
+                @if($usageFilter)
                     @php
-                        $filterLabel = match($sousCategorieFilter) {
+                        $filterLabel = match($usageFilter) {
                             'pour_dons'          => 'Nouveau don',
                             'pour_cotisations'   => 'Nouvelle cotisation',
                             'pour_inscriptions'  => 'Nouvelle inscription',
@@ -161,7 +161,7 @@
                         };
                     @endphp
                     <button type="button"
-                            @click="$dispatch('open-transaction-form', { id: null, type: 'recette', sousCategorieFilter: '{{ $sousCategorieFilter }}' })"
+                            @click="$dispatch('open-transaction-form', { id: null, type: 'recette', usageFilter: '{{ $usageFilter }}' })"
                             class="btn btn-sm btn-primary">
                         <i class="bi bi-plus-lg"></i> {{ $filterLabel }}
                     </button>
@@ -280,7 +280,7 @@
                     </th>
 
                     {{-- Type header (only if multi) --}}
-                    @if(count($availableTypes) > 1 && !$sousCategorieFilter)
+                    @if(count($availableTypes) > 1 && !$usageFilter)
                     <th>Type</th>
                     @endif
 
@@ -511,7 +511,7 @@
                     </td>
                     <td class="small text-muted text-nowrap">{{ $tx->numero_piece ?? '—' }}</td>
                     <td class="small text-nowrap">{{ \Carbon\Carbon::parse($tx->date)->format('d/m') }}</td>
-                    @if(count($availableTypes) > 1 && !$sousCategorieFilter)
+                    @if(count($availableTypes) > 1 && !$usageFilter)
                         <td>
                             <span class="badge text-bg-{{ $badgeClass }}" style="font-size:.65rem">{{ $badgeLabel }}</span>
                         </td>
@@ -684,7 +684,7 @@
                 {{-- Expansion row --}}
                 @if($isExpanded && $detail)
                     <tr style="background:#f8f9fa">
-                        <td colspan="{{ 10 + (count($availableTypes) > 1 && !$sousCategorieFilter ? 1 : 0) + ($showTiersCol ? 1 : 0) + ($showCompteCol ? 1 : 0) + ($showSolde ? 1 : 0) }}"
+                        <td colspan="{{ 10 + (count($availableTypes) > 1 && !$usageFilter ? 1 : 0) + ($showTiersCol ? 1 : 0) + ($showCompteCol ? 1 : 0) + ($showSolde ? 1 : 0) }}"
                             style="padding:0;border-top:none">
                             @if(!empty($detail['lignes']))
                                 <table class="table table-sm align-middle mb-0" style="margin-left:1.5rem;width:calc(100% - 1.5rem);--bs-table-bg:#f8f9fa;font-size:.78rem;--bs-table-cell-padding-y:.2rem">
@@ -700,7 +700,7 @@
                                     <tbody>
                                         @foreach($detail['lignes'] as $ligne)
                                             <tr>
-                                                <td>{{ $ligne['sous_categorie'] ?? '—' }}</td>
+                                                <td>{{ $ligne['compte'] ?? '—' }}</td>
                                                 <td class="text-muted">
                                                     @if($ligne['operation_id'] ?? null)
                                                         <a href="{{ route('operations.show', $ligne['operation_id']) }}" class="text-decoration-none" @click.stop>{{ $ligne['operation'] }}</a>
@@ -739,7 +739,7 @@
                 @endif
             @empty
                 <tr>
-                    <td colspan="{{ 9 + (count($availableTypes) > 1 && !$sousCategorieFilter ? 1 : 0) + ($showTiersCol ? 1 : 0) + ($showCompteCol ? 1 : 0) + ($showSolde ? 1 : 0) }}"
+                    <td colspan="{{ 9 + (count($availableTypes) > 1 && !$usageFilter ? 1 : 0) + ($showTiersCol ? 1 : 0) + ($showCompteCol ? 1 : 0) + ($showSolde ? 1 : 0) }}"
                         class="text-center text-muted py-4">
                         Aucune transaction trouvée.
                     </td>

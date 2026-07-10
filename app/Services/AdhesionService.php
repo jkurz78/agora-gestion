@@ -13,8 +13,8 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Observers\AdhesionTransactionLigneObserver;
+use App\Services\Adhesion\CompteFormuleResolver;
 use App\Services\Adhesion\NouvelleAdhesionDTO;
-use App\Services\Adhesion\SousCategorieFormuleResolver;
 use App\Tenant\TenantContext;
 use Carbon\CarbonImmutable;
 use DomainException;
@@ -25,7 +25,7 @@ final class AdhesionService
 {
     public function __construct(
         private readonly ExerciceService $exerciceService,
-        private readonly SousCategorieFormuleResolver $formuleResolver,
+        private readonly CompteFormuleResolver $formuleResolver,
         private readonly TransactionService $transactionService,
     ) {}
 
@@ -130,7 +130,7 @@ final class AdhesionService
     /**
      * Résout la formule applicable selon priorité :
      *   1. HelloAsso — formule auto-créée par la sync (lookup direct helloasso_form_slug + helloasso_tier_id)
-     *   2. Formule active sur la sous-catégorie de la ligne cotisation
+     *   2. Formule active sur le compte de ventilation de la ligne cotisation
      *   3. null (adhésion legacy)
      */
     private function resolveFormule(Transaction $tx, TransactionLigne $ligneCotisation): ?FormuleAdhesion
@@ -155,15 +155,10 @@ final class AdhesionService
             }
         }
 
-        // Priorité 2 : compte → formule active (DC-5 — lit compte_id quand la ligne est
-        // déjà enrichie partie double), repli sur sous-cat → formule active sinon
-        // (ligne pas encore enrichie, ou fixture pré-DC-2).
+        // Priorité 2 : compte de ventilation → formule active (DC-10a — compte_id
+        // est la source unique ; sans compte, pas de formule résolvable).
         if ($ligneCotisation->compte_id !== null) {
-            return $this->formuleResolver->resolveParCompte((int) $ligneCotisation->compte_id);
-        }
-
-        if ($ligneCotisation->sous_categorie_id !== null) {
-            return $this->formuleResolver->resolve((int) $ligneCotisation->sous_categorie_id);
+            return $this->formuleResolver->resolve((int) $ligneCotisation->compte_id);
         }
 
         return null;

@@ -243,7 +243,7 @@
                                                     @endif
                                                 </td>
                                                 <td>
-                                                    <livewire:sous-categorie-autocomplete
+                                                    <livewire:compte-autocomplete
                                                         wire:model="modalLignes.{{ $idx }}.compte_id"
                                                         filtre="depense"
                                                         :key="'sc-ac-'.$idx.'-'.($ligne['compte_id'] ?? 'null')"
