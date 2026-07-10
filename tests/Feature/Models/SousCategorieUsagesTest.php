@@ -6,6 +6,7 @@ use App\Enums\TypeCategorie;
 use App\Enums\UsageComptable;
 use App\Models\Association;
 use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\SousCategorie;
 use App\Models\UsageSousCategorie;
 use App\Tenant\TenantContext;
@@ -14,8 +15,8 @@ beforeEach(function () {
     $this->asso = Association::factory()->create();
     TenantContext::boot($this->asso);
     $this->catRecette = Categorie::factory()->for($this->asso, 'association')->create(['type' => TypeCategorie::Recette]);
-    $this->scDon = SousCategorie::factory()->for($this->asso, 'association')->for($this->catRecette)->create(['nom' => 'Dons manuels']);
-    $this->scCoti = SousCategorie::factory()->for($this->asso, 'association')->for($this->catRecette)->create(['nom' => 'Cotisations']);
+    $this->scDon = SousCategorie::factory()->for($this->asso, 'association')->for($this->catRecette)->create(['nom' => 'Dons manuels', 'code_cerfa' => '754A']);
+    $this->scCoti = SousCategorie::factory()->for($this->asso, 'association')->for($this->catRecette)->create(['nom' => 'Cotisations', 'code_cerfa' => '756A']);
     UsageSousCategorie::create([
         'association_id' => $this->asso->id, 'sous_categorie_id' => $this->scDon->id, 'usage' => UsageComptable::Don,
     ]);
@@ -36,8 +37,10 @@ it('SousCategorie::forUsage scope filters correctly', function () {
     expect($dons->first()->id)->toBe($this->scDon->id);
 });
 
-it('Association::sousCategoriesFor returns the right sous-cat', function () {
-    $cotis = $this->asso->sousCategoriesFor(UsageComptable::Cotisation);
-    expect($cotis)->toHaveCount(1);
-    expect($cotis->first()->id)->toBe($this->scCoti->id);
+it('Association::comptesFor returns the right compte', function () {
+    $compteCoti = Compte::where('association_id', $this->asso->id)->where('numero_pcg', '756A')->firstOrFail();
+
+    $comptes = $this->asso->comptesFor(UsageComptable::Cotisation);
+    expect($comptes)->toHaveCount(1);
+    expect($comptes->first()->id)->toBe($compteCoti->id);
 });

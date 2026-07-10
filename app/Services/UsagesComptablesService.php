@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\TypeCategorie;
 use App\Enums\UsageComptable;
 use App\Models\Compte;
-use App\Models\SousCategorie;
 use App\Models\UsageSousCategorie;
 use App\Tenant\TenantContext;
 use DomainException;
@@ -50,26 +50,50 @@ final class UsagesComptablesService
     }
 
     /**
-     * Création "from scratch" d'une ventilation : reste côté SousCategorie
-     * (échafaudage DC-8, disparaît en DC-10) — le miroir Compte est matérialisé
-     * par l'observer dès que code_cerfa (classe 6/7) est posé, et le trait
-     * SyncCompteDepuisSousCategorie remplit compte_id sur le lien d'usage.
+     * Création d'un compte de résultat directement flaggé d'un usage.
+     * Le miroir SousCategorie est matérialisé par CompteObserver (DC-7).
      *
-     * @param  array<string, mixed>  $attrs
+     * @param  array{categorie_id: int, intitule: string, numero_pcg: string}  $attrs
      */
-    public function createAndFlag(array $attrs, UsageComptable $usage): SousCategorie
+    public function createAndFlag(array $attrs, UsageComptable $usage): Compte
     {
-        return DB::transaction(function () use ($attrs, $usage): SousCategorie {
-            $sc = SousCategorie::create(array_merge(
-                ['association_id' => TenantContext::currentId()],
-                $attrs,
-            ));
-            $this->ensureLinkSousCategorie($usage, (int) $sc->id);
-            if ($usage === UsageComptable::AbandonCreance) {
-                $this->ensureLinkSousCategorie(UsageComptable::Don, (int) $sc->id);
+        $numero = trim((string) $attrs['numero_pcg']);
+        $classeAttendue = $usage->polarite() === TypeCategorie::Depense ? 6 : 7;
+
+        if ($numero === '' || (int) substr($numero, 0, 1) !== $classeAttendue) {
+            throw new DomainException("Le numéro de compte doit être de classe {$classeAttendue} pour cet usage.");
+        }
+
+        return DB::transaction(function () use ($attrs, $usage, $numero, $classeAttendue): Compte {
+            $associationId = TenantContext::currentId();
+
+            // Réutilise un compte existant plutôt que de heurter l'unicité
+            // (association_id, numero_pcg) — plus accueillant qu'une violation SQL.
+            $compte = Compte::withoutGlobalScopes()
+                ->where('association_id', $associationId)
+                ->where('numero_pcg', $numero)
+                ->first();
+
+            if ($compte === null) {
+                $compte = Compte::create([
+                    'association_id' => $associationId,
+                    'numero_pcg' => $numero,
+                    'intitule' => $attrs['intitule'],
+                    'classe' => $classeAttendue,
+                    'categorie_id' => $attrs['categorie_id'],
+                    'actif' => true,
+                    'est_systeme' => false,
+                    'pour_inscriptions' => $usage === UsageComptable::Inscription,
+                    'lettrable' => false,
+                ]);
             }
 
-            return $sc;
+            $this->ensureLink($usage, (int) $compte->id);
+            if ($usage === UsageComptable::AbandonCreance) {
+                $this->ensureLink(UsageComptable::Don, (int) $compte->id);
+            }
+
+            return $compte;
         });
     }
 
@@ -103,19 +127,6 @@ final class UsagesComptablesService
         UsageSousCategorie::firstOrCreate([
             'association_id' => TenantContext::currentId(),
             'compte_id' => $compteId,
-            'usage' => $usage->value,
-        ]);
-    }
-
-    /**
-     * Variante côté sous-catégorie pour createAndFlag() — le trait remplit
-     * compte_id en miroir. Échafaudage DC-8, disparaît en DC-10.
-     */
-    private function ensureLinkSousCategorie(UsageComptable $usage, int $sousCategorieId): void
-    {
-        UsageSousCategorie::firstOrCreate([
-            'association_id' => TenantContext::currentId(),
-            'sous_categorie_id' => $sousCategorieId,
             'usage' => $usage->value,
         ]);
     }

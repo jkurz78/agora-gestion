@@ -93,8 +93,8 @@ final class UsagesComptables extends Component
     public function submitInline(): void
     {
         $this->requireAdmin();
-        // DC-8 : numéro de compte requis — sans lui, pas de Compte miroir, donc
-        // la nouvelle entrée serait invisible sur cet écran (liste de comptes).
+        // Numéro de compte requis — sans lui, pas de Compte, donc la nouvelle
+        // entrée serait invisible sur cet écran (liste de comptes).
         $this->validate([
             'inlineUsage' => 'required|string',
             'inlineCategorieId' => 'required|integer|exists:categories,id',
@@ -102,11 +102,17 @@ final class UsagesComptables extends Component
             'inlineCodeCerfa' => 'required|string|max:20',
         ]);
         $usage = UsageComptable::from($this->inlineUsage);
-        app(UsagesComptablesService::class)->createAndFlag([
-            'categorie_id' => $this->inlineCategorieId,
-            'nom' => $this->inlineNom,
-            'code_cerfa' => $this->inlineCodeCerfa,
-        ], $usage);
+        try {
+            app(UsagesComptablesService::class)->createAndFlag([
+                'categorie_id' => $this->inlineCategorieId,
+                'intitule' => $this->inlineNom,
+                'numero_pcg' => $this->inlineCodeCerfa,
+            ], $usage);
+        } catch (DomainException $e) {
+            $this->addError('inlineCodeCerfa', $e->getMessage());
+
+            return;
+        }
         $this->inlineOpen = false;
         $this->dispatch('usage-created');
     }

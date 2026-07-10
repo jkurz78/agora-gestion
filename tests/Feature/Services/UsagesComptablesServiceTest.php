@@ -83,32 +83,65 @@ it('toggleDon(false) cascades and removes AbandonCreance', function () {
     expect($compte->fresh()->hasUsage(UsageComptable::AbandonCreance))->toBeFalse();
 });
 
-it('createAndFlag creates sous-cat and posts the pivot link', function () {
-    $sc = $this->service->createAndFlag([
+it('createAndFlag creates a compte and posts the pivot link', function () {
+    $compte = $this->service->createAndFlag([
         'categorie_id' => $this->catR->id,
-        'nom' => 'Nouvelle sous-cat',
-        'code_cerfa' => null,
+        'intitule' => 'Nouveau compte',
+        'numero_pcg' => '758A',
     ], UsageComptable::Cotisation);
 
-    expect($sc)->toBeInstanceOf(SousCategorie::class);
-    expect($sc->hasUsage(UsageComptable::Cotisation))->toBeTrue();
+    expect($compte)->toBeInstanceOf(Compte::class);
+    expect($compte->hasUsage(UsageComptable::Cotisation))->toBeTrue();
+
+    // Le miroir SousCategorie est matérialisé par CompteObserver (DC-7).
+    $sc = SousCategorie::where('association_id', $this->asso->id)->where('code_cerfa', '758A')->first();
+    expect($sc)->not->toBeNull();
+    expect($sc->nom)->toBe('Nouveau compte');
+});
+
+it('createAndFlag throws on empty numero_pcg', function () {
+    expect(fn () => $this->service->createAndFlag([
+        'categorie_id' => $this->catR->id,
+        'intitule' => 'Nouveau compte',
+        'numero_pcg' => '',
+    ], UsageComptable::Cotisation))->toThrow(DomainException::class);
+});
+
+it('createAndFlag throws on wrong-classe numero_pcg', function () {
+    // Cotisation est une Recette (classe 7 attendue) — '606' est classe 6.
+    expect(fn () => $this->service->createAndFlag([
+        'categorie_id' => $this->catR->id,
+        'intitule' => 'Nouveau compte',
+        'numero_pcg' => '606',
+    ], UsageComptable::Cotisation))->toThrow(DomainException::class);
+});
+
+it('createAndFlag reuses an existing compte with the same numero_pcg', function () {
+    $existing = creerCompteVentilation($this->asso, $this->catR, '754A');
+
+    $compte = $this->service->createAndFlag([
+        'categorie_id' => $this->catR->id,
+        'intitule' => 'Intitulé ignoré (compte déjà existant)',
+        'numero_pcg' => '754A',
+    ], UsageComptable::Cotisation);
+
+    expect((int) $compte->id)->toBe((int) $existing->id);
+    expect($compte->fresh()->hasUsage(UsageComptable::Cotisation))->toBeTrue();
 });
 
 it('createAndFlag(AbandonCreance) also posts Don', function () {
-    $sc = $this->service->createAndFlag([
+    $compte = $this->service->createAndFlag([
         'categorie_id' => $this->catR->id,
-        'nom' => 'Abandon de créance',
-        'code_cerfa' => '771',
+        'intitule' => 'Abandon de créance',
+        'numero_pcg' => '771',
     ], UsageComptable::AbandonCreance);
 
-    expect($sc->hasUsage(UsageComptable::Don))->toBeTrue();
-    expect($sc->hasUsage(UsageComptable::AbandonCreance))->toBeTrue();
-
-    // DC-8 : le lien d'usage porte aussi compte_id (miroir rempli par le trait) —
-    // le compte matérialisé est visible via Compte::forUsage().
-    $compte = Compte::where('association_id', $this->asso->id)->where('numero_pcg', '771')->firstOrFail();
     expect($compte->hasUsage(UsageComptable::Don))->toBeTrue();
     expect($compte->hasUsage(UsageComptable::AbandonCreance))->toBeTrue();
+
+    // Le miroir SousCategorie est matérialisé par CompteObserver (DC-7).
+    $sc = SousCategorie::where('association_id', $this->asso->id)->where('code_cerfa', '771')->first();
+    expect($sc)->not->toBeNull();
 });
 
 it('is tenant-scoped', function () {

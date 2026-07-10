@@ -86,7 +86,7 @@ final class SousCategorieAutocomplete extends Component
 
         $query = Compte::whereIn('classe', $classes)
             ->where('actif', true)
-            ->when($usage, fn ($q) => $q->whereIn('id', $this->compteIdsPourUsage($usage)));
+            ->when($usage, fn ($q) => $q->forUsage($usage));
 
         if ($this->search !== '') {
             $query->where(function ($q): void {
@@ -122,22 +122,6 @@ final class SousCategorieAutocomplete extends Component
             ->toArray();
 
         $this->open = true;
-    }
-
-    /**
-     * Résout les IDs de comptes ayant l'usage comptable demandé, via le
-     * mirroir sous_categories.code_cerfa = comptes.numero_pcg.
-     *
-     * Échafaudage — remplacer par Compte::forUsage() si/quand disponible
-     * (item 9 du programme DC-8).
-     *
-     * @return array<int, int>
-     */
-    private function compteIdsPourUsage(UsageComptable $usage): array
-    {
-        $codesCerfa = SousCategorie::forUsage($usage)->pluck('code_cerfa')->filter()->values();
-
-        return Compte::whereIn('numero_pcg', $codesCerfa)->pluck('id')->all();
     }
 
     public function selectSousCategorie(int $id): void

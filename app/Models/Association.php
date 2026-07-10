@@ -180,13 +180,8 @@ final class Association extends Model
         return preg_match('#^https?://#i', $url) === 1 ? $url : null;
     }
 
-    public function sousCategoriesFor(UsageComptable $usage): Collection
-    {
-        return SousCategorie::forUsage($usage)->where('association_id', $this->id)->orderBy('nom')->get();
-    }
-
     /**
-     * Équivalent compte-first de sousCategoriesFor() — DC-8.
+     * Comptes de résultat (classe 6/7) flaggés pour l'usage comptable donné.
      *
      * @return Collection<int, Compte>
      */

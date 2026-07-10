@@ -103,6 +103,17 @@ it('submitInline creates sous-cat and flags it', function () {
     expect($sc->hasUsage(UsageComptable::Cotisation))->toBeTrue();
 });
 
+it('submitInline surfaces a classe mismatch as a validation error', function () {
+    // Cotisation est une Recette (classe 7 attendue) — '606' est classe 6.
+    Livewire::test(UsagesComptables::class)
+        ->set('inlineUsage', UsageComptable::Cotisation->value)
+        ->set('inlineCategorieId', $this->catR->id)
+        ->set('inlineNom', 'Compte invalide')
+        ->set('inlineCodeCerfa', '606')
+        ->call('submitInline')
+        ->assertHasErrors(['inlineCodeCerfa']);
+});
+
 it('inlineCategoriesEligibles filtered to Depense for FraisKilometriques', function () {
     $comp = Livewire::test(UsagesComptables::class)
         ->set('inlineUsage', UsageComptable::FraisKilometriques->value);
