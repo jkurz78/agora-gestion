@@ -11,7 +11,6 @@ use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
 use App\Models\FactureLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -38,7 +37,7 @@ beforeEach(function () {
     SystemeSeeder::seed();
     $this->actingAs($this->user);
     $this->tiers = Tiers::factory()->create();
-    $this->sousCategorie = SousCategorie::factory()->create(['code_cerfa' => '706']);
+    $this->compte = Compte::factory()->numero('706')->create();
     $this->service = app(FactureService::class);
 
     $this->compteBancaire = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
@@ -73,7 +72,7 @@ function creerFactureLibre(
  */
 function ajouterLigneLibre(
     Facture $facture,
-    SousCategorie $sousCategorie,
+    Compte $compte,
     float $prixUnitaire,
     float $quantite = 1.0,
     string $libelle = 'Prestation test',
@@ -90,7 +89,7 @@ function ajouterLigneLibre(
         'quantite' => $quantite,
         'montant' => $montant,
         'transaction_ligne_id' => null,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compte->id,
         'operation_id' => $operationId,
         'seance' => $seance,
         'ordre' => FactureLigne::where('facture_id', $facture->id)->count() + 1,
@@ -103,8 +102,8 @@ describe('Happy path : 2 lignes MontantManuel → 1 Transaction recette + 2 Tran
 
     it('crée 1 Transaction recette avec le bon montant_total et statut', function () {
         $facture = creerFactureLibre($this->service, $this->tiers->id);
-        ajouterLigneLibre($facture, $this->sousCategorie, 1200.0, 1.0, 'Mission');
-        ajouterLigneLibre($facture, $this->sousCategorie, 200.0, 1.0, 'Frais');
+        ajouterLigneLibre($facture, $this->compte, 1200.0, 1.0, 'Mission');
+        ajouterLigneLibre($facture, $this->compte, 200.0, 1.0, 'Frais');
         $facture->update(['montant_total' => 1400.0]);
 
         $countAvant = Transaction::count();
@@ -126,8 +125,8 @@ describe('Happy path : 2 lignes MontantManuel → 1 Transaction recette + 2 Tran
 
     it('le libellé de la Transaction est "Facture {numero attribué}"', function () {
         $facture = creerFactureLibre($this->service, $this->tiers->id);
-        ajouterLigneLibre($facture, $this->sousCategorie, 1200.0, 1.0, 'Mission');
-        ajouterLigneLibre($facture, $this->sousCategorie, 200.0, 1.0, 'Frais');
+        ajouterLigneLibre($facture, $this->compte, 1200.0, 1.0, 'Mission');
+        ajouterLigneLibre($facture, $this->compte, 200.0, 1.0, 'Frais');
         $facture->update(['montant_total' => 1400.0]);
 
         $this->service->valider($facture);
@@ -141,8 +140,8 @@ describe('Happy path : 2 lignes MontantManuel → 1 Transaction recette + 2 Tran
 
     it('crée 2 TransactionLignes avec les bons montants et sous_cat', function () {
         $facture = creerFactureLibre($this->service, $this->tiers->id);
-        ajouterLigneLibre($facture, $this->sousCategorie, 1200.0, 1.0, 'Mission');
-        ajouterLigneLibre($facture, $this->sousCategorie, 200.0, 1.0, 'Frais');
+        ajouterLigneLibre($facture, $this->compte, 1200.0, 1.0, 'Mission');
+        ajouterLigneLibre($facture, $this->compte, 200.0, 1.0, 'Frais');
         $facture->update(['montant_total' => 1400.0]);
 
         $this->service->valider($facture);
@@ -155,9 +154,7 @@ describe('Happy path : 2 lignes MontantManuel → 1 Transaction recette + 2 Tran
         $montants = $ventilationLignes->pluck('montant')->map(fn ($m) => (float) $m)->sort()->values()->all();
         expect($montants)->toBe([200.0, 1200.0]);
 
-        $expectedCompteId = (int) Compte::where('numero_pcg', $this->sousCategorie->code_cerfa)
-            ->where('association_id', $this->association->id)
-            ->value('id');
+        $expectedCompteId = (int) $this->compte->id;
 
         foreach ($ventilationLignes as $ligne) {
             expect((int) $ligne->compte_id)->toBe($expectedCompteId);
@@ -166,8 +163,8 @@ describe('Happy path : 2 lignes MontantManuel → 1 Transaction recette + 2 Tran
 
     it('les notes des TransactionLignes reprennent le libellé des FactureLignes', function () {
         $facture = creerFactureLibre($this->service, $this->tiers->id);
-        ajouterLigneLibre($facture, $this->sousCategorie, 1200.0, 1.0, 'Mission conseil');
-        ajouterLigneLibre($facture, $this->sousCategorie, 200.0, 1.0, 'Frais annexes');
+        ajouterLigneLibre($facture, $this->compte, 1200.0, 1.0, 'Mission conseil');
+        ajouterLigneLibre($facture, $this->compte, 200.0, 1.0, 'Frais annexes');
         $facture->update(['montant_total' => 1400.0]);
 
         $this->service->valider($facture);
@@ -181,8 +178,8 @@ describe('Happy path : 2 lignes MontantManuel → 1 Transaction recette + 2 Tran
 
     it('chaque FactureLigne::MontantManuel.transaction_ligne_id est setté sur la TransactionLigne correspondante', function () {
         $facture = creerFactureLibre($this->service, $this->tiers->id);
-        $fl1 = ajouterLigneLibre($facture, $this->sousCategorie, 1200.0, 1.0, 'Mission');
-        $fl2 = ajouterLigneLibre($facture, $this->sousCategorie, 200.0, 1.0, 'Frais');
+        $fl1 = ajouterLigneLibre($facture, $this->compte, 1200.0, 1.0, 'Mission');
+        $fl2 = ajouterLigneLibre($facture, $this->compte, 200.0, 1.0, 'Frais');
         $facture->update(['montant_total' => 1400.0]);
 
         $this->service->valider($facture);
@@ -201,8 +198,8 @@ describe('Happy path : 2 lignes MontantManuel → 1 Transaction recette + 2 Tran
 
     it('le pivot facture_transaction contient la nouvelle Transaction', function () {
         $facture = creerFactureLibre($this->service, $this->tiers->id);
-        ajouterLigneLibre($facture, $this->sousCategorie, 1200.0, 1.0, 'Mission');
-        ajouterLigneLibre($facture, $this->sousCategorie, 200.0, 1.0, 'Frais');
+        ajouterLigneLibre($facture, $this->compte, 1200.0, 1.0, 'Mission');
+        ajouterLigneLibre($facture, $this->compte, 200.0, 1.0, 'Frais');
         $facture->update(['montant_total' => 1400.0]);
 
         $this->service->valider($facture);
@@ -215,8 +212,8 @@ describe('Happy path : 2 lignes MontantManuel → 1 Transaction recette + 2 Tran
 
     it('la Transaction générée est verrouillée par la facture validée (isLockedByFacture)', function () {
         $facture = creerFactureLibre($this->service, $this->tiers->id);
-        ajouterLigneLibre($facture, $this->sousCategorie, 1200.0, 1.0, 'Mission');
-        ajouterLigneLibre($facture, $this->sousCategorie, 200.0, 1.0, 'Frais');
+        ajouterLigneLibre($facture, $this->compte, 1200.0, 1.0, 'Mission');
+        ajouterLigneLibre($facture, $this->compte, 200.0, 1.0, 'Frais');
         $facture->update(['montant_total' => 1400.0]);
 
         $this->service->valider($facture);
@@ -246,7 +243,7 @@ describe('Mix Montant (ref) + MontantManuel → 2 transactions dans le pivot', f
         $facture->refresh();
 
         // Ajoute une ligne MontantManuel
-        ajouterLigneLibre($facture, $this->sousCategorie, 200.0, 1.0, 'Frais');
+        ajouterLigneLibre($facture, $this->compte, 200.0, 1.0, 'Frais');
         $facture->update(['montant_total' => 700.0]);
 
         $countAvant = Transaction::count();
@@ -277,7 +274,7 @@ describe('Mix Montant (ref) + MontantManuel → 2 transactions dans le pivot', f
         $this->service->ajouterTransactions($facture, [$transactionExistante->id]);
         $facture->refresh();
 
-        ajouterLigneLibre($facture, $this->sousCategorie, 200.0, 1.0, 'Frais');
+        ajouterLigneLibre($facture, $this->compte, 200.0, 1.0, 'Frais');
         $facture->update(['montant_total' => 700.0]);
 
         $this->service->valider($facture);
@@ -337,7 +334,7 @@ describe('Race : double validation de la même facture → no-op ou exception, j
 
     it('le second appel à valider sur une facture déjà validée lève une exception et ne crée pas de doublon', function () {
         $facture = creerFactureLibre($this->service, $this->tiers->id);
-        ajouterLigneLibre($facture, $this->sousCategorie, 1000.0, 1.0, 'Prestation');
+        ajouterLigneLibre($facture, $this->compte, 1000.0, 1.0, 'Prestation');
         $facture->update(['montant_total' => 1000.0]);
 
         // Premier appel : réussit
@@ -356,7 +353,7 @@ describe('Race : double validation de la même facture → no-op ou exception, j
 
     it('simulation de race : 2 validations séquentielles sur une facture — 1 seule Transaction créée', function () {
         $facture = creerFactureLibre($this->service, $this->tiers->id);
-        ajouterLigneLibre($facture, $this->sousCategorie, 500.0, 1.0, 'Test race');
+        ajouterLigneLibre($facture, $this->compte, 500.0, 1.0, 'Test race');
         $facture->update(['montant_total' => 500.0]);
 
         $countAvant = Transaction::count();
@@ -387,7 +384,7 @@ describe('Encaissement : la Transaction générée passe à "recu" via marquerRe
 
     it('après validation, marquerReglementRecu sur la transaction générée change le statut', function () {
         $facture = creerFactureLibre($this->service, $this->tiers->id);
-        ajouterLigneLibre($facture, $this->sousCategorie, 800.0, 1.0, 'Mission');
+        ajouterLigneLibre($facture, $this->compte, 800.0, 1.0, 'Mission');
         $facture->update(['montant_total' => 800.0]);
 
         $this->service->valider($facture);
@@ -407,7 +404,7 @@ describe('Encaissement : la Transaction générée passe à "recu" via marquerRe
 
     it('la facture est considérée comme acquittée après encaissement de la transaction générée', function () {
         $facture = creerFactureLibre($this->service, $this->tiers->id);
-        ajouterLigneLibre($facture, $this->sousCategorie, 800.0, 1.0, 'Mission');
+        ajouterLigneLibre($facture, $this->compte, 800.0, 1.0, 'Mission');
         $facture->update(['montant_total' => 800.0]);
 
         $this->service->valider($facture);
@@ -428,7 +425,7 @@ describe('Logs : facture.valide émis avec facture_id + transaction_id_generee',
 
     it('émet facture.valide avec facture_id et transaction_id_generee pour une facture avec MontantManuel', function () {
         $facture = creerFactureLibre($this->service, $this->tiers->id);
-        ajouterLigneLibre($facture, $this->sousCategorie, 600.0, 1.0, 'Presta');
+        ajouterLigneLibre($facture, $this->compte, 600.0, 1.0, 'Presta');
         $facture->update(['montant_total' => 600.0]);
 
         $spy = Log::spy();

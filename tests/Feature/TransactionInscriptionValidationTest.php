@@ -3,11 +3,9 @@
 declare(strict_types=1);
 
 use App\Models\Association;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Operation;
-use App\Models\SousCategorie;
 use App\Models\User;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\TransactionService;
@@ -26,24 +24,8 @@ beforeEach(function () {
     $this->service = app(TransactionService::class);
     $this->compte = CompteBancaire::factory()->create();
 
-    $categorie = Categorie::factory()->create(['type' => 'recette']);
-    $this->scInscription = SousCategorie::factory()->pourInscriptions()->create([
-        'categorie_id' => $categorie->id,
-        'nom' => 'Inscription stage',
-        'code_cerfa' => '706',
-    ]);
-    $this->scDon = SousCategorie::factory()->pourDons()->create([
-        'categorie_id' => $categorie->id,
-        'nom' => 'Don manuel',
-        'code_cerfa' => '754',
-    ]);
-
-    $this->compteInscription = Compte::where('numero_pcg', '706')
-        ->where('association_id', $this->association->id)
-        ->firstOrFail();
-    $this->compteDon = Compte::where('numero_pcg', '754')
-        ->where('association_id', $this->association->id)
-        ->firstOrFail();
+    $this->compteInscription = Compte::factory()->numero('706')->pourInscriptions()->create(['intitule' => 'Inscription stage']);
+    $this->compteDon = Compte::factory()->numero('754')->pourDons()->create(['intitule' => 'Don manuel']);
 });
 
 afterEach(function () {

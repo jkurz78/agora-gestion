@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Models\Adhesion;
 use App\Models\Association;
 use App\Models\Compte;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -79,14 +78,7 @@ it('affiche un bouton Voir sur la liste des dons', function (): void {
         'nom' => 'Donateur',
     ]);
 
-    $donSousCategorie = SousCategorie::factory()->pourDons()->create([
-        'association_id' => $this->association->id,
-        'code_cerfa' => '754',
-    ]);
-
-    $compte = Compte::where('numero_pcg', '754')
-        ->where('association_id', $this->association->id)
-        ->firstOrFail();
+    $compte = Compte::factory()->numero('754')->pourDons()->create(['association_id' => $this->association->id]);
 
     $transaction = Transaction::factory()->asRecette()->create([
         'association_id' => $this->association->id,
@@ -116,14 +108,7 @@ it('affiche un bouton Voir sur la liste des cotisations', function (): void {
         'nom' => 'Cotisant',
     ]);
 
-    $cotSousCategorie = SousCategorie::factory()->pourCotisations()->create([
-        'association_id' => $this->association->id,
-        'code_cerfa' => '751',
-    ]);
-
-    $compte = Compte::where('numero_pcg', '751')
-        ->where('association_id', $this->association->id)
-        ->firstOrFail();
+    $compte = Compte::factory()->numero('751')->pourCotisations()->create(['association_id' => $this->association->id]);
 
     $transaction = Transaction::factory()->asRecette()->create([
         'association_id' => $this->association->id,

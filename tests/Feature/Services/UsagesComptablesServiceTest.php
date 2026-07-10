@@ -14,15 +14,17 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 /**
  * DC-8 : le service accepte désormais des ids de comptes (classe 6/7).
- * Les fixtures créent une SousCategorie avec code_cerfa — l'observer DC-7
- * matérialise le Compte miroir, et le trait SyncCompteDepuisSousCategorie
- * remplit sous_categorie_id (NOT NULL) sur les liens d'usage écrits par compte_id.
+ * Les fixtures créent directement un Compte (DC-10b) — le trait
+ * SyncCompteDepuisSousCategorie continue de remplir sous_categorie_id
+ * (NOT NULL) sur les liens d'usage écrits par compte_id, via le miroir
+ * SousCategorie matérialisé par CompteObserver (bridge DC-7 toujours actif).
  */
 function creerCompteVentilation(Association $asso, Categorie $cat, string $codeCerfa): Compte
 {
-    SousCategorie::factory()->for($asso, 'association')->for($cat)->create(['code_cerfa' => $codeCerfa]);
-
-    return Compte::where('association_id', $asso->id)->where('numero_pcg', $codeCerfa)->firstOrFail();
+    return Compte::factory()->numero($codeCerfa)->create([
+        'association_id' => $asso->id,
+        'categorie_id' => $cat->id,
+    ]);
 }
 
 beforeEach(function () {

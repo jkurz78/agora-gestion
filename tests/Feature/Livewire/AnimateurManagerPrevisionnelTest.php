@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Enums\TypeTransaction;
 use App\Livewire\AnimateurManager;
 use App\Models\Association;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\EncadrementPrevision;
@@ -34,12 +33,8 @@ beforeEach(function (): void {
     $this->seance2 = Seance::create(['operation_id' => $this->operation->id, 'numero' => 2, 'date' => now()->addDays(7)]);
     $this->seance3 = Seance::create(['operation_id' => $this->operation->id, 'numero' => 3, 'date' => now()->addDays(14)]);
 
-    $this->categorie = Categorie::factory()->depense()->create();
-    $this->sc1 = SousCategorie::factory()->create(['categorie_id' => $this->categorie->id, 'nom' => 'Encadrement', 'code_cerfa' => '606']);
-    $this->sc2 = SousCategorie::factory()->create(['categorie_id' => $this->categorie->id, 'nom' => 'Frais déplacement', 'code_cerfa' => '625']);
-
-    $this->compte1 = Compte::where('numero_pcg', '606')->where('association_id', $this->association->id)->firstOrFail();
-    $this->compte2 = Compte::where('numero_pcg', '625')->where('association_id', $this->association->id)->firstOrFail();
+    $this->compte1 = Compte::factory()->numero('606')->create(['intitule' => 'Encadrement']);
+    $this->compte2 = Compte::factory()->numero('625')->create(['intitule' => 'Frais déplacement']);
 
     $this->tiers = Tiers::factory()->pourDepenses()->create(['nom' => 'DURAND', 'prenom' => 'Sophie']);
 });
@@ -48,11 +43,17 @@ it('ajoute un encadrant en créant une 1re ligne prévision à 0', function (): 
     Livewire::test(AnimateurManager::class, ['operation' => $this->operation])
         ->call('ajouterEncadrantAvecCompte', $this->tiers->id, $this->compte1->id);
 
+    // Bridge DC-7 : le miroir SousCategorie de compte1 (code_cerfa = numero_pcg) doit
+    // être posé en sous_categorie_id par SyncCompteDepuisSousCategorie.
+    $sc1 = SousCategorie::where('association_id', $this->association->id)
+        ->where('code_cerfa', $this->compte1->numero_pcg)
+        ->firstOrFail();
+
     expect(EncadrementPrevision::count())->toBe(1)
         ->and((float) EncadrementPrevision::first()->montant_prevu)->toBe(0.0)
         ->and((int) EncadrementPrevision::first()->tiers_id)->toBe((int) $this->tiers->id)
         ->and((int) EncadrementPrevision::first()->compte_id)->toBe((int) $this->compte1->id)
-        ->and((int) EncadrementPrevision::first()->sous_categorie_id)->toBe((int) $this->sc1->id)
+        ->and((int) EncadrementPrevision::first()->sous_categorie_id)->toBe((int) $sc1->id)
         ->and((int) EncadrementPrevision::first()->seance_id)->toBe((int) $this->seance1->id);
 });
 

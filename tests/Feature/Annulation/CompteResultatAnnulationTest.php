@@ -7,11 +7,9 @@ use App\Enums\RoleAssociation;
 use App\Enums\StatutFacture;
 use App\Enums\TypeLigneFacture;
 use App\Models\Association;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\FactureLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\TransactionLigne;
 use App\Models\User;
@@ -68,17 +66,8 @@ afterEach(function (): void {
  * directement les 2 TransactionLigne en base (sanity check).
  */
 test('le compte de résultat reflète une annulation par +X et -X dans la même sous-catégorie', function (): void {
-    // ── Setup sous-catégorie recette ──────────────────────────────────────────
-    $cat = Categorie::create([
-        'nom' => 'Cotisations',
-        'type' => 'recette',
-    ]);
-    $sousCategorie = SousCategorie::create([
-        'categorie_id' => $cat->id,
-        'nom' => 'Cotisations séance',
-        'libelle_article' => 'des cotisations séance',
-        'code_cerfa' => '706',
-    ]);
+    // ── Setup compte de résultat recette ──────────────────────────────────────
+    $compte = Compte::factory()->numero('706')->create(['intitule' => 'Cotisations séance']);
 
     $tiers = Tiers::factory()->create(['pour_recettes' => true]);
 
@@ -95,7 +84,7 @@ test('le compte de résultat reflète une annulation par +X et -X dans la même 
         'quantite' => 1.0,
         'montant' => 80.0,
         'transaction_ligne_id' => null,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compte->id,
         'ordre' => 1,
     ]);
 
@@ -114,9 +103,6 @@ test('le compte de résultat reflète une annulation par +X et -X dans la même 
     expect($factureFraiche->statut)->toBe(StatutFacture::Annulee);
 
     // ── Sanity check : 2 TransactionLigne dans la sous-catégorie (+80 et -80) ─
-    $compte = Compte::where('numero_pcg', $sousCategorie->code_cerfa)
-        ->where('association_id', $sousCategorie->association_id)
-        ->first();
     $lignes = TransactionLigne::where('compte_id', $compte->id)->get();
     expect($lignes)->toHaveCount(2, '2 lignes attendues : origine +80 et extourne -80');
 
@@ -127,7 +113,7 @@ test('le compte de résultat reflète une annulation par +X et -X dans la même 
     $result = $this->builder->compteDeResultat($this->exerciceCourant);
 
     $produits = collect($result['produits'])->flatMap(fn ($c) => $c['sous_categories'] ?? []);
-    $scResult = $produits->firstWhere('sous_categorie_id', $sousCategorie->id);
+    $scResult = $produits->firstWhere('sous_categorie_id', $compte->id);
 
     // Cas 1 : la sous-catégorie n'apparaît pas du tout (somme exactement 0, éliminée par la DB)
     // Cas 2 : elle apparaît avec montant_n = 0.0
@@ -148,16 +134,7 @@ test('le compte de résultat reflète une annulation par +X et -X dans la même 
  * Test de second opinion sur les données brutes (indépendant du builder).
  */
 test('la somme des TransactionLigne de la sous-catégorie est 0 après annulation', function (): void {
-    $cat = Categorie::create([
-        'nom' => 'Cotisations',
-        'type' => 'recette',
-    ]);
-    $sousCategorie = SousCategorie::create([
-        'categorie_id' => $cat->id,
-        'nom' => 'Cotisations séance 2',
-        'libelle_article' => 'des cotisations',
-        'code_cerfa' => '707',
-    ]);
+    $compte = Compte::factory()->numero('707')->create(['intitule' => 'Cotisations séance 2']);
 
     $tiers = Tiers::factory()->create(['pour_recettes' => true]);
 
@@ -173,7 +150,7 @@ test('la somme des TransactionLigne de la sous-catégorie est 0 après annulatio
         'quantite' => 1.0,
         'montant' => 150.0,
         'transaction_ligne_id' => null,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compte->id,
         'ordre' => 1,
     ]);
 
@@ -186,9 +163,6 @@ test('la somme des TransactionLigne de la sous-catégorie est 0 après annulatio
     $this->service->annuler($facture);
 
     // Détail : 2 lignes +150 et -150 → somme = 0
-    $compte = Compte::where('numero_pcg', $sousCategorie->code_cerfa)
-        ->where('association_id', $sousCategorie->association_id)
-        ->first();
     $lignes = TransactionLigne::where('compte_id', $compte->id)->get();
     expect($lignes)->toHaveCount(2);
     expect((float) $lignes->sum('montant'))->toBe(0.0);

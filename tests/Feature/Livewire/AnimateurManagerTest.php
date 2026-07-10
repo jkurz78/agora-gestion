@@ -5,11 +5,9 @@ declare(strict_types=1);
 use App\Enums\TypeTransaction;
 use App\Livewire\AnimateurManager;
 use App\Models\Association;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\Operation;
 use App\Models\Seance;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -27,13 +25,7 @@ beforeEach(function () {
     $this->actingAs($this->user);
     SystemeSeeder::seed();
 
-    $this->categorie = Categorie::factory()->depense()->create(['association_id' => $this->association->id]);
-    $this->sousCategorie = SousCategorie::factory()->create([
-        'association_id' => $this->association->id,
-        'categorie_id' => $this->categorie->id,
-        'code_cerfa' => '606',
-    ]);
-    $this->compte = Compte::where('numero_pcg', '606')->where('association_id', $this->association->id)->firstOrFail();
+    $this->compte = Compte::factory()->numero('606')->create(['association_id' => $this->association->id]);
 
     $this->operation = Operation::factory()->withSeances(3)->create(['association_id' => $this->association->id]);
 

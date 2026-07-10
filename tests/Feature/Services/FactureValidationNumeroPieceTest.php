@@ -7,7 +7,6 @@ use App\Enums\RoleAssociation;
 use App\Models\Association;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\User;
 use App\Services\Compta\Migrations\SystemeSeeder;
@@ -38,14 +37,7 @@ beforeEach(function (): void {
         'pour_recettes' => true,
     ]);
 
-    $this->sousCategorie = SousCategorie::factory()->create([
-        'association_id' => $this->association->id,
-        'code_cerfa' => '706',
-    ]);
-
-    $this->compteVentilation = Compte::where('numero_pcg', '706')
-        ->where('association_id', $this->association->id)
-        ->firstOrFail();
+    $this->compteVentilation = Compte::factory()->numero('706')->create(['association_id' => $this->association->id]);
 });
 
 afterEach(function (): void {

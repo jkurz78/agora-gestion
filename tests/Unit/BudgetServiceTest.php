@@ -1,8 +1,6 @@
 <?php
 
-use App\Models\Categorie;
 use App\Models\Compte;
-use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
@@ -12,26 +10,6 @@ beforeEach(function () {
     $this->service = new BudgetService;
     $this->user = User::factory()->create();
 });
-
-/**
- * Compte de résultat matérialisé par SousCategorieCompteObserver depuis le
- * code_cerfa de la sous-catégorie (classe 6 ou 7).
- */
-function budgetServiceTestCompte(string $codeCerfa, string $type): Compte
-{
-    $categorie = $type === 'depense'
-        ? Categorie::factory()->depense()->create()
-        : Categorie::factory()->recette()->create();
-
-    $sc = SousCategorie::factory()->create([
-        'categorie_id' => $categorie->id,
-        'code_cerfa' => $codeCerfa,
-    ]);
-
-    return Compte::where('numero_pcg', $codeCerfa)
-        ->where('association_id', $sc->association_id)
-        ->firstOrFail();
-}
 
 /** Ligne de ventilation compte-first (dépense: débit, recette: crédit). */
 function budgetServiceTestLigne(Transaction $tx, Compte $compte, float $montant): TransactionLigne
@@ -49,7 +27,7 @@ function budgetServiceTestLigne(Transaction $tx, Compte $compte, float $montant)
 }
 
 it('computes realise for comptes de classe 6 (depense)', function () {
-    $compte = budgetServiceTestCompte('606', 'depense');
+    $compte = Compte::factory()->numero('606')->create();
 
     // Depense in exercice 2025 (Sept 2025 - Aug 2026)
     $depense = Transaction::factory()->asDepense()->create([
@@ -74,7 +52,7 @@ it('computes realise for comptes de classe 6 (depense)', function () {
 });
 
 it('computes realise for comptes de classe 7 (recette)', function () {
-    $compte = budgetServiceTestCompte('706', 'recette');
+    $compte = Compte::factory()->numero('706')->create();
 
     // Recette in exercice 2025
     $recette = Transaction::factory()->asRecette()->create([
@@ -90,7 +68,7 @@ it('computes realise for comptes de classe 7 (recette)', function () {
 });
 
 it('returns 0 when no transactions', function () {
-    $compte = budgetServiceTestCompte('616', 'depense');
+    $compte = Compte::factory()->numero('616')->create();
 
     $result = $this->service->realise((int) $compte->id, 2025);
 

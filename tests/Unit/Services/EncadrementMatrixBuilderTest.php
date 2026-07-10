@@ -25,12 +25,8 @@ beforeEach(function (): void {
     $this->seance1 = Seance::create(['operation_id' => $this->operation->id, 'numero' => 1, 'date' => now()]);
     $this->seance2 = Seance::create(['operation_id' => $this->operation->id, 'numero' => 2, 'date' => now()->addDays(7)]);
 
-    $this->categorie = Categorie::factory()->depense()->create();
-    $this->sc1 = SousCategorie::factory()->create(['categorie_id' => $this->categorie->id, 'nom' => 'Encadrement', 'code_cerfa' => '606']);
-    $this->sc2 = SousCategorie::factory()->create(['categorie_id' => $this->categorie->id, 'nom' => 'Frais déplacement', 'code_cerfa' => '625']);
-
-    $this->compte606 = Compte::where('numero_pcg', '606')->where('association_id', $this->association->id)->firstOrFail();
-    $this->compte625 = Compte::where('numero_pcg', '625')->where('association_id', $this->association->id)->firstOrFail();
+    $this->compte606 = Compte::factory()->numero('606')->create(['intitule' => 'Encadrement']);
+    $this->compte625 = Compte::factory()->numero('625')->create(['intitule' => 'Frais déplacement']);
 
     $this->tiers = Tiers::factory()->create(['nom' => 'DURAND', 'prenom' => 'Sophie']);
     $this->compte = CompteBancaire::factory()->create();
