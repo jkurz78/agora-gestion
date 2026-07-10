@@ -10,8 +10,8 @@ it('crée une ligne don valide avec toutes les pièces', function () {
     expect($ligne)->not->toBeNull();
     expect($ligne->transaction)->not->toBeNull();
     expect($ligne->transaction->tiers)->not->toBeNull();
-    expect($ligne->sousCategorie)->not->toBeNull();
-    expect($ligne->sousCategorie->hasUsage(UsageComptable::Don))->toBeTrue();
+    expect($ligne->compte)->not->toBeNull();
+    expect($ligne->compte->hasUsage(UsageComptable::Don))->toBeTrue();
 });
 
 it('accepte des overrides sur le tiers', function () {

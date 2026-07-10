@@ -5,13 +5,11 @@ declare(strict_types=1);
 use App\Enums\ModePaiement;
 use App\Enums\NoteDeFraisLigneType;
 use App\Enums\StatutNoteDeFrais;
-use App\Enums\TypeCategorie;
 use App\Models\Association;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Services\NoteDeFrais\NoteDeFraisValidationService;
 use App\Services\NoteDeFrais\ValidationData;
@@ -26,14 +24,9 @@ beforeEach(function () {
 
     $this->tiers = Tiers::factory()->create(['association_id' => $this->asso->id]);
 
-    $this->cat = Categorie::factory()->create([
+    $this->compteVentilation = Compte::factory()->pourFraisKilometriques()->create([
         'association_id' => $this->asso->id,
-        'type' => TypeCategorie::Depense->value,
-    ]);
-    $this->sc = SousCategorie::factory()->pourFraisKilometriques()->create([
-        'association_id' => $this->asso->id,
-        'categorie_id' => $this->cat->id,
-        'nom' => 'Déplacements',
+        'intitule' => 'Déplacements',
     ]);
 
     $this->compte = CompteBancaire::factory()->create(['association_id' => $this->asso->id]);
@@ -63,7 +56,7 @@ it('peuple transaction_lignes.notes avec libelle + description km pour une ligne
             'distance_km' => 420,
             'bareme_eur_km' => 0.636,
         ],
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->compteVentilation->id,
         'piece_jointe_path' => "associations/{$this->asso->id}/notes-de-frais/{$ndf->id}/ligne-1.pdf",
     ]);
 
@@ -99,7 +92,7 @@ it('conserve le comportement actuel pour une ligne standard (notes = libelle)', 
         'type' => NoteDeFraisLigneType::Standard->value,
         'libelle' => 'Stylos bureau',
         'montant' => 12.50,
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->compteVentilation->id,
         'piece_jointe_path' => "associations/{$this->asso->id}/notes-de-frais/{$ndf->id}/ligne-1.pdf",
     ]);
 

@@ -10,7 +10,6 @@ use App\Models\Association;
 use App\Models\Compte;
 use App\Models\Exercice;
 use App\Models\Provision;
-use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\Compta\EcritureGenerator;
@@ -263,13 +262,13 @@ test('ProvisionPDService::supprimer removes all PD transactions', function () {
 });
 
 test('ProvisionIndex::save creates PD transactions on new provision', function () {
-    $sc = SousCategorie::factory()->create([
+    $compte = Compte::factory()->create([
         'association_id' => $this->association->id,
     ]);
 
     Livewire::test(ProvisionIndex::class)
         ->set('libelle', 'Test provision PD')
-        ->set('sous_categorie_id', (string) $sc->id)
+        ->set('sous_categorie_id', (string) $compte->id)
         ->set('type', 'depense')
         ->set('montant', '1200.50')
         ->call('save');

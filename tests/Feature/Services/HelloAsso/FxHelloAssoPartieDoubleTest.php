@@ -15,17 +15,16 @@ declare(strict_types=1);
  */
 
 use App\Enums\StatutReglement;
-use App\Enums\TypeCategorie;
+use App\Enums\UsageComptable;
 use App\Models\Association;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\HelloAssoFormMapping;
 use App\Models\HelloAssoParametres;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Models\UsageSousCategorie;
 use App\Models\User;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\HelloAssoSyncService;
@@ -63,7 +62,7 @@ beforeEach(function (): void {
     ]);
 
     // Compte 7xx pour dons
-    Compte::forceCreate([
+    $this->compteDon = Compte::forceCreate([
         'association_id' => (int) $this->asso->id,
         'numero_pcg' => '754',
         'intitule' => 'Dons',
@@ -73,9 +72,14 @@ beforeEach(function (): void {
         'lettrable' => false,
         'pour_inscriptions' => false,
     ]);
+    UsageSousCategorie::create([
+        'association_id' => (int) $this->asso->id,
+        'compte_id' => (int) $this->compteDon->id,
+        'usage' => UsageComptable::Don->value,
+    ]);
 
     // Compte 7xx pour cotisations
-    Compte::forceCreate([
+    $this->compteCot = Compte::forceCreate([
         'association_id' => (int) $this->asso->id,
         'numero_pcg' => '756',
         'intitule' => 'Cotisations',
@@ -85,24 +89,10 @@ beforeEach(function (): void {
         'lettrable' => false,
         'pour_inscriptions' => false,
     ]);
-
-    $catRecette = Categorie::factory()->create([
+    UsageSousCategorie::create([
         'association_id' => (int) $this->asso->id,
-        'type' => TypeCategorie::Recette->value,
-    ]);
-
-    $this->scDon = SousCategorie::factory()->pourDons()->create([
-        'association_id' => (int) $this->asso->id,
-        'categorie_id' => (int) $catRecette->id,
-        'nom' => 'Don',
-        'code_cerfa' => '754',
-    ]);
-
-    $this->scCot = SousCategorie::factory()->pourCotisations()->create([
-        'association_id' => (int) $this->asso->id,
-        'categorie_id' => (int) $catRecette->id,
-        'nom' => 'Cotisation',
-        'code_cerfa' => '756',
+        'compte_id' => (int) $this->compteCot->id,
+        'usage' => UsageComptable::Cotisation->value,
     ]);
 
     $this->parametres = HelloAssoParametres::create([
@@ -119,14 +109,14 @@ beforeEach(function (): void {
         'form_slug' => 'dons-libres',
         'form_type' => 'Donation',
         'form_title' => 'Dons libres',
-        'sous_categorie_id' => (int) $this->scDon->id,
+        'compte_id' => (int) $this->compteDon->id,
     ]);
     HelloAssoFormMapping::create([
         'helloasso_parametres_id' => (int) $this->parametres->id,
         'form_slug' => 'adhesion-2025',
         'form_type' => 'Membership',
         'form_title' => 'Adhésion 2025',
-        'sous_categorie_id' => (int) $this->scCot->id,
+        'compte_id' => (int) $this->compteCot->id,
     ]);
 
     $this->tiers = Tiers::factory()->avecHelloasso()->create([

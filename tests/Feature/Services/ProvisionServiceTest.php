@@ -3,9 +3,8 @@
 declare(strict_types=1);
 
 use App\Enums\TypeTransaction;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\Provision;
-use App\Models\SousCategorie;
 use App\Models\User;
 use App\Services\ProvisionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -14,15 +13,8 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->user = User::factory()->create();
-    $this->categorie = Categorie::factory()->create(['nom' => 'Charges externes']);
-    $this->scLoyer = SousCategorie::factory()->create([
-        'categorie_id' => $this->categorie->id,
-        'nom' => 'Loyer',
-    ]);
-    $this->scSubvention = SousCategorie::factory()->create([
-        'categorie_id' => $this->categorie->id,
-        'nom' => 'Subventions',
-    ]);
+    $this->compteLoyer = Compte::factory()->depense()->create(['intitule' => 'Loyer']);
+    $this->compteSubvention = Compte::factory()->create(['intitule' => 'Subventions']);
     $this->service = app(ProvisionService::class);
 });
 
@@ -30,7 +22,7 @@ it('returns provisions grouped by sous-categorie for exercice N', function () {
     Provision::factory()->create([
         'exercice' => 2025,
         'type' => TypeTransaction::Depense,
-        'sous_categorie_id' => $this->scLoyer->id,
+        'compte_id' => $this->compteLoyer->id,
         'libelle' => 'FNP Loyer',
         'montant' => 500.00,
         'saisi_par' => $this->user->id,
@@ -40,7 +32,7 @@ it('returns provisions grouped by sous-categorie for exercice N', function () {
     Provision::factory()->create([
         'exercice' => 2025,
         'type' => TypeTransaction::Recette,
-        'sous_categorie_id' => $this->scSubvention->id,
+        'compte_id' => $this->compteSubvention->id,
         'libelle' => 'PCA Subventions',
         'montant' => -5000.00,
         'saisi_par' => $this->user->id,
@@ -56,7 +48,7 @@ it('returns extournes as inverted provisions from N-1', function () {
     Provision::factory()->create([
         'exercice' => 2024,
         'type' => TypeTransaction::Depense,
-        'sous_categorie_id' => $this->scLoyer->id,
+        'compte_id' => $this->compteLoyer->id,
         'libelle' => 'FNP Loyer',
         'montant' => 500.00,
         'saisi_par' => $this->user->id,
@@ -75,7 +67,7 @@ it('computes total provisions for exercice', function () {
         'exercice' => 2025,
         'type' => TypeTransaction::Depense,
         'montant' => 500.00,
-        'sous_categorie_id' => $this->scLoyer->id,
+        'compte_id' => $this->compteLoyer->id,
         'saisi_par' => $this->user->id,
         'date' => '2026-08-31',
     ]);
@@ -83,7 +75,7 @@ it('computes total provisions for exercice', function () {
         'exercice' => 2025,
         'type' => TypeTransaction::Recette,
         'montant' => -3000.00,
-        'sous_categorie_id' => $this->scSubvention->id,
+        'compte_id' => $this->compteSubvention->id,
         'saisi_par' => $this->user->id,
         'date' => '2026-08-31',
     ]);
@@ -97,7 +89,7 @@ it('computes total extournes for exercice', function () {
         'exercice' => 2024,
         'type' => TypeTransaction::Depense,
         'montant' => 500.00,
-        'sous_categorie_id' => $this->scLoyer->id,
+        'compte_id' => $this->compteLoyer->id,
         'saisi_par' => $this->user->id,
         'date' => '2025-08-31',
     ]);
@@ -105,7 +97,7 @@ it('computes total extournes for exercice', function () {
         'exercice' => 2024,
         'type' => TypeTransaction::Recette,
         'montant' => -3000.00,
-        'sous_categorie_id' => $this->scSubvention->id,
+        'compte_id' => $this->compteSubvention->id,
         'saisi_par' => $this->user->id,
         'date' => '2025-08-31',
     ]);

@@ -19,7 +19,6 @@ declare(strict_types=1);
 use App\Enums\ModePaiement;
 use App\Enums\StatutRapprochement;
 use App\Enums\TypeTransaction;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\Facture;
 use App\Models\RapprochementBancaire;
@@ -43,49 +42,13 @@ beforeEach(function () {
 
     // Alias : sc706 → scRecette (convention locale de ce fichier)
     $this->scRecette = $this->sc706;
-    $this->categorieRecette = Categorie::where('association_id', $this->association->id)
-        ->where('type', 'recette')->first();
 
-    // Seconde sous-catégorie recette → compte 708 (pour tester changement de sous-catégorie)
-    $this->scRecette2 = SousCategorie::create([
+    // Second compte recette 708 (pour tester changement de compte de ventilation).
+    // Note : $this->compte606 est déjà posé par setupPartieDoubleContext().
+    $this->compte708 = Compte::factory()->numero('708')->create([
         'association_id' => $this->association->id,
-        'categorie_id' => $this->categorieRecette->id,
-        'nom' => 'Ventes diverses',
-        'code_cerfa' => '708',
+        'intitule' => 'Produits des activités annexes',
     ]);
-    $this->compte708 = Compte::firstOrCreate(
-        ['association_id' => $this->association->id, 'numero_pcg' => '708'],
-        [
-            'intitule' => 'Produits des activités annexes',
-            'classe' => 7,
-            'lettrable' => false,
-            'actif' => true,
-            'est_systeme' => false,
-            'pour_inscriptions' => false,
-        ]
-    );
-
-    // Catégorie de charge + sous-catégorie dépense 606
-    $this->categorieDepense = Categorie::factory()->depense()->create([
-        'association_id' => $this->association->id,
-    ]);
-    $this->scDepense = SousCategorie::create([
-        'association_id' => $this->association->id,
-        'categorie_id' => $this->categorieDepense->id,
-        'nom' => 'Achats fournitures',
-        'code_cerfa' => '606',
-    ]);
-    $this->compte606 = Compte::firstOrCreate(
-        ['association_id' => $this->association->id, 'numero_pcg' => '606'],
-        [
-            'intitule' => 'Achats non stockés',
-            'classe' => 6,
-            'lettrable' => false,
-            'actif' => true,
-            'est_systeme' => false,
-            'pour_inscriptions' => false,
-        ]
-    );
 
     // Tiers
     $this->tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
@@ -502,17 +465,11 @@ it('[G] update Rappro-locked multi-lignes — 2 ventilations patchées, comptes 
     $transaction->refresh();
     $transaction->load('lignes');
 
-    // Créer une 3ème sous-catégorie recette → compte 701
-    $sc3 = SousCategorie::create([
+    // Créer un 3ème compte recette 701
+    $compte701 = Compte::factory()->numero('701')->create([
         'association_id' => $this->association->id,
-        'categorie_id' => $this->categorieRecette->id,
-        'nom' => 'Cotisations membres',
-        'code_cerfa' => '701',
+        'intitule' => 'Ventes de produits finis',
     ]);
-    $compte701 = Compte::firstOrCreate(
-        ['association_id' => $this->association->id, 'numero_pcg' => '701'],
-        ['intitule' => 'Ventes de produits finis', 'classe' => 7, 'lettrable' => false, 'actif' => true, 'est_systeme' => false, 'pour_inscriptions' => false]
-    );
 
     // Placer la transaction dans un rapprochement verrouillé
     $rapprochement = RapprochementBancaire::factory()->create([

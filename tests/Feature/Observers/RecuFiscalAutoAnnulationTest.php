@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\SousCategorie;
 use App\Services\RecuFiscalService;
 use App\Tenant\TenantContext;
@@ -57,9 +58,13 @@ it('annule auto le reçu si la sous_categorie_id change', function () {
 
     $recu = app(RecuFiscalService::class)->obtenirOuGenerer($ligne);
 
-    // Créer une autre sous-cat (un usage Don aussi pour rester cohérent)
-    $autreSousCat = SousCategorie::factory()->pourDons()->create();
-    $ligne->update(['sous_categorie_id' => $autreSousCat->id]);
+    // Créer un autre compte (usage Don aussi pour rester cohérent). L'observer
+    // TransactionLigneRecuFiscalObserver n'est pas encore converti compte-first
+    // (Phase 2 à venir) : il surveille encore sous_categorie_id, donc on renseigne
+    // aussi le miroir légataire du nouveau compte pour déclencher l'invalidation.
+    $autreCompte = Compte::factory()->pourDons()->create();
+    $autreSousCat = SousCategorie::where('code_cerfa', $autreCompte->numero_pcg)->first();
+    $ligne->update(['compte_id' => $autreCompte->id, 'sous_categorie_id' => $autreSousCat->id]);
     $recu->refresh();
 
     expect($recu->isAnnule())->toBeTrue();

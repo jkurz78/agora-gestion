@@ -6,11 +6,10 @@ use App\Enums\StatutExercice;
 use App\Enums\StatutRapprochement;
 use App\Exceptions\ExerciceCloturedException;
 use App\Models\Association;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Exercice;
 use App\Models\RapprochementBancaire;
-use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\RapprochementBancaireService;
@@ -29,8 +28,7 @@ beforeEach(function () {
     $this->actingAs($this->user);
     session(['exercice_actif' => 2025]);
     $this->compte = CompteBancaire::factory()->create();
-    $this->categorie = Categorie::factory()->create();
-    $this->sousCategorie = SousCategorie::factory()->create(['categorie_id' => $this->categorie->id]);
+    $this->compteVentilation = Compte::factory()->depense()->create();
 
     // Exercice 2025 clôturé
     Exercice::create(['annee' => 2025, 'statut' => StatutExercice::Cloture]);
@@ -46,14 +44,14 @@ describe('TransactionService verrou', function () {
     it('blocks create on closed exercice', function () {
         app(TransactionService::class)->create(
             ['date' => '2025-10-15', 'type' => 'depense', 'compte_id' => $this->compte->id, 'montant_total' => 100, 'mode_paiement' => 'virement', 'reference' => 'TEST'],
-            [['montant' => 100, 'sous_categorie_id' => $this->sousCategorie->id, 'operation_id' => null, 'seance' => null, 'notes' => null]]
+            [['montant' => 100, 'compte_id' => $this->compteVentilation->id, 'operation_id' => null, 'seance' => null, 'notes' => null]]
         );
     })->throws(ExerciceCloturedException::class);
 
     it('allows create on open exercice', function () {
         $transaction = app(TransactionService::class)->create(
             ['date' => '2024-10-15', 'type' => 'depense', 'compte_id' => $this->compte->id, 'montant_total' => 100, 'mode_paiement' => 'virement', 'reference' => 'TEST'],
-            [['montant' => 100, 'sous_categorie_id' => $this->sousCategorie->id, 'operation_id' => null, 'seance' => null, 'notes' => null]]
+            [['montant' => 100, 'compte_id' => $this->compteVentilation->id, 'operation_id' => null, 'seance' => null, 'notes' => null]]
         );
         expect($transaction->id)->not->toBeNull();
     });

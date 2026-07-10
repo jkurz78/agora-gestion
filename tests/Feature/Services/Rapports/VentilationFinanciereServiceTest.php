@@ -6,7 +6,6 @@ use App\Models\Association;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Operation;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -23,12 +22,8 @@ beforeEach(function () {
     $this->actingAs($this->user);
 
     $this->compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
-    // code_cerfa déclenche la matérialisation Compte/Famille — la ventilation est
-    // portée par transaction_lignes.compte_id (lecture compte-first).
-    $this->sousCategorie = SousCategorie::factory()->create(['association_id' => $this->association->id, 'code_cerfa' => '706']);
-    $this->compteVentilation = Compte::where('numero_pcg', '706')
-        ->where('association_id', $this->association->id)
-        ->firstOrFail();
+    // La ventilation est portée par transaction_lignes.compte_id (lecture compte-first).
+    $this->compteVentilation = Compte::factory()->numero('706')->create(['association_id' => $this->association->id]);
 });
 
 afterEach(function () {
@@ -60,7 +55,6 @@ function ventilationTestLigne(array $txAttrs = [], array $ligneAttrs = []): Tran
 
     return TransactionLigne::create(array_merge([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => test()->sousCategorie->id,
         'montant' => $montant,
         'compte_id' => test()->compteVentilation->id,
         'debit' => $estDepense ? $montant : 0.0,
@@ -151,8 +145,7 @@ it('ne retourne pas les lignes d\'une autre association', function () {
     $autre = Association::factory()->create();
     TenantContext::boot($autre);
     $compteB = CompteBancaire::factory()->create(['association_id' => $autre->id]);
-    $scB = SousCategorie::factory()->create(['association_id' => $autre->id, 'code_cerfa' => '706']);
-    $compteVentB = Compte::where('numero_pcg', '706')->where('association_id', $autre->id)->firstOrFail();
+    $compteVentB = Compte::factory()->numero('706')->create(['association_id' => $autre->id]);
     $tiersB = Tiers::factory()->create(['association_id' => $autre->id]);
     $txB = Transaction::create([
         'association_id' => $autre->id, 'tiers_id' => $tiersB->id, 'compte_id' => $compteB->id,
@@ -160,7 +153,7 @@ it('ne retourne pas les lignes d\'une autre association', function () {
         'mode_paiement' => 'virement', 'saisi_par' => $this->user->id,
     ]);
     TransactionLigne::create([
-        'transaction_id' => $txB->id, 'sous_categorie_id' => $scB->id, 'montant' => 99.00,
+        'transaction_id' => $txB->id, 'montant' => 99.00,
         'compte_id' => $compteVentB->id, 'debit' => 0.0, 'credit' => 99.00,
     ]);
 
@@ -189,7 +182,7 @@ it('compose le libellé Tiers en gérant un nom de famille nul', function () {
         'saisi_par' => $this->user->id,
     ]);
     TransactionLigne::create([
-        'transaction_id' => $txComplet->id, 'sous_categorie_id' => $this->sousCategorie->id, 'montant' => 10.00,
+        'transaction_id' => $txComplet->id, 'montant' => 10.00,
         'compte_id' => $this->compteVentilation->id, 'debit' => 0.0, 'credit' => 10.00,
     ]);
 
@@ -207,7 +200,7 @@ it('compose le libellé Tiers en gérant un nom de famille nul', function () {
         'saisi_par' => $this->user->id,
     ]);
     TransactionLigne::create([
-        'transaction_id' => $txNomSeul->id, 'sous_categorie_id' => $this->sousCategorie->id, 'montant' => 20.00,
+        'transaction_id' => $txNomSeul->id, 'montant' => 20.00,
         'compte_id' => $this->compteVentilation->id, 'debit' => 0.0, 'credit' => 20.00,
     ]);
 

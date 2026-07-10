@@ -96,8 +96,8 @@ describe('ajouterLigne()', function () {
     it('accepte compte_id réel', function () {
         $devis = Devis::factory()->brouillon()->create();
         // DC-8 : le service écrit compte_id — code_cerfa classe 7 matérialise le miroir.
-        $sousCategorie = SousCategorie::factory()->create(['code_cerfa' => '706A']);
-        $compte = Compte::where('numero_pcg', '706A')->firstOrFail();
+        $compte = Compte::factory()->numero('706A')->create();
+        $sousCategorieMiroir = SousCategorie::where('code_cerfa', '706A')->firstOrFail();
 
         $ligne = $this->service->ajouterLigne($devis, [
             'libelle' => 'Ligne avec compte',
@@ -108,7 +108,7 @@ describe('ajouterLigne()', function () {
 
         expect((int) $ligne->compte_id)->toBe((int) $compte->id)
             // Miroir rempli par le trait SyncCompteDepuisSousCategorie.
-            ->and((int) $ligne->sous_categorie_id)->toBe((int) $sousCategorie->id);
+            ->and((int) $ligne->sous_categorie_id)->toBe((int) $sousCategorieMiroir->id);
     });
 
     it('additionne correctement plusieurs lignes dans montant_total', function () {

@@ -8,6 +8,7 @@ use App\Enums\ModePaiement;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Enums\UsageComptable;
+use App\Models\Compte;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
@@ -18,7 +19,7 @@ trait LigneDonHelper
     /**
      * Crée une TransactionLigne éligible à l'émission d'un reçu fiscal :
      *  - Tiers de type particulier avec adresse complète
-     *  - Sous-catégorie portant l'usage Don
+     *  - Compte portant l'usage Don
      *  - Transaction de type Recette, encaissée (statut_reglement = Recu)
      *
      * @param  array<string, mixed>  $tiersOverrides
@@ -39,10 +40,10 @@ trait LigneDonHelper
             'ville' => 'Paris',
         ], $tiersOverrides));
 
-        $sousCategorieDon = SousCategorie::query()
-            ->whereHas('usages', fn ($q) => $q->where('usage', UsageComptable::Don->value))
+        $compteDon = Compte::query()
+            ->forUsage(UsageComptable::Don)
             ->first()
-            ?? SousCategorie::factory()->pourDons()->create();
+            ?? Compte::factory()->pourDons()->create();
 
         $transaction = Transaction::factory()->create(array_merge([
             'tiers_id' => $tiers->id,
@@ -52,10 +53,29 @@ trait LigneDonHelper
             'mode_paiement' => ModePaiement::Cheque,
         ], $transactionOverrides));
 
+        $montant = $ligneOverrides['montant'] ?? 150.00;
+
+        // RecuFiscalService (pas encore converti compte-first, Phase 2 à venir)
+        // lit encore $ligne->sousCategorie : on renseigne donc le compte ET son
+        // miroir sous_categorie_id (code_cerfa = numero_pcg) pour que les usages
+        // (Don, AbandonCreance…) restent visibles côté legacy. Si l'appelant
+        // override compte_id sans override sous_categorie_id, on re-dérive le
+        // miroir à partir du compte final plutôt que de garder celui de $compteDon.
+        $compteFinalId = $ligneOverrides['compte_id'] ?? $compteDon->id;
+        $compteFinal = (int) $compteFinalId === (int) $compteDon->id
+            ? $compteDon
+            : Compte::find($compteFinalId);
+
+        $sousCategorieFinaleId = $ligneOverrides['sous_categorie_id']
+            ?? SousCategorie::where('code_cerfa', $compteFinal?->numero_pcg)->value('id');
+
         return TransactionLigne::factory()->create(array_merge([
             'transaction_id' => $transaction->id,
-            'sous_categorie_id' => $sousCategorieDon->id,
-            'montant' => 150.00,
+            'compte_id' => $compteFinalId,
+            'sous_categorie_id' => $sousCategorieFinaleId,
+            'debit' => 0,
+            'credit' => $montant,
+            'montant' => $montant,
         ], $ligneOverrides));
     }
 }

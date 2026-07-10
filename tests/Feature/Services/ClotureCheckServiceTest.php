@@ -6,11 +6,10 @@ use App\Enums\StatutExercice;
 use App\Enums\StatutRapprochement;
 use App\Models\Association;
 use App\Models\BudgetLine;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Exercice;
 use App\Models\RapprochementBancaire;
-use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\ClotureCheckService;
@@ -107,14 +106,10 @@ describe('contrôles avertissement', function () {
     });
 
     it('budget absent: passes when budget lines exist', function () {
-        $categorie = Categorie::factory()->create(['association_id' => $this->association->id]);
-        $sc = SousCategorie::factory()->create([
-            'categorie_id' => $categorie->id,
-            'association_id' => $this->association->id,
-        ]);
+        $compte = Compte::factory()->create(['association_id' => $this->association->id]);
         BudgetLine::create([
             'association_id' => $this->association->id,
-            'sous_categorie_id' => $sc->id,
+            'compte_id' => $compte->id,
             'exercice' => 2025,
             'montant_prevu' => 100,
         ]);

@@ -19,15 +19,12 @@ use App\Enums\JournalComptable;
 use App\Enums\ModePaiement;
 use App\Enums\NoteDeFraisLigneType;
 use App\Enums\StatutReglement;
-use App\Enums\TypeCategorie;
 use App\Enums\TypeTransaction;
 use App\Models\Association;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Services\Compta\Migrations\SystemeSeeder;
@@ -52,37 +49,18 @@ beforeEach(function (): void {
     // Infrastructure partie double — comptes système 411, 401, 467 requis par abandonCreancePd()
     SystemeSeeder::seed();
 
-    // Sous-catégorie Dépense avec code_cerfa → Compte classe 6 pour PD
-    $catDepense = Categorie::factory()->create([
+    // Compte Dépense classe 6 pour PD
+    $this->compteDepense = Compte::factory()->numero('625')->create([
         'association_id' => $this->asso->id,
-        'type' => TypeCategorie::Depense->value,
+        'intitule' => 'Frais missions déplacements',
     ]);
-    $this->scDepense = SousCategorie::factory()->create([
-        'association_id' => $this->asso->id,
-        'categorie_id' => $catDepense->id,
-        'nom' => 'Frais divers',
-        'code_cerfa' => '625',
-    ]);
-    Compte::firstOrCreate(
-        ['association_id' => $this->asso->id, 'numero_pcg' => '625'],
-        ['intitule' => 'Frais missions déplacements', 'classe' => 6, 'lettrable' => false, 'actif' => true, 'est_systeme' => false, 'pour_inscriptions' => false]
-    );
 
-    // Sous-catégorie Recette AbandonCreance avec code_cerfa → Compte classe 7 pour PD
-    $catRecette = Categorie::factory()->create([
+    // Compte Recette AbandonCreance (usage) classe 7 pour PD — DC-10a : le service
+    // résout ce compte via $association->comptesFor(UsageComptable::AbandonCreance).
+    Compte::factory()->numero('771')->pourAbandonCreance()->create([
         'association_id' => $this->asso->id,
-        'type' => TypeCategorie::Recette->value,
+        'intitule' => 'Dons et abandons de créances',
     ]);
-    $this->scAbandon = SousCategorie::factory()->pourAbandonCreance()->create([
-        'association_id' => $this->asso->id,
-        'categorie_id' => $catRecette->id,
-        'nom' => 'Abandon de creance',
-        'code_cerfa' => '771',
-    ]);
-    Compte::firstOrCreate(
-        ['association_id' => $this->asso->id, 'numero_pcg' => '771'],
-        ['intitule' => 'Dons et abandons de créances', 'classe' => 7, 'lettrable' => false, 'actif' => true, 'est_systeme' => false, 'pour_inscriptions' => false]
-    );
 
     $this->compte = CompteBancaire::factory()->create(['association_id' => $this->asso->id]);
 
@@ -106,7 +84,7 @@ beforeEach(function (): void {
 function makeNdfSoumiseForListTest(
     Association $asso,
     Tiers $tiers,
-    SousCategorie $sc,
+    Compte $compte,
     float $montant = 200.0,
 ): NoteDeFrais {
     $ndf = NoteDeFrais::factory()->soumise()->create([
@@ -119,7 +97,7 @@ function makeNdfSoumiseForListTest(
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
         'type' => NoteDeFraisLigneType::Standard->value,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $compte->id,
         'libelle' => 'Repas',
         'montant' => $montant,
         'piece_jointe_path' => null,
@@ -133,7 +111,7 @@ function makeNdfSoumiseForListTest(
 // ---------------------------------------------------------------------------
 
 it('apres constat abandon aucune transaction nest en statut EnAttente', function (): void {
-    $ndf = makeNdfSoumiseForListTest($this->asso, $this->tiers, $this->scDepense);
+    $ndf = makeNdfSoumiseForListTest($this->asso, $this->tiers, $this->compteDepense);
 
     $this->validationService->validerAvecAbandonCreance($ndf, $this->data, '2025-10-20');
 
@@ -166,7 +144,7 @@ it('apres constat abandon aucune transaction nest en statut EnAttente', function
 });
 
 it('apres constat abandon les deux transactions sont bien presentes en base (non filtrees)', function (): void {
-    $ndf = makeNdfSoumiseForListTest($this->asso, $this->tiers, $this->scDepense, 150.0);
+    $ndf = makeNdfSoumiseForListTest($this->asso, $this->tiers, $this->compteDepense, 150.0);
 
     $this->validationService->validerAvecAbandonCreance($ndf, $this->data, '2025-10-20');
 
@@ -258,7 +236,7 @@ it('une transaction standalone en EnAttente apparait dans les listes a regler', 
 // ---------------------------------------------------------------------------
 
 it('apres abandon les listes depenses-a-regler et recettes-a-encaisser sont vides', function (): void {
-    $ndf = makeNdfSoumiseForListTest($this->asso, $this->tiers, $this->scDepense);
+    $ndf = makeNdfSoumiseForListTest($this->asso, $this->tiers, $this->compteDepense);
 
     $this->validationService->validerAvecAbandonCreance($ndf, $this->data, '2025-10-20');
 
