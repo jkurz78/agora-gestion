@@ -6,6 +6,7 @@ use App\Enums\TypeTransaction;
 use App\Livewire\AnimateurManager;
 use App\Models\Association;
 use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\Operation;
 use App\Models\Seance;
 use App\Models\SousCategorie;
@@ -13,6 +14,7 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
@@ -23,12 +25,15 @@ beforeEach(function () {
     TenantContext::boot($this->association);
     session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
+    SystemeSeeder::seed();
 
     $this->categorie = Categorie::factory()->depense()->create(['association_id' => $this->association->id]);
     $this->sousCategorie = SousCategorie::factory()->create([
         'association_id' => $this->association->id,
         'categorie_id' => $this->categorie->id,
+        'code_cerfa' => '606',
     ]);
+    $this->compte = Compte::where('numero_pcg', '606')->where('association_id', $this->association->id)->firstOrFail();
 
     $this->operation = Operation::factory()->withSeances(3)->create(['association_id' => $this->association->id]);
 
@@ -70,7 +75,9 @@ it('displays animateur from existing depense transaction', function () {
     TransactionLigne::where('transaction_id', $transaction->id)->delete();
     TransactionLigne::factory()->create([
         'transaction_id' => $transaction->id,
-        'sous_categorie_id' => $this->sousCategorie->id,
+        'compte_id' => $this->compte->id,
+        'debit' => 100.00,
+        'credit' => 0,
         'operation_id' => $this->operation->id,
         'seance' => 1,
         'montant' => 100.00,
@@ -84,22 +91,22 @@ it('displays animateur from existing depense transaction', function () {
 
 it('opens create modal with pre-filled tiers and seance', function () {
     Livewire::test(AnimateurManager::class, ['operation' => $this->operation])
-        ->call('openCreateModal', $this->tiers->id, $this->sousCategorie->id, 2)
+        ->call('openCreateModal', $this->tiers->id, $this->compte->id, 2)
         ->assertSet('showModal', true)
         ->assertSet('isEditing', false)
         ->assertSet('modalTiersId', $this->tiers->id)
         ->assertSet('modalTiersLabel', $this->tiers->displayName())
         ->assertSet('modalLignes.0.seance', 2)
-        ->assertSet('modalLignes.0.sous_categorie_id', $this->sousCategorie->id)
+        ->assertSet('modalLignes.0.compte_id', $this->compte->id)
         ->assertSet('modalLignes.0.operation_id', $this->operation->id);
 });
 
 it('creates a depense transaction from modal', function () {
     Livewire::test(AnimateurManager::class, ['operation' => $this->operation])
-        ->call('openCreateModal', $this->tiers->id, $this->sousCategorie->id, 1)
+        ->call('openCreateModal', $this->tiers->id, $this->compte->id, 1)
         ->set('modalDate', now()->format('Y-m-d'))
         ->set('modalReference', 'FAC-2026-001')
-        ->set('modalLignes.0.sous_categorie_id', $this->sousCategorie->id)
+        ->set('modalLignes.0.compte_id', $this->compte->id)
         ->set('modalLignes.0.montant', '150.00')
         ->call('saveTransaction')
         ->assertSet('showModal', false);
@@ -124,13 +131,13 @@ it('creates a depense transaction from modal', function () {
 
 it('validates required fields on save', function () {
     Livewire::test(AnimateurManager::class, ['operation' => $this->operation])
-        ->call('openCreateModal', $this->tiers->id, $this->sousCategorie->id, null)
+        ->call('openCreateModal', $this->tiers->id, $this->compte->id, null)
         ->set('modalDate', '')
         ->set('modalReference', '')
-        ->set('modalLignes.0.sous_categorie_id', null)
+        ->set('modalLignes.0.compte_id', null)
         ->set('modalLignes.0.montant', '')
         ->call('saveTransaction')
-        ->assertHasErrors(['modalDate', 'modalReference', 'modalLignes.0.sous_categorie_id', 'modalLignes.0.montant']);
+        ->assertHasErrors(['modalDate', 'modalReference', 'modalLignes.0.compte_id', 'modalLignes.0.montant']);
 });
 
 it('opens edit modal with existing transaction data', function () {
@@ -146,7 +153,9 @@ it('opens edit modal with existing transaction data', function () {
     TransactionLigne::where('transaction_id', $transaction->id)->delete();
     $ligne = TransactionLigne::factory()->create([
         'transaction_id' => $transaction->id,
-        'sous_categorie_id' => $this->sousCategorie->id,
+        'compte_id' => $this->compte->id,
+        'debit' => 200.00,
+        'credit' => 0,
         'operation_id' => $this->operation->id,
         'seance' => 2,
         'montant' => 200.00,
@@ -160,14 +169,14 @@ it('opens edit modal with existing transaction data', function () {
         ->assertSet('modalTiersId', $this->tiers->id)
         ->assertSet('modalDate', '2026-03-15')
         ->assertSet('modalReference', 'REF-EDIT')
-        ->assertSet('modalLignes.0.sous_categorie_id', $this->sousCategorie->id)
+        ->assertSet('modalLignes.0.compte_id', $this->compte->id)
         ->assertSet('modalLignes.0.seance', 2)
         ->assertSet('modalLignes.0.id', $ligne->id);
 });
 
 it('adds and removes modal lines', function () {
     $component = Livewire::test(AnimateurManager::class, ['operation' => $this->operation])
-        ->call('openCreateModal', $this->tiers->id, $this->sousCategorie->id, 1);
+        ->call('openCreateModal', $this->tiers->id, $this->compte->id, 1);
 
     // Starts with 1 line
     expect($component->get('modalLignes'))->toHaveCount(1);

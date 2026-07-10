@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\TypeTransaction;
 use App\Models\Association;
 use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\EncadrementPrevision;
 use App\Models\Operation;
@@ -25,8 +26,11 @@ beforeEach(function (): void {
     $this->seance2 = Seance::create(['operation_id' => $this->operation->id, 'numero' => 2, 'date' => now()->addDays(7)]);
 
     $this->categorie = Categorie::factory()->depense()->create();
-    $this->sc1 = SousCategorie::factory()->create(['categorie_id' => $this->categorie->id, 'nom' => 'Encadrement']);
-    $this->sc2 = SousCategorie::factory()->create(['categorie_id' => $this->categorie->id, 'nom' => 'Frais déplacement']);
+    $this->sc1 = SousCategorie::factory()->create(['categorie_id' => $this->categorie->id, 'nom' => 'Encadrement', 'code_cerfa' => '606']);
+    $this->sc2 = SousCategorie::factory()->create(['categorie_id' => $this->categorie->id, 'nom' => 'Frais déplacement', 'code_cerfa' => '625']);
+
+    $this->compte606 = Compte::where('numero_pcg', '606')->where('association_id', $this->association->id)->firstOrFail();
+    $this->compte625 = Compte::where('numero_pcg', '625')->where('association_id', $this->association->id)->firstOrFail();
 
     $this->tiers = Tiers::factory()->create(['nom' => 'DURAND', 'prenom' => 'Sophie']);
     $this->compte = CompteBancaire::factory()->create();
@@ -36,7 +40,7 @@ it('retourne une matrice avec uniquement des prévisions si aucun réalisé', fu
     EncadrementPrevision::create([
         'operation_id' => $this->operation->id,
         'tiers_id' => $this->tiers->id,
-        'sous_categorie_id' => $this->sc1->id,
+        'compte_id' => $this->compte606->id,
         'seance_id' => $this->seance1->id,
         'montant_prevu' => 100,
     ]);
@@ -44,9 +48,9 @@ it('retourne une matrice avec uniquement des prévisions si aucun réalisé', fu
     $data = app(EncadrementMatrixBuilder::class)->build($this->operation);
 
     expect($data['animateurs'])->toHaveKey($this->tiers->id)
-        ->and($data['animateurs'][$this->tiers->id]['sousCategories'])->toHaveKey($this->sc1->id)
-        ->and($data['animateurs'][$this->tiers->id]['sousCategories'][$this->sc1->id]['prevuParSeance'][$this->seance1->id] ?? 0)->toBe(100.0)
-        ->and($data['animateurs'][$this->tiers->id]['sousCategories'][$this->sc1->id]['realiseParSeance'][$this->seance1->id] ?? 0.0)->toBe(0.0)
+        ->and($data['animateurs'][$this->tiers->id]['comptes'])->toHaveKey($this->compte606->id)
+        ->and($data['animateurs'][$this->tiers->id]['comptes'][$this->compte606->id]['prevuParSeance'][$this->seance1->id] ?? 0)->toBe(100.0)
+        ->and($data['animateurs'][$this->tiers->id]['comptes'][$this->compte606->id]['realiseParSeance'][$this->seance1->id] ?? 0.0)->toBe(0.0)
         ->and($data['animateurs'][$this->tiers->id]['totalPrevu'])->toBe(100.0)
         ->and($data['animateurs'][$this->tiers->id]['totalRealise'])->toBe(0.0);
 });
@@ -60,7 +64,9 @@ it('ajoute une ligne fantôme quand un réalisé existe sans prévision', functi
     ]);
     TransactionLigne::create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $this->sc2->id,
+        'compte_id' => $this->compte625->id,
+        'debit' => 75,
+        'credit' => 0,
         'operation_id' => $this->operation->id,
         'seance' => 1,
         'montant' => 75,
@@ -68,17 +74,17 @@ it('ajoute une ligne fantôme quand un réalisé existe sans prévision', functi
 
     $data = app(EncadrementMatrixBuilder::class)->build($this->operation);
 
-    expect($data['animateurs'][$this->tiers->id]['sousCategories'])->toHaveKey($this->sc2->id)
-        ->and($data['animateurs'][$this->tiers->id]['sousCategories'][$this->sc2->id]['previsionIds'][$this->seance1->id] ?? null)->toBeNull()
-        ->and($data['animateurs'][$this->tiers->id]['sousCategories'][$this->sc2->id]['realiseParSeance'][$this->seance1->id])->toBe(75.0)
-        ->and($data['animateurs'][$this->tiers->id]['sousCategories'][$this->sc2->id]['hasRealise'])->toBeTrue();
+    expect($data['animateurs'][$this->tiers->id]['comptes'])->toHaveKey($this->compte625->id)
+        ->and($data['animateurs'][$this->tiers->id]['comptes'][$this->compte625->id]['previsionIds'][$this->seance1->id] ?? null)->toBeNull()
+        ->and($data['animateurs'][$this->tiers->id]['comptes'][$this->compte625->id]['realiseParSeance'][$this->seance1->id])->toBe(75.0)
+        ->and($data['animateurs'][$this->tiers->id]['comptes'][$this->compte625->id]['hasRealise'])->toBeTrue();
 });
 
 it('fusionne prévision et réalisé sur la même cellule', function (): void {
     EncadrementPrevision::create([
         'operation_id' => $this->operation->id,
         'tiers_id' => $this->tiers->id,
-        'sous_categorie_id' => $this->sc1->id,
+        'compte_id' => $this->compte606->id,
         'seance_id' => $this->seance1->id,
         'montant_prevu' => 100,
     ]);
@@ -90,14 +96,16 @@ it('fusionne prévision et réalisé sur la même cellule', function (): void {
     ]);
     TransactionLigne::create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $this->sc1->id,
+        'compte_id' => $this->compte606->id,
+        'debit' => 90,
+        'credit' => 0,
         'operation_id' => $this->operation->id,
         'seance' => 1,
         'montant' => 90,
     ]);
 
     $data = app(EncadrementMatrixBuilder::class)->build($this->operation);
-    $cellule = $data['animateurs'][$this->tiers->id]['sousCategories'][$this->sc1->id];
+    $cellule = $data['animateurs'][$this->tiers->id]['comptes'][$this->compte606->id];
 
     expect($cellule['prevuParSeance'][$this->seance1->id])->toBe(100.0)
         ->and($cellule['realiseParSeance'][$this->seance1->id])->toBe(90.0)
@@ -110,14 +118,14 @@ it('calcule les totaux par séance et globaux', function (): void {
     EncadrementPrevision::create([
         'operation_id' => $this->operation->id,
         'tiers_id' => $this->tiers->id,
-        'sous_categorie_id' => $this->sc1->id,
+        'compte_id' => $this->compte606->id,
         'seance_id' => $this->seance1->id,
         'montant_prevu' => 100,
     ]);
     EncadrementPrevision::create([
         'operation_id' => $this->operation->id,
         'tiers_id' => $this->tiers->id,
-        'sous_categorie_id' => $this->sc1->id,
+        'compte_id' => $this->compte606->id,
         'seance_id' => $this->seance2->id,
         'montant_prevu' => 120,
     ]);
@@ -138,7 +146,9 @@ it('expose les réalisés hors-séance via orphanRealiseHorsSeance', function ()
     ]);
     TransactionLigne::create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $this->sc1->id,
+        'compte_id' => $this->compte606->id,
+        'debit' => 60,
+        'credit' => 0,
         'operation_id' => $this->operation->id,
         'seance' => null,
         'montant' => 60,
@@ -160,7 +170,9 @@ it('calcule grandRealise depuis séances + orphelins', function (): void {
     ]);
     TransactionLigne::create([
         'transaction_id' => $tx1->id,
-        'sous_categorie_id' => $this->sc1->id,
+        'compte_id' => $this->compte606->id,
+        'debit' => 80,
+        'credit' => 0,
         'operation_id' => $this->operation->id,
         'seance' => 1,
         'montant' => 80,
@@ -175,7 +187,9 @@ it('calcule grandRealise depuis séances + orphelins', function (): void {
     ]);
     TransactionLigne::create([
         'transaction_id' => $tx2->id,
-        'sous_categorie_id' => $this->sc1->id,
+        'compte_id' => $this->compte606->id,
+        'debit' => 30,
+        'credit' => 0,
         'operation_id' => $this->operation->id,
         'seance' => null,
         'montant' => 30,
@@ -197,7 +211,9 @@ it('route les realises avec numero seance obsolète vers orphanRealiseHorsSeance
     ]);
     TransactionLigne::create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $this->sc1->id,
+        'compte_id' => $this->compte606->id,
+        'debit' => 42,
+        'credit' => 0,
         'operation_id' => $this->operation->id,
         'seance' => 99, // numero qui n'existe pas
         'montant' => 42,
