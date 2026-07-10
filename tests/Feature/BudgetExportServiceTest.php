@@ -6,21 +6,32 @@ use App\Enums\TypeCategorie;
 use App\Enums\TypeTransaction;
 use App\Models\BudgetLine;
 use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
+use App\Models\Famille;
 use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\BudgetExportService;
+use App\Tenant\TenantContext;
 
 beforeEach(function () {
-    // Catégories dépenses
-    $catCharge = Categorie::factory()->create(['nom' => 'Charges', 'type' => TypeCategorie::Depense]);
-    $this->scLoyers = SousCategorie::factory()->create(['nom' => 'Loyers', 'categorie_id' => $catCharge->id]);
-    $this->scElec = SousCategorie::factory()->create(['nom' => 'Électricité', 'categorie_id' => $catCharge->id]);
+    $tenantId = (int) TenantContext::currentId();
 
-    // Catégories recettes
+    // Familles nommées AVANT la matérialisation des comptes (sinon fallback nom = code)
+    Famille::create(['association_id' => $tenantId, 'code' => '61', 'nom' => 'Charges']);
+    Famille::create(['association_id' => $tenantId, 'code' => '75', 'nom' => 'Produits']);
+
+    // Sous-catégories avec code_cerfa → SousCategorieCompteObserver matérialise les comptes
+    $catCharge = Categorie::factory()->create(['nom' => 'Charges', 'type' => TypeCategorie::Depense]);
+    $this->scLoyers = SousCategorie::factory()->create(['nom' => 'Loyers', 'categorie_id' => $catCharge->id, 'code_cerfa' => '613']);
+    $this->scElec = SousCategorie::factory()->create(['nom' => 'Électricité', 'categorie_id' => $catCharge->id, 'code_cerfa' => '616']);
+
     $catProduit = Categorie::factory()->create(['nom' => 'Produits', 'type' => TypeCategorie::Recette]);
-    $this->scCotis = SousCategorie::factory()->create(['nom' => 'Cotisations', 'categorie_id' => $catProduit->id]);
+    $this->scCotis = SousCategorie::factory()->create(['nom' => 'Cotisations', 'categorie_id' => $catProduit->id, 'code_cerfa' => '756']);
+
+    $this->compteLoyers = Compte::where('numero_pcg', '613')->where('association_id', $tenantId)->firstOrFail();
+    $this->compteCotis = Compte::where('numero_pcg', '756')->where('association_id', $tenantId)->firstOrFail();
 
     // Réalisé 2025 : Loyers=1200, Électricité=0 (pas de transaction), Cotisations=850
     $compte = CompteBancaire::factory()->create();
@@ -35,6 +46,9 @@ beforeEach(function () {
         'transaction_id' => $txLoyers->id,
         'sous_categorie_id' => $this->scLoyers->id,
         'montant' => 1200.00,
+        'compte_id' => $this->compteLoyers->id,
+        'debit' => 1200.00,
+        'credit' => 0.0,
     ]);
 
     $txCotis = Transaction::factory()->create([
@@ -47,6 +61,9 @@ beforeEach(function () {
         'transaction_id' => $txCotis->id,
         'sous_categorie_id' => $this->scCotis->id,
         'montant' => 850.00,
+        'compte_id' => $this->compteCotis->id,
+        'debit' => 0.0,
+        'credit' => 850.00,
     ]);
 });
 
@@ -97,12 +114,12 @@ it('source budget exporte les montants_prevu de la table budget_lines', function
     expect($byName['Cotisations'][3])->toBe('700.00');
 });
 
-it('inclut le nom de la catégorie en deuxième colonne', function () {
+it('inclut le libellé de la famille en deuxième colonne', function () {
     $rows = app(BudgetExportService::class)->rows(2026, 'zero', 2026);
 
-    $byName = array_column($rows, null, 2); // col 2 = sous_categorie
-    expect($byName['Loyers'][1])->toBe('Charges');
-    expect($byName['Cotisations'][1])->toBe('Produits');
+    $byName = array_column($rows, null, 2); // col 2 = compte (intitulé)
+    expect($byName['Loyers'][1])->toBe('61 — Charges');
+    expect($byName['Cotisations'][1])->toBe('75 — Produits');
 });
 
 it('toCsv génère un CSV valide avec en-tête', function () {

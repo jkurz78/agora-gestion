@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\Espace;
 use App\Livewire\AnalysePivot;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Operation;
 use App\Models\Participant;
@@ -98,9 +99,12 @@ it('returns participants data with correct fields', function () {
 it('returns financier data with correct fields including temporal dimensions', function () {
     $compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
     $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Fournisseur', 'pour_depenses' => true]);
-    // DC-4 : code_cerfa déclenche la matérialisation Compte/Famille nécessaire à
-    // VentilationFinancièreService (source du mode financier de l'Analyse pivot).
+    // code_cerfa déclenche la matérialisation Compte/Famille — la ventilation est
+    // portée par transaction_lignes.compte_id (source du mode financier de l'Analyse pivot).
     $sousCategorie = SousCategorie::factory()->create(['association_id' => $this->association->id, 'code_cerfa' => '606']);
+    $compteVentilation = Compte::where('numero_pcg', '606')
+        ->where('association_id', $this->association->id)
+        ->firstOrFail();
     $transaction = Transaction::create([
         'association_id' => $this->association->id,
         'tiers_id' => $tiers->id,
@@ -116,6 +120,9 @@ it('returns financier data with correct fields including temporal dimensions', f
         'transaction_id' => $transaction->id,
         'sous_categorie_id' => $sousCategorie->id,
         'montant' => 100.00,
+        'compte_id' => $compteVentilation->id,
+        'debit' => 100.00,
+        'credit' => 0.0,
     ]);
 
     $component = Livewire::test(AnalysePivot::class, ['mode' => 'financier']);

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Support\Concerns;
 
 use App\Enums\StatutReglement;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
 use App\Models\SousCategorie;
@@ -18,7 +19,14 @@ use App\Tenant\TenantContext;
  *
  * Crée une transaction (recette ou dépense) avec une seule ligne sur la
  * sous-catégorie donnée, dans l'exercice donné.
- * Le montant peut être négatif — aucune validation Eloquent ne l'interdit.
+ * Le montant peut être négatif — aucune validation Eloquent ne l'interdit
+ * (brèche du signe : les invariants de TransactionLigneObserver comparent à 0
+ * avec `> 0` / `=== 0.0`, un montant négatif passe).
+ *
+ * Si la sous-catégorie porte un code_cerfa, la ligne est créée compte-first
+ * (compte_id + debit/credit) — requis pour être vue par les lecteurs de rapports.
+ * Sinon la ligne reste sans compte_id (suffisant pour les tests qui n'agrègent
+ * que les transactions).
  */
 trait MakesAuditTransactions
 {
@@ -50,11 +58,24 @@ trait MakesAuditTransactions
             'rapprochement_id' => $rapprochement?->id,
         ], $overrides));
 
-        TransactionLigne::create([
+        $ligne = [
             'transaction_id' => $tx->id,
             'sous_categorie_id' => $sc->id,
             'montant' => $montant,
-        ]);
+        ];
+
+        if ($sc->code_cerfa !== null && $sc->code_cerfa !== '') {
+            $compteVentilation = Compte::where('numero_pcg', $sc->code_cerfa)
+                ->where('association_id', (int) $sc->association_id)
+                ->firstOrFail();
+
+            $estDepense = $type === 'depense';
+            $ligne['compte_id'] = $compteVentilation->id;
+            $ligne['debit'] = $estDepense ? $montant : 0.0;
+            $ligne['credit'] = $estDepense ? 0.0 : $montant;
+        }
+
+        TransactionLigne::create($ligne);
 
         return $tx;
     }

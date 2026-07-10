@@ -26,6 +26,26 @@ function affectationCompteIdPour(SousCategorie $sousCategorie): int
     return (int) Compte::where('numero_pcg', $sousCategorie->code_cerfa)->firstOrFail()->id;
 }
 
+/**
+ * Ligne de ventilation compte-first (dépense: débit, recette: crédit), compte
+ * résolu depuis le code_cerfa de la sous-catégorie.
+ */
+function affectationLigne(Transaction $tx, SousCategorie $sc, float $montant, ?int $operationId = null): TransactionLigne
+{
+    $estDepense = $tx->type->value === 'depense';
+
+    return TransactionLigne::factory()->create([
+        'transaction_id' => $tx->id,
+        'sous_categorie_id' => $sc->id,
+        'operation_id' => $operationId,
+        'seance' => null,
+        'montant' => $montant,
+        'compte_id' => affectationCompteIdPour($sc),
+        'debit' => $estDepense ? $montant : 0.0,
+        'credit' => $estDepense ? 0.0 : $montant,
+    ]);
+}
+
 beforeEach(function () {
     $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
@@ -52,12 +72,7 @@ it('le rapport onglet 2 prend en compte les affectations au lieu de operation_id
         'montant_total' => 20000.00,
     ]);
     $recette->lignes()->forceDelete();
-    $ligne = TransactionLigne::factory()->create([
-        'transaction_id' => $recette->id,
-        'sous_categorie_id' => $this->sousCategorie->id,
-        'operation_id' => null,
-        'montant' => 20000.00,
-    ]);
+    $ligne = affectationLigne($recette, $this->sousCategorie, 20000.00);
 
     // Affectation de 8000 à op1
     TransactionLigneAffectation::create([
@@ -86,12 +101,7 @@ it('une ligne sans affectation continue d\'utiliser son operation_id direct', fu
         'montant_total' => 5000.00,
     ]);
     $recette->lignes()->forceDelete();
-    TransactionLigne::factory()->create([
-        'transaction_id' => $recette->id,
-        'sous_categorie_id' => $this->sousCategorie->id,
-        'operation_id' => $this->op1->id,
-        'montant' => 5000.00,
-    ]);
+    affectationLigne($recette, $this->sousCategorie, 5000.00, (int) $this->op1->id);
 
     $rapport = $this->service->compteDeResultatOperations(2025, [$this->op1->id]);
 
@@ -112,12 +122,7 @@ it('le rapport onglet 2 prend en compte les affectations de dépenses', function
         'montant_total' => 12000.00,
     ]);
     $depense->lignes()->forceDelete();
-    $ligne = TransactionLigne::factory()->create([
-        'transaction_id' => $depense->id,
-        'sous_categorie_id' => $sousCatD->id,
-        'operation_id' => null,
-        'montant' => 12000.00,
-    ]);
+    $ligne = affectationLigne($depense, $sousCatD, 12000.00);
 
     TransactionLigneAffectation::create([
         'transaction_ligne_id' => $ligne->id,
@@ -143,13 +148,7 @@ it('le rapport onglet 3 prend en compte les affectations de recettes avec séanc
         'montant_total' => 3000.00,
     ]);
     $recette->lignes()->forceDelete();
-    $ligne = TransactionLigne::factory()->create([
-        'transaction_id' => $recette->id,
-        'sous_categorie_id' => $this->sousCategorie->id,
-        'operation_id' => null,
-        'seance' => null,
-        'montant' => 3000.00,
-    ]);
+    $ligne = affectationLigne($recette, $this->sousCategorie, 3000.00);
 
     TransactionLigneAffectation::create([
         'transaction_ligne_id' => $ligne->id,
@@ -183,12 +182,7 @@ it('compteDeResultat global : recette ventilée partiellement sans opération �
         'montant_total' => 20000.00,
     ]);
     $recette->lignes()->forceDelete();
-    $ligne = TransactionLigne::factory()->create([
-        'transaction_id' => $recette->id,
-        'sous_categorie_id' => $this->sousCategorie->id,
-        'operation_id' => null,
-        'montant' => 20000.00,
-    ]);
+    $ligne = affectationLigne($recette, $this->sousCategorie, 20000.00);
 
     TransactionLigneAffectation::create([
         'transaction_ligne_id' => $ligne->id,
@@ -220,12 +214,7 @@ it('compteDeResultat global : recette ventilée entièrement sans opération —
         'montant_total' => 10000.00,
     ]);
     $recette->lignes()->forceDelete();
-    $ligne = TransactionLigne::factory()->create([
-        'transaction_id' => $recette->id,
-        'sous_categorie_id' => $this->sousCategorie->id,
-        'operation_id' => null,
-        'montant' => 10000.00,
-    ]);
+    $ligne = affectationLigne($recette, $this->sousCategorie, 10000.00);
 
     TransactionLigneAffectation::create([
         'transaction_ligne_id' => $ligne->id,
@@ -253,12 +242,7 @@ it('compteDeResultat global : dépense ventilée partiellement sans opération �
         'montant_total' => 9000.00,
     ]);
     $depense->lignes()->forceDelete();
-    $ligne = TransactionLigne::factory()->create([
-        'transaction_id' => $depense->id,
-        'sous_categorie_id' => $sousCatD->id,
-        'operation_id' => null,
-        'montant' => 9000.00,
-    ]);
+    $ligne = affectationLigne($depense, $sousCatD, 9000.00);
 
     TransactionLigneAffectation::create([
         'transaction_ligne_id' => $ligne->id,
@@ -290,12 +274,7 @@ it('compteDeResultatOperations filtré : affectation sans opération n\'apparaî
         'montant_total' => 20000.00,
     ]);
     $recette->lignes()->forceDelete();
-    $ligne = TransactionLigne::factory()->create([
-        'transaction_id' => $recette->id,
-        'sous_categorie_id' => $this->sousCategorie->id,
-        'operation_id' => null,
-        'montant' => 20000.00,
-    ]);
+    $ligne = affectationLigne($recette, $this->sousCategorie, 20000.00);
 
     // 15 000 sans opération, 5 000 avec opération
     TransactionLigneAffectation::create([
@@ -332,13 +311,7 @@ it('le rapport onglet 3 prend en compte les affectations de dépenses avec séan
         'montant_total' => 4000.00,
     ]);
     $depense->lignes()->forceDelete();
-    $ligne = TransactionLigne::factory()->create([
-        'transaction_id' => $depense->id,
-        'sous_categorie_id' => $sousCatD->id,
-        'operation_id' => null,
-        'seance' => null,
-        'montant' => 4000.00,
-    ]);
+    $ligne = affectationLigne($depense, $sousCatD, 4000.00);
 
     TransactionLigneAffectation::create([
         'transaction_ligne_id' => $ligne->id,

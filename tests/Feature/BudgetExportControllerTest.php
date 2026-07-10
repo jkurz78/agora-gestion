@@ -7,7 +7,9 @@ use App\Enums\TypeTransaction;
 use App\Models\Association;
 use App\Models\BudgetLine;
 use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
+use App\Models\Famille;
 use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -21,8 +23,14 @@ beforeEach(function () {
     TenantContext::boot($this->association);
     session(['current_association_id' => $this->association->id]);
 
+    // Famille nommée AVANT la matérialisation du compte (sinon fallback nom = code)
+    Famille::create(['association_id' => $this->association->id, 'code' => '61', 'nom' => 'Charges']);
+
     $cat = Categorie::factory()->create(['nom' => 'Charges', 'type' => TypeCategorie::Depense]);
-    $this->sc = SousCategorie::factory()->create(['nom' => 'Loyers', 'categorie_id' => $cat->id]);
+    $this->sc = SousCategorie::factory()->create(['nom' => 'Loyers', 'categorie_id' => $cat->id, 'code_cerfa' => '613']);
+    $this->compteLoyers = Compte::where('numero_pcg', '613')
+        ->where('association_id', $this->association->id)
+        ->firstOrFail();
 
     // Réalisé exercice 2025 (Sept 2025–Aug 2026) : Loyers=1200
     $compte = CompteBancaire::factory()->create();
@@ -36,6 +44,9 @@ beforeEach(function () {
         'transaction_id' => $tx->id,
         'sous_categorie_id' => $this->sc->id,
         'montant' => 1200.00,
+        'compte_id' => $this->compteLoyers->id,
+        'debit' => 1200.00,
+        'credit' => 0.0,
     ]);
 });
 
@@ -54,7 +65,7 @@ it('télécharge un CSV budget', function () {
 
     expect($response->getContent())
         ->toContain('exercice;categorie;sous_categorie;montant_prevu')
-        ->toContain('2026-2027;Charges;Loyers;1200.00');
+        ->toContain('2026-2027;61 — Charges;Loyers;1200.00');
 });
 
 it('source zero produit des montants vides dans le CSV', function () {
@@ -62,7 +73,7 @@ it('source zero produit des montants vides dans le CSV', function () {
         ->get(route('comptabilite.budget.export', ['format' => 'csv', 'exercice' => 2026, 'source' => 'zero']));
 
     $response->assertOk();
-    expect($response->getContent())->toContain('2026-2027;Charges;Loyers;');
+    expect($response->getContent())->toContain('2026-2027;61 — Charges;Loyers;');
     expect($response->getContent())->not->toContain('1200');
 });
 
@@ -82,7 +93,7 @@ it('source budget exporte les montants_prevu', function () {
         ->get(route('comptabilite.budget.export', ['format' => 'csv', 'exercice' => 2026, 'source' => 'budget']));
 
     $response->assertOk();
-    expect($response->getContent())->toContain('2026-2027;Charges;Loyers;900.00');
+    expect($response->getContent())->toContain('2026-2027;61 — Charges;Loyers;900.00');
 });
 
 it('redirige les invités vers login', function () {

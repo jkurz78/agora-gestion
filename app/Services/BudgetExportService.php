@@ -4,14 +4,15 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Enums\TypeCategorie;
 use App\Models\BudgetLine;
-use App\Models\Categorie;
+use App\Services\Compta\PlanComptableSelecteur;
 
 final class BudgetExportService
 {
     /**
      * Retourne les lignes d'export triées dépenses puis recettes.
+     *
+     * Groupement famille/compte identique à l'écran Budget ({@see PlanComptableSelecteur}).
      *
      * @param  int  $exerciceCible  Valeur à écrire dans la colonne exercice
      * @param  string  $source  'zero' | 'realise' | 'budget'
@@ -26,31 +27,30 @@ final class BudgetExportService
         // Pré-charger le budget de l'exercice source en une seule requête
         $budgetMap = $source === 'budget'
             ? BudgetLine::forExercice($sourceExercice)
-                ->pluck('montant_prevu', 'sous_categorie_id')
+                ->pluck('montant_prevu', 'compte_id')
                 ->map(fn ($v) => (float) $v)
                 ->all()
             : [];
 
         $rows = [];
 
-        foreach ([TypeCategorie::Depense, TypeCategorie::Recette] as $type) {
-            $categories = Categorie::where('type', $type)
-                ->with(['sousCategories' => fn ($q) => $q->orderBy('nom')])
-                ->orderBy('nom')
-                ->get();
+        foreach (['depense', 'recette'] as $type) {
+            $groupes = PlanComptableSelecteur::groupesPourType($type);
 
-            foreach ($categories as $categorie) {
-                foreach ($categorie->sousCategories as $sc) {
+            foreach ($groupes as $codeFamille => $groupe) {
+                $groupeLabel = $groupe['famille']?->libelle() ?? $codeFamille;
+
+                foreach ($groupe['comptes'] as $compte) {
                     $montant = match ($source) {
-                        'realise' => $budgetService->realise($sc->id, $sourceExercice),
-                        'budget' => $budgetMap[$sc->id] ?? 0.0,
+                        'realise' => $budgetService->realise((int) $compte->id, $sourceExercice),
+                        'budget' => $budgetMap[$compte->id] ?? 0.0,
                         default => 0.0,
                     };
 
                     $rows[] = [
                         $exerciceLabel,
-                        $categorie->nom,
-                        $sc->nom,
+                        $groupeLabel,
+                        $compte->intitule,
                         $montant > 0 ? number_format($montant, 2, '.', '') : '',
                     ];
                 }

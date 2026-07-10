@@ -474,4 +474,4 @@ it('[PD8] feature flag OFF → mode legacy actif (pas de régression)', function
     // Le mode legacy doit voir la ligne (via sous_categorie_id)
     expect($result['produits'])->toHaveCount(1);
     expect((float) $result['produits'][0]['montant_n'])->toBe(400.0);
-});
+})->skip('DC-10a : lecteur legacy supprimé — CR compte-first inconditionnel');

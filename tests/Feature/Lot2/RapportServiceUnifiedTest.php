@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\TypeCategorie;
 use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\SousCategorie;
 use App\Models\Transaction;
@@ -28,6 +29,9 @@ it('includes don-type recettes in produits', function () {
         'transaction_id' => $tx->id,
         'sous_categorie_id' => $scDon->id,
         'montant' => 150.00,
+        'compte_id' => Compte::where('numero_pcg', '754')->where('association_id', $scDon->association_id)->firstOrFail()->id,
+        'debit' => 0.0,
+        'credit' => 150.00,
     ]);
 
     $result = app(RapportService::class)->compteDeResultat(2025);
@@ -55,6 +59,9 @@ it('includes cotisation-type recettes in produits', function () {
         'transaction_id' => $tx->id,
         'sous_categorie_id' => $scCot->id,
         'montant' => 80.00,
+        'compte_id' => Compte::where('numero_pcg', '756')->where('association_id', $scCot->association_id)->firstOrFail()->id,
+        'debit' => 0.0,
+        'credit' => 80.00,
     ]);
 
     $result = app(RapportService::class)->compteDeResultat(2025);

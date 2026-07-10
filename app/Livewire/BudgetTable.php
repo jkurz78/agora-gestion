@@ -8,7 +8,6 @@ use App\Enums\Espace;
 use App\Enums\RoleAssociation;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\BudgetLine;
-use App\Models\SousCategorie;
 use App\Services\BudgetImportService;
 use App\Services\BudgetService;
 use App\Services\Compta\PlanComptableSelecteur;
@@ -67,8 +66,8 @@ final class BudgetTable extends Component
 
         app(ExerciceService::class)->assertOuvert(app(ExerciceService::class)->current());
 
-        // DC-8 : la ligne budgétaire est clé par compte — le trait
-        // SyncCompteDepuisSousCategorie remplit le miroir sous_categorie_id.
+        // La ligne budgétaire est clé par compte — le trait
+        // SyncCompteDepuisSousCategorie maintient la colonne miroir legacy.
         BudgetLine::create([
             'compte_id' => $compteId,
             'exercice' => app(ExerciceService::class)->current(),
@@ -199,20 +198,12 @@ final class BudgetTable extends Component
 
         $budgetLines = BudgetLine::forExercice($exercice)->get()->keyBy('compte_id');
 
-        // Échafaudage DC-8 — BudgetService::realise() reste sous_categorie_id-first
-        // (hors périmètre : appelé aussi par Dashboard et BudgetExportService),
-        // conversion en lecture via le miroir ici, disparaît en DC-10.
         $tousComptes = $depenseGroupes->flatMap(fn (array $g) => $g['comptes'])
             ->merge($recetteGroupes->flatMap(fn (array $g) => $g['comptes']));
-        $miroirs = SousCategorie::whereIn('code_cerfa', $tousComptes->pluck('numero_pcg'))
-            ->pluck('id', 'code_cerfa');
 
         $realiseData = [];
         foreach ($tousComptes as $compte) {
-            $sousCategorieId = $miroirs->get($compte->numero_pcg);
-            $realiseData[$compte->id] = $sousCategorieId !== null
-                ? $budgetService->realise((int) $sousCategorieId, $exercice)
-                : 0.0;
+            $realiseData[$compte->id] = $budgetService->realise((int) $compte->id, $exercice);
         }
 
         return view('livewire.budget-table', [

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Operation;
 use App\Models\SousCategorie;
@@ -22,9 +23,12 @@ beforeEach(function () {
     $this->actingAs($this->user);
 
     $this->compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
-    // DC-4 : code_cerfa déclenche la matérialisation Compte/Famille — nécessaire pour que
-    // VentilationFinancièreService (lecture compte_id/familles) retrouve la ligne.
+    // code_cerfa déclenche la matérialisation Compte/Famille — la ventilation est
+    // portée par transaction_lignes.compte_id (lecture compte-first).
     $this->sousCategorie = SousCategorie::factory()->create(['association_id' => $this->association->id, 'code_cerfa' => '706']);
+    $this->compteVentilation = Compte::where('numero_pcg', '706')
+        ->where('association_id', $this->association->id)
+        ->firstOrFail();
 });
 
 afterEach(function () {
@@ -32,7 +36,8 @@ afterEach(function () {
 });
 
 /**
- * Helper : crée une transaction + 1 ligne dans l'association courante, retourne la ligne.
+ * Helper : crée une transaction + 1 ligne compte-first dans l'association courante,
+ * retourne la ligne (dépense: débit, recette: crédit).
  * Nom préfixé pour éviter toute collision de fonction globale Pest entre fichiers.
  */
 function ventilationTestLigne(array $txAttrs = [], array $ligneAttrs = []): TransactionLigne
@@ -50,10 +55,16 @@ function ventilationTestLigne(array $txAttrs = [], array $ligneAttrs = []): Tran
         'saisi_par' => test()->user->id,
     ], $txAttrs));
 
+    $montant = (float) ($ligneAttrs['montant'] ?? 100.00);
+    $estDepense = $tx->type->value === 'depense';
+
     return TransactionLigne::create(array_merge([
         'transaction_id' => $tx->id,
         'sous_categorie_id' => test()->sousCategorie->id,
-        'montant' => 100.00,
+        'montant' => $montant,
+        'compte_id' => test()->compteVentilation->id,
+        'debit' => $estDepense ? $montant : 0.0,
+        'credit' => $estDepense ? 0.0 : $montant,
     ], $ligneAttrs));
 }
 
@@ -136,18 +147,22 @@ it('exclut les lignes supprimées (soft delete)', function () {
 });
 
 it('ne retourne pas les lignes d\'une autre association', function () {
-    // Données dans une autre association
+    // Données compte-first dans une autre association (exclusion par le seul filtre tenant)
     $autre = Association::factory()->create();
     TenantContext::boot($autre);
     $compteB = CompteBancaire::factory()->create(['association_id' => $autre->id]);
-    $scB = SousCategorie::factory()->create(['association_id' => $autre->id]);
+    $scB = SousCategorie::factory()->create(['association_id' => $autre->id, 'code_cerfa' => '706']);
+    $compteVentB = Compte::where('numero_pcg', '706')->where('association_id', $autre->id)->firstOrFail();
     $tiersB = Tiers::factory()->create(['association_id' => $autre->id]);
     $txB = Transaction::create([
         'association_id' => $autre->id, 'tiers_id' => $tiersB->id, 'compte_id' => $compteB->id,
         'type' => 'recette', 'date' => '2026-01-15', 'libelle' => 'B', 'montant_total' => 99.00,
         'mode_paiement' => 'virement', 'saisi_par' => $this->user->id,
     ]);
-    TransactionLigne::create(['transaction_id' => $txB->id, 'sous_categorie_id' => $scB->id, 'montant' => 99.00]);
+    TransactionLigne::create([
+        'transaction_id' => $txB->id, 'sous_categorie_id' => $scB->id, 'montant' => 99.00,
+        'compte_id' => $compteVentB->id, 'debit' => 0.0, 'credit' => 99.00,
+    ]);
 
     // Retour au tenant courant + une ligne à nous
     TenantContext::boot($this->association);
@@ -173,7 +188,10 @@ it('compose le libellé Tiers en gérant un nom de famille nul', function () {
         'libelle' => 'A', 'montant_total' => 10.00, 'mode_paiement' => 'virement',
         'saisi_par' => $this->user->id,
     ]);
-    TransactionLigne::create(['transaction_id' => $txComplet->id, 'sous_categorie_id' => $this->sousCategorie->id, 'montant' => 10.00]);
+    TransactionLigne::create([
+        'transaction_id' => $txComplet->id, 'sous_categorie_id' => $this->sousCategorie->id, 'montant' => 10.00,
+        'compte_id' => $this->compteVentilation->id, 'debit' => 0.0, 'credit' => 10.00,
+    ]);
 
     // Particulier avec nom seul (prénom null) — le cas qui révèle le bug CONCAT/NULL
     $tiersNomSeul = Tiers::factory()->create([
@@ -188,7 +206,10 @@ it('compose le libellé Tiers en gérant un nom de famille nul', function () {
         'libelle' => 'B', 'montant_total' => 20.00, 'mode_paiement' => 'virement',
         'saisi_par' => $this->user->id,
     ]);
-    TransactionLigne::create(['transaction_id' => $txNomSeul->id, 'sous_categorie_id' => $this->sousCategorie->id, 'montant' => 20.00]);
+    TransactionLigne::create([
+        'transaction_id' => $txNomSeul->id, 'sous_categorie_id' => $this->sousCategorie->id, 'montant' => 20.00,
+        'compte_id' => $this->compteVentilation->id, 'debit' => 0.0, 'credit' => 20.00,
+    ]);
 
     $rows = app(VentilationFinanciereService::class)->pourExercice(2025);
     $tiersValues = collect($rows)->pluck('Tiers')->all();

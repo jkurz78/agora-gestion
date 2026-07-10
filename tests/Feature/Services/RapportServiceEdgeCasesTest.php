@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\TypeCategorie;
 use App\Enums\TypeTransaction;
 use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\SousCategorie;
 use App\Models\Transaction;
@@ -54,6 +55,9 @@ it('compteDeResultat handles negative transaction amounts correctly', function (
         'transaction_id' => $tx->id,
         'sous_categorie_id' => $sc->id,
         'montant' => -50.00,
+        'compte_id' => Compte::where('numero_pcg', '606')->where('association_id', $sc->association_id)->firstOrFail()->id,
+        'debit' => -50.00,
+        'credit' => 0.0,
     ]);
 
     $result = $this->service->compteDeResultat(2025);
@@ -115,6 +119,9 @@ it('compteDeResultat exercice boundaries are correct (sept-aug)', function () {
         'transaction_id' => $tx->id,
         'sous_categorie_id' => $sc->id,
         'montant' => 100.00,
+        'compte_id' => Compte::where('numero_pcg', '606')->where('association_id', $sc->association_id)->firstOrFail()->id,
+        'debit' => 100.00,
+        'credit' => 0.0,
     ]);
 
     $result2025 = $this->service->compteDeResultat(2025);

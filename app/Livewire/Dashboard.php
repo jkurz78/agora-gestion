@@ -8,10 +8,10 @@ use App\Enums\StatutOperation;
 use App\Enums\UsageComptable;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\BudgetLine;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Famille;
 use App\Models\Operation;
-use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\BudgetService;
@@ -40,10 +40,9 @@ final class Dashboard extends Component
         $totalDepenses = (float) Transaction::where('type', 'depense')->operationnel()->forExercice($exercice)->sum('montant_total');
         $soldeGeneral = $totalRecettes - $totalDepenses;
 
-        // Budget résumé — agrégation par famille (DC-6 : lecture compte + famille,
-        // repli sur sousCategorie.categorie si le compte n'est pas encore renseigné)
+        // Budget résumé — agrégation par famille (lecture compte-first)
         $budgetLines = BudgetLine::forExercice($exercice)
-            ->with(['compte', 'sousCategorie.categorie'])
+            ->with(['compte'])
             ->get();
 
         $familles = Famille::pourComptes(EloquentCollection::make($budgetLines->pluck('compte')->filter()));
@@ -52,17 +51,16 @@ final class Dashboard extends Component
         $totalRealise = 0.0;
         $budgetParCategorie = []; // ['nomGroupe' => ['type' => 'depense|recette', 'prevu' => float, 'realise' => float]]
         foreach ($budgetLines as $line) {
-            $r = (float) $budgetService->realise($line->sous_categorie_id, $exercice);
+            $r = $line->compte_id !== null ? (float) $budgetService->realise((int) $line->compte_id, $exercice) : 0.0;
             $totalRealise += $r;
 
             $compte = $line->compte;
             $famille = $compte !== null ? $familles->get(substr($compte->numero_pcg, 0, 2)) : null;
-            $cat = $line->sousCategorie?->categorie;
 
-            $catKey = $famille?->nom ?? $cat?->nom ?? '—';
+            $catKey = $famille?->nom ?? '—';
             if (! isset($budgetParCategorie[$catKey])) {
                 $budgetParCategorie[$catKey] = [
-                    'type' => $famille !== null ? ($famille->estDepense() ? 'depense' : 'recette') : ($cat?->type ?? 'depense'),
+                    'type' => $famille !== null ? ($famille->estDepense() ? 'depense' : 'recette') : 'depense',
                     'prevu' => 0.0,
                     'realise' => 0.0,
                 ];
@@ -92,14 +90,14 @@ final class Dashboard extends Component
             ->take(5)
             ->get();
 
-        // Derniers dons — lignes de transaction avec sous-cat usage Don
+        // Derniers dons — lignes de transaction avec compte usage Don
         // (et non transactions entières : une même transaction peut contenir
         // une adhésion ET un don, il faut isoler chaque ligne par montant).
-        $donSousCategorieIds = SousCategorie::forUsage(UsageComptable::Don)->pluck('id');
+        $donCompteIds = Compte::forUsage(UsageComptable::Don)->pluck('id');
         $derniersDons = TransactionLigne::query()
-            ->whereIn('transaction_lignes.sous_categorie_id', $donSousCategorieIds)
+            ->whereIn('transaction_lignes.compte_id', $donCompteIds)
             ->whereHas('transaction', fn ($q) => $q->where('type', 'recette')->forExercice($exercice))
-            ->with(['transaction.tiers', 'compte', 'sousCategorie'])
+            ->with(['transaction.tiers', 'compte'])
             ->join('transactions', 'transactions.id', '=', 'transaction_lignes.transaction_id')
             ->orderByDesc('transactions.date')
             ->orderByDesc('transaction_lignes.id')
@@ -108,11 +106,11 @@ final class Dashboard extends Component
             ->get();
 
         // Dernières adhésions — lignes de cotisation, avec adhésion (formule + dates)
-        $cotSousCategorieIds = SousCategorie::forUsage(UsageComptable::Cotisation)->pluck('id');
+        $cotCompteIds = Compte::forUsage(UsageComptable::Cotisation)->pluck('id');
         $dernieresAdhesions = TransactionLigne::query()
-            ->whereIn('transaction_lignes.sous_categorie_id', $cotSousCategorieIds)
+            ->whereIn('transaction_lignes.compte_id', $cotCompteIds)
             ->whereHas('transaction', fn ($q) => $q->where('type', 'recette')->forExercice($exercice))
-            ->with(['transaction.tiers', 'transaction.adhesions.formuleAdhesion', 'sousCategorie'])
+            ->with(['transaction.tiers', 'transaction.adhesions.formuleAdhesion', 'compte'])
             ->join('transactions', 'transactions.id', '=', 'transaction_lignes.transaction_id')
             ->orderByDesc('transactions.date')
             ->orderByDesc('transaction_lignes.id')

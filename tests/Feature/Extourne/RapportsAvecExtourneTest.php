@@ -45,11 +45,40 @@ function rapportsCreateRecetteWithSousCategorie(SousCategorie $sc, CompteBancair
         'compte_id' => $compte->id,
         'date' => $date,
     ]);
-    TransactionLigne::create([
+
+    $ligne = [
         'transaction_id' => $tx->id,
         'sous_categorie_id' => $sc->id,
         'montant' => $montant,
-    ]);
+    ];
+
+    // Écriture compte-first équilibrée (crédit 7xx + débit 5112) quand la
+    // sous-catégorie porte un code_cerfa — requis pour être vue par
+    // CompteResultatBuilder ET pour passer le guard ∑D=∑C du miroir d'extourne.
+    if ($sc->code_cerfa !== null && $sc->code_cerfa !== '') {
+        $compteVentilation = Compte::where('numero_pcg', $sc->code_cerfa)
+            ->where('association_id', (int) $sc->association_id)
+            ->firstOrFail();
+
+        $ligne['compte_id'] = $compteVentilation->id;
+        $ligne['debit'] = 0.0;
+        $ligne['credit'] = $montant;
+
+        $c5112 = Compte::firstOrCreate(
+            ['association_id' => (int) $sc->association_id, 'numero_pcg' => '5112'],
+            ['intitule' => 'Chèques à encaisser', 'classe' => 5, 'actif' => true, 'est_systeme' => true, 'lettrable' => false],
+        );
+        TransactionLigne::create([
+            'transaction_id' => $tx->id,
+            'sous_categorie_id' => null,
+            'montant' => $montant,
+            'compte_id' => $c5112->id,
+            'debit' => $montant,
+            'credit' => 0.0,
+        ]);
+    }
+
+    TransactionLigne::create($ligne);
 
     return $tx;
 }

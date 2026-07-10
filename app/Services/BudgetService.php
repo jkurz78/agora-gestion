@@ -4,28 +4,27 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Enums\TypeCategorie;
-use App\Models\SousCategorie;
+use App\Models\Compte;
 use App\Models\TransactionLigne;
 
 final class BudgetService
 {
     /**
-     * Compute the réalisé (actual) amount for a sous-catégorie in a given exercice.
+     * Compute le réalisé (montant réel) pour un compte du plan comptable sur un exercice.
      *
-     * For depense sous-categories: sum of depense_lignes.montant where depense.date is in exercice range.
-     * For recette sous-categories: sum of recette_lignes.montant where recette.date is in exercice range.
+     * Compte de classe 6 (charges) : lignes des transactions de type depense.
+     * Compte de classe 7 (produits) : lignes des transactions de type recette.
      */
-    public function realise(int $sousCategorieId, int $exercice): float
+    public function realise(int $compteId, int $exercice): float
     {
-        $sousCategorie = SousCategorie::with('categorie')->findOrFail($sousCategorieId);
+        $compte = Compte::findOrFail($compteId);
 
         $startDate = "{$exercice}-09-01";
         $endDate = ($exercice + 1).'-08-31';
 
-        $typeValue = $sousCategorie->categorie->type === TypeCategorie::Depense ? 'depense' : 'recette';
+        $typeValue = (int) $compte->classe === 6 ? 'depense' : 'recette';
 
-        return (float) TransactionLigne::where('sous_categorie_id', $sousCategorieId)
+        return (float) TransactionLigne::where('compte_id', $compteId)
             ->whereHas('transaction', fn ($q) => $q->where('type', $typeValue)->whereBetween('date', [$startDate, $endDate]))
             ->sum('montant');
     }

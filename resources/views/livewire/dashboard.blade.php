@@ -245,7 +245,7 @@
                                     <tr>
                                         <td class="small text-nowrap">{{ $ligne->transaction->date->format('d/m/Y') }}</td>
                                         <td class="small">{{ $ligne->transaction->tiers ? $ligne->transaction->tiers->displayName() : 'Anonyme' }}</td>
-                                        <td class="small text-muted">{{ $ligne->compte?->intitule ?? $ligne->sousCategorie?->nom ?? '—' }}</td>
+                                        <td class="small text-muted">{{ $ligne->compte?->intitule ?? '—' }}</td>
                                         <td class="text-end small fw-semibold text-nowrap">{{ number_format((float) $ligne->montant, 2, ',', ' ') }} &euro;</td>
                                     </tr>
                                 @empty

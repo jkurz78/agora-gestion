@@ -27,9 +27,11 @@ beforeEach(function () {
     TenantContext::boot($this->association);
     $this->actingAs($this->user);
 
+    // code_cerfa → SousCategorieCompteObserver matérialise les comptes ; l'import
+    // résout désormais les libellés contre comptes.intitule.
     $catCharge = Categorie::factory()->create(['nom' => 'Charges', 'type' => TypeCategorie::Depense]);
-    $this->scLoyers = SousCategorie::factory()->create(['nom' => 'Loyers', 'categorie_id' => $catCharge->id]);
-    $this->scElec = SousCategorie::factory()->create(['nom' => 'Électricité', 'categorie_id' => $catCharge->id]);
+    $this->scLoyers = SousCategorie::factory()->create(['nom' => 'Loyers', 'categorie_id' => $catCharge->id, 'code_cerfa' => '613']);
+    $this->scElec = SousCategorie::factory()->create(['nom' => 'Électricité', 'categorie_id' => $catCharge->id, 'code_cerfa' => '616']);
 });
 
 afterEach(function () {
@@ -111,7 +113,7 @@ it('liste tous les exercices incorrects distincts dans le message d\'erreur', fu
         ->and($result->errors[0]['message'])->toContain('2024-2025');
 });
 
-it('rejette si une sous-catégorie est introuvable', function () {
+it('rejette si un compte est introuvable', function () {
     $csv = "exercice;categorie;sous_categorie;montant_prevu\n"
          ."2025-2026;Charges;Inconnu;100.00\n";
 
@@ -122,9 +124,9 @@ it('rejette si une sous-catégorie est introuvable', function () {
         ->and($result->errors[0]['line'])->toBe(2);
 });
 
-it('rejette si une sous-catégorie est ambiguë (doublon de nom)', function () {
+it('rejette si un compte est ambigu (doublon d\'intitulé)', function () {
     $cat2 = Categorie::factory()->create(['nom' => 'Produits', 'type' => TypeCategorie::Recette]);
-    SousCategorie::factory()->create(['nom' => 'Loyers', 'categorie_id' => $cat2->id]); // doublon !
+    SousCategorie::factory()->create(['nom' => 'Loyers', 'categorie_id' => $cat2->id, 'code_cerfa' => '756']); // compte doublon d'intitulé !
 
     $csv = "exercice;categorie;sous_categorie;montant_prevu\n"
          ."2025-2026;Charges;Loyers;100.00\n";
