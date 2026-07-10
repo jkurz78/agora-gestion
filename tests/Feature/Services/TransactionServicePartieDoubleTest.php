@@ -81,7 +81,7 @@ it('recette comptant chèque — T1 (Vente, 411D/7xxC) + T2 séparée (Banque, 5
         'compte_id' => $this->compteBancaire->id,
     ];
     $lignes = [[
-        'sous_categorie_id' => $this->scRecette->id,
+        'compte_id' => $this->compte706->id,
         'montant' => '100.00',
         'operation_id' => null,
         'seance' => null,
@@ -93,8 +93,8 @@ it('recette comptant chèque — T1 (Vente, 411D/7xxC) + T2 séparée (Banque, 5
     $compte411 = compteSysteme('411');
     $compte5112 = compteSysteme('5112');
 
-    // ---- T1 : 2 lignes avec compte_id (411 D + ventilation 706 C enrichie) ----
-    // La ligne legacy est enrichie en place avec compte_id 706.
+    // ---- T1 : 2 lignes avec compte_id (411 D + ventilation 706 C) ----
+    // La ligne de ventilation porte compte_id dès la création (contrat compte-first).
     $lignesT1 = TransactionLigne::where('transaction_id', $t1->id)
         ->whereNotNull('compte_id')
         ->get();
@@ -110,14 +110,13 @@ it('recette comptant chèque — T1 (Vente, 411D/7xxC) + T2 séparée (Banque, 5
     $ligne5112T1 = $lignesT1->firstWhere('compte_id', $compte5112->id);
     expect($ligne5112T1)->toBeNull('T1 ne doit PAS avoir de ligne 5112 (portage sur T2)');
 
-    // La ligne legacy enrichie avec compte_id 706
+    // La ligne de ventilation porte compte_id 706
     $ligneVentilation = TransactionLigne::where('transaction_id', $t1->id)
-        ->where('sous_categorie_id', $this->scRecette->id)
+        ->where('compte_id', $this->compte706->id)
         ->first();
-    expect($ligneVentilation)->not()->toBeNull('La ligne legacy doit exister');
-    expect($ligneVentilation->compte_id)->toBe($this->compte706->id, 'La ligne legacy est enrichie avec compte_id 706');
+    expect($ligneVentilation)->not()->toBeNull('La ligne de ventilation doit exister');
     expect((float) $ligneVentilation->credit)->toBe(100.0, 'La ligne 706 est créditée (produit)');
-    expect((float) $ligneVentilation->montant)->toBe(100.0, 'montant legacy conservé');
+    expect((float) $ligneVentilation->montant)->toBe(100.0, 'montant conservé');
 
     // ---- T2 : 2 lignes (5112 D + 411 C), lettrage 411 T1↔T2 ----
     $ligne411D_T1->refresh();
@@ -158,7 +157,7 @@ it('recette à crédit — crée 2 lignes (1 ventilation enrichie + 411 D), pas 
         'compte_id' => null,   // pas de compte bancaire pour une créance
     ];
     $lignes = [[
-        'sous_categorie_id' => $this->scRecette->id,
+        'compte_id' => $this->compte706->id,
         'montant' => '75.00',
         'operation_id' => null,
         'seance' => null,
@@ -181,12 +180,11 @@ it('recette à crédit — crée 2 lignes (1 ventilation enrichie + 411 D), pas 
     expect((int) $ligne411->tiers_id)->toBe((int) $this->tiers->id);
     expect($ligne411->lettrage_code)->toBeNull('Créance ouverte — pas encore lettrée');
 
-    // 1 ligne ventilation 706 C enrichie
+    // 1 ligne ventilation 706 C
     $ligneVent = TransactionLigne::where('transaction_id', $transaction->id)
-        ->where('sous_categorie_id', $this->scRecette->id)
+        ->where('compte_id', $this->compte706->id)
         ->first();
     expect($ligneVent)->not()->toBeNull();
-    expect($ligneVent->compte_id)->toBe($this->compte706->id);
     expect((float) $ligneVent->credit)->toBe(75.0);
 });
 
@@ -207,7 +205,7 @@ it('dépense comptant virement — T1 (Achat, 60xD/401C) + T2 séparée (Banque,
         'compte_id' => $this->compteBancaire->id,
     ];
     $lignes = [[
-        'sous_categorie_id' => $this->scDepense->id,
+        'compte_id' => $this->compte606->id,
         'montant' => '200.00',
         'operation_id' => null,
         'seance' => null,
@@ -233,12 +231,11 @@ it('dépense comptant virement — T1 (Achat, 60xD/401C) + T2 séparée (Banque,
     expect((float) $ligne401C_T1->credit)->toBe(200.0);
     expect((int) $ligne401C_T1->tiers_id)->toBe((int) $this->tiers->id);
 
-    // La ligne legacy enrichie avec compte_id 606
+    // La ligne de ventilation porte compte_id 606
     $ligneVent = TransactionLigne::where('transaction_id', $t1->id)
-        ->where('sous_categorie_id', $this->scDepense->id)
+        ->where('compte_id', $this->compte606->id)
         ->first();
-    expect($ligneVent)->not()->toBeNull('La ligne legacy doit exister');
-    expect($ligneVent->compte_id)->toBe($this->compte606->id, 'La ligne legacy est enrichie avec compte_id 606');
+    expect($ligneVent)->not()->toBeNull('La ligne de ventilation doit exister');
     expect((float) $ligneVent->debit)->toBe(200.0, 'La ligne 606 est débitée (charge)');
 
     // T2 : 2 lignes (401 D + 512X C), 401 lettré inter-tx
@@ -280,7 +277,7 @@ it('dépense à crédit — crée 2 lignes symétriques, pas de lettrage', funct
         'compte_id' => null,
     ];
     $lignes = [[
-        'sous_categorie_id' => $this->scDepense->id,
+        'compte_id' => $this->compte606->id,
         'montant' => '300.00',
         'operation_id' => null,
         'seance' => null,
@@ -303,12 +300,11 @@ it('dépense à crédit — crée 2 lignes symétriques, pas de lettrage', funct
     expect((int) $ligne401->tiers_id)->toBe((int) $this->tiers->id);
     expect($ligne401->lettrage_code)->toBeNull('Dette ouverte — pas encore lettrée');
 
-    // 1 ligne ventilation 606 D enrichie
+    // 1 ligne ventilation 606 D
     $ligneVent = TransactionLigne::where('transaction_id', $transaction->id)
-        ->where('sous_categorie_id', $this->scDepense->id)
+        ->where('compte_id', $this->compte606->id)
         ->first();
     expect($ligneVent)->not()->toBeNull();
-    expect($ligneVent->compte_id)->toBe($this->compte606->id);
     expect((float) $ligneVent->debit)->toBe(300.0);
 });
 
@@ -350,14 +346,14 @@ it('multi-ventilation recette comptant chèque — T1 (411D/2×7xxC) + T2 sépar
     ];
     $lignes = [
         [
-            'sous_categorie_id' => $this->scRecette->id,
+            'compte_id' => $this->compte706->id,
             'montant' => '100.00',
             'operation_id' => null,
             'seance' => null,
             'notes' => null,
         ],
         [
-            'sous_categorie_id' => $scRecette2->id,
+            'compte_id' => $compte706B->id,
             'montant' => '50.00',
             'operation_id' => null,
             'seance' => null,
@@ -385,17 +381,17 @@ it('multi-ventilation recette comptant chèque — T1 (411D/2×7xxC) + T2 sépar
     $ligne5112T1 = $lignesT1->firstWhere('compte_id', $compte5112->id);
     expect($ligne5112T1)->toBeNull('T1 ne doit PAS avoir de ligne 5112 (sur T2 uniquement)');
 
-    // Les 2 lignes legacy sont enrichies avec leur compte_id respectif
+    // Les 2 lignes de ventilation portent chacune leur compte_id respectif
     $ligneVent1 = TransactionLigne::where('transaction_id', $t1->id)
-        ->where('sous_categorie_id', $this->scRecette->id)
+        ->where('compte_id', $this->compte706->id)
         ->first();
     $ligneVent2 = TransactionLigne::where('transaction_id', $t1->id)
-        ->where('sous_categorie_id', $scRecette2->id)
+        ->where('compte_id', $compte706B->id)
         ->first();
 
-    expect($ligneVent1->compte_id)->toBe($this->compte706->id);
+    expect($ligneVent1)->not()->toBeNull();
     expect((float) $ligneVent1->credit)->toBe(100.0);
-    expect($ligneVent2->compte_id)->toBe($compte706B->id);
+    expect($ligneVent2)->not()->toBeNull();
     expect((float) $ligneVent2->credit)->toBe(50.0);
 
     // T2 : 2 lignes (5112 D + 411 C), 411 lettré inter-tx
@@ -420,21 +416,21 @@ it('multi-ventilation recette comptant chèque — T1 (411D/2×7xxC) + T2 sépar
 });
 
 // ---------------------------------------------------------------------------
-// Scénario 6 : Les lignes legacy (sous_categorie_id + montant) sont conservées
+// Scénario 6 : Les champs de la ligne de ventilation (compte_id + montant) sont conservés
 // ---------------------------------------------------------------------------
 
-it('les champs legacy (sous_categorie_id et montant) sont conservés intacts après double écriture', function () {
+it('les champs (compte_id et montant) sont conservés intacts après double écriture', function () {
     $data = [
         'type' => TypeTransaction::Recette->value,
         'date' => '2025-10-15',
-        'libelle' => 'Test conservation legacy',
+        'libelle' => 'Test conservation champs ventilation',
         'montant_total' => '100.00',
         'mode_paiement' => ModePaiement::Cheque->value,
         'tiers_id' => $this->tiers->id,
         'compte_id' => $this->compteBancaire->id,
     ];
     $lignes = [[
-        'sous_categorie_id' => $this->scRecette->id,
+        'compte_id' => $this->compte706->id,
         'montant' => '100.00',
         'operation_id' => null,
         'seance' => null,
@@ -443,14 +439,14 @@ it('les champs legacy (sous_categorie_id et montant) sont conservés intacts apr
 
     $transaction = $this->service->create($data, $lignes);
 
-    // La ligne legacy doit avoir ses champs originaux intacts
+    // La ligne de ventilation doit avoir ses champs originaux intacts
     $ligneVent = TransactionLigne::where('transaction_id', $transaction->id)
-        ->where('sous_categorie_id', $this->scRecette->id)
+        ->where('compte_id', $this->compte706->id)
         ->first();
 
     expect($ligneVent)->not()->toBeNull();
-    expect((int) $ligneVent->sous_categorie_id)->toBe((int) $this->scRecette->id);
-    expect((float) $ligneVent->montant)->toBe(100.0, 'montant legacy conservé');
+    expect((int) $ligneVent->compte_id)->toBe((int) $this->compte706->id);
+    expect((float) $ligneVent->montant)->toBe(100.0, 'montant conservé');
     expect($ligneVent->notes)->toBe('Note test', 'notes conservées');
 });
 
@@ -469,7 +465,7 @@ it('si tiers_id est null, la double écriture est ignorée (lignes legacy seules
         'compte_id' => $this->compteBancaire->id,
     ];
     $lignes = [[
-        'sous_categorie_id' => $this->scRecette->id,
+        'compte_id' => $this->compte706->id,
         'montant' => '50.00',
         'operation_id' => null,
         'seance' => null,
@@ -479,7 +475,7 @@ it('si tiers_id est null, la double écriture est ignorée (lignes legacy seules
     // Ne doit pas lever d'exception
     $transaction = $this->service->create($data, $lignes);
 
-    // Seulement 1 ligne legacy (pas de PD-only sans tiers)
+    // Seulement 1 ligne de ventilation (pas de PD-only sans tiers)
     $totalLignes = TransactionLigne::where('transaction_id', $transaction->id)->count();
     expect($totalLignes)->toBe(1);
 });
@@ -549,7 +545,7 @@ it('dépense comptant chèque — T2 séparée avec ligne portage sur 512X IBAN-
         'compte_id' => $this->compteBancaire->id,  // IBAN → compte5121
     ];
     $lignes = [[
-        'sous_categorie_id' => $this->scDepense->id,
+        'compte_id' => $this->compte606->id,
         'montant' => '80.00',
         'operation_id' => null,
         'seance' => null,
@@ -599,12 +595,11 @@ it('dépense comptant chèque — T2 séparée avec ligne portage sur 512X IBAN-
         ->count();
     expect($lignes5112_T2)->toBe(0, 'Chèque émis → 512X direct sur T2, jamais 5112 (chèques reçus)');
 
-    // Ligne ventilation 606 D enrichie sur T1
+    // Ligne ventilation 606 D sur T1
     $ligneVent = TransactionLigne::where('transaction_id', $t1->id)
-        ->where('sous_categorie_id', $this->scDepense->id)
+        ->where('compte_id', $this->compte606->id)
         ->first();
     expect($ligneVent)->not()->toBeNull();
-    expect($ligneVent->compte_id)->toBe($this->compte606->id);
     expect((float) $ligneVent->debit)->toBe(80.0);
 });
 
@@ -623,7 +618,7 @@ it('dépense comptant virement avec compte_id null — skip gracieux sans TypeEr
         'compte_id' => null,  // ← compte_id null avec mode comptant
     ];
     $lignes = [[
-        'sous_categorie_id' => $this->scDepense->id,
+        'compte_id' => $this->compte606->id,
         'montant' => '50.00',
         'operation_id' => null,
         'seance' => null,
@@ -633,9 +628,9 @@ it('dépense comptant virement avec compte_id null — skip gracieux sans TypeEr
     // Ne doit pas lever de TypeError ni d'exception — skip gracieux
     $transaction = $this->service->create($data, $lignes);
 
-    // Seulement 1 ligne legacy (pas de PD-only car 512X introuvable)
+    // Seulement 1 ligne de ventilation (pas de PD-only car 512X introuvable)
     $totalLignes = TransactionLigne::where('transaction_id', $transaction->id)->count();
-    expect($totalLignes)->toBe(1, 'Skip gracieux : seulement la ligne legacy sans double écriture');
+    expect($totalLignes)->toBe(1, 'Skip gracieux : seulement la ligne de ventilation sans double écriture');
 });
 
 // ---------------------------------------------------------------------------

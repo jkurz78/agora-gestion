@@ -15,6 +15,7 @@ use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\ExerciceService;
 use App\Services\FactureService;
 use App\Tenant\TenantContext;
@@ -38,6 +39,7 @@ beforeEach(function (): void {
     $this->comptable->update(['derniere_association_id' => $this->association->id]);
 
     TenantContext::boot($this->association);
+    SystemeSeeder::seed();
     $this->actingAs($this->comptable);
 
     $this->service = app(FactureService::class);
@@ -52,7 +54,7 @@ afterEach(function (): void {
 
 test('il refuse l annulation si une TX MontantManuel a deja ete extournee hors flux etat pathologique', function (): void {
     $tiers = Tiers::factory()->create(['pour_recettes' => true]);
-    $sousCategorie = SousCategorie::factory()->create();
+    $sousCategorie = SousCategorie::factory()->create(['code_cerfa' => '706']);
 
     // Créer facture validée avec 1 ligne MontantManuel (Tg générée)
     $facture = $this->service->creerManuelleVierge($tiers->id);
@@ -108,7 +110,7 @@ test('il refuse l annulation si une TX MontantManuel a deja ete extournee hors f
 
 test('le message d erreur contient Etat incoherent', function (): void {
     $tiers = Tiers::factory()->create(['pour_recettes' => true]);
-    $sousCategorie = SousCategorie::factory()->create();
+    $sousCategorie = SousCategorie::factory()->create(['code_cerfa' => '706']);
 
     $facture = $this->service->creerManuelleVierge($tiers->id);
     $facture->update(['mode_paiement_prevu' => ModePaiement::Virement->value]);

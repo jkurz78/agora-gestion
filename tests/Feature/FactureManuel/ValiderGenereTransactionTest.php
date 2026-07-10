@@ -7,6 +7,8 @@ use App\Enums\StatutReglement;
 use App\Enums\TypeLigneFacture;
 use App\Enums\TypeTransaction;
 use App\Models\Association;
+use App\Models\Compte;
+use App\Models\CompteBancaire;
 use App\Models\Facture;
 use App\Models\FactureLigne;
 use App\Models\SousCategorie;
@@ -14,6 +16,8 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Services\Compta\Migrations\BancairesSeeder;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\FactureService;
 use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -31,10 +35,17 @@ beforeEach(function () {
         'joined_at' => now(),
     ]);
     TenantContext::boot($this->association);
+    SystemeSeeder::seed();
     $this->actingAs($this->user);
     $this->tiers = Tiers::factory()->create();
-    $this->sousCategorie = SousCategorie::factory()->create();
+    $this->sousCategorie = SousCategorie::factory()->create(['code_cerfa' => '706']);
     $this->service = app(FactureService::class);
+
+    $this->compteBancaire = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
+    $this->association->update(['facture_compte_bancaire_id' => $this->compteBancaire->id]);
+    // Matérialise le Compte 512X correspondant (jointure compte_bancaire_id) pour
+    // que CompteTresorerieResolver trouve un compte de trésorerie à l'encaissement.
+    BancairesSeeder::seed();
 });
 
 afterEach(function () {
@@ -138,13 +149,18 @@ describe('Happy path : 2 lignes MontantManuel → 1 Transaction recette + 2 Tran
 
         $transaction = Transaction::latest('id')->first();
 
-        expect($transaction->lignes)->toHaveCount(2);
+        expect($transaction->lignes()->ventilation()->count())->toBe(2);
 
-        $montants = $transaction->lignes->pluck('montant')->map(fn ($m) => (float) $m)->sort()->values()->all();
+        $ventilationLignes = $transaction->lignes()->ventilation()->get();
+        $montants = $ventilationLignes->pluck('montant')->map(fn ($m) => (float) $m)->sort()->values()->all();
         expect($montants)->toBe([200.0, 1200.0]);
 
-        foreach ($transaction->lignes as $ligne) {
-            expect((int) $ligne->sous_categorie_id)->toBe((int) $this->sousCategorie->id);
+        $expectedCompteId = (int) Compte::where('numero_pcg', $this->sousCategorie->code_cerfa)
+            ->where('association_id', $this->association->id)
+            ->value('id');
+
+        foreach ($ventilationLignes as $ligne) {
+            expect((int) $ligne->compte_id)->toBe($expectedCompteId);
         }
     });
 

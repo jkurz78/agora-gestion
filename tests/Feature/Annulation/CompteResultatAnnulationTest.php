@@ -8,12 +8,14 @@ use App\Enums\StatutFacture;
 use App\Enums\TypeLigneFacture;
 use App\Models\Association;
 use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\FactureLigne;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\ExerciceService;
 use App\Services\FactureService;
 use App\Services\Rapports\CompteResultatBuilder;
@@ -38,6 +40,7 @@ beforeEach(function (): void {
     $this->comptable->update(['derniere_association_id' => $this->association->id]);
 
     TenantContext::boot($this->association);
+    SystemeSeeder::seed();
     $this->actingAs($this->comptable);
 
     $this->service = app(FactureService::class);
@@ -74,6 +77,7 @@ test('le compte de résultat reflète une annulation par +X et -X dans la même 
         'categorie_id' => $cat->id,
         'nom' => 'Cotisations séance',
         'libelle_article' => 'des cotisations séance',
+        'code_cerfa' => '706',
     ]);
 
     $tiers = Tiers::factory()->create(['pour_recettes' => true]);
@@ -110,7 +114,10 @@ test('le compte de résultat reflète une annulation par +X et -X dans la même 
     expect($factureFraiche->statut)->toBe(StatutFacture::Annulee);
 
     // ── Sanity check : 2 TransactionLigne dans la sous-catégorie (+80 et -80) ─
-    $lignes = TransactionLigne::where('sous_categorie_id', $sousCategorie->id)->get();
+    $compte = Compte::where('numero_pcg', $sousCategorie->code_cerfa)
+        ->where('association_id', $sousCategorie->association_id)
+        ->first();
+    $lignes = TransactionLigne::where('compte_id', $compte->id)->get();
     expect($lignes)->toHaveCount(2, '2 lignes attendues : origine +80 et extourne -80');
 
     $montants = $lignes->pluck('montant')->map(fn ($m) => (float) $m)->sort()->values()->all();
@@ -149,6 +156,7 @@ test('la somme des TransactionLigne de la sous-catégorie est 0 après annulatio
         'categorie_id' => $cat->id,
         'nom' => 'Cotisations séance 2',
         'libelle_article' => 'des cotisations',
+        'code_cerfa' => '707',
     ]);
 
     $tiers = Tiers::factory()->create(['pour_recettes' => true]);
@@ -178,7 +186,10 @@ test('la somme des TransactionLigne de la sous-catégorie est 0 après annulatio
     $this->service->annuler($facture);
 
     // Détail : 2 lignes +150 et -150 → somme = 0
-    $lignes = TransactionLigne::where('sous_categorie_id', $sousCategorie->id)->get();
+    $compte = Compte::where('numero_pcg', $sousCategorie->code_cerfa)
+        ->where('association_id', $sousCategorie->association_id)
+        ->first();
+    $lignes = TransactionLigne::where('compte_id', $compte->id)->get();
     expect($lignes)->toHaveCount(2);
     expect((float) $lignes->sum('montant'))->toBe(0.0);
     expect($lignes->pluck('montant')->map(fn ($m) => (float) $m)->sort()->values()->all())

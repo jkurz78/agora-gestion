@@ -112,9 +112,13 @@ it('couvre les 10 tables de ventilation', function () {
     ]);
 
     // type_operations
+    // DC-10a : TypeOperationFactory pose un compte_id par défaut (ventilation
+    // produits) — on le neutralise explicitement pour que le backfiller le
+    // traite (il ne touche que les lignes compte_id IS NULL).
     $typeOperation = TypeOperation::factory()->create([
         'association_id' => $associationId,
         'sous_categorie_id' => $scId,
+        'compte_id' => null,
     ]);
 
     // helloasso_form_mappings (pas de factory — insertion minimale via DB::table)

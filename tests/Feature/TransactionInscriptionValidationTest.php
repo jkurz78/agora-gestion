@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 use App\Models\Association;
 use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Operation;
 use App\Models\SousCategorie;
 use App\Models\User;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\TransactionService;
 use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -19,6 +21,7 @@ beforeEach(function () {
     $this->user = User::factory()->create();
     $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
     TenantContext::boot($this->association);
+    SystemeSeeder::seed();
     $this->actingAs($this->user);
     $this->service = app(TransactionService::class);
     $this->compte = CompteBancaire::factory()->create();
@@ -34,6 +37,13 @@ beforeEach(function () {
         'nom' => 'Don manuel',
         'code_cerfa' => '754',
     ]);
+
+    $this->compteInscription = Compte::where('numero_pcg', '706')
+        ->where('association_id', $this->association->id)
+        ->firstOrFail();
+    $this->compteDon = Compte::where('numero_pcg', '754')
+        ->where('association_id', $this->association->id)
+        ->firstOrFail();
 });
 
 afterEach(function () {
@@ -50,7 +60,7 @@ it('refuses a transaction ligne with inscription sous-categorie without operatio
         'reference' => 'REF-INS',
     ];
     $lignes = [[
-        'sous_categorie_id' => $this->scInscription->id,
+        'compte_id' => $this->compteInscription->id,
         'montant' => '50.00',
         'operation_id' => null,
         'seance' => null,
@@ -73,7 +83,7 @@ it('accepts a transaction ligne with inscription sous-categorie with operation_i
         'reference' => 'REF-INS-OK',
     ];
     $lignes = [[
-        'sous_categorie_id' => $this->scInscription->id,
+        'compte_id' => $this->compteInscription->id,
         'montant' => '50.00',
         'operation_id' => $operation->id,
         'seance' => null,
@@ -81,8 +91,11 @@ it('accepts a transaction ligne with inscription sous-categorie with operation_i
     ]];
 
     $transaction = $this->service->create($data, $lignes);
-    expect($transaction->lignes()->count())->toBe(1)
-        ->and($transaction->lignes->first()->operation_id)->toBe($operation->id);
+    expect($transaction->lignes()->ventilation()->count())->toBe(1);
+
+    $ventilationLignes = $transaction->lignes()->ventilation()->get();
+    expect($ventilationLignes)->toHaveCount(1)
+        ->and($ventilationLignes->first()->operation_id)->toBe($operation->id);
 });
 
 it('does not require operation_id for non-inscription sous-categorie', function () {
@@ -95,7 +108,7 @@ it('does not require operation_id for non-inscription sous-categorie', function 
         'reference' => 'REF-DON',
     ];
     $lignes = [[
-        'sous_categorie_id' => $this->scDon->id,
+        'compte_id' => $this->compteDon->id,
         'montant' => '50.00',
         'operation_id' => null,
         'seance' => null,
@@ -103,5 +116,5 @@ it('does not require operation_id for non-inscription sous-categorie', function 
     ]];
 
     $transaction = $this->service->create($data, $lignes);
-    expect($transaction->lignes()->count())->toBe(1);
+    expect($transaction->lignes()->ventilation()->count())->toBe(1);
 });

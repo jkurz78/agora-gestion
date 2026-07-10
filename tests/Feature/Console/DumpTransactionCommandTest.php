@@ -124,7 +124,7 @@ test('[C] dump-transaction : Tx recette chèque PD → lignes + lettrage 411 aff
             'compte_id' => $this->compteBancaire->id,
         ],
         [
-            ['sous_categorie_id' => $this->sc706->id, 'montant' => 100.00],
+            ['compte_id' => $this->compte706->id, 'montant' => 100.00],
         ]
     );
 
@@ -173,7 +173,7 @@ test('[D] dump-transaction : Tx T4 remise → section Sources consolidées', fun
             'tiers_id' => $tiers1->id,
             'compte_id' => $this->compteBancaire->id,
         ],
-        [['sous_categorie_id' => $this->sc706->id, 'montant' => 80.00]]
+        [['compte_id' => $this->compte706->id, 'montant' => 80.00]]
     );
     $tx2 = $service->create(
         [
@@ -185,7 +185,7 @@ test('[D] dump-transaction : Tx T4 remise → section Sources consolidées', fun
             'tiers_id' => $tiers2->id,
             'compte_id' => $this->compteBancaire->id,
         ],
-        [['sous_categorie_id' => $this->sc706->id, 'montant' => 150.00]]
+        [['compte_id' => $this->compte706->id, 'montant' => 150.00]]
     );
 
     // Créer la remise bancaire
@@ -282,7 +282,7 @@ test('[E] dump-transaction : Tx T2 encaissement → section Transactions liées 
             'tiers_id' => $tiers->id,
             'compte_id' => null,
         ],
-        [['sous_categorie_id' => $this->sc706->id, 'montant' => 200.00]]
+        [['compte_id' => $this->compte706->id, 'montant' => 200.00]]
     );
 
     // T2 — encaissement via EcritureGenerator directement

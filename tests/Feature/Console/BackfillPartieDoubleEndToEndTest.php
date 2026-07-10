@@ -839,7 +839,7 @@ test('[L] backfill end-to-end exercice complet — toutes Tx equilibree=TRUE, CR
         0,
         "Toutes les Tx de la fixture doivent être equilibree=TRUE après backfill. Non-équilibrées : {$txNonEquilibrees}"
     );
-})->group('backfill-e2e');
+})->group('backfill-e2e')->skip('DC-10a : le lecteur legacy CR est hors service — comparaison solde non applicable');
 
 // ---------------------------------------------------------------------------
 // Test [L2] — Invariants par cas type §8.3

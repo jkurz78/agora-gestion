@@ -161,10 +161,10 @@ it('[2a-2] réversion (mode null) → T2 supprimée, 411 T1 délettré, T1 reste
     // Réversion : repasser la recette en mode null (non reçue)
     $t1->load('lignes');
     $lignesData = $t1->lignes
-        ->filter(fn ($l) => $l->sous_categorie_id !== null)
+        ->filter(fn ($l) => $l->compte_id !== null && $l->compte !== null && in_array($l->compte->classe, [6, 7]))
         ->map(fn ($l) => [
             'id' => null,
-            'sous_categorie_id' => $l->sous_categorie_id,
+            'compte_id' => $l->compte_id,
             'montant' => $l->montant,
             'operation_id' => $l->operation_id,
             'seance' => $l->seance,

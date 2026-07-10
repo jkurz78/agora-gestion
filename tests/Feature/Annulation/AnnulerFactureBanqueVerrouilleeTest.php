@@ -18,6 +18,7 @@ use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\ExerciceService;
 use App\Services\FactureService;
 use App\Tenant\TenantContext;
@@ -41,6 +42,7 @@ beforeEach(function (): void {
     $this->comptable->update(['derniere_association_id' => $this->association->id]);
 
     TenantContext::boot($this->association);
+    SystemeSeeder::seed();
     $this->actingAs($this->comptable);
 
     $this->service = app(FactureService::class);
@@ -66,7 +68,7 @@ afterEach(function (): void {
  */
 test('il n\'echoue plus quand une transaction MontantManuel est pointée banque verrouillée', function (): void {
     $tiers = Tiers::factory()->create(['pour_recettes' => true]);
-    $sousCategorie = SousCategorie::factory()->create();
+    $sousCategorie = SousCategorie::factory()->create(['code_cerfa' => '706']);
 
     // Créer et valider une facture MontantManuel (génère Tg en EnAttente)
     $facture = $this->service->creerManuelleVierge($tiers->id);

@@ -5,10 +5,12 @@ declare(strict_types=1);
 use App\Enums\ModePaiement;
 use App\Enums\RoleAssociation;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\User;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\FactureService;
 use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -28,6 +30,7 @@ beforeEach(function (): void {
     $this->user->update(['derniere_association_id' => $this->association->id]);
 
     TenantContext::boot($this->association);
+    SystemeSeeder::seed();
     $this->actingAs($this->user);
 
     $this->tiers = Tiers::factory()->create([
@@ -37,7 +40,12 @@ beforeEach(function (): void {
 
     $this->sousCategorie = SousCategorie::factory()->create([
         'association_id' => $this->association->id,
+        'code_cerfa' => '706',
     ]);
+
+    $this->compteVentilation = Compte::where('numero_pcg', '706')
+        ->where('association_id', $this->association->id)
+        ->firstOrFail();
 });
 
 afterEach(function (): void {
@@ -54,7 +62,7 @@ test('la transaction generee a la validation d une facture MontantManuel porte u
         'libelle' => 'Cotisation mars',
         'prix_unitaire' => 80.0,
         'quantite' => 1.0,
-        'sous_categorie_id' => $this->sousCategorie->id,
+        'compte_id' => $this->compteVentilation->id,
     ]);
 
     $service->valider($facture);

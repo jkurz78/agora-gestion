@@ -12,6 +12,7 @@ use App\Models\Facture;
 use App\Models\FactureLigne;
 use App\Models\Tiers;
 use App\Models\User;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\ExerciceService;
 use App\Services\FactureService;
 use App\Tenant\TenantContext;
@@ -114,6 +115,7 @@ beforeEach(function (): void {
 
     // Contexte courant = Asso A (l'intrus)
     TenantContext::boot($this->assoA);
+    SystemeSeeder::seed();
     $this->actingAs($this->comptableA);
 });
 

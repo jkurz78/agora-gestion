@@ -14,6 +14,7 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\FactureService;
 use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -29,7 +30,7 @@ function classifCreateTiers(): Tiers
 
 function classifCreateSousCategorie(): SousCategorie
 {
-    return SousCategorie::factory()->create();
+    return SousCategorie::factory()->create(['code_cerfa' => '706']);
 }
 
 /**
@@ -114,6 +115,7 @@ beforeEach(function (): void {
     ]);
     $this->user->update(['derniere_association_id' => $this->association->id]);
     TenantContext::boot($this->association);
+    SystemeSeeder::seed();
     $this->actingAs($this->user);
     $this->service = app(FactureService::class);
 });

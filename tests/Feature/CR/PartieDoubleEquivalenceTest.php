@@ -596,7 +596,7 @@ it('[E1] compteDeResultat — legacy ↔ PD identiques sur exercice complet (tol
     expect($crLegacy['charges'])->not->toBe([], 'La fixture doit créer des charges en mode legacy');
     expect($crPD['produits'])->not->toBe([], 'La fixture doit créer des produits en mode PD');
     expect($crPD['charges'])->not->toBe([], 'La fixture doit créer des charges en mode PD');
-});
+})->skip('DC-10a : TransactionLigne ne porte plus sous_categorie_id — le lecteur legacy est hors service');
 
 // ---------------------------------------------------------------------------
 // [E2] Équivalence compteDeResultat — sous-catégories par catégorie
@@ -665,7 +665,7 @@ it('[E2] compteDeResultat — totaux par sous-catégorie identiques legacy ↔ P
             "Produit sous-cat '{$label}' présent en PD mais absent en LEGACY (PD={$montantPD}€)"
         );
     }
-});
+})->skip('DC-10a : TransactionLigne ne porte plus sous_categorie_id — le lecteur legacy est hors service');
 
 // ---------------------------------------------------------------------------
 // [E3] Équivalence compteDeResultatOperations — filtre par opération

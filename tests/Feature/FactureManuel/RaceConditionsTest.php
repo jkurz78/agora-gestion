@@ -28,6 +28,7 @@ use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\DevisService;
 use App\Services\FactureService;
 use App\Tenant\TenantContext;
@@ -45,10 +46,11 @@ beforeEach(function (): void {
         'joined_at' => now(),
     ]);
     TenantContext::boot($this->association);
+    SystemeSeeder::seed();
     $this->actingAs($this->user);
 
     $this->tiers = Tiers::factory()->create();
-    $this->sousCategorie = SousCategorie::factory()->create();
+    $this->sousCategorie = SousCategorie::factory()->create(['code_cerfa' => '706']);
     $this->factureService = app(FactureService::class);
     $this->devisService = app(DevisService::class);
 });

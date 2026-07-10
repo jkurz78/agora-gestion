@@ -255,9 +255,13 @@ it('couvre les 10 modèles', function () {
     ]);
 
     // type_operations
+    // DC-10a : TypeOperationFactory pose un compte_id par défaut (ventilation
+    // produits) — on le neutralise explicitement pour laisser le trait dériver
+    // compte_id depuis sous_categorie_id, comme les 9 autres modèles couverts ici.
     $typeOperation = TypeOperation::factory()->create([
         'association_id' => $associationId,
         'sous_categorie_id' => $scId,
+        'compte_id' => null,
     ]);
 
     // helloasso_form_mappings (pas de factory — forceCreate pour déclencher le hook saving)
