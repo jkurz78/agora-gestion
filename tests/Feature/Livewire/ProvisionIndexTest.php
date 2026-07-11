@@ -62,7 +62,7 @@ it('creates a provision via modal', function () {
         ->call('openCreate')
         ->assertSet('showModal', true)
         ->set('libelle', 'Provision loyer')
-        ->set('sous_categorie_id', (string) $compte->id)
+        ->set('compte_id', (string) $compte->id)
         ->set('type', 'depense')
         ->set('montant', '500')
         ->call('save')
@@ -136,7 +136,7 @@ it('blocks editing when exercice is closed', function () {
         ->assertSee('clôturé')
         ->call('openCreate')
         ->set('libelle', 'Provision bloquée')
-        ->set('sous_categorie_id', (string) $compteBloque->id)
+        ->set('compte_id', (string) $compteBloque->id)
         ->set('type', 'depense')
         ->set('montant', '100')
         ->call('save')
@@ -150,5 +150,5 @@ it('validates required fields', function () {
     Livewire::test(ProvisionIndex::class)
         ->call('openCreate')
         ->call('save')
-        ->assertHasErrors(['libelle', 'sous_categorie_id', 'type', 'montant']);
+        ->assertHasErrors(['libelle', 'compte_id', 'type', 'montant']);
 });

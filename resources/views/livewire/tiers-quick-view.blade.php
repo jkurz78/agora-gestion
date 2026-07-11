@@ -355,7 +355,7 @@
                                         <td data-sort="{{ $don->transaction->date->format('Y-m-d') }}">
                                             {{ $don->transaction->date->format('d/m/Y') }}
                                         </td>
-                                        <td>{{ $don->sousCategorie->nom }}</td>
+                                        <td>{{ $don->compte->intitule }}</td>
                                         <td>{{ ucfirst($don->transaction->mode_paiement?->value ?? '—') }}</td>
                                         <td class="text-end" data-sort="{{ $don->montant }}">
                                             {{ number_format((float) $don->montant, 2, ',', ' ') }} €

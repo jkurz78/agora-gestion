@@ -28,7 +28,7 @@ final class ClotureCheckService
         return new ClotureCheckResult(
             bloquants: [
                 $this->checkRapprochementsEnCours($start, $end),
-                $this->checkLignesSansSousCategorie($annee),
+                $this->checkLignesSansCompte($annee),
                 $this->checkVirementsDesequilibres($start, $end),
             ],
             avertissements: [
@@ -54,18 +54,23 @@ final class ClotureCheckService
         );
     }
 
-    private function checkLignesSansSousCategorie(int $annee): CheckItem
+    /**
+     * Lignes de ventilation sans compte (compte_id NULL). Les lignes PD-only
+     * générées par EcritureGenerator (411/401/5XXX) portent toujours un
+     * compte_id — ce critère ne cible donc que les lignes métier non ventilées.
+     */
+    private function checkLignesSansCompte(int $annee): CheckItem
     {
         $count = TransactionLigne::whereHas('transaction', fn ($q) => $q->forExercice($annee))
-            ->whereNull('sous_categorie_id')
+            ->whereNull('compte_id')
             ->count();
 
         return new CheckItem(
-            nom: 'Lignes sans sous-catégorie',
+            nom: 'Lignes sans compte',
             ok: $count === 0,
             message: $count === 0
-                ? 'Toutes les lignes ont une sous-catégorie'
-                : "{$count} ligne(s) sans sous-catégorie",
+                ? 'Toutes les lignes ont un compte'
+                : "{$count} ligne(s) sans compte",
         );
     }
 

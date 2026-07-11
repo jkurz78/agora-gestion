@@ -71,7 +71,7 @@ it('upload PJ dans ProvisionIndex place le fichier sous associations/{aid}/provi
 
     $component
         ->set('libelle', 'Provision test')
-        ->set('sous_categorie_id', (string) $compte->id)
+        ->set('compte_id', (string) $compte->id)
         ->set('type', 'depense')
         ->set('montant', '500')
         ->set('piece_jointe', $file)
@@ -96,7 +96,7 @@ it('piece_jointe_path sans PJ reste null', function () {
 
     Livewire\Livewire::test(ProvisionIndex::class)
         ->set('libelle', 'Provision sans PJ')
-        ->set('sous_categorie_id', (string) $compte->id)
+        ->set('compte_id', (string) $compte->id)
         ->set('type', 'recette')
         ->set('montant', '200')
         ->call('save');

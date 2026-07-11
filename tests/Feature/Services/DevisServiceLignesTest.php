@@ -7,7 +7,6 @@ use App\Models\Association;
 use App\Models\Compte;
 use App\Models\Devis;
 use App\Models\DevisLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\User;
 use App\Services\DevisService;
@@ -80,24 +79,22 @@ describe('ajouterLigne()', function () {
             ->and($l3->ordre)->toBe(3);
     });
 
-    it('accepte sous_categorie_id null', function () {
+    it('accepte compte_id null', function () {
         $devis = Devis::factory()->brouillon()->create();
 
         $ligne = $this->service->ajouterLigne($devis, [
-            'libelle' => 'Ligne sans catégorie',
+            'libelle' => 'Ligne sans compte',
             'prix_unitaire' => 50.00,
             'quantite' => 1.0,
-            'sous_categorie_id' => null,
+            'compte_id' => null,
         ]);
 
-        expect($ligne->sous_categorie_id)->toBeNull();
+        expect($ligne->compte_id)->toBeNull();
     });
 
     it('accepte compte_id réel', function () {
         $devis = Devis::factory()->brouillon()->create();
-        // DC-8 : le service écrit compte_id — code_cerfa classe 7 matérialise le miroir.
         $compte = Compte::factory()->numero('706A')->create();
-        $sousCategorieMiroir = SousCategorie::where('code_cerfa', '706A')->firstOrFail();
 
         $ligne = $this->service->ajouterLigne($devis, [
             'libelle' => 'Ligne avec compte',
@@ -106,9 +103,7 @@ describe('ajouterLigne()', function () {
             'compte_id' => $compte->id,
         ]);
 
-        expect((int) $ligne->compte_id)->toBe((int) $compte->id)
-            // Miroir rempli par le trait SyncCompteDepuisSousCategorie.
-            ->and((int) $ligne->sous_categorie_id)->toBe((int) $sousCategorieMiroir->id);
+        expect((int) $ligne->compte_id)->toBe((int) $compte->id);
     });
 
     it('additionne correctement plusieurs lignes dans montant_total', function () {
@@ -204,7 +199,7 @@ describe('modifierLigne()', function () {
             ->and((float) $devis->montant_total)->toBe(450.00);
     });
 
-    it('ne modifie que les champs fournis (libelle, sous_categorie_id)', function () {
+    it('ne modifie que les champs fournis (libelle, compte_id)', function () {
         $devis = Devis::factory()->brouillon()->create();
         $ligne = DevisLigne::factory()->create([
             'devis_id' => $devis->id,

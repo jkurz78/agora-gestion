@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
-use App\Enums\UsageComptable;
 use App\Livewire\Portail\MesDons;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\RecuFiscalEmis;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -27,20 +26,17 @@ afterEach(function () {
 });
 
 /**
- * Helper : crée une SousCategorie avec usage Don dans le contexte d'une asso.
+ * Helper : crée un Compte avec usage Don dans le contexte d'une asso.
  */
-function makeSousCatDon(Association $asso): SousCategorie
+function makeSousCatDon(Association $asso): Compte
 {
-    $sousCat = SousCategorie::factory()->create(['association_id' => $asso->id]);
-    $sousCat->usages()->create(['usage' => UsageComptable::Don->value]);
-
-    return $sousCat;
+    return Compte::factory()->pourDons()->create(['association_id' => $asso->id]);
 }
 
 /**
  * Helper : crée une transaction Recette + ligne Don pour un Tiers.
  */
-function makeDonLigne(Association $asso, Tiers $tiers, SousCategorie $sousCat, string $date, float $montant, StatutReglement $statut = StatutReglement::Recu): TransactionLigne
+function makeDonLigne(Association $asso, Tiers $tiers, Compte $compte, string $date, float $montant, StatutReglement $statut = StatutReglement::Recu): TransactionLigne
 {
     $tx = Transaction::factory()->create([
         'association_id' => $asso->id,
@@ -52,7 +48,8 @@ function makeDonLigne(Association $asso, Tiers $tiers, SousCategorie $sousCat, s
 
     return TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compte->id,
+        'credit' => $montant,
         'montant' => $montant,
     ]);
 }

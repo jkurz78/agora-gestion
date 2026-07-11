@@ -12,7 +12,6 @@ use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Exercice;
 use App\Models\Facture;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -31,10 +30,7 @@ beforeEach(function () {
     $this->actingAs($this->user);
     $this->tiers = Tiers::factory()->create();
     $this->compteBancaire = CompteBancaire::factory()->create();
-    // FactureService::genererLibelle() lit encore $ligne->sousCategorie (pas
-    // converti compte-first) : on renseigne donc aussi le miroir légataire.
     $this->compte = Compte::factory()->create(['intitule' => 'Inscription']);
-    $this->sousCategorieId = SousCategorie::where('code_cerfa', $this->compte->numero_pcg)->value('id');
     $this->service = app(FactureService::class);
 });
 
@@ -74,7 +70,6 @@ function createBrouillonWithLignes(
     TransactionLigne::create([
         'transaction_id' => $transaction->id,
         'compte_id' => $context->compte->id,
-        'sous_categorie_id' => $context->sousCategorieId,
         'debit' => 0,
         'credit' => $montant,
         'montant' => $montant,
@@ -119,7 +114,6 @@ describe('valider()', function () {
         TransactionLigne::create([
             'transaction_id' => $transaction1->id,
             'compte_id' => $this->compte->id,
-            'sous_categorie_id' => $this->sousCategorieId,
             'debit' => 0,
             'credit' => 75.50,
             'montant' => 75.50,
@@ -128,7 +122,6 @@ describe('valider()', function () {
         TransactionLigne::create([
             'transaction_id' => $transaction1->id,
             'compte_id' => $this->compte->id,
-            'sous_categorie_id' => $this->sousCategorieId,
             'debit' => 0,
             'credit' => 49.50,
             'montant' => 49.50,

@@ -138,7 +138,7 @@ final class FactureService
         $this->assertBrouillon($facture);
 
         DB::transaction(function () use ($facture, $transactionIds): void {
-            $transactions = Transaction::with(['lignes.sousCategorie', 'lignes.operation'])
+            $transactions = Transaction::with(['lignes.compte', 'lignes.operation'])
                 ->whereIn('id', $transactionIds)
                 ->get();
 
@@ -1159,14 +1159,14 @@ XML;
      */
     private function genererLibelleLigne(TransactionLigne $ligne): string
     {
-        $sousCategorie = $ligne->sousCategorie?->nom ?? '';
+        $compteLibelle = $ligne->compte?->intitule ?? '';
         $operation = $ligne->operation?->nom;
 
         if ($operation === null) {
-            return $sousCategorie;
+            return $compteLibelle;
         }
 
-        $parts = [$sousCategorie, $operation];
+        $parts = [$compteLibelle, $operation];
 
         if ($ligne->seance !== null) {
             $seanceLabel = "Séance {$ligne->seance}";

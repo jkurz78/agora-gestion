@@ -2,12 +2,11 @@
 
 declare(strict_types=1);
 
-use App\Enums\TypeCategorie;
 use App\Models\Association;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
+use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Services\CsvImportService;
 use App\Tenant\TenantContext;
@@ -34,8 +33,7 @@ beforeEach(function () {
         'actif_recettes_depenses' => true,
     ]);
 
-    $cat = Categorie::factory()->create(['type' => TypeCategorie::Depense]);
-    $this->sc = SousCategorie::factory()->create(['categorie_id' => $cat->id, 'nom' => 'Fournitures']);
+    $this->compteVentilation = Compte::factory()->depense()->create(['intitule' => 'Fournitures']);
 });
 
 afterEach(function () {
@@ -52,11 +50,15 @@ it('importe un CSV valide avec une transaction simple', function () {
         ->and($result->transactionsCreated)->toBe(1)
         ->and($result->lignesCreated)->toBe(1)
         ->and($result->errors)->toBeEmpty();
+
+    $ligne = TransactionLigne::first();
+    expect((int) $ligne->compte_id)->toBe($this->compteVentilation->id)
+        ->and((float) $ligne->debit)->toBe(100.0)
+        ->and((float) $ligne->credit)->toBe(0.0);
 });
 
 it('regroupe plusieurs lignes CSV en une seule transaction', function () {
-    $cat2 = Categorie::factory()->create(['type' => TypeCategorie::Depense]);
-    SousCategorie::factory()->create(['categorie_id' => $cat2->id, 'nom' => 'Communication']);
+    Compte::factory()->depense()->create(['intitule' => 'Communication']);
 
     $csv = "date;reference;sous_categorie;montant_ligne;mode_paiement;compte;libelle;tiers;operation;seance;notes\n"
          ."2024-09-15;FAC-001;Fournitures;100.00;virement;Compte principal;Test;;;;\n"
@@ -70,8 +72,7 @@ it('regroupe plusieurs lignes CSV en une seule transaction', function () {
 });
 
 it('regroupe des lignes non-contigues de meme date+reference en une seule transaction', function () {
-    $cat2 = Categorie::factory()->create(['type' => TypeCategorie::Depense]);
-    SousCategorie::factory()->create(['categorie_id' => $cat2->id, 'nom' => 'Communication']);
+    Compte::factory()->depense()->create(['intitule' => 'Communication']);
 
     // FAC-001 apparaît en lignes 2 et 4 (non-contigus), FAC-002 en ligne 3
     $csv = "date;reference;sous_categorie;montant_ligne;mode_paiement;compte;libelle;tiers;operation;seance;notes\n"

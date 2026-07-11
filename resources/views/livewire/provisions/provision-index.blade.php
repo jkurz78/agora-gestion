@@ -48,8 +48,7 @@
                 @forelse ($provisions as $provision)
                     <tr wire:key="prov-{{ $provision->id }}">
                         <td>{{ $provision->libelle }}</td>
-                        {{-- DC-8 : lecture compte-first, repli sous-catégorie miroir --}}
-                        <td>{{ $provision->compte?->intitule ?? $provision->sousCategorie?->nom ?? '—' }}</td>
+                        <td>{{ $provision->compte?->intitule ?? '—' }}</td>
                         <td>
                             @if($provision->type === \App\Enums\TypeTransaction::Depense)
                                 <span class="badge bg-danger">Dépense</span>
@@ -133,12 +132,12 @@
                 <div class="row g-2 mb-3">
                     <div class="col-md-8">
                         <label class="form-label small">Compte <span class="text-danger">*</span></label>
-                        <select wire:model="sous_categorie_id"
-                                class="form-select form-select-sm @error('sous_categorie_id') is-invalid @enderror">
+                        <select wire:model="compte_id"
+                                class="form-select form-select-sm @error('compte_id') is-invalid @enderror">
                             <option value="">— Choisir —</option>
                             @include('partials.select-compte-options', ['groupes' => $groupesComptes])
                         </select>
-                        @error('sous_categorie_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                        @error('compte_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
                     </div>
                     <div class="col-md-4">
                         <label class="form-label small">Type <span class="text-danger">*</span></label>

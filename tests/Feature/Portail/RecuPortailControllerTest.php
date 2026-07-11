@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
-use App\Enums\UsageComptable;
 use App\Models\Adhesion;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\RecuFiscalEmis;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -75,8 +74,7 @@ function makeFakePdfRecu(Association $asso, Tiers $tiers, TransactionLigne $lign
 
 function makeAdhesionAvecRecu(Association $asso, Tiers $tiers): array
 {
-    $sousCat = SousCategorie::factory()->create(['association_id' => $asso->id]);
-    $sousCat->usages()->create(['usage' => UsageComptable::Cotisation->value]);
+    $compte = Compte::factory()->pourCotisations()->create(['association_id' => $asso->id]);
 
     $tx = Transaction::factory()->create([
         'association_id' => $asso->id,
@@ -90,7 +88,8 @@ function makeAdhesionAvecRecu(Association $asso, Tiers $tiers): array
     $tx->lignes()->delete();
     $ligne = TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compte->id,
+        'credit' => 60.0,
         'montant' => 60.0,
     ]);
 
@@ -109,8 +108,7 @@ function makeAdhesionAvecRecu(Association $asso, Tiers $tiers): array
 
 function makeDonLigneAvecRecu(Association $asso, Tiers $tiers): array
 {
-    $sousCat = SousCategorie::factory()->create(['association_id' => $asso->id]);
-    $sousCat->usages()->create(['usage' => UsageComptable::Don->value]);
+    $compte = Compte::factory()->pourDons()->create(['association_id' => $asso->id]);
 
     $tx = Transaction::factory()->create([
         'association_id' => $asso->id,
@@ -122,7 +120,8 @@ function makeDonLigneAvecRecu(Association $asso, Tiers $tiers): array
 
     $ligne = TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compte->id,
+        'credit' => 100.0,
         'montant' => 100.0,
     ]);
 

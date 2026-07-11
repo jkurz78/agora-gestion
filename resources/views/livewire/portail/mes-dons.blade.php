@@ -49,7 +49,7 @@
                                 <td data-sort="{{ $donDto->ligne->transaction->date->format('Y-m-d') }}">
                                     {{ $donDto->ligne->transaction->date->format('d/m/Y') }}
                                 </td>
-                                <td>{{ $donDto->ligne->sousCategorie?->nom ?? '—' }}</td>
+                                <td>{{ $donDto->ligne->compte?->intitule ?? '—' }}</td>
                                 <td class="text-end" data-sort="{{ $donDto->ligne->montant }}">
                                     {{ number_format((float) $donDto->ligne->montant, 2, ',', ' ') }}&nbsp;€
                                 </td>

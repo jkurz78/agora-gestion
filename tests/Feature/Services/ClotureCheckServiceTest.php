@@ -54,13 +54,13 @@ describe('contrôles bloquants', function () {
         expect($bloquant->ok)->toBeFalse();
     });
 
-    it('lignes sans sous-categorie: passes when all have one', function () {
+    it('lignes sans compte: passes when all have one', function () {
         $result = $this->service->executer(2025);
-        $bloquant = collect($result->bloquants)->firstWhere('nom', 'Lignes sans sous-catégorie');
+        $bloquant = collect($result->bloquants)->firstWhere('nom', 'Lignes sans compte');
         expect($bloquant->ok)->toBeTrue();
     });
 
-    it('lignes sans sous-categorie: fails when some lack it', function () {
+    it('lignes sans compte: fails when some lack it', function () {
         $compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
         $transaction = Transaction::factory()->asDepense()->create([
             'date' => '2025-10-15',
@@ -69,11 +69,11 @@ describe('contrôles bloquants', function () {
         ]);
         $transaction->lignes()->create([
             'montant' => 50,
-            'sous_categorie_id' => null,
+            'compte_id' => null,
         ]);
 
         $result = $this->service->executer(2025);
-        $bloquant = collect($result->bloquants)->firstWhere('nom', 'Lignes sans sous-catégorie');
+        $bloquant = collect($result->bloquants)->firstWhere('nom', 'Lignes sans compte');
         expect($bloquant->ok)->toBeFalse();
     });
 });

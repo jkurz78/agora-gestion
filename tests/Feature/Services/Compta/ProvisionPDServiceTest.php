@@ -268,7 +268,7 @@ test('ProvisionIndex::save creates PD transactions on new provision', function (
 
     Livewire::test(ProvisionIndex::class)
         ->set('libelle', 'Test provision PD')
-        ->set('sous_categorie_id', (string) $compte->id)
+        ->set('compte_id', (string) $compte->id)
         ->set('type', 'depense')
         ->set('montant', '1200.50')
         ->call('save');

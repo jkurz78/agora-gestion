@@ -29,7 +29,7 @@ final class ProvisionIndex extends Component
     // ── Form fields ──────────────────────────────────────────────
     public string $libelle = '';
 
-    public string $sous_categorie_id = '';
+    public string $compte_id = '';
 
     public string $type = '';
 
@@ -60,7 +60,7 @@ final class ProvisionIndex extends Component
         $exerciceModel = $exerciceService->exerciceAffiche();
         $isCloture = $exerciceModel !== null && $exerciceModel->isCloture();
 
-        $provisions = Provision::with(['compte', 'sousCategorie.categorie', 'tiers', 'operation'])
+        $provisions = Provision::with(['compte', 'tiers', 'operation'])
             ->forExercice($exercice)
             ->orderBy('libelle')
             ->get();
@@ -108,8 +108,7 @@ final class ProvisionIndex extends Component
 
         $this->editingId = $provision->id;
         $this->libelle = $provision->libelle;
-        // DC-8 : le sélecteur porte un id de compte (nom de propriété conservé jusqu'à DC-10).
-        $this->sous_categorie_id = (string) $provision->compte_id;
+        $this->compte_id = (string) $provision->compte_id;
         $this->type = $provision->type->value;
         $this->montant = (string) $provision->montant;
         $this->tiers_id = $provision->tiers_id ? (int) $provision->tiers_id : null;
@@ -138,7 +137,7 @@ final class ProvisionIndex extends Component
 
         $this->validate([
             'libelle' => 'required|string|max:255',
-            'sous_categorie_id' => 'required|exists:comptes,id',
+            'compte_id' => 'required|exists:comptes,id',
             'type' => 'required|in:depense,recette',
             'montant' => 'required|numeric',
             'tiers_id' => 'nullable|exists:tiers,id',
@@ -153,8 +152,7 @@ final class ProvisionIndex extends Component
         $data = [
             'exercice' => $exercice,
             'libelle' => $this->libelle,
-            // DC-8 : écrit compte_id, le trait remplit le miroir sous_categorie_id.
-            'compte_id' => (int) $this->sous_categorie_id,
+            'compte_id' => (int) $this->compte_id,
             'type' => $this->type,
             'montant' => (float) $this->montant,
             'tiers_id' => $this->tiers_id,
@@ -231,7 +229,7 @@ final class ProvisionIndex extends Component
     {
         $this->editingId = null;
         $this->libelle = '';
-        $this->sous_categorie_id = '';
+        $this->compte_id = '';
         $this->type = '';
         $this->montant = '';
         $this->tiers_id = null;

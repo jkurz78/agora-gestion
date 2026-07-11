@@ -16,7 +16,6 @@ use App\Models\Facture;
 use App\Models\FactureLigne;
 use App\Models\Operation;
 use App\Models\Seance;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -111,10 +110,7 @@ describe('creer()', function () {
 
 describe('ajouterTransactions()', function () {
     beforeEach(function () {
-        // FactureService::genererLibelle() lit encore $ligne->sousCategorie (pas
-        // converti compte-first) : on renseigne donc aussi le miroir légataire.
         $this->compte = Compte::factory()->create(['intitule' => 'Inscription Yoga']);
-        $this->sousCategorieId = SousCategorie::where('code_cerfa', $this->compte->numero_pcg)->value('id');
         $this->operation = Operation::factory()->create(['nom' => 'Yoga Adultes']);
         $this->facture = Facture::create([
             'date' => now()->toDateString(),
@@ -134,7 +130,6 @@ describe('ajouterTransactions()', function () {
         $ligne1 = TransactionLigne::create([
             'transaction_id' => $transaction->id,
             'compte_id' => $this->compte->id,
-            'sous_categorie_id' => $this->sousCategorieId,
             'debit' => 0,
             'credit' => 60.00,
             'operation_id' => $this->operation->id,
@@ -144,7 +139,6 @@ describe('ajouterTransactions()', function () {
         $ligne2 = TransactionLigne::create([
             'transaction_id' => $transaction->id,
             'compte_id' => $this->compte->id,
-            'sous_categorie_id' => $this->sousCategorieId,
             'debit' => 0,
             'credit' => 40.00,
             'operation_id' => $this->operation->id,
@@ -185,7 +179,6 @@ describe('ajouterTransactions()', function () {
         TransactionLigne::create([
             'transaction_id' => $transaction->id,
             'compte_id' => $this->compte->id,
-            'sous_categorie_id' => $this->sousCategorieId,
             'debit' => 0,
             'credit' => 30.00,
             'operation_id' => $this->operation->id,
@@ -196,7 +189,6 @@ describe('ajouterTransactions()', function () {
         TransactionLigne::create([
             'transaction_id' => $transaction->id,
             'compte_id' => $this->compte->id,
-            'sous_categorie_id' => $this->sousCategorieId,
             'debit' => 0,
             'credit' => 20.00,
             'operation_id' => $this->operation->id,
@@ -222,7 +214,6 @@ describe('ajouterTransactions()', function () {
         TransactionLigne::create([
             'transaction_id' => $transaction->id,
             'compte_id' => $this->compte->id,
-            'sous_categorie_id' => $this->sousCategorieId,
             'debit' => 0,
             'credit' => 30.00,
             'operation_id' => $this->operation->id,
@@ -244,7 +235,6 @@ describe('ajouterTransactions()', function () {
         TransactionLigne::create([
             'transaction_id' => $transaction->id,
             'compte_id' => $this->compte->id,
-            'sous_categorie_id' => $this->sousCategorieId,
             'debit' => 0,
             'credit' => 30.00,
             'operation_id' => null,
@@ -267,7 +257,6 @@ describe('ajouterTransactions()', function () {
         TransactionLigne::create([
             'transaction_id' => $transaction->id,
             'compte_id' => $this->compte->id,
-            'sous_categorie_id' => $this->sousCategorieId,
             'debit' => 0,
             'credit' => 50.00,
             'montant' => 50.00,
@@ -284,7 +273,6 @@ describe('ajouterTransactions()', function () {
         TransactionLigne::create([
             'transaction_id' => $transaction->id,
             'compte_id' => $this->compte->id,
-            'sous_categorie_id' => $this->sousCategorieId,
             'debit' => 0,
             'credit' => 50.00,
             'montant' => 50.00,
@@ -312,7 +300,6 @@ describe('ajouterTransactions()', function () {
         TransactionLigne::create([
             'transaction_id' => $transaction->id,
             'compte_id' => $this->compte->id,
-            'sous_categorie_id' => $this->sousCategorieId,
             'debit' => 0,
             'credit' => 50.00,
             'montant' => 50.00,
@@ -341,7 +328,6 @@ describe('ajouterTransactions()', function () {
         TransactionLigne::create([
             'transaction_id' => $transaction->id,
             'compte_id' => $this->compte->id,
-            'sous_categorie_id' => $this->sousCategorieId,
             'debit' => 50.00,
             'credit' => 0,
             'montant' => 50.00,
@@ -354,7 +340,6 @@ describe('ajouterTransactions()', function () {
 describe('retirerTransaction()', function () {
     beforeEach(function () {
         $this->compte = Compte::factory()->create();
-        $this->sousCategorieId = SousCategorie::where('code_cerfa', $this->compte->numero_pcg)->value('id');
         $this->facture = Facture::create([
             'date' => now()->toDateString(),
             'statut' => StatutFacture::Brouillon,
@@ -373,7 +358,6 @@ describe('retirerTransaction()', function () {
         TransactionLigne::create([
             'transaction_id' => $transaction->id,
             'compte_id' => $this->compte->id,
-            'sous_categorie_id' => $this->sousCategorieId,
             'debit' => 0,
             'credit' => 100.00,
             'montant' => 100.00,
@@ -407,7 +391,6 @@ describe('retirerTransaction()', function () {
 describe('supprimerBrouillon()', function () {
     it('deletes facture, lignes, and pivot', function () {
         $compte = Compte::factory()->create();
-        $sousCategorieId = SousCategorie::where('code_cerfa', $compte->numero_pcg)->value('id');
         $facture = Facture::create([
             'date' => now()->toDateString(),
             'statut' => StatutFacture::Brouillon,
@@ -424,7 +407,6 @@ describe('supprimerBrouillon()', function () {
         TransactionLigne::create([
             'transaction_id' => $transaction->id,
             'compte_id' => $compte->id,
-            'sous_categorie_id' => $sousCategorieId,
             'debit' => 0,
             'credit' => 50.00,
             'montant' => 50.00,

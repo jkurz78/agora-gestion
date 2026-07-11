@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
-use App\Enums\UsageComptable;
 use App\Models\Adhesion;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\RecuFiscalEmis;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -74,8 +73,7 @@ it('mode mono: GET /portail/mes-dons retourne 200 avec Mes dons', function () {
     Auth::guard('tiers-portail')->login($tiers);
     session(['portail.last_activity_at' => now()->timestamp]);
 
-    $sousCat = SousCategorie::factory()->create(['association_id' => $asso->id]);
-    $sousCat->usages()->create(['usage' => UsageComptable::Don->value]);
+    $compte = Compte::factory()->pourDons()->create(['association_id' => $asso->id]);
 
     $tx = Transaction::factory()->create([
         'association_id' => $asso->id,
@@ -86,7 +84,8 @@ it('mode mono: GET /portail/mes-dons retourne 200 avec Mes dons', function () {
     ]);
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compte->id,
+        'credit' => 50.00,
         'montant' => 50.00,
     ]);
 
@@ -116,8 +115,7 @@ it('mode mono: GET /portail/recus/cotisation/{id} sert le PDF inline', function 
     Auth::guard('tiers-portail')->login($tiers);
     session(['portail.last_activity_at' => now()->timestamp]);
 
-    $sousCat = SousCategorie::factory()->create(['association_id' => $asso->id]);
-    $sousCat->usages()->create(['usage' => UsageComptable::Cotisation->value]);
+    $compte = Compte::factory()->pourCotisations()->create(['association_id' => $asso->id]);
 
     $tx = Transaction::factory()->create([
         'association_id' => $asso->id,
@@ -130,7 +128,8 @@ it('mode mono: GET /portail/recus/cotisation/{id} sert le PDF inline', function 
     $tx->lignes()->delete();
     $ligne = TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compte->id,
+        'credit' => 50.00,
         'montant' => 50.00,
     ]);
 
@@ -194,8 +193,7 @@ it('mode mono: GET /portail/recus/fiscal/{id} sert le PDF inline', function () {
     Auth::guard('tiers-portail')->login($tiers);
     session(['portail.last_activity_at' => now()->timestamp]);
 
-    $sousCat = SousCategorie::factory()->create(['association_id' => $asso->id]);
-    $sousCat->usages()->create(['usage' => UsageComptable::Don->value]);
+    $compte = Compte::factory()->pourDons()->create(['association_id' => $asso->id]);
 
     $tx = Transaction::factory()->create([
         'association_id' => $asso->id,
@@ -206,7 +204,8 @@ it('mode mono: GET /portail/recus/fiscal/{id} sert le PDF inline', function () {
     ]);
     $ligne = TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compte->id,
+        'credit' => 75.00,
         'montant' => 75.00,
     ]);
 

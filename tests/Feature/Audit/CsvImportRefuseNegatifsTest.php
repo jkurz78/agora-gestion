@@ -16,12 +16,10 @@ declare(strict_types=1);
  * @see docs/audit/2026-04-30-signe-negatif.md §2.4 CsvImportService (Step 8)
  */
 
-use App\Enums\TypeCategorie;
 use App\Livewire\Concerns\MontantValidation;
 use App\Models\Association;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
-use App\Models\SousCategorie;
 use App\Models\User;
 use App\Services\CsvImportService;
 use App\Tenant\TenantContext;
@@ -51,8 +49,7 @@ beforeEach(function (): void {
         'actif_recettes_depenses' => true,
     ]);
 
-    $cat = Categorie::factory()->create(['type' => TypeCategorie::Depense]);
-    $this->sc = SousCategorie::factory()->create(['categorie_id' => $cat->id, 'nom' => 'Charges test']);
+    $this->compteVentilation = Compte::factory()->depense()->create(['intitule' => 'Charges test']);
 });
 
 afterEach(function (): void {

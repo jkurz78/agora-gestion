@@ -8,8 +8,8 @@ use App\Enums\TypeTransaction;
 use App\Enums\UsageComptable;
 use App\Models\Adhesion;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\RecuFiscalEmis;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -45,10 +45,10 @@ function genererHtmlPdfCotisation(RecuFiscalService $service, Association $asso)
         'ville' => 'Paris',
     ]);
 
-    $sousCat = SousCategorie::query()
-        ->whereHas('usages', fn ($q) => $q->where('usage', UsageComptable::Cotisation->value))
+    $compteCotisation = Compte::query()
+        ->forUsage(UsageComptable::Cotisation)
         ->first()
-        ?? SousCategorie::factory()->pourCotisations()->create();
+        ?? Compte::factory()->pourCotisations()->create();
 
     $transaction = Transaction::factory()->create([
         'tiers_id' => $tiers->id,
@@ -61,8 +61,9 @@ function genererHtmlPdfCotisation(RecuFiscalService $service, Association $asso)
 
     TransactionLigne::factory()->create([
         'transaction_id' => $transaction->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compteCotisation->id,
         'montant' => 60.00,
+        'credit' => 60.00,
     ]);
 
     // L'observer AdhesionTransactionLigneObserver peut avoir auto-créé une adhésion

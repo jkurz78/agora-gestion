@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\ModePaiement;
-use App\Enums\TypeCategorie;
 use App\Livewire\Concerns\MontantValidation;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Operation;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use Illuminate\Http\UploadedFile;
@@ -66,13 +65,16 @@ final class CsvImportService
         array_shift($rows); // Retirer la ligne d'en-tête
 
         // Charger les lookups DB une seule fois (case-insensitive via lowercase key)
-        $typeEnum = TypeCategorie::from($type);
+        // Colonne CSV « sous_categorie » (format conservé) résolue contre les comptes
+        // PCG de la classe attendue — dépense → classe 6, recette → classe 7.
+        $classeVentilation = $type === 'depense' ? 6 : 7;
         $flagField = $type === 'depense' ? 'pour_depenses' : 'pour_recettes';
         $typeLabel = $type === 'depense' ? 'dépenses' : 'recettes';
 
-        $sousCategories = SousCategorie::whereHas('categorie', fn ($q) => $q->where('type', $typeEnum))
+        $comptesVentilation = Compte::where('classe', $classeVentilation)
+            ->where('actif', true)
             ->get()
-            ->keyBy(fn ($sc) => Str::lower(trim($sc->nom)));
+            ->keyBy(fn ($c) => Str::lower(trim($c->intitule)));
 
         $comptes = CompteBancaire::saisieManuelle()
             ->get()
@@ -96,7 +98,7 @@ final class CsvImportService
             $csvLine = $idx + 2; // +1 pour l'en-tête, +1 pour l'indexation 1-based
 
             // Validation des champs par ligne
-            $rowErrors = $this->validateRow($row, $csvLine, $sousCategories, $tiersMap, $operations, $flagField, $typeLabel);
+            $rowErrors = $this->validateRow($row, $csvLine, $comptesVentilation, $tiersMap, $operations, $flagField, $typeLabel);
             $errors = array_merge($errors, $rowErrors);
 
             if (! empty($rowErrors)) {
@@ -107,8 +109,8 @@ final class CsvImportService
             $reference = trim($row[1]);
             $groupKey = $date.'|'.$reference;
 
-            $scNom = Str::lower(trim($row[2]));
-            $sc = $sousCategories[$scNom];
+            $compteNomLigne = Str::lower(trim($row[2]));
+            $compteVentilation = $comptesVentilation[$compteNomLigne];
             $montant = trim($row[3]);
             $operationNom = Str::lower(trim($row[8] ?? ''));
             $operation = $operationNom !== '' ? ($operations[$operationNom] ?? null) : null;
@@ -181,7 +183,7 @@ final class CsvImportService
 
             $notesRaw = trim($row[10] ?? '');
             $groups[$groupKey]['lignes'][] = [
-                'sous_categorie_id' => $sc->id,
+                'compte_id' => $compteVentilation->id,
                 'montant' => (float) $montant,
                 'operation_id' => $operationId,
                 'seance' => $seance,
@@ -298,7 +300,7 @@ final class CsvImportService
     private function validateRow(
         array $row,
         int $csvLine,
-        Collection $sousCategories,
+        Collection $comptesVentilation,
         array $tiersMap,
         Collection $operations,
         string $flagField,
@@ -321,12 +323,12 @@ final class CsvImportService
             $errors[] = ['line' => $csvLine, 'message' => 'Colonne reference : valeur trop longue (max 100 caractères).'];
         }
 
-        // sous_categorie (col 2)
-        $scNom = Str::lower(trim($row[2] ?? ''));
-        if ($scNom === '') {
+        // sous_categorie (col 2) — résolue contre un compte de ventilation (classe 6/7)
+        $compteNom = Str::lower(trim($row[2] ?? ''));
+        if ($compteNom === '') {
             $errors[] = ['line' => $csvLine, 'message' => 'Colonne sous_categorie : valeur vide (champ obligatoire).'];
-        } elseif (! isset($sousCategories[$scNom])) {
-            $errors[] = ['line' => $csvLine, 'message' => "Colonne sous_categorie : \"{$row[2]}\" inconnue ou de mauvais type."];
+        } elseif (! isset($comptesVentilation[$compteNom])) {
+            $errors[] = ['line' => $csvLine, 'message' => "Colonne sous_categorie : compte \"{$row[2]}\" inconnu ou de mauvaise classe."];
         }
 
         // montant_ligne (col 3)

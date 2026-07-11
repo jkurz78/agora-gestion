@@ -102,7 +102,7 @@
                                     <span class="badge text-bg-info ms-1" style="font-size:.6rem" title="Don importé depuis HelloAsso">HA</span>
                                 @endif
                             </td>
-                            <td>{{ $don->sousCategorie->nom ?? '—' }}</td>
+                            <td>{{ $don->compte->intitule ?? '—' }}</td>
                             <td>{{ $don->operation->nom ?? '—' }}</td>
                             <td class="text-end" data-sort="{{ $don->montant }}">
                                 {{ number_format((float) $don->montant, 2, ',', ' ') }} €

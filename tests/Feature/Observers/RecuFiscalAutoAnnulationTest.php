@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Models\Association;
 use App\Models\Compte;
-use App\Models\SousCategorie;
 use App\Services\RecuFiscalService;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Schema;
@@ -52,19 +51,15 @@ it('annule auto le reçu si le montant change', function () {
     expect($recu->annule_motif)->toContain('modifi');
 });
 
-it('annule auto le reçu si la sous_categorie_id change', function () {
+it('annule auto le reçu si le compte_id change', function () {
     setupAssoEligible12();
     $ligne = $this->ligneDonValide();
 
     $recu = app(RecuFiscalService::class)->obtenirOuGenerer($ligne);
 
-    // Créer un autre compte (usage Don aussi pour rester cohérent). L'observer
-    // TransactionLigneRecuFiscalObserver n'est pas encore converti compte-first
-    // (Phase 2 à venir) : il surveille encore sous_categorie_id, donc on renseigne
-    // aussi le miroir légataire du nouveau compte pour déclencher l'invalidation.
+    // Créer un autre compte (usage Don aussi pour rester cohérent).
     $autreCompte = Compte::factory()->pourDons()->create();
-    $autreSousCat = SousCategorie::where('code_cerfa', $autreCompte->numero_pcg)->first();
-    $ligne->update(['compte_id' => $autreCompte->id, 'sous_categorie_id' => $autreSousCat->id]);
+    $ligne->update(['compte_id' => $autreCompte->id]);
     $recu->refresh();
 
     expect($recu->isAnnule())->toBeTrue();

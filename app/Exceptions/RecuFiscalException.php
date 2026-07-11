@@ -28,9 +28,9 @@ final class RecuFiscalException extends RuntimeException
         return new self('Un don doit être encaissé pour donner droit à un reçu fiscal.');
     }
 
-    public static function sansSousCategorie(): self
+    public static function sansCompte(): self
     {
-        return new self('La transaction n\'a pas de sous-catégorie associée.');
+        return new self('La transaction n\'a pas de compte associé.');
     }
 
     public static function adhesionGratuite(): self

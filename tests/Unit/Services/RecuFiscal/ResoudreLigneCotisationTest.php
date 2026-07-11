@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Exceptions\RecuFiscalException;
 use App\Models\Adhesion;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\FormuleAdhesion;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
@@ -99,12 +100,12 @@ it('résout la ligne cotisation pour adhésion manuelle avec une seule ligne', f
     expect($ligneResolue->id)->toBe($ligne->id);
 });
 
-it('résout la ligne cotisation en multi-lignes par sous_categorie_id de la formule', function () {
-    $sousCatCotisation = SousCategorie::factory()->pourCotisations()->create();
-    $sousCatAutre = SousCategorie::factory()->create();
+it('résout la ligne cotisation en multi-lignes par compte_id de la formule', function () {
+    $compteCotisation = Compte::factory()->pourCotisations()->create();
+    $compteAutre = Compte::factory()->create();
 
     $formule = FormuleAdhesion::factory()->create([
-        'sous_categorie_id' => $sousCatCotisation->id,
+        'compte_id' => $compteCotisation->id,
         'est_helloasso' => false,
     ]);
 
@@ -116,11 +117,13 @@ it('résout la ligne cotisation en multi-lignes par sous_categorie_id de la form
 
     $ligneAttendue = TransactionLigne::factory()->create([
         'transaction_id' => $transaction->id,
-        'sous_categorie_id' => $sousCatCotisation->id,
+        'compte_id' => $compteCotisation->id,
+        'credit' => 50.00,
     ]);
     TransactionLigne::factory()->create([
         'transaction_id' => $transaction->id,
-        'sous_categorie_id' => $sousCatAutre->id,
+        'compte_id' => $compteAutre->id,
+        'credit' => 30.00,
     ]);
 
     $adhesion = Adhesion::factory()->create([

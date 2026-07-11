@@ -8,8 +8,8 @@ use App\Enums\UsageComptable;
 use App\Exceptions\RecuFiscalException;
 use App\Models\Adhesion;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\RecuFiscalEmis;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\TransactionLigne;
 use App\Models\User;
@@ -34,8 +34,8 @@ final class RecuFiscalService
             throw RecuFiscalException::signataireManquant();
         }
 
-        if (! $ligne->sousCategorie) {
-            throw RecuFiscalException::sansSousCategorie();
+        if (! $ligne->compte) {
+            throw RecuFiscalException::sansCompte();
         }
 
         // Garde montant > 0 : un don ou une cotisation à 0€ (palier HelloAsso "offert"
@@ -85,15 +85,15 @@ final class RecuFiscalService
 
             $asso = Association::findOrFail(TenantContext::currentId());
             $tiers = $ligne->transaction->tiers;
-            $sousCat = $ligne->sousCategorie;
+            $compteVentilation = $ligne->compte;
             $dateVersement = $ligne->transaction->date;
             $anneeCivile = (int) $dateVersement->format('Y');
 
             $articleCgi = $this->determinerArticleCgi($tiers);
-            $formeDon = $this->determinerFormeDon($sousCat);
+            $formeDon = $this->determinerFormeDon($compteVentilation);
             $modeVersement = $ligne->transaction->mode_paiement?->value ?? 'autre';
             $numero = $this->allouerNumero($anneeCivile);
-            $objet = $this->determinerObjetRecu($sousCat);
+            $objet = $this->determinerObjetRecu($compteVentilation);
 
             $pdfBinaire = $this->genererPdfBinaire($asso, $tiers, $ligne, $numero, $articleCgi, $formeDon, $modeVersement, $objet);
             $relativePath = "recus_fiscaux/{$anneeCivile}/{$numero}.pdf";
@@ -230,7 +230,7 @@ final class RecuFiscalService
         }
 
         if ($adhesion->formuleAdhesion !== null) {
-            $ligne = $lignes->firstWhere('sous_categorie_id', $adhesion->formuleAdhesion->sous_categorie_id);
+            $ligne = $lignes->firstWhere('compte_id', $adhesion->formuleAdhesion->compte_id);
             if ($ligne !== null) {
                 return $ligne;
             }
@@ -266,16 +266,16 @@ final class RecuFiscalService
         return $donateur->type === 'entreprise' ? 'art_238_bis' : 'art_200';
     }
 
-    private function determinerFormeDon(SousCategorie $sc): string
+    private function determinerFormeDon(Compte $compte): string
     {
-        return $sc->hasUsage(UsageComptable::AbandonCreance)
+        return $compte->hasUsage(UsageComptable::AbandonCreance)
             ? 'abandon_revenus'
             : 'numeraire';
     }
 
-    private function determinerObjetRecu(SousCategorie $sc): string
+    private function determinerObjetRecu(Compte $compte): string
     {
-        return $sc->hasUsage(UsageComptable::Cotisation) ? 'cotisation' : 'don';
+        return $compte->hasUsage(UsageComptable::Cotisation) ? 'cotisation' : 'don';
     }
 
     private function genererPdfBinaire(

@@ -197,9 +197,12 @@ it('cloture_wizard_resultat_avec_dataset_mixte', function () {
     $this->makeAuditTransaction('recette', 200.0, $this->sc, $this->compte, 2025);
     $this->makeAuditTransaction('recette', -50.0, $this->sc, $this->compte, 2025);
 
+    // code_cerfa requis pour que makeAuditTransaction pose compte_id (ClotureCheckService
+    // bloque désormais la clôture sur toute ligne dépense/recette sans compte de ventilation).
     $scDepense = SousCategorie::factory()->create([
         'categorie_id' => $this->categorie->id,
         'association_id' => $this->association->id,
+        'code_cerfa' => '606',
     ]);
     $this->makeAuditTransaction('depense', 80.0, $scDepense, $this->compte, 2025);
 

@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
-use App\Enums\UsageComptable;
 use App\Livewire\Tiers\Onglets\Dons;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\RecuFiscalEmis;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -28,11 +27,10 @@ beforeEach(function () {
     ]);
     TenantContext::boot($asso->fresh());
 
-    $this->sousCat = SousCategorie::factory()->create(['nom' => 'Don courant']);
-    $this->sousCat->usages()->create(['usage' => UsageComptable::Don->value]);
+    $this->compteDon = Compte::factory()->pourDons()->create(['intitule' => 'Don courant']);
 });
 
-function makeDonForDonsTest(Tiers $tiers, SousCategorie $sousCat, string $date, float $montant, array $tx = []): TransactionLigne
+function makeDonForDonsTest(Tiers $tiers, Compte $compte, string $date, float $montant, array $tx = []): TransactionLigne
 {
     $tx = Transaction::factory()->create(array_merge([
         'tiers_id' => $tiers->id,
@@ -43,7 +41,8 @@ function makeDonForDonsTest(Tiers $tiers, SousCategorie $sousCat, string $date, 
 
     return TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compte->id,
+        'credit' => $montant,
         'montant' => $montant,
     ]);
 }
@@ -52,8 +51,8 @@ it('groupe les dons par année civile en ordre desc', function (): void {
     $tiers = Tiers::factory()->create([
         'adresse_ligne1' => '1 rue', 'code_postal' => '69000', 'ville' => 'Lyon',
     ]);
-    makeDonForDonsTest($tiers, $this->sousCat, '2024-06-15', 100);
-    makeDonForDonsTest($tiers, $this->sousCat, '2025-03-10', 50);
+    makeDonForDonsTest($tiers, $this->compteDon, '2024-06-15', 100);
+    makeDonForDonsTest($tiers, $this->compteDon, '2025-03-10', 50);
 
     $component = Livewire::test(Dons::class, ['tiers' => $tiers]);
 
@@ -65,7 +64,7 @@ it('affiche un badge "Reçu émis" si un reçu actif existe', function (): void 
     $tiers = Tiers::factory()->create([
         'adresse_ligne1' => '1 rue', 'code_postal' => '69000', 'ville' => 'Lyon',
     ]);
-    $don = makeDonForDonsTest($tiers, $this->sousCat, '2025-03-10', 50);
+    $don = makeDonForDonsTest($tiers, $this->compteDon, '2025-03-10', 50);
     RecuFiscalEmis::factory()->create([
         'transaction_ligne_id' => $don->id,
         'annule_at' => null,
@@ -79,7 +78,7 @@ it('désactive le bouton télécharger si l\'adresse du tiers est incomplète', 
     $tiers = Tiers::factory()->create([
         'adresse_ligne1' => null, 'code_postal' => '69000', 'ville' => 'Lyon',
     ]);
-    makeDonForDonsTest($tiers, $this->sousCat, '2025-03-10', 50);
+    makeDonForDonsTest($tiers, $this->compteDon, '2025-03-10', 50);
 
     Livewire::test(Dons::class, ['tiers' => $tiers])
         ->assertSee('Adresse du donateur incomplète');
@@ -91,7 +90,7 @@ it('affiche un encart de blocage global si signataire absent', function (): void
     TenantContext::boot($asso->fresh());
 
     $tiers = Tiers::factory()->create();
-    makeDonForDonsTest($tiers, $this->sousCat, '2025-03-10', 50);
+    makeDonForDonsTest($tiers, $this->compteDon, '2025-03-10', 50);
 
     Livewire::test(Dons::class, ['tiers' => $tiers])
         ->assertSee('signataire');
@@ -104,10 +103,9 @@ it("refuse d'afficher les avertissements d'un don d'un autre tenant", function (
 
     $assoB = Association::factory()->create();
     TenantContext::boot($assoB);
-    $sousCatB = SousCategorie::factory()->create(['nom' => 'Don B', 'association_id' => $assoB->id]);
-    $sousCatB->usages()->create(['usage' => UsageComptable::Don->value]);
+    $compteB = Compte::factory()->pourDons()->create(['intitule' => 'Don B', 'association_id' => $assoB->id]);
     $tiersB = Tiers::factory()->create(['association_id' => $assoB->id]);
-    $donB = makeDonForDonsTest($tiersB, $sousCatB, '2025-04-01', 80);
+    $donB = makeDonForDonsTest($tiersB, $compteB, '2025-04-01', 80);
 
     TenantContext::boot(Association::find($tiersA->association_id));
 
@@ -122,7 +120,7 @@ it("refuse d'afficher les avertissements d'un don d'un autre tenant", function (
 it("refuse d'afficher les avertissements d'un don d'un autre tiers (même tenant)", function (): void {
     $tiers = Tiers::factory()->create();
     $autreTiers = Tiers::factory()->create();
-    $donAutreTiers = makeDonForDonsTest($autreTiers, $this->sousCat, '2025-04-01', 80);
+    $donAutreTiers = makeDonForDonsTest($autreTiers, $this->compteDon, '2025-04-01', 80);
 
     Livewire::test(Dons::class, ['tiers' => $tiers])
         ->call('afficherAvertissements', $donAutreTiers->id)
@@ -132,7 +130,7 @@ it("refuse d'afficher les avertissements d'un don d'un autre tiers (même tenant
 it("refuse de re-émettre un reçu d'un autre tiers (même tenant)", function (): void {
     $tiers = Tiers::factory()->create();
     $autreTiers = Tiers::factory()->create();
-    $donAutreTiers = makeDonForDonsTest($autreTiers, $this->sousCat, '2025-04-01', 80);
+    $donAutreTiers = makeDonForDonsTest($autreTiers, $this->compteDon, '2025-04-01', 80);
     $recuAutreTiers = RecuFiscalEmis::factory()->create([
         'transaction_ligne_id' => $donAutreTiers->id,
         'tiers_id' => $autreTiers->id,

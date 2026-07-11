@@ -76,7 +76,7 @@ it('dérive article 238 bis pour un donateur entreprise', function () {
     expect($recu->article_cgi)->toBe('art_238_bis');
 });
 
-it('dérive forme abandon_revenus pour sous-cat avec usage AbandonCreance', function () {
+it('dérive forme abandon_revenus pour compte avec usage AbandonCreance', function () {
     setupAssoEligible();
 
     // Créer un compte avec les deux usages Don + AbandonCreance

@@ -23,7 +23,7 @@ final class TiersDonsTimelineService
         return TransactionLigne::query()
             ->whereHas('transaction', fn ($q) => $q->where('tiers_id', (int) $tiers->id)
                 ->where('type', TypeTransaction::Recette->value))
-            ->whereHas('sousCategorie.usages', fn ($q) => $q->where('usage', UsageComptable::Don->value))
+            ->whereHas('compte.usages', fn ($q) => $q->where('usage', UsageComptable::Don->value))
             ->exists();
     }
 
@@ -37,10 +37,10 @@ final class TiersDonsTimelineService
                     $q->whereYear('date', $anneeCivile);
                 }
             })
-            ->whereHas('sousCategorie.usages', function ($q): void {
+            ->whereHas('compte.usages', function ($q): void {
                 $q->where('usage', UsageComptable::Don->value);
             })
-            ->with(['transaction', 'sousCategorie', 'operation'])
+            ->with(['transaction', 'compte', 'operation'])
             ->orderByDesc('id');
 
         $dons = $query->get();

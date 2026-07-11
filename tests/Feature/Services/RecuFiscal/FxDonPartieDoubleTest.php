@@ -16,7 +16,6 @@ use App\Enums\TypeTransaction;
 use App\Exceptions\RecuFiscalException;
 use App\Models\Association;
 use App\Models\Compte;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -41,20 +40,10 @@ afterEach(function (): void {
     TenantContext::clear();
 });
 
-/**
- * Helper : crée un compte Don + son miroir sous_categorie_id (RecuFiscalService
- * lit encore $ligne->sousCategorie, pas converti compte-first — Phase 2 à venir).
- *
- * @return array{0: Compte, 1: int|null}
- */
-function compteDonAvecMiroir(int $assoId): array
+/** Helper : crée un compte Don (RecuFiscalService lit $ligne->compte). */
+function compteDon(int $assoId): Compte
 {
-    $compte = Compte::factory()->pourDons()->create(['association_id' => $assoId]);
-    $sousCategorieId = SousCategorie::where('code_cerfa', $compte->numero_pcg)
-        ->where('association_id', $assoId)
-        ->value('id');
-
-    return [$compte, $sousCategorieId];
+    return Compte::factory()->pourDons()->create(['association_id' => $assoId]);
 }
 
 // ---------------------------------------------------------------------------
@@ -62,7 +51,7 @@ function compteDonAvecMiroir(int $assoId): array
 // ---------------------------------------------------------------------------
 
 test('[A] validerEligibilite lève une exception si la transaction n\'a pas de tiers', function (): void {
-    [$compteDon, $sousCategorieDonId] = compteDonAvecMiroir((int) $this->asso->id);
+    $compte = compteDon((int) $this->asso->id);
 
     $transaction = Transaction::factory()->create([
         'association_id' => (int) $this->asso->id,
@@ -75,8 +64,7 @@ test('[A] validerEligibilite lève une exception si la transaction n\'a pas de t
 
     $ligne = TransactionLigne::factory()->create([
         'transaction_id' => (int) $transaction->id,
-        'compte_id' => (int) $compteDon->id,
-        'sous_categorie_id' => $sousCategorieDonId,
+        'compte_id' => (int) $compte->id,
         'montant' => 100.00,
         'credit' => 100.00,
     ]);
@@ -97,7 +85,7 @@ test('[B] validerEligibilite utilise credit PD pour la garde montant > 0', funct
         'ville' => 'Paris',
     ]);
 
-    [$compteDon, $sousCategorieDonId] = compteDonAvecMiroir((int) $this->asso->id);
+    $compte = compteDon((int) $this->asso->id);
 
     // Ligne avec montant legacy = 0 mais credit PD = 50
     $transaction = Transaction::factory()->create([
@@ -111,8 +99,7 @@ test('[B] validerEligibilite utilise credit PD pour la garde montant > 0', funct
 
     $ligne = TransactionLigne::factory()->create([
         'transaction_id' => (int) $transaction->id,
-        'compte_id' => (int) $compteDon->id,
-        'sous_categorie_id' => $sousCategorieDonId,
+        'compte_id' => (int) $compte->id,
         'montant' => 0.00,
         'credit' => 50.00,
     ]);
@@ -134,7 +121,7 @@ test('[C] obtenirOuGenerer stocke montant_centimes depuis credit PD', function (
         'ville' => 'Paris',
     ]);
 
-    [$compteDon, $sousCategorieDonId] = compteDonAvecMiroir((int) $this->asso->id);
+    $compte = compteDon((int) $this->asso->id);
 
     $transaction = Transaction::factory()->create([
         'association_id' => (int) $this->asso->id,
@@ -148,8 +135,7 @@ test('[C] obtenirOuGenerer stocke montant_centimes depuis credit PD', function (
     // credit PD = 75.50, montant legacy = 75.50 (cohérent pour ce test)
     $ligne = TransactionLigne::factory()->create([
         'transaction_id' => (int) $transaction->id,
-        'compte_id' => (int) $compteDon->id,
-        'sous_categorie_id' => $sousCategorieDonId,
+        'compte_id' => (int) $compte->id,
         'montant' => 75.50,
         'credit' => 75.50,
     ]);
