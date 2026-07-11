@@ -10,11 +10,11 @@ use App\Enums\StatutReglement;
 use App\Enums\TypeLigneFacture;
 use App\Enums\TypeRapprochement;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
 use App\Models\FactureLigne;
 use App\Models\RapprochementBancaire;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
@@ -68,7 +68,7 @@ afterEach(function (): void {
  */
 test('il n\'echoue plus quand une transaction MontantManuel est pointée banque verrouillée', function (): void {
     $tiers = Tiers::factory()->create(['pour_recettes' => true]);
-    $sousCategorie = SousCategorie::factory()->create(['code_cerfa' => '706']);
+    $compteVentilation = Compte::factory()->numero('706')->create();
 
     // Créer et valider une facture MontantManuel (génère Tg en EnAttente)
     $facture = $this->service->creerManuelleVierge($tiers->id);
@@ -83,7 +83,7 @@ test('il n\'echoue plus quand une transaction MontantManuel est pointée banque 
         'quantite' => 1.0,
         'montant' => 150.0,
         'transaction_ligne_id' => null,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
         'ordre' => 1,
     ]);
 

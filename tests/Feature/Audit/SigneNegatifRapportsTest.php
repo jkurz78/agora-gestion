@@ -21,12 +21,11 @@ use App\Livewire\Exercices\ClotureWizard;
 use App\Livewire\RapportCompteResultat;
 use App\Livewire\SuperAdmin\Dashboard as SuperAdminDashboard;
 use App\Models\Association;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Exercice;
 use App\Models\Provision;
 use App\Models\RapprochementBancaire;
-use App\Models\SousCategorie;
 use App\Models\User;
 use App\Services\Rapports\CompteResultatBuilder;
 use App\Services\Rapports\FluxTresorerieBuilder;
@@ -50,15 +49,7 @@ beforeEach(function () {
     session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
 
-    // Catégorie / sous-catégorie de recette
-    // DC-4 : code_cerfa déclenche SousCategorieCompteObserver → matérialise le Compte
-    // (puis CompteObserver la Famille), nécessaire pour CompteResultatBuilder.
-    $this->categorie = Categorie::factory()->create(['association_id' => $this->association->id]);
-    $this->sc = SousCategorie::factory()->create([
-        'categorie_id' => $this->categorie->id,
-        'association_id' => $this->association->id,
-        'code_cerfa' => '706',
-    ]);
+    $this->sc = Compte::factory()->numero('706')->create();
 
     // Compte bancaire réel
     $this->compte = CompteBancaire::factory()->create([
@@ -132,11 +123,8 @@ it('dashboard_kpis_somme_negatifs', function () {
     $this->makeAuditTransaction('recette', 100.0, $this->sc, $this->compte, 2025);
     $this->makeAuditTransaction('recette', -30.0, $this->sc, $this->compte, 2025);
 
-    $scDepense = SousCategorie::factory()->create([
-        'categorie_id' => $this->categorie->id,
-        'association_id' => $this->association->id,
-    ]);
-    $this->makeAuditTransaction('depense', 50.0, $scDepense, $this->compte, 2025);
+    $compteDepense = Compte::factory()->depense()->numero('606')->create();
+    $this->makeAuditTransaction('depense', 50.0, $compteDepense, $this->compte, 2025);
 
     $component = Livewire::test(Dashboard::class);
 
@@ -197,14 +185,8 @@ it('cloture_wizard_resultat_avec_dataset_mixte', function () {
     $this->makeAuditTransaction('recette', 200.0, $this->sc, $this->compte, 2025);
     $this->makeAuditTransaction('recette', -50.0, $this->sc, $this->compte, 2025);
 
-    // code_cerfa requis pour que makeAuditTransaction pose compte_id (ClotureCheckService
-    // bloque désormais la clôture sur toute ligne dépense/recette sans compte de ventilation).
-    $scDepense = SousCategorie::factory()->create([
-        'categorie_id' => $this->categorie->id,
-        'association_id' => $this->association->id,
-        'code_cerfa' => '606',
-    ]);
-    $this->makeAuditTransaction('depense', 80.0, $scDepense, $this->compte, 2025);
+    $compteDepense = Compte::factory()->depense()->numero('606')->create();
+    $this->makeAuditTransaction('depense', 80.0, $compteDepense, $this->compte, 2025);
 
     $component = Livewire::test(ClotureWizard::class)
         ->call('suite')
@@ -290,7 +272,7 @@ it('compte_resultat_avec_transactions_negatives_ET_provisions_PCA', function () 
         'association_id' => $this->association->id,
         'exercice' => 2025,
         'type' => TypeTransaction::Recette,
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'libelle' => 'PCA Test',
         'montant' => -30.0,
         'saisi_par' => $this->user->id,

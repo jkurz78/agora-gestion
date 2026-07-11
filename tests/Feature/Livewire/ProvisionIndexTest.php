@@ -9,7 +9,6 @@ use App\Models\Association;
 use App\Models\Compte;
 use App\Models\Exercice;
 use App\Models\Provision;
-use App\Models\SousCategorie;
 use App\Models\User;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Tenant\TenantContext;
@@ -34,7 +33,7 @@ afterEach(function () {
 });
 
 it('renders the provision list', function () {
-    $sousCategorie = SousCategorie::factory()->create(['association_id' => $this->association->id]);
+    $compteVentilation = Compte::factory()->create();
 
     Provision::factory()->create([
         'association_id' => $this->association->id,
@@ -42,7 +41,7 @@ it('renders the provision list', function () {
         'libelle' => 'Provision congés payés',
         'type' => TypeTransaction::Depense,
         'montant' => 1200.00,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
         'saisi_par' => $this->user->id,
     ]);
 
@@ -54,9 +53,7 @@ it('renders the provision list', function () {
 });
 
 it('creates a provision via modal', function () {
-    // DC-8 : le sélecteur porte un id de compte — code_cerfa matérialise le miroir.
-    $sousCategorie = SousCategorie::factory()->create(['association_id' => $this->association->id, 'code_cerfa' => '606']);
-    $compte = Compte::where('numero_pcg', '606')->firstOrFail();
+    $compte = Compte::factory()->numero('606')->create();
 
     Livewire::test(ProvisionIndex::class)
         ->call('openCreate')
@@ -80,9 +77,7 @@ it('creates a provision via modal', function () {
 });
 
 it('edits a provision via modal', function () {
-    // DC-8 : code_cerfa matérialise le miroir — le trait remplit compte_id
-    // sur la provision, hydraté par openEdit.
-    $sousCategorie = SousCategorie::factory()->create(['association_id' => $this->association->id, 'code_cerfa' => '606']);
+    $compteVentilation = Compte::factory()->numero('606')->create();
 
     $provision = Provision::factory()->create([
         'association_id' => $this->association->id,
@@ -90,7 +85,7 @@ it('edits a provision via modal', function () {
         'libelle' => 'Provision initiale',
         'type' => TypeTransaction::Depense,
         'montant' => 300.00,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
         'saisi_par' => $this->user->id,
     ]);
 
@@ -110,13 +105,13 @@ it('edits a provision via modal', function () {
 });
 
 it('deletes a provision', function () {
-    $sousCategorie = SousCategorie::factory()->create(['association_id' => $this->association->id]);
+    $compteVentilation = Compte::factory()->create();
 
     $provision = Provision::factory()->create([
         'association_id' => $this->association->id,
         'exercice' => 2025,
         'libelle' => 'À supprimer',
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
         'saisi_par' => $this->user->id,
     ]);
 
@@ -129,8 +124,7 @@ it('deletes a provision', function () {
 it('blocks editing when exercice is closed', function () {
     $this->exercice->update(['statut' => StatutExercice::Cloture]);
 
-    $sousCategorie = SousCategorie::factory()->create(['association_id' => $this->association->id, 'code_cerfa' => '606']);
-    $compteBloque = Compte::where('numero_pcg', '606')->firstOrFail();
+    $compteBloque = Compte::factory()->numero('606')->create();
 
     Livewire::test(ProvisionIndex::class)
         ->assertSee('clôturé')

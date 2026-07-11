@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\SousCategorie;
 use App\Models\Transaction;
@@ -110,7 +111,12 @@ it('CompteResultatBuilder fetchBudgetMap does not leak cross-tenant budget lines
 
     TenantContext::boot($this->assoA);
     $compteA = CompteBancaire::factory()->create(['solde_initial' => 0]);
-    $souscatA = SousCategorie::factory()->create();
+    // fetchBudgetMap résout encore via sous_categories.code_cerfa → comptes.numero_pcg :
+    // on crée le compte de ventilation puis on récupère son miroir sous_categorie.
+    $compteVentilationA = Compte::factory()->depense()->create();
+    $souscatA = SousCategorie::where('code_cerfa', $compteVentilationA->numero_pcg)
+        ->where('association_id', $this->assoA->id)
+        ->firstOrFail();
     $txA = Transaction::factory()->asDepense()->create([
         'compte_id' => $compteA->id,
         'date' => '2025-01-10',

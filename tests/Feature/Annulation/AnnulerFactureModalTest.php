@@ -12,11 +12,11 @@ use App\Enums\TypeRapprochement;
 use App\Enums\TypeTransaction;
 use App\Livewire\FactureShow;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
 use App\Models\FactureLigne;
 use App\Models\RapprochementBancaire;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
@@ -65,7 +65,7 @@ afterEach(function (): void {
 function modalCreerFactureAvecMontantManuel(
     FactureService $service,
     Tiers $tiers,
-    SousCategorie $sousCategorie,
+    Compte $compteVentilation,
     float $montant = 80.0,
 ): array {
     $facture = $service->creerManuelleVierge($tiers->id);
@@ -80,7 +80,7 @@ function modalCreerFactureAvecMontantManuel(
         'quantite' => 1.0,
         'montant' => $montant,
         'transaction_ligne_id' => null,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
         'ordre' => 1,
     ]);
 
@@ -145,12 +145,12 @@ function modalCreerFactureAvecTransactionRef(
 
 test('la modale liste les transactions generees par lignes manuelles', function (): void {
     $tiers = Tiers::factory()->create(['pour_recettes' => true]);
-    $sousCategorie = SousCategorie::factory()->create(['code_cerfa' => '706']);
+    $compteVentilation = Compte::factory()->numero('706')->create();
 
     [$facture, $tg] = modalCreerFactureAvecMontantManuel(
         $this->service,
         $tiers,
-        $sousCategorie,
+        $compteVentilation,
         80.0,
     );
 
@@ -198,12 +198,12 @@ test('la modale liste les reglements references', function (): void {
 
 test('le bandeau banque s affiche si au moins une MM est Pointee', function (): void {
     $tiers = Tiers::factory()->create(['pour_recettes' => true]);
-    $sousCategorie = SousCategorie::factory()->create(['code_cerfa' => '706']);
+    $compteVentilation = Compte::factory()->numero('706')->create();
 
     [$facture, $tg] = modalCreerFactureAvecMontantManuel(
         $this->service,
         $tiers,
-        $sousCategorie,
+        $compteVentilation,
         150.0,
     );
 
@@ -233,12 +233,12 @@ test('le bandeau banque s affiche si au moins une MM est Pointee', function (): 
 
 test('le bandeau banque ne s affiche pas si toutes les MM sont EnAttente', function (): void {
     $tiers = Tiers::factory()->create(['pour_recettes' => true]);
-    $sousCategorie = SousCategorie::factory()->create(['code_cerfa' => '706']);
+    $compteVentilation = Compte::factory()->numero('706')->create();
 
     [$facture, $tg] = modalCreerFactureAvecMontantManuel(
         $this->service,
         $tiers,
-        $sousCategorie,
+        $compteVentilation,
         80.0,
     );
 

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 use App\Livewire\AdherentList;
 use App\Models\Adhesion;
+use App\Models\Compte;
 use App\Models\FormuleAdhesion;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\User;
 use App\Tenant\TenantContext;
@@ -14,7 +14,7 @@ use Livewire\Livewire;
 beforeEach(function (): void {
     $this->user = User::factory()->create();
     $this->user->associations()->attach(TenantContext::currentId(), ['role' => 'admin', 'joined_at' => now()]);
-    $this->sc = SousCategorie::factory()->pourCotisations()->create();
+    $this->compteCotisation = Compte::factory()->pourCotisations()->create();
     session(['exercice_actif' => 2025]);
 });
 
@@ -24,7 +24,7 @@ afterEach(function (): void {
 
 it('filtre a_jour inclut un adhérent en mode durée dont la période couvre aujourd\'hui', function (): void {
     $tiers = Tiers::factory()->create(['nom' => 'DUREE_AJOUR']);
-    $formule = FormuleAdhesion::factory()->modeDuree(12)->create(['sous_categorie_id' => $this->sc->id]);
+    $formule = FormuleAdhesion::factory()->modeDuree(12)->create(['compte_id' => $this->compteCotisation->id]);
 
     Adhesion::factory()->create([
         'tiers_id' => $tiers->id,
@@ -42,7 +42,7 @@ it('filtre a_jour inclut un adhérent en mode durée dont la période couvre auj
 
 it('filtre a_jour exclut un adhérent en mode durée dont la période est expirée', function (): void {
     $tiers = Tiers::factory()->create(['nom' => 'DUREE_EXPIRE']);
-    $formule = FormuleAdhesion::factory()->modeDuree(12)->create(['sous_categorie_id' => $this->sc->id]);
+    $formule = FormuleAdhesion::factory()->modeDuree(12)->create(['compte_id' => $this->compteCotisation->id]);
 
     Adhesion::factory()->create([
         'tiers_id' => $tiers->id,
@@ -60,7 +60,7 @@ it('filtre a_jour exclut un adhérent en mode durée dont la période est expir�
 
 it('filtre en_retard inclut un adhérent en mode durée expiré dans les 30 derniers jours', function (): void {
     $tiers = Tiers::factory()->create(['nom' => 'DUREE_RETARD']);
-    $formule = FormuleAdhesion::factory()->modeDuree(12)->create(['sous_categorie_id' => $this->sc->id]);
+    $formule = FormuleAdhesion::factory()->modeDuree(12)->create(['compte_id' => $this->compteCotisation->id]);
 
     Adhesion::factory()->create([
         'tiers_id' => $tiers->id,
@@ -79,7 +79,7 @@ it('filtre en_retard inclut un adhérent en mode durée expiré dans les 30 dern
 it('affiche le badge de la formule sur la ligne (mode exercice)', function (): void {
     $tiers = Tiers::factory()->create(['nom' => 'AVEC_FORMULE']);
     $formule = FormuleAdhesion::factory()->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->compteCotisation->id,
         'nom' => 'Adhésion adulte 2025',
     ]);
     Adhesion::factory()->create([
@@ -96,7 +96,7 @@ it('affiche le badge de la formule sur la ligne (mode exercice)', function (): v
 
 it('affiche l\'intervalle de validité en mode durée', function (): void {
     $tiers = Tiers::factory()->create(['nom' => 'DUREE_AFFICHE']);
-    $formule = FormuleAdhesion::factory()->modeDuree(12)->create(['sous_categorie_id' => $this->sc->id]);
+    $formule = FormuleAdhesion::factory()->modeDuree(12)->create(['compte_id' => $this->compteCotisation->id]);
     Adhesion::factory()->create([
         'tiers_id' => $tiers->id,
         'formule_adhesion_id' => $formule->id,
@@ -115,7 +115,7 @@ it('affiche l\'intervalle de validité en mode durée', function (): void {
 it('filtre a_jour inclut les adhésions mode illimite', function (): void {
     $tiers = Tiers::factory()->create(['nom' => 'PERMANENT']);
     $formule = FormuleAdhesion::factory()->modeIllimite()->create([
-        'sous_categorie_id' => SousCategorie::factory()->pourCotisations()->create()->id,
+        'compte_id' => Compte::factory()->pourCotisations()->create()->id,
     ]);
 
     Adhesion::factory()->create([
@@ -136,7 +136,7 @@ it('filtre a_jour inclut les adhésions mode illimite', function (): void {
 it('AdherentList affiche le badge Permanente pour les adhésions illimite', function (): void {
     $tiers = Tiers::factory()->create(['nom' => 'BADGE_PERM']);
     $formule = FormuleAdhesion::factory()->modeIllimite()->create([
-        'sous_categorie_id' => SousCategorie::factory()->pourCotisations()->create()->id,
+        'compte_id' => Compte::factory()->pourCotisations()->create()->id,
     ]);
 
     Adhesion::factory()->create([

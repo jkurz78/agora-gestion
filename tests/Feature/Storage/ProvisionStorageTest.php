@@ -8,7 +8,6 @@ use App\Models\Association;
 use App\Models\Compte;
 use App\Models\Exercice;
 use App\Models\Provision;
-use App\Models\SousCategorie;
 use App\Models\User;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Tenant\TenantContext;
@@ -64,9 +63,8 @@ it('upload PJ dans ProvisionIndex place le fichier sous associations/{aid}/provi
     $component = Livewire\Livewire::test(ProvisionIndex::class);
 
     // On prépare les données du formulaire
-    // DC-8 : le sélecteur porte un id de compte — code_cerfa matérialise le miroir.
-    $sc = SousCategorie::factory()->create(['code_cerfa' => '606']);
-    $compte = Compte::where('numero_pcg', '606')->firstOrFail();
+    // DC-10a : le sélecteur porte directement un id de compte.
+    $compte = Compte::factory()->numero('606')->create();
     $file = UploadedFile::fake()->create('contrat.pdf', 100, 'application/pdf');
 
     $component
@@ -91,8 +89,7 @@ it('upload PJ dans ProvisionIndex place le fichier sous associations/{aid}/provi
 });
 
 it('piece_jointe_path sans PJ reste null', function () {
-    $sc = SousCategorie::factory()->create(['code_cerfa' => '706']);
-    $compte = Compte::where('numero_pcg', '706')->firstOrFail();
+    $compte = Compte::factory()->numero('706')->create();
 
     Livewire\Livewire::test(ProvisionIndex::class)
         ->set('libelle', 'Provision sans PJ')

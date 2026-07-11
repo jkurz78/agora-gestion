@@ -11,7 +11,6 @@ use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Reglement;
 use App\Models\Seance;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -99,12 +98,7 @@ it('returns participants data with correct fields', function () {
 it('returns financier data with correct fields including temporal dimensions', function () {
     $compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
     $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Fournisseur', 'pour_depenses' => true]);
-    // code_cerfa déclenche la matérialisation Compte/Famille — la ventilation est
-    // portée par transaction_lignes.compte_id (source du mode financier de l'Analyse pivot).
-    $sousCategorie = SousCategorie::factory()->create(['association_id' => $this->association->id, 'code_cerfa' => '606']);
-    $compteVentilation = Compte::where('numero_pcg', '606')
-        ->where('association_id', $this->association->id)
-        ->firstOrFail();
+    $compteVentilation = Compte::factory()->depense()->numero('606')->create();
     $transaction = Transaction::create([
         'association_id' => $this->association->id,
         'tiers_id' => $tiers->id,
@@ -118,7 +112,6 @@ it('returns financier data with correct fields including temporal dimensions', f
     ]);
     TransactionLigne::create([
         'transaction_id' => $transaction->id,
-        'sous_categorie_id' => $sousCategorie->id,
         'montant' => 100.00,
         'compte_id' => $compteVentilation->id,
         'debit' => 100.00,

@@ -3,14 +3,12 @@
 declare(strict_types=1);
 
 use App\Models\Association;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\EncadrementPrevision;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Reglement;
 use App\Models\Seance;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Services\Rapports\CompteResultatBuilder;
@@ -22,16 +20,10 @@ beforeEach(function (): void {
     $this->association = Association::factory()->create();
     TenantContext::boot($this->association);
 
-    // DC-4 : code_cerfa déclenche SousCategorieCompteObserver, qui matérialise le Compte
-    // (puis CompteObserver matérialise la Famille) — nécessaire pour que
-    // CompteResultatBuilder (lecture compte_id/familles) retrouve ces lignes.
-    $this->categorieDep = Categorie::factory()->depense()->create();
-    $this->scDep = SousCategorie::factory()->create(['categorie_id' => $this->categorieDep->id, 'nom' => 'Encadrement', 'code_cerfa' => '606']);
+    $this->scDep = Compte::factory()->depense()->numero('606')->create(['intitule' => 'Encadrement']);
+    $this->scRec = Compte::factory()->numero('706')->create(['intitule' => 'Cotisations']);
 
-    $this->categorieRec = Categorie::factory()->recette()->create();
-    $this->scRec = SousCategorie::factory()->create(['categorie_id' => $this->categorieRec->id, 'nom' => 'Cotisations', 'code_cerfa' => '706']);
-
-    $this->typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $this->scRec->id]);
+    $this->typeOp = TypeOperation::factory()->create(['compte_id' => $this->scRec->id]);
     $this->operation = Operation::factory()->create([
         'type_operation_id' => $this->typeOp->id,
         'date_debut' => Carbon::create(2026, 9, 5),
@@ -58,7 +50,7 @@ it('affiche la raison sociale d\'un tiers entreprise dans les prévisions par ti
     EncadrementPrevision::create([
         'operation_id' => $this->operation->id,
         'tiers_id' => $entreprise->id,
-        'sous_categorie_id' => $this->scDep->id,
+        'compte_id' => $this->scDep->id,
         'seance_id' => $this->seance->id,
         'montant_prevu' => 100,
     ]);
@@ -82,7 +74,7 @@ it('retourne previsions_charges quand previsionnel=true', function (): void {
     EncadrementPrevision::create([
         'operation_id' => $this->operation->id,
         'tiers_id' => $this->tiersEnc->id,
-        'sous_categorie_id' => $this->scDep->id,
+        'compte_id' => $this->scDep->id,
         'seance_id' => $this->seance->id,
         'montant_prevu' => 200,
     ]);
@@ -132,7 +124,7 @@ it("n'expose pas previsions quand previsionnel=false (rétrocompat)", function (
     EncadrementPrevision::create([
         'operation_id' => $this->operation->id,
         'tiers_id' => $this->tiersEnc->id,
-        'sous_categorie_id' => $this->scDep->id,
+        'compte_id' => $this->scDep->id,
         'seance_id' => $this->seance->id,
         'montant_prevu' => 200,
     ]);
@@ -157,9 +149,7 @@ it("filtre fail-closed les prévisions d'autres associations", function (): void
     EncadrementPrevision::create([
         'operation_id' => $opAutre->id,
         'tiers_id' => Tiers::factory()->create()->id,
-        'sous_categorie_id' => SousCategorie::factory()->create([
-            'categorie_id' => Categorie::factory()->depense()->create()->id,
-        ])->id,
+        'compte_id' => Compte::factory()->depense()->create()->id,
         'seance_id' => $sAutre->id,
         'montant_prevu' => 9999,
     ]);
@@ -169,7 +159,7 @@ it("filtre fail-closed les prévisions d'autres associations", function (): void
     EncadrementPrevision::create([
         'operation_id' => $this->operation->id,
         'tiers_id' => $this->tiersEnc->id,
-        'sous_categorie_id' => $this->scDep->id,
+        'compte_id' => $this->scDep->id,
         'seance_id' => $this->seance->id,
         'montant_prevu' => 50,
     ]);
@@ -198,9 +188,7 @@ it("filtre fail-closed les previsions produits d'autres associations", function 
     $autre = Association::factory()->create();
     TenantContext::boot($autre);
     $typeOpAutre = TypeOperation::factory()->create([
-        'sous_categorie_id' => SousCategorie::factory()->create([
-            'categorie_id' => Categorie::factory()->recette()->create()->id,
-        ])->id,
+        'compte_id' => Compte::factory()->create()->id,
     ]);
     $opAutre = Operation::factory()->create([
         'type_operation_id' => $typeOpAutre->id,
@@ -236,7 +224,7 @@ it('retourne ProjectionMatrix dans proj_charges/proj_produits', function (): voi
     EncadrementPrevision::create([
         'operation_id' => $this->operation->id,
         'tiers_id' => $this->tiersEnc->id,
-        'sous_categorie_id' => $this->scDep->id,
+        'compte_id' => $this->scDep->id,
         'seance_id' => $this->seance->id,
         'montant_prevu' => 200,
     ]);
@@ -269,7 +257,7 @@ it('ProjectionMatrix contient les valeurs projetées au grain tiers', function (
     EncadrementPrevision::create([
         'operation_id' => $this->operation->id,
         'tiers_id' => $this->tiersEnc->id,
-        'sous_categorie_id' => $this->scDep->id,
+        'compte_id' => $this->scDep->id,
         'seance_id' => $this->seance->id,
         'montant_prevu' => 350,
     ]);
@@ -285,9 +273,7 @@ it('ProjectionMatrix contient les valeurs projetées au grain tiers', function (
     /** @var ProjectionMatrix $projCharges */
     $projCharges = $data['proj_charges'];
 
-    // DC-4 : la ProjectionMatrix est désormais indexée par compte_id (résolu depuis
-    // sous_categorie_id via code_cerfa = numero_pcg), pas par sous_categorie_id.
-    $scId = (int) Compte::where('numero_pcg', $this->scDep->code_cerfa)->first()->id;
+    $scId = (int) $this->scDep->id;
     $tiersId = (int) $this->tiersEnc->id;
 
     $tiersTotal = $projCharges->byScTiers($scId)[$tiersId] ?? 0;

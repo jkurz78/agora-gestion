@@ -109,6 +109,7 @@ it('couvre les 10 tables de ventilation', function () {
     $formule = FormuleAdhesion::factory()->create([
         'association_id' => $associationId,
         'sous_categorie_id' => $scId,
+        'compte_id' => null,
     ]);
 
     // type_operations
@@ -137,6 +138,7 @@ it('couvre les 10 tables de ventilation', function () {
     $provision = Provision::factory()->create([
         'association_id' => $associationId,
         'sous_categorie_id' => $scId,
+        'compte_id' => null,
         'saisi_par' => $user->id,
     ]);
 
@@ -151,6 +153,7 @@ it('couvre les 10 tables de ventilation', function () {
     $noteDeFraisLigne = NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $noteDeFrais->id,
         'sous_categorie_id' => $scId,
+        'compte_id' => null,
     ]);
 
     // encadrement_previsions
@@ -162,6 +165,7 @@ it('couvre les 10 tables de ventilation', function () {
         'operation_id' => $operation->id,
         'tiers_id' => $tiers->id,
         'sous_categorie_id' => $scId,
+        'compte_id' => null,
         'seance_id' => $seance->id,
     ]);
 
@@ -193,6 +197,7 @@ it('une sous-catégorie sans code_cerfa n est pas mappée', function () {
     $budgetLine = BudgetLine::factory()->create([
         'association_id' => $associationId,
         'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => null,
     ]);
 
     $resultat = VentilationCompteIdBackfiller::backfill();
@@ -237,6 +242,7 @@ it('respecte l isolation multi-tenant : chaque association reçoit son propre co
     $budgetLineA = BudgetLine::factory()->create([
         'association_id' => $associationA->id,
         'sous_categorie_id' => $sousCategorieA->id,
+        'compte_id' => null,
     ]);
 
     TenantContext::boot($associationB);
@@ -250,6 +256,7 @@ it('respecte l isolation multi-tenant : chaque association reçoit son propre co
     $budgetLineB = BudgetLine::factory()->create([
         'association_id' => $associationB->id,
         'sous_categorie_id' => $sousCategorieB->id,
+        'compte_id' => null,
     ]);
 
     VentilationCompteIdBackfiller::backfill();

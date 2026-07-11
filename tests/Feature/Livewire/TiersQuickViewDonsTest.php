@@ -8,7 +8,7 @@ use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Livewire\TiersQuickView;
 use App\Models\Association;
-use App\Models\SousCategorie;
+use App\Models\Compte;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -120,7 +120,7 @@ it('ne déclenche PAS l\'avertissement si tiers/asso modifiés AVANT la créatio
     ]);
     // Transaction enregistrée APRÈS (created_at = maintenant par défaut),
     // mais avec une date métier antérieure d'un mois
-    $sousCatDon = SousCategorie::factory()->pourDons()->create();
+    $compteDon = Compte::factory()->numero('754')->pourDons()->create();
     $tx = Transaction::factory()->create([
         'tiers_id' => $tiers->id,
         'date' => now()->subMonth()->toDateString(),
@@ -130,8 +130,10 @@ it('ne déclenche PAS l\'avertissement si tiers/asso modifiés AVANT la créatio
     ]);
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sousCatDon->id,
+        'compte_id' => $compteDon->id,
         'montant' => 100,
+        'debit' => 0.0,
+        'credit' => 100.0,
     ]);
 
     Livewire::actingAs($user)->test(TiersQuickView::class)

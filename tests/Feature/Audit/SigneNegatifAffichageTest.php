@@ -24,10 +24,9 @@ use App\Enums\StatutExercice;
 use App\Enums\TypeTransaction;
 use App\Livewire\Provisions\ProvisionIndex;
 use App\Models\Association;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\Exercice;
 use App\Models\Provision;
-use App\Models\SousCategorie;
 use App\Models\User;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
@@ -45,11 +44,7 @@ beforeEach(function () {
     session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
 
-    $categorie = Categorie::factory()->create(['association_id' => $this->association->id]);
-    $this->sc = SousCategorie::factory()->create([
-        'categorie_id' => $categorie->id,
-        'association_id' => $this->association->id,
-    ]);
+    $this->sc = Compte::factory()->depense()->create();
 
     Exercice::create([
         'association_id' => $this->association->id,
@@ -100,7 +95,7 @@ it('data_sort_sur_colonnes_montants_est_numerique', function () {
             'association_id' => $this->association->id,
             'exercice' => 2025,
             'type' => TypeTransaction::Depense,
-            'sous_categorie_id' => $this->sc->id,
+            'compte_id' => $this->sc->id,
             'libelle' => 'Prov '.abs($montant).(($montant < 0) ? ' neg' : ' pos'),
             'montant' => $montant,
             'saisi_par' => $this->user->id,

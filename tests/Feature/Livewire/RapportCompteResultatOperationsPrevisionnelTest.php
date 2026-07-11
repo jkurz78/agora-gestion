@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 use App\Livewire\RapportCompteResultatOperations;
 use App\Models\Association;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\EncadrementPrevision;
 use App\Models\Operation;
 use App\Models\Seance;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Models\User;
@@ -64,12 +63,10 @@ it('exportUrl contient mode=projection quand mode projection activé', function 
 });
 
 it('affiche les montants projetés quand mode projection ON', function (): void {
-    $categorieDep = Categorie::factory()->depense()->create();
-    $sc = SousCategorie::factory()->create(['categorie_id' => $categorieDep->id, 'nom' => 'Encadrement', 'code_cerfa' => '622']);
+    $sc = Compte::factory()->depense()->numero('622')->create(['intitule' => 'Encadrement']);
 
-    $catRec = Categorie::factory()->recette()->create();
-    $scRec = SousCategorie::factory()->create(['categorie_id' => $catRec->id, 'code_cerfa' => '722']);
-    $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $scRec->id]);
+    $scRec = Compte::factory()->numero('722')->create();
+    $typeOp = TypeOperation::factory()->create(['compte_id' => $scRec->id]);
     $op = Operation::factory()->create([
         'type_operation_id' => $typeOp->id,
         'date_debut' => Carbon::create(2026, 9, 5),
@@ -80,7 +77,7 @@ it('affiche les montants projetés quand mode projection ON', function (): void 
     EncadrementPrevision::create([
         'operation_id' => $op->id,
         'tiers_id' => $tiers->id,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $sc->id,
         'seance_id' => $seance->id,
         'montant_prevu' => 300,
     ]);
@@ -92,12 +89,10 @@ it('affiche les montants projetés quand mode projection ON', function (): void 
 });
 
 it('affiche un tiers prévision-only avec son montant projeté (mode simple)', function (): void {
-    $categorieDep = Categorie::factory()->depense()->create();
-    $sc = SousCategorie::factory()->create(['categorie_id' => $categorieDep->id, 'nom' => 'Encadrement', 'code_cerfa' => '622']);
+    $sc = Compte::factory()->depense()->numero('622')->create(['intitule' => 'Encadrement']);
 
-    $catRec = Categorie::factory()->recette()->create();
-    $scRec = SousCategorie::factory()->create(['categorie_id' => $catRec->id, 'code_cerfa' => '722']);
-    $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $scRec->id]);
+    $scRec = Compte::factory()->numero('722')->create();
+    $typeOp = TypeOperation::factory()->create(['compte_id' => $scRec->id]);
     $op = Operation::factory()->create([
         'type_operation_id' => $typeOp->id,
         'date_debut' => Carbon::create(2026, 9, 5),
@@ -108,7 +103,7 @@ it('affiche un tiers prévision-only avec son montant projeté (mode simple)', f
     EncadrementPrevision::create([
         'operation_id' => $op->id,
         'tiers_id' => $tiers->id,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $sc->id,
         'seance_id' => $seance->id,
         'montant_prevu' => 450,
     ]);
@@ -124,12 +119,10 @@ it('affiche un tiers prévision-only avec son montant projeté (mode simple)', f
 });
 
 it('affiche un tiers prévision-only avec ses opérations projetées', function (): void {
-    $categorieDep = Categorie::factory()->depense()->create();
-    $sc = SousCategorie::factory()->create(['categorie_id' => $categorieDep->id, 'nom' => 'Encadrement', 'code_cerfa' => '622']);
+    $sc = Compte::factory()->depense()->numero('622')->create(['intitule' => 'Encadrement']);
 
-    $catRec = Categorie::factory()->recette()->create();
-    $scRec = SousCategorie::factory()->create(['categorie_id' => $catRec->id, 'code_cerfa' => '722']);
-    $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $scRec->id]);
+    $scRec = Compte::factory()->numero('722')->create();
+    $typeOp = TypeOperation::factory()->create(['compte_id' => $scRec->id]);
     $op1 = Operation::factory()->create([
         'type_operation_id' => $typeOp->id,
         'date_debut' => Carbon::create(2026, 9, 5),
@@ -145,14 +138,14 @@ it('affiche un tiers prévision-only avec ses opérations projetées', function 
     EncadrementPrevision::create([
         'operation_id' => $op1->id,
         'tiers_id' => $tiers->id,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $sc->id,
         'seance_id' => $seance1->id,
         'montant_prevu' => 200,
     ]);
     EncadrementPrevision::create([
         'operation_id' => $op2->id,
         'tiers_id' => $tiers->id,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $sc->id,
         'seance_id' => $seance2->id,
         'montant_prevu' => 300,
     ]);
@@ -168,12 +161,10 @@ it('affiche un tiers prévision-only avec ses opérations projetées', function 
 });
 
 it('affiche un tiers prévision-only avec ses séances projetées', function (): void {
-    $categorieDep = Categorie::factory()->depense()->create();
-    $sc = SousCategorie::factory()->create(['categorie_id' => $categorieDep->id, 'nom' => 'Encadrement', 'code_cerfa' => '622']);
+    $sc = Compte::factory()->depense()->numero('622')->create(['intitule' => 'Encadrement']);
 
-    $catRec = Categorie::factory()->recette()->create();
-    $scRec = SousCategorie::factory()->create(['categorie_id' => $catRec->id, 'code_cerfa' => '722']);
-    $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $scRec->id]);
+    $scRec = Compte::factory()->numero('722')->create();
+    $typeOp = TypeOperation::factory()->create(['compte_id' => $scRec->id]);
     $op = Operation::factory()->create([
         'type_operation_id' => $typeOp->id,
         'date_debut' => Carbon::create(2026, 9, 5),
@@ -184,7 +175,7 @@ it('affiche un tiers prévision-only avec ses séances projetées', function ():
     EncadrementPrevision::create([
         'operation_id' => $op->id,
         'tiers_id' => $tiers->id,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $sc->id,
         'seance_id' => $seance->id,
         'montant_prevu' => 175,
     ]);
@@ -200,12 +191,10 @@ it('affiche un tiers prévision-only avec ses séances projetées', function ():
 });
 
 it('exporte le PDF avec tiers prévision-only sans erreur', function (): void {
-    $categorieDep = Categorie::factory()->depense()->create();
-    $sc = SousCategorie::factory()->create(['categorie_id' => $categorieDep->id, 'code_cerfa' => '622']);
+    $sc = Compte::factory()->depense()->numero('622')->create();
 
-    $catRec = Categorie::factory()->recette()->create();
-    $scRec = SousCategorie::factory()->create(['categorie_id' => $catRec->id, 'code_cerfa' => '722']);
-    $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $scRec->id]);
+    $scRec = Compte::factory()->numero('722')->create();
+    $typeOp = TypeOperation::factory()->create(['compte_id' => $scRec->id]);
     $op = Operation::factory()->create([
         'type_operation_id' => $typeOp->id,
         'date_debut' => Carbon::create(2026, 9, 5),
@@ -216,7 +205,7 @@ it('exporte le PDF avec tiers prévision-only sans erreur', function (): void {
     EncadrementPrevision::create([
         'operation_id' => $op->id,
         'tiers_id' => $tiers->id,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $sc->id,
         'seance_id' => $seance->id,
         'montant_prevu' => 500,
     ]);
@@ -244,12 +233,10 @@ it('exporte le PDF avec tiers prévision-only sans erreur', function (): void {
 });
 
 it('affiche le mode combiné séances × opérations avec projection', function (): void {
-    $categorieDep = Categorie::factory()->depense()->create();
-    $sc = SousCategorie::factory()->create(['categorie_id' => $categorieDep->id, 'nom' => 'Encadrement', 'code_cerfa' => '622']);
+    $sc = Compte::factory()->depense()->numero('622')->create(['intitule' => 'Encadrement']);
 
-    $catRec = Categorie::factory()->recette()->create();
-    $scRec = SousCategorie::factory()->create(['categorie_id' => $catRec->id, 'code_cerfa' => '722']);
-    $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $scRec->id]);
+    $scRec = Compte::factory()->numero('722')->create();
+    $typeOp = TypeOperation::factory()->create(['compte_id' => $scRec->id]);
     $op1 = Operation::factory()->create([
         'type_operation_id' => $typeOp->id,
         'date_debut' => Carbon::create(2026, 9, 5),
@@ -265,14 +252,14 @@ it('affiche le mode combiné séances × opérations avec projection', function 
     EncadrementPrevision::create([
         'operation_id' => $op1->id,
         'tiers_id' => $tiers->id,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $sc->id,
         'seance_id' => $seance1->id,
         'montant_prevu' => 200,
     ]);
     EncadrementPrevision::create([
         'operation_id' => $op2->id,
         'tiers_id' => $tiers->id,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $sc->id,
         'seance_id' => $seance2->id,
         'montant_prevu' => 300,
     ]);
@@ -290,12 +277,10 @@ it('affiche le mode combiné séances × opérations avec projection', function 
 });
 
 it('exporte PDF et Excel en mode combiné séances × opérations', function (): void {
-    $categorieDep = Categorie::factory()->depense()->create();
-    $sc = SousCategorie::factory()->create(['categorie_id' => $categorieDep->id, 'code_cerfa' => '622']);
+    $sc = Compte::factory()->depense()->numero('622')->create();
 
-    $catRec = Categorie::factory()->recette()->create();
-    $scRec = SousCategorie::factory()->create(['categorie_id' => $catRec->id, 'code_cerfa' => '722']);
-    $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $scRec->id]);
+    $scRec = Compte::factory()->numero('722')->create();
+    $typeOp = TypeOperation::factory()->create(['compte_id' => $scRec->id]);
     $op1 = Operation::factory()->create(['type_operation_id' => $typeOp->id, 'date_debut' => Carbon::create(2026, 9, 5)]);
     $op2 = Operation::factory()->create(['type_operation_id' => $typeOp->id, 'date_debut' => Carbon::create(2026, 9, 12)]);
     Seance::create(['operation_id' => $op1->id, 'numero' => 1, 'date' => Carbon::create(2026, 9, 10)]);
@@ -305,7 +290,7 @@ it('exporte PDF et Excel en mode combiné séances × opérations', function ():
     EncadrementPrevision::create([
         'operation_id' => $op1->id,
         'tiers_id' => $tiers->id,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $sc->id,
         'seance_id' => Seance::where('operation_id', $op1->id)->first()->id,
         'montant_prevu' => 150,
     ]);

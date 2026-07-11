@@ -25,10 +25,10 @@ beforeEach(function (): void {
 
     $this->user = User::factory()->create();
     $this->user->associations()->attach(1, ['role' => 'admin', 'joined_at' => now()]);
-    // DC-8 : les actions souscat: portent des ids de comptes — code_cerfa
-    // classe 7 matérialise le Compte miroir.
-    $this->scCotisation = SousCategorie::factory()->pourCotisations()->create(['code_cerfa' => '756']);
-    $this->compteCotisation = Compte::where('numero_pcg', '756')->firstOrFail();
+    // DC-8 : les actions souscat: portent des ids de comptes — créer le Compte
+    // matérialise en retour la SousCategorie miroir (CompteObserver).
+    $this->compteCotisation = Compte::factory()->numero('756')->pourCotisations()->create();
+    $this->scCotisation = SousCategorie::where('code_cerfa', '756')->firstOrFail();
 
     $compte = CompteBancaire::factory()->create();
     $this->parametres = HelloAssoParametres::factory()->create([

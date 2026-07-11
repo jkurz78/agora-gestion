@@ -5,16 +5,13 @@ declare(strict_types=1);
 use App\Enums\RoleAssociation;
 use App\Enums\StatutNoteDeFrais;
 use App\Enums\StatutReglement;
-use App\Enums\TypeCategorie;
 use App\Enums\TypeTransaction;
 use App\Livewire\BackOffice\NoteDeFrais\Show;
 use App\Models\Association;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
@@ -45,9 +42,9 @@ function constaterAbandonBootTenant(Association $association): void
 }
 
 /**
- * Creates an NDF with abandon_creance_propose + one ligne + one AbandonCreance sous-cat.
+ * Creates an NDF with abandon_creance_propose + one ligne + one AbandonCreance compte.
  *
- * @return array{ndf: NoteDeFrais, compte: CompteBancaire, scAbandon: SousCategorie}
+ * @return array{ndf: NoteDeFrais, compte: CompteBancaire, scAbandon: Compte}
  */
 function constaterAbandonSetupHappyPath(Association $association, string $ndfDate = '2026-03-10'): array
 {
@@ -56,38 +53,17 @@ function constaterAbandonSetupHappyPath(Association $association, string $ndfDat
     // Infrastructure partie double — comptes système 411, 401, 467 requis par abandonCreancePd()
     SystemeSeeder::seed();
 
-    $catDepense = Categorie::factory()->create([
+    // Compte Dépense classe 6 pour PD
+    $compteDepense = Compte::factory()->depense()->numero('625')->create([
         'association_id' => $association->id,
-        'type' => TypeCategorie::Depense->value,
-    ]);
-    $catRecette = Categorie::factory()->create([
-        'association_id' => $association->id,
-        'type' => TypeCategorie::Recette->value,
+        'intitule' => 'Frais missions déplacements',
     ]);
 
-    // Sous-catégorie Dépense avec code_cerfa → Compte classe 6 pour PD
-    $scDepense = SousCategorie::factory()->create([
+    // Compte AbandonCreance classe 7 pour PD
+    $compteAbandon = Compte::factory()->pourAbandonCreance()->numero('771')->create([
         'association_id' => $association->id,
-        'categorie_id' => $catDepense->id,
-        'nom' => 'Frais déplacement',
-        'code_cerfa' => '625',
+        'intitule' => 'Dons et abandons de créances',
     ]);
-    Compte::firstOrCreate(
-        ['association_id' => $association->id, 'numero_pcg' => '625'],
-        ['intitule' => 'Frais missions déplacements', 'classe' => 6, 'lettrable' => false, 'actif' => true, 'est_systeme' => false, 'pour_inscriptions' => false]
-    );
-
-    // Sous-catégorie AbandonCreance avec code_cerfa → Compte classe 7 pour PD
-    $scAbandon = SousCategorie::factory()->pourAbandonCreance()->create([
-        'association_id' => $association->id,
-        'categorie_id' => $catRecette->id,
-        'nom' => 'Don abandon test',
-        'code_cerfa' => '771',
-    ]);
-    Compte::firstOrCreate(
-        ['association_id' => $association->id, 'numero_pcg' => '771'],
-        ['intitule' => 'Dons et abandons de créances', 'classe' => 7, 'lettrable' => false, 'actif' => true, 'est_systeme' => false, 'pour_inscriptions' => false]
-    );
 
     $compte = CompteBancaire::factory()->create([
         'association_id' => $association->id,
@@ -106,13 +82,13 @@ function constaterAbandonSetupHappyPath(Association $association, string $ndfDat
 
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $scDepense->id,
+        'compte_id' => $compteDepense->id,
         'libelle' => 'Déplacement',
         'montant' => '75.00',
         'piece_jointe_path' => null,
     ]);
 
-    return ['ndf' => $ndf, 'compte' => $compte, 'scAbandon' => $scAbandon];
+    return ['ndf' => $ndf, 'compte' => $compte, 'scAbandon' => $compteAbandon];
 }
 
 // ── 1. Propriété dateDon initialisée à ndf->date au mount ────────────────────
@@ -282,6 +258,7 @@ it('confirmValidation avec choix=normal valide normalement et ferme le miniForm'
 
     $association = Association::factory()->create();
     constaterAbandonBootTenant($association);
+    SystemeSeeder::seed();
     $admin = constaterAbandonMakeAdmin($association);
 
     $compte = CompteBancaire::factory()->create([
@@ -297,10 +274,10 @@ it('confirmValidation avec choix=normal valide normalement et ferme le miniForm'
         'date' => '2026-03-10',
     ]);
 
-    $scDepense = SousCategorie::factory()->create(['association_id' => $association->id]);
+    $compteDepense = Compte::factory()->depense()->create(['association_id' => $association->id]);
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $scDepense->id,
+        'compte_id' => $compteDepense->id,
         'montant' => '50.00',
         'piece_jointe_path' => null,
     ]);
@@ -348,10 +325,10 @@ it('confirmValidation avec choix=abandon flash error si aucune sous-cat AbandonC
         'date' => '2026-03-10',
     ]);
 
-    $sousCategorie = SousCategorie::factory()->create(['association_id' => $association->id]);
+    $compteVentilation = Compte::factory()->create(['association_id' => $association->id]);
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
         'montant' => '50.00',
         'piece_jointe_path' => null,
     ]);
@@ -421,10 +398,10 @@ it('confirmValidation avec choix=normal ignore dateDon vide', function (): void 
         'date' => '2026-03-10',
     ]);
 
-    $sc = SousCategorie::factory()->create(['association_id' => $association->id]);
+    $compteVentilation = Compte::factory()->create(['association_id' => $association->id]);
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $compteVentilation->id,
         'montant' => '40.00',
         'piece_jointe_path' => null,
     ]);

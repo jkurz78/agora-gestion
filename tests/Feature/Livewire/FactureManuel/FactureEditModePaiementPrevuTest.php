@@ -8,11 +8,10 @@ use App\Enums\StatutFacture;
 use App\Enums\TypeLigneFacture;
 use App\Livewire\FactureEdit;
 use App\Models\Association;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\Devis;
 use App\Models\Facture;
 use App\Models\FactureLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\User;
 use App\Services\ExerciceService;
@@ -40,15 +39,7 @@ beforeEach(function (): void {
         'association_id' => $this->association->id,
     ]);
 
-    $this->categorie = Categorie::factory()->create([
-        'association_id' => $this->association->id,
-        'type' => 'recette',
-    ]);
-
-    $this->sousCategorie = SousCategorie::factory()->create([
-        'association_id' => $this->association->id,
-        'categorie_id' => $this->categorie->id,
-    ]);
+    $this->compteVentilation = Compte::factory()->numero('706')->create();
 
     $this->facture = Facture::create([
         'association_id' => $this->association->id,
@@ -98,7 +89,7 @@ it('le champ mode_paiement_prevu est présent dans le DOM si au moins une ligne 
         'quantite' => 1,
         'montant' => 100.00,
         'transaction_ligne_id' => null,
-        'sous_categorie_id' => $this->sousCategorie->id,
+        'compte_id' => $this->compteVentilation->id,
         'ordre' => 1,
     ]);
 
@@ -117,7 +108,7 @@ it('updatedModePaiementPrevu persiste le mode de paiement sur la facture', funct
         'quantite' => 1,
         'montant' => 200.00,
         'transaction_ligne_id' => null,
-        'sous_categorie_id' => $this->sousCategorie->id,
+        'compte_id' => $this->compteVentilation->id,
         'ordre' => 1,
     ]);
 

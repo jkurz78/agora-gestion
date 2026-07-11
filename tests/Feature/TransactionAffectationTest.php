@@ -1,9 +1,9 @@
 <?php
 
 declare(strict_types=1);
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Operation;
-use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\TransactionLigneAffectation;
@@ -117,7 +117,7 @@ it('supprimerAffectations supprime toutes les affectations d\'une ligne', functi
 });
 
 it('update() sur pièce non verrouillée préserve les affectations existantes', function () {
-    $sousCategorie = SousCategorie::factory()->create();
+    $compteVentilation = Compte::factory()->create();
 
     $transaction = Transaction::factory()->create([
         'compte_id' => $this->compte->id,
@@ -125,11 +125,13 @@ it('update() sur pièce non verrouillée préserve les affectations existantes',
     ]);
     $transaction->lignes()->forceDelete();
     $ligne = $transaction->lignes()->create([
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
         'operation_id' => null,
         'montant' => 100.00,
         'seance' => null,
         'notes' => null,
+        'debit' => 100.00,
+        'credit' => 0.0,
     ]);
 
     $ligne->affectations()->create([
@@ -154,7 +156,7 @@ it('update() sur pièce non verrouillée préserve les affectations existantes',
         'compte_id' => $transaction->compte_id,
         'reference' => $transaction->reference,
     ], [
-        ['id' => $ligne->id, 'sous_categorie_id' => $sousCategorie->id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['id' => $ligne->id, 'compte_id' => $compteVentilation->id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 
     $newLigne = $transaction->fresh(['lignes.affectations'])->lignes->first();
@@ -164,7 +166,7 @@ it('update() sur pièce non verrouillée préserve les affectations existantes',
 
 it('update() non verrouillé supprime les affectations quand le montant de ligne change', function () {
     $compte = CompteBancaire::factory()->create();
-    $sousCategorie = SousCategorie::factory()->create();
+    $compteVentilation = Compte::factory()->create();
     $op = Operation::factory()->create();
 
     $transaction = Transaction::factory()->create([
@@ -173,11 +175,13 @@ it('update() non verrouillé supprime les affectations quand le montant de ligne
     ]);
     $transaction->lignes()->forceDelete();
     $ligne = $transaction->lignes()->create([
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
         'operation_id' => null,
         'montant' => 100.00,
         'seance' => null,
         'notes' => null,
+        'debit' => 100.00,
+        'credit' => 0.0,
     ]);
     $ligne->affectations()->create([
         'operation_id' => $op->id,
@@ -195,7 +199,7 @@ it('update() non verrouillé supprime les affectations quand le montant de ligne
         'compte_id' => $transaction->compte_id,
         'reference' => $transaction->reference,
     ], [
-        ['id' => $ligne->id, 'sous_categorie_id' => $sousCategorie->id, 'montant' => '150.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['id' => $ligne->id, 'compte_id' => $compteVentilation->id, 'montant' => '150.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 
     $newLigne = $transaction->fresh(['lignes.affectations'])->lignes->first();

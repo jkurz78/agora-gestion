@@ -3,12 +3,10 @@
 declare(strict_types=1);
 
 use App\Enums\RoleAssociation;
-use App\Enums\TypeCategorie;
 use App\Livewire\BackOffice\NoteDeFrais\Show;
 use App\Models\Association;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\NoteDeFrais;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\User;
 use App\Tenant\TenantContext;
@@ -44,17 +42,11 @@ it('affiche bandeau alert-info avec le compte si compte désigné', function ():
     $admin = abandonBandeauMakeAdmin($association);
     $tiers = Tiers::factory()->create(['association_id' => $association->id]);
 
-    $catRecette = Categorie::factory()->create([
+    // DC-10a : compte-first — l'écran affiche désormais le compte désigné
+    // (numero — intitulé) via la ventilation UsageComptable::AbandonCreance.
+    Compte::factory()->pourAbandonCreance()->numero('754')->create([
         'association_id' => $association->id,
-        'type' => TypeCategorie::Recette->value,
-    ]);
-    // DC-8 : code_cerfa classe 7 pour matérialiser le Compte miroir — l'écran
-    // affiche désormais le compte désigné (numero — intitulé).
-    SousCategorie::factory()->pourAbandonCreance()->create([
-        'association_id' => $association->id,
-        'categorie_id' => $catRecette->id,
-        'nom' => 'Abandon créance test',
-        'code_cerfa' => '754A',
+        'intitule' => 'Abandon créance test',
     ]);
 
     $ndf = NoteDeFrais::factory()->soumise()->create([
@@ -68,7 +60,7 @@ it('affiche bandeau alert-info avec le compte si compte désigné', function ():
     Livewire::test(Show::class, ['noteDeFrais' => $ndf])
         ->assertSee('Proposition de don par abandon de créance')
         ->assertSee('Compte désigné')
-        ->assertSee('754A')
+        ->assertSee('754')
         ->assertSee('Abandon créance test')
         ->assertDontSeeHtml('wire:click="openAbandonForm"')
         ->assertDontSeeHtml("Valider sans constater l'abandon")

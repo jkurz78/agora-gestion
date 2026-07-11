@@ -5,9 +5,9 @@ declare(strict_types=1);
 use App\Enums\ModePaiement;
 use App\Livewire\NouvelleAdhesionModal;
 use App\Models\Adhesion;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\FormuleAdhesion;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
@@ -17,11 +17,11 @@ use Livewire\Livewire;
 beforeEach(function (): void {
     $this->user = User::factory()->create();
     $this->user->associations()->attach(TenantContext::currentId(), ['role' => 'admin', 'joined_at' => now()]);
-    $this->sc = SousCategorie::factory()->pourCotisations()->create();
+    $this->sc = Compte::factory()->pourCotisations()->create();
     $this->tiers = Tiers::factory()->create();
     $this->compte = CompteBancaire::factory()->create();
     $this->formuleExercice = FormuleAdhesion::factory()->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'mode' => 'exercice',
         'montant_par_defaut' => 30.00,
     ]);
@@ -95,7 +95,7 @@ it('mode durée affiche date_debut + date_fin readonly', function (): void {
     // La 1re formule ('exercice') doit être inactive pour la contrainte 1-active-par-sous-cat
     $this->formuleExercice->update(['actif' => false]);
     $formuleDuree = FormuleAdhesion::factory()->modeDuree(12)->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'montant_par_defaut' => 50.00,
     ]);
 
@@ -149,7 +149,7 @@ it('updatedFormuleId NE pré-remplit PAS le montant en mode gratuite', function 
 it('updatedFormuleId initialise dateDebut à today en mode durée', function (): void {
     $this->formuleExercice->update(['actif' => false]);
     $formuleDuree = FormuleAdhesion::factory()->modeDuree(12)->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
     ]);
 
     $today = now()->toDateString();
@@ -177,9 +177,9 @@ it('valide les champs obligatoires (avec paid fields lorsque montant > 0)', func
 it('le dropdown formules est groupé en optgroup Manuelles / HelloAsso', function (): void {
     // $this->formuleExercice (est_helloasso=false) est déjà active sur $this->sc
     // Créer une formule HelloAsso sur une sous-cat distincte
-    $scHa = SousCategorie::factory()->pourCotisations()->create();
+    $compteHa = Compte::factory()->pourCotisations()->create();
     FormuleAdhesion::factory()->helloasso('cotisation-2025', 1)->create([
-        'sous_categorie_id' => $scHa->id,
+        'compte_id' => $compteHa->id,
         'nom' => 'Adhésion HA test',
         'actif' => true,
     ]);
@@ -198,7 +198,7 @@ it('mode illimite affiche le bandeau permanente et crée l\'adhésion sans date_
     $this->formuleExercice->update(['actif' => false]);
 
     $formuleIllimite = FormuleAdhesion::factory()->modeIllimite()->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'actif' => true,
         'nom' => 'Membre à vie',
     ]);
@@ -244,7 +244,7 @@ it('le sélecteur Compte exclut les comptes HelloAsso (saisie automatisée)', fu
 it('mode duree_jours=10 : dateFinCalculee affiche la bonne date', function (): void {
     $this->formuleExercice->update(['actif' => false]);
     $formuleDureeJours = FormuleAdhesion::factory()->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'mode' => 'duree',
         'duree_mois' => null,
         'duree_jours' => 10,
@@ -263,7 +263,7 @@ it('mode duree_jours=10 : dateFinCalculee affiche la bonne date', function (): v
 it('mode duree_jours=10 : submit crée adhésion avec dates correctes', function (): void {
     $this->formuleExercice->update(['actif' => false]);
     $formuleDureeJours = FormuleAdhesion::factory()->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'mode' => 'duree',
         'duree_mois' => null,
         'duree_jours' => 10,
@@ -290,7 +290,7 @@ it('mode duree_jours=10 : submit crée adhésion avec dates correctes', function
 it('régression : mode duree_mois=12, dateDebut=2025-10-15 → date_fin=2026-10-14 (inchangé)', function (): void {
     $this->formuleExercice->update(['actif' => false]);
     $formuleDureeMois = FormuleAdhesion::factory()->modeDuree(12)->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'montant_par_defaut' => 50.00,
     ]);
 

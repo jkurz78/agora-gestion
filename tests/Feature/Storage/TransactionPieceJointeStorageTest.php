@@ -5,9 +5,9 @@ declare(strict_types=1);
 use App\Enums\TypeTransaction;
 use App\Http\Controllers\TransactionPieceJointeController;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\IncomingDocument;
-use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\TransactionService;
@@ -190,7 +190,7 @@ it('download retourne 404 si le fichier est absent du disque', function () {
 // ── Suppression de transaction efface la PJ ───────────────────────────────────
 
 it('la suppression d\'une transaction efface aussi la pièce jointe tenant-scoped', function () {
-    $sc = SousCategorie::factory()->create();
+    $compteDepense = Compte::factory()->depense()->create();
     $compte = CompteBancaire::factory()->create();
     $service = app(TransactionService::class);
 
@@ -202,7 +202,7 @@ it('la suppression d\'une transaction efface aussi la pièce jointe tenant-scope
         'mode_paiement' => 'virement',
         'reference' => 'REF-DEL',
         'compte_id' => $compte->id,
-    ], [['sous_categorie_id' => $sc->id, 'montant' => '50.00', 'operation_id' => null, 'seance' => null, 'notes' => null]]);
+    ], [['compte_id' => $compteDepense->id, 'montant' => '50.00', 'operation_id' => null, 'seance' => null, 'notes' => null]]);
 
     $file = UploadedFile::fake()->create('facture.pdf', 100, 'application/pdf');
     $service->storePieceJointe($tx, $file);

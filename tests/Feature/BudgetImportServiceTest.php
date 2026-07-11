@@ -2,11 +2,9 @@
 
 declare(strict_types=1);
 
-use App\Enums\TypeCategorie;
 use App\Models\Association;
 use App\Models\BudgetLine;
-use App\Models\Categorie;
-use App\Models\SousCategorie;
+use App\Models\Compte;
 use App\Models\User;
 use App\Services\BudgetImportService;
 use App\Tenant\TenantContext;
@@ -27,11 +25,9 @@ beforeEach(function () {
     TenantContext::boot($this->association);
     $this->actingAs($this->user);
 
-    // code_cerfa → SousCategorieCompteObserver matérialise les comptes ; l'import
-    // résout désormais les libellés contre comptes.intitule.
-    $catCharge = Categorie::factory()->create(['nom' => 'Charges', 'type' => TypeCategorie::Depense]);
-    $this->scLoyers = SousCategorie::factory()->create(['nom' => 'Loyers', 'categorie_id' => $catCharge->id, 'code_cerfa' => '613']);
-    $this->scElec = SousCategorie::factory()->create(['nom' => 'Électricité', 'categorie_id' => $catCharge->id, 'code_cerfa' => '616']);
+    // Comptes classe 6 → l'import résout les libellés contre comptes.intitule.
+    $this->scLoyers = Compte::factory()->numero('613')->create(['intitule' => 'Loyers']);
+    $this->scElec = Compte::factory()->numero('616')->create(['intitule' => 'Électricité']);
 });
 
 afterEach(function () {
@@ -49,7 +45,7 @@ it('importe un CSV valide et insère les lignes non nulles', function () {
         ->and($result->linesImported)->toBe(1);
 
     expect(BudgetLine::where('exercice', 2025)->count())->toBe(1);
-    expect(BudgetLine::where('sous_categorie_id', $this->scLoyers->id)->value('montant_prevu'))->toBe('1200.00');
+    expect(BudgetLine::where('compte_id', $this->scLoyers->id)->value('montant_prevu'))->toBe('1200.00');
 });
 
 it('ignore les lignes avec montant à zéro', function () {
@@ -66,8 +62,8 @@ it('ignore les lignes avec montant à zéro', function () {
 });
 
 it('supprime les lignes existantes de l\'exercice avant import', function () {
-    BudgetLine::factory()->create(['sous_categorie_id' => $this->scLoyers->id, 'exercice' => 2025, 'montant_prevu' => 999]);
-    BudgetLine::factory()->create(['sous_categorie_id' => $this->scLoyers->id, 'exercice' => 2024, 'montant_prevu' => 500]); // autre exercice
+    BudgetLine::factory()->create(['compte_id' => $this->scLoyers->id, 'exercice' => 2025, 'montant_prevu' => 999]);
+    BudgetLine::factory()->create(['compte_id' => $this->scLoyers->id, 'exercice' => 2024, 'montant_prevu' => 500]); // autre exercice
 
     $csv = "exercice;categorie;sous_categorie;montant_prevu\n"
          ."2025-2026;Charges;Électricité;300.00\n";
@@ -76,7 +72,7 @@ it('supprime les lignes existantes de l\'exercice avant import', function () {
 
     expect($result->success)->toBeTrue();
     // L'ancienne ligne 2025 est supprimée
-    expect(BudgetLine::where('sous_categorie_id', $this->scLoyers->id)->where('exercice', 2025)->exists())->toBeFalse();
+    expect(BudgetLine::where('compte_id', $this->scLoyers->id)->where('exercice', 2025)->exists())->toBeFalse();
     // La ligne 2024 est préservée
     expect(BudgetLine::where('exercice', 2024)->count())->toBe(1);
 });
@@ -125,8 +121,7 @@ it('rejette si un compte est introuvable', function () {
 });
 
 it('rejette si un compte est ambigu (doublon d\'intitulé)', function () {
-    $cat2 = Categorie::factory()->create(['nom' => 'Produits', 'type' => TypeCategorie::Recette]);
-    SousCategorie::factory()->create(['nom' => 'Loyers', 'categorie_id' => $cat2->id, 'code_cerfa' => '756']); // compte doublon d'intitulé !
+    Compte::factory()->numero('756')->create(['intitule' => 'Loyers']); // compte doublon d'intitulé !
 
     $csv = "exercice;categorie;sous_categorie;montant_prevu\n"
          ."2025-2026;Charges;Loyers;100.00\n";
@@ -159,7 +154,7 @@ it('rejette si un montant est invalide (non numérique)', function () {
 it('rejette un fichier sans lignes de données', function () {
     $csv = "exercice;categorie;sous_categorie;montant_prevu\n";
 
-    BudgetLine::factory()->create(['sous_categorie_id' => $this->scLoyers->id, 'exercice' => 2025, 'montant_prevu' => 999]);
+    BudgetLine::factory()->create(['compte_id' => $this->scLoyers->id, 'exercice' => 2025, 'montant_prevu' => 999]);
 
     $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
 
@@ -182,7 +177,7 @@ it('ignore les montants à zéro sous toutes les formes', function () {
 });
 
 it('n\'insère rien si validation échoue (atomicité)', function () {
-    BudgetLine::factory()->create(['sous_categorie_id' => $this->scLoyers->id, 'exercice' => 2025, 'montant_prevu' => 999]);
+    BudgetLine::factory()->create(['compte_id' => $this->scLoyers->id, 'exercice' => 2025, 'montant_prevu' => 999]);
 
     $csv = "exercice;categorie;sous_categorie;montant_prevu\n"
          ."2025-2026;Charges;Loyers;100.00\n"

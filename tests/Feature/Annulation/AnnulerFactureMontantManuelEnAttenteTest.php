@@ -9,12 +9,12 @@ use App\Enums\StatutReglement;
 use App\Enums\TypeLigneFacture;
 use App\Enums\TypeRapprochement;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Extourne;
 use App\Models\Facture;
 use App\Models\FactureLigne;
 use App\Models\RapprochementBancaire;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
@@ -64,7 +64,7 @@ afterEach(function (): void {
 function enAttenteCreerFactureValideeAvecMontantManuel(
     FactureService $service,
     Tiers $tiers,
-    SousCategorie $sousCategorie,
+    Compte $compteVentilation,
     float $montant = 80.0,
 ): array {
     $facture = $service->creerManuelleVierge($tiers->id);
@@ -79,7 +79,7 @@ function enAttenteCreerFactureValideeAvecMontantManuel(
         'quantite' => 1.0,
         'montant' => $montant,
         'transaction_ligne_id' => null,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
         'ordre' => 1,
     ]);
 
@@ -99,12 +99,12 @@ function enAttenteCreerFactureValideeAvecMontantManuel(
 
 test('annulation facture MontantManuel EnAttente produit extourne sans lettrage', function (): void {
     $tiers = Tiers::factory()->create(['pour_recettes' => true]);
-    $sousCategorie = SousCategorie::factory()->create(['code_cerfa' => '706']);
+    $compteVentilation = Compte::factory()->numero('706')->create();
 
     [$facture, $tg] = enAttenteCreerFactureValideeAvecMontantManuel(
         $this->service,
         $tiers,
-        $sousCategorie,
+        $compteVentilation,
         80.0,
     );
 

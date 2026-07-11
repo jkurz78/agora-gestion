@@ -11,12 +11,12 @@ use App\Enums\TypeRapprochement;
 use App\Enums\TypeTransaction;
 use App\Events\TransactionExtournee;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Extourne;
 use App\Models\Facture;
 use App\Models\FactureLigne;
 use App\Models\RapprochementBancaire;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -70,7 +70,7 @@ afterEach(function (): void {
 function atomiciteCreerFactureValidee(
     FactureService $service,
     Tiers $tiers,
-    SousCategorie $sousCategorie,
+    Compte $compteVentilation,
     CompteBancaire $compte,
 ): array {
     // Tref préexistante 50 € Recu
@@ -86,7 +86,7 @@ function atomiciteCreerFactureValidee(
 
     TransactionLigne::create([
         'transaction_id' => $tref->id,
-        'sous_categorie_id' => null,
+        'compte_id' => null,
         'montant' => 50.0,
     ]);
 
@@ -104,7 +104,7 @@ function atomiciteCreerFactureValidee(
         'quantite' => 1.0,
         'montant' => 100.0,
         'transaction_ligne_id' => null,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
         'ordre' => 1,
     ]);
 
@@ -131,12 +131,12 @@ function atomiciteCreerFactureValidee(
 
 test('exception pendant annulation provoque rollback complet', function (): void {
     $tiers = Tiers::factory()->create(['pour_recettes' => true]);
-    $sousCategorie = SousCategorie::factory()->create(['code_cerfa' => '706']);
+    $compte = Compte::factory()->numero('706')->create();
 
     [$facture, $tg, $tref] = atomiciteCreerFactureValidee(
         $this->service,
         $tiers,
-        $sousCategorie,
+        $compte,
         $this->compte,
     );
 

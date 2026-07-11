@@ -13,10 +13,9 @@ declare(strict_types=1);
 
 use App\Enums\StatutExercice;
 use App\Models\Association;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Exercice;
-use App\Models\SousCategorie;
 use App\Models\User;
 use App\Services\Rapports\FluxTresorerieBuilder;
 use App\Services\RapportService;
@@ -39,15 +38,7 @@ beforeEach(function () {
     session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
 
-    // Catégorie / sous-catégorie de recette
-    // DC-4 : code_cerfa déclenche SousCategorieCompteObserver → matérialise le Compte
-    // (puis CompteObserver la Famille), nécessaire pour CompteResultatBuilder.
-    $this->categorie = Categorie::factory()->create(['association_id' => $this->association->id]);
-    $this->sc = SousCategorie::factory()->create([
-        'categorie_id' => $this->categorie->id,
-        'association_id' => $this->association->id,
-        'code_cerfa' => '706',
-    ]);
+    $this->sc = Compte::factory()->numero('706')->create();
 
     // Compte bancaire réel
     $this->compte = CompteBancaire::factory()->create([
@@ -201,15 +192,9 @@ it('pdf_compte_resultat_somme_negatifs', function () {
 // ── Test 3 — PDF compte de résultat : sous-catégorie à montant strictement négatif ──
 
 it('pdf_compte_resultat_sous_categorie_negative_visible', function () {
-    // Crée une DEUXIÈME sous-catégorie avec seulement -40 €
-    // (aucun positif dans cette sous-cat)
-    $sc2 = SousCategorie::factory()->create([
-        'categorie_id' => $this->categorie->id,
-        'association_id' => $this->association->id,
-        'code_cerfa' => '758',
-    ]);
+    $compteRecette2 = Compte::factory()->numero('758')->create();
 
-    $this->makeAuditTransaction('recette', -40.0, $sc2, $this->compte, 2025);
+    $this->makeAuditTransaction('recette', -40.0, $compteRecette2, $this->compte, 2025);
 
     $rapportService = app(RapportService::class);
     $data = $rapportService->compteDeResultat(2025);

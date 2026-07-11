@@ -3,12 +3,12 @@
 declare(strict_types=1);
 
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\FormuleAdhesion;
-use App\Models\SousCategorie;
 use App\Tenant\TenantContext;
 
 it('persiste une formule en mode exercice', function (): void {
-    $sc = SousCategorie::factory()->pourCotisations()->create();
+    $sc = Compte::factory()->pourCotisations()->create();
 
     $formule = FormuleAdhesion::create([
         'association_id' => TenantContext::currentId(),
@@ -18,7 +18,7 @@ it('persiste une formule en mode exercice', function (): void {
         'duree_mois' => null,
         'montant_par_defaut' => 30.00,
         'deductible_fiscal' => false,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $sc->id,
         'actif' => true,
     ]);
 
@@ -33,7 +33,7 @@ it('persiste une formule en mode exercice', function (): void {
 });
 
 it('persiste une formule en mode durée 12 mois', function (): void {
-    $sc = SousCategorie::factory()->pourCotisations()->create();
+    $sc = Compte::factory()->pourCotisations()->create();
 
     $formule = FormuleAdhesion::create([
         'association_id' => TenantContext::currentId(),
@@ -42,7 +42,7 @@ it('persiste une formule en mode durée 12 mois', function (): void {
         'duree_mois' => 12,
         'montant_par_defaut' => 50.00,
         'deductible_fiscal' => true,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $sc->id,
         'actif' => true,
     ]);
 
@@ -53,24 +53,16 @@ it('persiste une formule en mode durée 12 mois', function (): void {
     expect($formule->isModeExercice())->toBeFalse();
 });
 
-it('expose la relation sous-catégorie', function (): void {
-    $sc = SousCategorie::factory()->pourCotisations()->create();
-    $formule = FormuleAdhesion::factory()->create(['sous_categorie_id' => $sc->id]);
+it('expose la relation compte', function (): void {
+    $sc = Compte::factory()->pourCotisations()->create();
+    $formule = FormuleAdhesion::factory()->create(['compte_id' => $sc->id]);
 
-    expect($formule->sousCategorie->id)->toBe($sc->id);
-});
-
-it('expose la relation inverse depuis la sous-catégorie', function (): void {
-    $sc = SousCategorie::factory()->pourCotisations()->create();
-    FormuleAdhesion::factory()->create(['sous_categorie_id' => $sc->id]);
-    FormuleAdhesion::factory()->create(['sous_categorie_id' => $sc->id, 'actif' => false]);
-
-    expect($sc->formulesAdhesion()->count())->toBe(2);
+    expect($formule->compte->id)->toBe($sc->id);
 });
 
 it('respecte le scope tenant fail-closed', function (): void {
-    $sc = SousCategorie::factory()->pourCotisations()->create();
-    FormuleAdhesion::factory()->create(['sous_categorie_id' => $sc->id]);
+    $sc = Compte::factory()->pourCotisations()->create();
+    FormuleAdhesion::factory()->create(['compte_id' => $sc->id]);
 
     TenantContext::clear();
     $autreAsso = Association::factory()->create();
@@ -80,8 +72,8 @@ it('respecte le scope tenant fail-closed', function (): void {
 });
 
 it('soft-delete préserve les données pour historique', function (): void {
-    $sc = SousCategorie::factory()->pourCotisations()->create();
-    $formule = FormuleAdhesion::factory()->create(['sous_categorie_id' => $sc->id]);
+    $sc = Compte::factory()->pourCotisations()->create();
+    $formule = FormuleAdhesion::factory()->create(['compte_id' => $sc->id]);
 
     $formule->delete();
 
@@ -89,25 +81,12 @@ it('soft-delete préserve les données pour historique', function (): void {
     expect(FormuleAdhesion::withTrashed()->count())->toBe(1);
 });
 
-it('formuleAdhesionActive sur SousCategorie retourne uniquement la formule active', function (): void {
-    $sc = SousCategorie::factory()->pourCotisations()->create();
-    FormuleAdhesion::factory()->create(['sous_categorie_id' => $sc->id, 'actif' => false]);
-    $active = FormuleAdhesion::factory()->create(['sous_categorie_id' => $sc->id, 'actif' => true]);
-
-    expect($sc->formuleAdhesionActive()?->id)->toBe($active->id);
-});
-
-it('formuleAdhesionActive retourne null si aucune formule active', function (): void {
-    $sc = SousCategorie::factory()->pourCotisations()->create();
-    FormuleAdhesion::factory()->create(['sous_categorie_id' => $sc->id, 'actif' => false]);
-
-    expect($sc->formuleAdhesionActive())->toBeNull();
-});
+// Tests formuleAdhesionActive() sur SousCategorie — TRIAGE DC-10b-3 (relation SousCategorie)
 
 it('caste duree_mois en int', function (): void {
-    $sc = SousCategorie::factory()->pourCotisations()->create();
+    $sc = Compte::factory()->pourCotisations()->create();
     $formule = FormuleAdhesion::factory()->create([
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $sc->id,
         'mode' => 'duree',
         'duree_mois' => 6,
     ]);

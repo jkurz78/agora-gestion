@@ -8,7 +8,6 @@ use App\Models\Association;
 use App\Models\Compte;
 use App\Models\Facture;
 use App\Models\FactureLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\User;
 use App\Services\FactureService;
@@ -27,9 +26,7 @@ beforeEach(function () {
     TenantContext::boot($this->association);
     $this->actingAs($this->user);
     $this->tiers = Tiers::factory()->create();
-    // DC-8 : le service écrit compte_id — code_cerfa classe 7 matérialise le miroir.
-    $this->sousCategorie = SousCategorie::factory()->create(['code_cerfa' => '706A']);
-    $this->compte = Compte::where('numero_pcg', '706A')->firstOrFail();
+    $this->compte = Compte::factory()->numero('706A')->create();
     $this->service = app(FactureService::class);
     $this->facture = $this->service->creerManuelleVierge($this->tiers->id);
 });
@@ -56,9 +53,7 @@ describe('ajouterLigneManuelle()', function () {
             ->and((float) $ligne->montant)->toBe(2400.0)
             ->and($ligne->ordre)->toBe(1)
             ->and($ligne->transaction_ligne_id)->toBeNull()
-            ->and((int) $ligne->compte_id)->toBe((int) $this->compte->id)
-            // Miroir rempli par le trait SyncCompteDepuisSousCategorie.
-            ->and((int) $ligne->sous_categorie_id)->toBe((int) $this->sousCategorie->id);
+            ->and((int) $ligne->compte_id)->toBe((int) $this->compte->id);
 
         $this->facture->refresh();
         expect((float) $this->facture->montant_total)->toBe(2400.0);

@@ -7,11 +7,11 @@ use App\Enums\StatutExercice;
 use App\Enums\StatutNoteDeFrais;
 use App\Livewire\BackOffice\NoteDeFrais\Show;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Exercice;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
@@ -55,10 +55,10 @@ it('shows header, lines and Valider/Rejeter buttons for a Soumise NDF', function
         'libelle' => 'Frais déplacement test',
     ]);
 
-    $sousCategorie = SousCategorie::factory()->create();
+    $compteVentilation = Compte::factory()->create();
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
         'libelle' => 'Billet train',
         'montant' => '55.00',
     ]);
@@ -235,10 +235,10 @@ it('confirmValidation happy path creates transaction and sets NDF to Validee', f
         'date' => '2025-10-15',
     ]);
 
-    $sousCategorie = SousCategorie::factory()->create();
+    $compteVentilation = Compte::factory()->create();
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
         'montant' => '42.00',
         'piece_jointe_path' => null,
     ]);
@@ -340,10 +340,10 @@ it('confirmValidation with closed exercice flashes error and NDF stays Soumise',
         'date' => '2024-01-15', // in exercice 2023-2024
     ]);
 
-    $sousCategorie = SousCategorie::factory()->create();
+    $compteVentilation = Compte::factory()->create();
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
         'montant' => '10.00',
         'piece_jointe_path' => null,
     ]);
@@ -451,10 +451,10 @@ it('piece-jointe route returns 200 for an authorized admin with a valid PJ', fun
     $path = "associations/{$association->id}/notes-de-frais/{$ndf->id}/ligne-1.pdf";
     Storage::disk('local')->put($path, 'fake-pdf-content');
 
-    $sousCategorie = SousCategorie::factory()->create();
+    $compteVentilation = Compte::factory()->create();
     $ligne = NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
         'piece_jointe_path' => $path,
     ]);
 
@@ -486,10 +486,10 @@ it('piece-jointe returns 404 if the ligne belongs to a different NDF', function 
     $path = "associations/{$association->id}/notes-de-frais/{$ndf2->id}/ligne-1.pdf";
     Storage::disk('local')->put($path, 'fake-pdf-content');
 
-    $sousCategorie = SousCategorie::factory()->create();
+    $compteVentilation = Compte::factory()->create();
     $ligne = NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf2->id,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
         'piece_jointe_path' => $path,
     ]);
 
@@ -517,10 +517,10 @@ it('piece-jointe returns 404 when the NDF belongs to another association', funct
         'association_id' => $assocB->id,
         'tiers_id' => $tiersB->id,
     ]);
-    $sousCategorie = SousCategorie::factory()->create();
+    $compteVentilation = Compte::factory()->create();
     $ligneB = NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndfB->id,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
         'piece_jointe_path' => "associations/{$assocB->id}/ndf/{$ndfB->id}/f.pdf",
     ]);
     Storage::disk('local')->put($ligneB->piece_jointe_path, 'content');

@@ -8,9 +8,9 @@ use App\Enums\StatutNoteDeFrais;
 use App\Livewire\BackOffice\NoteDeFrais\Index;
 use App\Livewire\BackOffice\NoteDeFrais\Show;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
@@ -161,12 +161,12 @@ it('comptable from A cannot access piece-jointe of NDF from B', function (): voi
     // Create NDF + ligne with PJ in B
     isoBootTenant($assocB);
     $ndfB = isoMakeSoumise($assocB);
-    $sousCategorie = SousCategorie::factory()->create();
+    $compteVentilation = Compte::factory()->create();
     $path = "associations/{$assocB->id}/notes-de-frais/{$ndfB->id}/ligne-1.pdf";
     Storage::disk('local')->put($path, 'fake-pdf');
     $ligneB = NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndfB->id,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
         'piece_jointe_path' => $path,
     ]);
 

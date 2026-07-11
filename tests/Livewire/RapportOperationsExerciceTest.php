@@ -5,9 +5,8 @@ declare(strict_types=1);
 use App\Enums\StatutOperation;
 use App\Livewire\RapportCompteResultatOperations;
 use App\Models\Association;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\Operation;
-use App\Models\SousCategorie;
 use App\Models\TypeOperation;
 use App\Models\User;
 use App\Tenant\TenantContext;
@@ -22,11 +21,7 @@ beforeEach(function () {
     $this->actingAs($this->user);
     session(['exercice_actif' => 2025]);
 
-    $categorie = Categorie::factory()->recette()->create(['association_id' => $this->association->id]);
-    $this->sousCategorie = SousCategorie::factory()->create([
-        'association_id' => $this->association->id,
-        'categorie_id' => $categorie->id,
-    ]);
+    $this->compteVentilation = Compte::factory()->create(['association_id' => $this->association->id]);
 });
 
 afterEach(function () {
@@ -37,7 +32,7 @@ afterEach(function () {
 it('RapportCompteResultatOperations n\'affiche pas les opérations hors exercice', function () {
     $typeOp = TypeOperation::factory()->create([
         'association_id' => $this->association->id,
-        'sous_categorie_id' => $this->sousCategorie->id,
+        'compte_id' => $this->compteVentilation->id,
     ]);
     Operation::factory()->create([
         'association_id' => $this->association->id,
@@ -57,7 +52,7 @@ it('RapportCompteResultatOperations n\'affiche pas les opérations hors exercice
 it('RapportCompteResultatOperations affiche les opérations clôturées dans l\'exercice', function () {
     $typeOp = TypeOperation::factory()->create([
         'association_id' => $this->association->id,
-        'sous_categorie_id' => $this->sousCategorie->id,
+        'compte_id' => $this->compteVentilation->id,
     ]);
     Operation::factory()->create([
         'association_id' => $this->association->id,

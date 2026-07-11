@@ -1,11 +1,9 @@
 <?php
 
 use App\Models\BudgetLine;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\Famille;
 use App\Models\Operation;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -16,26 +14,14 @@ use App\Tenant\TenantContext;
 beforeEach(function () {
     $this->service = new RapportService;
     $this->user = User::factory()->create();
-    $this->depenseCat = Categorie::factory()->depense()->create(['nom' => 'Achats']);
-    $this->recetteCat = Categorie::factory()->recette()->create(['nom' => 'Cotisations']);
 });
 
-/**
- * Ligne de ventilation compte-first : compte résolu depuis le code_cerfa de la
- * sous-catégorie (matérialisé par SousCategorieCompteObserver), debit/credit
- * posés selon le type de la transaction (dépense: débit, recette: crédit).
- */
-function rapportSvcLigne(Transaction $tx, SousCategorie $sc, float $montant, ?int $operationId = null, ?int $seance = null): TransactionLigne
+function rapportSvcLigne(Transaction $tx, Compte $compte, float $montant, ?int $operationId = null, ?int $seance = null): TransactionLigne
 {
-    $compte = Compte::where('numero_pcg', $sc->code_cerfa)
-        ->where('association_id', $sc->association_id)
-        ->firstOrFail();
-
     $estDepense = $tx->type->value === 'depense';
 
     return TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sc->id,
         'operation_id' => $operationId,
         'seance' => $seance,
         'montant' => $montant,
@@ -48,14 +34,7 @@ function rapportSvcLigne(Transaction $tx, SousCategorie $sc, float $montant, ?in
 // ── compteDeResultat ──────────────────────────────────────────────────────────
 
 it('compteDeResultat retourne la hiérarchie famille/compte pour N', function () {
-    // DC-4 : le regroupement de 1er niveau est la famille (préfixe 2 chiffres du
-    // numero_pcg), pas la catégorie. code_cerfa déclenche la matérialisation
-    // Compte (intitulé = nom de la sous-catégorie) + Famille de secours (nom = code).
-    $sc = SousCategorie::factory()->create([
-        'categorie_id' => $this->depenseCat->id,
-        'nom' => 'Fournitures',
-        'code_cerfa' => '606',
-    ]);
+    $sc = Compte::factory()->depense()->numero('606')->create(['intitule' => 'Fournitures']);
     $depense = Transaction::factory()->asDepense()->create(['date' => '2025-11-15', 'saisi_par' => $this->user->id]);
     $depense->lignes()->forceDelete();
     rapportSvcLigne($depense, $sc, 150.00);
@@ -75,7 +54,7 @@ it('compteDeResultat retourne la hiérarchie famille/compte pour N', function ()
 });
 
 it('compteDeResultat inclut montant_n1 depuis exercice précédent', function () {
-    $sc = SousCategorie::factory()->create(['categorie_id' => $this->depenseCat->id, 'nom' => 'Location', 'code_cerfa' => '613']);
+    $sc = Compte::factory()->depense()->numero('613')->create(['intitule' => 'Location']);
 
     // N-1 : exercice 2024 (sept 2024 - août 2025)
     $depenseN1 = Transaction::factory()->asDepense()->create(['date' => '2024-10-01', 'saisi_par' => $this->user->id]);
@@ -95,8 +74,8 @@ it('compteDeResultat inclut montant_n1 depuis exercice précédent', function ()
 });
 
 it('compteDeResultat inclut le budget depuis budget_lines', function () {
-    $sc = SousCategorie::factory()->create(['categorie_id' => $this->depenseCat->id, 'nom' => 'Salle', 'code_cerfa' => '614']);
-    BudgetLine::factory()->create(['sous_categorie_id' => $sc->id, 'exercice' => 2025, 'montant_prevu' => 1000.00]);
+    $sc = Compte::factory()->depense()->numero('614')->create(['intitule' => 'Salle']);
+    BudgetLine::factory()->create(['compte_id' => $sc->id, 'exercice' => 2025, 'montant_prevu' => 1000.00]);
 
     $depense = Transaction::factory()->asDepense()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
     $depense->lignes()->forceDelete();
@@ -109,7 +88,7 @@ it('compteDeResultat inclut le budget depuis budget_lines', function () {
 });
 
 it('compteDeResultat inclut les dons dans les produits', function () {
-    $sc = SousCategorie::factory()->create(['categorie_id' => $this->recetteCat->id, 'nom' => 'Dons manuels', 'code_cerfa' => '754']);
+    $sc = Compte::factory()->numero('754')->create(['intitule' => 'Dons manuels']);
     $recette = Transaction::factory()->asRecette()->create([
         'date' => '2025-11-01',
         'montant_total' => 500.00,
@@ -125,7 +104,7 @@ it('compteDeResultat inclut les dons dans les produits', function () {
 });
 
 it('compteDeResultat inclut les cotisations dans les produits', function () {
-    $sc = SousCategorie::factory()->create(['categorie_id' => $this->recetteCat->id, 'nom' => 'Adhésions', 'code_cerfa' => '756']);
+    $sc = Compte::factory()->numero('756')->create(['intitule' => 'Adhésions']);
     $recette = Transaction::factory()->asRecette()->create([
         'date' => '2025-11-01',
         'montant_total' => 200.00,
@@ -140,38 +119,33 @@ it('compteDeResultat inclut les cotisations dans les produits', function () {
 });
 
 it('compteDeResultat trie familles et comptes par nom', function () {
-    // DC-4 : le regroupement de 1er niveau est la famille (préfixe 2 chiffres du numero_pcg).
-    // On nomme explicitement 2 familles ('Alpha' code 61, 'Zèbre' code 62) pour contrôler
-    // le tri, et on rattache chaque sous-catégorie via code_cerfa à l'une ou l'autre.
     $tenantId = (int) TenantContext::currentId();
     Famille::create(['association_id' => $tenantId, 'code' => '61', 'nom' => 'Alpha']);
     Famille::create(['association_id' => $tenantId, 'code' => '62', 'nom' => 'Zèbre']);
 
-    $catB = Categorie::factory()->depense()->create(['nom' => 'Zèbre']);
-    $catA = Categorie::factory()->depense()->create(['nom' => 'Alpha']);
-    $sc2 = SousCategorie::factory()->create(['categorie_id' => $catA->id, 'nom' => 'Zzz', 'code_cerfa' => '611']);
-    $sc1 = SousCategorie::factory()->create(['categorie_id' => $catA->id, 'nom' => 'Aaa', 'code_cerfa' => '612']);
+    $sc2 = Compte::factory()->depense()->numero('611')->create(['intitule' => 'Zzz']);
+    $sc1 = Compte::factory()->depense()->numero('612')->create(['intitule' => 'Aaa']);
+    $sc3 = Compte::factory()->depense()->numero('621')->create(['intitule' => 'Mid']);
 
-    foreach ([$catA, $catB] as $cat) {
-        $sc = $cat->id === $catA->id ? $sc1 : SousCategorie::factory()->create(['categorie_id' => $catB->id, 'nom' => 'Mid', 'code_cerfa' => '621']);
-        $d = Transaction::factory()->asDepense()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
-        $d->lignes()->forceDelete();
-        rapportSvcLigne($d, $sc, 10.00);
-    }
-    // Also add sc2 data
+    $d = Transaction::factory()->asDepense()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
+    $d->lignes()->forceDelete();
+    rapportSvcLigne($d, $sc1, 10.00);
+
     $d2 = Transaction::factory()->asDepense()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
     $d2->lignes()->forceDelete();
-    rapportSvcLigne($d2, $sc2, 10.00);
+    rapportSvcLigne($d2, $sc3, 10.00);
+
+    $d3 = Transaction::factory()->asDepense()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
+    $d3->lignes()->forceDelete();
+    rapportSvcLigne($d3, $sc2, 10.00);
 
     $result = $this->service->compteDeResultat(2025);
 
     $chargeLabels = collect($result['charges'])->pluck('label')->toArray();
-    // Verify Alpha before Zèbre
     $alphaIdx = array_search('61 — Alpha', $chargeLabels);
     $zebreIdx = array_search('62 — Zèbre', $chargeLabels);
     expect($alphaIdx)->toBeLessThan($zebreIdx);
 
-    // Sous-catégories (comptes) de la famille Alpha triées : Aaa avant Zzz
     $alphaEntry = collect($result['charges'])->firstWhere('label', '61 — Alpha');
     expect($alphaEntry['sous_categories'][0]['label'])->toBe('Aaa');
     expect($alphaEntry['sous_categories'][1]['label'])->toBe('Zzz');
@@ -181,7 +155,7 @@ it('compteDeResultat trie familles et comptes par nom', function () {
 
 it('compteDeResultatOperations filtre par opérations et exclut les cotisations', function () {
     $op = Operation::factory()->create();
-    $sc = SousCategorie::factory()->create(['categorie_id' => $this->depenseCat->id, 'nom' => 'Transport', 'code_cerfa' => '625']);
+    $sc = Compte::factory()->depense()->numero('625')->create(['intitule' => 'Transport']);
 
     $depense = Transaction::factory()->asDepense()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
     $depense->lignes()->forceDelete();
@@ -189,8 +163,7 @@ it('compteDeResultatOperations filtre par opérations et exclut les cotisations'
     rapportSvcLigne($depense, $sc, 100.00, (int) $op->id);
     rapportSvcLigne($depense, $sc, 200.00, null);
 
-    // Cotisation via transaction (doit être exclue car sans operation_id)
-    $scCot = SousCategorie::factory()->pourCotisations()->create(['categorie_id' => $this->recetteCat->id, 'nom' => 'Adhésions', 'code_cerfa' => '756']);
+    $scCot = Compte::factory()->pourCotisations()->numero('756')->create(['intitule' => 'Adhésions']);
     $recette = Transaction::factory()->asRecette()->create(['date' => '2025-10-01', 'montant_total' => 500.00, 'saisi_par' => $this->user->id]);
     $recette->lignes()->forceDelete();
     rapportSvcLigne($recette, $scCot, 500.00);
@@ -198,13 +171,13 @@ it('compteDeResultatOperations filtre par opérations et exclut les cotisations'
     $result = $this->service->compteDeResultatOperations(2025, [$op->id]);
 
     expect($result['charges'][0]['montant'])->toBe(100.0);
-    expect($result['produits'])->toHaveCount(0); // pas de recettes ni dons pour cette op
+    expect($result['produits'])->toHaveCount(0);
 });
 
 it('compteDeResultatOperations retourne structure sans montant_n1 ni budget', function () {
     $op = Operation::factory()->create();
-    $sc = SousCategorie::factory()->create(['categorie_id' => $this->depenseCat->id, 'nom' => 'Salle', 'code_cerfa' => '614']);
-    BudgetLine::factory()->create(['sous_categorie_id' => $sc->id, 'exercice' => 2025, 'montant_prevu' => 999.00]);
+    $sc = Compte::factory()->depense()->numero('614')->create(['intitule' => 'Salle']);
+    BudgetLine::factory()->create(['compte_id' => $sc->id, 'exercice' => 2025, 'montant_prevu' => 999.00]);
 
     $d = Transaction::factory()->asDepense()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
     $d->lignes()->forceDelete();
@@ -221,7 +194,7 @@ it('compteDeResultatOperations retourne structure sans montant_n1 ni budget', fu
 
 it('compteDeResultatOperations avec parSeances regroupe par séance', function () {
     $op = Operation::factory()->create();
-    $sc = SousCategorie::factory()->create(['categorie_id' => $this->depenseCat->id, 'nom' => 'Transport', 'code_cerfa' => '625']);
+    $sc = Compte::factory()->depense()->numero('625')->create(['intitule' => 'Transport']);
 
     $d1 = Transaction::factory()->asDepense()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
     $d1->lignes()->forceDelete();
@@ -250,7 +223,7 @@ it('compteDeResultatOperations avec parSeances regroupe par séance', function (
 
 it('compteDeResultatOperations avec parTiers regroupe par tiers', function () {
     $op = Operation::factory()->create();
-    $sc = SousCategorie::factory()->create(['categorie_id' => $this->depenseCat->id, 'nom' => 'Transport', 'code_cerfa' => '625']);
+    $sc = Compte::factory()->depense()->numero('625')->create(['intitule' => 'Transport']);
 
     $tiers1 = Tiers::factory()->create(['type' => 'particulier', 'nom' => 'dupont', 'prenom' => 'Jean']);
     $tiers2 = Tiers::factory()->entreprise()->create(['entreprise' => 'Martin SAS']);
@@ -292,7 +265,7 @@ it('compteDeResultatOperations avec parTiers regroupe par tiers', function () {
 
 it('compteDeResultatOperations avec parSeances et parTiers combinés', function () {
     $op = Operation::factory()->create();
-    $sc = SousCategorie::factory()->create(['categorie_id' => $this->depenseCat->id, 'nom' => 'Transport', 'code_cerfa' => '625']);
+    $sc = Compte::factory()->depense()->numero('625')->create(['intitule' => 'Transport']);
     $tiers = Tiers::factory()->create(['type' => 'particulier', 'nom' => 'dupont', 'prenom' => 'Jean']);
 
     $d = Transaction::factory()->asDepense()->create(['date' => '2025-10-01', 'tiers_id' => $tiers->id, 'saisi_par' => $this->user->id]);

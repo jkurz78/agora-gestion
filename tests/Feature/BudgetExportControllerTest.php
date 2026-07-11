@@ -2,15 +2,12 @@
 
 declare(strict_types=1);
 
-use App\Enums\TypeCategorie;
 use App\Enums\TypeTransaction;
 use App\Models\Association;
 use App\Models\BudgetLine;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Famille;
-use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
@@ -26,11 +23,8 @@ beforeEach(function () {
     // Famille nommée AVANT la matérialisation du compte (sinon fallback nom = code)
     Famille::create(['association_id' => $this->association->id, 'code' => '61', 'nom' => 'Charges']);
 
-    $cat = Categorie::factory()->create(['nom' => 'Charges', 'type' => TypeCategorie::Depense]);
-    $this->sc = SousCategorie::factory()->create(['nom' => 'Loyers', 'categorie_id' => $cat->id, 'code_cerfa' => '613']);
-    $this->compteLoyers = Compte::where('numero_pcg', '613')
-        ->where('association_id', $this->association->id)
-        ->firstOrFail();
+    $this->sc = Compte::factory()->numero('613')->create(['intitule' => 'Loyers']);
+    $this->compteLoyers = $this->sc;
 
     // Réalisé exercice 2025 (Sept 2025–Aug 2026) : Loyers=1200
     $compte = CompteBancaire::factory()->create();
@@ -42,7 +36,6 @@ beforeEach(function () {
     ]);
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $this->sc->id,
         'montant' => 1200.00,
         'compte_id' => $this->compteLoyers->id,
         'debit' => 1200.00,
@@ -86,7 +79,7 @@ it('télécharge un Excel budget', function () {
 });
 
 it('source budget exporte les montants_prevu', function () {
-    BudgetLine::factory()->create(['sous_categorie_id' => $this->sc->id, 'exercice' => 2025, 'montant_prevu' => 900.00]);
+    BudgetLine::factory()->create(['compte_id' => $this->sc->id, 'exercice' => 2025, 'montant_prevu' => 900.00]);
 
     $response = $this->actingAs($this->user)
         ->withSession(['exercice_actif' => 2025])

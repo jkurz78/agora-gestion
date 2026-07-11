@@ -15,15 +15,13 @@ use Livewire\Livewire;
 beforeEach(function (): void {
     $this->user = User::factory()->create();
     $this->user->associations()->attach(TenantContext::currentId(), ['role' => 'admin', 'joined_at' => now()]);
-    // DC-8 : le sélecteur porte des ids de comptes — code_cerfa classe 7
-    // matérialise le Compte miroir utilisé par les tests.
-    $this->sc = SousCategorie::factory()->pourCotisations()->create(['code_cerfa' => '756']);
-    $this->compte = Compte::where('numero_pcg', '756')->firstOrFail();
+    // DC-8/DC-10a : le sélecteur porte des ids de comptes — création directe.
+    $this->compte = Compte::factory()->numero('756')->pourCotisations()->create();
 });
 
 it('affiche la liste des formules', function (): void {
-    FormuleAdhesion::factory()->create(['sous_categorie_id' => $this->sc->id, 'nom' => 'Adhésion adulte']);
-    FormuleAdhesion::factory()->create(['sous_categorie_id' => SousCategorie::factory()->pourCotisations(), 'nom' => 'Adhésion étudiant']);
+    FormuleAdhesion::factory()->create(['compte_id' => $this->compte->id, 'nom' => 'Adhésion adulte']);
+    FormuleAdhesion::factory()->create(['compte_id' => Compte::factory()->pourCotisations(), 'nom' => 'Adhésion étudiant']);
 
     Livewire::actingAs($this->user)
         ->test(FormulesList::class)
@@ -87,7 +85,7 @@ it('refuse mode durée sans duree_mois', function (): void {
 });
 
 it('refuse une 2e formule active sur la même sous-cat (contrainte applicative remontée à l\'UI)', function (): void {
-    FormuleAdhesion::factory()->create(['sous_categorie_id' => $this->sc->id, 'actif' => true]);
+    FormuleAdhesion::factory()->create(['compte_id' => $this->compte->id, 'actif' => true]);
 
     Livewire::actingAs($this->user)
         ->test(FormulesList::class)
@@ -101,7 +99,7 @@ it('refuse une 2e formule active sur la même sous-cat (contrainte applicative r
 });
 
 it('édite une formule existante via la modale', function (): void {
-    $formule = FormuleAdhesion::factory()->create(['sous_categorie_id' => $this->sc->id, 'nom' => 'Ancien nom']);
+    $formule = FormuleAdhesion::factory()->create(['compte_id' => $this->compte->id, 'nom' => 'Ancien nom']);
 
     Livewire::actingAs($this->user)
         ->test(FormulesList::class)
@@ -115,7 +113,7 @@ it('édite une formule existante via la modale', function (): void {
 });
 
 it('soft-delete une formule', function (): void {
-    $formule = FormuleAdhesion::factory()->create(['sous_categorie_id' => $this->sc->id]);
+    $formule = FormuleAdhesion::factory()->create(['compte_id' => $this->compte->id]);
 
     Livewire::actingAs($this->user)
         ->test(FormulesList::class)
@@ -126,8 +124,7 @@ it('soft-delete une formule', function (): void {
 });
 
 it('refuse un compte dont l\'usage n\'est pas Cotisation', function (): void {
-    SousCategorie::factory()->pourDons()->create(['code_cerfa' => '754A']);
-    $compteDon = Compte::where('numero_pcg', '754A')->firstOrFail();
+    $compteDon = Compte::factory()->numero('754')->pourDons()->create();
 
     Livewire::actingAs($this->user)
         ->test(FormulesList::class)
@@ -141,7 +138,7 @@ it('refuse un compte dont l\'usage n\'est pas Cotisation', function (): void {
 
 it('édition d\'une formule HelloAsso : seul le flag actif est modifiable', function (): void {
     $formule = FormuleAdhesion::factory()->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->compte->id,
         'nom' => 'Adhésion HA',
         'est_helloasso' => true,
         'helloasso_form_slug' => 'cotisation-2025',
@@ -244,7 +241,7 @@ it('crée une formule mode duree avec unité jours (duree_jours=10)', function (
 
 it('la liste affiche "N jours" dans la colonne Durée pour une formule en jours', function (): void {
     FormuleAdhesion::factory()->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->compte->id,
         'nom' => 'Saison 300j',
         'mode' => 'duree',
         'duree_mois' => null,
@@ -263,7 +260,7 @@ it('openEdit d\'une formule duree_jours=300 pré-remplit uniteDuree=jours et dur
     FormuleAdhesion::query()->update(['actif' => false]);
 
     $formule = FormuleAdhesion::factory()->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->compte->id,
         'nom' => 'Saison sportive',
         'mode' => 'duree',
         'duree_mois' => null,

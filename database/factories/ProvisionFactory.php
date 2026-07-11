@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Enums\TypeTransaction;
+use App\Models\Compte;
 use App\Models\Provision;
-use App\Models\SousCategorie;
 use App\Models\User;
 use App\Services\ExerciceService;
 use App\Tenant\TenantContext;
@@ -26,7 +26,7 @@ final class ProvisionFactory extends Factory
             'association_id' => TenantContext::currentId() ?? 1,
             'exercice' => $exercice,
             'type' => fake()->randomElement(TypeTransaction::cases()),
-            'sous_categorie_id' => SousCategorie::factory(),
+            'compte_id' => Compte::factory(),
             'libelle' => 'Provision '.fake()->word(),
             'montant' => fake()->randomFloat(2, -5000, 5000),
             'tiers_id' => null,

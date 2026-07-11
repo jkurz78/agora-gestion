@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Livewire\TypeOperationShow;
 use App\Models\Association;
 use App\Models\Compte;
-use App\Models\SousCategorie;
 use App\Models\TypeOperation;
 use App\Models\User;
 use App\Tenant\TenantContext;
@@ -21,14 +20,10 @@ beforeEach(function () {
     TenantContext::boot($this->association);
     session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
-    // DC-8 : le sélecteur porte des ids de comptes — code_cerfa classe 7
-    // matérialise le Compte miroir utilisé par les wire sets.
-    $this->sousCategorie = SousCategorie::factory()->pourInscriptions()->create([
+    // DC-10a : le sélecteur porte directement des ids de comptes.
+    $this->compte = Compte::factory()->pourInscriptions()->numero('706')->create([
         'association_id' => $this->association->id,
-        'code_cerfa' => '706',
     ]);
-    $this->compte = Compte::where('association_id', $this->association->id)
-        ->where('numero_pcg', '706')->firstOrFail();
 });
 
 afterEach(function () {
@@ -75,7 +70,7 @@ it('upload attestation via TypeOperationShow places file under associations/{aid
 
 it('typeOpLogoFullPath returns correct path when logo_path is set', function () {
     $type = TypeOperation::factory()->create([
-        'sous_categorie_id' => $this->sousCategorie->id,
+        'compte_id' => $this->compte->id,
         'association_id' => $this->association->id,
         'logo_path' => 'logo.png',
     ]);
@@ -88,7 +83,7 @@ it('typeOpLogoFullPath returns correct path when logo_path is set', function () 
 
 it('typeOpLogoFullPath returns null when logo_path is null', function () {
     $type = TypeOperation::factory()->create([
-        'sous_categorie_id' => $this->sousCategorie->id,
+        'compte_id' => $this->compte->id,
         'association_id' => $this->association->id,
         'logo_path' => null,
     ]);
@@ -98,7 +93,7 @@ it('typeOpLogoFullPath returns null when logo_path is null', function () {
 
 it('typeOpAttestationFullPath returns correct path when attestation_medicale_path is set', function () {
     $type = TypeOperation::factory()->create([
-        'sous_categorie_id' => $this->sousCategorie->id,
+        'compte_id' => $this->compte->id,
         'association_id' => $this->association->id,
         'attestation_medicale_path' => 'attestation.pdf',
     ]);
@@ -111,7 +106,7 @@ it('typeOpAttestationFullPath returns correct path when attestation_medicale_pat
 
 it('typeOpAttestationFullPath returns null when attestation_medicale_path is null', function () {
     $type = TypeOperation::factory()->create([
-        'sous_categorie_id' => $this->sousCategorie->id,
+        'compte_id' => $this->compte->id,
         'association_id' => $this->association->id,
         'attestation_medicale_path' => null,
     ]);
@@ -123,7 +118,7 @@ it('delete logo removes the file from local disk and sets logo_path to null', fu
     $aid = $this->association->id;
 
     $type = TypeOperation::factory()->create([
-        'sous_categorie_id' => $this->sousCategorie->id,
+        'compte_id' => $this->compte->id,
         'association_id' => $aid,
         'logo_path' => 'logo.png',
     ]);

@@ -2,14 +2,11 @@
 
 declare(strict_types=1);
 
-use App\Enums\TypeCategorie;
 use App\Enums\TypeTransaction;
 use App\Models\BudgetLine;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Famille;
-use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\BudgetExportService;
@@ -22,16 +19,13 @@ beforeEach(function () {
     Famille::create(['association_id' => $tenantId, 'code' => '61', 'nom' => 'Charges']);
     Famille::create(['association_id' => $tenantId, 'code' => '75', 'nom' => 'Produits']);
 
-    // Sous-catégories avec code_cerfa → SousCategorieCompteObserver matérialise les comptes
-    $catCharge = Categorie::factory()->create(['nom' => 'Charges', 'type' => TypeCategorie::Depense]);
-    $this->scLoyers = SousCategorie::factory()->create(['nom' => 'Loyers', 'categorie_id' => $catCharge->id, 'code_cerfa' => '613']);
-    $this->scElec = SousCategorie::factory()->create(['nom' => 'Électricité', 'categorie_id' => $catCharge->id, 'code_cerfa' => '616']);
+    // Comptes classe 6/7 → CompteObserver matérialise la famille + la sous-catégorie miroir
+    $this->scLoyers = Compte::factory()->numero('613')->create(['intitule' => 'Loyers']);
+    $this->scElec = Compte::factory()->numero('616')->create(['intitule' => 'Électricité']);
+    $this->scCotis = Compte::factory()->numero('756')->create(['intitule' => 'Cotisations']);
 
-    $catProduit = Categorie::factory()->create(['nom' => 'Produits', 'type' => TypeCategorie::Recette]);
-    $this->scCotis = SousCategorie::factory()->create(['nom' => 'Cotisations', 'categorie_id' => $catProduit->id, 'code_cerfa' => '756']);
-
-    $this->compteLoyers = Compte::where('numero_pcg', '613')->where('association_id', $tenantId)->firstOrFail();
-    $this->compteCotis = Compte::where('numero_pcg', '756')->where('association_id', $tenantId)->firstOrFail();
+    $this->compteLoyers = $this->scLoyers;
+    $this->compteCotis = $this->scCotis;
 
     // Réalisé 2025 : Loyers=1200, Électricité=0 (pas de transaction), Cotisations=850
     $compte = CompteBancaire::factory()->create();
@@ -44,7 +38,6 @@ beforeEach(function () {
     ]);
     TransactionLigne::factory()->create([
         'transaction_id' => $txLoyers->id,
-        'sous_categorie_id' => $this->scLoyers->id,
         'montant' => 1200.00,
         'compte_id' => $this->compteLoyers->id,
         'debit' => 1200.00,
@@ -59,7 +52,6 @@ beforeEach(function () {
     ]);
     TransactionLigne::factory()->create([
         'transaction_id' => $txCotis->id,
-        'sous_categorie_id' => $this->scCotis->id,
         'montant' => 850.00,
         'compte_id' => $this->compteCotis->id,
         'debit' => 0.0,
@@ -102,8 +94,8 @@ it('source realise remplit les montants non nuls, laisse vide les zéros', funct
 });
 
 it('source budget exporte les montants_prevu de la table budget_lines', function () {
-    BudgetLine::factory()->create(['sous_categorie_id' => $this->scLoyers->id, 'exercice' => 2025, 'montant_prevu' => 900.00]);
-    BudgetLine::factory()->create(['sous_categorie_id' => $this->scCotis->id, 'exercice' => 2025, 'montant_prevu' => 700.00]);
+    BudgetLine::factory()->create(['compte_id' => $this->scLoyers->id, 'exercice' => 2025, 'montant_prevu' => 900.00]);
+    BudgetLine::factory()->create(['compte_id' => $this->scCotis->id, 'exercice' => 2025, 'montant_prevu' => 700.00]);
     // scElec intentionnellement absent → cellule vide
 
     $rows = app(BudgetExportService::class)->rows(2026, 'budget', 2025);

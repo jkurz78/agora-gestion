@@ -7,9 +7,8 @@ declare(strict_types=1);
 use App\Enums\TypeTransaction;
 use App\Livewire\RapportCompteResultat;
 use App\Models\Association;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\Provision;
-use App\Models\SousCategorie;
 use App\Models\User;
 use App\Services\ExerciceService;
 use App\Tenant\TenantContext;
@@ -22,8 +21,7 @@ beforeEach(function () {
     TenantContext::boot($this->association);
     session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
-    $this->categorie = Categorie::factory()->create();
-    $this->sc = SousCategorie::factory()->create(['categorie_id' => $this->categorie->id]);
+    $this->sc = Compte::factory()->create();
 });
 
 afterEach(function () {
@@ -39,7 +37,7 @@ it('displays provisions block in compte de resultat', function () {
         'type' => TypeTransaction::Depense,
         'libelle' => 'FNP Maintenance',
         'montant' => 800.00,
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'saisi_par' => $this->user->id,
         'date' => ($annee + 1).'-08-31',
     ]);
@@ -58,7 +56,7 @@ it('displays extournes block from previous exercice', function () {
         'type' => TypeTransaction::Depense,
         'libelle' => 'FNP Loyer ancien',
         'montant' => 500.00,
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'saisi_par' => $this->user->id,
         'date' => $annee.'-08-31',
     ]);
@@ -76,7 +74,7 @@ it('computes resultat net including provisions and extournes', function () {
         'exercice' => $annee,
         'type' => TypeTransaction::Depense,
         'montant' => 800.00,
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'saisi_par' => $this->user->id,
         'date' => ($annee + 1).'-08-31',
     ]);

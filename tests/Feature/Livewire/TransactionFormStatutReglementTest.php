@@ -18,10 +18,8 @@ declare(strict_types=1);
 use App\Enums\StatutReglement;
 use App\Livewire\TransactionForm;
 use App\Models\Association;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
-use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Tenant\TenantContext;
@@ -44,20 +42,7 @@ beforeEach(function () {
         'association_id' => $this->association->id,
     ]);
 
-    // Sous-catégorie recette (sans usage spécial pour rester hors inscription-guard)
-    // DC-8 : code_cerfa classe 7 matérialise le Compte miroir — TransactionForm
-    // attend désormais un id de compte dans lignes.*.sous_categorie_id.
-    $categorieRecette = Categorie::factory()->recette()->create([
-        'association_id' => $this->association->id,
-    ]);
-    $this->scRecette = SousCategorie::factory()->create([
-        'association_id' => $this->association->id,
-        'categorie_id' => $categorieRecette->id,
-        'code_cerfa' => '706',
-    ]);
-    $this->compteRecette = Compte::where('association_id', $this->association->id)
-        ->where('numero_pcg', '706')
-        ->firstOrFail();
+    $this->compteRecette = Compte::factory()->numero('706')->create();
 });
 
 afterEach(function () {

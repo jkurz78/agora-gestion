@@ -7,9 +7,9 @@ use App\Enums\StatutReglement;
 use App\Enums\TypeLigneFacture;
 use App\Enums\TypeTransaction;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\Facture;
 use App\Models\FactureLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -28,9 +28,9 @@ function classifCreateTiers(): Tiers
     return Tiers::factory()->create();
 }
 
-function classifCreateSousCategorie(): SousCategorie
+function classifCreateCompteVentilation(): Compte
 {
-    return SousCategorie::factory()->create(['code_cerfa' => '706']);
+    return Compte::factory()->numero('706')->create();
 }
 
 /**
@@ -40,7 +40,7 @@ function classifCreateSousCategorie(): SousCategorie
 function classifCreerFactureAvecMontantManuel(
     FactureService $service,
     Tiers $tiers,
-    SousCategorie $sousCategorie,
+    Compte $compteVentilation,
     float $montant = 80.0,
 ): array {
     $facture = $service->creerManuelleVierge($tiers->id);
@@ -55,7 +55,7 @@ function classifCreerFactureAvecMontantManuel(
         'quantite' => 1.0,
         'montant' => $montant,
         'transaction_ligne_id' => null,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
         'ordre' => 1,
     ]);
 
@@ -90,7 +90,7 @@ function classifCreerFactureAvecRef(
     // Ajoute une TransactionLigne à tref
     $tl = TransactionLigne::create([
         'transaction_id' => $tref->id,
-        'sous_categorie_id' => null,
+        'compte_id' => null,
         'montant' => $montant,
     ]);
 
@@ -128,9 +128,9 @@ afterEach(function (): void {
 
 test('transactionsGenereesParLignesManuelles_retourne_tx_des_lignes_MontantManuel', function (): void {
     $tiers = classifCreateTiers();
-    $sousCategorie = classifCreateSousCategorie();
+    $compteVentilation = classifCreateCompteVentilation();
 
-    [$facture, $tg] = classifCreerFactureAvecMontantManuel($this->service, $tiers, $sousCategorie);
+    [$facture, $tg] = classifCreerFactureAvecMontantManuel($this->service, $tiers, $compteVentilation);
 
     $result = $facture->transactionsGenereesParLignesManuelles();
 
@@ -163,9 +163,9 @@ test('transactionsReferencees_retourne_tx_des_lignes_Montant_ref', function (): 
 
 test('transactionsReferencees_ignore_tx_generees', function (): void {
     $tiers = classifCreateTiers();
-    $sousCategorie = classifCreateSousCategorie();
+    $compteVentilation = classifCreateCompteVentilation();
 
-    [$facture, $tg] = classifCreerFactureAvecMontantManuel($this->service, $tiers, $sousCategorie);
+    [$facture, $tg] = classifCreerFactureAvecMontantManuel($this->service, $tiers, $compteVentilation);
 
     $result = $facture->transactionsReferencees();
 
@@ -176,7 +176,7 @@ test('transactionsReferencees_ignore_tx_generees', function (): void {
 
 test('helpers_disjoints_sur_facture_mixte', function (): void {
     $tiers = classifCreateTiers();
-    $sousCategorie = classifCreateSousCategorie();
+    $compteVentilation = classifCreateCompteVentilation();
 
     // Crée transaction préexistante (ref)
     $tref = Transaction::factory()->create([
@@ -188,7 +188,7 @@ test('helpers_disjoints_sur_facture_mixte', function (): void {
     ]);
     $tl = TransactionLigne::create([
         'transaction_id' => $tref->id,
-        'sous_categorie_id' => null,
+        'compte_id' => null,
         'montant' => 50.0,
     ]);
 
@@ -206,7 +206,7 @@ test('helpers_disjoints_sur_facture_mixte', function (): void {
         'quantite' => 1.0,
         'montant' => 100.0,
         'transaction_ligne_id' => null,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
         'ordre' => 1,
     ]);
 

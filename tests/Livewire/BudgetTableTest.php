@@ -3,7 +3,6 @@
 use App\Livewire\BudgetTable;
 use App\Models\Association;
 use App\Models\BudgetLine;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\SousCategorie;
 use App\Models\User;
@@ -19,25 +18,17 @@ beforeEach(function () {
     session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
 
-    // DC-8 : l'écran budget est clé par compte — code_cerfa classe 6/7
-    // matérialise les Comptes miroirs affichés par la table.
-    $this->depenseCategorie = Categorie::factory()->depense()->create(['association_id' => $this->association->id, 'nom' => 'Cat Depense']);
-    $this->depenseSc = SousCategorie::factory()->create([
+    // DC-8/DC-10a : l'écran budget est clé par compte — création directe des
+    // Comptes affichés par la table (plus de SousCategorie intermédiaire).
+    $this->depenseCompte = Compte::factory()->numero('606')->create([
         'association_id' => $this->association->id,
-        'categorie_id' => $this->depenseCategorie->id,
-        'nom' => 'SC Depense',
-        'code_cerfa' => '606',
+        'intitule' => 'SC Depense',
     ]);
-    $this->depenseCompte = Compte::where('association_id', $this->association->id)->where('numero_pcg', '606')->firstOrFail();
 
-    $this->recetteCategorie = Categorie::factory()->recette()->create(['association_id' => $this->association->id, 'nom' => 'Cat Recette']);
-    $this->recetteSc = SousCategorie::factory()->create([
+    $this->recetteCompte = Compte::factory()->numero('706')->create([
         'association_id' => $this->association->id,
-        'categorie_id' => $this->recetteCategorie->id,
-        'nom' => 'SC Recette',
-        'code_cerfa' => '706',
+        'intitule' => 'SC Recette',
     ]);
-    $this->recetteCompte = Compte::where('association_id', $this->association->id)->where('numero_pcg', '706')->firstOrFail();
 });
 
 afterEach(function () {
@@ -59,10 +50,13 @@ it('can add a budget line', function () {
     Livewire::test(BudgetTable::class)
         ->call('addLine', $this->depenseCompte->id);
 
-    // DC-8 : écrit compte_id, le trait remplit le miroir sous_categorie_id.
+    // DC-8 : écrit compte_id, le trait remplit le miroir sous_categorie_id
+    // (SousCategorie matérialisée automatiquement par CompteObserver).
+    $sousCategorieMiroir = SousCategorie::where('code_cerfa', $this->depenseCompte->numero_pcg)->firstOrFail();
+
     $this->assertDatabaseHas('budget_lines', [
         'compte_id' => $this->depenseCompte->id,
-        'sous_categorie_id' => $this->depenseSc->id,
+        'sous_categorie_id' => $sousCategorieMiroir->id,
         'exercice' => $exercice,
         'montant_prevu' => '0.00',
     ]);
@@ -73,7 +67,7 @@ it('can edit montant_prevu inline', function () {
 
     $line = BudgetLine::factory()->create([
         'association_id' => $this->association->id,
-        'sous_categorie_id' => $this->depenseSc->id,
+        'compte_id' => $this->depenseCompte->id,
         'exercice' => $exercice,
         'montant_prevu' => 100.00,
     ]);
@@ -97,7 +91,7 @@ it('can delete a budget line', function () {
 
     $line = BudgetLine::factory()->create([
         'association_id' => $this->association->id,
-        'sous_categorie_id' => $this->depenseSc->id,
+        'compte_id' => $this->depenseCompte->id,
         'exercice' => $exercice,
         'montant_prevu' => 500.00,
     ]);
@@ -113,7 +107,7 @@ it('shows prevu vs realise', function () {
 
     BudgetLine::factory()->create([
         'association_id' => $this->association->id,
-        'sous_categorie_id' => $this->depenseSc->id,
+        'compte_id' => $this->depenseCompte->id,
         'exercice' => $exercice,
         'montant_prevu' => 1000.00,
     ]);

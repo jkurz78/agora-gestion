@@ -9,11 +9,11 @@ use App\Enums\TypeLigneFacture;
 use App\Enums\TypeTransaction;
 use App\Livewire\FactureEdit;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Extourne;
 use App\Models\Facture;
 use App\Models\FactureLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -67,7 +67,7 @@ function selecteurCreerFactureAnnuleeAvecMM(
     CompteBancaire $compte,
     float $montant = 80.0,
 ): array {
-    $sousCategorie = SousCategorie::factory()->create(['code_cerfa' => '706']);
+    $compteVentilation = Compte::factory()->numero('706')->create();
 
     $facture = $service->creerManuelleVierge($tiers->id);
     $facture->update(['mode_paiement_prevu' => ModePaiement::Virement->value]);
@@ -81,7 +81,7 @@ function selecteurCreerFactureAnnuleeAvecMM(
         'quantite' => 1.0,
         'montant' => $montant,
         'transaction_ligne_id' => null,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
         'ordre' => 1,
     ]);
 
@@ -134,7 +134,7 @@ test('le selecteur de FactureEdit exclut la TX origine extournee d une facture p
     ]);
     TransactionLigne::create([
         'transaction_id' => $txLibre->id,
-        'sous_categorie_id' => null,
+        'compte_id' => null,
         'montant' => 50.0,
     ]);
 
@@ -195,7 +195,7 @@ test('le selecteur de FactureEdit inclut une TX libre du meme tiers', function (
     ]);
     TransactionLigne::create([
         'transaction_id' => $txLibre->id,
-        'sous_categorie_id' => null,
+        'compte_id' => null,
         'montant' => 50.0,
     ]);
 

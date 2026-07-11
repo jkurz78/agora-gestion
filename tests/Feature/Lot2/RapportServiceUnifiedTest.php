@@ -2,11 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Enums\TypeCategorie;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
-use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\RapportService;
@@ -15,9 +12,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 it('includes don-type recettes in produits', function () {
-    $cat = Categorie::factory()->create(['type' => TypeCategorie::Recette]);
-    // DC-4 : code_cerfa déclenche la matérialisation Compte/Famille nécessaire à CompteResultatBuilder.
-    $scDon = SousCategorie::factory()->pourDons()->create(['categorie_id' => $cat->id, 'nom' => 'Dons manuels', 'code_cerfa' => '754']);
+    $compteDon = Compte::factory()->numero('754')->pourDons()->create(['intitule' => 'Dons manuels']);
 
     $compte = CompteBancaire::factory()->create();
     $tx = Transaction::factory()->asRecette()->create([
@@ -27,9 +22,8 @@ it('includes don-type recettes in produits', function () {
     ]);
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $scDon->id,
+        'compte_id' => $compteDon->id,
         'montant' => 150.00,
-        'compte_id' => Compte::where('numero_pcg', '754')->where('association_id', $scDon->association_id)->firstOrFail()->id,
         'debit' => 0.0,
         'credit' => 150.00,
     ]);
@@ -45,9 +39,7 @@ it('includes don-type recettes in produits', function () {
 });
 
 it('includes cotisation-type recettes in produits', function () {
-    $cat = Categorie::factory()->create(['type' => TypeCategorie::Recette]);
-    // DC-4 : code_cerfa déclenche la matérialisation Compte/Famille nécessaire à CompteResultatBuilder.
-    $scCot = SousCategorie::factory()->pourCotisations()->create(['categorie_id' => $cat->id, 'nom' => 'Cotisations', 'code_cerfa' => '756']);
+    $compteCot = Compte::factory()->numero('756')->pourCotisations()->create(['intitule' => 'Cotisations']);
 
     $compte = CompteBancaire::factory()->create();
     $tx = Transaction::factory()->asRecette()->create([
@@ -57,9 +49,8 @@ it('includes cotisation-type recettes in produits', function () {
     ]);
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $scCot->id,
+        'compte_id' => $compteCot->id,
         'montant' => 80.00,
-        'compte_id' => Compte::where('numero_pcg', '756')->where('association_id', $scCot->association_id)->firstOrFail()->id,
         'debit' => 0.0,
         'credit' => 80.00,
     ]);

@@ -8,12 +8,10 @@ use App\Enums\StatutFactureDeposee;
 use App\Events\Portail\FactureDeposeeComptabilisee;
 use App\Livewire\TransactionForm;
 use App\Models\Association;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Exercice;
 use App\Models\FacturePartenaireDeposee;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
@@ -38,15 +36,8 @@ beforeEach(function () {
 
     $this->tiers = Tiers::factory()->pourDepenses()->create(['association_id' => $this->association->id]);
 
-    $this->categorie = Categorie::factory()->depense()->create(['association_id' => $this->association->id]);
-    // DC-8 : code_cerfa classe 6 matérialise le Compte miroir — TransactionForm
-    // attend désormais un id de compte dans lignes.*.sous_categorie_id.
-    $this->sousCategorie = SousCategorie::factory()
-        ->for($this->categorie)
-        ->create(['association_id' => $this->association->id, 'code_cerfa' => '606']);
-    $this->compteVentilation = Compte::where('association_id', $this->association->id)
-        ->where('numero_pcg', '606')
-        ->firstOrFail();
+    // DC-8/DC-10a : TransactionForm attend un id de compte dans lignes.*.compte_id.
+    $this->compteVentilation = Compte::factory()->numero('606')->create(['association_id' => $this->association->id]);
 
     $this->compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
 });

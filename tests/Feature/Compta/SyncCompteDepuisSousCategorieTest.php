@@ -62,6 +62,7 @@ it('remplit compte_id à la création quand seule la sous-catégorie est fournie
     $budgetLine = BudgetLine::factory()->create([
         'association_id' => $associationId,
         'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => null,
     ]);
 
     expect((int) $budgetLine->compte_id)->toBe((int) $compte->id);
@@ -95,6 +96,7 @@ it('resynchronise compte_id quand la sous-catégorie change', function () {
     $budgetLine = BudgetLine::factory()->create([
         'association_id' => $associationId,
         'sous_categorie_id' => $sousCategorieA->id,
+        'compte_id' => null,
     ]);
 
     expect((int) $budgetLine->compte_id)->toBe((int) $compteA->id);
@@ -116,6 +118,7 @@ it('laisse compte_id null si la sous-catégorie n a pas de code_cerfa', function
     $budgetLine = BudgetLine::factory()->create([
         'association_id' => $associationId,
         'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => null,
     ]);
 
     expect($budgetLine->compte_id)->toBeNull();
@@ -228,6 +231,7 @@ it('couvre les 10 modèles', function () {
     $budgetLine = BudgetLine::factory()->create([
         'association_id' => $associationId,
         'sous_categorie_id' => $scId,
+        'compte_id' => null,
     ]);
 
     // facture_lignes (pas de factory — forceCreate pour déclencher le hook saving)
@@ -252,6 +256,7 @@ it('couvre les 10 modèles', function () {
     $formule = FormuleAdhesion::factory()->create([
         'association_id' => $associationId,
         'sous_categorie_id' => $scId,
+        'compte_id' => null,
     ]);
 
     // type_operations
@@ -278,6 +283,7 @@ it('couvre les 10 modèles', function () {
     $provision = Provision::factory()->create([
         'association_id' => $associationId,
         'sous_categorie_id' => $scId,
+        'compte_id' => null,
         'saisi_par' => $user->id,
     ]);
 
@@ -292,6 +298,7 @@ it('couvre les 10 modèles', function () {
     $noteDeFraisLigne = NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $noteDeFrais->id,
         'sous_categorie_id' => $scId,
+        'compte_id' => null,
     ]);
 
     // encadrement_previsions
@@ -303,6 +310,7 @@ it('couvre les 10 modèles', function () {
         'operation_id' => $operation->id,
         'tiers_id' => $tiers->id,
         'sous_categorie_id' => $scId,
+        'compte_id' => null,
         'seance_id' => $seance->id,
     ]);
 

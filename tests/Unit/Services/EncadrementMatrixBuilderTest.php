@@ -4,13 +4,11 @@ declare(strict_types=1);
 
 use App\Enums\TypeTransaction;
 use App\Models\Association;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\EncadrementPrevision;
 use App\Models\Operation;
 use App\Models\Seance;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -229,13 +227,12 @@ it('ignore les prévisions d\'une autre association (fail-closed)', function ():
     $opAutre = Operation::factory()->create();
     $sAutre = Seance::create(['operation_id' => $opAutre->id, 'numero' => 1, 'date' => now()]);
     $tAutre = Tiers::factory()->create();
-    $cAutre = Categorie::factory()->depense()->create();
-    $scAutre = SousCategorie::factory()->create(['categorie_id' => $cAutre->id]);
+    $scAutre = Compte::factory()->depense()->create();
 
     EncadrementPrevision::create([
         'operation_id' => $opAutre->id,
         'tiers_id' => $tAutre->id,
-        'sous_categorie_id' => $scAutre->id,
+        'compte_id' => $scAutre->id,
         'seance_id' => $sAutre->id,
         'montant_prevu' => 9999,
     ]);

@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 use App\Livewire\TransactionForm;
 use App\Models\Association;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
@@ -28,20 +26,7 @@ beforeEach(function () {
     $this->actingAs($this->user);
 
     $this->compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
-    $catRecette = Categorie::factory()->create([
-        'association_id' => $this->association->id,
-        'type' => 'recette',
-    ]);
-    // DC-8 : code_cerfa classe 7 matérialise le Compte miroir consommé par le
-    // sélecteur de ventilation (TransactionForm attend un id de compte).
-    $this->scRecette = SousCategorie::factory()->create([
-        'categorie_id' => $catRecette->id,
-        'association_id' => $this->association->id,
-        'code_cerfa' => '706',
-    ]);
-    $this->compteRecette = Compte::where('association_id', $this->association->id)
-        ->where('numero_pcg', '706')
-        ->firstOrFail();
+    $this->compteRecette = Compte::factory()->numero('706')->create();
 });
 
 afterEach(fn () => TenantContext::clear());

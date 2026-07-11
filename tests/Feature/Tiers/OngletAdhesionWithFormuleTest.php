@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 use App\Livewire\Tiers\FicheTiers;
 use App\Models\Adhesion;
+use App\Models\Compte;
 use App\Models\FormuleAdhesion;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\User;
 use App\Tenant\TenantContext;
@@ -14,13 +14,13 @@ use Livewire\Livewire;
 beforeEach(function (): void {
     $this->user = User::factory()->create();
     $this->user->associations()->attach(TenantContext::currentId(), ['role' => 'admin', 'joined_at' => now()]);
-    $this->sc = SousCategorie::factory()->pourCotisations()->create();
+    $this->sc = Compte::factory()->pourCotisations()->create();
 });
 
 it('affiche la formule et l\'intervalle dates en mode durée', function (): void {
     $tiers = Tiers::factory()->create();
     $formule = FormuleAdhesion::factory()->modeDuree(12)->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'nom' => 'Adhésion glissante',
     ]);
     Adhesion::factory()->create([
@@ -42,7 +42,7 @@ it('affiche la formule et l\'intervalle dates en mode durée', function (): void
 it('affiche la formule et l\'exercice en mode exercice', function (): void {
     $tiers = Tiers::factory()->create();
     $formule = FormuleAdhesion::factory()->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'nom' => 'Adhésion adulte 2025',
     ]);
     Adhesion::factory()->create([
@@ -74,7 +74,7 @@ it('reste fonctionnel pour une adhésion legacy sans formule', function (): void
 it('onglet Adhésion fiche tiers affiche Permanente pour les adhésions illimite', function (): void {
     $tiers = Tiers::factory()->create();
     $formule = FormuleAdhesion::factory()->modeIllimite()->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'nom' => 'Membre à vie',
     ]);
     Adhesion::factory()->create([
@@ -96,7 +96,7 @@ it('onglet Adhésion fiche tiers affiche Permanente pour les adhésions illimite
 it('onglet Adhésion fiche tiers affiche le badge Déductible si snapshot fiscal', function (): void {
     $tiers = Tiers::factory()->create();
     $formule = FormuleAdhesion::factory()->deductible()->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'nom' => 'Adhésion bienfaiteur',
     ]);
     Adhesion::factory()->create([
@@ -115,7 +115,7 @@ it('onglet Adhésion fiche tiers affiche le badge Déductible si snapshot fiscal
 it('onglet Adhésion fiche tiers n\'affiche pas le badge Déductible si snapshot non déductible', function (): void {
     $tiers = Tiers::factory()->create();
     $formule = FormuleAdhesion::factory()->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'nom' => 'Adhésion classique',
     ]);
     Adhesion::factory()->create([

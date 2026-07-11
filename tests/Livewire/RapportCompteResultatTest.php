@@ -3,9 +3,7 @@
 use App\Livewire\RapportCompteResultat;
 use App\Models\Association;
 use App\Models\BudgetLine;
-use App\Models\Categorie;
 use App\Models\Compte;
-use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
@@ -13,23 +11,17 @@ use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
 /**
- * Ligne de ventilation compte-first : compte résolu depuis le code_cerfa de la
- * sous-catégorie (matérialisé par SousCategorieCompteObserver), debit/credit
- * posés selon le type de la transaction (dépense: débit, recette: crédit).
+ * Ligne de ventilation compte-first : le compte est passé directement,
+ * debit/credit posés selon le type de la transaction (dépense: débit, recette: crédit).
  */
-function crTestLigne(Transaction $tx, SousCategorie $sc, float $montant): TransactionLigne
+function crTestLigne(Transaction $tx, Compte $compte, float $montant): TransactionLigne
 {
-    $compte = Compte::where('numero_pcg', $sc->code_cerfa)
-        ->where('association_id', $sc->association_id)
-        ->firstOrFail();
-
     $estDepense = $tx->type->value === 'depense';
 
     return TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sc->id,
-        'montant' => $montant,
         'compte_id' => $compte->id,
+        'montant' => $montant,
         'debit' => $estDepense ? $montant : 0.0,
         'credit' => $estDepense ? 0.0 : $montant,
     ]);
@@ -63,11 +55,10 @@ it('affiche les familles et comptes', function () {
     // du numero_pcg) et non plus la catégorie. code_cerfa déclenche la matérialisation
     // Compte (intitulé = nom de la sous-catégorie) + Famille (nom = code, fallback
     // CompteObserver) — d'où le libellé "60 — 60".
-    $cat = Categorie::factory()->depense()->create(['association_id' => $this->association->id, 'nom' => 'Charges admin']);
-    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $cat->id, 'nom' => 'Fournitures', 'code_cerfa' => '606']);
+    $compte = Compte::factory()->numero('606')->create(['association_id' => $this->association->id, 'intitule' => 'Fournitures']);
     $d = Transaction::factory()->asDepense()->create(['association_id' => $this->association->id, 'date' => '2025-11-15', 'saisi_par' => $this->user->id]);
     $d->lignes()->forceDelete();
-    crTestLigne($d, $sc, 250.00);
+    crTestLigne($d, $compte, 250.00);
 
     Livewire::test(RapportCompteResultat::class)
         ->assertSee('60 — 60')
@@ -76,18 +67,16 @@ it('affiche les familles et comptes', function () {
 });
 
 it('affiche le résultat avec couleur verte quand excédent', function () {
-    $catD = Categorie::factory()->depense()->create(['association_id' => $this->association->id]);
-    $catR = Categorie::factory()->recette()->create(['association_id' => $this->association->id]);
-    $scD = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $catD->id, 'nom' => 'Frais', 'code_cerfa' => '616']);
-    $scR = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $catR->id, 'nom' => 'Adhésions', 'code_cerfa' => '716']);
+    $compteD = Compte::factory()->numero('616')->create(['association_id' => $this->association->id, 'intitule' => 'Frais']);
+    $compteR = Compte::factory()->numero('716')->create(['association_id' => $this->association->id, 'intitule' => 'Adhésions']);
 
     $d = Transaction::factory()->asDepense()->create(['association_id' => $this->association->id, 'date' => '2025-11-01', 'saisi_par' => $this->user->id]);
     $d->lignes()->forceDelete();
-    crTestLigne($d, $scD, 100.00);
+    crTestLigne($d, $compteD, 100.00);
 
     $r = Transaction::factory()->asRecette()->create(['association_id' => $this->association->id, 'date' => '2025-11-01', 'saisi_par' => $this->user->id]);
     $r->lignes()->forceDelete();
-    crTestLigne($r, $scR, 500.00);
+    crTestLigne($r, $compteR, 500.00);
 
     Livewire::test(RapportCompteResultat::class)
         ->assertSeeHtml('#2E7D32')
@@ -95,11 +84,10 @@ it('affiche le résultat avec couleur verte quand excédent', function () {
 });
 
 it('affiche le résultat avec couleur rouge quand déficit', function () {
-    $cat = Categorie::factory()->depense()->create(['association_id' => $this->association->id]);
-    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $cat->id, 'nom' => 'Lourdes charges', 'code_cerfa' => '626']);
+    $compte = Compte::factory()->numero('626')->create(['association_id' => $this->association->id, 'intitule' => 'Lourdes charges']);
     $d = Transaction::factory()->asDepense()->create(['association_id' => $this->association->id, 'date' => '2025-11-01', 'saisi_par' => $this->user->id]);
     $d->lignes()->forceDelete();
-    crTestLigne($d, $sc, 5000.00);
+    crTestLigne($d, $compte, 5000.00);
 
     Livewire::test(RapportCompteResultat::class)
         ->assertSeeHtml('#B5453A')
@@ -107,31 +95,28 @@ it('affiche le résultat avec couleur rouge quand déficit', function () {
 });
 
 it('affiche la barre de budget quand un budget existe', function () {
-    $cat = Categorie::factory()->depense()->create(['association_id' => $this->association->id]);
-    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $cat->id, 'nom' => 'Salle', 'code_cerfa' => '636']);
-    BudgetLine::factory()->create(['association_id' => $this->association->id, 'sous_categorie_id' => $sc->id, 'exercice' => 2025, 'montant_prevu' => 1000.00]);
+    $compte = Compte::factory()->numero('636')->create(['association_id' => $this->association->id, 'intitule' => 'Salle']);
+    BudgetLine::factory()->create(['association_id' => $this->association->id, 'compte_id' => $compte->id, 'exercice' => 2025, 'montant_prevu' => 1000.00]);
     $d = Transaction::factory()->asDepense()->create(['association_id' => $this->association->id, 'date' => '2025-11-01', 'saisi_par' => $this->user->id]);
     $d->lignes()->forceDelete();
-    crTestLigne($d, $sc, 800.00);
+    crTestLigne($d, $compte, 800.00);
 
     Livewire::test(RapportCompteResultat::class)->assertSee('80 %');
 });
 
 it('barre budget recette au-dessus de l\'objectif → verte (et non rouge)', function () {
     // Recette à 120 % de son budget → la barre doit être VERTE (plus que prévu = bien).
-    $catR = Categorie::factory()->recette()->create(['association_id' => $this->association->id]);
-    $scR = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $catR->id, 'nom' => 'Cotisations', 'code_cerfa' => '746']);
-    BudgetLine::factory()->create(['association_id' => $this->association->id, 'sous_categorie_id' => $scR->id, 'exercice' => 2025, 'montant_prevu' => 1000.00]);
+    $compteR = Compte::factory()->numero('746')->create(['association_id' => $this->association->id, 'intitule' => 'Cotisations']);
+    BudgetLine::factory()->create(['association_id' => $this->association->id, 'compte_id' => $compteR->id, 'exercice' => 2025, 'montant_prevu' => 1000.00]);
     $r = Transaction::factory()->asRecette()->create(['association_id' => $this->association->id, 'date' => '2025-11-01', 'saisi_par' => $this->user->id]);
     $r->lignes()->forceDelete();
-    crTestLigne($r, $scR, 1200.00);
+    crTestLigne($r, $compteR, 1200.00);
 
     // Grosse dépense sans budget → résultat déficitaire (rouge) : le SEUL vert possible est la barre recette.
-    $catD = Categorie::factory()->depense()->create(['association_id' => $this->association->id]);
-    $scD = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $catD->id, 'nom' => 'Frais', 'code_cerfa' => '646']);
+    $compteD = Compte::factory()->numero('646')->create(['association_id' => $this->association->id, 'intitule' => 'Frais']);
     $d = Transaction::factory()->asDepense()->create(['association_id' => $this->association->id, 'date' => '2025-11-01', 'saisi_par' => $this->user->id]);
     $d->lignes()->forceDelete();
-    crTestLigne($d, $scD, 5000.00);
+    crTestLigne($d, $compteD, 5000.00);
 
     Livewire::test(RapportCompteResultat::class)
         ->assertSee('120 %')
@@ -161,12 +146,11 @@ it('propage l\'état des toggles dans exportUrl', function () {
 });
 
 it('masque la colonne N-1 quand compareN1 est false', function () {
-    $cat = Categorie::factory()->depense()->create(['association_id' => $this->association->id]);
-    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $cat->id, 'nom' => 'Frais', 'code_cerfa' => '656']);
+    $compte = Compte::factory()->numero('656')->create(['association_id' => $this->association->id, 'intitule' => 'Frais']);
     // Une dépense datée dans l'exercice N-1 (2024-2025) pour produire un montant_n1 distinct.
     $d = Transaction::factory()->asDepense()->create(['association_id' => $this->association->id, 'date' => '2024-10-01', 'saisi_par' => $this->user->id]);
     $d->lignes()->forceDelete();
-    crTestLigne($d, $sc, 777.00);
+    crTestLigne($d, $compte, 777.00);
 
     Livewire::test(RapportCompteResultat::class)
         ->assertSee('777,00')              // visible par défaut (colonne N-1 affichée)
@@ -175,12 +159,11 @@ it('masque la colonne N-1 quand compareN1 est false', function () {
 });
 
 it('masque budget/écart/barre quand compareBudget est false', function () {
-    $cat = Categorie::factory()->depense()->create(['association_id' => $this->association->id]);
-    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $cat->id, 'nom' => 'Salle', 'code_cerfa' => '666']);
-    BudgetLine::factory()->create(['association_id' => $this->association->id, 'sous_categorie_id' => $sc->id, 'exercice' => 2025, 'montant_prevu' => 1000.00]);
+    $compte = Compte::factory()->numero('666')->create(['association_id' => $this->association->id, 'intitule' => 'Salle']);
+    BudgetLine::factory()->create(['association_id' => $this->association->id, 'compte_id' => $compte->id, 'exercice' => 2025, 'montant_prevu' => 1000.00]);
     $d = Transaction::factory()->asDepense()->create(['association_id' => $this->association->id, 'date' => '2025-11-01', 'saisi_par' => $this->user->id]);
     $d->lignes()->forceDelete();
-    crTestLigne($d, $sc, 800.00);
+    crTestLigne($d, $compte, 800.00);
 
     Livewire::test(RapportCompteResultat::class)
         ->assertSeeHtml('budget-bar-fill')   // barre visible par défaut

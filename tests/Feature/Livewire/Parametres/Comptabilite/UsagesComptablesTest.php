@@ -39,23 +39,19 @@ it('renders 4 usage cards', function () {
         ->assertSee('Comptabilisation des Dons');
 });
 
-// DC-8 : l'écran liste des comptes — les fixtures créent la SousCategorie avec
-// code_cerfa pour matérialiser le Compte miroir (observer DC-7), et les appels
-// passent l'id du compte.
+// DC-10a : l'écran liste des comptes — les fixtures créent le Compte directement,
+// et les appels passent l'id du compte.
 
 it('toggleDon persists through service', function () {
-    SousCategorie::factory()->for($this->asso, 'association')->for($this->catR)->create(['code_cerfa' => '754A']);
-    $compte = Compte::where('numero_pcg', '754A')->firstOrFail();
+    $compte = Compte::factory()->numero('754')->create();
     Livewire::test(UsagesComptables::class)
         ->call('toggleDon', $compte->id, true);
     expect($compte->fresh()->hasUsage(UsageComptable::Don))->toBeTrue();
 });
 
 it('setFraisKilometriques switches mono link', function () {
-    SousCategorie::factory()->for($this->asso, 'association')->for($this->catD)->create(['code_cerfa' => '625A']);
-    SousCategorie::factory()->for($this->asso, 'association')->for($this->catD)->create(['code_cerfa' => '625B']);
-    $compte1 = Compte::where('numero_pcg', '625A')->firstOrFail();
-    $compte2 = Compte::where('numero_pcg', '625B')->firstOrFail();
+    $compte1 = Compte::factory()->depense()->numero('625')->create();
+    $compte2 = Compte::factory()->depense()->numero('6250')->create();
     Livewire::test(UsagesComptables::class)
         ->set('fraisKmSelectedId', $compte1->id)
         ->call('saveFraisKilometriques');
@@ -68,10 +64,8 @@ it('setFraisKilometriques switches mono link', function () {
 });
 
 it('abandonCreanceCandidates lists only Dons', function () {
-    SousCategorie::factory()->for($this->asso, 'association')->for($this->catR)->create(['nom' => 'Don A', 'code_cerfa' => '754A']);
-    SousCategorie::factory()->for($this->asso, 'association')->for($this->catR)->create(['nom' => 'Autre', 'code_cerfa' => '706A']);
-    $compteDon = Compte::where('numero_pcg', '754A')->firstOrFail();
-    $compteAutre = Compte::where('numero_pcg', '706A')->firstOrFail();
+    $compteDon = Compte::factory()->numero('754')->create(['intitule' => 'Don A']);
+    $compteAutre = Compte::factory()->numero('706')->create(['intitule' => 'Autre']);
     app(UsagesComptablesService::class)->toggleDon($compteDon->id, true);
 
     $comp = Livewire::test(UsagesComptables::class);
@@ -81,8 +75,7 @@ it('abandonCreanceCandidates lists only Dons', function () {
 });
 
 it('toggleDon false cascades AbandonCreance', function () {
-    SousCategorie::factory()->for($this->asso, 'association')->for($this->catR)->create(['code_cerfa' => '754A']);
-    $compte = Compte::where('numero_pcg', '754A')->firstOrFail();
+    $compte = Compte::factory()->numero('754')->create();
     $svc = app(UsagesComptablesService::class);
     $svc->toggleDon($compte->id, true);
     $svc->setAbandonCreance($compte->id);

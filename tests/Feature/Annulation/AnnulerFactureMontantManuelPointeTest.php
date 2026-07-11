@@ -10,12 +10,12 @@ use App\Enums\StatutReglement;
 use App\Enums\TypeLigneFacture;
 use App\Enums\TypeRapprochement;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Extourne;
 use App\Models\Facture;
 use App\Models\FactureLigne;
 use App\Models\RapprochementBancaire;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
@@ -65,7 +65,7 @@ afterEach(function (): void {
 function pointeCreerFactureAvecTgPointee(
     FactureService $service,
     Tiers $tiers,
-    SousCategorie $sousCategorie,
+    Compte $compteVentilation,
     CompteBancaire $compte,
     float $montant = 150.0,
 ): array {
@@ -81,7 +81,7 @@ function pointeCreerFactureAvecTgPointee(
         'quantite' => 1.0,
         'montant' => $montant,
         'transaction_ligne_id' => null,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
         'ordre' => 1,
     ]);
 
@@ -116,12 +116,12 @@ function pointeCreerFactureAvecTgPointee(
 
 test('annulation facture MontantManuel Pointe produit extourne EnAttente sans lettrage', function (): void {
     $tiers = Tiers::factory()->create(['pour_recettes' => true]);
-    $sousCategorie = SousCategorie::factory()->create(['code_cerfa' => '706']);
+    $compteVentilation = Compte::factory()->numero('706')->create();
 
     [$facture, $tg, $r1] = pointeCreerFactureAvecTgPointee(
         $this->service,
         $tiers,
-        $sousCategorie,
+        $compteVentilation,
         $this->compte,
         150.0,
     );

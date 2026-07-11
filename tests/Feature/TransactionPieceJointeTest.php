@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 use App\Enums\TypeTransaction;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
-use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\TransactionService;
@@ -162,7 +162,7 @@ it('deletePieceJointe supprime le fichier et remet les colonnes à null', functi
 
 it('la suppression d\'une transaction supprime aussi la pièce jointe du disque', function () {
     Storage::fake('local');
-    $sc = SousCategorie::factory()->create();
+    $compteVentilation = Compte::factory()->depense()->create();
     $compte = CompteBancaire::factory()->create();
     $service = app(TransactionService::class);
 
@@ -174,7 +174,7 @@ it('la suppression d\'une transaction supprime aussi la pièce jointe du disque'
         'mode_paiement' => 'virement',
         'reference' => 'REF-PJ',
         'compte_id' => $compte->id,
-    ], [['sous_categorie_id' => $sc->id, 'montant' => '50.00', 'operation_id' => null, 'seance' => null, 'notes' => null]]);
+    ], [['compte_id' => $compteVentilation->id, 'montant' => '50.00', 'operation_id' => null, 'seance' => null, 'notes' => null]]);
 
     $file = UploadedFile::fake()->create('facture.pdf', 100, 'application/pdf');
     $service->storePieceJointe($transaction, $file);
