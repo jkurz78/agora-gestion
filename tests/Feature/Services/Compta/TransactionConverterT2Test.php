@@ -76,17 +76,16 @@ function makeRecetteLegacy(object $ctx, array $overrides = []): Transaction
     // Purger toutes les lignes créées par la factory (elles ont des SC parasites)
     TransactionLigne::where('transaction_id', $tx->id)->delete();
 
-    // Ligne legacy unique : sous_categorie_id set, colonnes PD vides
-    TransactionLigne::create([
+    TransactionLigne::withoutEvents(fn () => TransactionLigne::create([
         'transaction_id' => $tx->id,
         'sous_categorie_id' => $ctx->sc706->id,
+        'compte_id' => $ctx->compte706->id,
         'montant' => 100.00,
         'operation_id' => null,
         'debit' => 0,
         'credit' => 0,
-        'compte_id' => null,
         'tiers_id' => null,
-    ]);
+    ]));
 
     return $tx->fresh();
 }
@@ -111,16 +110,16 @@ function makeDepenseLegacy(object $ctx, array $overrides = []): Transaction
     // Purger toutes les lignes créées par la factory
     TransactionLigne::where('transaction_id', $tx->id)->delete();
 
-    TransactionLigne::create([
+    TransactionLigne::withoutEvents(fn () => TransactionLigne::create([
         'transaction_id' => $tx->id,
         'sous_categorie_id' => $ctx->sc606->id,
+        'compte_id' => $ctx->compte606->id,
         'montant' => 80.00,
         'operation_id' => null,
         'debit' => 0,
         'credit' => 0,
-        'compte_id' => null,
         'tiers_id' => null,
-    ]);
+    ]));
 
     return $tx->fresh();
 }

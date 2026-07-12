@@ -6,7 +6,6 @@ namespace App\Livewire\Parametres\Comptabilite;
 
 use App\Enums\RoleAssociation;
 use App\Enums\UsageComptable;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Services\UsagesComptablesService;
 use DomainException;
@@ -23,8 +22,6 @@ final class UsagesComptables extends Component
     public bool $inlineOpen = false;
 
     public ?string $inlineUsage = null;
-
-    public ?int $inlineCategorieId = null;
 
     public string $inlineNom = '';
 
@@ -85,7 +82,7 @@ final class UsagesComptables extends Component
     public function openInline(string $usage): void
     {
         $this->requireAdmin();
-        $this->reset(['inlineCategorieId', 'inlineNom', 'inlineCodeCerfa']);
+        $this->reset(['inlineNom', 'inlineCodeCerfa']);
         $this->inlineUsage = $usage;
         $this->inlineOpen = true;
     }
@@ -97,14 +94,12 @@ final class UsagesComptables extends Component
         // entrée serait invisible sur cet écran (liste de comptes).
         $this->validate([
             'inlineUsage' => 'required|string',
-            'inlineCategorieId' => 'required|integer|exists:categories,id',
             'inlineNom' => 'required|string|max:255',
             'inlineCodeCerfa' => 'required|string|max:20',
         ]);
         $usage = UsageComptable::from($this->inlineUsage);
         try {
             app(UsagesComptablesService::class)->createAndFlag([
-                'categorie_id' => $this->inlineCategorieId,
                 'intitule' => $this->inlineNom,
                 'numero_pcg' => $this->inlineCodeCerfa,
             ], $usage);
@@ -120,16 +115,6 @@ final class UsagesComptables extends Component
     public function getAbandonCreanceCandidatesProperty(): array
     {
         return Compte::forUsage(UsageComptable::Don)->orderBy('numero_pcg')->get()->all();
-    }
-
-    public function getInlineCategoriesEligiblesProperty(): array
-    {
-        if ($this->inlineUsage === null) {
-            return [];
-        }
-        $polarite = UsageComptable::from($this->inlineUsage)->polarite();
-
-        return Categorie::where('type', $polarite)->orderBy('nom')->get()->all();
     }
 
     public function render(): View

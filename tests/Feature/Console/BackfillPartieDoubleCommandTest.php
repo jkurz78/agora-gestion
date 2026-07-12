@@ -100,7 +100,7 @@ function setupBackfillFixtureStep32(object $ctx): void
         'nom' => 'Cotisations membres',
         'code_cerfa' => '706',
     ]);
-    Compte::firstOrCreate(
+    $ctx->compte706 = Compte::firstOrCreate(
         ['association_id' => $ctx->association->id, 'numero_pcg' => '706'],
         [
             'intitule' => 'Cotisations membres',
@@ -139,7 +139,7 @@ function setupBackfillFixtureStep32(object $ctx): void
         'tiers_id' => $ctx->tiersA->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
-        ['sous_categorie_id' => $ctx->sc706->id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte706->id, 'sous_categorie_id' => $ctx->sc706->id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 
     $ctx->txVirement = $ctx->txService->create([
@@ -152,7 +152,7 @@ function setupBackfillFixtureStep32(object $ctx): void
         'tiers_id' => $ctx->tiersA->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
-        ['sous_categorie_id' => $ctx->sc706->id, 'montant' => '250.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte706->id, 'sous_categorie_id' => $ctx->sc706->id, 'montant' => '250.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 }
 
@@ -269,6 +269,8 @@ function setupBackfillFixtureStep33Legacy(object $ctx): void
         ]
     );
 
+    $ctx->compte606 = Compte::where('association_id', $ctx->association->id)->where('numero_pcg', '606')->first();
+
     $ctx->txDepense = $ctx->txService->create([
         'type' => 'depense',
         'date' => '2025-10-15',
@@ -279,7 +281,7 @@ function setupBackfillFixtureStep33Legacy(object $ctx): void
         'tiers_id' => $ctx->tiersA->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
-        ['sous_categorie_id' => $ctx->sc606->id, 'montant' => '75.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte606->id, 'sous_categorie_id' => $ctx->sc606->id, 'montant' => '75.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 
     // Chantier 2a — purge des T2 d'encaissement séparées AVANT la remise en legacy.
@@ -311,10 +313,10 @@ function setupBackfillFixtureStep33Legacy(object $ctx): void
                 ->whereNull('sous_categorie_id')
                 ->forceDelete();
 
-            // Reset: compte_id et debit/credit sur les lignes de ventilation restantes
+            // Reset: debit/credit sur les lignes de ventilation restantes
+            // compte_id est préservé (allocation utilisateur, pas dérivée)
             TransactionLigne::where('transaction_id', $tx->id)
                 ->update([
-                    'compte_id' => null,
                     'debit' => 0,
                     'credit' => 0,
                     'tiers_id' => null,
@@ -715,7 +717,7 @@ test('[N] --all convertit l\'exercice courant ET l\'exercice précédent', funct
         'tiers_id' => $this->tiersA->id,
         'compte_id' => $this->compteBancaire->id,
     ], [
-        ['sous_categorie_id' => $this->sc706->id, 'montant' => '500.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $this->compte706->id, 'sous_categorie_id' => $this->sc706->id, 'montant' => '500.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 
     // Remettre cette Tx en état legacy (les autres le sont déjà via le helper).
@@ -723,7 +725,7 @@ test('[N] --all convertit l\'exercice courant ET l\'exercice précédent', funct
         ->whereNull('sous_categorie_id')
         ->forceDelete();
     TransactionLigne::where('transaction_id', $txExercice2024->id)
-        ->update(['compte_id' => null, 'debit' => 0, 'credit' => 0, 'tiers_id' => null, 'lettrage_code' => null]);
+        ->update(['debit' => 0, 'credit' => 0, 'tiers_id' => null, 'lettrage_code' => null]);
     $txExercice2024->forceFill(['equilibree' => false])->save();
 
     // Chantier 2a — purger la T2 d'encaissement séparée créée pour txExercice2024.
@@ -868,9 +870,9 @@ function simulerLegacySurTx(Transaction $tx): void
         ->forceDelete();
 
     // Étape 2 : reset colonnes PD sur les lignes de ventilation
+    // compte_id est préservé (allocation utilisateur)
     TransactionLigne::where('transaction_id', $tx->id)
         ->update([
-            'compte_id' => null,
             'debit' => 0,
             'credit' => 0,
             'tiers_id' => null,
@@ -895,7 +897,7 @@ test('[AC1] recette en_attente avec mode → créance only — 411D/706C, aucune
         'tiers_id' => $this->tiersA->id,
         'compte_id' => $this->compteBancaire->id,
     ], [
-        ['sous_categorie_id' => $this->sc706->id, 'montant' => '200.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $this->compte706->id, 'sous_categorie_id' => $this->sc706->id, 'montant' => '200.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 
     // En mode PD inconditionnel, TransactionService crée T1+T2 et letters le 411.
@@ -989,7 +991,7 @@ test('[AC2] chèque recu avec remise_id → portage 5112, 411 pair lettré', fun
         'tiers_id' => $this->tiersA->id,
         'compte_id' => $this->compteBancaire->id,
     ], [
-        ['sous_categorie_id' => $this->sc706->id, 'montant' => '120.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $this->compte706->id, 'sous_categorie_id' => $this->sc706->id, 'montant' => '120.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 
     // Poser remise_id sur la transaction (cas 2)
@@ -1073,7 +1075,7 @@ test('[AC5] chèque pointe rapprochement_id non null → portage 512X (pas 5112)
         'tiers_id' => $this->tiersA->id,
         'compte_id' => $this->compteBancaire->id,
     ], [
-        ['sous_categorie_id' => $this->sc706->id, 'montant' => '150.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $this->compte706->id, 'sous_categorie_id' => $this->sc706->id, 'montant' => '150.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 
     // Poser rapprochement_id sur la transaction (cas 1 — pointé direct)
@@ -1152,7 +1154,7 @@ test('[AC6] chèque recu sans remise ni rapprochement → portage 5112, 411 lett
         'tiers_id' => $this->tiersA->id,
         'compte_id' => $this->compteBancaire->id,
     ], [
-        ['sous_categorie_id' => $this->sc706->id, 'montant' => '80.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $this->compte706->id, 'sous_categorie_id' => $this->sc706->id, 'montant' => '80.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 
     // Vérification : remise_id et rapprochement_id doivent être null
@@ -1266,7 +1268,7 @@ function setupFixtureRemiseBackfill(object $ctx, bool $avecRapprochement = false
         'tiers_id' => $ctx->tiersA->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
-        ['sous_categorie_id' => $ctx->sc706->id, 'montant' => '120.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte706->id, 'sous_categorie_id' => $ctx->sc706->id, 'montant' => '120.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 
     // Source 2 : chèque recu remisé — 100€
@@ -1281,7 +1283,7 @@ function setupFixtureRemiseBackfill(object $ctx, bool $avecRapprochement = false
         'tiers_id' => $ctx->tiersB->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
-        ['sous_categorie_id' => $ctx->sc706->id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte706->id, 'sous_categorie_id' => $ctx->sc706->id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 
     // Lier les sources à la remise. Par défaut avec reference (comme comptabiliser()).

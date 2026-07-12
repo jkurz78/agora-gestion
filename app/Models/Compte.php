@@ -33,7 +33,6 @@ final class Compte extends TenantModel
         'numero_pcg',
         'intitule',
         'classe',
-        'categorie_id',
         'parent_compte_id',
         'actif',
         'est_systeme',

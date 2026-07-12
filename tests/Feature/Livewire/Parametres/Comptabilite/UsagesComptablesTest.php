@@ -86,7 +86,6 @@ it('toggleDon false cascades AbandonCreance', function () {
 it('submitInline creates compte and flags it', function () {
     Livewire::test(UsagesComptables::class)
         ->set('inlineUsage', UsageComptable::Cotisation->value)
-        ->set('inlineCategorieId', $this->catR->id)
         ->set('inlineNom', 'Nouvelle cotisation')
         ->set('inlineCodeCerfa', '751B')
         ->call('submitInline');
@@ -96,22 +95,12 @@ it('submitInline creates compte and flags it', function () {
 });
 
 it('submitInline surfaces a classe mismatch as a validation error', function () {
-    // Cotisation est une Recette (classe 7 attendue) — '606' est classe 6.
     Livewire::test(UsagesComptables::class)
         ->set('inlineUsage', UsageComptable::Cotisation->value)
-        ->set('inlineCategorieId', $this->catR->id)
         ->set('inlineNom', 'Compte invalide')
         ->set('inlineCodeCerfa', '606')
         ->call('submitInline')
         ->assertHasErrors(['inlineCodeCerfa']);
-});
-
-it('inlineCategoriesEligibles filtered to Depense for FraisKilometriques', function () {
-    $comp = Livewire::test(UsagesComptables::class)
-        ->set('inlineUsage', UsageComptable::FraisKilometriques->value);
-    $cats = collect($comp->instance()->inlineCategoriesEligibles);
-    $types = $cats->pluck('type')->unique()->values();
-    expect($types->all())->toBe([TypeCategorie::Depense]);
 });
 
 it('denies non-admin users', function () {

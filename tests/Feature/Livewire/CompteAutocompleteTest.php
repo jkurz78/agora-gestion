@@ -131,7 +131,7 @@ it('crée un compte via la modale (compte-first) puis le sélectionne', function
     Livewire::test(CompteAutocomplete::class)
         ->call('openCreateModal')
         ->set('newIntitule', 'Cotisations annuelles')
-        ->set('newCategorieId', $cat->id)
+
         ->set('newNumeroPcg', '756Z')
         ->call('confirmCreate')
         ->assertSet('showCreateModal', false)
@@ -151,7 +151,7 @@ it('rejette la création sans numero de compte (champ obligatoire)', function ()
     Livewire::test(CompteAutocomplete::class)
         ->call('openCreateModal')
         ->set('newIntitule', 'Cotisations annuelles')
-        ->set('newCategorieId', $cat->id)
+
         ->set('newNumeroPcg', '')
         ->call('confirmCreate')
         ->assertHasErrors(['newNumeroPcg' => 'required']);
@@ -163,7 +163,7 @@ it('rejette un numéro dont la classe ne correspond pas au filtre', function () 
     Livewire::test(CompteAutocomplete::class, ['filtre' => 'recette'])
         ->call('openCreateModal')
         ->set('newIntitule', 'Achat détourné')
-        ->set('newCategorieId', $cat->id)
+
         ->set('newNumeroPcg', '606B')
         ->call('confirmCreate')
         ->assertHasErrors(['newNumeroPcg']);
@@ -177,7 +177,7 @@ it('réutilise un compte existant sur le même numero_pcg au lieu de planter', f
     Livewire::test(CompteAutocomplete::class, ['filtre' => 'recette'])
         ->call('openCreateModal')
         ->set('newIntitule', 'Doublon de Formations')
-        ->set('newCategorieId', $cat->id)
+
         ->set('newNumeroPcg', '706A')
         ->call('confirmCreate')
         ->assertHasNoErrors()

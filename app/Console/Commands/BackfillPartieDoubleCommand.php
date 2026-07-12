@@ -272,9 +272,9 @@ final class BackfillPartieDoubleCommand extends Command
             }
 
             // 2. Reset colonnes PD sur les lignes de ventilation restantes
+            //    compte_id est préservé : c'est l'allocation utilisateur, pas une valeur dérivée.
             TransactionLigne::whereIn('transaction_id', $txIds)
                 ->update([
-                    'compte_id' => null,
                     'debit' => 0,
                     'credit' => 0,
                     'tiers_id' => null,
@@ -286,10 +286,8 @@ final class BackfillPartieDoubleCommand extends Command
                 ->whereIn('id', $txIds)
                 ->update(['equilibree' => false]);
 
-            // 4. Supprimer les entrées lettrage_audit motif='backfill' scopées tenant + exercice.
-            //    Sécurité multi-tenant : WHERE association_id = tenant courant.
-            //    Scope exercice : WHERE lettrage_code IN (codes portés par les lignes de cet exercice).
-            $nbDeleted = $this->resetLettrageAuditExercice($txIds);
+            // 4. Supprimer les entrées lettrage_audit motif='backfill' scopées tenant.
+            $nbDeleted = $this->resetLettrageAudit();
 
             Log::info('[Backfill] Reset exercice terminé', [
                 'nb_transactions' => count($txIds),
@@ -299,44 +297,18 @@ final class BackfillPartieDoubleCommand extends Command
     }
 
     /**
-     * Supprime les entrées lettrage_audit motif='backfill' pour le tenant courant
-     * et les transactions de l'exercice donné.
+     * Supprime les entrées lettrage_audit motif='backfill' pour le tenant courant.
      *
-     * Scopage (double garantie) :
-     *   - association_id = TenantContext::currentId()  → sécurité multi-tenant (isolation stricte)
-     *   - compte_id IN (comptes du tenant)             → scope exercice via les comptes concernés
-     *
-     * Note : la table `lettrage_audit` stocke `transaction_ligne_ids` en JSON (pas de FK unitaire).
-     * Le scope via `compte_id` sur les comptes du tenant est portable SQLite + MySQL et garantit
-     * que seules les entrées appartenant à ce tenant sont ciblées.
-     *
-     * @param  array<int>  $txIds  IDs des transactions de l'exercice (déjà filtrés par tenant).
-     * @return int Nombre d'entrées supprimées (pour logging).
+     * Scopage : association_id = TenantContext::currentId() (isolation multi-tenant stricte).
+     * Pas de scope exercice : les mêmes comptes (411, 512X…) apparaissent dans tous les exercices,
+     * un filtre par compte_id ne discrimine pas. --force est destructif par nature.
      */
-    private function resetLettrageAuditExercice(array $txIds): int
+    private function resetLettrageAudit(): int
     {
-        if (empty($txIds)) {
-            return 0;
-        }
-
-        // Récupérer les IDs des comptes impliqués dans les transactions de cet exercice
-        // (via transaction_lignes → compte_id). Scope exercice natif.
-        $compteIds = DB::table('transaction_lignes')
-            ->whereIn('transaction_id', $txIds)
-            ->whereNotNull('compte_id')
-            ->distinct()
-            ->pluck('compte_id')
-            ->all();
-
-        $query = DB::table('lettrage_audit')
+        return DB::table('lettrage_audit')
             ->where('association_id', TenantContext::currentId())
-            ->where('motif', 'backfill');
-
-        if (! empty($compteIds)) {
-            $query->whereIn('compte_id', $compteIds);
-        }
-
-        return $query->delete();
+            ->where('motif', 'backfill')
+            ->delete();
     }
 
     private function runConversion(int $annee, bool $isForce): void

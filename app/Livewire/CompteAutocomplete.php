@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\UsageComptable;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\Famille;
 use App\Tenant\TenantContext;
@@ -34,8 +33,6 @@ final class CompteAutocomplete extends Component
     public bool $showCreateModal = false;
 
     public string $newIntitule = '';
-
-    public ?int $newCategorieId = null;
 
     public string $newNumeroPcg = '';
 
@@ -148,7 +145,6 @@ final class CompteAutocomplete extends Component
     public function openCreateModal(): void
     {
         $this->newIntitule = $this->search;
-        $this->newCategorieId = null;
         $this->newNumeroPcg = '';
         $this->showCreateModal = true;
         $this->open = false;
@@ -158,7 +154,6 @@ final class CompteAutocomplete extends Component
     {
         $this->validate([
             'newIntitule' => ['required', 'string', 'max:150'],
-            'newCategorieId' => ['required', 'integer', 'exists:categories,id'],
             'newNumeroPcg' => ['required', 'string', 'max:20'],
         ]);
 
@@ -194,7 +189,6 @@ final class CompteAutocomplete extends Component
                 'numero_pcg' => $numero,
                 'intitule' => $this->newIntitule,
                 'classe' => $classe,
-                'categorie_id' => $this->newCategorieId,
                 'actif' => true,
                 'est_systeme' => false,
                 'lettrable' => false,
@@ -209,12 +203,6 @@ final class CompteAutocomplete extends Component
 
     public function render(): View
     {
-        $categories = $this->showCreateModal
-            ? Categorie::when($this->filtre !== 'tous', fn ($q) => $q->where('type', $this->filtre))
-                ->orderBy('nom')
-                ->get()
-            : collect();
-
-        return view('livewire.compte-autocomplete', compact('categories'));
+        return view('livewire.compte-autocomplete');
     }
 }

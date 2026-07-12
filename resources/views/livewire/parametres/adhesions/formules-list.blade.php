@@ -209,18 +209,6 @@
                                                        maxlength="10"
                                                        placeholder="751">
                                             </div>
-                                            <div class="col-md-3">
-                                                <label class="form-label small mb-1" for="new-sc-cat">Catégorie *</label>
-                                                <select id="new-sc-cat"
-                                                        class="form-select form-select-sm @error('newSousCatCategorieId') is-invalid @enderror"
-                                                        wire:model="newSousCatCategorieId">
-                                                    <option value="">— Choisir —</option>
-                                                    @foreach($categories as $cat)
-                                                        <option value="{{ $cat->id }}">{{ $cat->nom }}</option>
-                                                    @endforeach
-                                                </select>
-                                                @error('newSousCatCategorieId')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                                            </div>
                                         </div>
                                         <div class="d-flex gap-1 justify-content-end">
                                             <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="cancelCreateSousCat">

@@ -18,31 +18,22 @@ use Illuminate\Support\Facades\Log;
 /**
  * Service de conversion d'une transaction legacy vers le modèle partie double.
  *
- * Extrait au Step 33 (testabilité unitaire + rule-of-three anticipée).
- *
  * Stratégie :
- *   1. Charger les lignes de ventilation : compte-first (compte_id classe 6/7 —
- *      DC-10a) OU legacy (sous_categorie_id non null, compte_id null).
- *   2. Compte-first : valider la classe du compte porté par la ligne ;
- *      legacy : résoudre via CompteVentilationResolver (sous_categorie → Compte 6x/7x).
- *   3. Enrichir les lignes qui ne portent pas encore debit/credit (mise à jour
- *      in-place, idempotent — les lignes compte-first arrivent déjà posées).
- *   4. Appeler EcritureGenerator::pour*() avec existingTransaction pour créer les lignes
- *      PD-only (411/401, portage, lettrage).
- *   5. Marquer la transaction equilibree=TRUE (via l'observer XOR — déclenché par save).
+ *   1. Charger les lignes de ventilation (compte_id classe 6/7).
+ *   2. Valider la classe du compte porté par la ligne.
+ *   3. Enrichir les lignes qui ne portent pas encore debit/credit.
+ *   4. Appeler EcritureGenerator::pour*() pour créer les lignes PD-only
+ *      (411/401, portage, lettrage).
+ *   5. Marquer la transaction equilibree=TRUE (via l'observer XOR).
  *
  * Skip silencieux si :
- *   - montant_total = 0 (inscription gratuite HelloAsso, artifact sans effet comptable)
- *   - tiers_id null (transactions sans tiers — OD-like)
- *   - aucune ligne de ventilation (ni compte-first ni legacy)
- *   - compte de classe inattendue, ou CompteVentilationResolver retourne null
- *     (SC sans code_cerfa ou compte introuvable)
+ *   - montant_total = 0 (inscription gratuite HelloAsso)
+ *   - tiers_id null (OD-like)
+ *   - aucune ligne de ventilation
+ *   - compte de classe inattendue
  *   - CompteTresorerieResolver retourne null (compte bancaire introuvable)
  *
  * Le caller (BackfillPartieDoubleCommand) enveloppe chaque conversion dans DB::transaction.
- *
- * Note : le pre-nettoyage auto-délettrage avant conversion est géré via
- * LettrageService::autoDelettrerLignesDe (mutualisé en Vague 3b — rule-of-three).
  */
 final class TransactionConverter
 {
@@ -82,14 +73,8 @@ final class TransactionConverter
         /** @var Tiers $tiers */
         $tiers = Tiers::findOrFail($tx->tiers_id);
 
-        // Charger les lignes de ventilation : compte-first (compte classe 6/7 —
-        // DC-10a, lignes créées par les writers migrés) OU legacy (sous_categorie_id
-        // non null, compte_id encore vide — données historiques pré-backfill).
         $lignesVentilation = TransactionLigne::where('transaction_id', $tx->id)
-            ->where(function ($q): void {
-                $q->whereNotNull('sous_categorie_id')
-                    ->orWhereHas('compte', fn ($qq) => $qq->whereIn('classe', [6, 7]));
-            })
+            ->whereHas('compte', fn ($qq) => $qq->whereIn('classe', [6, 7]))
             ->whereNull('deleted_at')
             ->get();
 
@@ -99,42 +84,22 @@ final class TransactionConverter
             return false;
         }
 
-        // Résolution des ventilations : compte porté par la ligne en priorité,
-        // repli resolver sous_categorie → Compte 6x/7x pour les lignes legacy.
         $classeAttendue = $tx->type === TypeTransaction::Recette ? 7 : 6;
         $ventilations = [];
         $skipDoubleEcriture = false;
 
         foreach ($lignesVentilation as $ligne) {
-            if ($ligne->compte_id !== null) {
-                $compte = Compte::find((int) $ligne->compte_id);
+            $compte = Compte::find((int) $ligne->compte_id);
 
-                if ($compte === null || (int) $compte->classe !== $classeAttendue) {
-                    Log::warning('[Backfill] Skip : compte_id porté par la ligne invalide', [
-                        'transaction_id' => $tx->id,
-                        'transaction_ligne_id' => $ligne->id,
-                        'compte_id' => $ligne->compte_id,
-                        'classe_attendue' => $classeAttendue,
-                    ]);
-                    $skipDoubleEcriture = true;
-                    break;
-                }
-            } else {
-                $compte = CompteVentilationResolver::resoudre(
-                    sousCategorieId: (int) $ligne->sous_categorie_id,
-                    classeAttendue: $classeAttendue,
-                    contextLog: '[Backfill] Step 33',
-                    contextLogData: ['transaction_id' => $tx->id],
-                );
-
-                if ($compte === null) {
-                    Log::warning('[Backfill] Skip : CompteVentilationResolver retourne null', [
-                        'transaction_id' => $tx->id,
-                        'sous_categorie_id' => $ligne->sous_categorie_id,
-                    ]);
-                    $skipDoubleEcriture = true;
-                    break;
-                }
+            if ($compte === null || (int) $compte->classe !== $classeAttendue) {
+                Log::warning('[Backfill] Skip : compte_id porté par la ligne invalide', [
+                    'transaction_id' => $tx->id,
+                    'transaction_ligne_id' => $ligne->id,
+                    'compte_id' => $ligne->compte_id,
+                    'classe_attendue' => $classeAttendue,
+                ]);
+                $skipDoubleEcriture = true;
+                break;
             }
 
             $montant = (float) $ligne->montant;

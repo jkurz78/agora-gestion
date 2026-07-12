@@ -5,7 +5,6 @@ use App\Http\Controllers\AttestationPresencePdfController;
 use App\Http\Controllers\BackOffice\FacturePartenaireDepotPdfController;
 use App\Http\Controllers\BackOffice\NoteDeFraisPieceJointeController;
 use App\Http\Controllers\BudgetExportController;
-use App\Http\Controllers\CategorieController;
 use App\Http\Controllers\CompteBancaireController;
 use App\Http\Controllers\CsvImportController;
 use App\Http\Controllers\DashboardController;
@@ -92,7 +91,7 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class, CheckEspaceAccess
         Route::view('/helloasso', 'parametres.helloasso')->name('helloasso');
         Route::view('/reception-documents', 'parametres.reception-documents')->name('reception-documents');
         Route::view('/smtp', 'parametres.smtp')->name('smtp');
-        Route::resource('categories', CategorieController::class)->except(['show']);
+        // DC-10b-3 : route categories supprimée — l'écran Plan comptable prend le relais.
         // DC-7 : l'écran « Plan comptable » (table comptes) remplace l'écran
         // « Sous-catégories » — les anciennes URLs redirigent en 301 (voir la
         // section « Redirections legacy » en fin de fichier).
@@ -453,8 +452,9 @@ Route::middleware('auth')->group(function (): void {
     Route::permanentRedirect('/gestion/parametres/helloasso', '/parametres/helloasso');
     Route::permanentRedirect('/compta/parametres/reception-documents', '/parametres/reception-documents');
     Route::permanentRedirect('/gestion/parametres/reception-documents', '/parametres/reception-documents');
-    Route::permanentRedirect('/compta/parametres/categories', '/parametres/categories');
-    Route::permanentRedirect('/gestion/parametres/categories', '/parametres/categories');
+    Route::permanentRedirect('/parametres/categories', '/parametres/plan-comptable');
+    Route::permanentRedirect('/compta/parametres/categories', '/parametres/plan-comptable');
+    Route::permanentRedirect('/gestion/parametres/categories', '/parametres/plan-comptable');
     Route::permanentRedirect('/compta/parametres/sous-categories', '/parametres/plan-comptable');
     Route::permanentRedirect('/gestion/parametres/sous-categories', '/parametres/plan-comptable');
     Route::permanentRedirect('/parametres/sous-categories', '/parametres/plan-comptable');

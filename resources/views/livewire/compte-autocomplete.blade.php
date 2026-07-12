@@ -121,16 +121,6 @@
                     @error('newIntitule') <div class="text-danger small">{{ $message }}</div> @enderror
                 </div>
 
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Catégorie <span class="text-danger">*</span></label>
-                    <select class="form-select" wire:model="newCategorieId">
-                        <option value="">— Choisir une catégorie —</option>
-                        @foreach($categories as $cat)
-                            <option value="{{ $cat->id }}">{{ $cat->nom }}</option>
-                        @endforeach
-                    </select>
-                    @error('newCategorieId') <div class="text-danger small">{{ $message }}</div> @enderror
-                </div>
 
                 <div class="mb-4">
                     <label class="form-label fw-semibold">Numéro de compte <span class="text-danger">*</span></label>

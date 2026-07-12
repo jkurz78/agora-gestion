@@ -1074,13 +1074,14 @@ it('[E8] EtatReglementResolver — statut dérivé identique live vs backfill (v
         'equilibree' => false,
         'type_ecriture' => 'normale',
     ]);
-    TransactionLigne::create([
+    TransactionLigne::withoutEvents(fn () => TransactionLigne::create([
         'transaction_id' => $txLegacy->id,
         'sous_categorie_id' => $this->sc706->id,
+        'compte_id' => $this->compte706->id,
         'montant' => 200.00,
         'debit' => 0.0,
         'credit' => 0.0,
-    ]);
+    ]));
 
     DB::transaction(fn () => $converter->convertir($txLegacy->fresh()));
     $txBackfille = $txLegacy->fresh();

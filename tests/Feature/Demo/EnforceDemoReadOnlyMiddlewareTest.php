@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Models\Association;
-use App\Models\Categorie;
 use App\Models\User;
 use App\Tenant\TenantContext;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
@@ -63,36 +62,6 @@ it('blocks DELETE on parametres/utilisateurs in demo env', function (): void {
 
     demoRequest($this)
         ->delete("/parametres/utilisateurs/{$victim->id}")
-        ->assertStatus(403);
-
-    Log::shouldHaveReceived('info')->once()->withArgs(function (string $message): bool {
-        return $message === 'demo.write_blocked';
-    });
-});
-
-it('blocks POST on parametres/categories in demo env', function (): void {
-    app()->detectEnvironment(fn (): string => 'demo');
-    Log::spy();
-
-    demoRequest($this)
-        ->post('/parametres/categories', [])
-        ->assertStatus(403);
-
-    Log::shouldHaveReceived('info')->once()->withArgs(function (string $message): bool {
-        return $message === 'demo.write_blocked';
-    });
-});
-
-it('blocks PUT on parametres/categories in demo env', function (): void {
-    app()->detectEnvironment(fn (): string => 'demo');
-    Log::spy();
-
-    $categorie = Categorie::factory()->create([
-        'association_id' => TenantContext::current()->id,
-    ]);
-
-    demoRequest($this)
-        ->put("/parametres/categories/{$categorie->id}", [])
         ->assertStatus(403);
 
     Log::shouldHaveReceived('info')->once()->withArgs(function (string $message): bool {

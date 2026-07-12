@@ -6,10 +6,10 @@ namespace App\Livewire;
 
 use App\Models\Compte;
 use App\Models\Famille;
-use App\Models\SousCategorie;
 use App\Tenant\TenantContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Livewire\Component;
@@ -176,21 +176,15 @@ final class PlanComptable extends Component
             return;
         }
 
-        $miroir = SousCategorie::where('code_cerfa', $compte->numero_pcg)->first();
-
         try {
-            DB::transaction(function () use ($compte, $miroir): void {
-                // Le miroir d'abord : ses FK legacy en RESTRICT (budget_lines,
-                // transaction_lignes.sous_categorie_id, provisions…) jettent si
-                // référencé → rollback complet, le compte reste intact.
-                // Reprend les gardes DB de l'ancien écran Sous-catégories.
-                $miroir?->delete();
+            DB::transaction(function () use ($compte): void {
+                if (Schema::hasTable('sous_categories')) {
+                    DB::table('sous_categories')
+                        ->where('code_cerfa', $compte->numero_pcg)
+                        ->where('association_id', $compte->association_id)
+                        ->delete();
+                }
 
-                // forceDelete (pas soft) : l'index unique (association_id,
-                // numero_pcg) inclut les lignes soft-deleted — un soft delete
-                // rendrait le numéro définitivement irrecréable à l'écran.
-                // Sans écriture ni référence (gardes ci-dessus), le hard
-                // delete est sûr ; les FK compte_id restantes sont nullOnDelete.
                 $compte->forceDelete();
             });
         } catch (QueryException $e) {

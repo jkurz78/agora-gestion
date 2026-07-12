@@ -53,7 +53,7 @@ final class UsagesComptablesService
      * Création d'un compte de résultat directement flaggé d'un usage.
      * Le miroir SousCategorie est matérialisé par CompteObserver (DC-7).
      *
-     * @param  array{categorie_id: int, intitule: string, numero_pcg: string}  $attrs
+     * @param  array{intitule: string, numero_pcg: string, categorie_id?: int}  $attrs
      */
     public function createAndFlag(array $attrs, UsageComptable $usage): Compte
     {
@@ -80,7 +80,6 @@ final class UsagesComptablesService
                     'numero_pcg' => $numero,
                     'intitule' => $attrs['intitule'],
                     'classe' => $classeAttendue,
-                    'categorie_id' => $attrs['categorie_id'],
                     'actif' => true,
                     'est_systeme' => false,
                     'pour_inscriptions' => $usage === UsageComptable::Inscription,

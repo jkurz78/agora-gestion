@@ -4,15 +4,14 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Enums\TypeCategorie;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\Famille;
-use App\Models\SousCategorie;
 use App\Support\Demo;
 use App\Support\Demo\SnapshotLoader;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 
@@ -198,7 +197,14 @@ final class DemoResetCommand extends Command
 
     private function materialiserComptesDepuisSousCategories(): void
     {
-        $sousCategories = SousCategorie::withoutGlobalScopes()->get();
+        if (! Schema::hasTable('sous_categories')) {
+            return;
+        }
+
+        $sousCategories = DB::table('sous_categories')
+            ->whereNotNull('code_cerfa')
+            ->where('code_cerfa', '!=', '')
+            ->get();
 
         if ($sousCategories->isEmpty()) {
             return;
@@ -209,10 +215,6 @@ final class DemoResetCommand extends Command
 
         foreach ($sousCategories as $sc) {
             $numero = $sc->code_cerfa;
-            if ($numero === null || $numero === '') {
-                continue;
-            }
-
             $classe = (int) substr($numero, 0, 1);
             if ($classe !== 6 && $classe !== 7) {
                 continue;
@@ -235,31 +237,12 @@ final class DemoResetCommand extends Command
                 continue;
             }
 
-            $categorie = Categorie::withoutGlobalScopes()
-                ->where('association_id', $associationId)
-                ->where('nom', 'LIKE', $code.' -%')
-                ->first();
-
-            if ($categorie === null) {
-                $famille = Famille::withoutGlobalScopes()
-                    ->where('association_id', $associationId)
-                    ->where('code', $code)
-                    ->first();
-
-                $categorie = Categorie::create([
-                    'association_id' => $associationId,
-                    'nom' => $famille ? $code.' - '.$famille->nom : $code.' - '.$code,
-                    'type' => str_starts_with($code, '6') ? TypeCategorie::Depense->value : TypeCategorie::Recette->value,
-                ]);
-            }
-
-            Compte::withoutEvents(function () use ($associationId, $numero, $sc, $classe, $categorie) {
+            Compte::withoutEvents(function () use ($associationId, $numero, $sc, $classe) {
                 Compte::withoutGlobalScopes()->create([
                     'association_id' => $associationId,
                     'numero_pcg' => $numero,
                     'intitule' => $sc->nom,
                     'classe' => $classe,
-                    'categorie_id' => $categorie->id,
                     'actif' => true,
                     'est_systeme' => false,
                     'pour_inscriptions' => false,

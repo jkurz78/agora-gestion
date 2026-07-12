@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Livewire\Parametres\Adhesions;
 
 use App\Enums\UsageComptable;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\FormuleAdhesion;
 use App\Models\UsageSousCategorie;
@@ -48,8 +47,6 @@ final class FormulesList extends Component
     public string $newSousCatNom = '';
 
     public ?string $newSousCatCodeCerfa = null;
-
-    public ?int $newSousCatCategorieId = null;
 
     public ?string $newSousCatErreur = null;
 
@@ -190,7 +187,6 @@ final class FormulesList extends Component
     {
         $this->newSousCatNom = '';
         $this->newSousCatCodeCerfa = null;
-        $this->newSousCatCategorieId = null;
         $this->newSousCatErreur = null;
         $this->showCreateSousCat = true;
     }
@@ -200,7 +196,6 @@ final class FormulesList extends Component
         $this->showCreateSousCat = false;
         $this->newSousCatNom = '';
         $this->newSousCatCodeCerfa = null;
-        $this->newSousCatCategorieId = null;
         $this->newSousCatErreur = null;
     }
 
@@ -242,7 +237,7 @@ final class FormulesList extends Component
 
     public function render(): View
     {
-        $query = FormuleAdhesion::query()->with('sousCategorie');
+        $query = FormuleAdhesion::query()->with('compte');
         match ($this->filtre) {
             'actives' => $query->where('actif', true),
             'inactives' => $query->where('actif', false),
@@ -255,8 +250,6 @@ final class FormulesList extends Component
             ->orderBy('numero_pcg')
             ->get();
 
-        $categories = Categorie::orderBy('nom')->get();
-
-        return view('livewire.parametres.adhesions.formules-list', compact('formules', 'comptesCotisation', 'categories'));
+        return view('livewire.parametres.adhesions.formules-list', compact('formules', 'comptesCotisation'));
     }
 }
