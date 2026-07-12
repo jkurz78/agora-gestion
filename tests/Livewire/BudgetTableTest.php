@@ -50,13 +50,8 @@ it('can add a budget line', function () {
     Livewire::test(BudgetTable::class)
         ->call('addLine', $this->depenseCompte->id);
 
-    // DC-8 : écrit compte_id, le trait remplit le miroir sous_categorie_id
-    // (SousCategorie matérialisée automatiquement par CompteObserver).
-    $sousCategorieMiroir = SousCategorie::where('code_cerfa', $this->depenseCompte->numero_pcg)->firstOrFail();
-
     $this->assertDatabaseHas('budget_lines', [
         'compte_id' => $this->depenseCompte->id,
-        'sous_categorie_id' => $sousCategorieMiroir->id,
         'exercice' => $exercice,
         'montant_prevu' => '0.00',
     ]);

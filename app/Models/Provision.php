@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\TypeTransaction;
-use App\Models\Concerns\SyncCompteDepuisSousCategorie;
 use App\Traits\TenantStorage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,13 +14,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 final class Provision extends TenantModel
 {
-    use HasFactory, SoftDeletes, SyncCompteDepuisSousCategorie, TenantStorage;
+    use HasFactory, SoftDeletes, TenantStorage;
 
     protected $fillable = [
         'association_id',
         'exercice',
         'type',
-        'sous_categorie_id',
         'compte_id',
         'libelle',
         'montant',
@@ -43,7 +41,6 @@ final class Provision extends TenantModel
             'date' => 'date',
             'montant' => 'decimal:2',
             'exercice' => 'integer',
-            'sous_categorie_id' => 'integer',
             'compte_id' => 'integer',
             'tiers_id' => 'integer',
             'operation_id' => 'integer',

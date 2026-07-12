@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Enums\JournalComptable;
-use App\Enums\ModePaiement;
 use App\Enums\StatutReglement;
 use App\Livewire\TransactionUniverselle;
 use App\Models\Association;
@@ -12,9 +11,10 @@ use App\Models\Extourne;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Tenant\TenantContext;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->association = Association::factory()->create();

@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 use App\Enums\StatutFacture;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
 use App\Models\Operation;
-use App\Models\Compte;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;

@@ -7,7 +7,6 @@ namespace App\Services\Rapports;
 use App\Models\Famille;
 use App\Models\Operation;
 use App\Models\Tiers;
-use App\Services\Compta\CompteVentilationResolver;
 use App\Tenant\TenantContext;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
@@ -206,33 +205,9 @@ final class CompteResultatBuilder
         return ["{$exercice}-09-01", ($exercice + 1).'-08-31'];
     }
 
-    // ── Résolution compte/famille pour les données de configuration sans compte_id direct ──
-
-    /**
-     * Ajoute au query builder les JOIN vers `comptes` (résolu depuis la sous-catégorie
-     * `sc` déjà jointe, via `code_cerfa` = `numero_pcg` — même mapping que
-     * {@see CompteVentilationResolver}) puis `familles` (résolu par
-     * préfixe à 2 chiffres du `numero_pcg`, cf. {@see Famille}).
-     *
-     * Réservé aux tables de configuration qui n'ont pas de colonne `compte_id` propre
-     * (`encadrement_previsions`, `type_operations` via `reglements`) — elles ne portent
-     * que `sous_categorie_id`, d'où le passage obligé par `code_cerfa` = `numero_pcg`.
-     * Les lectures de ventilation réelle (`transaction_lignes`) n'utilisent plus ce
-     * helper : elles lisent `compte_id` directement (cf. {@see fetchClasseRowsPD}).
-     *
-     * `familles` est joint en LEFT JOIN par défense (l'observer CompteObserver matérialise
-     * toujours une famille de secours à la création d'un compte 6/7, donc ce cas ne devrait
-     * jamais se présenter en pratique).
-     *
-     * Suppose que l'alias `sc` (sous_categories) est déjà joint sur la requête.
-     */
-    private function joinCompteEtFamille(Builder $query): void
+    private function joinFamille(Builder $query): void
     {
         $query
-            ->join('comptes as cpt', function ($join): void {
-                $join->on('cpt.numero_pcg', '=', 'sc.code_cerfa')
-                    ->on('cpt.association_id', '=', 'sc.association_id');
-            })
             ->leftJoin('familles as f', function ($join): void {
                 $join->on('f.code', '=', DB::raw('SUBSTR(cpt.numero_pcg, 1, 2)'))
                     ->on('f.association_id', '=', 'cpt.association_id');
@@ -473,36 +448,16 @@ final class CompteResultatBuilder
     }
 
     /**
-     * Budget alloué par COMPTE pour un exercice.
-     *
-     * Le compte de résultat agrège les montants par compte_id (cf. fetchClasseRowsPD :
-     * la clé 'sous_categorie_id' du rapport porte en réalité le compte_id résolu). La
-     * clé budget suit la même résolution — sinon la colonne budget ne s'affiche jamais
-     * (clé sous_categorie_id ≠ compte_id du rapport).
-     *
-     * Suit la même correspondance que le backfill compte_id (Step 36) :
-     *   budget_lines.sous_categorie_id → sous_categories.code_cerfa → comptes.numero_pcg → comptes.id
-     *
-     * Plusieurs sous-catégories partageant un même code_cerfa se replient sur un
-     * seul compte → leurs budgets sont sommés (cohérent avec l'agrégation des
-     * montants par compte). Une sous-catégorie sans code_cerfa, ou dont le
-     * code_cerfa ne correspond à aucun compte, est silencieusement ignorée
-     * (pas de compte cible → pas de ligne dans le rapport non plus).
-     *
      * @return array<int, float> [compte_id => montant_prevu]
      */
     private function fetchBudgetMap(int $exercice): array
     {
-        return DB::table('budget_lines as bl')
-            ->join('sous_categories as sc', 'sc.id', '=', 'bl.sous_categorie_id')
-            ->join('comptes as cpt', function ($join): void {
-                $join->on('cpt.numero_pcg', '=', 'sc.code_cerfa')
-                    ->on('cpt.association_id', '=', 'bl.association_id');
-            })
-            ->where('bl.exercice', $exercice)
-            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('bl.association_id', TenantContext::currentId()))
-            ->select('cpt.id as compte_id', DB::raw('SUM(bl.montant_prevu) as budget'))
-            ->groupBy('cpt.id')
+        return DB::table('budget_lines')
+            ->whereNotNull('compte_id')
+            ->where('exercice', $exercice)
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('association_id', TenantContext::currentId()))
+            ->select('compte_id', DB::raw('SUM(montant_prevu) as budget'))
+            ->groupBy('compte_id')
             ->get()
             ->keyBy('compte_id')
             ->map(fn ($row) => (float) $row->budget)
@@ -1078,12 +1033,12 @@ final class CompteResultatBuilder
     private function buildPrevisionsCharges(array $operationIds, bool $parSeances, bool $parTiers, bool $parOperations = false): array
     {
         $q = DB::table('encadrement_previsions as ep')
-            ->join('sous_categories as sc', 'sc.id', '=', 'ep.sous_categorie_id')
+            ->join('comptes as cpt', 'cpt.id', '=', 'ep.compte_id')
             ->join('seances as s', 's.id', '=', 'ep.seance_id')
             ->leftJoin('tiers as t', 't.id', '=', 'ep.tiers_id')
             ->whereIn('ep.operation_id', $operationIds)
             ->when(TenantContext::hasBooted(), fn ($x) => $x->where('ep.association_id', TenantContext::currentId()));
-        $this->joinCompteEtFamille($q);
+        $this->joinFamille($q);
 
         $selects = [
             DB::raw('COALESCE(f.id, 0) as categorie_id'),
@@ -1129,13 +1084,13 @@ final class CompteResultatBuilder
             ->join('participants as p', 'p.id', '=', 'r.participant_id')
             ->join('operations as op', 'op.id', '=', 'p.operation_id')
             ->join('type_operations as to_', 'to_.id', '=', 'op.type_operation_id')
-            ->join('sous_categories as sc', 'sc.id', '=', 'to_.sous_categorie_id')
+            ->join('comptes as cpt', 'cpt.id', '=', 'to_.compte_id')
             ->join('seances as s', 's.id', '=', 'r.seance_id')
             ->leftJoin('tiers as t', 't.id', '=', 'p.tiers_id')
             ->whereIn('p.operation_id', $operationIds)
             ->where('r.montant_prevu', '>', 0)
             ->when(TenantContext::hasBooted(), fn ($x) => $x->where('op.association_id', TenantContext::currentId()));
-        $this->joinCompteEtFamille($q);
+        $this->joinFamille($q);
 
         $selects = [
             DB::raw('COALESCE(f.id, 0) as categorie_id'),
@@ -1366,11 +1321,11 @@ final class CompteResultatBuilder
     private function fetchFlatPrevisionsCharges(array $operationIds): array
     {
         $q = DB::table('encadrement_previsions as ep')
-            ->join('sous_categories as sc', 'sc.id', '=', 'ep.sous_categorie_id')
+            ->join('comptes as cpt', 'cpt.id', '=', 'ep.compte_id')
             ->join('seances as s', 's.id', '=', 'ep.seance_id')
             ->whereIn('ep.operation_id', $operationIds)
             ->when(TenantContext::hasBooted(), fn ($q) => $q->where('ep.association_id', TenantContext::currentId()));
-        $this->joinCompteEtFamille($q);
+        $this->joinFamille($q);
         $rows = $q
             ->select([
                 DB::raw('cpt.id as sous_categorie_id'),
@@ -1406,12 +1361,12 @@ final class CompteResultatBuilder
             ->join('participants as p', 'p.id', '=', 'r.participant_id')
             ->join('operations as op', 'op.id', '=', 'p.operation_id')
             ->join('type_operations as to_', 'to_.id', '=', 'op.type_operation_id')
-            ->join('sous_categories as sc', 'sc.id', '=', 'to_.sous_categorie_id')
+            ->join('comptes as cpt', 'cpt.id', '=', 'to_.compte_id')
             ->join('seances as s', 's.id', '=', 'r.seance_id')
             ->whereIn('p.operation_id', $operationIds)
             ->where('r.montant_prevu', '>', 0)
             ->when(TenantContext::hasBooted(), fn ($q) => $q->where('op.association_id', TenantContext::currentId()));
-        $this->joinCompteEtFamille($q);
+        $this->joinFamille($q);
         $rows = $q
             ->select([
                 DB::raw('cpt.id as sous_categorie_id'),

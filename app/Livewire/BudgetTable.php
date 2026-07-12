@@ -66,8 +66,6 @@ final class BudgetTable extends Component
 
         app(ExerciceService::class)->assertOuvert(app(ExerciceService::class)->current());
 
-        // La ligne budgétaire est clé par compte — le trait
-        // SyncCompteDepuisSousCategorie maintient la colonne miroir legacy.
         BudgetLine::create([
             'compte_id' => $compteId,
             'exercice' => app(ExerciceService::class)->current(),

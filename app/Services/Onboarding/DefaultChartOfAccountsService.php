@@ -12,16 +12,7 @@ use App\Models\UsageSousCategorie;
 use Illuminate\Support\Facades\DB;
 
 /**
- * DC-9 du programme « dissolution sous_categories → comptes ».
- *
- * Provisionne le plan comptable par défaut à l'onboarding en créant
- * `Famille` + `Compte` comme objets PRIMAIRES (comptes/familles = source de
- * vérité). Le miroir `CompteObserver` matérialise automatiquement la
- * `SousCategorie` (et sa `Categorie` de secours) pour le pont CR legacy, tant
- * que `sous_categories` existe (drop prévu en DC-10).
- *
- * Avant DC-9, ce service créait Categorie/SousCategorie en primaire et
- * laissait `SousCategorieCompteObserver` matérialiser les comptes en miroir.
+ * Provisionne le plan comptable par défaut à l'onboarding.
  */
 final class DefaultChartOfAccountsService
 {

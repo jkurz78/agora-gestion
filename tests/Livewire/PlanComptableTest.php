@@ -6,19 +6,14 @@ use App\Livewire\PlanComptable;
 use App\Models\Association;
 use App\Models\Compte;
 use App\Models\Famille;
-use App\Models\SousCategorie;
 use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
 /**
- * DC-7 — écran « Plan comptable » (dissolution sous_categories → comptes).
- *
- * L'écran gère les comptes de résultat (classes 6/7) groupés par famille ;
- * le miroir sous_categories est entretenu par les observers (voir aussi
- * tests/Feature/Compta/SousCategorieCompteMirrorTest.php pour la preuve de
- * convergence détaillée du miroir bidirectionnel).
+ * Écran « Plan comptable » — comptes de résultat (classes 6/7) groupés par
+ * famille.
  */
 beforeEach(function () {
     $this->asso = Association::factory()->create();
@@ -104,10 +99,6 @@ it('crée un compte numéro-first et matérialise la famille orpheline + le miro
     expect($famille)->not->toBeNull()
         ->and($famille->nom)->toBe('75');
 
-    // Miroir sous_categorie auto-créé (échafaudage DC-7, disparaît en DC-10)
-    $miroir = SousCategorie::where('code_cerfa', '758')->first();
-    expect($miroir)->not->toBeNull()
-        ->and($miroir->nom)->toBe('Produits divers de gestion');
 });
 
 // ── 3. Validation ────────────────────────────────────────────────
@@ -142,14 +133,13 @@ it('rejette un numéro en doublon dans l association', function () {
 
 // ── 4. Édition inline ────────────────────────────────────────────
 
-it('édite l intitulé inline et répercute sur le miroir', function () {
+it('édite l intitulé inline', function () {
     $compte = dc7CreerCompte('706', 'Ancien intitulé');
 
     Livewire::test(PlanComptable::class)
         ->call('updateField', $compte->id, 'intitule', 'Nouvel intitulé');
 
-    expect($compte->fresh()->intitule)->toBe('Nouvel intitulé')
-        ->and(SousCategorie::where('code_cerfa', '706')->first()->nom)->toBe('Nouvel intitulé');
+    expect($compte->fresh()->intitule)->toBe('Nouvel intitulé');
 });
 
 it('édite le nom de famille inline, avec création défensive à la volée', function () {
@@ -215,39 +205,20 @@ it('refuse la suppression d un compte porteur d écritures', function () {
         ->assertSet('flashType', 'danger');
 
     expect($compte->fresh())->not->toBeNull()
-        ->and(SousCategorie::where('code_cerfa', '706')->exists())->toBeTrue(); // miroir intact
+        ->and(Compte::where('numero_pcg', '706')->exists())->toBeTrue();
 });
 
 // ── 7. Suppression d un compte propre ────────────────────────────
 
-it('supprime un compte propre avec son miroir sous-jacent', function () {
+it('supprime un compte propre', function () {
     $compte = dc7CreerCompte('758', 'Produits divers');
-    expect(SousCategorie::where('code_cerfa', '758')->exists())->toBeTrue();
 
     Livewire::test(PlanComptable::class)->call('delete', $compte->id);
 
-    expect(Compte::withTrashed()->where('numero_pcg', '758')->exists())->toBeFalse()
-        ->and(SousCategorie::where('code_cerfa', '758')->exists())->toBeFalse();
+    expect(Compte::withTrashed()->where('numero_pcg', '758')->exists())->toBeFalse();
 });
 
-// ── 8. Convergence observers (résumé — détail dans SousCategorieCompteMirrorTest) ──
-
-it('converge dans les deux sens sans doublon ni boucle', function () {
-    // SousCategorie → Compte
-    SousCategorie::factory()->create([
-        'association_id' => $this->asso->id,
-        'code_cerfa' => '604',
-        'nom' => 'Prestations achetées',
-    ]);
-    expect(Compte::where('numero_pcg', '604')->count())->toBe(1);
-
-    // Compte → SousCategorie, sans re-création du Compte au retour
-    dc7CreerCompte('704', 'Travaux');
-    expect(SousCategorie::where('code_cerfa', '704')->count())->toBe(1)
-        ->and(Compte::where('numero_pcg', '704')->count())->toBe(1);
-});
-
-// ── 9. Anciennes routes ──────────────────────────────────────────
+// ── 8. Anciennes routes ──────────────────────────────────────────
 
 it('redirige les anciennes routes en 301 vers le plan comptable', function () {
     $this->get('/parametres/sous-categories')

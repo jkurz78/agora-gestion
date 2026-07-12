@@ -10,7 +10,6 @@ use App\Models\CompteBancaire;
 use App\Models\EncadrementPrevision;
 use App\Models\Operation;
 use App\Models\Seance;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -43,17 +42,10 @@ it('ajoute un encadrant en créant une 1re ligne prévision à 0', function (): 
     Livewire::test(AnimateurManager::class, ['operation' => $this->operation])
         ->call('ajouterEncadrantAvecCompte', $this->tiers->id, $this->compte1->id);
 
-    // Bridge DC-7 : le miroir SousCategorie de compte1 (code_cerfa = numero_pcg) doit
-    // être posé en sous_categorie_id par SyncCompteDepuisSousCategorie.
-    $sc1 = SousCategorie::where('association_id', $this->association->id)
-        ->where('code_cerfa', $this->compte1->numero_pcg)
-        ->firstOrFail();
-
     expect(EncadrementPrevision::count())->toBe(1)
         ->and((float) EncadrementPrevision::first()->montant_prevu)->toBe(0.0)
         ->and((int) EncadrementPrevision::first()->tiers_id)->toBe((int) $this->tiers->id)
         ->and((int) EncadrementPrevision::first()->compte_id)->toBe((int) $this->compte1->id)
-        ->and((int) EncadrementPrevision::first()->sous_categorie_id)->toBe((int) $sc1->id)
         ->and((int) EncadrementPrevision::first()->seance_id)->toBe((int) $this->seance1->id);
 });
 

@@ -32,7 +32,7 @@ class SousCategorieFactory extends Factory
 
     public function pourDons(): static
     {
-        return $this->afterCreating(fn (SousCategorie $sc) => UsageSousCategorie::firstOrCreate([
+        return $this->afterCreating(fn (SousCategorie $sc) => UsageSousCategorie::forceCreate([
             'association_id' => $sc->association_id,
             'sous_categorie_id' => $sc->id,
             'usage' => UsageComptable::Don->value,
@@ -41,7 +41,7 @@ class SousCategorieFactory extends Factory
 
     public function pourCotisations(): static
     {
-        return $this->afterCreating(fn (SousCategorie $sc) => UsageSousCategorie::firstOrCreate([
+        return $this->afterCreating(fn (SousCategorie $sc) => UsageSousCategorie::forceCreate([
             'association_id' => $sc->association_id,
             'sous_categorie_id' => $sc->id,
             'usage' => UsageComptable::Cotisation->value,
@@ -50,7 +50,7 @@ class SousCategorieFactory extends Factory
 
     public function pourInscriptions(): static
     {
-        return $this->afterCreating(fn (SousCategorie $sc) => UsageSousCategorie::firstOrCreate([
+        return $this->afterCreating(fn (SousCategorie $sc) => UsageSousCategorie::forceCreate([
             'association_id' => $sc->association_id,
             'sous_categorie_id' => $sc->id,
             'usage' => UsageComptable::Inscription->value,
@@ -59,7 +59,7 @@ class SousCategorieFactory extends Factory
 
     public function pourFraisKilometriques(): static
     {
-        return $this->afterCreating(fn (SousCategorie $sc) => UsageSousCategorie::firstOrCreate([
+        return $this->afterCreating(fn (SousCategorie $sc) => UsageSousCategorie::forceCreate([
             'association_id' => $sc->association_id,
             'sous_categorie_id' => $sc->id,
             'usage' => UsageComptable::FraisKilometriques->value,
@@ -68,7 +68,7 @@ class SousCategorieFactory extends Factory
 
     public function pourAbandonCreance(): static
     {
-        return $this->afterCreating(fn (SousCategorie $sc) => UsageSousCategorie::firstOrCreate([
+        return $this->afterCreating(fn (SousCategorie $sc) => UsageSousCategorie::forceCreate([
             'association_id' => $sc->association_id,
             'sous_categorie_id' => $sc->id,
             'usage' => UsageComptable::AbandonCreance->value,

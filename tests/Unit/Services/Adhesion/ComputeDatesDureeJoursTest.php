@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
-use App\Models\CompteBancaire;
-use App\Models\FormuleAdhesion;
 use App\Enums\UsageComptable;
 use App\Models\Compte;
+use App\Models\CompteBancaire;
+use App\Models\FormuleAdhesion;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
-use App\Tenant\TenantContext;
 use App\Models\User;
 use App\Services\Adhesion\NouvelleAdhesionDTO;
 use App\Services\AdhesionService;
+use App\Tenant\TenantContext;
 use Illuminate\Support\Carbon;
 
 beforeEach(function (): void {

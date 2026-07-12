@@ -7,17 +7,12 @@ use App\Enums\UsageComptable;
 use App\Models\Association;
 use App\Models\Categorie;
 use App\Models\Compte;
-use App\Models\SousCategorie;
 use App\Services\UsagesComptablesService;
 use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 /**
- * DC-8 : le service accepte désormais des ids de comptes (classe 6/7).
- * Les fixtures créent directement un Compte (DC-10b) — le trait
- * SyncCompteDepuisSousCategorie continue de remplir sous_categorie_id
- * (NOT NULL) sur les liens d'usage écrits par compte_id, via le miroir
- * SousCategorie matérialisé par CompteObserver (bridge DC-7 toujours actif).
+ * DC-8 : le service accepte des ids de comptes (classe 6/7).
  */
 function creerCompteVentilation(Association $asso, Categorie $cat, string $codeCerfa): Compte
 {
@@ -95,10 +90,6 @@ it('createAndFlag creates a compte and posts the pivot link', function () {
     expect($compte)->toBeInstanceOf(Compte::class);
     expect($compte->hasUsage(UsageComptable::Cotisation))->toBeTrue();
 
-    // Le miroir SousCategorie est matérialisé par CompteObserver (DC-7).
-    $sc = SousCategorie::where('association_id', $this->asso->id)->where('code_cerfa', '758A')->first();
-    expect($sc)->not->toBeNull();
-    expect($sc->nom)->toBe('Nouveau compte');
 });
 
 it('createAndFlag throws on empty numero_pcg', function () {
@@ -141,9 +132,6 @@ it('createAndFlag(AbandonCreance) also posts Don', function () {
     expect($compte->hasUsage(UsageComptable::Don))->toBeTrue();
     expect($compte->hasUsage(UsageComptable::AbandonCreance))->toBeTrue();
 
-    // Le miroir SousCategorie est matérialisé par CompteObserver (DC-7).
-    $sc = SousCategorie::where('association_id', $this->asso->id)->where('code_cerfa', '771')->first();
-    expect($sc)->not->toBeNull();
 });
 
 it('is tenant-scoped', function () {

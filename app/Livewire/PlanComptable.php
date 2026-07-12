@@ -15,18 +15,10 @@ use Illuminate\View\View;
 use Livewire\Component;
 
 /**
- * Écran « Plan comptable » (DC-7 — dissolution sous_categories → comptes).
+ * Écran « Plan comptable ».
  *
- * Remplace l'écran « Sous-catégories » (SousCategorieList) : l'IHM gère
- * désormais les comptes de résultat (classes 6/7), groupés par famille
- * (préfixe à 2 caractères). Le miroir `sous_categories` est entretenu en
- * dessous par les observers (CompteObserver → miroir retour,
- * SousCategorieCompteObserver → garde-fou de convergence) jusqu'à DC-10.
- *
- * Renumérotation : le numéro PCG est l'IDENTITÉ du compte — il se saisit à
- * la création et ne s'édite jamais ici. L'UI ne l'expose pas, et
- * `updateField()` n'accepte que `intitule` (garde serveur contre tout
- * payload forgé qui tenterait de renuméroter un compte porteur d'écritures).
+ * Gère les comptes de résultat (classes 6/7), groupés par famille
+ * (préfixe à 2 caractères).
  */
 final class PlanComptable extends Component
 {
@@ -99,8 +91,7 @@ final class PlanComptable extends Component
             'lettrable' => false,
             'pour_inscriptions' => false,
         ]);
-        // La famille orpheline + le miroir sous_categorie se matérialisent
-        // seuls via CompteObserver::created (échafaudage DC-7).
+        // La famille orpheline se matérialise via CompteObserver::created.
 
         $this->showModal = false;
         $this->resetForm();
@@ -137,13 +128,6 @@ final class PlanComptable extends Component
         }
 
         $compte->update(['intitule' => $value]);
-
-        // Miroir : répercuter le nouveau nom sur la sous-catégorie legacy pour
-        // que les écrans non encore basculés (DC-8) l'affichent aussi.
-        // N'altère pas code_cerfa → SousCategorieCompteObserver::updated no-op.
-        SousCategorie::where('code_cerfa', $compte->numero_pcg)
-            ->first()
-            ?->update(['nom' => $value]);
     }
 
     /**

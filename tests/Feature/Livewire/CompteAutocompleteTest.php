@@ -8,7 +8,6 @@ use App\Models\Association;
 use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\Famille;
-use App\Models\SousCategorie;
 use App\Models\User;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
@@ -144,10 +143,6 @@ it('crée un compte via la modale (compte-first) puis le sélectionne', function
     expect((int) $compte->classe)->toBe(7);
     expect($compte->est_systeme)->toBeFalse();
 
-    // Le miroir legacy SousCategorie est matérialisé par CompteObserver (DC-7).
-    $sc = SousCategorie::where('code_cerfa', '756Z')->first();
-    expect($sc)->not->toBeNull();
-    expect($sc->nom)->toBe('Cotisations annuelles');
 });
 
 it('rejette la création sans numero de compte (champ obligatoire)', function () {

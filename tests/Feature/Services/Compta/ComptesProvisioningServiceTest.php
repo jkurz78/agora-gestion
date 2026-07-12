@@ -2,10 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
-use App\Models\SousCategorie;
 use App\Services\Compta\ComptesProvisioningService;
 use App\Tenant\TenantContext;
 
@@ -16,20 +14,12 @@ use App\Tenant\TenantContext;
 test('provisionAll seede les comptes systeme, bancaires et de gestion une fois les sources presentes', function () {
     $assoId = TenantContext::currentId();
 
-    // Source 1 : une sous-catégorie de gestion (classe 7).
-    $categorie = Categorie::factory()->create(['association_id' => $assoId]);
-    SousCategorie::create([
-        'association_id' => $assoId,
-        'categorie_id' => $categorie->id,
-        'nom' => 'Ventes',
-        'code_cerfa' => '706',
-    ]);
+    // Source 1 : un compte de gestion (classe 7).
+    Compte::factory()->numero('706')->create(['intitule' => 'Ventes']);
 
     // Source 2 : un compte bancaire.
     $bancaire = CompteBancaire::factory()->create(['association_id' => $assoId]);
 
-    // Le compte de gestion '706' est déjà matérialisé par l'observer à la création
-    // de la sous-catégorie. provisionAll reste idempotent et ajoute système + bancaire.
     expect(Compte::where('numero_pcg', '706')->exists())->toBeTrue();
 
     app(ComptesProvisioningService::class)->provisionAll();

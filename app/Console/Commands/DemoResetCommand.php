@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Enums\TypeCategorie;
+use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\Famille;
 use App\Models\SousCategorie;
-use App\Observers\SousCategorieCompteObserver;
 use App\Support\Demo;
 use App\Support\Demo\SnapshotLoader;
 use Illuminate\Console\Command;
@@ -119,16 +120,6 @@ final class DemoResetCommand extends Command
                 $filesCopied = $this->syncStorage($filesEntries);
             }
 
-            // DC-9 (programme « dissolution sous_categories → comptes») : le
-            // replay ci-dessus est un INSERT brut par table (SnapshotLoader),
-            // qui ne déclenche AUCUN évènement Eloquent — le miroir
-            // SousCategorieCompteObserver ne tourne donc jamais pendant le
-            // reset. Un snapshot capturé avant les tables `comptes`/`familles`
-            // (ex. l'actuel database/demo/snapshot.yaml, capturé 2026-04-29)
-            // laisserait ces deux tables vides après reset, cassant tout
-            // écran partie-double de la démo. On rejoue donc explicitement la
-            // matérialisation ici, une fois pour toutes les sous-catégories
-            // rechargées.
             $this->materialiserComptesDepuisSousCategories();
         } finally {
             Artisan::call('up');
@@ -205,18 +196,6 @@ final class DemoResetCommand extends Command
         return $copied;
     }
 
-    /**
-     * Rejoue le miroir SousCategorie → Compte/Famille pour toutes les
-     * sous-catégories rechargées par le snapshot (DC-9).
-     *
-     * SnapshotLoader::load() insère par INSERT brut (DB::table()->insert()),
-     * ce qui ne déclenche jamais l'évènement Eloquent `created`/`updated` — le
-     * miroir bidirectionnel (SousCategorieCompteObserver) reste donc muet
-     * pendant un reset. On appelle directement sa méthode publique `created()`
-     * pour chaque sous-catégorie : elle est idempotente (garde `$existe` sur
-     * numero_pcg) donc un rejeu répété — ou un snapshot qui contient déjà
-     * `comptes`/`familles` cohérents — est un no-op sûr.
-     */
     private function materialiserComptesDepuisSousCategories(): void
     {
         $sousCategories = SousCategorie::withoutGlobalScopes()->get();
@@ -225,19 +204,75 @@ final class DemoResetCommand extends Command
             return;
         }
 
-        $observer = new SousCategorieCompteObserver;
         $avantComptes = Compte::withoutGlobalScopes()->count();
         $avantFamilles = Famille::withoutGlobalScopes()->count();
 
-        foreach ($sousCategories as $sousCategorie) {
-            $observer->created($sousCategorie);
+        foreach ($sousCategories as $sc) {
+            $numero = $sc->code_cerfa;
+            if ($numero === null || $numero === '') {
+                continue;
+            }
+
+            $classe = (int) substr($numero, 0, 1);
+            if ($classe !== 6 && $classe !== 7) {
+                continue;
+            }
+
+            $associationId = (int) $sc->association_id;
+            $code = substr($numero, 0, 2);
+
+            Famille::firstOrCreate(
+                ['association_id' => $associationId, 'code' => $code],
+                ['nom' => $code],
+            );
+
+            $existe = Compte::withoutGlobalScopes()
+                ->where('association_id', $associationId)
+                ->where('numero_pcg', $numero)
+                ->exists();
+
+            if ($existe) {
+                continue;
+            }
+
+            $categorie = Categorie::withoutGlobalScopes()
+                ->where('association_id', $associationId)
+                ->where('nom', 'LIKE', $code.' -%')
+                ->first();
+
+            if ($categorie === null) {
+                $famille = Famille::withoutGlobalScopes()
+                    ->where('association_id', $associationId)
+                    ->where('code', $code)
+                    ->first();
+
+                $categorie = Categorie::create([
+                    'association_id' => $associationId,
+                    'nom' => $famille ? $code.' - '.$famille->nom : $code.' - '.$code,
+                    'type' => str_starts_with($code, '6') ? TypeCategorie::Depense->value : TypeCategorie::Recette->value,
+                ]);
+            }
+
+            Compte::withoutEvents(function () use ($associationId, $numero, $sc, $classe, $categorie) {
+                Compte::withoutGlobalScopes()->create([
+                    'association_id' => $associationId,
+                    'numero_pcg' => $numero,
+                    'intitule' => $sc->nom,
+                    'classe' => $classe,
+                    'categorie_id' => $categorie->id,
+                    'actif' => true,
+                    'est_systeme' => false,
+                    'pour_inscriptions' => false,
+                    'lettrable' => false,
+                ]);
+            });
         }
 
         $comptesCreated = Compte::withoutGlobalScopes()->count() - $avantComptes;
         $famillesCreated = Famille::withoutGlobalScopes()->count() - $avantFamilles;
 
         if ($comptesCreated > 0 || $famillesCreated > 0) {
-            $this->info("Miroir plan comptable rejoué : {$comptesCreated} compte(s), {$famillesCreated} famille(s) matérialisé(s) depuis les sous-catégories du snapshot.");
+            $this->info("Plan comptable matérialisé : {$comptesCreated} compte(s), {$famillesCreated} famille(s).");
         }
     }
 }

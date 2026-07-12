@@ -8,10 +8,8 @@ use Illuminate\Support\Facades\Schema;
 
 /*
  * DC-8 (dissolution sous_categories → comptes) : les écrans écrivent désormais
- * compte_id ; sous_categorie_id n'est plus rempli que par le miroir transitoire
- * (trait SyncCompteDepuisSousCategorie), qui peut légitimement rester vide
- * (compte système sans miroir, ex. 681/781). Les 6 tables encore NOT NULL
- * passent nullable — la colonne disparaît en DC-10.
+ * compte_id ; sous_categorie_id n'est plus peuplé sur les nouvelles lignes.
+ * Les 6 tables encore NOT NULL passent nullable — la colonne disparaît en DC-10.
  */
 return new class extends Migration
 {

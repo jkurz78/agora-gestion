@@ -3,9 +3,8 @@
 declare(strict_types=1);
 
 use App\Enums\NoteDeFraisLigneType;
-use App\Models\Association;
-use App\Models\Categorie;
 use App\Enums\UsageComptable;
+use App\Models\Association;
 use App\Models\Compte;
 use App\Services\NoteDeFrais\LigneTypes\KilometriqueLigneType;
 use App\Tenant\TenantContext;

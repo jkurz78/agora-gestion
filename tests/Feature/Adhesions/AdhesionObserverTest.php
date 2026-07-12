@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Models\Adhesion;
 use App\Enums\UsageComptable;
+use App\Models\Adhesion;
 use App\Models\Compte;
 use App\Models\Tiers;
 use App\Models\Transaction;
@@ -38,10 +38,10 @@ function createTxWithoutObservers(array $txAttrs, ?int $compteId = null): Transa
             TransactionLigne::factory()->create([
                 'transaction_id' => $tx->id,
                 'compte_id' => $compteId,
-            'montant' => 50.00,
-            'debit' => 0,
-            'credit' => 50.00,
-        ]);
+                'montant' => 50.00,
+                'debit' => 0,
+                'credit' => 50.00,
+            ]);
         });
     }
 
@@ -74,10 +74,10 @@ it('créer une transaction recette avec ligne cotisation crée une adhésion aut
     TransactionLigne::factory()->create([
         'transaction_id' => $this->tx->id,
         'compte_id' => $this->sc->id,
-            'montant' => 50.00,
-            'debit' => 0,
-            'credit' => 50.00,
-        ]);
+        'montant' => 50.00,
+        'debit' => 0,
+        'credit' => 50.00,
+    ]);
 
     expect(Adhesion::count())->toBe(1);
     $adhesion = Adhesion::first();
@@ -96,10 +96,10 @@ it('soft-deleter la transaction soft-delete l\'adhésion miroir', function (): v
     TransactionLigne::factory()->create([
         'transaction_id' => $this->tx->id,
         'compte_id' => $this->sc->id,
-            'montant' => 50.00,
-            'debit' => 0,
-            'credit' => 50.00,
-        ]);
+        'montant' => 50.00,
+        'debit' => 0,
+        'credit' => 50.00,
+    ]);
 
     expect(Adhesion::count())->toBe(1);
 
@@ -118,10 +118,10 @@ it('restore la transaction restore l\'adhésion miroir', function (): void {
     TransactionLigne::factory()->create([
         'transaction_id' => $this->tx->id,
         'compte_id' => $this->sc->id,
-            'montant' => 50.00,
-            'debit' => 0,
-            'credit' => 50.00,
-        ]);
+        'montant' => 50.00,
+        'debit' => 0,
+        'credit' => 50.00,
+    ]);
 
     $this->tx->delete();
     expect(Adhesion::count())->toBe(0);
@@ -151,10 +151,10 @@ it('créer une transaction recette avec ligne don (pas cotisation) ne crée PAS 
     TransactionLigne::factory()->create([
         'transaction_id' => $this->tx->id,
         'compte_id' => $scDon->id,
-            'montant' => 50.00,
-            'debit' => 0,
-            'credit' => 50.00,
-        ]);
+        'montant' => 50.00,
+        'debit' => 0,
+        'credit' => 50.00,
+    ]);
 
     expect(Adhesion::count())->toBe(0);
 });
@@ -168,10 +168,10 @@ it('mettre à jour la transaction sans changement de cotisation ne duplique pas 
     TransactionLigne::factory()->create([
         'transaction_id' => $this->tx->id,
         'compte_id' => $this->sc->id,
-            'montant' => 50.00,
-            'debit' => 0,
-            'credit' => 50.00,
-        ]);
+        'montant' => 50.00,
+        'debit' => 0,
+        'credit' => 50.00,
+    ]);
 
     expect(Adhesion::count())->toBe(1);
 
@@ -200,19 +200,19 @@ it('transaction avec plusieurs lignes (cotisation + don) ne crée qu\'une seule 
     TransactionLigne::factory()->create([
         'transaction_id' => $this->tx->id,
         'compte_id' => $this->sc->id,
-            'montant' => 50.00,
-            'debit' => 0,
-            'credit' => 50.00,
-        ]);
+        'montant' => 50.00,
+        'debit' => 0,
+        'credit' => 50.00,
+    ]);
 
     // Add don ligne — creerDepuisTransaction idempotent: still 1 adhesion
     TransactionLigne::factory()->create([
         'transaction_id' => $this->tx->id,
         'compte_id' => $scDon->id,
-            'montant' => 50.00,
-            'debit' => 0,
-            'credit' => 50.00,
-        ]);
+        'montant' => 50.00,
+        'debit' => 0,
+        'credit' => 50.00,
+    ]);
 
     expect(Adhesion::count())->toBe(1);
 });

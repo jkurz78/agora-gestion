@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Enums\JournalComptable;
 use App\Enums\ModePaiement;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
@@ -54,7 +55,7 @@ class TransactionFactory extends Factory
     {
         return $this->state([
             'type' => TypeTransaction::Virement,
-            'journal' => \App\Enums\JournalComptable::Banque,
+            'journal' => JournalComptable::Banque,
         ]);
     }
 

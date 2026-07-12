@@ -8,7 +8,6 @@ use App\Enums\UsageComptable;
 use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\FormuleAdhesion;
-use App\Models\SousCategorie;
 use App\Models\UsageSousCategorie;
 use DomainException;
 use Illuminate\View\View;
@@ -207,28 +206,29 @@ final class FormulesList extends Component
 
     public function saveNewSousCat(): void
     {
-        // DC-8 : numéro de compte requis — sans lui, pas de Compte miroir, donc
-        // la nouvelle entrée serait invisible dans le sélecteur (liste de comptes).
         $this->validate([
             'newSousCatNom' => ['required', 'string', 'max:255'],
             'newSousCatCodeCerfa' => ['required', 'string', 'max:10'],
-            'newSousCatCategorieId' => ['required', 'integer', 'exists:categories,id'],
         ]);
 
-        $sc = SousCategorie::create([
-            'nom' => $this->newSousCatNom,
-            'code_cerfa' => $this->newSousCatCodeCerfa,
-            'categorie_id' => $this->newSousCatCategorieId,
+        $classe = (int) substr((string) $this->newSousCatCodeCerfa, 0, 1);
+
+        $compte = Compte::create([
+            'numero_pcg' => $this->newSousCatCodeCerfa,
+            'intitule' => $this->newSousCatNom,
+            'classe' => $classe,
+            'actif' => true,
+            'est_systeme' => false,
+            'pour_inscriptions' => true,
+            'lettrable' => false,
         ]);
 
         UsageSousCategorie::create([
-            'sous_categorie_id' => $sc->id,
+            'compte_id' => $compte->id,
             'usage' => UsageComptable::Cotisation->value,
         ]);
 
-        // Sélectionne le Compte miroir matérialisé par l'observer DC-7.
-        $compte = Compte::ofNumero((string) $sc->code_cerfa);
-        $this->compteId = $compte?->id;
+        $this->compteId = $compte->id;
         $this->showCreateSousCat = false;
     }
 

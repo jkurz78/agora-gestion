@@ -14,6 +14,7 @@ declare(strict_types=1);
 
 use App\Enums\ModePaiement;
 use App\Enums\StatutReglement;
+use App\Enums\UsageComptable;
 use App\Exceptions\ExerciceCloturedException;
 use App\Models\Adhesion;
 use App\Models\Association;
@@ -75,7 +76,7 @@ beforeEach(function (): void {
         'lettrable' => false,
         'pour_inscriptions' => false,
     ]);
-    $this->compteCotisation->usages()->create(['usage' => \App\Enums\UsageComptable::Cotisation->value]);
+    $this->compteCotisation->usages()->create(['usage' => UsageComptable::Cotisation->value]);
 
     $this->formule = FormuleAdhesion::factory()->create([
         'association_id' => (int) $this->asso->id,

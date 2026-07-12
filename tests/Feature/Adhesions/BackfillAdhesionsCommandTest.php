@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Enums\UsageComptable;
 use App\Models\Adhesion;
 use App\Models\Association;
-use App\Enums\UsageComptable;
 use App\Models\Compte;
 use App\Models\Tiers;
 use App\Models\Transaction;
@@ -39,10 +39,10 @@ function createCotisationTxSansAdhesion(array $txAttrs = []): Transaction
             TransactionLigne::factory()->create([
                 'transaction_id' => $tx->id,
                 'compte_id' => $sc->id,
-        'montant' => 50.00,
-        'debit' => 0,
-        'credit' => 50.00,
-    ]);
+                'montant' => 50.00,
+                'debit' => 0,
+                'credit' => 50.00,
+            ]);
         });
     });
 

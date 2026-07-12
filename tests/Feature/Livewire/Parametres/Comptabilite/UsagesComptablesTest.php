@@ -10,7 +10,6 @@ use App\Models\Association;
 use App\Models\AssociationUser;
 use App\Models\Categorie;
 use App\Models\Compte;
-use App\Models\SousCategorie;
 use App\Models\User;
 use App\Services\UsagesComptablesService;
 use App\Tenant\TenantContext;
@@ -84,16 +83,16 @@ it('toggleDon false cascades AbandonCreance', function () {
     expect($compte->fresh()->hasUsage(UsageComptable::AbandonCreance))->toBeFalse();
 });
 
-it('submitInline creates sous-cat and flags it', function () {
+it('submitInline creates compte and flags it', function () {
     Livewire::test(UsagesComptables::class)
         ->set('inlineUsage', UsageComptable::Cotisation->value)
         ->set('inlineCategorieId', $this->catR->id)
         ->set('inlineNom', 'Nouvelle cotisation')
         ->set('inlineCodeCerfa', '751B')
         ->call('submitInline');
-    $sc = SousCategorie::where('nom', 'Nouvelle cotisation')->first();
-    expect($sc)->not->toBeNull();
-    expect($sc->hasUsage(UsageComptable::Cotisation))->toBeTrue();
+    $compte = Compte::where('numero_pcg', '751B')->first();
+    expect($compte)->not->toBeNull();
+    expect($compte->hasUsage(UsageComptable::Cotisation))->toBeTrue();
 });
 
 it('submitInline surfaces a classe mismatch as a validation error', function () {

@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Enums\JournalComptable;
-use App\Enums\TypeTransaction;
 use App\Models\Association;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
@@ -11,8 +10,9 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Tenant\TenantContext;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->association = Association::factory()->create();

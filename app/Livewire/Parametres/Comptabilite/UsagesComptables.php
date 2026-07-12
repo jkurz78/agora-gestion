@@ -134,9 +134,6 @@ final class UsagesComptables extends Component
 
     public function render(): View
     {
-        // DC-8 : l'écran liste les comptes de résultat (classe 6 = dépenses,
-        // classe 7 = recettes) ; les toggles écrivent compte_id (le trait
-        // SyncCompteDepuisSousCategorie remplit le miroir sous_categorie_id).
         return view('livewire.parametres.comptabilite.usages-comptables', [
             'comptesDepense' => Compte::where('classe', 6)->where('actif', true)->orderBy('numero_pcg')->get(),
             'comptesRecette' => Compte::where('classe', 7)->where('actif', true)->orderBy('numero_pcg')->get(),

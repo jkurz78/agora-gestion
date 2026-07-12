@@ -4,19 +4,16 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Models\Concerns\SyncCompteDepuisSousCategorie;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 final class EncadrementPrevision extends TenantModel
 {
     use HasFactory;
-    use SyncCompteDepuisSousCategorie;
 
     protected $fillable = [
         'operation_id',
         'tiers_id',
-        'sous_categorie_id',
         'compte_id',
         'seance_id',
         'montant_prevu',
@@ -26,7 +23,6 @@ final class EncadrementPrevision extends TenantModel
     {
         return [
             'montant_prevu' => 'decimal:2',
-            'sous_categorie_id' => 'integer',
             'compte_id' => 'integer',
         ];
     }

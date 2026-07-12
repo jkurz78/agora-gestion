@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\JournalComptable;
 use App\Enums\ModePaiement;
 use App\Enums\StatutReglement;
 use App\Livewire\RemiseBancaireSelection;
@@ -204,13 +205,13 @@ test('un miroir extourne de dépense (type=depense, sens=recette) apparaît dans
     $tx = Transaction::factory()->asDepense()->create([
         'association_id' => $this->association->id,
         'compte_id' => $this->compteCible->id,
-        'mode_paiement' => \App\Enums\ModePaiement::Cheque,
+        'mode_paiement' => ModePaiement::Cheque,
         'montant_total' => -50.00,
         'statut_reglement' => StatutReglement::EnMain,
         'tiers_id' => $tiers->id,
         'remise_id' => null,
         'type_ecriture' => 'extourne',
-        'journal' => \App\Enums\JournalComptable::Achat,
+        'journal' => JournalComptable::Achat,
         'equilibree' => true,
         'extournee_at' => null,
     ]);
@@ -231,13 +232,13 @@ test('un miroir extourne de recette (type=recette, sens=depense) n apparaît PAS
     $tx = Transaction::factory()->asRecette()->create([
         'association_id' => $this->association->id,
         'compte_id' => $this->compteCible->id,
-        'mode_paiement' => \App\Enums\ModePaiement::Cheque,
+        'mode_paiement' => ModePaiement::Cheque,
         'montant_total' => -100.00,
         'statut_reglement' => StatutReglement::EnMain,
         'tiers_id' => $tiers->id,
         'remise_id' => null,
         'type_ecriture' => 'extourne',
-        'journal' => \App\Enums\JournalComptable::Vente,
+        'journal' => JournalComptable::Vente,
         'equilibree' => true,
         'extournee_at' => null,
     ]);

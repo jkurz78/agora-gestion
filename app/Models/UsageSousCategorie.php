@@ -5,20 +5,17 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\UsageComptable;
-use App\Models\Concerns\SyncCompteDepuisSousCategorie;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 final class UsageSousCategorie extends TenantModel
 {
     use HasFactory;
-    use SyncCompteDepuisSousCategorie;
 
     protected $table = 'usages_sous_categories';
 
     protected $fillable = [
         'association_id',
-        'sous_categorie_id',
         'compte_id',
         'usage',
     ];
@@ -27,7 +24,6 @@ final class UsageSousCategorie extends TenantModel
     {
         return [
             'association_id' => 'integer',
-            'sous_categorie_id' => 'integer',
             'compte_id' => 'integer',
             'usage' => UsageComptable::class,
         ];

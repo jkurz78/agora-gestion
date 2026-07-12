@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 use App\Enums\UsageComptable;
 use App\Livewire\Parametres\Adhesions\FormulesList;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\FormuleAdhesion;
-use App\Models\SousCategorie;
 use App\Models\User;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
@@ -188,24 +186,20 @@ it('openCreateSousCat ouvre le sub-bloc et reset les champs', function (): void 
         ->assertSet('newSousCatCodeCerfa', '');
 });
 
-it('saveNewSousCat crée la sous-cat avec usage Cotisation et la pré-sélectionne', function (): void {
-    $categorie = Categorie::factory()->create();
-
+it('saveNewSousCat crée le compte avec usage Cotisation et le pré-sélectionne', function (): void {
     Livewire::actingAs($this->user)
         ->test(FormulesList::class)
         ->call('openCreate')
         ->call('openCreateSousCat')
         ->set('newSousCatNom', 'Cotisations 2026')
         ->set('newSousCatCodeCerfa', '751')
-        ->set('newSousCatCategorieId', $categorie->id)
         ->call('saveNewSousCat')
         ->assertSet('showCreateSousCat', false);
 
-    $sc = SousCategorie::where('nom', 'Cotisations 2026')->first();
-    expect($sc)->not->toBeNull();
-    expect($sc->code_cerfa)->toBe('751');
-    expect($sc->categorie_id)->toBe($categorie->id);
-    expect($sc->hasUsage(UsageComptable::Cotisation))->toBeTrue();
+    $compte = Compte::where('numero_pcg', '751')->first();
+    expect($compte)->not->toBeNull();
+    expect($compte->intitule)->toBe('Cotisations 2026');
+    expect($compte->hasUsage(UsageComptable::Cotisation))->toBeTrue();
 });
 
 it('saveNewSousCat valide les champs obligatoires', function (): void {
@@ -214,9 +208,9 @@ it('saveNewSousCat valide les champs obligatoires', function (): void {
         ->call('openCreate')
         ->call('openCreateSousCat')
         ->set('newSousCatNom', '')
-        ->set('newSousCatCategorieId', null)
+        ->set('newSousCatCodeCerfa', '')
         ->call('saveNewSousCat')
-        ->assertHasErrors(['newSousCatNom', 'newSousCatCategorieId']);
+        ->assertHasErrors(['newSousCatNom', 'newSousCatCodeCerfa']);
 });
 
 // ─── Tests extension duree_jours (Phase 3) ───────────────────────────────────

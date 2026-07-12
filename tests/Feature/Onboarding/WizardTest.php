@@ -524,12 +524,8 @@ it('saves step 7 with default plan comptable and advances to step 8', function (
     // encore lu par le pont CR legacy tant que DC-10 ne les a pas dropées.
     $familleCount = Famille::where('association_id', $this->association->id)->count();
     $compteCount = Compte::where('association_id', $this->association->id)->count();
-    $catCount = Categorie::where('association_id', $this->association->id)->count();
-    $scCount = SousCategorie::where('association_id', $this->association->id)->count();
     expect($familleCount)->toBeGreaterThan(0);
     expect($compteCount)->toBeGreaterThan(0);
-    expect($catCount)->toBeGreaterThan(0);
-    expect($scCount)->toBeGreaterThan(0);
 });
 
 it('saves step 7 with empty plan and advances to step 8', function () {

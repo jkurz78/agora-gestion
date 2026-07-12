@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-use App\Models\Adhesion;
-use App\Models\FormuleAdhesion;
 use App\Enums\UsageComptable;
+use App\Models\Adhesion;
 use App\Models\Compte;
+use App\Models\FormuleAdhesion;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -162,10 +162,10 @@ it('observer reste idempotent (multi-cotisations même exercice)', function (): 
         TransactionLigne::factory()->create([
             'transaction_id' => $tx->id,
             'compte_id' => $this->sc->id,
-        'montant' => 50.00,
-        'debit' => 0,
-        'credit' => 50.00,
-    ]);
+            'montant' => 50.00,
+            'debit' => 0,
+            'credit' => 50.00,
+        ]);
     }
 
     expect(Adhesion::count())->toBe(1);
@@ -186,10 +186,10 @@ it('observer reste idempotent en mode durée (même date_debut)', function (): v
         TransactionLigne::factory()->create([
             'transaction_id' => $tx->id,
             'compte_id' => $this->sc->id,
-        'montant' => 50.00,
-        'debit' => 0,
-        'credit' => 50.00,
-    ]);
+            'montant' => 50.00,
+            'debit' => 0,
+            'credit' => 50.00,
+        ]);
     }
 
     expect(Adhesion::count())->toBe(1);

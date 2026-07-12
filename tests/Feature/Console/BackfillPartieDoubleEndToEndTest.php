@@ -363,6 +363,7 @@ function creerFixtureE2E(object $ctx): array
         'facture_id' => $facture->id,
         'type' => TypeLigneFacture::MontantManuel->value,
         'sous_categorie_id' => $ctx->sc706->id,
+        'compte_id' => $ctx->compte706->id,
         'libelle' => 'Formation hiver',
         'montant' => 400.00,
         'ordre' => 1,

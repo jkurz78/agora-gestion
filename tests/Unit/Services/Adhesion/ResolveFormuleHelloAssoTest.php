@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-use App\Models\FormuleAdhesion;
 use App\Enums\UsageComptable;
 use App\Models\Compte;
+use App\Models\FormuleAdhesion;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;

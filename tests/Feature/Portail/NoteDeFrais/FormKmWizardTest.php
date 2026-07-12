@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 use App\Enums\NoteDeFraisLigneType;
 use App\Enums\StatutNoteDeFrais;
+use App\Enums\UsageComptable;
 use App\Livewire\Portail\NoteDeFrais\Form;
-use App\Models\Compte;
 use App\Models\Association;
 use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
 use App\Models\Tiers;
@@ -147,7 +148,7 @@ it('confirme la ligne km et l\'ajoute au tableau des lignes', function () {
             'classe' => 6,
             'actif' => true,
         ]);
-        $c->usages()->create(['usage' => \App\Enums\UsageComptable::FraisKilometriques->value]);
+        $c->usages()->create(['usage' => UsageComptable::FraisKilometriques->value]);
 
         return $c;
     })();

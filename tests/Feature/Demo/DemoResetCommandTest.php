@@ -320,7 +320,7 @@ it('round-trips data through demo:capture then demo:reset', function (): void {
 // T6 — DC-9 : un snapshot pré-comptes (contient sous_categories mais pas
 // comptes/familles, comme l'actuel database/demo/snapshot.yaml capturé
 // 2026-04-29) doit voir son miroir plan comptable matérialisé après reset —
-// le replay est un INSERT brut qui ne déclenche jamais SousCategorieCompteObserver.
+// le replay est un INSERT brut — le plan comptable est matérialisé explicitement.
 // ---------------------------------------------------------------------------
 it('materializes comptes/familles from sous_categories on reset of a pre-comptes snapshot', function (): void {
     app()->detectEnvironment(fn (): string => 'demo');

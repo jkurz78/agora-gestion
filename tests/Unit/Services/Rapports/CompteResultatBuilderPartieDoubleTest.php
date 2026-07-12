@@ -419,12 +419,9 @@ it('[PD7] lignes du tenant voisin ignorées en mode PD', function () {
 it('[PD9] compteDeResultat — la colonne budget est rattachée au compte en mode PD', function () {
     $tenantId = (int) TenantContext::currentId();
 
-    // Budget posé sur la sous-catégorie (clé legacy = sous_categorie_id).
-    // En mode PD, le rapport agrège par compte_id → le budget doit suivre la
-    // correspondance sous_categories.code_cerfa → comptes.numero_pcg.
     BudgetLine::create([
         'association_id' => $tenantId,
-        'sous_categorie_id' => (int) $this->scDepense->id,
+        'compte_id' => (int) $this->compte606->id,
         'exercice' => 2025,
         'montant_prevu' => 250.00,
     ]);

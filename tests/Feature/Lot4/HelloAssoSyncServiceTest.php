@@ -3,14 +3,14 @@
 declare(strict_types=1);
 
 use App\Enums\ModePaiement;
+use App\Enums\UsageComptable;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\HelloAssoFormMapping;
 use App\Models\HelloAssoParametres;
 use App\Models\Operation;
 use App\Models\Participant;
-use App\Enums\UsageComptable;
-use App\Models\Compte;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;

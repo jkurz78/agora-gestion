@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\TypeLigneDevis;
-use App\Models\Concerns\SyncCompteDepuisSousCategorie;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,12 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 final class DevisLigne extends Model
 {
     use HasFactory;
-    use SyncCompteDepuisSousCategorie;
 
-    /**
-     * DevisLigne n'a pas de timestamps — c'est une ligne de document,
-     * pas une entité autonome.
-     */
     public $timestamps = false;
 
     protected $fillable = [
@@ -29,7 +23,6 @@ final class DevisLigne extends Model
         'prix_unitaire',
         'quantite',
         'montant',
-        'sous_categorie_id',
         'compte_id',
     ];
 
@@ -42,7 +35,6 @@ final class DevisLigne extends Model
             'prix_unitaire' => 'decimal:2',
             'quantite' => 'decimal:3',
             'montant' => 'decimal:2',
-            'sous_categorie_id' => 'integer',
             'compte_id' => 'integer',
         ];
     }

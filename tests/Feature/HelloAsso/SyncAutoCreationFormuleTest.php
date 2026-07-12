@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 use App\Enums\HelloAssoEnvironnement;
+use App\Enums\UsageComptable;
 use App\Models\Adhesion;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\FormuleAdhesion;
 use App\Models\HelloAssoFormMapping;
@@ -15,16 +17,16 @@ use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Http;
 
 // DC-10a : compte classe 7 flaggé Cotisation (compte-first).
-function compteHelloAssoAutoFormule(): \App\Models\Compte
+function compteHelloAssoAutoFormule(): Compte
 {
-    $compte = \App\Models\Compte::create([
-        'association_id' => \App\Tenant\TenantContext::currentId(),
+    $compte = Compte::create([
+        'association_id' => TenantContext::currentId(),
         'numero_pcg' => '756A',
         'intitule' => 'Cotisations',
         'classe' => 7,
         'actif' => true,
     ]);
-    $compte->usages()->create(['usage' => \App\Enums\UsageComptable::Cotisation->value]);
+    $compte->usages()->create(['usage' => UsageComptable::Cotisation->value]);
 
     return $compte;
 }

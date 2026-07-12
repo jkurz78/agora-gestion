@@ -6,13 +6,12 @@ use App\Enums\StatutNoteDeFrais;
 use App\Enums\StatutOperation;
 use App\Enums\TypeCategorie;
 use App\Livewire\Portail\NoteDeFrais\Form;
-use App\Models\Compte;
 use App\Models\Association;
 use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
 use App\Models\Operation;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Tenant\TenantContext;
 use Illuminate\Http\UploadedFile;
@@ -25,12 +24,12 @@ use Illuminate\Support\Facades\Storage;
 // ---------------------------------------------------------------------------
 
 // DC-10a : helper compte-first — compte de charge (classe 6) pour les lignes NDF.
-function compteChargeNdfFC(int $assoId): \App\Models\Compte
+function compteChargeNdfFC(int $assoId): Compte
 {
     static $seq = 0;
     $seq++;
 
-    return \App\Models\Compte::create([
+    return Compte::create([
         'association_id' => $assoId,
         'numero_pcg' => '626'.$seq,
         'intitule' => 'Charge NDF '.$seq,

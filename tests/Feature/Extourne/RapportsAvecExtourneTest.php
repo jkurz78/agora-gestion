@@ -87,10 +87,10 @@ test('compte de résultat — recette nette zéro avec extourne dans même sous-
     rapportsActAsComptable();
 
     // Setup catégorie + sous-catégorie recette dans l'exercice 2025 (Sept 2025 → Aug 2026)
-    // DC-4 : code_cerfa déclenche SousCategorieCompteObserver, qui matérialise le Compte —
-    // nécessaire pour que CompteResultatBuilder (lecture compte_id/familles) trouve la ligne.
+    // code_cerfa permet le mapping SousCategorie → Compte via numero_pcg.
     $cat = Categorie::create(['nom' => 'Cotisations', 'type' => 'recette']);
     $sc = SousCategorie::create(['categorie_id' => $cat->id, 'nom' => 'Cotisations séance', 'libelle_article' => 'des cotisations séance', 'code_cerfa' => '706']);
+    Compte::factory()->numero('706')->create(['intitule' => 'Cotisations séance', 'categorie_id' => $cat->id]);
     $compte = CompteBancaire::factory()->create();
 
     // Recette +80€ dans l'exercice 2025

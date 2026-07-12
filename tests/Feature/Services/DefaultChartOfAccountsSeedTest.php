@@ -6,7 +6,6 @@ use App\Enums\UsageComptable;
 use App\Models\Association;
 use App\Models\Compte;
 use App\Models\Famille;
-use App\Models\SousCategorie;
 use App\Services\Onboarding\DefaultChartOfAccountsService;
 use App\Tenant\TenantContext;
 
@@ -39,13 +38,9 @@ it('materializes the sous_categories/categories mirror for the legacy CR bridge'
     TenantContext::boot($asso);
     (new DefaultChartOfAccountsService)->applyTo($asso);
 
-    // Le compte primaire ET son miroir sous_categorie (même code_cerfa =
-    // numero_pcg) doivent coexister tant que sous_categories n'est pas dropée (DC-10).
     $compte = Compte::where('numero_pcg', '625A')->firstOrFail();
-    $sc = SousCategorie::where('code_cerfa', '625A')->firstOrFail();
-    expect($sc->hasUsage(UsageComptable::FraisKilometriques))->toBeTrue();
-    expect($sc->categorie)->not->toBeNull();
     expect($compte->classe)->toBe(6);
+    expect($compte->hasUsage(UsageComptable::FraisKilometriques))->toBeTrue();
 
     // Toutes les familles créées en primaire existent bien (60/61/62/70/74/75/76/77 —
     // 627 "Frais bancaires" est nichée sous 62, pas une famille 66 à part : le

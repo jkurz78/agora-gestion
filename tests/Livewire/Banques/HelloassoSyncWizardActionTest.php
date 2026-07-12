@@ -10,7 +10,6 @@ use App\Models\CompteBancaire;
 use App\Models\HelloAssoFormMapping;
 use App\Models\HelloAssoParametres;
 use App\Models\Operation;
-use App\Models\SousCategorie;
 use App\Models\TypeOperation;
 use App\Models\User;
 use App\Tenant\TenantContext;
@@ -25,10 +24,7 @@ beforeEach(function (): void {
 
     $this->user = User::factory()->create();
     $this->user->associations()->attach(1, ['role' => 'admin', 'joined_at' => now()]);
-    // DC-8 : les actions souscat: portent des ids de comptes — créer le Compte
-    // matérialise en retour la SousCategorie miroir (CompteObserver).
     $this->compteCotisation = Compte::factory()->numero('756')->pourCotisations()->create();
-    $this->scCotisation = SousCategorie::where('code_cerfa', '756')->firstOrFail();
 
     $compte = CompteBancaire::factory()->create();
     $this->parametres = HelloAssoParametres::factory()->create([
@@ -78,9 +74,7 @@ it('sauvegarderEtSuite persiste souscat: pour Membership', function (): void {
 
     $this->formMembership->refresh();
     expect($this->formMembership->ignore)->toBeFalse();
-    // DC-8 : écrit compte_id, le trait remplit le miroir sous_categorie_id.
     expect((int) $this->formMembership->compte_id)->toBe((int) $this->compteCotisation->id);
-    expect((int) $this->formMembership->sous_categorie_id)->toBe((int) $this->scCotisation->id);
 });
 
 it('sauvegarderEtSuite persiste operation: pour Event (form d\'inscription HelloAsso)', function (): void {
@@ -151,10 +145,7 @@ it('étape 1 : seuls les forms Event ont le bouton "créer opération"', functio
 });
 
 it('un form imported_at est verrouillé : son action ne peut plus être changée', function (): void {
-    $this->formMembership->update([
-        'imported_at' => now(),
-        'sous_categorie_id' => $this->scCotisation->id,
-    ]);
+    $this->formMembership->forceFill(['imported_at' => now(), 'compte_id' => $this->compteCotisation->id])->save();
 
     Livewire::actingAs($this->user)
         ->test(HelloassoSyncWizard::class)
@@ -164,6 +155,6 @@ it('un form imported_at est verrouillé : son action ne peut plus être changée
 
     $this->formMembership->refresh();
     expect($this->formMembership->imported_at)->not->toBeNull();
-    expect($this->formMembership->ignore)->toBeFalse(); // PAS modifié — verrouillé
-    expect($this->formMembership->sous_categorie_id)->toBe($this->scCotisation->id); // PAS modifié
+    expect($this->formMembership->ignore)->toBeFalse();
+    expect((int) $this->formMembership->compte_id)->toBe((int) $this->compteCotisation->id);
 });

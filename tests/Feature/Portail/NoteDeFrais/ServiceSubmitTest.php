@@ -8,8 +8,8 @@ use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
 use App\Models\Tiers;
 use App\Services\Portail\NoteDeFrais\NoteDeFraisService;
-use Illuminate\Validation\ValidationException;
 use App\Tenant\TenantContext;
+use Illuminate\Validation\ValidationException;
 
 function submitService(): NoteDeFraisService
 {

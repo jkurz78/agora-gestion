@@ -3,11 +3,11 @@
 declare(strict_types=1);
 
 use App\Enums\ModePaiement;
+use App\Enums\UsageComptable;
 use App\Models\Adhesion;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\FormuleAdhesion;
-use App\Enums\UsageComptable;
-use App\Models\Compte;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;

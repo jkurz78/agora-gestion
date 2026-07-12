@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Models\Compte;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
 use App\Models\Tiers;

@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Models\Association;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
-use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Services\Rapports\CompteResultatBuilder;
 use App\Services\TransactionUniverselleService;
@@ -111,33 +110,27 @@ it('CompteResultatBuilder fetchBudgetMap does not leak cross-tenant budget lines
 
     TenantContext::boot($this->assoA);
     $compteA = CompteBancaire::factory()->create(['solde_initial' => 0]);
-    // fetchBudgetMap résout encore via sous_categories.code_cerfa → comptes.numero_pcg :
-    // on crée le compte de ventilation puis on récupère son miroir sous_categorie.
     $compteVentilationA = Compte::factory()->depense()->create();
-    $souscatA = SousCategorie::where('code_cerfa', $compteVentilationA->numero_pcg)
-        ->where('association_id', $this->assoA->id)
-        ->firstOrFail();
     $txA = Transaction::factory()->asDepense()->create([
         'compte_id' => $compteA->id,
         'date' => '2025-01-10',
         'montant_total' => 100.00,
     ]);
-    $txA->lignes()->update(['sous_categorie_id' => $souscatA->id]);
+    $txA->lignes()->update(['compte_id' => $compteVentilationA->id]);
     DB::table('budget_lines')->insert([
         'association_id' => $this->assoA->id,
         'exercice' => 2024,
-        'sous_categorie_id' => $souscatA->id,
+        'compte_id' => $compteVentilationA->id,
         'montant_prevu' => 200.00,
         'created_at' => now(),
         'updated_at' => now(),
     ]);
 
-    // Tenant B inserts a budget for THE SAME sous_categorie_id (cross-tenant collision).
-    // This is the realistic scenario: in a shared DB, IDs from table A can appear in table B.
+    // Tenant B inserts a budget for the SAME compte_id (cross-tenant collision).
     DB::table('budget_lines')->insert([
         'association_id' => $this->assoB->id,
         'exercice' => 2024,
-        'sous_categorie_id' => $souscatA->id, // intentionally same sous_categorie_id
+        'compte_id' => $compteVentilationA->id,
         'montant_prevu' => 9999.00,
         'created_at' => now(),
         'updated_at' => now(),

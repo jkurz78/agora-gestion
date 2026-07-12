@@ -229,11 +229,9 @@ final class HelloassoSyncWizard extends Component
                 $mapping->update([
                     'ignore' => true,
                     'compte_id' => null,
-                    'sous_categorie_id' => null,
                     'operation_id' => null,
                 ]);
             } elseif (str_starts_with($action, 'souscat:')) {
-                // DC-8 : écrit compte_id, le trait remplit le miroir sous_categorie_id.
                 $compteId = (int) substr($action, 8);
                 $mapping->update([
                     'ignore' => false,
@@ -245,7 +243,6 @@ final class HelloassoSyncWizard extends Component
                 $mapping->update([
                     'ignore' => false,
                     'compte_id' => null,
-                    'sous_categorie_id' => null,
                     'operation_id' => $opId,
                 ]);
             }

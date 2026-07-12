@@ -120,7 +120,7 @@ function creerTxAvecPd(Association $asso, array $overrides = []): Transaction
     // (CompteResultatBuilder) résout désormais compte_id depuis sous_categorie_id via cette
     // correspondance ; sans elle, la ligne "disparaît" du total legacy et introduit un delta
     // artificiel legacy vs PD (faux positif "sans PD"). Posé après coup (compte7 existe déjà)
-    // pour que SousCategorieCompteObserver::updated() ne tente pas de matérialiser un doublon.
+    // pour aligner code_cerfa avec le numero_pcg du compte existant.
     $sousCat->update(['code_cerfa' => '706']);
 
     $compte411 = Compte::where('association_id', (int) $asso->id)

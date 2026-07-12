@@ -17,11 +17,13 @@ beforeEach(function () {
     $this->catRecette = Categorie::factory()->for($this->asso, 'association')->create(['type' => TypeCategorie::Recette]);
     $this->scDon = SousCategorie::factory()->for($this->asso, 'association')->for($this->catRecette)->create(['nom' => 'Dons manuels', 'code_cerfa' => '754A']);
     $this->scCoti = SousCategorie::factory()->for($this->asso, 'association')->for($this->catRecette)->create(['nom' => 'Cotisations', 'code_cerfa' => '756A']);
-    UsageSousCategorie::create([
-        'association_id' => $this->asso->id, 'sous_categorie_id' => $this->scDon->id, 'usage' => UsageComptable::Don,
+    $this->compteDon = Compte::factory()->numero('754A')->create(['association_id' => $this->asso->id, 'intitule' => 'Dons manuels']);
+    $this->compteCoti = Compte::factory()->numero('756A')->create(['association_id' => $this->asso->id, 'intitule' => 'Cotisations']);
+    UsageSousCategorie::forceCreate([
+        'association_id' => $this->asso->id, 'sous_categorie_id' => $this->scDon->id, 'compte_id' => $this->compteDon->id, 'usage' => UsageComptable::Don->value,
     ]);
-    UsageSousCategorie::create([
-        'association_id' => $this->asso->id, 'sous_categorie_id' => $this->scCoti->id, 'usage' => UsageComptable::Cotisation,
+    UsageSousCategorie::forceCreate([
+        'association_id' => $this->asso->id, 'sous_categorie_id' => $this->scCoti->id, 'compte_id' => $this->compteCoti->id, 'usage' => UsageComptable::Cotisation->value,
     ]);
 });
 

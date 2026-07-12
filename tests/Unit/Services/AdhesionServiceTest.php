@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-use App\Models\Adhesion;
 use App\Enums\UsageComptable;
+use App\Models\Adhesion;
 use App\Models\Compte;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
-use App\Tenant\TenantContext;
 use App\Models\User;
 use App\Services\AdhesionService;
+use App\Tenant\TenantContext;
 
 it('creerDepuisTransaction crée une adhésion pour une transaction cotisation', function (): void {
     $service = app(AdhesionService::class);
@@ -109,10 +109,10 @@ it('creerDepuisTransaction ne duplique pas une adhésion déjà liée à la tran
         TransactionLigne::factory()->create([
             'transaction_id' => $tx->id,
             'compte_id' => $sc->id,
-        'montant' => 50.00,
-        'debit' => 0,
-        'credit' => 50.00,
-    ]);
+            'montant' => 50.00,
+            'debit' => 0,
+            'credit' => 50.00,
+        ]);
     });
 
     // Adhésion déjà créée par le wizard pour CETTE transaction, mode durée → exercice NULL.
