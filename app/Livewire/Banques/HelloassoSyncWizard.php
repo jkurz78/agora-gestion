@@ -20,6 +20,7 @@ use App\Services\HelloAssoTiersResolver;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -194,7 +195,11 @@ final class HelloassoSyncWizard extends Component
             'newOperationNom' => 'required|string|max:255',
             'newOperationDateDebut' => 'required|date',
             'newOperationDateFin' => 'nullable|date|after_or_equal:newOperationDateDebut',
-            'newOperationTypeOperationId' => 'required|exists:type_operations,id',
+            'newOperationTypeOperationId' => [
+                'required',
+                Rule::exists('type_operations', 'id')
+                    ->where('association_id', (int) TenantContext::currentId()),
+            ],
         ]);
 
         $operation = Operation::create([

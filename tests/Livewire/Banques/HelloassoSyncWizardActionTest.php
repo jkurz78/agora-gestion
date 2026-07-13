@@ -172,6 +172,38 @@ it('un form imported_at est verrouillé : son action ne peut plus être changée
     expect((int) $this->formMembership->compte_id)->toBe((int) $this->compteCotisation->id);
 });
 
+it('refuse de créer une opération avec un type d’un autre tenant', function (): void {
+    $typeOperationA = TypeOperation::factory()->create();
+    $associationB = Association::factory()->create();
+    $this->user->associations()->attach((int) $associationB->id, ['role' => 'admin', 'joined_at' => now()]);
+
+    TenantContext::clear();
+    TenantContext::boot($associationB);
+    session(['current_association_id' => (int) $associationB->id]);
+
+    $typeOperationB = TypeOperation::factory()->create([
+        'association_id' => (int) $associationB->id,
+    ]);
+    $nombreOperations = Operation::withoutGlobalScopes()->count();
+
+    $component = Livewire::actingAs($this->user)
+        ->test(HelloassoSyncWizard::class)
+        ->set('newOperationNom', 'Opération tenant B')
+        ->set('newOperationDateDebut', '2026-07-13')
+        ->set('newOperationTypeOperationId', (int) $typeOperationA->id)
+        ->call('storeOperation')
+        ->assertHasErrors(['newOperationTypeOperationId']);
+
+    expect(Operation::withoutGlobalScopes()->count())->toBe($nombreOperations);
+
+    $component->set('newOperationTypeOperationId', (int) $typeOperationB->id)
+        ->call('storeOperation')
+        ->assertHasNoErrors();
+
+    expect(Operation::withoutGlobalScopes()->count())->toBe($nombreOperations + 1)
+        ->and(Operation::query()->where('type_operation_id', (int) $typeOperationB->id)->exists())->toBeTrue();
+});
+
 it('isole config résumé et formulaires HelloAsso sur le tenant courant hors association 1', function (): void {
     $typeOperationA = TypeOperation::factory()->create();
     $operationA = Operation::factory()->create(['type_operation_id' => (int) $typeOperationA->id]);
