@@ -115,7 +115,17 @@ déjà, la suite reste verte lot par lot.
 - [x] `database/schema/mysql-schema.sql` régénéré depuis le schéma final, sans `--prune`.
   Une seconde base MySQL vide charge ce dump puis répond `Nothing to migrate` et ne
   contient aucune table ou colonne historique.
-- [ ] AC1, Pint et suite complète : gates de clôture de la Task 6.
+- [x] Gates de clôture de la Task 6 :
+  - AC1 : aucune référence au modèle ou au schéma comptable historique dans `app/`
+    et `resources/views/` ;
+  - dump final : aucune table, colonne ou index historique hors noms des migrations
+    enregistrées ;
+  - Pint : succès sur tous les fichiers PHP suivis hors `config/version.php`,
+    modification utilisateur laissée intacte et hors commit ;
+  - suite complète : 5 583 tests, 14 606 assertions, aucun échec avec
+    `php -d memory_limit=1G ./vendor/bin/pest --compact` (la limite standard de 512 Mo
+    est insuffisante à cause de l'accumulation des dépréciations PHP 8.5) ;
+  - revue indépendante des deux correctifs MySQL et du dump : approuvée sans finding.
 
 ### Procédure de cutover reproductible
 
