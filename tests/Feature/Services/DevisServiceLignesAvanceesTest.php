@@ -68,6 +68,31 @@ describe('ajouterLigne()', function () {
     });
 });
 
+describe('modifierLigne()', function () {
+    it('refuse un compte cross-tenant sans modifier la ligne', function () {
+        $compteInitial = Compte::factory()->numero('706')->create();
+        $devis = Devis::factory()->brouillon()->create();
+        $ligne = DevisLigne::factory()->montant()->create([
+            'devis_id' => $devis->id,
+            'libelle' => 'Libellé initial',
+            'compte_id' => $compteInitial->id,
+        ]);
+
+        $autreAssociation = Association::factory()->create();
+        TenantContext::boot($autreAssociation);
+        $compteExterne = Compte::factory()->numero('707')->create();
+        TenantContext::boot($this->association);
+
+        expect(fn () => $this->service->modifierLigne($ligne, [
+            'libelle' => 'Libellé interdit',
+            'compte_id' => $compteExterne->id,
+        ]))->toThrow(RuntimeException::class, 'compte actif de classe 7');
+
+        expect($ligne->fresh()->libelle)->toBe('Libellé initial')
+            ->and((int) $ligne->fresh()->compte_id)->toBe((int) $compteInitial->id);
+    });
+});
+
 // ─── ajouterLigneTexte ────────────────────────────────────────────────────────
 
 describe('ajouterLigneTexte()', function () {

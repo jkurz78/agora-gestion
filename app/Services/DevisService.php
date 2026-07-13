@@ -259,7 +259,10 @@ final class DevisService
             }
 
             if (array_key_exists('compte_id', $data)) {
-                $updates['compte_id'] = $data['compte_id'];
+                $compte = $this->resolveCompteProduit(
+                    $data['compte_id'] !== null ? (int) $data['compte_id'] : null
+                );
+                $updates['compte_id'] = $compte?->id;
             }
 
             if (array_key_exists('prix_unitaire', $data)) {
@@ -567,6 +570,10 @@ final class DevisService
             $nouveau->save();
 
             foreach ($lignesSource as $ligne) {
+                $compte = $this->resolveCompteProduit(
+                    $ligne->compte_id !== null ? (int) $ligne->compte_id : null
+                );
+
                 DevisLigne::create([
                     'devis_id' => $nouveau->id,
                     'ordre' => $ligne->ordre,
@@ -575,7 +582,7 @@ final class DevisService
                     'prix_unitaire' => $ligne->prix_unitaire,
                     'quantite' => $ligne->quantite,
                     'montant' => $ligne->montant,
-                    'compte_id' => $ligne->compte_id,
+                    'compte_id' => $compte?->id,
                 ]);
             }
 
@@ -710,6 +717,9 @@ final class DevisService
 
         // TypeLigneDevis::Montant → TypeLigneFacture::MontantManuel
         $montant = round((float) $ligne->prix_unitaire * (float) $ligne->quantite, 2);
+        $compte = $this->resolveCompteProduit(
+            $ligne->compte_id !== null ? (int) $ligne->compte_id : null
+        );
 
         return FactureLigne::create([
             'facture_id' => $facture->id,
@@ -720,7 +730,7 @@ final class DevisService
             'quantite' => (float) $ligne->quantite,
             'montant' => $montant,
             'transaction_ligne_id' => null,
-            'compte_id' => $ligne->compte_id !== null ? (int) $ligne->compte_id : null,
+            'compte_id' => $compte?->id,
             'operation_id' => null,
             'seance' => null,
         ]);

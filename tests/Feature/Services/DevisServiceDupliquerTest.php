@@ -276,6 +276,29 @@ describe('dupliquer() — lignes recopiées', function () {
         expect($nouveau->lignes()->count())->toBe(0)
             ->and((float) $nouveau->montant_total)->toBe(0.0);
     });
+
+    it('refuse un compte source devenu invalide sans créer de devis partiel', function (string $etatCompte) {
+        $source = Devis::factory()->brouillon()->create(['montant_total' => 100.00]);
+        $compte = Compte::factory()->numero('706')->create();
+        DevisLigne::factory()->montant()->create([
+            'devis_id' => $source->id,
+            'compte_id' => $compte->id,
+            'montant' => 100.00,
+        ]);
+
+        if ($etatCompte === 'supprimé') {
+            $compte->delete();
+        } else {
+            $compte->update(['actif' => false]);
+        }
+
+        $nombreDevisAvant = Devis::withoutGlobalScopes()->count();
+
+        expect(fn () => $this->service->dupliquer($source))
+            ->toThrow(RuntimeException::class, 'compte actif de classe 7');
+
+        expect(Devis::withoutGlobalScopes()->count())->toBe($nombreDevisAvant);
+    })->with(['supprimé', 'inactif']);
 });
 
 // ─── Isolation multi-tenant ────────────────────────────────────────────────────

@@ -266,6 +266,22 @@ describe('Happy path : devis accepté (2 lignes Montant + 1 Texte) → Facture b
             'libelle' => 'Détail de la prestation selon annexe',
         ]);
     });
+
+    it('refuse un compte devenu hors classe 7 sans créer de facture partielle', function () {
+        $devis = creerDevisAccepte($this->tiers, $this->compteVentilation);
+        $this->compteVentilation->update([
+            'numero_pcg' => '606T',
+            'classe' => 6,
+        ]);
+
+        $nombreFacturesAvant = Facture::withoutGlobalScopes()->count();
+
+        expect(fn () => $this->service->transformerEnFacture($devis))
+            ->toThrow(RuntimeException::class, 'compte actif de classe 7');
+
+        expect(Facture::withoutGlobalScopes()->count())->toBe($nombreFacturesAvant)
+            ->and($devis->fresh()->statut)->toBe(StatutDevis::Accepte);
+    });
 });
 
 // ─── Test 2 : Guards statut ──────────────────────────────────────────────────
