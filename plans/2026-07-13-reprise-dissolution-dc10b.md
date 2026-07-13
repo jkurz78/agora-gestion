@@ -93,6 +93,7 @@ Expected: exit 0.
 - Modify: `app/Livewire/Parametres/Adhesions/FormulesList.php`
 - Modify: `app/Services/ProvisionService.php`
 - Modify: `app/Services/Compta/Migrations/SystemeSeeder.php`
+- Modify: `app/Services/Compta/Migrations/BancairesSeeder.php`
 - Modify: `resources/views/components/operation-breadcrumb.blade.php`
 - Modify: `resources/views/livewire/dashboard.blade.php`
 - Modify: `resources/views/livewire/type-operation-list.blade.php`
