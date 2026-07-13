@@ -97,6 +97,7 @@ Expected: exit 0.
 - Modify: `app/Livewire/Parametres/HelloassoSyncConfig.php`
 - Modify: `app/Http/Controllers/HelloAssoCallbackController.php`
 - Modify: `app/Services/ProvisionService.php`
+- Modify: `app/Services/FactureService.php`
 - Modify: `app/Models/HelloAssoParametres.php`
 - Modify: `database/factories/HelloAssoParametresFactory.php`
 - Modify: `app/Services/Compta/Migrations/SystemeSeeder.php`
