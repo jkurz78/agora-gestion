@@ -82,21 +82,52 @@ déjà, la suite reste verte lot par lot.
 
 ## DC-10b-4 — Migration de drop + validation finale
 
-- [ ] Migration unique `drop_sous_categories_legacy` :
-  1. drop FK + colonne `sous_categorie_id` sur les 11 tables (transaction_lignes,
-     budget_lines, facture_lignes, devis_lignes, formules_adhesion, type_operations,
-     helloasso_form_mappings, provisions, usages_sous_categories, notes_de_frais_lignes,
-     encadrement_previsions),
-  2. drop FK + colonne `comptes.categorie_id`,
-  3. drop tables `sous_categories` puis `categories`.
-  `down()` : recréation structurelle best-effort (données non restaurées — documenter).
-- [ ] Renommer la table `usages_sous_categories` → `usages_comptes` ? NON — hors périmètre,
-  noter en dette (rename de table = churn migrations/modèle sans gain fonctionnel).
-- [ ] `./vendor/bin/sail artisan migrate` sur la base dev (clone prod) — vérifier le
-  backfill DC-2 déjà joué n'est pas rejoué, la migration de drop passe.
-- [ ] AC1 : `grep -rn 'sous_categorie\|SousCategorie\|Categorie\b' app/ resources/views/`
-  → zéro (hors `usages_sous_categories` nom de table et migrations historiques).
-- [ ] Pint + suite complète + `compta:smoke-test-v5`. Commit final.
+- [x] Migration finale `2026_07_12_200001_drop_sous_categories_and_categories` :
+  1. backfill fail-closed des rattachements encore résolubles, y compris les lignes
+     soft-deleted et le compte de dons HelloAsso ;
+  2. suppression des FK, index puis colonnes `sous_categorie_id` sur les 10 tables de
+     ventilation et de `sous_categorie_don_id` ;
+  3. remplacement de l'index transaction composite historique par l'index final
+     `transaction_lignes_transaction_id_index` ;
+  4. suppression de `comptes.categorie_id` ;
+  5. transformation de `usages_sous_categories` en `usages_comptes`, avec
+     `compte_id NOT NULL`, FK cascade, unique `(association_id, compte_id, usage)` et
+     index finaux `usages_comptes_compte_id_index` et `(association_id, usage)`, sans
+     nom d'index historique ;
+  6. suppression des tables `sous_categories` puis `categories`.
+
+  `down()` est volontairement irréversible : restaurer la sauvegarde.
+
+- [x] Contrat de nullabilité confirmé : les 10 tables de ventilation conservent
+  `compte_id` nullable et leur FK `ON DELETE SET NULL` (lignes texte, brouillons et
+  mappings ignorés sont légitimes). Seul `usages_comptes.compte_id` est obligatoire et
+  supprimé en cascade avec le compte.
+- [x] Répétition MySQL sur une copie jetable du clone, jamais sur `svs_accounting` :
+  dump `--single-transaction --skip-lock-tables`, compteurs source/copie identiques,
+  zéro rattachement irrésoluble, zéro doublon d'usage et zéro doublon d'encadrement.
+- [x] Les deux migrations du 12 juillet passent sur MySQL. `information_schema`
+  confirme l'absence des tables et colonnes historiques, les FK/nullabilités attendues,
+  les index finaux et l'unicité d'encadrement sur `compte_id`.
+- [x] `compta:smoke-test-v5 --detail` et `compta:assert-pd-complete --check` passent.
+  `compta:check-integrity` signale séparément 13 écarts de rapprochements déjà présents
+  dans les données du clone ; la répétition reste saine (delta CR et rapprochements du
+  smoke à 0, aucune transaction déséquilibrée ou sans partie double).
+- [x] `database/schema/mysql-schema.sql` régénéré depuis le schéma final, sans `--prune`.
+  Une seconde base MySQL vide charge ce dump puis répond `Nothing to migrate` et ne
+  contient aucune table ou colonne historique.
+- [ ] AC1, Pint et suite complète : gates de clôture de la Task 6.
+
+### Procédure de cutover reproductible
+
+1. Sauvegarder la source avec `mysqldump --single-transaction --skip-lock-tables`.
+2. Restaurer le dump dans une base `agora_dc10b_verify_*` et comparer les compteurs ainsi
+   que les préflights avant toute migration.
+3. Afficher et vérifier explicitement `DB_DATABASE` : refuser `svs_accounting`, n'exécuter
+   `artisan migrate --force` que sur la copie jetable.
+4. Contrôler `information_schema`, le smoke V5 et la complétude partie double.
+5. Tester le dump de schéma sur une deuxième base vide et vérifier zéro migration pending.
+6. Comparer à nouveau le statut des migrations de la source, puis supprimer bases et dump
+   temporaires.
 
 ---
 

@@ -73,6 +73,11 @@ return new class extends Migration
             $table->dropForeign(['sous_categorie_id']);
             $table->dropForeign(['compte_id']);
         });
+        if (Schema::hasIndex('usages_sous_categories', 'usages_sous_categories_compte_id_foreign')) {
+            Schema::table('usages_sous_categories', function (Blueprint $table): void {
+                $table->dropIndex('usages_sous_categories_compte_id_foreign');
+            });
+        }
         Schema::table('usages_sous_categories', function (Blueprint $table): void {
             $table->dropUnique('usages_sc_unique');
             $table->dropIndex('usages_sc_asso_usage_idx');
@@ -87,6 +92,7 @@ return new class extends Migration
             $table->unsignedBigInteger('compte_id')->nullable(false)->change();
         });
         Schema::table('usages_comptes', function (Blueprint $table): void {
+            $table->index('compte_id', 'usages_comptes_compte_id_index');
             $table->foreign('association_id')->references('id')->on('association')->cascadeOnDelete();
             $table->foreign('compte_id')->references('id')->on('comptes')->cascadeOnDelete();
             $table->unique(['association_id', 'compte_id', 'usage'], 'usages_comptes_unique');

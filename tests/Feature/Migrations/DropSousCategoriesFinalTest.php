@@ -227,12 +227,21 @@ it('enforces a non-null account and cascades deleted accounts on usages', functi
 });
 
 it('keeps the tenant usage lookup index', function (): void {
-    $index = collect(Schema::getIndexes('usages_comptes'))
+    $indexes = collect(Schema::getIndexes('usages_comptes'));
+    $index = $indexes
         ->firstWhere('name', 'usages_comptes_asso_usage_idx');
+    $compteIndex = $indexes
+        ->firstWhere('name', 'usages_comptes_compte_id_index');
 
     expect($index)->not->toBeNull()
         ->and($index['columns'])->toBe(['association_id', 'usage'])
-        ->and($index['unique'])->toBeFalse();
+        ->and($index['unique'])->toBeFalse()
+        ->and($compteIndex)->not->toBeNull()
+        ->and($compteIndex['columns'])->toBe(['compte_id'])
+        ->and($compteIndex['unique'])->toBeFalse()
+        ->and($indexes->pluck('name')->contains(
+            fn (string $name): bool => str_contains($name, 'sous_categories')
+        ))->toBeFalse();
 });
 
 it('keeps a final transaction lookup index after dropping the legacy composite', function (): void {
