@@ -157,6 +157,7 @@ Expected: PASS.
 - Modify: `app/Services/Rapports/CompteResultatBuilder.php`
 - Modify: `app/Services/CsvImportService.php`
 - Modify: `app/Http/Controllers/CsvImportController.php`
+- Modify: `app/Livewire/TypeOperationShow.php`
 - Modify: `resources/views/pdf/rapport-compte-resultat.blade.php`
 - Modify: `resources/views/pdf/rapport-operations.blade.php`
 - Modify: `resources/views/livewire/rapport-compte-resultat.blade.php`
@@ -165,6 +166,10 @@ Expected: PASS.
 - Modify: `resources/views/livewire/facture-edit/partials/ligne-manuelle-montant-form.blade.php`
 - Modify: `resources/views/livewire/devis-manuel/devis-edit.blade.php`
 - Modify: `resources/views/livewire/type-operation-show.blade.php`
+- Test: `tests/Feature/RapportServiceAffectationTest.php`
+- Test: `tests/Livewire/RapportCompteResultatTest.php`
+- Test: `tests/Feature/CsvImportServiceTest.php`
+- Test: `tests/Feature/TypeOperationTest.php`
 
 **Interfaces:**
 - Consumes: payloads compte-first des services.
