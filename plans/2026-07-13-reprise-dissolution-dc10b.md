@@ -169,11 +169,13 @@ Expected: PASS.
 - Test: `tests/Feature/RapportServiceAffectationTest.php`
 - Test: `tests/Livewire/RapportCompteResultatTest.php`
 - Test: `tests/Feature/CsvImportServiceTest.php`
+- Test: `tests/Feature/CsvImportControllerTest.php`
+- Test: `tests/Feature/Audit/CsvImportRefuseNegatifsTest.php`
 - Test: `tests/Feature/TypeOperationTest.php`
 
 **Interfaces:**
 - Consumes: payloads compte-first des services.
-- Produces: clés internes `compte_id`, `compte_nom`, `famille_nom` et libellé CSV `compte`, sans vocabulaire comptable historique.
+- Produces: clés internes `compte_id`, `compte_nom`, `famille_nom`, sans vocabulaire comptable historique. Dans le CSV, `compte` désigne le compte comptable de ventilation et `compte_bancaire` le compte de trésorerie, afin d'éviter deux colonnes homonymes.
 
 - [ ] **Step 1: Adapter d'abord les assertions des tests de rapports et imports**
 
@@ -184,6 +186,8 @@ Expected: FAIL sur les anciennes clés ou l'ancien en-tête.
 - [ ] **Step 2: Renommer les payloads et leurs consommateurs en une chaîne atomique**
 
 Remplacer les alias SQL, clés de tableaux, index de projection et variables Blade ensemble afin qu'aucune frontière producteur/consommateur ne soit désynchronisée.
+
+Le contrat CSV cible est `date;reference;compte;montant_ligne;mode_paiement;compte_bancaire;libelle;tiers;operation;seance;notes`.
 
 - [ ] **Step 3: Vérifier les rapports et imports**
 
