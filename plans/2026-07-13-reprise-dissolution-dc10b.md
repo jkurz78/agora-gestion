@@ -99,6 +99,7 @@ Expected: exit 0.
 - Modify: `database/factories/HelloAssoParametresFactory.php`
 - Modify: `app/Services/Compta/Migrations/SystemeSeeder.php`
 - Modify: `app/Services/Compta/Migrations/BancairesSeeder.php`
+- Modify: `app/Services/Compta/BackfillAuditor.php`
 - Modify: `resources/views/components/operation-breadcrumb.blade.php`
 - Modify: `resources/views/livewire/dashboard.blade.php`
 - Modify: `resources/views/livewire/type-operation-list.blade.php`
