@@ -48,7 +48,7 @@ final class BackfillAuditor
             })
             ->count();
 
-        // -- Lignes de ventilation sans compte 6/7 valide dans cet exercice --
+        // -- Lignes de ventilation que TransactionConverter skipperait --
         $ventilationsInvalides = DB::table('transaction_lignes as tl')
             ->join('transactions as t', 't.id', '=', 'tl.transaction_id')
             ->leftJoin('comptes as c', 'c.id', '=', 'tl.compte_id')
@@ -60,7 +60,15 @@ final class BackfillAuditor
             ->where(function ($query) use ($associationId): void {
                 $query->whereNull('c.id')
                     ->orWhere('c.association_id', '!=', $associationId)
-                    ->orWhereNotIn('c.classe', [6, 7]);
+                    ->orWhereNotNull('c.deleted_at')
+                    ->orWhere(function ($classe): void {
+                        $classe->where('t.type', 'recette')
+                            ->where('c.classe', '!=', 7);
+                    })
+                    ->orWhere(function ($classe): void {
+                        $classe->where('t.type', 'depense')
+                            ->where('c.classe', '!=', 6);
+                    });
             })
             ->select('tl.id', 'tl.libelle')
             ->orderBy('tl.id')

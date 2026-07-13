@@ -169,3 +169,56 @@ it('un form imported_at est verrouillé : son action ne peut plus être changée
     expect($this->formMembership->ignore)->toBeFalse();
     expect((int) $this->formMembership->compte_id)->toBe((int) $this->compteCotisation->id);
 });
+
+it('isole config résumé et formulaires HelloAsso sur le tenant courant hors association 1', function (): void {
+    $associationB = Association::factory()->create();
+    $this->user->associations()->attach((int) $associationB->id, ['role' => 'admin', 'joined_at' => now()]);
+
+    TenantContext::clear();
+    TenantContext::boot($associationB);
+    session(['current_association_id' => (int) $associationB->id]);
+
+    $compteB = CompteBancaire::factory()->create(['association_id' => (int) $associationB->id]);
+    $parametresB = HelloAssoParametres::factory()->create([
+        'association_id' => (int) $associationB->id,
+        'environnement' => HelloAssoEnvironnement::Sandbox,
+        'client_id' => 'cid-b',
+        'client_secret' => 'secret-b',
+        'organisation_slug' => 'asso-b',
+        'compte_helloasso_id' => (int) $compteB->id,
+        'compte_versement_id' => null,
+    ]);
+    $mappingB = HelloAssoFormMapping::create([
+        'helloasso_parametres_id' => (int) $parametresB->id,
+        'form_slug' => 'cotisation-b',
+        'form_type' => 'Membership',
+        'form_title' => 'Cotisation tenant B',
+    ]);
+    $typeOperationB = TypeOperation::factory()->create(['association_id' => (int) $associationB->id]);
+    $operationB = Operation::factory()->create([
+        'association_id' => (int) $associationB->id,
+        'type_operation_id' => (int) $typeOperationB->id,
+    ]);
+    $eventMappingB = HelloAssoFormMapping::create([
+        'helloasso_parametres_id' => (int) $parametresB->id,
+        'form_slug' => 'event-b',
+        'form_type' => 'Event',
+        'form_title' => 'Événement tenant B',
+        'operation_id' => (int) $operationB->id,
+    ]);
+
+    expect(HelloAssoParametres::query()->pluck('id')->map(fn ($id): int => (int) $id)->all())
+        ->toBe([(int) $parametresB->id]);
+
+    $component = Livewire::actingAs($this->user)
+        ->test(HelloassoSyncWizard::class)
+        ->set('formsLoaded', true)
+        ->set('tiersFetched', true);
+
+    expect($component->get('configWarnings'))
+        ->toContain('Le compte de versement n\'est pas configuré — les versements (cashouts) ne seront pas traités.');
+    expect($component->viewData('formMappings')->pluck('id')->map(fn ($id): int => (int) $id)->all())
+        ->toBe([(int) $mappingB->id, (int) $eventMappingB->id]);
+    $component->call('sauvegarderEtSuite')
+        ->assertSet('stepOneSummary', '2 formulaires, 1 mappés');
+});

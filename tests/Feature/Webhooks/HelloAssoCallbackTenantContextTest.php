@@ -36,3 +36,29 @@ it('boots TenantContext for the resolved association during the webhook', functi
     $response->assertOk();
     expect($observed)->toBe($asso->id);
 });
+
+it('résout le token hors scope puis écrit uniquement sous le tenant correspondant', function (): void {
+    $associationA = Association::factory()->create();
+    $associationB = Association::factory()->create();
+    HelloAssoParametres::create([
+        'association_id' => (int) $associationA->id,
+        'callback_token' => 'token-a',
+    ]);
+    HelloAssoParametres::create([
+        'association_id' => (int) $associationB->id,
+        'callback_token' => 'token-b',
+    ]);
+
+    $this->postJson('/api/helloasso/callback/token-b', [
+        'eventType' => 'Order',
+        'data' => ['formType' => 'Donation', 'name' => 'Tenant B'],
+    ])->assertOk();
+
+    expect(DB::table('helloasso_notifications')->count())->toBe(1)
+        ->and((int) DB::table('helloasso_notifications')->value('association_id'))
+        ->toBe((int) $associationB->id);
+
+    $this->postJson('/api/helloasso/callback/token-invalide', ['eventType' => 'Order'])
+        ->assertForbidden();
+    expect(DB::table('helloasso_notifications')->count())->toBe(1);
+});

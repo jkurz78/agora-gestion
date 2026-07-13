@@ -6,11 +6,10 @@ namespace App\Models;
 
 use App\Enums\HelloAssoEnvironnement;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-final class HelloAssoParametres extends Model
+final class HelloAssoParametres extends TenantModel
 {
     use HasFactory;
 
@@ -44,11 +43,6 @@ final class HelloAssoParametres extends Model
             'compte_versement_id' => 'integer',
             'compte_don_id' => 'integer',
         ];
-    }
-
-    public function association(): BelongsTo
-    {
-        return $this->belongsTo(Association::class);
     }
 
     public function compteHelloasso(): BelongsTo

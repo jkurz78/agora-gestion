@@ -522,7 +522,7 @@ final class HelloassoSyncWizard extends Component
         $range = app(ExerciceService::class)->dateRange($exercice);
         $exerciceStart = $range['start']->toDateString();
 
-        $p = HelloAssoParametres::where('association_id', 1)->first();
+        $p = HelloAssoParametres::query()->first();
         $filtered = $p?->formMappings()
             ->where(function ($q) use ($exerciceStart) {
                 $q->whereNull('end_date')
@@ -536,7 +536,7 @@ final class HelloassoSyncWizard extends Component
 
     private function checkConfig(): void
     {
-        $p = HelloAssoParametres::where('association_id', 1)->first();
+        $p = HelloAssoParametres::query()->first();
 
         if ($p === null || $p->client_id === null) {
             $this->configErrors[] = 'Les credentials HelloAsso ne sont pas encore configurés.';
@@ -563,7 +563,7 @@ final class HelloassoSyncWizard extends Component
         $range = app(ExerciceService::class)->dateRange($exercice);
         $exerciceStart = $range['start']->toDateString();
 
-        $p = HelloAssoParametres::where('association_id', 1)->first();
+        $p = HelloAssoParametres::query()->first();
 
         $query = $p?->formMappings()->with('compte')->orderBy('form_title');
 

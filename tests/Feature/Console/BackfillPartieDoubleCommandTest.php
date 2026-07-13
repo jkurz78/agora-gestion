@@ -31,6 +31,7 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Services\Compta\BackfillAuditor;
 use App\Services\Compta\Migrations\BancairesSeeder;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\Compta\TransactionConverter;
@@ -1626,3 +1627,63 @@ test('[Régression #1] re-run sans --force reconstruit la T4 même quand toutes 
         ->count();
     expect($nbT4Apres)->toBe(1, 'La phase 2 doit reconstruire la T4 sur un re-run sans --force (régression finding #1)');
 })->group('backfill', 'remise-backfill');
+
+test('[Régression auditeur] dry-run applique la même matrice de comptes que le converter', function (): void {
+    $association = Association::factory()->create();
+    TenantContext::boot($association);
+    $tiers = Tiers::factory()->create(['association_id' => (int) $association->id]);
+
+    $compte6 = Compte::factory()->numero('6061')->create(['association_id' => (int) $association->id]);
+    $compte7 = Compte::factory()->numero('7061')->create(['association_id' => (int) $association->id]);
+    $compte7Supprime = Compte::factory()->numero('7062')->create(['association_id' => (int) $association->id]);
+
+    $creerTransaction = function (string $type, Compte $compte, string $libelle) use ($association, $tiers): array {
+        $transaction = Transaction::forceCreate([
+            'association_id' => (int) $association->id,
+            'type' => $type,
+            'date' => '2025-10-15',
+            'libelle' => $libelle,
+            'montant_total' => 100,
+            'mode_paiement' => ModePaiement::Virement->value,
+            'statut_reglement' => StatutReglement::EnAttente->value,
+            'tiers_id' => (int) $tiers->id,
+            'type_ecriture' => 'normale',
+            'equilibree' => false,
+        ]);
+        $ligneId = DB::table('transaction_lignes')->insertGetId([
+            'transaction_id' => (int) $transaction->id,
+            'compte_id' => (int) $compte->id,
+            'libelle' => $libelle,
+            'montant' => 100,
+            'debit' => 0,
+            'credit' => 0,
+        ]);
+
+        return [$transaction, (int) $ligneId];
+    };
+
+    [$recetteSur6, $ligneRecetteSur6] = $creerTransaction('recette', $compte6, 'Recette sur classe 6');
+    [$depenseSur7, $ligneDepenseSur7] = $creerTransaction('depense', $compte7, 'Dépense sur classe 7');
+    [$recetteCompteSupprime, $ligneCompteSupprime] = $creerTransaction('recette', $compte7Supprime, 'Recette compte supprimé');
+    [, $ligneRecetteValide] = $creerTransaction('recette', $compte7, 'Recette valide');
+    [, $ligneDepenseValide] = $creerTransaction('depense', $compte6, 'Dépense valide');
+    $compte7Supprime->delete();
+
+    $rapport = app(BackfillAuditor::class)->auditer((int) $association->id, 2025);
+
+    expect(array_column($rapport['ventilations_invalides'], 'id'))
+        ->toBe([$ligneRecetteSur6, $ligneDepenseSur7, $ligneCompteSupprime])
+        ->not->toContain($ligneRecetteValide, $ligneDepenseValide);
+
+    $this->artisan('compta:backfill-partie-double', [
+        '--exercice' => '2025',
+        '--dry-run' => true,
+        '--asso' => (int) $association->id,
+    ])->expectsOutputToContain('Ventilations sans compte valide (3)')
+        ->assertSuccessful();
+
+    $converter = app(TransactionConverter::class);
+    expect($converter->convertir($recetteSur6))->toBeFalse()
+        ->and($converter->convertir($depenseSur7))->toBeFalse()
+        ->and($converter->convertir($recetteCompteSupprime))->toBeFalse();
+})->group('backfill');

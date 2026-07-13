@@ -30,7 +30,7 @@ final class HelloassoSyncConfig extends Component
 
     public function mount(): void
     {
-        $p = HelloAssoParametres::where('association_id', 1)->first();
+        $p = HelloAssoParametres::query()->first();
         if ($p !== null) {
             $this->compteHelloassoId = $p->compte_helloasso_id;
             $this->compteVersementId = $p->compte_versement_id;
@@ -40,7 +40,7 @@ final class HelloassoSyncConfig extends Component
 
     public function sauvegarder(): void
     {
-        $p = HelloAssoParametres::where('association_id', 1)->first();
+        $p = HelloAssoParametres::query()->first();
         if ($p === null) {
             $this->erreur = 'Paramètres HelloAsso non configurés.';
 
