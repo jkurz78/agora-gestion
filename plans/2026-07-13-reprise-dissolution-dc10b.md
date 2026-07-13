@@ -92,6 +92,8 @@ Expected: exit 0.
 - Modify: `app/Livewire/ParticipantTable.php`
 - Modify: `app/Livewire/Parametres/Adhesions/FormulesList.php`
 - Modify: `app/Livewire/Portail/NoteDeFrais/Show.php`
+- Modify: `app/Livewire/BackOffice/NoteDeFrais/Show.php`
+- Modify: `app/Livewire/Banques/HelloAssoSyncWizard.php`
 - Modify: `app/Services/ProvisionService.php`
 - Modify: `app/Services/Compta/Migrations/SystemeSeeder.php`
 - Modify: `app/Services/Compta/Migrations/BancairesSeeder.php`
@@ -105,6 +107,7 @@ Expected: exit 0.
 - Test: `tests/Feature/Console/DumpTransactionCommandTest.php`
 - Test: `tests/Feature/Console/SmokeTestV5CommandTest.php`
 - Test: `tests/Feature/Console/SmokeTestV5SansPdTest.php`
+- Test: `tests/Feature/Console/BackfillPartieDoubleCommandTest.php`
 - Test: `tests/Feature/Commands/TenantBenchmarkCommandTest.php`
 - Create: `tests/Feature/Console/ComptaCheckIntegrityCommandTest.php`
 - Test: `tests/Feature/GestionOperationNavigationTest.php`
@@ -112,6 +115,8 @@ Expected: exit 0.
 - Test: `tests/Feature/Livewire/ParticipantTableTest.php`
 - Test: `tests/Feature/TypeOperationTest.php`
 - Test: `tests/Feature/Services/ProvisionServiceTest.php`
+- Test: `tests/Feature/BackOffice/NoteDeFrais/ShowTest.php`
+- Test: `tests/Livewire/Banques/HelloassoSyncWizardActionTest.php`
 
 **Interfaces:**
 - Consumes: relations `compte()` des modèles de ventilation et `Compte::usages()`.
