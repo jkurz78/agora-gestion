@@ -6,8 +6,10 @@ use App\Enums\StatutExercice;
 use App\Enums\StatutRapprochement;
 use App\Livewire\Exercices\ClotureWizard;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Exercice;
+use App\Models\Provision;
 use App\Models\RapprochementBancaire;
 use App\Models\User;
 use App\Tenant\TenantContext;
@@ -40,6 +42,22 @@ it('can advance to step 2 when all blocking checks pass', function () {
     Livewire::test(ClotureWizard::class)
         ->call('suite')
         ->assertSet('step', 2);
+});
+
+it('affiche le compte des provisions dans le récapitulatif', function () {
+    $compte = Compte::factory()->depense()->create(['intitule' => 'Compte clôture']);
+    Provision::factory()->create([
+        'exercice' => 2025,
+        'compte_id' => $compte->id,
+        'saisi_par' => $this->user->id,
+        'date' => '2026-08-31',
+        'libelle' => 'Provision clôture',
+    ]);
+
+    Livewire::test(ClotureWizard::class)
+        ->call('suite')
+        ->assertSet('step', 2)
+        ->assertSee('Compte clôture');
 });
 
 it('cannot advance to step 2 when blocking checks fail', function () {

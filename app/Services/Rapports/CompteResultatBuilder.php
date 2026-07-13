@@ -77,7 +77,7 @@ final class CompteResultatBuilder
             if ($previsionnel) {
                 $prevSeances = DB::table('seances')
                     ->whereIn('operation_id', $operationIds)
-                    ->when(TenantContext::hasBooted(), fn ($q) => $q->where('association_id', TenantContext::currentId()))
+                    ->tap(fn (Builder $query) => $this->scopeToCurrentTenant($query, 'association_id'))
                     ->pluck('numero')
                     ->unique()
                     ->map(fn ($s) => (int) $s)
@@ -109,7 +109,7 @@ final class CompteResultatBuilder
         if ($parSeances && $parOperations) {
             $seancesParOp = DB::table('seances')
                 ->whereIn('operation_id', $operationIds)
-                ->when(TenantContext::hasBooted(), fn ($q) => $q->where('association_id', TenantContext::currentId()))
+                ->tap(fn (Builder $query) => $this->scopeToCurrentTenant($query, 'association_id'))
                 ->select('operation_id', 'numero')
                 ->orderBy('numero')
                 ->get()
@@ -203,6 +203,17 @@ final class CompteResultatBuilder
     private function exerciceDates(int $exercice): array
     {
         return ["{$exercice}-09-01", ($exercice + 1).'-08-31'];
+    }
+
+    private function scopeToCurrentTenant(Builder $query, string $associationColumn): void
+    {
+        if (! TenantContext::hasBooted()) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $query->where($associationColumn, TenantContext::currentId());
     }
 
     private function joinFamille(Builder $query): void
@@ -303,7 +314,7 @@ final class CompteResultatBuilder
             if (! isset($categories[$catId])) {
                 $categories[$catId] = [
                     'famille_id' => $catId,
-                    'label' => $entry['famille_nom'],
+                    'famille_nom' => $entry['famille_nom'],
                     'montant' => 0.0,
                     'comptes_map' => [],
                 ];
@@ -322,7 +333,7 @@ final class CompteResultatBuilder
             if (! isset($categories[$catId]['comptes_map'][$scId])) {
                 $scEntry = [
                     'compte_id' => $scId,
-                    'label' => $entry['compte_nom'],
+                    'compte_nom' => $entry['compte_nom'],
                     'montant' => 0.0,
                 ];
                 if ($withSeance) {
@@ -418,12 +429,12 @@ final class CompteResultatBuilder
                 }
                 $scs[] = $sc;
             }
-            usort($scs, fn ($a, $b) => strcmp($a['label'], $b['label']));
+            usort($scs, fn ($a, $b) => strcmp($a['compte_nom'], $b['compte_nom']));
             $cat['comptes'] = $scs;
             unset($cat['comptes_map']);
             $result[] = $cat;
         }
-        usort($result, fn ($a, $b) => strcmp($a['label'], $b['label']));
+        usort($result, fn ($a, $b) => strcmp($a['famille_nom'], $b['famille_nom']));
 
         return $result;
     }
@@ -455,7 +466,7 @@ final class CompteResultatBuilder
         return DB::table('budget_lines')
             ->whereNotNull('compte_id')
             ->where('exercice', $exercice)
-            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('association_id', TenantContext::currentId()))
+            ->tap(fn (Builder $query) => $this->scopeToCurrentTenant($query, 'association_id'))
             ->select('compte_id', DB::raw('SUM(montant_prevu) as budget'))
             ->groupBy('compte_id')
             ->get()
@@ -550,7 +561,7 @@ final class CompteResultatBuilder
             if (! isset($categories[$catId])) {
                 $categories[$catId] = [
                     'famille_id' => $catId,
-                    'label' => $sc['famille_nom'],
+                    'famille_nom' => $sc['famille_nom'],
                     'seances' => array_fill_keys($allSeances, 0.0),
                     'total' => 0.0,
                     'comptes' => [],
@@ -570,15 +581,15 @@ final class CompteResultatBuilder
 
             $categories[$catId]['comptes'][] = [
                 'compte_id' => $scId,
-                'label' => $sc['compte_nom'],
+                'compte_nom' => $sc['compte_nom'],
                 'seances' => $scSeances,
                 'total' => $sc['total'],
             ];
         }
 
-        usort($categories, fn ($a, $b) => strcmp($a['label'], $b['label']));
+        usort($categories, fn ($a, $b) => strcmp($a['famille_nom'], $b['famille_nom']));
         foreach ($categories as &$cat) {
-            usort($cat['comptes'], fn ($a, $b) => strcmp($a['label'], $b['label']));
+            usort($cat['comptes'], fn ($a, $b) => strcmp($a['compte_nom'], $b['compte_nom']));
         }
 
         return array_values($categories);
@@ -602,7 +613,7 @@ final class CompteResultatBuilder
             if (! isset($categories[$catId])) {
                 $cat = [
                     'famille_id' => $catId,
-                    'label' => $sc['famille_nom'],
+                    'famille_nom' => $sc['famille_nom'],
                     'comptes' => [],
                 ];
                 if ($withN1Budget) {
@@ -625,7 +636,7 @@ final class CompteResultatBuilder
                 }
                 $categories[$catId]['comptes'][] = [
                     'compte_id' => $scId,
-                    'label' => $sc['compte_nom'],
+                    'compte_nom' => $sc['compte_nom'],
                     'montant_n' => $sc['montant_n'],
                     'montant_n1' => $sc['montant_n1'],
                     'budget' => $sc['budget'],
@@ -634,15 +645,15 @@ final class CompteResultatBuilder
                 $categories[$catId]['montant'] += $sc['montant'];
                 $categories[$catId]['comptes'][] = [
                     'compte_id' => $scId,
-                    'label' => $sc['compte_nom'],
+                    'compte_nom' => $sc['compte_nom'],
                     'montant' => $sc['montant'],
                 ];
             }
         }
 
-        usort($categories, fn ($a, $b) => strcmp($a['label'], $b['label']));
+        usort($categories, fn ($a, $b) => strcmp($a['famille_nom'], $b['famille_nom']));
         foreach ($categories as &$cat) {
-            usort($cat['comptes'], fn ($a, $b) => strcmp($a['label'], $b['label']));
+            usort($cat['comptes'], fn ($a, $b) => strcmp($a['compte_nom'], $b['compte_nom']));
         }
 
         return array_values($categories);
@@ -693,7 +704,7 @@ final class CompteResultatBuilder
             ->whereNull('tl.deleted_at')
             ->whereNull('t.deleted_at')
             ->whereBetween('t.date', [$start, $end])
-            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('c.association_id', TenantContext::currentId()))
+            ->tap(fn (Builder $query) => $this->scopeToCurrentTenant($query, 'c.association_id'))
             ->select([
                 DB::raw('COALESCE(f.id, 0) as famille_id'),
                 DB::raw("COALESCE(CONCAT(f.code, ' — ', f.nom), '(sans famille)') as famille_nom"),
@@ -748,7 +759,7 @@ final class CompteResultatBuilder
             ->whereNull('tla.id')
             ->whereBetween('t.date', [$start, $end])
             ->whereIn('tl.operation_id', $operationIds)
-            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('c.association_id', TenantContext::currentId()))
+            ->tap(fn (Builder $query) => $this->scopeToCurrentTenant($query, 'c.association_id'))
             ->select([
                 DB::raw('COALESCE(f.id, 0) as famille_id'),
                 DB::raw("COALESCE(CONCAT(f.code, ' — ', f.nom), '(sans famille)') as famille_nom"),
@@ -775,7 +786,7 @@ final class CompteResultatBuilder
             ->whereNull('t.deleted_at')
             ->whereBetween('t.date', [$start, $end])
             ->whereIn('tla2.operation_id', $operationIds)
-            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('c.association_id', TenantContext::currentId()))
+            ->tap(fn (Builder $query) => $this->scopeToCurrentTenant($query, 'c.association_id'))
             ->select([
                 DB::raw('COALESCE(f.id, 0) as famille_id'),
                 DB::raw("COALESCE(CONCAT(f.code, ' — ', f.nom), '(sans famille)') as famille_nom"),
@@ -867,7 +878,7 @@ final class CompteResultatBuilder
             ->whereNull('tla.id')  // Lignes sans affectations
             ->whereIn('tl.operation_id', $operationIds)
             ->whereBetween('tx.date', [$start, $end])
-            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('c.association_id', TenantContext::currentId()))
+            ->tap(fn (Builder $query) => $this->scopeToCurrentTenant($query, 'c.association_id'))
             ->select($q1Cols)
             ->groupBy($q1Group);
 
@@ -903,7 +914,7 @@ final class CompteResultatBuilder
             ->whereNull('tx.deleted_at')
             ->whereIn('tla2.operation_id', $operationIds)
             ->whereBetween('tx.date', [$start, $end])
-            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('c.association_id', TenantContext::currentId()))
+            ->tap(fn (Builder $query) => $this->scopeToCurrentTenant($query, 'c.association_id'))
             ->select($q2Cols)
             ->groupBy($q2Group);
 
@@ -978,7 +989,7 @@ final class CompteResultatBuilder
             if (! isset($byCatId[$catId])) {
                 $byCatId[$catId] = [
                     'famille_id' => $catId,
-                    'label' => $prevCat['label'],
+                    'famille_nom' => $prevCat['famille_nom'],
                     'comptes' => [],
                     'montant' => 0.0,
                 ];
@@ -993,7 +1004,7 @@ final class CompteResultatBuilder
                 if (! isset($byScId[$scId])) {
                     $byScId[$scId] = [
                         'compte_id' => $scId,
-                        'label' => $prevSc['label'],
+                        'compte_nom' => $prevSc['compte_nom'],
                         'montant' => 0.0,
                         'tiers' => [],
                     ];
@@ -1037,7 +1048,7 @@ final class CompteResultatBuilder
             ->join('seances as s', 's.id', '=', 'ep.seance_id')
             ->leftJoin('tiers as t', 't.id', '=', 'ep.tiers_id')
             ->whereIn('ep.operation_id', $operationIds)
-            ->when(TenantContext::hasBooted(), fn ($x) => $x->where('ep.association_id', TenantContext::currentId()));
+            ->tap(fn (Builder $query) => $this->scopeToCurrentTenant($query, 'ep.association_id'));
         $this->joinFamille($q);
 
         $selects = [
@@ -1089,7 +1100,7 @@ final class CompteResultatBuilder
             ->leftJoin('tiers as t', 't.id', '=', 'p.tiers_id')
             ->whereIn('p.operation_id', $operationIds)
             ->where('r.montant_prevu', '>', 0)
-            ->when(TenantContext::hasBooted(), fn ($x) => $x->where('op.association_id', TenantContext::currentId()));
+            ->tap(fn (Builder $query) => $this->scopeToCurrentTenant($query, 'op.association_id'));
         $this->joinFamille($q);
 
         $selects = [
@@ -1146,7 +1157,7 @@ final class CompteResultatBuilder
             if (! isset($tree[$catId])) {
                 $tree[$catId] = [
                     'famille_id' => $catId,
-                    'label' => $row->famille_nom,
+                    'famille_nom' => $row->famille_nom,
                     'comptes' => [],
                     'seances' => [],
                     'montant' => 0.0,
@@ -1158,7 +1169,7 @@ final class CompteResultatBuilder
             if (! isset($tree[$catId]['comptes'][$scId])) {
                 $tree[$catId]['comptes'][$scId] = [
                     'compte_id' => $scId,
-                    'label' => $row->compte_nom,
+                    'compte_nom' => $row->compte_nom,
                     'seances' => [],
                     'montant' => 0.0,
                     'tiers' => [],
@@ -1324,7 +1335,7 @@ final class CompteResultatBuilder
             ->join('comptes as cpt', 'cpt.id', '=', 'ep.compte_id')
             ->join('seances as s', 's.id', '=', 'ep.seance_id')
             ->whereIn('ep.operation_id', $operationIds)
-            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('ep.association_id', TenantContext::currentId()));
+            ->tap(fn (Builder $query) => $this->scopeToCurrentTenant($query, 'ep.association_id'));
         $this->joinFamille($q);
         $rows = $q
             ->select([
@@ -1365,7 +1376,7 @@ final class CompteResultatBuilder
             ->join('seances as s', 's.id', '=', 'r.seance_id')
             ->whereIn('p.operation_id', $operationIds)
             ->where('r.montant_prevu', '>', 0)
-            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('op.association_id', TenantContext::currentId()));
+            ->tap(fn (Builder $query) => $this->scopeToCurrentTenant($query, 'op.association_id'));
         $this->joinFamille($q);
         $rows = $q
             ->select([
@@ -1398,6 +1409,7 @@ final class CompteResultatBuilder
                 $join->on('familles.code', '=', DB::raw('SUBSTR(comptes.numero_pcg, 1, 2)'))
                     ->on('familles.association_id', '=', 'comptes.association_id');
             })
+            ->tap(fn (Builder $query) => $this->scopeToCurrentTenant($query, 'comptes.association_id'))
             ->where('comptes.id', $scId)
             ->value('familles.id');
     }

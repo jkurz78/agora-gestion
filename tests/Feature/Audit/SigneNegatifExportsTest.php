@@ -78,7 +78,7 @@ it('export_excel_compte_resultat_somme_negatifs', function () {
 
     // Vérification 2 : le total net de la sous-catégorie vaut 60
     $scMontants = collect($data['produits'])
-        ->flatMap(fn ($cat) => collect($cat['sous_categories'])->pluck('montant_n'));
+        ->flatMap(fn ($cat) => collect($cat['comptes'])->pluck('montant_n'));
     expect($scMontants->sum())->toBe(60.0);
 
     // Vérification 3 : l'export XLSX HTTP retourne 200 avec le bon Content-Type
@@ -357,7 +357,7 @@ it('export_excel_compte_resultat_builder_valeurs_cellules', function () {
 
     // La sous-catégorie unique doit avoir montant_n = 80
     $scMontant = collect($data['produits'])
-        ->flatMap(fn ($cat) => collect($cat['sous_categories']))
+        ->flatMap(fn ($cat) => collect($cat['comptes']))
         ->first()['montant_n'];
     expect((float) $scMontant)->toBe(80.0);
 

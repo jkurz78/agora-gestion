@@ -215,7 +215,7 @@
                                 @foreach($summary['provisions'] as $p)
                                 <tr>
                                     <td>{{ $p['libelle'] }}</td>
-                                    <td>{{ $p['sous_categorie_nom'] }}</td>
+                                    <td>{{ $p['compte_nom'] }}</td>
                                     <td class="text-end">{{ number_format($p['montant_signe'], 2, ',', ' ') }} €</td>
                                 </tr>
                                 @endforeach

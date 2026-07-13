@@ -141,7 +141,7 @@
                 @if (! $scVisibles->isEmpty())
                     {{-- Category row --}}
                     <tr class="cr-cat">
-                        <td colspan="2">{{ $cat['label'] }}</td>
+                        <td colspan="2">{{ $cat['famille_nom'] }}</td>
                         @if ($combinedMode)
                             @php $catId = (int) ($cat['famille_id'] ?? 0); @endphp
                             @foreach ($operationNames as $opId => $opNom)
@@ -226,7 +226,7 @@
                         {{-- Combined mode: column-based SC row --}}
                         <tr class="cr-sub">
                             <td style="width:16px;"></td>
-                            <td>{{ $sc['label'] }}</td>
+                            <td>{{ $sc['compte_nom'] }}</td>
                             @foreach ($operationNames as $opId => $opNom)
                                 @foreach ($seancesParOperation[$opId] ?? [] as $s)
                                     @php
@@ -254,7 +254,7 @@
                         {{-- Sub-category row --}}
                         <tr class="cr-sub">
                             <td style="width:16px;"></td>
-                            <td>{{ $sc['label'] }}</td>
+                            <td>{{ $sc['compte_nom'] }}</td>
                             @if ($parOperations)
                                 @foreach ($operationNames as $opId => $opNom)
                                     @if ($mode === 'projection' && $projMatrix)

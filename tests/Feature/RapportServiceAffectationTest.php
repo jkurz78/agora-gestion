@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Association;
+use App\Models\BudgetLine;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Operation;
@@ -57,7 +58,7 @@ afterEach(function () {
     TenantContext::clear();
 });
 
-it('expose une hiérarchie famille et comptes sans clés historiques', function () {
+it('expose une hiérarchie famille et comptes avec des clés métier explicites', function () {
     $recette = Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
         'date' => '2025-10-15',
@@ -70,10 +71,35 @@ it('expose une hiérarchie famille et comptes sans clés historiques', function 
     $famille = collect($rapport['produits'])->first();
     $compte = collect($famille['comptes'] ?? [])->first();
 
-    expect($famille)->toHaveKeys(['famille_id', 'label', 'comptes'])
-        ->not->toHaveKey('categorie_id')
-        ->and($compte)->toHaveKeys(['compte_id', 'label', 'montant'])
-        ->not->toHaveKey('sous_categorie_id');
+    expect($famille)->toHaveKeys(['famille_id', 'famille_nom', 'comptes'])
+        ->not->toHaveKeys(['categorie_id', 'label'])
+        ->and($compte)->toHaveKeys(['compte_id', 'compte_nom', 'montant'])
+        ->not->toHaveKeys(['sous_categorie_id', 'label']);
+});
+
+it('échoue fermé sur toutes les requêtes brutes quand le tenant est absent', function () {
+    $recette = Transaction::factory()->asRecette()->create([
+        'compte_id' => $this->compte->id,
+        'date' => '2025-10-15',
+        'montant_total' => 2500.00,
+    ]);
+    $recette->lignes()->forceDelete();
+    affectationLigne($recette, $this->compteVentilation, 2500.00);
+    BudgetLine::factory()->create([
+        'compte_id' => $this->compteVentilation->id,
+        'exercice' => 2025,
+        'montant_prevu' => 3000.00,
+    ]);
+
+    TenantContext::clear();
+
+    $rapport = $this->service->compteDeResultat(2025);
+    $source = file_get_contents(app_path('Services/Rapports/CompteResultatBuilder.php'));
+
+    expect($rapport['charges'])->toBeEmpty()
+        ->and($rapport['produits'])->toBeEmpty()
+        ->and($source)->not->toContain('->when(TenantContext::hasBooted()')
+        ->and(substr_count((string) $source, 'scopeToCurrentTenant('))->toBe(14);
 });
 
 it('le rapport onglet 2 prend en compte les affectations au lieu de operation_id ligne', function () {

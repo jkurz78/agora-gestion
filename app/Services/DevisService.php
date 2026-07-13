@@ -10,6 +10,7 @@ use App\Enums\StatutFacture;
 use App\Enums\TypeLigneDevis;
 use App\Enums\TypeLigneFacture;
 use App\Mail\DevisManuelMail;
+use App\Models\Compte;
 use App\Models\Devis;
 use App\Models\DevisLigne;
 use App\Models\EmailLog;
@@ -88,7 +89,11 @@ final class DevisService
      */
     public function ajouterLigne(Devis $devis, array $data): DevisLigne
     {
-        return DB::transaction(function () use ($devis, $data): DevisLigne {
+        $compte = $this->resolveCompteProduit(
+            isset($data['compte_id']) ? (int) $data['compte_id'] : null
+        );
+
+        return DB::transaction(function () use ($devis, $data, $compte): DevisLigne {
             $locked = Devis::withoutGlobalScopes()
                 ->whereKey($devis->getKey())
                 ->lockForUpdate()
@@ -111,7 +116,7 @@ final class DevisService
                 'prix_unitaire' => $prixUnitaire,
                 'quantite' => $quantite,
                 'montant' => $montant,
-                'compte_id' => $data['compte_id'] ?? null,
+                'compte_id' => $compte?->id,
             ]);
 
             $this->rebasculerSiEnvoye($locked);
@@ -993,5 +998,31 @@ final class DevisService
         if ((int) $locked->association_id !== (int) TenantContext::currentId()) {
             throw new RuntimeException('Accès interdit : ce devis n\'appartient pas à votre association.');
         }
+    }
+
+    /**
+     * Résout un compte produit valide dans le tenant courant.
+     *
+     * Le scope tenant et SoftDeletes de Compte rendent la recherche fail-closed.
+     */
+    private function resolveCompteProduit(?int $compteId): ?Compte
+    {
+        if ($compteId === null) {
+            return null;
+        }
+
+        $compte = Compte::query()
+            ->whereKey($compteId)
+            ->where('actif', true)
+            ->where('classe', 7)
+            ->first();
+
+        if ($compte === null) {
+            throw new RuntimeException(
+                "Le compte de ventilation doit être un compte actif de classe 7 de l'association courante."
+            );
+        }
+
+        return $compte;
     }
 }

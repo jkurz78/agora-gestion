@@ -159,7 +159,7 @@ final class RapportExportController extends Controller
         $sheet->setTitle('Compte de résultat');
 
         $row = 1;
-        $sheet->fromArray([['Type', 'Famille', 'Compte', $labelN1, $label, 'Budget', 'Écart']], null, 'A'.$row);
+        $sheet->fromArray([['Nature', 'Famille', 'Compte', $labelN1, $label, 'Budget', 'Écart']], null, 'A'.$row);
         $sheet->getStyle('A1:G1')->getFont()->setBold(true);
         $row++;
 
@@ -171,8 +171,8 @@ final class RapportExportController extends Controller
                         : null;
                     $sheet->fromArray([[
                         $type,
-                        $cat['label'],
-                        $sc['label'],
+                        $cat['famille_nom'],
+                        $sc['compte_nom'],
                         $sc['montant_n1'] !== null ? (float) $sc['montant_n1'] : null,
                         (float) $sc['montant_n'],
                         $sc['budget'] !== null ? (float) $sc['budget'] : null,
@@ -183,7 +183,7 @@ final class RapportExportController extends Controller
                 // Category subtotal
                 $sheet->fromArray([[
                     $type,
-                    $cat['label'],
+                    $cat['famille_nom'],
                     'TOTAL',
                     $cat['montant_n1'] !== null ? (float) $cat['montant_n1'] : null,
                     (float) $cat['montant_n'],
@@ -207,12 +207,12 @@ final class RapportExportController extends Controller
             foreach ($allExtourneKeys as $key) {
                 $eN = $extournesNKeyed->get($key);
                 $eN1 = $extournesN1Keyed->get($key);
-                $scNom = $eN['compte_nom'] ?? $eN1['compte_nom'];
-                $libelle = $eN['libelle'] ?? $eN1['libelle'];
+                $familleNom = $eN['famille_nom'] ?? $eN1['famille_nom'];
+                $compteNom = $eN['compte_nom'] ?? $eN1['compte_nom'];
                 $sheet->fromArray([[
                     'Extourne',
-                    $scNom,
-                    $libelle,
+                    $familleNom,
+                    $compteNom,
                     $eN1 !== null ? $eN1['montant_signe'] : null,
                     $eN !== null ? $eN['montant_signe'] : null,
                     null,
@@ -257,12 +257,12 @@ final class RapportExportController extends Controller
             foreach ($allProvisionKeys as $key) {
                 $pN = $provisionsNKeyed->get($key);
                 $pN1 = $provisionsN1Keyed->get($key);
-                $scNom = $pN['compte_nom'] ?? $pN1['compte_nom'];
-                $libelle = $pN['libelle'] ?? $pN1['libelle'];
+                $familleNom = $pN['famille_nom'] ?? $pN1['famille_nom'];
+                $compteNom = $pN['compte_nom'] ?? $pN1['compte_nom'];
                 $sheet->fromArray([[
                     'Provision',
-                    $scNom,
-                    $libelle,
+                    $familleNom,
+                    $compteNom,
                     $pN1 !== null ? $pN1['montant_signe'] : null,
                     $pN !== null ? $pN['montant_signe'] : null,
                     null,
@@ -433,7 +433,7 @@ final class RapportExportController extends Controller
                         if ($parTiers && ! empty($sc['tiers'])) {
                             foreach ($sc['tiers'] as $t) {
                                 $tId = (int) ($t['tiers_id'] ?? 0);
-                                $tValues = [$type, $cat['label'], $sc['label'], $t['label']];
+                                $tValues = [$type, $cat['famille_nom'], $sc['compte_nom'], $t['label']];
                                 $projTSO = ($mode === 'projection' && $projMatrix) ? ($projMatrix->byScTiersSeanceOp($scId)[$tId] ?? []) : [];
                                 foreach ($operationNames as $opId => $opName) {
                                     foreach ($seancesParOperation[$opId] ?? [] as $s) {
@@ -451,7 +451,7 @@ final class RapportExportController extends Controller
                             }
                         }
 
-                        $values = [$type, $cat['label'], $sc['label']];
+                        $values = [$type, $cat['famille_nom'], $sc['compte_nom']];
                         if ($parTiers) {
                             $values[] = 'TOTAL';
                         }
@@ -473,7 +473,7 @@ final class RapportExportController extends Controller
                         $row++;
                     }
 
-                    $catValues = [$type, $cat['label'], 'TOTAL'];
+                    $catValues = [$type, $cat['famille_nom'], 'TOTAL'];
                     if ($parTiers) {
                         $catValues[] = '';
                     }
@@ -596,7 +596,7 @@ final class RapportExportController extends Controller
                             $projMatrix = $sectionLabel === 'DÉPENSES' ? $projChargesMatrix : $projProduitsMatrix;
                             foreach ($seances as $s) {
                                 $sLabel = $s === 0 ? 'Hors séances' : 'S'.$s;
-                                $sValues = [$type, $cat['label'], $sc['label'], $sLabel];
+                                $sValues = [$type, $cat['famille_nom'], $sc['compte_nom'], $sLabel];
                                 if ($parTiers) {
                                     $sValues[] = '';
                                 }
@@ -622,7 +622,7 @@ final class RapportExportController extends Controller
                             $projMatrix = $projMatrixFor($sectionLabel);
                             foreach ($sc['tiers'] as $t) {
                                 $tId = (int) ($t['tiers_id'] ?? 0);
-                                $tValues = [$type, $cat['label'], $sc['label']];
+                                $tValues = [$type, $cat['famille_nom'], $sc['compte_nom']];
                                 if ($parSeances) {
                                     $tValues[] = '';
                                 }
@@ -645,7 +645,7 @@ final class RapportExportController extends Controller
                         }
 
                         // SC row (subtotal when parTiers or parSeances)
-                        $values = [$type, $cat['label'], $sc['label']];
+                        $values = [$type, $cat['famille_nom'], $sc['compte_nom']];
                         if ($parSeances) {
                             $values[] = 'TOTAL';
                         }
@@ -677,7 +677,7 @@ final class RapportExportController extends Controller
                     }
 
                     // Category total row
-                    $catValues = [$type, $cat['label'], 'TOTAL'];
+                    $catValues = [$type, $cat['famille_nom'], 'TOTAL'];
                     if ($parSeances) {
                         $catValues[] = '';
                     }
@@ -818,7 +818,7 @@ final class RapportExportController extends Controller
                         $projMatrix = $projMatrixFor($sectionLabel);
                         foreach ($sc['tiers'] as $t) {
                             $tId = (int) ($t['tiers_id'] ?? 0);
-                            $values = [$type, $cat['label'], $sc['label'], $t['label']];
+                            $values = [$type, $cat['famille_nom'], $sc['compte_nom'], $t['label']];
                             if ($parSeances) {
                                 if ($mode === 'projection' && $projMatrix) {
                                     $projTSeances = $projMatrix->byScTiersSeance($scId)[$tId] ?? [];
@@ -844,7 +844,7 @@ final class RapportExportController extends Controller
                         }
                     }
                     // Sous-total du compte
-                    $values = [$type, $cat['label'], $sc['label']];
+                    $values = [$type, $cat['famille_nom'], $sc['compte_nom']];
                     if ($parTiers) {
                         $values[] = 'TOTAL';
                     }
@@ -875,7 +875,7 @@ final class RapportExportController extends Controller
                     $row++;
                 }
                 // Category total row
-                $values = [$type, $cat['label'], 'TOTAL'];
+                $values = [$type, $cat['famille_nom'], 'TOTAL'];
                 if ($parTiers) {
                     $values[] = '';
                 }

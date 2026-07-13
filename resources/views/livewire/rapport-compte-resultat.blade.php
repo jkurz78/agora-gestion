@@ -159,7 +159,7 @@
                         @if (! $scVisibles->isEmpty())
                         <tr class="cr-cat">
                             <td></td>
-                            <td>{{ $cat['label'] }}</td>
+                            <td>{{ $cat['famille_nom'] }}</td>
                             @if($compareN1)<td class="text-end cr-n1">{!! $fmt($cat['montant_n1']) !!}</td>@endif
                             <td class="text-end">{!! $fmt($cat['montant_n']) !!}</td>
                             @if($compareBudget)
@@ -171,7 +171,7 @@
                         @foreach ($scVisibles as $sc)
                             <tr class="cr-sub">
                                 <td></td>
-                                <td style="padding-left:32px;">{{ $sc['label'] }}</td>
+                                <td style="padding-left:32px;">{{ $sc['compte_nom'] }}</td>
                                 @if($compareN1)<td class="text-end cr-n1">{!! $fmt($sc['montant_n1']) !!}</td>@endif
                                 <td class="text-end">{!! $fmt($sc['montant_n']) !!}</td>
                                 @if($compareBudget)

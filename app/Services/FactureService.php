@@ -406,7 +406,9 @@ final class FactureService
             throw new \RuntimeException('Le compte ne peut être modifié que sur une ligne manuelle.');
         }
 
-        $ligne->update(['compte_id' => $compteId]);
+        $compte = $this->resolveCompteProduit($compteId);
+
+        $ligne->update(['compte_id' => $compte?->id]);
     }
 
     /**
@@ -831,7 +833,11 @@ XML;
             );
         }
 
-        return DB::transaction(function () use ($facture, $attrs, $prixUnitaire, $quantite): FactureLigne {
+        $compte = $this->resolveCompteProduit(
+            isset($attrs['compte_id']) ? (int) $attrs['compte_id'] : null
+        );
+
+        return DB::transaction(function () use ($facture, $attrs, $prixUnitaire, $quantite, $compte): FactureLigne {
             $maxOrdre = (int) FactureLigne::where('facture_id', $facture->id)->max('ordre');
 
             $montant = round($prixUnitaire * $quantite, 2);
@@ -845,7 +851,7 @@ XML;
                 'montant' => $montant,
                 'transaction_ligne_id' => null,
                 // DC-10a : la ventilation est portée par compte_id (source unique).
-                'compte_id' => $attrs['compte_id'] ?? null,
+                'compte_id' => $compte?->id,
                 'operation_id' => $attrs['operation_id'] ?? null,
                 'seance' => $attrs['seance'] ?? null,
                 'ordre' => $maxOrdre + 1,
@@ -1152,6 +1158,32 @@ XML;
         if ($facture->statut !== StatutFacture::Brouillon) {
             throw new \RuntimeException('Cette action n\'est possible que sur un brouillon.');
         }
+    }
+
+    /**
+     * Résout un compte produit valide dans le tenant courant.
+     *
+     * Le scope tenant et SoftDeletes de Compte rendent la recherche fail-closed.
+     */
+    private function resolveCompteProduit(?int $compteId): ?Compte
+    {
+        if ($compteId === null) {
+            return null;
+        }
+
+        $compte = Compte::query()
+            ->whereKey($compteId)
+            ->where('actif', true)
+            ->where('classe', 7)
+            ->first();
+
+        if ($compte === null) {
+            throw new \RuntimeException(
+                "Le compte de ventilation doit être un compte actif de classe 7 de l'association courante."
+            );
+        }
+
+        return $compte;
     }
 
     /**

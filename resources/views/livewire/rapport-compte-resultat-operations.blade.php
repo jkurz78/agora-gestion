@@ -283,7 +283,7 @@
                                 {{-- Ligne famille --}}
                                 <tr style="background:#dce6f0;">
                                     <td></td>
-                                    <td style="font-weight:600;color:#1e3a5f;padding:7px 12px;">{{ $cat['label'] }}</td>
+                                    <td style="font-weight:600;color:#1e3a5f;padding:7px 12px;">{{ $cat['famille_nom'] }}</td>
                                     @if ($combinedMode)
                                         @php $catId = (int) ($cat['famille_id'] ?? 0); @endphp
                                         @foreach ($operationNames as $opId => $opNom)
@@ -379,7 +379,7 @@
                                     {{-- Ligne compte --}}
                                     <tr style="background:#f7f9fc;">
                                         <td></td>
-                                        <td style="padding:5px 12px 5px 32px;color:#444;">{{ $sc['label'] }}</td>
+                                        <td style="padding:5px 12px 5px 32px;color:#444;">{{ $sc['compte_nom'] }}</td>
                                         @if ($combinedMode)
                                             @php $__scIdC = (int) ($sc['compte_id'] ?? 0); @endphp
                                             @foreach ($operationNames as $opId => $opNom)

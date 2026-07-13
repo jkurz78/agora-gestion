@@ -282,10 +282,11 @@ final class CsvImportService
 
     private function validateHeader(array $row): ?string
     {
-        $normalized = array_map(fn ($h) => Str::lower(trim($h)), $row);
-        $missing = array_diff(self::EXPECTED_HEADERS, $normalized);
-        if (! empty($missing)) {
-            return 'En-tête invalide. Colonnes manquantes : '.implode(', ', $missing).'.';
+        $normalized = array_values(array_map(fn ($h) => Str::lower(trim($h)), $row));
+
+        if ($normalized !== self::EXPECTED_HEADERS) {
+            return 'En-tête invalide. Les colonnes doivent correspondre exactement, dans l’ordre exact : '
+                .implode(';', self::EXPECTED_HEADERS).'.';
         }
 
         return null;

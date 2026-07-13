@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\StatutDevis;
 use App\Enums\TypeLigneDevis;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\Devis;
 use App\Models\DevisLigne;
 use App\Models\Tiers;
@@ -28,6 +29,45 @@ afterEach(function () {
     TenantContext::clear();
 });
 
+describe('ajouterLigne()', function () {
+    it('accepte un compte actif de classe 7 du tenant courant', function () {
+        $devis = Devis::factory()->brouillon()->create();
+        $compte = Compte::factory()->numero('706')->create();
+
+        $ligne = $this->service->ajouterLigne($devis, [
+            'libelle' => 'Prestation ventilée',
+            'prix_unitaire' => 100,
+            'quantite' => 1,
+            'compte_id' => $compte->id,
+        ]);
+
+        expect((int) $ligne->compte_id)->toBe((int) $compte->id);
+    });
+
+    it('refuse les comptes externes, supprimés ou hors classe 7 avant toute écriture', function () {
+        $devis = Devis::factory()->brouillon()->create();
+        $compteClasse6 = Compte::factory()->numero('606')->create();
+        $compteSupprime = Compte::factory()->numero('707')->create();
+        $compteSupprime->delete();
+
+        $autreAssociation = Association::factory()->create();
+        TenantContext::boot($autreAssociation);
+        $compteExterne = Compte::factory()->numero('708')->create();
+        TenantContext::boot($this->association);
+
+        foreach ([$compteClasse6, $compteSupprime, $compteExterne] as $compteInvalide) {
+            expect(fn () => $this->service->ajouterLigne($devis, [
+                'libelle' => 'Ligne invalide',
+                'prix_unitaire' => 100,
+                'quantite' => 1,
+                'compte_id' => $compteInvalide->id,
+            ]))->toThrow(RuntimeException::class, 'compte actif de classe 7');
+        }
+
+        expect(DevisLigne::where('devis_id', $devis->id)->count())->toBe(0);
+    });
+});
+
 // ─── ajouterLigneTexte ────────────────────────────────────────────────────────
 
 describe('ajouterLigneTexte()', function () {
@@ -42,7 +82,7 @@ describe('ajouterLigneTexte()', function () {
             ->and($ligne->montant)->toBeNull()
             ->and($ligne->prix_unitaire)->toBeNull()
             ->and($ligne->quantite)->toBeNull()
-            ->and($ligne->sous_categorie_id)->toBeNull();
+            ->and($ligne->compte_id)->toBeNull();
     });
 
     it('n\'impacte pas le montant_total du devis', function () {
