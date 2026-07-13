@@ -91,6 +91,7 @@ Expected: exit 0.
 - Modify: `app/Livewire/TypeOperationList.php`
 - Modify: `app/Livewire/ParticipantTable.php`
 - Modify: `app/Livewire/Parametres/Adhesions/FormulesList.php`
+- Modify: `app/Livewire/Portail/NoteDeFrais/Show.php`
 - Modify: `app/Services/ProvisionService.php`
 - Modify: `app/Services/Compta/Migrations/SystemeSeeder.php`
 - Modify: `app/Services/Compta/Migrations/BancairesSeeder.php`
