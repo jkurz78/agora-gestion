@@ -31,8 +31,8 @@ it('includes don-type recettes in produits', function () {
     $result = app(RapportService::class)->compteDeResultat(2025);
 
     $produits = collect($result['produits']);
-    $found = $produits->flatMap(fn ($cat) => $cat['sous_categories'])
-        ->firstWhere('label', 'Dons manuels');
+    $found = $produits->flatMap(fn ($famille) => $famille['comptes'])
+        ->firstWhere('compte_nom', 'Dons manuels');
 
     expect($found)->not->toBeNull();
     expect($found['montant_n'])->toBe(150.00);
@@ -58,8 +58,8 @@ it('includes cotisation-type recettes in produits', function () {
     $result = app(RapportService::class)->compteDeResultat(2025);
 
     $produits = collect($result['produits']);
-    $found = $produits->flatMap(fn ($cat) => $cat['sous_categories'])
-        ->firstWhere('label', 'Cotisations');
+    $found = $produits->flatMap(fn ($famille) => $famille['comptes'])
+        ->firstWhere('compte_nom', 'Cotisations');
 
     expect($found)->not->toBeNull();
     expect($found['montant_n'])->toBe(80.00);

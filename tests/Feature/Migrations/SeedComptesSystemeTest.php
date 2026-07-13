@@ -160,7 +160,7 @@ it('530 conditional is per-tenant (A has espèces → 530 ; B no espèces → no
     expect($compte530B)->toBeNull('Tenant B without espèces should NOT have compte 530');
 });
 
-it('system comptes have correct attributes (est_systeme, lettrable, categorie_id, actif, pour_inscriptions)', function () {
+it('system comptes have correct attributes (est_systeme, lettrable, actif, pour_inscriptions)', function () {
     $association = Association::firstOrFail();
 
     // Add espèces transaction so 530 is created
@@ -188,7 +188,6 @@ it('system comptes have correct attributes (est_systeme, lettrable, categorie_id
         expect($compte)->not->toBeNull("Compte {$numero} should exist");
         expect((bool) $compte->est_systeme)->toBeTrue("{$numero}: est_systeme should be true");
         expect((bool) $compte->lettrable)->toBeTrue("{$numero}: lettrable should be true");
-        expect($compte->categorie_id)->toBeNull("{$numero}: categorie_id should be null");
         expect((bool) $compte->actif)->toBeTrue("{$numero}: actif should be true");
         expect((bool) $compte->pour_inscriptions)->toBeFalse("{$numero}: pour_inscriptions should be false");
         expect($compte->parent_compte_id)->toBeNull("{$numero}: parent_compte_id should be null");

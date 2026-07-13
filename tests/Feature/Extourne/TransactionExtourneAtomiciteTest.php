@@ -43,7 +43,6 @@ function atomCreateRecette(StatutReglement $statut, ?CompteBancaire $compte = nu
     ]);
     TransactionLigne::create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => null,
         'montant' => 80,
     ]);
 

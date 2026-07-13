@@ -7,10 +7,8 @@ use App\Enums\StatutRapprochement;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Models\Association;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -70,16 +68,6 @@ beforeEach(function () {
         ->firstOrFail();
 
     // Compte 706 (classe 7) pour les ventilations
-    $categorie = Categorie::factory()->recette()->create([
-        'association_id' => $this->association->id,
-        'nom' => 'Prestations',
-    ]);
-    $this->sc706 = SousCategorie::create([
-        'association_id' => $this->association->id,
-        'categorie_id' => $categorie->id,
-        'nom' => 'Cotisations',
-        'code_cerfa' => '706',
-    ]);
     $this->compte706 = Compte::firstOrCreate(
         ['association_id' => $this->association->id, 'numero_pcg' => '706'],
         [
@@ -93,16 +81,6 @@ beforeEach(function () {
     );
 
     // Compte 601 (classe 6) pour les dépenses
-    $categorieDep = Categorie::factory()->depense()->create([
-        'association_id' => $this->association->id,
-        'nom' => 'Charges',
-    ]);
-    $this->sc601 = SousCategorie::create([
-        'association_id' => $this->association->id,
-        'categorie_id' => $categorieDep->id,
-        'nom' => 'Fournitures',
-        'code_cerfa' => '601',
-    ]);
     $this->compte601 = Compte::firstOrCreate(
         ['association_id' => $this->association->id, 'numero_pcg' => '601'],
         [
@@ -162,7 +140,6 @@ function pdRecette(
         'tiers_id' => $tiers->id,
         'libelle' => 'Recette virement PD',
         'montant' => 0,
-        'sous_categorie_id' => null,
     ]);
     // 706 C
     TransactionLigne::create([
@@ -173,7 +150,6 @@ function pdRecette(
         'tiers_id' => null,
         'libelle' => 'Recette virement PD',
         'montant' => 0,
-        'sous_categorie_id' => null,
     ]);
     // 512X D (mouvement de trésorerie)
     TransactionLigne::create([
@@ -184,7 +160,6 @@ function pdRecette(
         'tiers_id' => null,
         'libelle' => 'Recette virement PD',
         'montant' => 0,
-        'sous_categorie_id' => null,
     ]);
     // 411 C tiers (contrepassation)
     TransactionLigne::create([
@@ -195,7 +170,6 @@ function pdRecette(
         'tiers_id' => $tiers->id,
         'libelle' => 'Recette virement PD',
         'montant' => 0,
-        'sous_categorie_id' => null,
     ]);
 
     return $tx;
@@ -233,7 +207,6 @@ function pdDepense(
         'tiers_id' => null,
         'libelle' => 'Dépense virement PD',
         'montant' => 0,
-        'sous_categorie_id' => null,
     ]);
     // 401 C tiers
     TransactionLigne::create([
@@ -244,7 +217,6 @@ function pdDepense(
         'tiers_id' => $tiers->id,
         'libelle' => 'Dépense virement PD',
         'montant' => 0,
-        'sous_categorie_id' => null,
     ]);
     // 401 D tiers (soldage immédiat)
     TransactionLigne::create([
@@ -255,7 +227,6 @@ function pdDepense(
         'tiers_id' => $tiers->id,
         'libelle' => 'Dépense virement PD',
         'montant' => 0,
-        'sous_categorie_id' => null,
     ]);
     // 512X C (décaissement)
     TransactionLigne::create([
@@ -266,7 +237,6 @@ function pdDepense(
         'tiers_id' => null,
         'libelle' => 'Dépense virement PD',
         'montant' => 0,
-        'sous_categorie_id' => null,
     ]);
 
     return $tx;
@@ -443,22 +413,22 @@ test('[PD-D] remise comptabilisée via RemiseBancaireService = 1 ligne 512X au r
         TransactionLigne::create([
             'transaction_id' => $tx->id, 'compte_id' => $compte411->id,
             'debit' => $montant, 'credit' => 0, 'tiers_id' => $this->tiers->id,
-            'libelle' => 'Recette chèque', 'montant' => 0, 'sous_categorie_id' => null,
+            'libelle' => 'Recette chèque', 'montant' => 0,
         ]);
         TransactionLigne::create([
             'transaction_id' => $tx->id, 'compte_id' => $this->compte706->id,
             'debit' => 0, 'credit' => $montant, 'tiers_id' => null,
-            'libelle' => 'Recette chèque', 'montant' => 0, 'sous_categorie_id' => null,
+            'libelle' => 'Recette chèque', 'montant' => 0,
         ]);
         TransactionLigne::create([
             'transaction_id' => $tx->id, 'compte_id' => $compte5112->id,
             'debit' => $montant, 'credit' => 0, 'tiers_id' => null,
-            'libelle' => 'Recette chèque', 'montant' => 0, 'sous_categorie_id' => null,
+            'libelle' => 'Recette chèque', 'montant' => 0,
         ]);
         TransactionLigne::create([
             'transaction_id' => $tx->id, 'compte_id' => $compte411->id,
             'debit' => 0, 'credit' => $montant, 'tiers_id' => $this->tiers->id,
-            'libelle' => 'Recette chèque', 'montant' => 0, 'sous_categorie_id' => null,
+            'libelle' => 'Recette chèque', 'montant' => 0,
         ]);
 
         $txIds[] = $tx->id;
@@ -573,22 +543,22 @@ test('[PD-G] toggle remise pointée en mode PD : solde = ouverture + total remis
         TransactionLigne::create([
             'transaction_id' => $tx->id, 'compte_id' => $compte411->id,
             'debit' => $montant, 'credit' => 0, 'tiers_id' => $this->tiers->id,
-            'libelle' => 'Chèque source', 'montant' => 0, 'sous_categorie_id' => null,
+            'libelle' => 'Chèque source', 'montant' => 0,
         ]);
         TransactionLigne::create([
             'transaction_id' => $tx->id, 'compte_id' => $this->compte706->id,
             'debit' => 0, 'credit' => $montant, 'tiers_id' => null,
-            'libelle' => 'Chèque source', 'montant' => 0, 'sous_categorie_id' => null,
+            'libelle' => 'Chèque source', 'montant' => 0,
         ]);
         TransactionLigne::create([
             'transaction_id' => $tx->id, 'compte_id' => $compte5112->id,
             'debit' => $montant, 'credit' => 0, 'tiers_id' => null,
-            'libelle' => 'Chèque source', 'montant' => 0, 'sous_categorie_id' => null,
+            'libelle' => 'Chèque source', 'montant' => 0,
         ]);
         TransactionLigne::create([
             'transaction_id' => $tx->id, 'compte_id' => $compte411->id,
             'debit' => 0, 'credit' => $montant, 'tiers_id' => $this->tiers->id,
-            'libelle' => 'Chèque source', 'montant' => 0, 'sous_categorie_id' => null,
+            'libelle' => 'Chèque source', 'montant' => 0,
         ]);
 
         $txIds[] = $tx->id;
@@ -703,7 +673,6 @@ function pdCreanceVirement(
         'tiers_id' => $tiers->id,
         'libelle' => 'Créance virement en attente',
         'montant' => 0,
-        'sous_categorie_id' => null,
     ]);
     // 706 C
     TransactionLigne::create([
@@ -714,7 +683,6 @@ function pdCreanceVirement(
         'tiers_id' => null,
         'libelle' => 'Créance virement en attente',
         'montant' => 0,
-        'sous_categorie_id' => null,
     ]);
 
     return $tx;

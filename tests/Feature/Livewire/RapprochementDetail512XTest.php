@@ -22,11 +22,9 @@ use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Livewire\RapprochementDetail;
 use App\Models\Association;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -87,16 +85,6 @@ beforeEach(function () {
         ->firstOrFail();
 
     // Compte 706 (classe 7) pour les ventilations recette
-    $categorieRec = Categorie::factory()->recette()->create([
-        'association_id' => $this->association->id,
-        'nom' => 'Prestations',
-    ]);
-    $this->sc706 = SousCategorie::create([
-        'association_id' => $this->association->id,
-        'categorie_id' => $categorieRec->id,
-        'nom' => 'Cotisations',
-        'code_cerfa' => '706',
-    ]);
     $this->compte706 = Compte::firstOrCreate(
         ['association_id' => $this->association->id, 'numero_pcg' => '706'],
         [
@@ -110,16 +98,6 @@ beforeEach(function () {
     );
 
     // Compte 601 (classe 6) pour les dépenses
-    $categorieDep = Categorie::factory()->depense()->create([
-        'association_id' => $this->association->id,
-        'nom' => 'Charges',
-    ]);
-    $this->sc601 = SousCategorie::create([
-        'association_id' => $this->association->id,
-        'categorie_id' => $categorieDep->id,
-        'nom' => 'Fournitures',
-        'code_cerfa' => '601',
-    ]);
     $this->compte601 = Compte::firstOrCreate(
         ['association_id' => $this->association->id, 'numero_pcg' => '601'],
         [
@@ -177,7 +155,6 @@ it('[512X-1] recette virement portant une ligne 512X-A est listée dans le rappr
         'libelle' => 'Recette 512X',
         'montant' => 0,
         'tiers_id' => null,
-        'sous_categorie_id' => null,
     ]);
     // Ligne 706 C (contrepartie produit)
     TransactionLigne::create([
@@ -188,7 +165,6 @@ it('[512X-1] recette virement portant une ligne 512X-A est listée dans le rappr
         'libelle' => 'Recette 512X',
         'montant' => 0,
         'tiers_id' => null,
-        'sous_categorie_id' => null,
     ]);
 
     $component = Livewire::test(RapprochementDetail::class, ['rapprochement' => $this->rapprochement]);
@@ -227,7 +203,6 @@ it('[512X-2] chèque loose (5112, sans 512X) est exclu de la liste rappro (mode 
         'libelle' => 'Portage chèque',
         'montant' => 0,
         'tiers_id' => null,
-        'sous_categorie_id' => null,
     ]);
     // Ligne 706 C
     TransactionLigne::create([
@@ -238,7 +213,6 @@ it('[512X-2] chèque loose (5112, sans 512X) est exclu de la liste rappro (mode 
         'libelle' => 'Portage chèque',
         'montant' => 0,
         'tiers_id' => null,
-        'sous_categorie_id' => null,
     ]);
 
     $component = Livewire::test(RapprochementDetail::class, ['rapprochement' => $this->rapprochement]);
@@ -277,7 +251,6 @@ it('[512X-3] remise comptabilisée (T4 porte 512X-A) est listée comme 1 ligne g
         'libelle' => 'Portage chèque source',
         'montant' => 0,
         'tiers_id' => null,
-        'sous_categorie_id' => null,
     ]);
     TransactionLigne::create([
         'transaction_id' => $txSource->id,
@@ -287,7 +260,6 @@ it('[512X-3] remise comptabilisée (T4 porte 512X-A) est listée comme 1 ligne g
         'libelle' => 'Portage chèque source',
         'montant' => 0,
         'tiers_id' => null,
-        'sous_categorie_id' => null,
     ]);
 
     // Comptabiliser la remise via le service → crée T4 avec ligne 512X
@@ -335,7 +307,6 @@ it('[512X-4] dépense portant une ligne 512X-A crédit est listée dans le rappr
         'libelle' => 'Dépense chèque',
         'montant' => 0,
         'tiers_id' => null,
-        'sous_categorie_id' => null,
     ]);
     // 401 C
     TransactionLigne::create([
@@ -346,7 +317,6 @@ it('[512X-4] dépense portant une ligne 512X-A crédit est listée dans le rappr
         'libelle' => 'Dépense chèque',
         'montant' => 0,
         'tiers_id' => null,
-        'sous_categorie_id' => null,
     ]);
     // 401 D (soldage)
     TransactionLigne::create([
@@ -357,7 +327,6 @@ it('[512X-4] dépense portant une ligne 512X-A crédit est listée dans le rappr
         'libelle' => 'Dépense chèque',
         'montant' => 0,
         'tiers_id' => null,
-        'sous_categorie_id' => null,
     ]);
     // 512X C (décaissement)
     TransactionLigne::create([
@@ -368,7 +337,6 @@ it('[512X-4] dépense portant une ligne 512X-A crédit est listée dans le rappr
         'libelle' => 'Dépense chèque',
         'montant' => 0,
         'tiers_id' => null,
-        'sous_categorie_id' => null,
     ]);
 
     $component = Livewire::test(RapprochementDetail::class, ['rapprochement' => $this->rapprochement]);
@@ -419,7 +387,6 @@ it('[512X-5] écriture portant 512X-B (autre compte) est exclue de la liste rapp
         'libelle' => 'Cross 512X-B',
         'montant' => 0,
         'tiers_id' => null,
-        'sous_categorie_id' => null,
     ]);
     TransactionLigne::create([
         'transaction_id' => $txCrossCompte->id,
@@ -429,7 +396,6 @@ it('[512X-5] écriture portant 512X-B (autre compte) est exclue de la liste rapp
         'libelle' => 'Cross 512X-B',
         'montant' => 0,
         'tiers_id' => null,
-        'sous_categorie_id' => null,
     ]);
 
     $component = Livewire::test(RapprochementDetail::class, ['rapprochement' => $this->rapprochement]);
@@ -470,7 +436,6 @@ it('[512X-6] T2 règlement sans compte_id header mais avec ligne 512X-A est list
         'tiers_id' => $this->tiers->id,
         'libelle' => 'Règlement',
         'montant' => 0,
-        'sous_categorie_id' => null,
     ]);
     // 512X C (décaissement bancaire)
     TransactionLigne::create([
@@ -481,7 +446,6 @@ it('[512X-6] T2 règlement sans compte_id header mais avec ligne 512X-A est list
         'libelle' => 'Règlement',
         'montant' => 0,
         'tiers_id' => null,
-        'sous_categorie_id' => null,
     ]);
 
     $component = Livewire::test(RapprochementDetail::class, ['rapprochement' => $this->rapprochement]);
@@ -521,7 +485,6 @@ it('[512X-7] recette virement en_attente sans 512X est listée via compte_id (mo
         'tiers_id' => $this->tiers->id,
         'libelle' => 'Virement en attente',
         'montant' => 0,
-        'sous_categorie_id' => null,
     ]);
     // 706 C (produit)
     TransactionLigne::create([
@@ -532,7 +495,6 @@ it('[512X-7] recette virement en_attente sans 512X est listée via compte_id (mo
         'libelle' => 'Virement en attente',
         'montant' => 0,
         'tiers_id' => null,
-        'sous_categorie_id' => null,
     ]);
 
     $component = Livewire::test(RapprochementDetail::class, ['rapprochement' => $this->rapprochement]);
@@ -571,7 +533,6 @@ it('[512X-8] chèque en_attente sans 512X reste exclu du rappro (mode PD)', func
         'tiers_id' => $this->tiers->id,
         'libelle' => 'Chèque en attente',
         'montant' => 0,
-        'sous_categorie_id' => null,
     ]);
     TransactionLigne::create([
         'transaction_id' => $txChequeEnAttente->id,
@@ -581,7 +542,6 @@ it('[512X-8] chèque en_attente sans 512X reste exclu du rappro (mode PD)', func
         'libelle' => 'Chèque en attente',
         'montant' => 0,
         'tiers_id' => null,
-        'sous_categorie_id' => null,
     ]);
 
     $component = Livewire::test(RapprochementDetail::class, ['rapprochement' => $this->rapprochement]);
@@ -621,7 +581,6 @@ it('[512X-9] dépense virement en_attente sans 512X est listée via compte_id (m
         'libelle' => 'Dépense virement en attente',
         'montant' => 0,
         'tiers_id' => null,
-        'sous_categorie_id' => null,
     ]);
     // 401 C (dette ouverte)
     TransactionLigne::create([
@@ -632,7 +591,6 @@ it('[512X-9] dépense virement en_attente sans 512X est listée via compte_id (m
         'tiers_id' => $this->tiers->id,
         'libelle' => 'Dépense virement en attente',
         'montant' => 0,
-        'sous_categorie_id' => null,
     ]);
 
     $component = Livewire::test(RapprochementDetail::class, ['rapprochement' => $this->rapprochement]);

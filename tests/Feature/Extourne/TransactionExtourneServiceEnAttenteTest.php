@@ -42,7 +42,6 @@ function enAttenteCreateRecette(CompteBancaire $compte, float $montant = 80.0): 
 
     TransactionLigne::create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => null,
         'montant' => $montant,
     ]);
 

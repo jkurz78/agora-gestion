@@ -184,7 +184,7 @@ it('résout la ligne parent (option_id IS NULL) dans une transaction avec lignes
         'helloasso_tier_id' => $tierId,
     ]);
 
-    // Ligne option (12€) — même sous-cat
+    // Ligne option (12€) — même compte
     TransactionLigne::factory()->create([
         'transaction_id' => $transaction->id,
         'compte_id' => $sousCat->id,
@@ -225,7 +225,7 @@ it('throws générique si aucune ligne ne correspond (cas dégénéré multi-lig
         'transaction_id' => $transaction->id,
     ]);
 
-    // Adhésion sans formule : impossible de matcher par sous_categorie_id
+    // Adhésion sans formule : impossible de matcher par compte_id
     $adhesion = Adhesion::factory()->create([
         'transaction_id' => $transaction->id,
         'tiers_id' => $tiers->id,

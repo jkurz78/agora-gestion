@@ -18,7 +18,6 @@ function budgetServiceTestLigne(Transaction $tx, Compte $compte, float $montant)
 
     return TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => null,
         'montant' => $montant,
         'compte_id' => $compte->id,
         'debit' => $estDepense ? $montant : 0.0,

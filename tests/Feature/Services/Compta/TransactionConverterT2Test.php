@@ -55,7 +55,7 @@ beforeEach(function () {
 /**
  * Crée une Transaction recette legacy (equilibree=false, ventilation legacy).
  *
- * La factory TransactionFactory::configure() crée des lignes avec SousCategorie::factory()
+ * La factory TransactionFactory::configure() crée des lignes rattachées aux comptes.
  * — ces lignes parasite la conversion (SC sans code_cerfa, compte introuvable).
  * On les supprime toutes et on insère manuellement la seule ligne de ventilation souhaitée.
  */
@@ -78,7 +78,6 @@ function makeRecetteLegacy(object $ctx, array $overrides = []): Transaction
 
     TransactionLigne::withoutEvents(fn () => TransactionLigne::create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $ctx->sc706->id,
         'compte_id' => $ctx->compte706->id,
         'montant' => 100.00,
         'operation_id' => null,
@@ -112,7 +111,6 @@ function makeDepenseLegacy(object $ctx, array $overrides = []): Transaction
 
     TransactionLigne::withoutEvents(fn () => TransactionLigne::create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $ctx->sc606->id,
         'compte_id' => $ctx->compte606->id,
         'montant' => 80.00,
         'operation_id' => null,

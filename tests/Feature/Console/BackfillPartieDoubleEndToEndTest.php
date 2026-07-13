@@ -35,12 +35,10 @@ use App\Enums\StatutFacture;
 use App\Enums\StatutReglement;
 use App\Enums\TypeLigneFacture;
 use App\Models\Association;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
 use App\Models\FactureLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -102,17 +100,7 @@ beforeEach(function () {
         ->where('association_id', $this->association->id)
         ->firstOrFail();
 
-    // Catégories + sous-catégories + comptes PCG
-    $this->catRecette = Categorie::factory()->recette()->create([
-        'association_id' => $this->association->id,
-        'nom' => 'Prestations',
-    ]);
-    $this->sc706 = SousCategorie::create([
-        'association_id' => $this->association->id,
-        'categorie_id' => $this->catRecette->id,
-        'nom' => 'Cotisations membres',
-        'code_cerfa' => '706',
-    ]);
+    // Comptes de ventilation PCG
     $this->compte706 = Compte::firstOrCreate(
         ['association_id' => $this->association->id, 'numero_pcg' => '706'],
         [
@@ -122,20 +110,9 @@ beforeEach(function () {
             'actif' => true,
             'est_systeme' => false,
             'pour_inscriptions' => false,
-            'categorie_id' => $this->catRecette->id,
         ]
     );
 
-    $this->catDepense = Categorie::factory()->depense()->create([
-        'association_id' => $this->association->id,
-        'nom' => 'Charges de fonctionnement',
-    ]);
-    $this->sc606 = SousCategorie::create([
-        'association_id' => $this->association->id,
-        'categorie_id' => $this->catDepense->id,
-        'nom' => 'Fournitures et petits matériels',
-        'code_cerfa' => '606',
-    ]);
     $this->compte606 = Compte::firstOrCreate(
         ['association_id' => $this->association->id, 'numero_pcg' => '606'],
         [
@@ -145,7 +122,6 @@ beforeEach(function () {
             'actif' => true,
             'est_systeme' => false,
             'pour_inscriptions' => false,
-            'categorie_id' => $this->catDepense->id,
         ]
     );
 
@@ -190,7 +166,7 @@ function creerFixtureE2E(object $ctx): array
         'tiers_id' => $ctx->tiersA->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
-        ['sous_categorie_id' => $ctx->sc706->id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte706->id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
     $txIds[] = $txR1->id;
 
@@ -205,7 +181,7 @@ function creerFixtureE2E(object $ctx): array
         'tiers_id' => $ctx->tiersB->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
-        ['sous_categorie_id' => $ctx->sc706->id, 'montant' => '150.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte706->id, 'montant' => '150.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
     $txIds[] = $txR2->id;
 
@@ -220,7 +196,7 @@ function creerFixtureE2E(object $ctx): array
         'tiers_id' => $ctx->tiersA->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
-        ['sous_categorie_id' => $ctx->sc706->id, 'montant' => '80.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte706->id, 'montant' => '80.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
     $txIds[] = $txR3->id;
 
@@ -235,7 +211,7 @@ function creerFixtureE2E(object $ctx): array
         'tiers_id' => $ctx->tiersB->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
-        ['sous_categorie_id' => $ctx->sc706->id, 'montant' => '250.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte706->id, 'montant' => '250.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
     $txIds[] = $txR4->id;
 
@@ -250,7 +226,7 @@ function creerFixtureE2E(object $ctx): array
         'tiers_id' => $ctx->tiersA->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
-        ['sous_categorie_id' => $ctx->sc706->id, 'montant' => '300.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte706->id, 'montant' => '300.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
     $txIds[] = $txR5->id;
 
@@ -264,7 +240,7 @@ function creerFixtureE2E(object $ctx): array
         'tiers_id' => $ctx->tiersB->id,
         'compte_id' => null,
     ], [
-        ['sous_categorie_id' => $ctx->sc706->id, 'montant' => '180.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte706->id, 'montant' => '180.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
     $txIds[] = $txR6->id;
     // R6 exposée pour l'assertion en_attente : mode null + statut par défaut (en_attente)
@@ -282,7 +258,7 @@ function creerFixtureE2E(object $ctx): array
         'tiers_id' => $ctx->tiersB->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
-        ['sous_categorie_id' => $ctx->sc706->id, 'montant' => '180.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte706->id, 'montant' => '180.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
     $txIds[] = $txEnc->id;
 
@@ -297,7 +273,7 @@ function creerFixtureE2E(object $ctx): array
         'tiers_id' => $ctx->tiersA->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
-        ['sous_categorie_id' => $ctx->sc606->id, 'montant' => '120.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte606->id, 'montant' => '120.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
     $txIds[] = $txD1->id;
 
@@ -312,7 +288,7 @@ function creerFixtureE2E(object $ctx): array
         'tiers_id' => $ctx->tiersB->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
-        ['sous_categorie_id' => $ctx->sc606->id, 'montant' => '80.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte606->id, 'montant' => '80.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
     $txIds[] = $txD2->id;
 
@@ -327,7 +303,7 @@ function creerFixtureE2E(object $ctx): array
         'tiers_id' => $ctx->tiersA->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
-        ['sous_categorie_id' => $ctx->sc606->id, 'montant' => '75.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte606->id, 'montant' => '75.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
     $txIds[] = $txD3->id;
 
@@ -341,7 +317,7 @@ function creerFixtureE2E(object $ctx): array
         'tiers_id' => $ctx->tiersA->id,
         'compte_id' => null,
     ], [
-        ['sous_categorie_id' => $ctx->sc606->id, 'montant' => '150.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte606->id, 'montant' => '150.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
     $txIds[] = $txD4->id;
 
@@ -362,7 +338,6 @@ function creerFixtureE2E(object $ctx): array
     FactureLigne::create([
         'facture_id' => $facture->id,
         'type' => TypeLigneFacture::MontantManuel->value,
-        'sous_categorie_id' => $ctx->sc706->id,
         'compte_id' => $ctx->compte706->id,
         'libelle' => 'Formation hiver',
         'montant' => 400.00,
@@ -417,7 +392,7 @@ function creerFixtureE2E(object $ctx): array
         'tiers_id' => $ctx->tiersA->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
-        ['sous_categorie_id' => $ctx->sc706->id, 'montant' => '60.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte706->id, 'montant' => '60.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
     $txIds[] = $txRCB->id;
     $ctx->txRCB = $txRCB;
@@ -435,7 +410,7 @@ function creerFixtureE2E(object $ctx): array
         'tiers_id' => $ctx->tiersB->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
-        ['sous_categorie_id' => $ctx->sc706->id, 'montant' => '90.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte706->id, 'montant' => '90.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
     $txIds[] = $txExtOrigine->id;
     $ctx->txExtOrigine = $txExtOrigine;
@@ -476,30 +451,16 @@ function creerFixtureE2E(object $ctx): array
  */
 function simulerEtatLegacyE2E(array $txIds): void
 {
-    // Identifier les transactions PD-pures (aucune ligne avec sous_categorie_id non null)
-    // OU les miroirs d'extourne (montant_total < 0 avec extournePour relation active).
-    $txPDPures = [];
-    foreach ($txIds as $txId) {
-        $hasLegacyLines = DB::table('transaction_lignes')
-            ->where('transaction_id', $txId)
-            ->whereNotNull('sous_categorie_id')
-            ->whereNull('deleted_at')
-            ->exists();
-        if (! $hasLegacyLines) {
-            $txPDPures[] = $txId;
-
-            continue;
-        }
-        // T2' miroir d'extourne : montant_total < 0 ET appartient à une extourne comme miroir
-        $isMiroirExtourne = DB::table('extournes')
-            ->where('transaction_extourne_id', $txId)
-            ->exists();
-        if ($isMiroirExtourne) {
-            $txPDPures[] = $txId;
-        }
-    }
-
-    $txIdsLegacy = array_values(array_diff($txIds, $txPDPures));
+    // Le schéma final conserve le compte d'allocation 6/7 sur chaque ligne.
+    // Seules les transactions qui en portent une sont reconvertibles ; les T2/T4
+    // purement techniques et les miroirs d'extourne restent intacts.
+    $txIdsLegacy = Transaction::query()
+        ->whereIn('id', $txIds)
+        ->whereDoesntHave('extournePour')
+        ->whereHas('lignes.compte', fn ($query) => $query->whereIn('classe', [6, 7]))
+        ->pluck('id')
+        ->map(fn ($id): int => (int) $id)
+        ->all();
 
     if (empty($txIdsLegacy)) {
         return;
@@ -507,12 +468,10 @@ function simulerEtatLegacyE2E(array $txIds): void
 
     // Étape 0 : supprimer les T2 séparées liées aux T1 legacy via lettrage (chantier T2-séparée).
     // La T2 encaissement/règlement est une transaction PD-pure liée à la T1 via le lettrage
-    // du compte tiers (411 ou 401). Elle n'est pas dans $txIdsLegacy (pas de sous_cat),
+    // du compte tiers (411 ou 401). Elle n'est pas dans $txIdsLegacy,
     // mais elle doit être purgée pour éviter les doublons au re-backfill.
     $lettrageCodesT1 = DB::table('transaction_lignes')
         ->whereIn('transaction_id', $txIdsLegacy)
-        ->whereNull('sous_categorie_id')
-        ->whereNotNull('compte_id')
         ->whereNotNull('lettrage_code')
         ->pluck('lettrage_code')
         ->unique()
@@ -536,16 +495,18 @@ function simulerEtatLegacyE2E(array $txIds): void
         }
     }
 
-    // Étape 1 : supprimer les lignes PD-only (sous_categorie_id null + compte_id non null) de T1
+    $comptesTechniques = Compte::query()
+        ->whereIn('classe', [4, 5])
+        ->pluck('id');
+
+    // Étape 1 : supprimer les contreparties techniques 4/5 des T1.
     TransactionLigne::whereIn('transaction_id', $txIdsLegacy)
-        ->whereNull('sous_categorie_id')
-        ->whereNotNull('compte_id')
+        ->whereIn('compte_id', $comptesTechniques)
         ->forceDelete();
 
-    // Étape 2 : reset colonnes PD sur les lignes de ventilation
+    // Étape 2 : reset des montants PD en préservant le compte d'allocation final.
     TransactionLigne::whereIn('transaction_id', $txIdsLegacy)
         ->update([
-            'compte_id' => null,
             'debit' => 0,
             'credit' => 0,
             'tiers_id' => null,
@@ -860,8 +821,7 @@ test('[L2] chaque cas type §8.3 produit un équilibre correct après backfill',
         '--asso' => $this->association->id,
     ])->assertSuccessful();
 
-    // Vérifier qu'aucune ligne de ventilation (sous_categorie_id non null)
-    // n'est restée sans compte_id après backfill (sauf si le skip était légitime)
+    // Vérifier qu'aucune ligne n'est restée sans compte après backfill.
     // Les Tx equilibree=TRUE doivent avoir toutes leurs lignes enrichies
     $txEquilibrees = Transaction::whereIn('id', $txIds)
         ->where('equilibree', true)
@@ -871,13 +831,12 @@ test('[L2] chaque cas type §8.3 produit un équilibre correct après backfill',
     foreach ($txEquilibrees as $txId) {
         $lignesSansCompte = DB::table('transaction_lignes')
             ->where('transaction_id', $txId)
-            ->whereNotNull('sous_categorie_id')
             ->whereNull('compte_id')
             ->whereNull('deleted_at')
             ->count();
 
         expect($lignesSansCompte)->toBe(0,
-            "Tx equilibree=TRUE #{$txId} a des lignes de ventilation sans compte_id (sous_categorie_id non null mais compte_id null)"
+            "Tx equilibree=TRUE #{$txId} a des lignes sans compte_id"
         );
     }
 

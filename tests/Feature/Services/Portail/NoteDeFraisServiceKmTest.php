@@ -5,10 +5,9 @@ declare(strict_types=1);
 use App\Enums\NoteDeFraisLigneType;
 use App\Enums\UsageComptable;
 use App\Models\Association;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\Tiers;
-use App\Models\UsageSousCategorie;
+use App\Models\UsageCompte;
 use App\Services\Portail\NoteDeFrais\NoteDeFraisService;
 use App\Tenant\TenantContext;
 
@@ -18,7 +17,6 @@ beforeEach(function () {
 
     $this->tiers = Tiers::factory()->create(['association_id' => $this->asso->id]);
 
-    $this->cat = Categorie::factory()->create(['association_id' => $this->asso->id]);
     $this->scKm = Compte::create([
         'association_id' => TenantContext::currentId(),
         'numero_pcg' => '625KM',
@@ -94,8 +92,8 @@ it('sauvegarde une ligne standard sans metadata', function () {
     expect((int) $ligne->compte_id)->toBe((int) $sc->id);
 });
 
-it('laisse compte_id à null pour ligne km si aucune sous-cat flaggée', function () {
-    UsageSousCategorie::where('compte_id', $this->scKm->id)
+it('laisse compte_id à null pour ligne km si aucun compte flaggé', function () {
+    UsageCompte::where('compte_id', $this->scKm->id)
         ->where('usage', UsageComptable::FraisKilometriques->value)
         ->delete();
 
@@ -122,7 +120,7 @@ it('laisse compte_id à null pour ligne km si aucune sous-cat flaggée', functio
     expect($ligne->compte_id)->toBeNull();
 });
 
-it('laisse compte_id à null pour ligne km si deux sous-cat flaggées', function () {
+it('laisse compte_id à null pour ligne km si deux comptes sont flaggés', function () {
     (function () {
         $c = Compte::create([
             'association_id' => TenantContext::currentId(),

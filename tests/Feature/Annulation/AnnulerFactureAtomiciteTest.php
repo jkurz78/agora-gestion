@@ -60,7 +60,7 @@ afterEach(function (): void {
 
 /**
  * Crée une facture brouillon avec :
- *   - 1 ligne MontantManuel "Stage avril" 100 € (sous-catégorie recette donnée)
+ *   - 1 ligne MontantManuel "Stage avril" 100 € (compte recette donnée)
  *   - 1 TX recette préexistante Tref 50 € Recu rattachée via ajouterTransactions
  * La valide (ce qui génère Tg EnAttente pour la ligne MM).
  * Retourne [facture rafraîchie, Tg, Tref].

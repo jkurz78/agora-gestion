@@ -24,7 +24,7 @@ use App\Models\HelloAssoParametres;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
-use App\Models\UsageSousCategorie;
+use App\Models\UsageCompte;
 use App\Models\User;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\HelloAssoSyncService;
@@ -72,7 +72,7 @@ beforeEach(function (): void {
         'lettrable' => false,
         'pour_inscriptions' => false,
     ]);
-    UsageSousCategorie::create([
+    UsageCompte::create([
         'association_id' => (int) $this->asso->id,
         'compte_id' => (int) $this->compteDon->id,
         'usage' => UsageComptable::Don->value,
@@ -89,7 +89,7 @@ beforeEach(function (): void {
         'lettrable' => false,
         'pour_inscriptions' => false,
     ]);
-    UsageSousCategorie::create([
+    UsageCompte::create([
         'association_id' => (int) $this->asso->id,
         'compte_id' => (int) $this->compteCot->id,
         'usage' => UsageComptable::Cotisation->value,

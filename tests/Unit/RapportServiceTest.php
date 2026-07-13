@@ -44,13 +44,13 @@ it('compteDeResultat retourne la hiérarchie famille/compte pour N', function ()
 
     expect($result['charges'])->toHaveCount(1);
     $cat = $result['charges'][0];
-    expect($cat['label'])->toBe('60 — 60');
+    expect($cat['famille_nom'])->toBe('60 — 60');
     expect($cat['montant_n'])->toBe(200.0);
     expect($cat['montant_n1'])->toBeNull();
     expect($cat['budget'])->toBeNull();
-    expect($cat['sous_categories'])->toHaveCount(1);
-    expect($cat['sous_categories'][0]['label'])->toBe('Fournitures');
-    expect($cat['sous_categories'][0]['montant_n'])->toBe(200.0);
+    expect($cat['comptes'])->toHaveCount(1);
+    expect($cat['comptes'][0]['compte_nom'])->toBe('Fournitures');
+    expect($cat['comptes'][0]['montant_n'])->toBe(200.0);
 });
 
 it('compteDeResultat inclut montant_n1 depuis exercice précédent', function () {
@@ -70,7 +70,7 @@ it('compteDeResultat inclut montant_n1 depuis exercice précédent', function ()
 
     expect($result['charges'][0]['montant_n'])->toBe(350.0);
     expect($result['charges'][0]['montant_n1'])->toBe(300.0);
-    expect($result['charges'][0]['sous_categories'][0]['montant_n1'])->toBe(300.0);
+    expect($result['charges'][0]['comptes'][0]['montant_n1'])->toBe(300.0);
 });
 
 it('compteDeResultat inclut le budget depuis budget_lines', function () {
@@ -84,7 +84,7 @@ it('compteDeResultat inclut le budget depuis budget_lines', function () {
     $result = $this->service->compteDeResultat(2025);
 
     expect($result['charges'][0]['budget'])->toBe(1000.0);
-    expect($result['charges'][0]['sous_categories'][0]['budget'])->toBe(1000.0);
+    expect($result['charges'][0]['comptes'][0]['budget'])->toBe(1000.0);
 });
 
 it('compteDeResultat inclut les dons dans les produits', function () {
@@ -100,7 +100,7 @@ it('compteDeResultat inclut les dons dans les produits', function () {
     $result = $this->service->compteDeResultat(2025);
 
     expect($result['produits'])->toHaveCount(1);
-    expect($result['produits'][0]['sous_categories'][0]['montant_n'])->toBe(500.0);
+    expect($result['produits'][0]['comptes'][0]['montant_n'])->toBe(500.0);
 });
 
 it('compteDeResultat inclut les cotisations dans les produits', function () {
@@ -115,7 +115,7 @@ it('compteDeResultat inclut les cotisations dans les produits', function () {
 
     $result = $this->service->compteDeResultat(2025);
 
-    expect($result['produits'][0]['sous_categories'][0]['montant_n'])->toBe(200.0);
+    expect($result['produits'][0]['comptes'][0]['montant_n'])->toBe(200.0);
 });
 
 it('compteDeResultat trie familles et comptes par nom', function () {
@@ -141,14 +141,14 @@ it('compteDeResultat trie familles et comptes par nom', function () {
 
     $result = $this->service->compteDeResultat(2025);
 
-    $chargeLabels = collect($result['charges'])->pluck('label')->toArray();
+    $chargeLabels = collect($result['charges'])->pluck('famille_nom')->toArray();
     $alphaIdx = array_search('61 — Alpha', $chargeLabels);
     $zebreIdx = array_search('62 — Zèbre', $chargeLabels);
     expect($alphaIdx)->toBeLessThan($zebreIdx);
 
-    $alphaEntry = collect($result['charges'])->firstWhere('label', '61 — Alpha');
-    expect($alphaEntry['sous_categories'][0]['label'])->toBe('Aaa');
-    expect($alphaEntry['sous_categories'][1]['label'])->toBe('Zzz');
+    $alphaEntry = collect($result['charges'])->firstWhere('famille_nom', '61 — Alpha');
+    expect($alphaEntry['comptes'][0]['compte_nom'])->toBe('Aaa');
+    expect($alphaEntry['comptes'][1]['compte_nom'])->toBe('Zzz');
 });
 
 // ── compteDeResultatOperations ────────────────────────────────────────────────
@@ -188,8 +188,8 @@ it('compteDeResultatOperations retourne structure sans montant_n1 ni budget', fu
     $cat = $result['charges'][0];
     expect($cat)->not->toHaveKey('montant_n1');
     expect($cat)->not->toHaveKey('budget');
-    expect($cat['sous_categories'][0])->not->toHaveKey('montant_n1');
-    expect($cat['sous_categories'][0])->not->toHaveKey('budget');
+    expect($cat['comptes'][0])->not->toHaveKey('montant_n1');
+    expect($cat['comptes'][0])->not->toHaveKey('budget');
 });
 
 it('compteDeResultatOperations avec parSeances regroupe par séance', function () {
@@ -216,7 +216,7 @@ it('compteDeResultatOperations avec parSeances regroupe par séance', function (
     expect($cat['seances'][1])->toBe(100.0);
     expect($cat['seances'][0])->toBe(50.0);
 
-    $sc0 = $cat['sous_categories'][0];
+    $sc0 = $cat['comptes'][0];
     expect($sc0['montant'])->toBe(150.0);
     expect($sc0['seances'][1])->toBe(100.0);
 });
@@ -247,7 +247,7 @@ it('compteDeResultatOperations avec parTiers regroupe par tiers', function () {
     $cat = $result['charges'][0];
     expect($cat['montant'])->toBe(350.0);
 
-    $sc0 = $cat['sous_categories'][0];
+    $sc0 = $cat['comptes'][0];
     expect($sc0['montant'])->toBe(350.0);
     expect($sc0)->toHaveKey('tiers');
     expect($sc0['tiers'])->toHaveCount(3);
@@ -276,7 +276,7 @@ it('compteDeResultatOperations avec parSeances et parTiers combinés', function 
 
     expect($result)->toHaveKey('seances');
 
-    $sc0 = $result['charges'][0]['sous_categories'][0];
+    $sc0 = $result['charges'][0]['comptes'][0];
     expect($sc0)->toHaveKey('tiers');
     expect($sc0)->toHaveKey('seances');
     expect($sc0['montant'])->toBe(75.0);

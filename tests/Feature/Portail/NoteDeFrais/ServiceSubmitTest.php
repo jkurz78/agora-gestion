@@ -18,7 +18,7 @@ function submitService(): NoteDeFraisService
 
 function validLigne(int $noteDeFraisId, array $override = []): NoteDeFraisLigne
 {
-    $sousCategorie = Compte::create([
+    $compte = Compte::create([
         'association_id' => TenantContext::currentId(),
         'numero_pcg' => '61SS'.random_int(100, 999),
         'intitule' => 'Charge NDF',
@@ -28,7 +28,7 @@ function validLigne(int $noteDeFraisId, array $override = []): NoteDeFraisLigne
 
     return NoteDeFraisLigne::factory()->create(array_merge([
         'note_de_frais_id' => $noteDeFraisId,
-        'compte_id' => $sousCategorie->id,
+        'compte_id' => $compte->id,
         'montant' => 25.00,
         'piece_jointe_path' => 'associations/1/notes-de-frais/1/ligne-1.pdf',
     ], $override));
@@ -127,10 +127,10 @@ it('submit: refuse si aucune ligne', function () {
 });
 
 // ---------------------------------------------------------------------------
-// 5. Refus : ligne sans sous-catégorie
+// 5. Refus : ligne sans compte
 // ---------------------------------------------------------------------------
 
-it('submit: refuse une ligne sans sous-catégorie', function () {
+it('submit: refuse une ligne sans compte', function () {
     $tiers = Tiers::factory()->create();
     $ndf = NoteDeFrais::factory()->brouillon()->create([
         'tiers_id' => $tiers->id,

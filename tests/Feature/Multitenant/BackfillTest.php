@@ -8,7 +8,7 @@ it('all rows in tenant-scoped tables have association_id populated', function (s
     $nullCount = DB::table($table)->whereNull('association_id')->count();
     expect($nullCount)->toBe(0);
 })->with([
-    'tiers', 'categories', 'sous_categories',
+    'tiers', 'comptes', 'familles', 'usages_comptes',
     'transactions', 'comptes_bancaires', 'remises_bancaires', 'rapprochements_bancaires', 'virements_internes',
     'operations', 'type_operations', 'participants', 'seances',
     'factures', 'documents_previsionnels', 'budget_lines', 'exercices', 'provisions',

@@ -13,7 +13,7 @@ it('group A tables have association_id column (indexed)', function (string $tabl
     $indexes = collect(Schema::getIndexes($table));
     $hasIndex = $indexes->first(fn ($i) => in_array('association_id', $i['columns']));
     expect($hasIndex)->not->toBeNull();
-})->with(['tiers', 'categories', 'sous_categories']);
+})->with(['tiers', 'comptes', 'familles', 'usages_comptes']);
 
 it('group B tables have association_id column (indexed)', function (string $table): void {
     expect(Schema::hasColumn($table, 'association_id'))->toBeTrue();
@@ -67,7 +67,7 @@ it('group A-E tables have association_id NOT NULL', function (string $table): vo
     expect($column)->not->toBeNull()
         ->and($column['nullable'])->toBeFalse();
 })->with([
-    'tiers', 'categories', 'sous_categories',
+    'tiers', 'comptes', 'familles', 'usages_comptes',
     'transactions', 'comptes_bancaires', 'remises_bancaires', 'rapprochements_bancaires', 'virements_internes',
     'operations', 'type_operations', 'participants', 'seances',
     'factures', 'documents_previsionnels', 'budget_lines', 'exercices', 'provisions',

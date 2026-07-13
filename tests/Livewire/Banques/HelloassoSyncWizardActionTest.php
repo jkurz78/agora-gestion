@@ -74,7 +74,7 @@ it('sauvegarderEtSuite persiste ignore sur le form mapping', function (): void {
 
     $this->formMembership->refresh();
     expect($this->formMembership->ignore)->toBeTrue();
-    expect($this->formMembership->sous_categorie_id)->toBeNull();
+    expect($this->formMembership->compte_id)->toBeNull();
     expect($this->formMembership->operation_id)->toBeNull();
 });
 
@@ -109,7 +109,7 @@ it('sauvegarderEtSuite persiste operation: pour Event (form d\'inscription Hello
 
     $formEvent->refresh();
     expect($formEvent->operation_id)->toBe($operation->id);
-    expect($formEvent->sous_categorie_id)->toBeNull();
+    expect($formEvent->compte_id)->toBeNull();
 });
 
 it('étape 1 : sépare les forms Membership/Donation et Event en 2 tableaux distincts', function (): void {

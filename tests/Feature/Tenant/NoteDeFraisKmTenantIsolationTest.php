@@ -58,7 +58,7 @@ it('une ligne km de asso A est invisible de asso B', function () {
 
     // Compte scopé tenant → usage km invisible depuis assoB
     $visibleCompteIds = Compte::pluck('id');
-    expect(DB::table('usages_sous_categories')
+    expect(DB::table('usages_comptes')
         ->whereIn('compte_id', $visibleCompteIds)
         ->where('usage', UsageComptable::FraisKilometriques->value)
         ->count())->toBe(0);
@@ -82,7 +82,7 @@ it('le pivot frais_kilometriques est scope-locked au tenant', function () {
 
     // En contexte B : aucun compte avec usage km
     $visibleComptesB = Compte::pluck('id');
-    $countB = DB::table('usages_sous_categories')
+    $countB = DB::table('usages_comptes')
         ->whereIn('compte_id', $visibleComptesB)
         ->where('usage', UsageComptable::FraisKilometriques->value)
         ->count();
@@ -91,7 +91,7 @@ it('le pivot frais_kilometriques est scope-locked au tenant', function () {
     // En contexte A : 1 compte avec usage km
     TenantContext::boot($assoA);
     $visibleComptesA = Compte::pluck('id');
-    $countA = DB::table('usages_sous_categories')
+    $countA = DB::table('usages_comptes')
         ->whereIn('compte_id', $visibleComptesA)
         ->where('usage', UsageComptable::FraisKilometriques->value)
         ->count();

@@ -72,9 +72,7 @@ it('expose une hiérarchie famille et comptes avec des clés métier explicites'
     $compte = collect($famille['comptes'] ?? [])->first();
 
     expect($famille)->toHaveKeys(['famille_id', 'famille_nom', 'comptes'])
-        ->not->toHaveKeys(['categorie_id', 'label'])
-        ->and($compte)->toHaveKeys(['compte_id', 'compte_nom', 'montant'])
-        ->not->toHaveKeys(['sous_categorie_id', 'label']);
+        ->and($compte)->toHaveKeys(['compte_id', 'compte_nom', 'montant']);
 });
 
 it('échoue fermé sur toutes les requêtes brutes quand le tenant est absent', function () {
@@ -199,7 +197,7 @@ it('le rapport onglet 3 prend en compte les affectations de recettes avec séanc
 
     // rapportSeances retourne ['seances' => [...], 'charges' => [...], 'produits' => [...]]
     // 'produits' est une liste de catégories, chacune avec 'comptes'
-    // et chaque sous-catégorie a une clé 'seances' = [seance_num => montant]
+    // et chaque compte a une clé 'seances' = [seance_num => montant]
     expect($rapport['seances'])->toContain(2);
 
     $produits = collect($rapport['produits'] ?? []);

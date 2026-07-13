@@ -69,7 +69,7 @@ beforeEach(function (): void {
     ]);
 });
 
-it('un don additionnel dans un order Membership tombe dans la sous-cat fallback Don', function (): void {
+it('un don additionnel dans un order Membership tombe dans le compte fallback Don', function (): void {
     Http::fake([
         '*api.helloasso-sandbox.com/oauth2/token' => Http::response(['access_token' => 'tok', 'expires_in' => 3600]),
         '*api.helloasso-sandbox.com/v5/organizations/mon-asso/forms/Membership/cotisation-2025/public' => Http::response([
@@ -111,9 +111,9 @@ it('un don additionnel dans un order Membership tombe dans la sous-cat fallback 
     expect((int) $ligneDon->compte_id)->toBe((int) $this->scDon->id);
 });
 
-it('un don additionnel dans un order Event tombe dans la sous-cat fallback Don (pas formation) tout en restant rattaché à l\'opération pour la traçabilité', function (): void {
+it('un don additionnel dans un order Event tombe dans le compte fallback Don (pas formation) tout en restant rattaché à l\'opération pour la traçabilité', function (): void {
     // Reproduit le bug observé sur HA-52045 : un don de 20€ joint à une inscription
-    // formation tombait dans la sous-cat de l'opération (formation), alors qu'il
+    // formation tombait dans le compte de l'opération (formation), alors qu'il
     // devrait suivre le compte fallback Don. La catégorisation fiscale est portée
     // par compte_id ; operation_id reste setté pour conserver la traçabilité
     // (le don est venu via cette opération).
@@ -164,7 +164,7 @@ it('un don additionnel dans un order Event tombe dans la sous-cat fallback Don (
         ->and((int) $ligneDon->operation_id)->toBe((int) $operation->id); // traçabilité conservée
 });
 
-it('échoue si fallback Don non configuré et un don additionnel apparaît sans sous-cat form', function (): void {
+it('échoue si fallback Don non configuré et un don additionnel apparaît sans compte form', function (): void {
     $this->parametres->update(['compte_don_id' => null]);
 
     Http::fake([

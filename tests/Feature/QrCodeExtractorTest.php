@@ -28,7 +28,7 @@ it('extracts a valid seance id from a well-formed PDF', function () {
     expect($result->seanceId)->toBe(42);
     expect($result->reason)->toBe('ok');
     expect($result->detail)->toBeNull();
-});
+})->skip(fn (): bool => ! extension_loaded('imagick'), 'Imagick requis pour la rasterisation PDF');
 
 it('returns qr_not_found when the PDF has no QR', function () {
     $pdfPath = $this->tempDir.'/noqr.pdf';
@@ -38,7 +38,7 @@ it('returns qr_not_found when the PDF has no QR', function () {
 
     expect($result->seanceId)->toBeNull();
     expect($result->reason)->toBe('qr_not_found');
-});
+})->skip(fn (): bool => ! extension_loaded('imagick'), 'Imagick requis pour la rasterisation PDF');
 
 it('returns pdf_unreadable when the PDF is corrupted', function () {
     $pdfPath = $this->tempDir.'/corrupted.pdf';
@@ -58,4 +58,4 @@ it('returns qr_wrong_environment when the QR env mismatches', function () {
 
     expect($result->seanceId)->toBeNull();
     expect($result->reason)->toBe('qr_wrong_environment');
-});
+})->skip(fn (): bool => ! extension_loaded('imagick'), 'Imagick requis pour la rasterisation PDF');

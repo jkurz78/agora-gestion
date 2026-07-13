@@ -9,7 +9,7 @@ use App\Tenant\TenantContext;
 
 /*
  * DC-10a — résolution des formules d'adhésion par compte_id uniquement
- * (le chemin legacy par sous_categorie_id a été supprimé).
+ * (le chemin legacy par compte_id a été supprimé).
  */
 function compteCotisationResolverTest(string $numeroPcg): Compte
 {

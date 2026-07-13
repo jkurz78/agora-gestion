@@ -26,7 +26,6 @@ use App\Enums\StatutFacture;
 use App\Enums\StatutReglement;
 use App\Enums\TypeLigneFacture;
 use App\Models\Association;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
@@ -35,7 +34,6 @@ use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Reglement;
 use App\Models\Seance;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -97,106 +95,52 @@ beforeEach(function () {
         ->where('association_id', $this->association->id)
         ->firstOrFail();
 
-    // ── Catégories + sous-catégories + comptes PCG
-    // Catégorie recette
-    $this->catRecette = Categorie::factory()->recette()->create([
-        'association_id' => $this->association->id,
-        'nom' => 'Prestations',
-    ]);
-
-    // Catégorie recette secondaire (pour multi-ventilation)
-    $this->catRecette2 = Categorie::factory()->recette()->create([
-        'association_id' => $this->association->id,
-        'nom' => 'Dons et subventions',
-    ]);
-
-    // Catégorie dépense
-    $this->catDepense = Categorie::factory()->depense()->create([
-        'association_id' => $this->association->id,
-        'nom' => 'Charges de fonctionnement',
-    ]);
-
-    // Sous-catégorie + compte 706 (cotisations)
-    // IMPORTANT : sc.nom = compte.intitule pour que les labels correspondent
-    // en mode legacy (sous_categorie_nom) et en mode PD (compte.intitule).
-    $this->sc706 = SousCategorie::create([
-        'association_id' => $this->association->id,
-        'categorie_id' => $this->catRecette->id,
-        'nom' => 'Cotisations membres',
-        'code_cerfa' => '706',
-    ]);
+    // ── Comptes de ventilation PCG
     $this->compte706 = Compte::firstOrCreate(
         ['association_id' => $this->association->id, 'numero_pcg' => '706'],
         [
-            'intitule' => 'Cotisations membres',  // aligné sur sc.nom
+            'intitule' => 'Cotisations membres',
             'classe' => 7,
             'lettrable' => false,
             'actif' => true,
             'est_systeme' => false,
             'pour_inscriptions' => false,
-            'categorie_id' => $this->catRecette->id,
         ]
     );
 
-    // Sous-catégorie + compte 758 (produits divers)
-    $this->sc758 = SousCategorie::create([
-        'association_id' => $this->association->id,
-        'categorie_id' => $this->catRecette2->id,
-        'nom' => 'Produits divers',
-        'code_cerfa' => '758',
-    ]);
     $this->compte758 = Compte::firstOrCreate(
         ['association_id' => $this->association->id, 'numero_pcg' => '758'],
         [
-            'intitule' => 'Produits divers',  // aligné sur sc.nom
+            'intitule' => 'Produits divers',
             'classe' => 7,
             'lettrable' => false,
             'actif' => true,
             'est_systeme' => false,
             'pour_inscriptions' => false,
-            'categorie_id' => $this->catRecette2->id,
         ]
     );
 
-    // Sous-catégorie + compte 606 (achats fournitures)
-    // IMPORTANT : sc.nom = compte.intitule pour que les labels correspondent
-    // en mode legacy (sous_categorie_nom) et en mode PD (compte.intitule).
-    $this->sc606 = SousCategorie::create([
-        'association_id' => $this->association->id,
-        'categorie_id' => $this->catDepense->id,
-        'nom' => 'Fournitures et petits matériels',
-        'code_cerfa' => '606',
-    ]);
     $this->compte606 = Compte::firstOrCreate(
         ['association_id' => $this->association->id, 'numero_pcg' => '606'],
         [
-            'intitule' => 'Fournitures et petits matériels',  // aligné sur sc.nom
+            'intitule' => 'Fournitures et petits matériels',
             'classe' => 6,
             'lettrable' => false,
             'actif' => true,
             'est_systeme' => false,
             'pour_inscriptions' => false,
-            'categorie_id' => $this->catDepense->id,
         ]
     );
 
-    // Sous-catégorie + compte 616 (assurances)
-    $this->sc616 = SousCategorie::create([
-        'association_id' => $this->association->id,
-        'categorie_id' => $this->catDepense->id,
-        'nom' => 'Assurances',
-        'code_cerfa' => '616',
-    ]);
     $this->compte616 = Compte::firstOrCreate(
         ['association_id' => $this->association->id, 'numero_pcg' => '616'],
         [
-            'intitule' => 'Assurances',  // aligné sur sc.nom
+            'intitule' => 'Assurances',
             'classe' => 6,
             'lettrable' => false,
             'actif' => true,
             'est_systeme' => false,
             'pour_inscriptions' => false,
-            'categorie_id' => $this->catDepense->id,
         ]
     );
 
@@ -289,7 +233,7 @@ function creerFixtureExerciceComplet(object $ctx): array
     $txIds[] = $tx1b->id;
 
     // ── T1c : Recette comptant espèces — multi-ventilation (706 : 60€ + 758 : 40€ = 100€)
-    // Couvre le cas multi-ventilation sur sous-catégories différentes.
+    // Couvre le cas multi-ventilation sur comptes différentes.
     $tx1c = $ctx->txService->create([
         'type' => 'recette',
         'date' => '2025-10-20',
@@ -489,7 +433,7 @@ function creerFixtureExerciceComplet(object $ctx): array
 // ---------------------------------------------------------------------------
 
 /**
- * Extrait un index { categorie_nom => total } depuis une liste de catégories CR.
+ * Extrait un index { famille_nom => total } depuis une liste de familles CR.
  *
  * @param  list<array>  $categories
  * @return array<string, float>
@@ -498,7 +442,7 @@ function indexTotauxParCategorie(array $categories, bool $fullCR = true): array
 {
     $index = [];
     foreach ($categories as $cat) {
-        $label = $cat['label'];
+        $label = $cat['famille_nom'];
         $montant = $fullCR ? (float) ($cat['montant_n'] ?? 0.0) : (float) ($cat['montant'] ?? 0.0);
         $index[$label] = ($index[$label] ?? 0.0) + $montant;
     }
@@ -507,7 +451,7 @@ function indexTotauxParCategorie(array $categories, bool $fullCR = true): array
 }
 
 /**
- * Compare deux index { categorie_nom => total } avec tolérance stricte 0,00€.
+ * Compare deux index { famille_nom => total } avec tolérance stricte 0,00€.
  *
  * Utilise array_key_exists + expect()->toEqual() — JAMAIS toHaveKey($key, $value)
  * car en Pest, toHaveKey(key, value) vérifie la valeur, pas le message d'erreur.
@@ -554,118 +498,6 @@ function totalCR(array $cr, bool $fullCR = true): float
 
     return $sumProduits - $sumCharges;
 }
-
-// ---------------------------------------------------------------------------
-// [E1] Équivalence compteDeResultat — exercice complet réaliste
-// ---------------------------------------------------------------------------
-
-it('[E1] compteDeResultat — legacy ↔ PD identiques sur exercice complet (tolérance 0€)', function () {
-    // Initialiser le store pour le helper fixture
-    $this->store = [];
-
-    creerFixtureExerciceComplet($this);
-
-    // ── Mode LEGACY
-    Config::set('compta.use_partie_double', false);
-    $crLegacy = $this->builder->compteDeResultat($this->exercice);
-
-    // ── Mode PD
-    Config::set('compta.use_partie_double', true);
-    $crPD = $this->builder->compteDeResultat($this->exercice);
-
-    // ── Comparaison charges
-    $chargesLegacy = indexTotauxParCategorie($crLegacy['charges']);
-    $chargesPD = indexTotauxParCategorie($crPD['charges']);
-    assertIndexEquivalents($chargesLegacy, $chargesPD, 'charges');
-
-    // ── Comparaison produits
-    $produitsLegacy = indexTotauxParCategorie($crLegacy['produits']);
-    $produitsPD = indexTotauxParCategorie($crPD['produits']);
-    assertIndexEquivalents($produitsLegacy, $produitsPD, 'produits');
-
-    // ── Comparaison total CR (produits - charges)
-    $totalLegacy = totalCR($crLegacy);
-    $totalPD = totalCR($crPD);
-    expect($totalPD)->toEqual(
-        $totalLegacy,
-        "Total CR : legacy={$totalLegacy}€ ≠ PD={$totalPD}€ — divergence globale"
-    );
-
-    // ── Sanity check : le CR n'est pas vide (la fixture a bien créé des données)
-    expect($crLegacy['produits'])->not->toBe([], 'La fixture doit créer des produits en mode legacy');
-    expect($crLegacy['charges'])->not->toBe([], 'La fixture doit créer des charges en mode legacy');
-    expect($crPD['produits'])->not->toBe([], 'La fixture doit créer des produits en mode PD');
-    expect($crPD['charges'])->not->toBe([], 'La fixture doit créer des charges en mode PD');
-})->skip('DC-10a : TransactionLigne ne porte plus sous_categorie_id — le lecteur legacy est hors service');
-
-// ---------------------------------------------------------------------------
-// [E2] Équivalence compteDeResultat — sous-catégories par catégorie
-// ---------------------------------------------------------------------------
-
-it('[E2] compteDeResultat — totaux par sous-catégorie identiques legacy ↔ PD', function () {
-    $this->store = [];
-    creerFixtureExerciceComplet($this);
-
-    Config::set('compta.use_partie_double', false);
-    $crLegacy = $this->builder->compteDeResultat($this->exercice);
-
-    Config::set('compta.use_partie_double', true);
-    $crPD = $this->builder->compteDeResultat($this->exercice);
-
-    // Construire un index { label_sous_cat => montant_n } pour chaque mode
-    $extractSousCats = function (array $categories): array {
-        $index = [];
-        foreach ($categories as $cat) {
-            foreach ($cat['sous_categories'] as $sc) {
-                $label = $sc['label'];
-                $index[$label] = ($index[$label] ?? 0.0) + (float) ($sc['montant_n'] ?? 0.0);
-            }
-        }
-
-        return $index;
-    };
-
-    $scChargesLegacy = $extractSousCats($crLegacy['charges']);
-    $scChargesPD = $extractSousCats($crPD['charges']);
-    $scProduitsLegacy = $extractSousCats($crLegacy['produits']);
-    $scProduitsPD = $extractSousCats($crPD['produits']);
-
-    // Comparer charges par sous-catégorie (label)
-    foreach ($scChargesLegacy as $label => $montantLegacy) {
-        expect(array_key_exists($label, $scChargesPD))->toBeTrue(
-            "Charge sous-cat '{$label}' absente en PD (legacy={$montantLegacy}€)"
-        );
-        if (array_key_exists($label, $scChargesPD)) {
-            expect($scChargesPD[$label])->toEqual(
-                $montantLegacy,
-                "Charge sous-cat '{$label}': legacy={$montantLegacy}€ ≠ PD={$scChargesPD[$label]}€"
-            );
-        }
-    }
-    foreach ($scChargesPD as $label => $montantPD) {
-        expect(array_key_exists($label, $scChargesLegacy))->toBeTrue(
-            "Charge sous-cat '{$label}' présente en PD mais absente en LEGACY (PD={$montantPD}€)"
-        );
-    }
-
-    // Comparer produits par sous-catégorie (label)
-    foreach ($scProduitsLegacy as $label => $montantLegacy) {
-        expect(array_key_exists($label, $scProduitsPD))->toBeTrue(
-            "Produit sous-cat '{$label}' absent en PD (legacy={$montantLegacy}€)"
-        );
-        if (array_key_exists($label, $scProduitsPD)) {
-            expect($scProduitsPD[$label])->toEqual(
-                $montantLegacy,
-                "Produit sous-cat '{$label}': legacy={$montantLegacy}€ ≠ PD={$scProduitsPD[$label]}€"
-            );
-        }
-    }
-    foreach ($scProduitsPD as $label => $montantPD) {
-        expect(array_key_exists($label, $scProduitsLegacy))->toBeTrue(
-            "Produit sous-cat '{$label}' présent en PD mais absent en LEGACY (PD={$montantPD}€)"
-        );
-    }
-})->skip('DC-10a : TransactionLigne ne porte plus sous_categorie_id — le lecteur legacy est hors service');
 
 // ---------------------------------------------------------------------------
 // [E3] Équivalence compteDeResultatOperations — filtre par opération
@@ -727,7 +559,7 @@ it('[E4] rapportSeances — totaux par séance identiques legacy ↔ PD', functi
     $extractTotauxSeances = function (array $categories): array {
         $index = [];
         foreach ($categories as $cat) {
-            $label = $cat['label'];
+            $label = $cat['famille_nom'];
             $index[$label] = ($index[$label] ?? 0.0) + (float) ($cat['total'] ?? 0.0);
         }
 
@@ -747,7 +579,7 @@ it('[E4] rapportSeances — totaux par séance identiques legacy ↔ PD', functi
         // Retourne { catLabel => { seanceNum => total } }
         $map = [];
         foreach ($categories as $cat) {
-            $label = $cat['label'];
+            $label = $cat['famille_nom'];
             foreach ($cat['seances'] as $seanceNum => $montant) {
                 if (! isset($map[$label])) {
                     $map[$label] = [];
@@ -836,10 +668,8 @@ it('[I2] rapportSeances — investigation tl.seance vs tla.seance', function () 
         'type_ecriture' => 'normale',
     ]);
 
-    // Ligne legacy : sous_categorie_id + montant + seance = seance1.numero
     $ligne = TransactionLigne::create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $this->sc706->id,
         'montant' => 200.00,
         'compte_id' => $this->compte706->id,
         'debit' => 0.0,
@@ -989,20 +819,20 @@ it('[E7] PD — les lignes techniques (411, 401, 5112, 530, 512X) ne sont pas co
     // Les lignes 411 (classe 4) et 5112/512X/530 (classe 5) sont exclues.
     //
     // Si une catégorie "(sans catégorie)" apparaît dans les produits, c'est suspect
-    // (les comptes système 411/401/5112 n'ont pas de categorie_id → COALESCE retourne "(sans catégorie)").
+    // (les comptes système 411/401/5112 n'ont pas de famille de gestion).
     // Mais ils sont classe 4 et 5, donc filtrés avant le SELECT.
 
     foreach ($crPD['produits'] as $cat) {
         // Aucun compte classe 4 ou 5 ne devrait apparaître
         // On vérifie indirectement que les catégories correspondent à des classes 7 réelles
-        expect($cat['label'])->not->toBe(
+        expect($cat['famille_nom'])->not->toBe(
             '(sans catégorie)',
             "Une catégorie '(sans catégorie)' est présente dans les produits PD — suspect d'une fuite de comptes techniques"
         );
     }
 
     foreach ($crPD['charges'] as $cat) {
-        expect($cat['label'])->not->toBe(
+        expect($cat['famille_nom'])->not->toBe(
             '(sans catégorie)',
             "Une catégorie '(sans catégorie)' est présente dans les charges PD — suspect d'une fuite de comptes techniques"
         );
@@ -1076,7 +906,6 @@ it('[E8] EtatReglementResolver — statut dérivé identique live vs backfill (v
     ]);
     TransactionLigne::withoutEvents(fn () => TransactionLigne::create([
         'transaction_id' => $txLegacy->id,
-        'sous_categorie_id' => $this->sc706->id,
         'compte_id' => $this->compte706->id,
         'montant' => 200.00,
         'debit' => 0.0,

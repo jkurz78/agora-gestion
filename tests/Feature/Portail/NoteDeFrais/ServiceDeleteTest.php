@@ -43,7 +43,7 @@ it('delete: supprime les fichiers PJ des lignes du storage local', function () {
     $tiers = Tiers::factory()->create();
     $ndf = NoteDeFrais::factory()->brouillon()->create(['tiers_id' => $tiers->id]);
 
-    $sousCategorie = Compte::create([
+    $compte = Compte::create([
         'association_id' => TenantContext::currentId(),
         'numero_pcg' => '61SD'.random_int(100, 999),
         'intitule' => 'Charge NDF',
@@ -59,12 +59,12 @@ it('delete: supprime les fichiers PJ des lignes du storage local', function () {
 
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'compte_id' => $sousCategorie->id,
+        'compte_id' => $compte->id,
         'piece_jointe_path' => $path1,
     ]);
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'compte_id' => $sousCategorie->id,
+        'compte_id' => $compte->id,
         'piece_jointe_path' => $path2,
     ]);
 
@@ -85,7 +85,7 @@ it('delete: fonctionne quand les lignes n\'ont pas de PJ', function () {
     $tiers = Tiers::factory()->create();
     $ndf = NoteDeFrais::factory()->brouillon()->create(['tiers_id' => $tiers->id]);
 
-    $sousCategorie = Compte::create([
+    $compte = Compte::create([
         'association_id' => TenantContext::currentId(),
         'numero_pcg' => '61SD'.random_int(100, 999),
         'intitule' => 'Charge NDF',
@@ -94,7 +94,7 @@ it('delete: fonctionne quand les lignes n\'ont pas de PJ', function () {
     ]);
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'compte_id' => $sousCategorie->id,
+        'compte_id' => $compte->id,
         'piece_jointe_path' => null,
     ]);
 
@@ -139,7 +139,7 @@ it('delete: ne plante pas si un fichier PJ référencé n\'existe pas en storage
     $tiers = Tiers::factory()->create();
     $ndf = NoteDeFrais::factory()->brouillon()->create(['tiers_id' => $tiers->id]);
 
-    $sousCategorie = Compte::create([
+    $compte = Compte::create([
         'association_id' => TenantContext::currentId(),
         'numero_pcg' => '61SD'.random_int(100, 999),
         'intitule' => 'Charge NDF',
@@ -148,7 +148,7 @@ it('delete: ne plante pas si un fichier PJ référencé n\'existe pas en storage
     ]);
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'compte_id' => $sousCategorie->id,
+        'compte_id' => $compte->id,
         'piece_jointe_path' => 'associations/999/notes-de-frais/999/inexistant.pdf',
     ]);
 

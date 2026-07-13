@@ -130,10 +130,10 @@ it('wizard: à l\'étape 2, montant valide passe à l\'étape 3', function () {
 });
 
 // ---------------------------------------------------------------------------
-// Test 6 : Étape 3 — sous-cat manquante → erreur
+// Test 6 : Étape 3 — compte manquante → erreur
 // ---------------------------------------------------------------------------
 
-it('wizard: wizardConfirm sans sous-catégorie produit une erreur', function () {
+it('wizard: wizardConfirm sans compte produit une erreur', function () {
     $component = makeForm($this->asso);
     $component->wizardStep = 3;
     $component->draftLigne['compte_id'] = null;

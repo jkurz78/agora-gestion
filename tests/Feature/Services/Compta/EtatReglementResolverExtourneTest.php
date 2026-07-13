@@ -49,7 +49,6 @@ test('resolve — miroir extourne Pointé (cancellation pure) → Pointe', funct
         'credit' => 0,
         'tiers_id' => (int) $tiers->id,
         'montant' => 0,
-        'sous_categorie_id' => null,
     ]);
 
     // Ligne 706 C sur l'origine (produit)
@@ -60,7 +59,6 @@ test('resolve — miroir extourne Pointé (cancellation pure) → Pointe', funct
         'credit' => 100.0,
         'tiers_id' => null,
         'montant' => 100.0,
-        'sous_categorie_id' => null,
     ]);
 
     // Miroir extourne
@@ -80,7 +78,6 @@ test('resolve — miroir extourne Pointé (cancellation pure) → Pointe', funct
         'credit' => 100.0,
         'tiers_id' => (int) $tiers->id,
         'montant' => 0,
-        'sous_categorie_id' => null,
     ]);
 
     // Ligne 706 D sur le miroir (inverse)
@@ -91,7 +88,6 @@ test('resolve — miroir extourne Pointé (cancellation pure) → Pointe', funct
         'credit' => 0,
         'tiers_id' => null,
         'montant' => 100.0,
-        'sous_categorie_id' => null,
     ]);
 
     // Cross-lettrage : origine 411 D ↔ miroir 411 C
@@ -128,7 +124,6 @@ test('resolve — miroir recette extourne EnAttente avec T2 → statut dérivé'
         'credit' => 150.0,
         'tiers_id' => (int) $tiers->id,
         'montant' => 0,
-        'sous_categorie_id' => null,
     ]);
 
     // Ligne 706 D (contrepartie)
@@ -139,7 +134,6 @@ test('resolve — miroir recette extourne EnAttente avec T2 → statut dérivé'
         'credit' => 0,
         'tiers_id' => null,
         'montant' => 150.0,
-        'sous_categorie_id' => null,
     ]);
 
     // Avant règlement : EnAttente (ligne tiers ouverte)
@@ -183,7 +177,6 @@ test('resolve — miroir dépense extourne EnAttente avec T2 → statut dérivé
         'credit' => 0,
         'tiers_id' => (int) $tiers->id,
         'montant' => 0,
-        'sous_categorie_id' => null,
     ]);
 
     // Ligne 606 C (contrepartie)
@@ -194,7 +187,6 @@ test('resolve — miroir dépense extourne EnAttente avec T2 → statut dérivé
         'credit' => 200.0,
         'tiers_id' => null,
         'montant' => 200.0,
-        'sous_categorie_id' => null,
     ]);
 
     // Avant règlement : EnAttente

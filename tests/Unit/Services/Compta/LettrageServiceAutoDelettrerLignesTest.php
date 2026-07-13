@@ -40,7 +40,6 @@ function makeLigneAD(Transaction $tx, Compte $compte, float $debit, float $credi
 {
     return TransactionLigne::create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => null,
         'operation_id' => null,
         'seance' => null,
         'montant' => max($debit, $credit),

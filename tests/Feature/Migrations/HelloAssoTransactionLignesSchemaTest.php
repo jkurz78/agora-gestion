@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
-use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
@@ -36,7 +36,7 @@ it('transaction_lignes table no longer has exercice column', function () {
 it('helloasso_item_id is nullable', function () {
     $user = User::factory()->create();
     $compte = CompteBancaire::factory()->create();
-    $sousCat = SousCategorie::factory()->create();
+    $compteVentilation = Compte::factory()->create(['classe' => 7]);
 
     $transaction = Transaction::create([
         'type' => 'recette',
@@ -51,8 +51,9 @@ it('helloasso_item_id is nullable', function () {
 
     $ligne = TransactionLigne::create([
         'transaction_id' => $transaction->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compteVentilation->id,
         'montant' => 50.00,
+        'credit' => 50.00,
     ]);
 
     expect($ligne->helloasso_item_id)->toBeNull();
@@ -61,7 +62,7 @@ it('helloasso_item_id is nullable', function () {
 it('can store helloasso_item_id on a transaction ligne', function () {
     $user = User::factory()->create();
     $compte = CompteBancaire::factory()->create();
-    $sousCat = SousCategorie::factory()->create();
+    $compteVentilation = Compte::factory()->create(['classe' => 7]);
 
     $transaction = Transaction::create([
         'type' => 'recette',
@@ -76,8 +77,9 @@ it('can store helloasso_item_id on a transaction ligne', function () {
 
     $ligne = TransactionLigne::create([
         'transaction_id' => $transaction->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compteVentilation->id,
         'montant' => 50.00,
+        'credit' => 50.00,
         'helloasso_item_id' => 123456789,
     ]);
 
@@ -91,7 +93,7 @@ it('helloasso_item_id allows multiple rows for same item (options split — B1)'
     // deux lignes avec le même item_id mais des option_id différents sont licites.
     $user = User::factory()->create();
     $compte = CompteBancaire::factory()->create();
-    $sousCat = SousCategorie::factory()->create();
+    $compteVentilation = Compte::factory()->create(['classe' => 7]);
 
     $transaction = Transaction::create([
         'type' => 'recette',
@@ -105,19 +107,20 @@ it('helloasso_item_id allows multiple rows for same item (options split — B1)'
     ]);
 
     // Ligne parent (option_id = null)
-    TransactionLigne::create([
+    TransactionLigne::withoutEvents(fn () => TransactionLigne::create([
         'transaction_id' => $transaction->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compteVentilation->id,
         'montant' => 0.00,
         'helloasso_item_id' => 999888777,
         'helloasso_option_id' => null,
-    ]);
+    ]));
 
     // Ligne option
     TransactionLigne::create([
         'transaction_id' => $transaction->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compteVentilation->id,
         'montant' => 100.00,
+        'credit' => 100.00,
         'helloasso_item_id' => 999888777,
         'helloasso_option_id' => 11111,
     ]);

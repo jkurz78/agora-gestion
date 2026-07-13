@@ -36,7 +36,7 @@ it('upload logo via TypeOperationShow places file under associations/{aid}/type-
 
     Livewire::test(TypeOperationShow::class)
         ->set('nom', 'Type avec logo')
-        ->set('sous_categorie_id', $this->compte->id)
+        ->set('compte_id', $this->compte->id)
         ->set('logo', $file)
         ->call('save')
         ->assertHasNoErrors();
@@ -55,7 +55,7 @@ it('upload attestation via TypeOperationShow places file under associations/{aid
 
     Livewire::test(TypeOperationShow::class)
         ->set('nom', 'Type avec attestation')
-        ->set('sous_categorie_id', $this->compte->id)
+        ->set('compte_id', $this->compte->id)
         ->set('attestationMedicale', $file)
         ->call('save')
         ->assertHasNoErrors();
@@ -128,7 +128,7 @@ it('delete logo removes the file from local disk and sets logo_path to null', fu
 
     Livewire::test(TypeOperationShow::class, ['typeOperation' => $type])
         ->set('nom', $type->nom)
-        ->set('sous_categorie_id', $type->compte_id)
+        ->set('compte_id', $type->compte_id)
         ->call('save')
         ->assertHasNoErrors();
 

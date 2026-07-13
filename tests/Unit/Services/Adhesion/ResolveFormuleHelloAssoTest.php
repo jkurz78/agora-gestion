@@ -14,7 +14,7 @@ use App\Tenant\TenantContext;
 // Régression : un palier HelloAsso à 0€ ("Cotisation offerte") n'a pas de
 // helloasso_payment_id côté API HA. La résolution prio 1 ne doit PAS
 // dépendre de helloasso_payment_id, sinon ces cas tombent en prio 2 (formule
-// manuelle active sur la sous-cat) avec un mauvais snapshot fiscal/mode.
+// manuelle active sur le compte) avec un mauvais snapshot fiscal/mode.
 it('résolveFormule prio 1 HelloAsso même sans helloasso_payment_id (palier HA à 0€)', function (): void {
     $service = app(AdhesionService::class);
 
@@ -33,7 +33,7 @@ it('résolveFormule prio 1 HelloAsso même sans helloasso_payment_id (palier HA 
         'est_helloasso' => true,
     ]);
 
-    // Formule manuelle active sur la sous-cat (le piège)
+    // Formule manuelle active sur le compte (le piège)
     $formuleManuelle = FormuleAdhesion::factory()->create([
         'compte_id' => $sc->id,
         'nom' => 'Cotisation annuelle',
@@ -65,15 +65,14 @@ it('résolveFormule prio 1 HelloAsso même sans helloasso_payment_id (palier HA 
         'helloasso_payment_id' => null, // ← le cas du palier offert
     ]);
     TransactionLigne::where('transaction_id', $tx->id)->delete();
-    // Ligne à 0 € : pas de compte (invariant XOR) — la détection cotisation
-    // passe par la paire HelloAsso (form_slug + tier_id).
-    TransactionLigne::factory()->create([
+    // Ligne à 0 € : le schéma final impose un compte ; l'événement est
+    // neutralisé pour représenter le palier HelloAsso gratuit.
+    TransactionLigne::withoutEvents(fn (): TransactionLigne => TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'compte_id' => null,
-        'sous_categorie_id' => null,
+        'compte_id' => $sc->id,
         'helloasso_tier_id' => 18597,
         'montant' => 0,
-    ]);
+    ]));
 
     $adhesion = $service->creerDepuisTransaction($tx);
 

@@ -7,12 +7,10 @@ use App\Enums\ModePaiement;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Models\Association;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Extourne;
 use App\Models\RemiseBancaire;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -41,20 +39,7 @@ beforeEach(function () {
     // Comptes système : 411, 401, 5112
     SystemeSeeder::seed();
 
-    // Catégorie de recette + sous-catégorie 706
-    $categorieRecette = Categorie::factory()->recette()->create([
-        'association_id' => $this->association->id,
-        'nom' => 'Cotisations',
-    ]);
-
-    $this->sc706 = SousCategorie::create([
-        'association_id' => $this->association->id,
-        'categorie_id' => $categorieRecette->id,
-        'nom' => 'Cotisations membres',
-        'code_cerfa' => '706',
-    ]);
-
-    // Compte 706 correspondant
+    // Compte de produit 706
     $this->compte706 = Compte::firstOrCreate(
         ['association_id' => $this->association->id, 'numero_pcg' => '706'],
         [
@@ -88,19 +73,6 @@ beforeEach(function () {
 
     // Tiers
     $this->tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
-
-    // Catégorie de dépense + sous-catégorie 601
-    $categorieDepense = Categorie::factory()->depense()->create([
-        'association_id' => $this->association->id,
-        'nom' => 'Achats',
-    ]);
-
-    $this->sc601 = SousCategorie::create([
-        'association_id' => $this->association->id,
-        'categorie_id' => $categorieDepense->id,
-        'nom' => 'Achats fournitures',
-        'code_cerfa' => '601',
-    ]);
 
     $this->compte601 = Compte::firstOrCreate(
         ['association_id' => $this->association->id, 'numero_pcg' => '601'],
@@ -260,7 +232,7 @@ it('[C] extourne Tx legacy (sans lignes PD) — miroir créé normalement, aucun
 
     TransactionLigne::create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => null,
+        'compte_id' => null,
         'montant' => 50.0,
     ]);
 

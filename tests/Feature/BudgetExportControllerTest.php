@@ -57,7 +57,7 @@ it('télécharge un CSV budget', function () {
     $response->assertDownload('budget-2026-2027.csv');
 
     expect($response->getContent())
-        ->toContain('exercice;categorie;sous_categorie;montant_prevu')
+        ->toContain('exercice;famille;compte;montant_prevu')
         ->toContain('2026-2027;61 — Charges;Loyers;1200.00');
 });
 

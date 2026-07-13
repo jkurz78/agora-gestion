@@ -92,7 +92,7 @@ it('crée une adhésion payée avec transaction', function (): void {
 });
 
 it('mode durée affiche date_debut + date_fin readonly', function (): void {
-    // La 1re formule ('exercice') doit être inactive pour la contrainte 1-active-par-sous-cat
+    // La 1re formule ('exercice') doit être inactive pour la contrainte 1-active-par-compte
     $this->formuleExercice->update(['actif' => false]);
     $formuleDuree = FormuleAdhesion::factory()->modeDuree(12)->create([
         'compte_id' => $this->sc->id,
@@ -176,7 +176,7 @@ it('valide les champs obligatoires (avec paid fields lorsque montant > 0)', func
 
 it('le dropdown formules est groupé en optgroup Manuelles / HelloAsso', function (): void {
     // $this->formuleExercice (est_helloasso=false) est déjà active sur $this->sc
-    // Créer une formule HelloAsso sur une sous-cat distincte
+    // Créer une formule HelloAsso sur un compte distincte
     $compteHa = Compte::factory()->pourCotisations()->create();
     FormuleAdhesion::factory()->helloasso('cotisation-2025', 1)->create([
         'compte_id' => $compteHa->id,
@@ -194,7 +194,7 @@ it('le dropdown formules est groupé en optgroup Manuelles / HelloAsso', functio
 });
 
 it('mode illimite affiche le bandeau permanente et crée l\'adhésion sans date_fin', function (): void {
-    // Désactiver la formule du beforeEach pour libérer la sous-cat
+    // Désactiver la formule du beforeEach pour libérer le compte
     $this->formuleExercice->update(['actif' => false]);
 
     $formuleIllimite = FormuleAdhesion::factory()->modeIllimite()->create([

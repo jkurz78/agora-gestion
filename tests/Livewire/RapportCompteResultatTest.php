@@ -53,7 +53,7 @@ it('se rend sans erreur', function () {
 it('affiche les familles et comptes', function () {
     // DC-4 : le regroupement de 1er niveau est désormais la famille (préfixe 2 chiffres
     // du numero_pcg) et non plus la catégorie. code_cerfa déclenche la matérialisation
-    // Compte (intitulé = nom de la sous-catégorie) + Famille (nom = code, fallback
+    // Compte (intitulé = nom de le compte) + Famille (nom = code, fallback
     // CompteObserver) — d'où le libellé "60 — 60".
     $compte = Compte::factory()->numero('606')->create(['association_id' => $this->association->id, 'intitule' => 'Fournitures']);
     $d = Transaction::factory()->asDepense()->create(['association_id' => $this->association->id, 'date' => '2025-11-15', 'saisi_par' => $this->user->id]);

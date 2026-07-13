@@ -296,7 +296,6 @@ it('sets expected default flags on seeded bank comptes', function () {
     expect((bool) $compte->lettrable)->toBeFalse();
     expect((bool) $compte->pour_inscriptions)->toBeFalse();
     expect((bool) $compte->actif)->toBeTrue();
-    expect($compte->categorie_id)->toBeNull();
     expect($compte->parent_compte_id)->toBeNull();
 });
 

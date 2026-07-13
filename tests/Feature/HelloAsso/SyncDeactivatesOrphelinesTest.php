@@ -30,7 +30,7 @@ it('désactive les formules HelloAsso orphelines', function (): void {
     ]);
 
     // Créer la formule orpheline sur un compte séparé pour éviter
-    // la contrainte "1 formule active par sous-cat"
+    // la contrainte "1 formule active par compte"
     $compteOrpheline = Compte::factory()->pourCotisations()->create();
     $formuleOrpheline = FormuleAdhesion::factory()->create([
         'compte_id' => $compteOrpheline->id,

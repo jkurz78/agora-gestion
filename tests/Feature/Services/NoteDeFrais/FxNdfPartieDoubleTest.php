@@ -67,7 +67,7 @@ beforeEach(function (): void {
         'compte_bancaire_id' => (int) $this->compteBancaire->id,
     ]);
 
-    // Sous-catégorie Dépense avec code_cerfa → compte 606
+    // Compte Dépense avec code_cerfa → compte 606
     Compte::forceCreate([
         'association_id' => (int) $this->asso->id,
         'numero_pcg' => '606',
@@ -207,12 +207,12 @@ test('[B] NDF valider() en PD : lignes PD correctes (606 D / 401 C)', function (
 // [C] Abandon de créance → 2 T1 + 2 OD compensation via 467, pas de 512X
 // ---------------------------------------------------------------------------
 
-test('[C] abandon de créance : T1-don est une recette avec tiers + sous-cat, pas de 512X', function (): void {
+test('[C] abandon de créance : T1-don est une recette avec tiers + compte, pas de 512X', function (): void {
     $ndf = makeNdfSoumisePd($this->asso, $this->tiers, $this->scDepense, montantParLigne: 120.0);
 
     $txDon = $this->service->validerAvecAbandonCreance($ndf, $this->data, '2025-10-20');
 
-    // T1-Don est une vraie recette avec tiers et sous_cat
+    // T1-Don est une vraie recette avec tiers et compte
     expect($txDon->type)->toBe(TypeTransaction::Recette);
     expect((int) $txDon->tiers_id)->toBe((int) $this->tiers->id);
 

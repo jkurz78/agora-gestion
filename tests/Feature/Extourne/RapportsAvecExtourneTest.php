@@ -9,11 +9,9 @@ use App\Enums\StatutRapprochement;
 use App\Enums\StatutReglement;
 use App\Enums\TypeRapprochement;
 use App\Enums\TypeTransaction;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
-use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
@@ -34,7 +32,7 @@ function rapportsActAsComptable(): User
     return $user;
 }
 
-function rapportsCreateRecetteWithSousCategorie(SousCategorie $sc, CompteBancaire $compte, float $montant, string $date): Transaction
+function rapportsCreateRecetteWithCompte(Compte $compteVentilation, CompteBancaire $compte, float $montant, string $date): Transaction
 {
     $tx = Transaction::factory()->create([
         'type' => TypeTransaction::Recette,
@@ -46,55 +44,37 @@ function rapportsCreateRecetteWithSousCategorie(SousCategorie $sc, CompteBancair
         'date' => $date,
     ]);
 
-    $ligne = [
+    TransactionLigne::create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $compteVentilation->id,
         'montant' => $montant,
-    ];
+        'debit' => 0.0,
+        'credit' => $montant,
+    ]);
 
-    // Écriture compte-first équilibrée (crédit 7xx + débit 5112) quand la
-    // sous-catégorie porte un code_cerfa — requis pour être vue par
-    // CompteResultatBuilder ET pour passer le guard ∑D=∑C du miroir d'extourne.
-    if ($sc->code_cerfa !== null && $sc->code_cerfa !== '') {
-        $compteVentilation = Compte::where('numero_pcg', $sc->code_cerfa)
-            ->where('association_id', (int) $sc->association_id)
-            ->firstOrFail();
-
-        $ligne['compte_id'] = $compteVentilation->id;
-        $ligne['debit'] = 0.0;
-        $ligne['credit'] = $montant;
-
-        $c5112 = Compte::firstOrCreate(
-            ['association_id' => (int) $sc->association_id, 'numero_pcg' => '5112'],
-            ['intitule' => 'Chèques à encaisser', 'classe' => 5, 'actif' => true, 'est_systeme' => true, 'lettrable' => false],
-        );
-        TransactionLigne::create([
-            'transaction_id' => $tx->id,
-            'sous_categorie_id' => null,
-            'montant' => $montant,
-            'compte_id' => $c5112->id,
-            'debit' => $montant,
-            'credit' => 0.0,
-        ]);
-    }
-
-    TransactionLigne::create($ligne);
+    $compte5112 = Compte::firstOrCreate(
+        ['association_id' => (int) $compteVentilation->association_id, 'numero_pcg' => '5112'],
+        ['intitule' => 'Chèques à encaisser', 'classe' => 5, 'actif' => true, 'est_systeme' => true, 'lettrable' => false],
+    );
+    TransactionLigne::create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $compte5112->id,
+        'montant' => $montant,
+        'debit' => $montant,
+        'credit' => 0.0,
+    ]);
 
     return $tx;
 }
 
-test('compte de résultat — recette nette zéro avec extourne dans même sous-catégorie', function (): void {
+test('compte de résultat — recette nette zéro avec extourne dans le même compte', function (): void {
     rapportsActAsComptable();
 
-    // Setup catégorie + sous-catégorie recette dans l'exercice 2025 (Sept 2025 → Aug 2026)
-    // code_cerfa permet le mapping SousCategorie → Compte via numero_pcg.
-    $cat = Categorie::create(['nom' => 'Cotisations', 'type' => 'recette']);
-    $sc = SousCategorie::create(['categorie_id' => $cat->id, 'nom' => 'Cotisations séance', 'libelle_article' => 'des cotisations séance', 'code_cerfa' => '706']);
-    Compte::factory()->numero('706')->create(['intitule' => 'Cotisations séance', 'categorie_id' => $cat->id]);
+    $compteVentilation = Compte::factory()->numero('706')->create(['intitule' => 'Cotisations séance']);
     $compte = CompteBancaire::factory()->create();
 
     // Recette +80€ dans l'exercice 2025
-    $origine = rapportsCreateRecetteWithSousCategorie($sc, $compte, 80.0, '2026-03-15');
+    $origine = rapportsCreateRecetteWithCompte($compteVentilation, $compte, 80.0, '2026-03-15');
 
     // Extourner — naît EnAttente, lettrage non créé (cas Recu)
     app(TransactionExtourneService::class)
@@ -102,28 +82,23 @@ test('compte de résultat — recette nette zéro avec extourne dans même sous-
 
     $result = app(CompteResultatBuilder::class)->compteDeResultat(2025);
 
-    // Le détail au niveau sous-catégorie doit refléter la somme nette = 0.
-    // DC-4 : 'sous_categorie_id' porte désormais le compte_id résolu (mapping code_cerfa = numero_pcg).
-    $compteResolu = Compte::where('numero_pcg', $sc->code_cerfa)->first();
-    $produits = collect($result['produits'])->flatMap(fn ($cat) => $cat['sous_categories'] ?? []);
-    $souscat = $produits->firstWhere('sous_categorie_id', $compteResolu->id);
+    $produits = collect($result['produits'])->flatMap(fn ($famille) => $famille['comptes'] ?? []);
+    $compteResultat = $produits->firstWhere('compte_id', $compteVentilation->id);
 
-    expect($souscat)->not->toBeNull('Compte absent du compte de résultat');
-    expect((float) $souscat['montant_n'])->toBe(0.0);
+    expect($compteResultat)->not->toBeNull('Compte absent du compte de résultat');
+    expect((float) $compteResultat['montant_n'])->toBe(0.0);
 });
 
-test('Transaction::sum sur même sous-cat = 0 avec extourne', function (): void {
+test('Transaction::sum sur le même compte = 0 avec extourne', function (): void {
     rapportsActAsComptable();
-    $cat = Categorie::create(['nom' => 'Cotisations', 'type' => 'recette']);
-    $sc = SousCategorie::create(['categorie_id' => $cat->id, 'nom' => 'Cotisations séance', 'libelle_article' => 'des cotisations séance']);
+    $compteVentilation = Compte::factory()->numero('706')->create(['intitule' => 'Cotisations séance']);
     $compte = CompteBancaire::factory()->create();
 
-    $origine = rapportsCreateRecetteWithSousCategorie($sc, $compte, 80.0, '2026-03-15');
+    $origine = rapportsCreateRecetteWithCompte($compteVentilation, $compte, 80.0, '2026-03-15');
     app(TransactionExtourneService::class)
         ->extourner($origine, ExtournePayload::fromOrigine($origine));
 
-    // Detail : 2 lignes de TransactionLigne sur la sous-cat (+80, -80)
-    $lignes = TransactionLigne::where('sous_categorie_id', $sc->id)->get();
+    $lignes = TransactionLigne::where('compte_id', $compteVentilation->id)->get();
     expect($lignes)->toHaveCount(2);
     expect((float) $lignes->sum('montant'))->toBe(0.0);
     expect($lignes->pluck('montant')->map(fn ($m) => (float) $m)->sort()->values()->all())
@@ -146,9 +121,8 @@ test('flux trésorerie cas encaissé — solde compte = ouverture - 80€ après
     ]);
 
     // Origine 80 € Pointe rattachée à R1
-    $cat = Categorie::create(['nom' => 'Cotisations', 'type' => 'recette']);
-    $sc = SousCategorie::create(['categorie_id' => $cat->id, 'nom' => 'Cotisations séance', 'libelle_article' => 'des cotisations séance']);
-    $origine = rapportsCreateRecetteWithSousCategorie($sc, $compte, 80.0, now()->toDateString());
+    $compteVentilation = Compte::factory()->numero('706')->create(['intitule' => 'Cotisations séance']);
+    $origine = rapportsCreateRecetteWithCompte($compteVentilation, $compte, 80.0, now()->toDateString());
     $origine->update([
         'statut_reglement' => StatutReglement::Pointe,
         'rapprochement_id' => $r1->id,
@@ -200,9 +174,8 @@ test('flux trésorerie cas non-encaissé — pas de lettrage, solde rapprochemen
     ]);
 
     // Origine EnAttente
-    $cat = Categorie::create(['nom' => 'Cotisations', 'type' => 'recette']);
-    $sc = SousCategorie::create(['categorie_id' => $cat->id, 'nom' => 'Cotisations séance', 'libelle_article' => 'des cotisations séance']);
-    $origine = rapportsCreateRecetteWithSousCategorie($sc, $compte, 80.0, now()->toDateString());
+    $compteVentilation = Compte::factory()->numero('706')->create(['intitule' => 'Cotisations séance']);
+    $origine = rapportsCreateRecetteWithCompte($compteVentilation, $compte, 80.0, now()->toDateString());
     $origine->update(['statut_reglement' => StatutReglement::EnAttente]);
 
     $extourne = app(TransactionExtourneService::class)

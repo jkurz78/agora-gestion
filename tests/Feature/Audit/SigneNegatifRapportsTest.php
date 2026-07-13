@@ -73,16 +73,16 @@ afterEach(function () {
 // ── Test 1 ────────────────────────────────────────────────────────────────────
 
 it('compte_resultat_somme_correctement_les_negatifs', function () {
-    // +80 et -80 dans la même sous-cat → ∑ = 0
+    // +80 et -80 dans la même compte → ∑ = 0
     $this->makeAuditTransaction('recette', 80.0, $this->sc, $this->compte, 2025);
     $this->makeAuditTransaction('recette', -80.0, $this->sc, $this->compte, 2025);
 
     $builder = app(CompteResultatBuilder::class);
     $result = $builder->compteDeResultat(2025);
 
-    // La sous-catégorie doit avoir montant_n = 0
+    // Le compte doit avoir montant_n = 0
     $totalProduits = collect($result['produits'])->flatMap(
-        fn ($cat) => collect($cat['sous_categories'])->pluck('montant_n')
+        fn ($famille) => collect($famille['comptes'])->pluck('montant_n')
     )->sum();
 
     expect($totalProduits)->toBe(0.0);
@@ -235,7 +235,7 @@ it('rapprochement_service_solde_avec_negatif', function () {
 // ── Test 8 ────────────────────────────────────────────────────────────────────
 
 it('rapport_compte_resultat_livewire_render_dataset_mixte', function () {
-    // +100 recette, -40 recette (même sous-cat) → ∑ produits = 60
+    // +100 recette, -40 recette (même compte) → ∑ produits = 60
     $this->makeAuditTransaction('recette', 100.0, $this->sc, $this->compte, 2025);
     $this->makeAuditTransaction('recette', -40.0, $this->sc, $this->compte, 2025);
 
@@ -284,7 +284,7 @@ it('compte_resultat_avec_transactions_negatives_ET_provisions_PCA', function () 
     $result = $builder->compteDeResultat(2025);
 
     $totalProduits = collect($result['produits'])->flatMap(
-        fn ($cat) => collect($cat['sous_categories'])->pluck('montant_n')
+        fn ($famille) => collect($famille['comptes'])->pluck('montant_n')
     )->sum();
 
     // Tx seule contribue -50 au total des produits

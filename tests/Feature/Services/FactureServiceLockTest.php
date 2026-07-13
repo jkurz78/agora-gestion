@@ -277,7 +277,7 @@ it('update rejette la modification du compte de ventilation sur transaction fact
         'operation_id' => $ligne->operation_id,
         'seance' => $ligne->seance,
         'notes' => $ligne->notes,
-    ]]))->toThrow(RuntimeException::class, 'sous-catégorie');
+    ]]))->toThrow(RuntimeException::class, 'compte');
 });
 
 it('update rejette la modification de operation_id sur transaction facturée', function () {

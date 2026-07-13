@@ -144,7 +144,6 @@ it('generates a balanced 2-line entry for a virement interne', function () {
     expect((float) $ligneDebit->debit)->toBe(1000.00);
     expect((float) $ligneDebit->credit)->toBe(0.00);
     expect($ligneDebit->tiers_id)->toBeNull();
-    expect($ligneDebit->sous_categorie_id)->toBeNull();
     expect($ligneDebit->lettrage_code)->toBeNull();
 
     // Ligne crédit = source (argent part)
@@ -154,7 +153,6 @@ it('generates a balanced 2-line entry for a virement interne', function () {
     expect((float) $ligneCredit->debit)->toBe(0.00);
     expect((float) $ligneCredit->credit)->toBe(1000.00);
     expect($ligneCredit->tiers_id)->toBeNull();
-    expect($ligneCredit->sous_categorie_id)->toBeNull();
     expect($ligneCredit->lettrage_code)->toBeNull();
 });
 

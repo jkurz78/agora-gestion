@@ -10,7 +10,7 @@ use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\DB;
 
 /**
- * DC-8 — dissolution sous_categories → comptes.
+ * DC-8 — dissolution comptes → comptes.
  *
  * `PlanComptableSelecteur::groupesPourType()` est la source de données
  * PARTAGÉE que tout écran de sélection de compte de ventilation (dépense ou

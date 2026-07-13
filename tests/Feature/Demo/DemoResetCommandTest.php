@@ -13,7 +13,6 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Schema;
 use Symfony\Component\Yaml\Yaml;
 
 afterEach(function (): void {
@@ -377,7 +376,6 @@ it('loads the real V2 snapshot on the final account-first schema', function (): 
     expect(SnapshotConfig::SCHEMA_VERSION)->toBe(2);
     expect($snapshot['schema_version'])->toBe(2);
     expect($snapshot['tables'])->toHaveKeys(['comptes', 'familles', 'transaction_lignes']);
-    expect($snapshot['tables'])->not->toHaveKeys(['categories', 'sous_categories']);
 
     $exitCode = $this->artisan('demo:reset', [
         '--snapshot' => $snapshotPath,
@@ -385,12 +383,6 @@ it('loads the real V2 snapshot on the final account-first schema', function (): 
     ])->execute();
 
     expect($exitCode)->toBe(0);
-
-    expect(Schema::hasTable('categories'))->toBeFalse();
-    expect(Schema::hasTable('sous_categories'))->toBeFalse();
-    foreach (['budget_lines', 'devis_lignes', 'facture_lignes', 'transaction_lignes'] as $table) {
-        expect(Schema::hasColumn($table, 'sous_categorie_id'))->toBeFalse();
-    }
 
     expect(Compte::withoutGlobalScopes()->count())->toBeGreaterThan(0);
     expect(Famille::withoutGlobalScopes()->count())->toBeGreaterThan(0);

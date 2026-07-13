@@ -138,7 +138,7 @@ describe('Happy path : 2 lignes MontantManuel → 1 Transaction recette + 2 Tran
         expect($facture->numero)->not->toBeNull();
     });
 
-    it('crée 2 TransactionLignes avec les bons montants et sous_cat', function () {
+    it('crée 2 TransactionLignes avec les bons montants et compte', function () {
         $facture = creerFactureLibre($this->service, $this->tiers->id);
         ajouterLigneLibre($facture, $this->compte, 1200.0, 1.0, 'Mission');
         ajouterLigneLibre($facture, $this->compte, 200.0, 1.0, 'Frais');

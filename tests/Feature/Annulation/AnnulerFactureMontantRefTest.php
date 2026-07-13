@@ -79,7 +79,6 @@ function refCreerFactureValideeAvecRef(
     // Créer une TransactionLigne pour Tref (sans utiliser la factory auto-create)
     TransactionLigne::create([
         'transaction_id' => $tref->id,
-        'sous_categorie_id' => null,
         'montant' => $montant,
     ]);
 
@@ -169,7 +168,6 @@ test('tx ref detachee redevient rattachable a une nouvelle facture', function ()
 
     TransactionLigne::create([
         'transaction_id' => $txExtournee->id,
-        'sous_categorie_id' => null,
         'montant' => 50.0,
     ]);
 

@@ -14,8 +14,8 @@ use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
-// DC-10a : le filtre par usage lit usages_sous_categories.compte_id — les
-// fixtures créent des comptes (classe 7) flaggés, plus de sous-catégories.
+// DC-10a : le filtre par usage lit usages_comptes.compte_id — les
+// fixtures créent des comptes (classe 7) flaggés, plus de comptes.
 function compteRecetteFiltreTest(string $numeroPcg, ?UsageComptable $usage = null): Compte
 {
     $compte = Compte::create([
@@ -33,7 +33,7 @@ function compteRecetteFiltreTest(string $numeroPcg, ?UsageComptable $usage = nul
     return $compte;
 }
 
-it('filters transactions by sous-categorie pour_dons flag', function () {
+it('filters transactions by compte pour_dons flag', function () {
     $compte = CompteBancaire::factory()->create();
     $compteDon = compteRecetteFiltreTest('754T', UsageComptable::Don);
     $compteAutre = compteRecetteFiltreTest('706T');
@@ -76,7 +76,7 @@ it('filters transactions by sous-categorie pour_dons flag', function () {
         ->assertDontSee('Autre transaction cachée');
 });
 
-it('filters transactions by sous-categorie pour_cotisations flag', function () {
+it('filters transactions by compte pour_cotisations flag', function () {
     $compte = CompteBancaire::factory()->create();
     $compteCot = compteRecetteFiltreTest('756T', UsageComptable::Cotisation);
     $compteAutre = compteRecetteFiltreTest('706U');

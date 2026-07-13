@@ -29,7 +29,7 @@ test('provisionAll seede les comptes systeme, bancaires et de gestion une fois l
     expect(Compte::where('numero_pcg', '401')->where('est_systeme', true)->exists())->toBeTrue();
     expect(Compte::where('numero_pcg', '5112')->where('est_systeme', true)->exists())->toBeTrue();
 
-    // Compte de gestion dérivé de la sous-catégorie.
+    // Compte de gestion dérivé de le compte.
     $gestion = Compte::where('numero_pcg', '706')->first();
     expect($gestion)->not->toBeNull();
     expect((int) $gestion->classe)->toBe(7);

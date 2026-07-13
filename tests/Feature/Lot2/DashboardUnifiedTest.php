@@ -13,7 +13,7 @@ use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
-it('shows recent donations from transaction_lignes with pour_dons sous-categorie', function () {
+it('shows recent donations from transaction_lignes with pour_dons compte', function () {
     $compte = CompteBancaire::factory()->create();
     $compteDon = Compte::factory()->numero('754')->pourDons()->create();
     $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Jean']);

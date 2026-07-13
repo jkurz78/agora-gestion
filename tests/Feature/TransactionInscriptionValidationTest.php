@@ -32,7 +32,7 @@ afterEach(function () {
     TenantContext::clear();
 });
 
-it('refuses a transaction ligne with inscription sous-categorie without operation_id', function () {
+it('refuses a transaction ligne with inscription compte without operation_id', function () {
     $data = [
         'type' => 'recette',
         'date' => '2025-10-15',
@@ -53,7 +53,7 @@ it('refuses a transaction ligne with inscription sous-categorie without operatio
         ->toThrow(InvalidArgumentException::class);
 });
 
-it('accepts a transaction ligne with inscription sous-categorie with operation_id', function () {
+it('accepts a transaction ligne with inscription compte with operation_id', function () {
     $operation = Operation::factory()->create();
 
     $data = [
@@ -80,7 +80,7 @@ it('accepts a transaction ligne with inscription sous-categorie with operation_i
         ->and($ventilationLignes->first()->operation_id)->toBe($operation->id);
 });
 
-it('does not require operation_id for non-inscription sous-categorie', function () {
+it('does not require operation_id for non-inscription compte', function () {
     $data = [
         'type' => 'recette',
         'date' => '2025-10-15',

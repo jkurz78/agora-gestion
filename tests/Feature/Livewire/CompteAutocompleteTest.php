@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Enums\UsageComptable;
 use App\Livewire\CompteAutocomplete;
 use App\Models\Association;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\Famille;
 use App\Models\User;
@@ -103,14 +102,11 @@ it('efface la sélection courante', function () {
 });
 
 it('filtre par usage comptable porté par le compte', function () {
-    $catDon = Categorie::factory()->create(['association_id' => $this->asso->id]);
-
     $compteDon = Compte::create([
         'association_id' => $this->asso->id,
         'numero_pcg' => '754',
         'intitule' => 'Dons manuels',
         'classe' => 7,
-        'categorie_id' => $catDon->id,
         'lettrable' => false,
         'actif' => true,
         'est_systeme' => false,
@@ -126,8 +122,6 @@ it('filtre par usage comptable porté par le compte', function () {
 });
 
 it('crée un compte via la modale (compte-first) puis le sélectionne', function () {
-    $cat = Categorie::factory()->create(['association_id' => $this->asso->id]);
-
     Livewire::test(CompteAutocomplete::class)
         ->call('openCreateModal')
         ->set('newIntitule', 'Cotisations annuelles')
@@ -146,8 +140,6 @@ it('crée un compte via la modale (compte-first) puis le sélectionne', function
 });
 
 it('rejette la création sans numero de compte (champ obligatoire)', function () {
-    $cat = Categorie::factory()->create(['association_id' => $this->asso->id]);
-
     Livewire::test(CompteAutocomplete::class)
         ->call('openCreateModal')
         ->set('newIntitule', 'Cotisations annuelles')
@@ -158,8 +150,6 @@ it('rejette la création sans numero de compte (champ obligatoire)', function ()
 });
 
 it('rejette un numéro dont la classe ne correspond pas au filtre', function () {
-    $cat = Categorie::factory()->create(['association_id' => $this->asso->id]);
-
     Livewire::test(CompteAutocomplete::class, ['filtre' => 'recette'])
         ->call('openCreateModal')
         ->set('newIntitule', 'Achat détourné')
@@ -172,8 +162,6 @@ it('rejette un numéro dont la classe ne correspond pas au filtre', function () 
 });
 
 it('réutilise un compte existant sur le même numero_pcg au lieu de planter', function () {
-    $cat = Categorie::factory()->create(['association_id' => $this->asso->id]);
-
     Livewire::test(CompteAutocomplete::class, ['filtre' => 'recette'])
         ->call('openCreateModal')
         ->set('newIntitule', 'Doublon de Formations')

@@ -7,11 +7,8 @@ use App\Models\Association;
 use App\Models\Compte;
 use App\Models\User;
 use App\Tenant\TenantContext;
-use Illuminate\Support\Facades\DB;
 
 /*
- * Step 5 of plans/fondations-partie-double-slice1.md (sous-slice 1a).
- *
  * Verifies that ComptePolicy::update() and ComptePolicy::delete() refuse
  * system accounts (est_systeme=true) regardless of user role, and allow
  * writes by Admin / Comptable on non-system accounts.
@@ -31,73 +28,32 @@ function makeCompteUser(Association $asso, RoleAssociation $role): User
     return $user;
 }
 
-// ── Helper: get or create a Compte row (no factory yet — deferred to Step 9) ──
-//
-// For system comptes (est_systeme=true), the migration 2026_05_20_000003 already
-// seeded '411' for every tenant during RefreshDatabase. We load that existing row
-// rather than inserting a duplicate that would violate the UNIQUE constraint.
-//
-// For non-system comptes, we insert a fresh row with a unique PCG derived from
-// the test's random integer to avoid cross-test collisions within the same DB state.
+// ── Helper: get or create a Compte row ──
 
 function makeCompte(Association $asso, bool $estSysteme): Compte
 {
     if ($estSysteme) {
-        // For system comptes, insert OR retrieve '411' (est_systeme=true).
-        // The SystemeSeeder may or may not have run for this tenant depending on
-        // whether RefreshDatabase replayed the migration before or after the factory
-        // association was created. We use insertOrIgnore to be safe in both cases.
-        DB::table('comptes')->insertOrIgnore([
-            'association_id' => $asso->id,
-            'numero_pcg' => '411',
-            'intitule' => 'Clients',
-            'classe' => 4,
-            'categorie_id' => null,
-            'parent_compte_id' => null,
-            'actif' => true,
-            'est_systeme' => true,
-            'pour_inscriptions' => false,
-            'lettrable' => true,
-            'iban' => null,
-            'bic' => null,
-            'domiciliation' => null,
-            'solde_initial' => null,
-            'date_solde_initial' => null,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        $row = DB::table('comptes')
-            ->where('association_id', $asso->id)
-            ->where('numero_pcg', '411')
-            ->first();
-
-        return Compte::withoutGlobalScopes()->findOrFail($row->id);
+        return Compte::withoutGlobalScopes()->firstOrCreate(
+            [
+                'association_id' => (int) $asso->id,
+                'numero_pcg' => '411',
+            ],
+            [
+                'intitule' => 'Clients',
+                'classe' => 4,
+                'actif' => true,
+                'est_systeme' => true,
+                'pour_inscriptions' => false,
+                'lettrable' => true,
+            ],
+        );
     }
 
-    // Non-system compte: use a PCG that won't collide with class-6/7 seeds
-    // (the sous_categories seed is empty in RefreshDatabase — we own this number).
-    $id = DB::table('comptes')->insertGetId([
-        'association_id' => $asso->id,
-        'numero_pcg' => '999',
-        'intitule' => 'Compte test non-système',
+    return Compte::factory()->numero('999')->create([
+        'association_id' => (int) $asso->id,
         'classe' => 9,
-        'categorie_id' => null,
-        'parent_compte_id' => null,
-        'actif' => true,
         'est_systeme' => false,
-        'pour_inscriptions' => false,
-        'lettrable' => false,
-        'iban' => null,
-        'bic' => null,
-        'domiciliation' => null,
-        'solde_initial' => null,
-        'date_solde_initial' => null,
-        'created_at' => now(),
-        'updated_at' => now(),
     ]);
-
-    return Compte::withoutGlobalScopes()->findOrFail($id);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

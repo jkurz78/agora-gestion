@@ -19,7 +19,7 @@ beforeEach(function () {
     Famille::create(['association_id' => $tenantId, 'code' => '61', 'nom' => 'Charges']);
     Famille::create(['association_id' => $tenantId, 'code' => '75', 'nom' => 'Produits']);
 
-    // Comptes classe 6/7 → CompteObserver matérialise la famille + la sous-catégorie miroir
+    // Comptes classes 6/7 : CompteObserver matérialise leur famille par préfixe.
     $this->scLoyers = Compte::factory()->numero('613')->create(['intitule' => 'Loyers']);
     $this->scElec = Compte::factory()->numero('616')->create(['intitule' => 'Électricité']);
     $this->scCotis = Compte::factory()->numero('756')->create(['intitule' => 'Cotisations']);
@@ -62,7 +62,7 @@ beforeEach(function () {
 it('retourne les lignes dans l\'ordre dépenses puis recettes', function () {
     $rows = app(BudgetExportService::class)->rows(2026, 'zero', 2026);
 
-    $noms = array_column($rows, 2); // col 2 = sous_categorie
+    $noms = array_column($rows, 2); // col 2 = intitulé du compte
     $posLoyers = array_search('Loyers', $noms);
     $posCotis = array_search('Cotisations', $noms);
     expect($posLoyers)->toBeLessThan($posCotis);
@@ -87,7 +87,7 @@ it('source zero produit des montants vides', function () {
 it('source realise remplit les montants non nuls, laisse vide les zéros', function () {
     $rows = app(BudgetExportService::class)->rows(2026, 'realise', 2025);
 
-    $byName = array_column($rows, null, 2); // col 2 = sous_categorie
+    $byName = array_column($rows, null, 2); // col 2 = intitulé du compte
     expect($byName['Loyers'][3])->toBe('1200.00');
     expect($byName['Électricité'][3])->toBe('');   // pas de transaction → vide
     expect($byName['Cotisations'][3])->toBe('850.00');
@@ -100,7 +100,7 @@ it('source budget exporte les montants_prevu de la table budget_lines', function
 
     $rows = app(BudgetExportService::class)->rows(2026, 'budget', 2025);
 
-    $byName = array_column($rows, null, 2); // col 2 = sous_categorie
+    $byName = array_column($rows, null, 2); // col 2 = intitulé du compte
     expect($byName['Loyers'][3])->toBe('900.00');
     expect($byName['Électricité'][3])->toBe('');
     expect($byName['Cotisations'][3])->toBe('700.00');

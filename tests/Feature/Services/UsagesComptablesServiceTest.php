@@ -2,10 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Enums\TypeCategorie;
 use App\Enums\UsageComptable;
 use App\Models\Association;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Services\UsagesComptablesService;
 use App\Tenant\TenantContext;
@@ -14,25 +12,23 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 /**
  * DC-8 : le service accepte des ids de comptes (classe 6/7).
  */
-function creerCompteVentilation(Association $asso, Categorie $cat, string $codeCerfa): Compte
+function creerCompteVentilation(Association $asso, string $numeroPcg): Compte
 {
-    return Compte::factory()->numero($codeCerfa)->create([
+    return Compte::factory()->numero($numeroPcg)->create([
         'association_id' => $asso->id,
-        'categorie_id' => $cat->id,
+        'classe' => (int) substr($numeroPcg, 0, 1),
     ]);
 }
 
 beforeEach(function () {
     $this->asso = Association::factory()->create();
     TenantContext::boot($this->asso);
-    $this->catR = Categorie::factory()->for($this->asso, 'association')->create(['type' => TypeCategorie::Recette]);
-    $this->catD = Categorie::factory()->for($this->asso, 'association')->create(['type' => TypeCategorie::Depense]);
     $this->service = app(UsagesComptablesService::class);
 });
 
 it('setFraisKilometriques poses the link and removes previous', function () {
-    $compte1 = creerCompteVentilation($this->asso, $this->catD, '625A');
-    $compte2 = creerCompteVentilation($this->asso, $this->catD, '625B');
+    $compte1 = creerCompteVentilation($this->asso, '625A');
+    $compte2 = creerCompteVentilation($this->asso, '625B');
 
     $this->service->setFraisKilometriques($compte1->id);
     expect($compte1->fresh()->hasUsage(UsageComptable::FraisKilometriques))->toBeTrue();
@@ -43,14 +39,14 @@ it('setFraisKilometriques poses the link and removes previous', function () {
 });
 
 it('setFraisKilometriques(null) clears', function () {
-    $compte = creerCompteVentilation($this->asso, $this->catD, '625A');
+    $compte = creerCompteVentilation($this->asso, '625A');
     $this->service->setFraisKilometriques($compte->id);
     $this->service->setFraisKilometriques(null);
     expect($compte->fresh()->hasUsage(UsageComptable::FraisKilometriques))->toBeFalse();
 });
 
 it('toggleDon / toggleCotisation / toggleInscription are idempotent', function () {
-    $compte = creerCompteVentilation($this->asso, $this->catR, '754A');
+    $compte = creerCompteVentilation($this->asso, '754A');
     $this->service->toggleDon($compte->id, true);
     $this->service->toggleDon($compte->id, true);
     expect($compte->fresh()->usages()->where('usage', UsageComptable::Don->value)->count())->toBe(1);
@@ -60,19 +56,19 @@ it('toggleDon / toggleCotisation / toggleInscription are idempotent', function (
 });
 
 it('setAbandonCreance on non-Don compte throws', function () {
-    $compte = creerCompteVentilation($this->asso, $this->catR, '771A');
+    $compte = creerCompteVentilation($this->asso, '771A');
     expect(fn () => $this->service->setAbandonCreance($compte->id))->toThrow(DomainException::class);
 });
 
 it('setAbandonCreance on Don compte succeeds', function () {
-    $compte = creerCompteVentilation($this->asso, $this->catR, '754A');
+    $compte = creerCompteVentilation($this->asso, '754A');
     $this->service->toggleDon($compte->id, true);
     $this->service->setAbandonCreance($compte->id);
     expect($compte->fresh()->hasUsage(UsageComptable::AbandonCreance))->toBeTrue();
 });
 
 it('toggleDon(false) cascades and removes AbandonCreance', function () {
-    $compte = creerCompteVentilation($this->asso, $this->catR, '754A');
+    $compte = creerCompteVentilation($this->asso, '754A');
     $this->service->toggleDon($compte->id, true);
     $this->service->setAbandonCreance($compte->id);
     $this->service->toggleDon($compte->id, false);
@@ -82,7 +78,6 @@ it('toggleDon(false) cascades and removes AbandonCreance', function () {
 
 it('createAndFlag creates a compte and posts the pivot link', function () {
     $compte = $this->service->createAndFlag([
-        'categorie_id' => $this->catR->id,
         'intitule' => 'Nouveau compte',
         'numero_pcg' => '758A',
     ], UsageComptable::Cotisation);
@@ -94,7 +89,6 @@ it('createAndFlag creates a compte and posts the pivot link', function () {
 
 it('createAndFlag throws on empty numero_pcg', function () {
     expect(fn () => $this->service->createAndFlag([
-        'categorie_id' => $this->catR->id,
         'intitule' => 'Nouveau compte',
         'numero_pcg' => '',
     ], UsageComptable::Cotisation))->toThrow(DomainException::class);
@@ -103,17 +97,15 @@ it('createAndFlag throws on empty numero_pcg', function () {
 it('createAndFlag throws on wrong-classe numero_pcg', function () {
     // Cotisation est une Recette (classe 7 attendue) — '606' est classe 6.
     expect(fn () => $this->service->createAndFlag([
-        'categorie_id' => $this->catR->id,
         'intitule' => 'Nouveau compte',
         'numero_pcg' => '606',
     ], UsageComptable::Cotisation))->toThrow(DomainException::class);
 });
 
 it('createAndFlag reuses an existing compte with the same numero_pcg', function () {
-    $existing = creerCompteVentilation($this->asso, $this->catR, '754A');
+    $existing = creerCompteVentilation($this->asso, '754A');
 
     $compte = $this->service->createAndFlag([
-        'categorie_id' => $this->catR->id,
         'intitule' => 'Intitulé ignoré (compte déjà existant)',
         'numero_pcg' => '754A',
     ], UsageComptable::Cotisation);
@@ -124,7 +116,6 @@ it('createAndFlag reuses an existing compte with the same numero_pcg', function 
 
 it('createAndFlag(AbandonCreance) also posts Don', function () {
     $compte = $this->service->createAndFlag([
-        'categorie_id' => $this->catR->id,
         'intitule' => 'Abandon de créance',
         'numero_pcg' => '771',
     ], UsageComptable::AbandonCreance);
@@ -137,8 +128,7 @@ it('createAndFlag(AbandonCreance) also posts Don', function () {
 it('is tenant-scoped', function () {
     $asso2 = Association::factory()->create();
     TenantContext::boot($asso2);
-    $catR2 = Categorie::factory()->for($asso2, 'association')->create(['type' => TypeCategorie::Recette]);
-    $compte2 = creerCompteVentilation($asso2, $catR2, '754A');
+    $compte2 = creerCompteVentilation($asso2, '754A');
 
     TenantContext::boot($this->asso);
     expect(fn () => $this->service->toggleDon($compte2->id, true))->toThrow(ModelNotFoundException::class);

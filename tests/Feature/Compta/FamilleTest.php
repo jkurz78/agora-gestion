@@ -2,43 +2,40 @@
 
 declare(strict_types=1);
 
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\Famille;
-use App\Services\Compta\Migrations\FamillesSeeder;
 use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\Collection;
 
 /**
- * DC-1 — dissolution sous_categories → comptes.
- *
  * La table `familles` nomme un préfixe à 2 chiffres (classes 6/7 du PCG).
  * Le rattachement compte → famille est DÉRIVÉ par préfixe (pas de FK).
- * `FamillesSeeder::seed()` porte la logique de migration de données pour
- * pouvoir être rejouée en test sans dérouler la migration complète.
  */
-it('migre les categories existantes en familles (parse "NN - Nom")', function () {
+it('crée automatiquement une famille à partir du préfixe d un compte', function () {
     $associationId = TenantContext::currentId();
 
-    Categorie::factory()->create([
+    Compte::create([
         'association_id' => $associationId,
-        'nom' => '74 - Subventions',
-        'type' => 'recette',
+        'numero_pcg' => '741',
+        'intitule' => 'Subventions',
+        'classe' => 7,
+        'actif' => true,
+        'est_systeme' => false,
+        'lettrable' => false,
+        'pour_inscriptions' => false,
     ]);
-
-    FamillesSeeder::seed();
 
     $famille = Famille::where('code', '74')->first();
 
     expect($famille)->not->toBeNull()
-        ->and($famille->nom)->toBe('Subventions')
+        ->and($famille->nom)->toBe('74')
         ->and((int) $famille->association_id)->toBe((int) $associationId);
 });
 
-it('crée une famille code=nom pour les préfixes de comptes 6/7 sans catégorie', function () {
+it('crée une famille code=nom pour un nouveau préfixe de compte 6/7', function () {
     $associationId = TenantContext::currentId();
 
-    Compte::forceCreate([
+    Compte::create([
         'association_id' => $associationId,
         'numero_pcg' => '781',
         'intitule' => 'Reprises sur provisions',
@@ -49,8 +46,6 @@ it('crée une famille code=nom pour les préfixes de comptes 6/7 sans catégorie
         'pour_inscriptions' => false,
     ]);
 
-    FamillesSeeder::seed();
-
     $famille = Famille::where('code', '78')->first();
 
     expect($famille)->not->toBeNull()
@@ -60,14 +55,26 @@ it('crée une famille code=nom pour les préfixes de comptes 6/7 sans catégorie
 it('ne duplique pas une famille existante (unique par association)', function () {
     $associationId = TenantContext::currentId();
 
-    Categorie::factory()->create([
+    Compte::create([
         'association_id' => $associationId,
-        'nom' => '70 - Ventes et prestations',
-        'type' => 'recette',
+        'numero_pcg' => '706',
+        'intitule' => 'Prestations',
+        'classe' => 7,
+        'actif' => true,
+        'est_systeme' => false,
+        'lettrable' => false,
+        'pour_inscriptions' => false,
     ]);
-
-    FamillesSeeder::seed();
-    FamillesSeeder::seed();
+    Compte::create([
+        'association_id' => $associationId,
+        'numero_pcg' => '708',
+        'intitule' => 'Produits annexes',
+        'classe' => 7,
+        'actif' => true,
+        'est_systeme' => false,
+        'lettrable' => false,
+        'pour_inscriptions' => false,
+    ]);
 
     $count = Famille::where('code', '70')->count();
 

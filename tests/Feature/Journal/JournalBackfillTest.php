@@ -54,7 +54,6 @@ it('[BF1] recette avec ligne classe 7 (+ ligne classe 4) → journal=vente', fun
         'debit' => 0.0,
         'credit' => 100.0,
         'montant' => 100.0,
-        'sous_categorie_id' => null,
     ]);
     TransactionLigne::create([
         'transaction_id' => $tx->id,
@@ -62,7 +61,6 @@ it('[BF1] recette avec ligne classe 7 (+ ligne classe 4) → journal=vente', fun
         'debit' => 100.0,
         'credit' => 0.0,
         'montant' => 100.0,
-        'sous_categorie_id' => null,
     ]);
 
     forceJournalNull($tx);
@@ -84,7 +82,6 @@ it('[BF2] dépense avec ligne classe 6 (+ ligne classe 4) → journal=achat', fu
         'debit' => 50.0,
         'credit' => 0.0,
         'montant' => 50.0,
-        'sous_categorie_id' => null,
     ]);
     TransactionLigne::create([
         'transaction_id' => $tx->id,
@@ -92,7 +89,6 @@ it('[BF2] dépense avec ligne classe 6 (+ ligne classe 4) → journal=achat', fu
         'debit' => 0.0,
         'credit' => 50.0,
         'montant' => 50.0,
-        'sous_categorie_id' => null,
     ]);
 
     forceJournalNull($tx);
@@ -113,7 +109,6 @@ it('[BF3] recette avec uniquement des lignes classe 5 → journal=banque', funct
         'debit' => 0.0,
         'credit' => 200.0,
         'montant' => 200.0,
-        'sous_categorie_id' => null,
     ]);
 
     forceJournalNull($tx);
@@ -150,7 +145,6 @@ it('[BF4] idempotence — deuxième appel ne modifie pas les journaux déjà ren
         'debit' => 0.0,
         'credit' => 100.0,
         'montant' => 100.0,
-        'sous_categorie_id' => null,
     ]);
     forceJournalNull($tx1);
 
@@ -162,7 +156,6 @@ it('[BF4] idempotence — deuxième appel ne modifie pas les journaux déjà ren
         'debit' => 50.0,
         'credit' => 0.0,
         'montant' => 50.0,
-        'sous_categorie_id' => null,
     ]);
     forceJournalNull($tx2);
 
@@ -174,7 +167,6 @@ it('[BF4] idempotence — deuxième appel ne modifie pas les journaux déjà ren
         'debit' => 0.0,
         'credit' => 80.0,
         'montant' => 80.0,
-        'sous_categorie_id' => null,
     ]);
     forceJournalNull($tx3);
 

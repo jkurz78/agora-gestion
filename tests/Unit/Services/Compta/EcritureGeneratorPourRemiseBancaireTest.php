@@ -481,7 +481,6 @@ test('pourRemiseBancaire lève InvalidArgumentException pour un mode non support
         'tiers_id' => $pierre->id,
         'libelle' => 'Fake',
         'montant' => 0,
-        'sous_categorie_id' => null,
     ]);
 
     $generator = app(EcritureGenerator::class);
@@ -542,7 +541,6 @@ test('pourRemiseBancaire lève InvalidArgumentException si lignes sources sur co
         'tiers_id' => $pierre->id,
         'libelle' => 'Mix5112',
         'montant' => 0,
-        'sous_categorie_id' => null,
     ]);
 
     // Ligne sur 530 (compte différent)
@@ -562,7 +560,6 @@ test('pourRemiseBancaire lève InvalidArgumentException si lignes sources sur co
         'tiers_id' => $paul->id,
         'libelle' => 'Mix530',
         'montant' => 0,
-        'sous_categorie_id' => null,
     ]);
 
     $generator = app(EcritureGenerator::class);

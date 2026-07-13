@@ -51,20 +51,18 @@ it('creerDepuisTransaction : adhésion créée depuis ligne parent (option_id IS
     // Supprimer les lignes auto-créées par Transaction::configure()
     TransactionLigne::where('transaction_id', $tx->id)->delete();
 
-    // Ligne parent cotisation (montant=0) — DC-10a : une ligne à 0 € ne porte pas
-    // de compte (invariant XOR) ; la détection cotisation passe par la paire
-    // HelloAsso (form_slug + tier_id).
-    $ligneParent = TransactionLigne::factory()->create([
+    // Ligne parent cotisation à 0 € : le schéma final impose un compte ;
+    // l'événement est neutralisé pour représenter le palier HelloAsso gratuit.
+    $ligneParent = TransactionLigne::withoutEvents(fn (): TransactionLigne => TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'compte_id' => null,
-        'sous_categorie_id' => null,
+        'compte_id' => $this->scCotisation->id,
         'montant' => 0.00,
         'helloasso_item_id' => 87070,
         'helloasso_option_id' => null,
         'helloasso_tier_id' => 18595,
-    ]);
+    ]));
 
-    // Ligne option (montant=12€) — même sous-cat que le parent
+    // Ligne option (montant=12€) — même compte que le parent
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
         'compte_id' => $this->scCotisation->id,
@@ -91,7 +89,7 @@ it('creerDepuisTransaction : adhésion créée depuis ligne parent (option_id IS
 
 it('creerDepuisTransaction : pas d\'adhésion si seule une ligne option cotisation existe (sans ligne parent)', function (): void {
     // Si pour une raison quelconque on n'a qu'une ligne option (option_id non-null)
-    // avec une sous-cat cotisation, aucune adhésion ne doit être créée.
+    // avec un compte cotisation, aucune adhésion ne doit être créée.
     // (Ce cas ne devrait pas se produire en production mais on teste la robustesse.)
     $tx = Transaction::factory()->create([
         'type' => 'recette',

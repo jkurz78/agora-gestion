@@ -42,7 +42,6 @@ test('lettrer deux lignes equilibrees sur compte lettrable avec code fourni → 
         'debit' => '100.00',
         'credit' => '0.00',
         'montant' => 100,
-        'sous_categorie_id' => null,
     ]);
 
     $ligne2 = TransactionLigne::create([
@@ -51,7 +50,6 @@ test('lettrer deux lignes equilibrees sur compte lettrable avec code fourni → 
         'debit' => '0.00',
         'credit' => '100.00',
         'montant' => 100,
-        'sous_categorie_id' => null,
     ]);
 
     $service = app(LettrageService::class);
@@ -96,7 +94,6 @@ test('lettrer deux lignes equilibrees sans code → code généré de 20 caract�
         'debit' => '50.00',
         'credit' => '0.00',
         'montant' => 50,
-        'sous_categorie_id' => null,
     ]);
 
     $ligne2 = TransactionLigne::create([
@@ -105,7 +102,6 @@ test('lettrer deux lignes equilibrees sans code → code généré de 20 caract�
         'debit' => '0.00',
         'credit' => '50.00',
         'montant' => 50,
-        'sous_categorie_id' => null,
     ]);
 
     $service = app(LettrageService::class);
@@ -139,7 +135,6 @@ test('lettrer sur compte non lettrable → CompteNonLettrableException sans écr
         'debit' => '75.00',
         'credit' => '0.00',
         'montant' => 75,
-        'sous_categorie_id' => null,
     ]);
 
     $ligne2 = TransactionLigne::create([
@@ -148,7 +143,6 @@ test('lettrer sur compte non lettrable → CompteNonLettrableException sans écr
         'debit' => '0.00',
         'credit' => '75.00',
         'montant' => 75,
-        'sous_categorie_id' => null,
     ]);
 
     $service = app(LettrageService::class);
@@ -196,7 +190,6 @@ test('lettrer des lignes sur comptes différents → LettrageMultiComptesExcepti
         'debit' => '100.00',
         'credit' => '0.00',
         'montant' => 100,
-        'sous_categorie_id' => null,
     ]);
 
     $ligne2 = TransactionLigne::create([
@@ -205,7 +198,6 @@ test('lettrer des lignes sur comptes différents → LettrageMultiComptesExcepti
         'debit' => '0.00',
         'credit' => '100.00',
         'montant' => 100,
-        'sous_categorie_id' => null,
     ]);
 
     $service = app(LettrageService::class);
@@ -237,7 +229,6 @@ test('lettrer des lignes non equilibrees → LettrageNonEquilibreException', fun
         'debit' => '100.00',
         'credit' => '0.00',
         'montant' => 100,
-        'sous_categorie_id' => null,
     ]);
 
     $ligne2 = TransactionLigne::create([
@@ -246,7 +237,6 @@ test('lettrer des lignes non equilibrees → LettrageNonEquilibreException', fun
         'debit' => '0.00',
         'credit' => '90.00',  // Pas équilibré : 100 - 90 ≠ 0
         'montant' => 90,
-        'sous_categorie_id' => null,
     ]);
 
     $service = app(LettrageService::class);
@@ -279,7 +269,6 @@ test('lettrer une ligne déjà lettrée → LettrageDejaPresentException', funct
         'credit' => '0.00',
         'lettrage_code' => 'DEJLETTRE123456789A', // déjà lettrée
         'montant' => 100,
-        'sous_categorie_id' => null,
     ]);
 
     $ligne2 = TransactionLigne::create([
@@ -288,7 +277,6 @@ test('lettrer une ligne déjà lettrée → LettrageDejaPresentException', funct
         'debit' => '0.00',
         'credit' => '100.00',
         'montant' => 100,
-        'sous_categorie_id' => null,
     ]);
 
     $service = app(LettrageService::class);
@@ -323,7 +311,6 @@ test('lettrer une ligne appartenant à un autre tenant → TenantBoundaryExcepti
         'debit' => '100.00',
         'credit' => '0.00',
         'montant' => 100,
-        'sous_categorie_id' => null,
     ]);
 
     // Créer le tenant B et une ligne appartenant à B
@@ -349,7 +336,6 @@ test('lettrer une ligne appartenant à un autre tenant → TenantBoundaryExcepti
         'debit' => '0.00',
         'credit' => '100.00',
         'montant' => 100,
-        'sous_categorie_id' => null,
     ]);
 
     // Revenir au tenant A
@@ -392,7 +378,6 @@ test('ligne audit contient transaction_ligne_ids JSON exact, user_id, motif, ass
         'debit' => '200.00',
         'credit' => '0.00',
         'montant' => 200,
-        'sous_categorie_id' => null,
     ]);
 
     $ligne2 = TransactionLigne::create([
@@ -401,7 +386,6 @@ test('ligne audit contient transaction_ligne_ids JSON exact, user_id, motif, ass
         'debit' => '0.00',
         'credit' => '200.00',
         'montant' => 200,
-        'sous_categorie_id' => null,
     ]);
 
     $service = app(LettrageService::class);
@@ -449,7 +433,6 @@ test('code fourni en argument est respecté — retour et transaction_lignes coh
         'debit' => '300.00',
         'credit' => '0.00',
         'montant' => 300,
-        'sous_categorie_id' => null,
     ]);
 
     $ligne2 = TransactionLigne::create([
@@ -458,7 +441,6 @@ test('code fourni en argument est respecté — retour et transaction_lignes coh
         'debit' => '0.00',
         'credit' => '300.00',
         'montant' => 300,
-        'sous_categorie_id' => null,
     ]);
 
     $codeFixe = 'CODEFIXTESTCODE12345'; // exactement 20 chars
@@ -499,7 +481,6 @@ test('lettrer deux lignes equilibrees mais de tiers differents → LettrageTiers
         'credit' => '0.00',
         'tiers_id' => $tiersA->id,
         'montant' => 0,
-        'sous_categorie_id' => null,
     ]);
 
     $ligneB = TransactionLigne::create([
@@ -509,7 +490,6 @@ test('lettrer deux lignes equilibrees mais de tiers differents → LettrageTiers
         'credit' => '100.00',
         'tiers_id' => $tiersB->id,
         'montant' => 0,
-        'sous_categorie_id' => null,
     ]);
 
     $service = app(LettrageService::class);

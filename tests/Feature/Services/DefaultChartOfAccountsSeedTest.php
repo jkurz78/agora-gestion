@@ -15,7 +15,7 @@ it('seeds 625A with FraisKilometriques and 771 with Don+AbandonCreance', functio
     $result = (new DefaultChartOfAccountsService)->applyTo($asso);
 
     expect($result)->toHaveKeys(['familles', 'comptes'])
-        ->not->toHaveKeys(['categories', 'sous_categories']);
+        ->and(array_keys($result))->toHaveCount(2);
 
     $km = Compte::where('numero_pcg', '625A')->firstOrFail();
     expect($km->hasUsage(UsageComptable::FraisKilometriques))->toBeTrue();

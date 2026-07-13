@@ -4,7 +4,6 @@ use App\Livewire\BudgetTable;
 use App\Models\Association;
 use App\Models\BudgetLine;
 use App\Models\Compte;
-use App\Models\SousCategorie;
 use App\Models\User;
 use App\Services\ExerciceService;
 use App\Tenant\TenantContext;
@@ -18,8 +17,7 @@ beforeEach(function () {
     session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
 
-    // DC-8/DC-10a : l'écran budget est clé par compte — création directe des
-    // Comptes affichés par la table (plus de SousCategorie intermédiaire).
+    // L'écran budget est clé par compte : création directe des comptes affichés.
     $this->depenseCompte = Compte::factory()->numero('606')->create([
         'association_id' => $this->association->id,
         'intitule' => 'SC Depense',

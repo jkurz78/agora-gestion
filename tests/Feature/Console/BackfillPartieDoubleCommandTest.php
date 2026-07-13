@@ -51,7 +51,7 @@ uses(RefreshDatabase::class);
 /**
  * Construit la fixture minimale nécessaire aux tests Step 32 :
  * - 2 recettes comptant (1 chèque + 1 virement)
- * - 1 sous-catégorie sans code_cerfa (pour tester la section "SC sans code_cerfa")
+ * - 1 ventilation non convertible (pour tester le rapport d'anomalie)
  */
 function setupBackfillFixtureStep32(object $ctx): void
 {
@@ -271,9 +271,8 @@ function setupBackfillFixtureStep33Legacy(object $ctx): void
         });
 
     // Simuler état LEGACY : supprimer les lignes PD-only (411/401/512X) et reset equilibree
-    // Pour chaque Tx, supprimer les lignes sans montant legacy (les lignes PD sont celles
-    // créées par EcritureGenerator : elles ont montant=0 ET compte_id non null ET sous_categorie_id null)
-    // Et les lignes de ventilation restent (sous_categorie_id non null).
+    // Pour chaque transaction, supprimer les lignes techniques de classes 4/5 ;
+    // les lignes de ventilation par compte restent présentes.
     Transaction::query()
         ->where('association_id', $ctx->association->id)
         ->each(function (Transaction $tx) {
@@ -826,7 +825,7 @@ function simulerLegacySurTx(Transaction $tx): void
         }
     }
 
-    // Étape 1 : supprimer les lignes PD-only de T1 (411/401, sous_cat=null, compte_id not null)
+    // Étape 1 : supprimer les lignes techniques de T1 (411/401).
     TransactionLigne::where('transaction_id', $tx->id)
         ->whereHas('compte', fn ($query) => $query->whereIn('classe', [4, 5]))
         ->forceDelete();

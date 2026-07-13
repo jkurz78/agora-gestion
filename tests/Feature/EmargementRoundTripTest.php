@@ -61,4 +61,4 @@ it('generates an emargement PDF that the QR extractor can read back', function (
     } finally {
         @unlink($tempPdf);
     }
-});
+})->skip(fn (): bool => ! extension_loaded('imagick'), 'Imagick requis pour la rasterisation PDF');

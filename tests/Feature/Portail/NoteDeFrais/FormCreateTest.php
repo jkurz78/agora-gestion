@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 use App\Enums\StatutNoteDeFrais;
 use App\Enums\StatutOperation;
-use App\Enums\TypeCategorie;
 use App\Livewire\Portail\NoteDeFrais\Form;
 use App\Models\Association;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
@@ -175,14 +173,10 @@ it('form create: page affichée avec le bouton Ajouter une ligne de dépense', f
 });
 
 // ---------------------------------------------------------------------------
-// Test 7 : Sous-catégories et opérations disponibles dans le render (via component)
+// Test 7 : Comptes et opérations disponibles dans le render (via component)
 // ---------------------------------------------------------------------------
 
-it('form create: sous-catégories accessibles via le composant', function () {
-    $catDepense = Categorie::factory()->create([
-        'association_id' => $this->asso->id,
-        'type' => TypeCategorie::Depense,
-    ]);
+it('form create: comptes accessibles via le composant', function () {
     Compte::create([
         'association_id' => $this->asso->id,
         'numero_pcg' => '625T',
@@ -205,11 +199,11 @@ it('form create: sous-catégories accessibles via le composant', function () {
     $component = new Form;
     $component->mount($this->asso);
 
-    // Les sous-catégories et opérations sont bien chargées dans render()
+    // Les comptes et opérations sont bien chargés dans render().
     $view = $component->render();
     $data = $view->getData();
 
-    expect($data['sousCategories']->pluck('intitule')->toArray())->toContain('Transport');
+    expect($data['comptes']->pluck('intitule')->toArray())->toContain('Transport');
     expect($data['operations']->pluck('nom')->toArray())->toContain('Op Active');
     expect($data['operations']->pluck('nom')->toArray())->not->toContain('Op Clôturée');
 });
@@ -251,27 +245,18 @@ it('form create: upload justificatif stocké dans storage tenant', function () {
 });
 
 // ---------------------------------------------------------------------------
-// Test 9 : render() filtre les sous-catégories sur type=Depense uniquement
+// Test 9 : render() filtre les comptes sur la classe 6 uniquement
 // ---------------------------------------------------------------------------
 
 it('form create: render filtre les comptes de charge (classe 6) uniquement', function () {
-    $catDepense = Categorie::factory()->create([
-        'association_id' => $this->asso->id,
-        'type' => TypeCategorie::Depense,
-    ]);
-    $catRecette = Categorie::factory()->create([
-        'association_id' => $this->asso->id,
-        'type' => TypeCategorie::Recette,
-    ]);
-
-    $compteDepense = Compte::create([
+    Compte::create([
         'association_id' => $this->asso->id,
         'numero_pcg' => '625FK',
         'intitule' => 'Frais kilométriques',
         'classe' => 6,
         'actif' => true,
     ]);
-    $compteRecette = Compte::create([
+    Compte::create([
         'association_id' => $this->asso->id,
         'numero_pcg' => '756CM',
         'intitule' => 'Cotisation membre',
@@ -286,7 +271,7 @@ it('form create: render filtre les comptes de charge (classe 6) uniquement', fun
     $view = $component->render();
     $data = $view->getData();
 
-    expect($data['sousCategories']->pluck('intitule')->toArray())
+    expect($data['comptes']->pluck('intitule')->toArray())
         ->toContain('Frais kilométriques')
         ->not->toContain('Cotisation membre');
 });

@@ -57,16 +57,6 @@ it('importe un CSV valide avec des colonnes compte et compte_bancaire non ambigu
         ->and((float) $ligne->credit)->toBe(0.0);
 });
 
-it('refuse explicitement les anciens en-têtes comptables', function () {
-    $csv = "date;reference;sous_categorie;montant_ligne;mode_paiement;compte_bancaire;libelle;tiers;operation;seance;notes\n"
-        ."2024-09-15;FAC-001;Fournitures;100.00;virement;Compte principal;Achat test;;;;\n";
-
-    $result = app(CsvImportService::class)->import(makeCsvFile($csv), 'depense');
-
-    expect($result->success)->toBeFalse()
-        ->and($result->errors[0]['message'])->toContain('compte');
-});
-
 it('refuse un en-tête dont les colonnes sont réordonnées', function () {
     $csv = "reference;date;compte;montant_ligne;mode_paiement;compte_bancaire;libelle;tiers;operation;seance;notes\n"
         ."FAC-001;2024-09-15;Fournitures;100.00;virement;Compte principal;Achat test;;;;\n";

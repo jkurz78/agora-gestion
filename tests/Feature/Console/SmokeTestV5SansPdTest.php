@@ -247,7 +247,7 @@ test('[J] smoke-test-v5 : Tx à 0 € sans PD → exemptée par design, exit 0',
 
     // Miroir de l'exemption TransactionConverter::convertir() : montant_total = 0
     // (ex. cotisation HelloAsso offerte par code promo) → aucune écriture PD possible
-    // ni souhaitable. Le smoke test ne doit pas la compter comme échappée.
+    // ni souhaitable. Le smoke test ne doit pas le compter comme échappée.
     creerTxVentilationSansPd($asso, [
         'montant_total' => 0.00,
         'helloasso_order_id' => 99999,

@@ -31,7 +31,6 @@ function makeLignePDG(Transaction $tx, Compte $compte, float $debit, float $cred
 {
     return TransactionLigne::create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => null,
         'operation_id' => null,
         'seance' => null,
         'montant' => max($debit, $credit),
@@ -79,18 +78,16 @@ test('[3] equilibree=false — assertComplete lève PartieDoubleIncompleteExcept
 // Test 4 : equilibree=true mais aucune ligne avec compte_id → lève sansLignes
 // ---------------------------------------------------------------------------
 
-test('[4] equilibree=true sans lignes PD — assertComplete lève PartieDoubleIncompleteException::sansLignes', function () {
+test('[4] equilibree=true sans lignes comptables — assertComplete lève PartieDoubleIncompleteException::sansLignes', function () {
     config()->set('compta.use_partie_double', true);
 
-    // La factory crée des lignes sans compte_id par défaut
     $tx = Transaction::factory()->create([
         'association_id' => TenantContext::currentId(),
         'equilibree' => true,
         'helloasso_order_id' => null,
     ]);
 
-    // S'assurer qu'aucune ligne n'a de compte_id
-    $tx->lignes()->update(['compte_id' => null]);
+    $tx->lignes()->forceDelete();
 
     expect(fn () => PartieDoubleGuard::assertComplete($tx))
         ->toThrow(PartieDoubleIncompleteException::class, 'aucune ligne comptable');

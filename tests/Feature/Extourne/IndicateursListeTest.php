@@ -42,7 +42,6 @@ function indicCreateRecette(?CompteBancaire $compte = null): Transaction
     ]);
     TransactionLigne::create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => null,
         'montant' => 80,
     ]);
 

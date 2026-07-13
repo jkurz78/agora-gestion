@@ -24,7 +24,7 @@ beforeEach(function (): void {
     $this->tiers = Tiers::factory()->create();
 });
 
-it('observer applique la formule active de la sous-catégorie (priorité 2)', function (): void {
+it('observer applique la formule active de le compte (priorité 2)', function (): void {
     $formule = FormuleAdhesion::factory()->create([
         'compte_id' => $this->sc->id,
         'mode' => 'exercice',
@@ -85,11 +85,11 @@ it('observer en mode durée pose date_debut + date_fin et exercice null', functi
 });
 
 it('observer applique la formule depuis le mapping HelloAsso (priorité 1)', function (): void {
-    // Formule active sur la sous-cat : ne doit PAS être choisie (priorité 2 < priorité 1)
+    // Formule active sur le compte : ne doit PAS être choisie (priorité 2 < priorité 1)
     FormuleAdhesion::factory()->create([
         'compte_id' => $this->sc->id,
         'actif' => true,
-        'nom' => 'Adhésion sous-cat fallback',
+        'nom' => 'Adhésion compte fallback',
     ]);
 
     // Formule HelloAsso : auto-créée par la sync avec helloasso_form_slug + helloasso_tier_id

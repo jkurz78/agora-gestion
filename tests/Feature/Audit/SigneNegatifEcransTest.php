@@ -234,7 +234,7 @@ it('dashboard_render_avec_negatifs', function () {
     $this->makeAuditTransaction('recette', 150.0, $this->sc, $this->compte, 2025);
     $this->makeAuditTransaction('recette', -80.0, $this->sc, $this->compte, 2025);
 
-    // Sous-catégorie dépense
+    // Compte dépense
     $compteDep = Compte::factory()->depense()->numero('606')->create();
     $this->makeAuditTransaction('depense', 50.0, $compteDep, $this->compte, 2025);
 

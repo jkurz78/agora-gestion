@@ -12,7 +12,7 @@ declare(strict_types=1);
  * Fix attendu :
  * - Branche libre : après recréation lignes legacy → appeler enrichirPartieDouble
  * - Branche Rappro-locked : patch ciblé compte_id sur la ligne de ventilation si
- *   sous_categorie_id change (montant gelé, lignes PD-only intactes)
+ *   compte_id change (montant gelé, lignes PD-only intactes)
  * - Branche Facture-locked : aucune ligne PD touchée (seul notes updatable)
  */
 
@@ -22,7 +22,6 @@ use App\Enums\TypeTransaction;
 use App\Models\Compte;
 use App\Models\Facture;
 use App\Models\RapprochementBancaire;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -39,9 +38,6 @@ uses(CreatesPartieDoubleContext::class);
 
 beforeEach(function () {
     $this->setupPartieDoubleContext();
-
-    // Alias : sc706 → scRecette (convention locale de ce fichier)
-    $this->scRecette = $this->sc706;
 
     // Second compte recette 708 (pour tester changement de compte de ventilation).
     // Note : $this->compte606 est déjà posé par setupPartieDoubleContext().
@@ -109,7 +105,7 @@ it('[A] update libre (non lockée) — lignes PD T1 recréées, T2 recréée apr
     $t2Avant = app(ReglementOperationService::class)->trouverEncaissementT2($t1);
     expect($t2Avant)->not()->toBeNull('[Précond] T2 doit exister avant update');
 
-    // Update libre : changer le libellé uniquement (même montant, même sous-catégorie)
+    // Update libre : changer le libellé uniquement (même montant, même compte)
     $t1 = $this->service->update($t1, [
         'type' => TypeTransaction::Recette->value,
         'date' => '2025-10-15',
@@ -209,7 +205,7 @@ it('[B] update libre — changer le compte de ventilation → compte_id PD mis �
     $compte411 = Compte::where('association_id', $this->association->id)->where('numero_pcg', '411')->first();
     $ligne411D = TransactionLigne::where('transaction_id', $transaction->id)
         ->where('compte_id', $compte411->id)->first();
-    expect($ligne411D)->not()->toBeNull('1 ligne 411 D sur T1 recréée après changement sous-catégorie');
+    expect($ligne411D)->not()->toBeNull('1 ligne 411 D sur T1 recréée après changement compte');
     expect($ligne411D->lettrage_code)->not()->toBeNull('411 D lettrée vers T2 recréée');
 
     // Ligne portage 5112 sur T2 (recette chèque)
@@ -217,10 +213,10 @@ it('[B] update libre — changer le compte de ventilation → compte_id PD mis �
     $ligne411C_T2 = TransactionLigne::where('lettrage_code', $ligne411D->lettrage_code)
         ->where('compte_id', $compte411->id)
         ->where('transaction_id', '!=', $transaction->id)->first();
-    expect($ligne411C_T2)->not()->toBeNull('T2 recréée après changement sous-catégorie');
+    expect($ligne411C_T2)->not()->toBeNull('T2 recréée après changement compte');
     $lignePortage = TransactionLigne::where('transaction_id', $ligne411C_T2->transaction_id)
         ->where('compte_id', $compte5112->id)->first();
-    expect($lignePortage)->not()->toBeNull('Ligne portage 5112 recréée sur T2 après changement sous-catégorie');
+    expect($lignePortage)->not()->toBeNull('Ligne portage 5112 recréée sur T2 après changement compte');
 });
 
 // ---------------------------------------------------------------------------
@@ -525,23 +521,21 @@ it('[G] update Rappro-locked multi-lignes — 2 ventilations patchées, comptes 
 // ---------------------------------------------------------------------------
 
 it('[E] update libre sans tiers_id — enrichissement PD skippé silencieusement (pas d\'exception)', function () {
-    // Créer une transaction sans tiers (saisie libre) via factory directe
-    $transaction = Transaction::factory()->asRecette()->create([
-        'association_id' => $this->association->id,
-        'compte_id' => $this->compteBancaire->id,
-        'montant_total' => 50.0,
+    $transaction = $this->service->create([
+        'type' => TypeTransaction::Recette->value,
         'mode_paiement' => ModePaiement::Virement->value,
         'date' => '2025-10-01',
         'libelle' => 'Recette sans tiers',
+        'montant_total' => '50.00',
         'tiers_id' => null,
-        'saisi_par' => $this->user->id,
-    ]);
-
-    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id]);
-    $transaction->lignes()->create([
-        'sous_categorie_id' => $sc->id,
-        'montant' => 50.0,
-    ]);
+        'compte_id' => $this->compteBancaire->id,
+    ], [[
+        'compte_id' => $this->compte706->id,
+        'montant' => '50.00',
+        'operation_id' => null,
+        'seance' => null,
+        'notes' => null,
+    ]]);
 
     // Update libre sans tiers → enrichirPartieDouble skip silencieux, pas d'exception
     $updated = $this->service->update($transaction, [
@@ -554,7 +548,7 @@ it('[E] update libre sans tiers_id — enrichissement PD skippé silencieusement
         'compte_id' => $this->compteBancaire->id,
     ], [[
         'id' => null,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $this->compte706->id,
         'montant' => '50.00',
         'operation_id' => null,
         'seance' => null,

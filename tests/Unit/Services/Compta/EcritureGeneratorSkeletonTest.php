@@ -113,7 +113,6 @@ test("assertTenantCoherence rejette comptes d'un autre tenant → TenantBoundary
         'debit' => '100.00',
         'credit' => '0.00',
         'montant' => 100,
-        'sous_categorie_id' => null,
     ]);
     $ligne->setRelation('compte', $compteBLoaded);
 
@@ -161,7 +160,6 @@ test("assertTenantCoherence rejette tiers d'un autre tenant → TenantBoundaryEx
         'debit' => '100.00',
         'credit' => '0.00',
         'montant' => 100,
-        'sous_categorie_id' => null,
     ]);
     $ligne->setRelation('compte', $compteA);
 
@@ -332,7 +330,6 @@ test('assertTiersObligatoire411 rejette une ligne 411 sans tiers même si compte
         'debit' => '100.00',
         'credit' => '0.00',
         'montant' => 100,
-        'sous_categorie_id' => null,
     ])->id;
 
     // Récupération FRAÎCHE : la relation compte n'est PAS chargée (cas source réel).
@@ -369,7 +366,6 @@ test('assertPasDeTiersSurClasse5 rejette une ligne 5112 avec tiers même si comp
         'debit' => '100.00',
         'credit' => '0.00',
         'montant' => 100,
-        'sous_categorie_id' => null,
     ])->id;
 
     $ligneSource = TransactionLigne::find($ligneId);
@@ -405,7 +401,6 @@ test('assertTenantCoherence rejette une ligne cross-tenant même si compte NON c
         'debit' => '100.00',
         'credit' => '0.00',
         'montant' => 100,
-        'sous_categorie_id' => null,
     ])->id;
 
     // Récupération FRAÎCHE : relation compte non chargée → la garde doit la charger

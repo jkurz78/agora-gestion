@@ -8,9 +8,7 @@ use App\Models\User;
 use App\Tenant\TenantContext;
 
 /**
- * DC-7 : l'écran « Plan comptable » (/parametres/plan-comptable) remplace
- * l'ancien écran Comptes/Sous-catégories — les deux anciennes URLs
- * redirigent désormais en 301 vers la nouvelle.
+ * L'écran « Plan comptable » est l'entrée unique des paramètres comptables.
  */
 beforeEach(function (): void {
     $this->association = Association::factory()->create();
@@ -27,13 +25,6 @@ afterEach(function (): void {
 
 it('[D] route /parametres/comptes redirige 301 vers /parametres/plan-comptable', function (): void {
     $response = $this->get('/parametres/comptes');
-
-    $response->assertStatus(301);
-    $response->assertRedirect('/parametres/plan-comptable');
-});
-
-it('[E] route /parametres/sous-categories redirige 301 vers /parametres/plan-comptable', function (): void {
-    $response = $this->get('/parametres/sous-categories');
 
     $response->assertStatus(301);
     $response->assertRedirect('/parametres/plan-comptable');

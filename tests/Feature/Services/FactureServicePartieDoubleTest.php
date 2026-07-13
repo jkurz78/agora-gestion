@@ -6,11 +6,9 @@ use App\Enums\ModePaiement;
 use App\Enums\StatutFacture;
 use App\Enums\TypeLigneFacture;
 use App\Enums\TypeTransaction;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\Facture;
 use App\Models\FactureLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -27,15 +25,7 @@ uses(CreatesPartieDoubleContext::class);
 beforeEach(function () {
     $this->setupPartieDoubleContext();
 
-    // sc706 et compte706 sont exposés par setupPartieDoubleContext()
-    // Sous-catégorie supplémentaire 758 (Produits divers) — spécifique FactureService tests
-    $categoriePrestations = Categorie::where('association_id', $this->association->id)->first();
-    $this->sc758 = SousCategorie::create([
-        'association_id' => $this->association->id,
-        'categorie_id' => $categoriePrestations->id,
-        'nom' => 'Produits divers',
-        'code_cerfa' => '758',
-    ]);
+    // Compte supplémentaire 758 (Produits divers) — spécifique FactureService tests
     $this->compte758 = Compte::firstOrCreate(
         ['association_id' => $this->association->id, 'numero_pcg' => '758'],
         [
@@ -134,7 +124,7 @@ it('facture 1 ligne MontantManuel → Transaction avec 2 lignes PD (706 C + 411 
 });
 
 // ---------------------------------------------------------------------------
-// Scénario 2 : Facture avec 2 lignes MontantManuel sur sous-catégories différentes
+// Scénario 2 : Facture avec 2 lignes MontantManuel sur comptes différentes
 // → 3 lignes PD (2 ventilations 7x enrichies + 1 ligne 411 D agrégée)
 // ---------------------------------------------------------------------------
 

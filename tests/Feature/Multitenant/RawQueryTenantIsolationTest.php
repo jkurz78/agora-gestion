@@ -105,8 +105,8 @@ it('CompteResultatBuilder::compteDeResultat does not aggregate other-tenant char
 });
 
 it('CompteResultatBuilder fetchBudgetMap does not leak cross-tenant budget lines', function () {
-    // Both tenants have a transaction + budget for the SAME sous_categorie_id.
-    // Without the fix, fetchBudgetMap SUMs both tenants' budgets for that sous-categorie.
+    // Both tenants have a transaction + budget for the SAME compte_id.
+    // Without the fix, fetchBudgetMap SUMs both tenants' budgets for that compte.
 
     TenantContext::boot($this->assoA);
     $compteA = CompteBancaire::factory()->create(['solde_initial' => 0]);
@@ -136,20 +136,19 @@ it('CompteResultatBuilder fetchBudgetMap does not leak cross-tenant budget lines
         'updated_at' => now(),
     ]);
 
-    // From tenant A's perspective, budget for souscatA must be 200€, not 200+9999=10199€
+    // Du point de vue du tenant A, le budget du compte reste 200 €, sans les 9 999 € du tenant B.
     TenantContext::boot($this->assoA);
     $builder = app(CompteResultatBuilder::class);
     $result = $builder->compteDeResultat(2024);
 
-    // The result is a hierarchie: [['categorie_nom' => ..., 'budget' => ..., 'sous_categories' => [...]]]
-    // We need to extract all 'budget' values from sous_categories within charges and produits
+    // Extraire toutes les valeurs de budget dans la hiérarchie famille/comptes.
     $extractBudgets = function (array $rows): array {
         $budgets = [];
         foreach ($rows as $cat) {
             if (isset($cat['budget']) && $cat['budget'] !== null) {
                 $budgets[] = (float) $cat['budget'];
             }
-            foreach ($cat['sous_categories'] ?? [] as $sc) {
+            foreach ($cat['comptes'] ?? [] as $sc) {
                 if (isset($sc['budget']) && $sc['budget'] !== null) {
                     $budgets[] = (float) $sc['budget'];
                 }

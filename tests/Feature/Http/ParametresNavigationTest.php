@@ -30,15 +30,8 @@ test('GET /parametres/plan-comptable retourne 200', function () {
     $response->assertStatus(200);
 });
 
-// DC-7 : les anciennes URLs Comptes / Sous-catégories redirigent vers le Plan comptable
 test('GET /parametres/comptes redirige 301 vers /parametres/plan-comptable', function () {
     $response = $this->get('/parametres/comptes');
-    $response->assertStatus(301);
-    $response->assertRedirect('/parametres/plan-comptable');
-});
-
-test('GET /parametres/sous-categories redirige 301 vers /parametres/plan-comptable', function () {
-    $response = $this->get('/parametres/sous-categories');
     $response->assertStatus(301);
     $response->assertRedirect('/parametres/plan-comptable');
 });

@@ -14,15 +14,15 @@ it('DefaultChartOfAccountsService crée des pivot rows pour dons et cotisations'
     (new DefaultChartOfAccountsService)->applyTo($asso);
 
     // Vérifier que les usages attendus ont été créés via pivot
-    $donCount = DB::table('usages_sous_categories')
+    $donCount = DB::table('usages_comptes')
         ->where('association_id', $asso->id)
         ->where('usage', UsageComptable::Don->value)
         ->count();
-    $cotCount = DB::table('usages_sous_categories')
+    $cotCount = DB::table('usages_comptes')
         ->where('association_id', $asso->id)
         ->where('usage', UsageComptable::Cotisation->value)
         ->count();
-    $inscrCount = DB::table('usages_sous_categories')
+    $inscrCount = DB::table('usages_comptes')
         ->where('association_id', $asso->id)
         ->where('usage', UsageComptable::Inscription->value)
         ->count();

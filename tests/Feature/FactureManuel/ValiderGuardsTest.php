@@ -78,7 +78,7 @@ describe('Guard mode_paiement_prevu requis sur facture MontantManuel', function 
     it('lève une exception si mode_paiement_prevu est null et la facture porte une ligne MontantManuel', function () {
         $facture = creerFactureBrouillon($this->service, $this->tiers->id);
 
-        // Ajouter une ligne MontantManuel avec sous_cat (donc guard sous_cat ne bloquera pas)
+        // Ajouter une ligne MontantManuel avec compte (donc guard compte ne bloquera pas)
         ajouterLigneMontantManuel($facture, $this->compteVentilation->id, avecCompte: true);
 
         // mode_paiement_prevu = null (pas de mise à jour)
@@ -108,14 +108,14 @@ describe('Guard mode_paiement_prevu requis sur facture MontantManuel', function 
     });
 });
 
-// ─── Guard 2 : sous_categorie_id requise sur chaque MontantManuel ─────────────
+// ─── Guard 2 : compte_id requise sur chaque MontantManuel ─────────────
 
-describe('Guard sous_categorie_id requise sur chaque ligne MontantManuel', function () {
+describe('Guard compte_id requise sur chaque ligne MontantManuel', function () {
 
-    it('lève une exception si une ligne MontantManuel n\'a pas de sous_categorie_id (mode_prevu fourni)', function () {
+    it('lève une exception si une ligne MontantManuel n\'a pas de compte_id (mode_prevu fourni)', function () {
         $facture = creerFactureBrouillon($this->service, $this->tiers->id);
 
-        // Ajouter une ligne MontantManuel SANS sous_cat
+        // Ajouter une ligne MontantManuel SANS compte
         ajouterLigneMontantManuel($facture, $this->compteVentilation->id, avecCompte: false);
 
         // Fournir mode_paiement_prevu
@@ -129,7 +129,7 @@ describe('Guard sous_categorie_id requise sur chaque ligne MontantManuel', funct
             );
     });
 
-    it('le statut reste Brouillon après l\'exception sous_categorie_id null', function () {
+    it('le statut reste Brouillon après l\'exception compte_id null', function () {
         $facture = creerFactureBrouillon($this->service, $this->tiers->id);
         ajouterLigneMontantManuel($facture, $this->compteVentilation->id, avecCompte: false);
         $facture->update(['mode_paiement_prevu' => ModePaiement::Virement->value]);
@@ -146,14 +146,14 @@ describe('Guard sous_categorie_id requise sur chaque ligne MontantManuel', funct
             ->and($facture->numero)->toBeNull();
     });
 
-    it('lève une exception si 2 lignes MontantManuel dont 1 sans sous_categorie_id (mode_prevu fourni)', function () {
+    it('lève une exception si 2 lignes MontantManuel dont 1 sans compte_id (mode_prevu fourni)', function () {
         $facture = creerFactureBrouillon($this->service, $this->tiers->id);
 
-        // Ligne 1 : avec sous_cat
+        // Ligne 1 : avec compte
         FactureLigne::create([
             'facture_id' => $facture->id,
             'type' => TypeLigneFacture::MontantManuel,
-            'libelle' => 'Ligne avec sous-catégorie',
+            'libelle' => 'Ligne avec compte',
             'prix_unitaire' => 200.00,
             'quantite' => 1.000,
             'montant' => 200.00,
@@ -164,11 +164,11 @@ describe('Guard sous_categorie_id requise sur chaque ligne MontantManuel', funct
             'ordre' => 1,
         ]);
 
-        // Ligne 2 : sans sous_cat
+        // Ligne 2 : sans compte
         FactureLigne::create([
             'facture_id' => $facture->id,
             'type' => TypeLigneFacture::MontantManuel,
-            'libelle' => 'Ligne sans sous-catégorie',
+            'libelle' => 'Ligne sans compte',
             'prix_unitaire' => 300.00,
             'quantite' => 1.000,
             'montant' => 300.00,
@@ -232,7 +232,7 @@ describe('Régression : factures classiques inchangées', function () {
 
 // ─── Happy path : facture MontantManuel complète → statut passe à Validee ────
 
-describe('Happy path : guards passent (mode_prevu + sous_cat fournis)', function () {
+describe('Happy path : guards passent (mode_prevu + compte fournis)', function () {
 
     it('facture brouillon avec 1 MontantManuel complet + mode_prevu fourni → statut passe à Validee, aucune exception', function () {
         $facture = creerFactureBrouillon($this->service, $this->tiers->id);

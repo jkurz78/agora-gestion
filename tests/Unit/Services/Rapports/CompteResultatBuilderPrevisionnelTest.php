@@ -64,7 +64,7 @@ it('affiche la raison sociale d\'un tiers entreprise dans les prévisions par ti
     );
 
     $labels = collect($data['previsions_charges'])
-        ->flatMap(fn ($cat) => collect($cat['sous_categories'])
+        ->flatMap(fn ($cat) => collect($cat['comptes'])
             ->flatMap(fn ($sc) => collect($sc['tiers'])->pluck('label')));
 
     expect($labels)->toContain('EPONA');
@@ -91,7 +91,7 @@ it('retourne previsions_charges quand previsionnel=true', function (): void {
         ->and($data['previsions_charges'])->not->toBeEmpty();
 
     $total = collect($data['previsions_charges'])->sum(function ($cat) {
-        return collect($cat['sous_categories'])->sum(fn ($sc) => $sc['total'] ?? $sc['montant'] ?? 0);
+        return collect($cat['comptes'])->sum(fn ($sc) => $sc['total'] ?? $sc['montant'] ?? 0);
     });
     expect($total)->toBe(200.0);
 });
@@ -115,7 +115,7 @@ it('retourne previsions_produits depuis les reglements', function (): void {
         ->and($data['previsions_produits'])->not->toBeEmpty();
 
     $total = collect($data['previsions_produits'])->sum(function ($cat) {
-        return collect($cat['sous_categories'])->sum(fn ($sc) => $sc['total'] ?? $sc['montant'] ?? 0);
+        return collect($cat['comptes'])->sum(fn ($sc) => $sc['total'] ?? $sc['montant'] ?? 0);
     });
     expect($total)->toBe(80.0);
 });
@@ -172,7 +172,7 @@ it("filtre fail-closed les prévisions d'autres associations", function (): void
         previsionnel: true,
     );
 
-    $total = collect($data['previsions_charges'])->sum(fn ($cat) => collect($cat['sous_categories'])->sum('montant'));
+    $total = collect($data['previsions_charges'])->sum(fn ($cat) => collect($cat['comptes'])->sum('montant'));
     expect($total)->toBe(50.0);
 });
 
@@ -216,7 +216,7 @@ it("filtre fail-closed les previsions produits d'autres associations", function 
         previsionnel: true,
     );
 
-    $total = collect($data['previsions_produits'])->sum(fn ($cat) => collect($cat['sous_categories'])->sum('montant'));
+    $total = collect($data['previsions_produits'])->sum(fn ($cat) => collect($cat['comptes'])->sum('montant'));
     expect($total)->toBe(60.0); // pas 9999 + 60
 });
 

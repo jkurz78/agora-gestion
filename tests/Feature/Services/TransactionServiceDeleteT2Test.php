@@ -61,7 +61,6 @@ function buildT1AvecT2(int $associationId, int $userId): array
         'credit' => 0,
         'lettrage_code' => 'TESTLET1',
         'montant' => 100.00,
-        'sous_categorie_id' => null,
     ]);
 
     $t2 = Transaction::factory()->create([
@@ -79,7 +78,6 @@ function buildT1AvecT2(int $associationId, int $userId): array
         'credit' => 100.00,
         'lettrage_code' => 'TESTLET1',
         'montant' => 100.00,
-        'sous_categorie_id' => null,
     ]);
 
     return [$t1, $t2];

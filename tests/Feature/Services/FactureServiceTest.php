@@ -165,7 +165,7 @@ describe('ajouterTransactions()', function () {
             ->and($lignes[1]->ordre)->toBe(2);
     });
 
-    it('generates correct auto-libellé with sous-catégorie, opération, séance', function () {
+    it('generates correct auto-libellé with compte, opération, séance', function () {
         Seance::create([
             'operation_id' => $this->operation->id,
             'numero' => 3,

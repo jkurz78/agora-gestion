@@ -43,7 +43,6 @@ it('show: brouillon du tiers affiché avec bouton Supprimer', function () {
         ->assertStatus(200)
         ->assertSeeText('Brouillon')
         ->assertSeeText('Compte')
-        ->assertDontSeeText('Sous-catégorie')
         ->assertSee('Supprimer');
 });
 

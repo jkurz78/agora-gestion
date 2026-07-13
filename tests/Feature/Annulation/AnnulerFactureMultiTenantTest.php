@@ -70,7 +70,6 @@ function mtCreerFactureValidee(Association $asso, Tiers $tiers, int $exercice, U
         'montant' => 100.0,
         'ordre' => 1,
         'transaction_ligne_id' => null,
-        'sous_categorie_id' => null,
         'operation_id' => null,
         'seance' => null,
     ]);

@@ -82,7 +82,7 @@ it('refuse mode durée sans duree_mois', function (): void {
         ->assertHasErrors(['dureeMois']);
 });
 
-it('refuse une 2e formule active sur la même sous-cat (contrainte applicative remontée à l\'UI)', function (): void {
+it('refuse une 2e formule active sur le même compte (contrainte applicative remontée à l\'UI)', function (): void {
     FormuleAdhesion::factory()->create(['compte_id' => $this->compte->id, 'actif' => true]);
 
     Livewire::actingAs($this->user)
@@ -157,7 +157,7 @@ it('édition d\'une formule HelloAsso : seul le flag actif est modifiable', func
 });
 
 it('création d\'une formule mode illimite OK', function (): void {
-    // Désactiver toute formule active existante sur la sous-cat pour éviter la contrainte
+    // Désactiver toute formule active existante sur le compte pour éviter la contrainte
     FormuleAdhesion::query()->update(['actif' => false]);
 
     Livewire::actingAs($this->user)
@@ -250,7 +250,7 @@ it('la liste affiche "N jours" dans la colonne Durée pour une formule en jours'
 });
 
 it('openEdit d\'une formule duree_jours=300 pré-remplit uniteDuree=jours et dureeJours=300', function (): void {
-    // Désactiver la formule du beforeEach pour libérer la sous-cat
+    // Désactiver la formule du beforeEach pour libérer le compte
     FormuleAdhesion::query()->update(['actif' => false]);
 
     $formule = FormuleAdhesion::factory()->create([

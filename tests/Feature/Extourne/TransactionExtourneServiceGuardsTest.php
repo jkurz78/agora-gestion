@@ -45,7 +45,6 @@ function guardsCreateRecette(?array $overrides = []): Transaction
 
     TransactionLigne::create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => null,
         'montant' => 80,
     ]);
 

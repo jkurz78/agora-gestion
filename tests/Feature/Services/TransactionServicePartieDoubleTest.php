@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\ModePaiement;
 use App\Enums\TypeTransaction;
-use App\Models\Categorie;
 use App\Models\Compte;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -22,34 +20,6 @@ uses(CreatesPartieDoubleContext::class);
 
 beforeEach(function () {
     $this->setupPartieDoubleContext();
-
-    // Alias : sc706 → scRecette (convention locale de ce fichier)
-    $this->scRecette = $this->sc706;
-    $this->categorieRecette = Categorie::where('association_id', $this->association->id)
-        ->where('type', 'recette')->first();
-
-    // Catégorie de charge + sous-catégorie dépense 606 (spécifiques TransactionService tests)
-    $this->categorieDepense = Categorie::factory()->depense()->create([
-        'association_id' => $this->association->id,
-        'nom' => 'Charges diverses',
-    ]);
-    $this->scDepense = SousCategorie::create([
-        'association_id' => $this->association->id,
-        'categorie_id' => $this->categorieDepense->id,
-        'nom' => 'Achats fournitures',
-        'code_cerfa' => '606',
-    ]);
-    $this->compte606 = Compte::firstOrCreate(
-        ['association_id' => $this->association->id, 'numero_pcg' => '606'],
-        [
-            'intitule' => 'Achats non stockés de matières et fournitures',
-            'classe' => 6,
-            'lettrable' => false,
-            'actif' => true,
-            'est_systeme' => false,
-            'pour_inscriptions' => false,
-        ]
-    );
 
     // Tiers
     $this->tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
@@ -309,20 +279,13 @@ it('dépense à crédit — crée 2 lignes symétriques, pas de lettrage', funct
 });
 
 // ---------------------------------------------------------------------------
-// Scénario 5 : Multi-ventilation (2 sous-catégories de recette)
+// Scénario 5 : Multi-ventilation (2 comptes de recette)
 // ---------------------------------------------------------------------------
 
 it('multi-ventilation recette comptant chèque — T1 (411D/2×7xxC) + T2 séparée (5112D/411C agrégé)', function () {
     // Chantier 2a : multi-ventilation produit toujours T1+T2 séparées.
     // T1 : 1 ligne 411 D (total agrégé) + 2 ventilations légacy enrichies 7xx C
     // T2 : 1 ligne 5112 D (total agrégé) + 1 ligne 411 C (total agrégé)
-    $scRecette2 = SousCategorie::create([
-        'association_id' => $this->association->id,
-        'categorie_id' => $this->categorieRecette->id,
-        'nom' => 'Formations',
-        'code_cerfa' => '706B',
-    ]);
-    // Le compte '706B' est matérialisé par l'observer à la création de la sous-catégorie.
     $compte706B = Compte::firstOrCreate(
         ['association_id' => $this->association->id, 'numero_pcg' => '706B'],
         [
@@ -481,53 +444,6 @@ it('si tiers_id est null, la double écriture est ignorée (lignes legacy seules
 });
 
 // ---------------------------------------------------------------------------
-// Scénario 8 : Skip silencieux si sous-catégorie sans code_cerfa
-// ---------------------------------------------------------------------------
-
-it('si sous-catégorie sans code_cerfa, la ligne legacy est créée mais pas enrichie', function () {
-    $scSansCode = SousCategorie::create([
-        'association_id' => $this->association->id,
-        'categorie_id' => $this->categorieRecette->id,
-        'nom' => 'Divers sans code',
-        'code_cerfa' => null,  // ← pas de code_cerfa
-    ]);
-
-    $data = [
-        'type' => TypeTransaction::Recette->value,
-        'date' => '2025-10-15',
-        'libelle' => 'Recette sous-cat sans code',
-        'montant_total' => '30.00',
-        'mode_paiement' => ModePaiement::Cheque->value,
-        'tiers_id' => $this->tiers->id,
-        'compte_id' => $this->compteBancaire->id,
-    ];
-    $lignes = [[
-        'sous_categorie_id' => $scSansCode->id,
-        'montant' => '30.00',
-        'operation_id' => null,
-        'seance' => null,
-        'notes' => null,
-    ]];
-
-    // Ne doit pas lever d'exception
-    $transaction = $this->service->create($data, $lignes);
-
-    // La ligne legacy est créée, mais pas de PD-only (code_cerfa manquant → skip)
-    $ligneVent = TransactionLigne::where('transaction_id', $transaction->id)
-        ->where('sous_categorie_id', $scSansCode->id)
-        ->first();
-    expect($ligneVent)->not()->toBeNull();
-    expect($ligneVent->compte_id)->toBeNull('Sans code_cerfa, pas d\'enrichissement compte_id');
-
-    // Aucune ligne 411 (skip de toute la double écriture car une ventilation manque son compte)
-    $compte411 = compteSysteme('411');
-    $lignes411 = TransactionLigne::where('transaction_id', $transaction->id)
-        ->where('compte_id', $compte411->id)
-        ->count();
-    expect($lignes411)->toBe(0, 'Pas de ligne 411 si une ventilation ne peut pas être résolue');
-});
-
-// ---------------------------------------------------------------------------
 // Scénario 9 : Dépense comptant chèque — portage T2 sur 512X (pas 5112)
 // Chantier 3a-i : T2 séparée (journal=Banque) porte la ligne 512X.
 // La ligne portage doit être sur 512X IBAN-matched, PAS sur 5112 (chèques reçus).
@@ -631,48 +547,6 @@ it('dépense comptant virement avec compte_id null — skip gracieux sans TypeEr
     // Seulement 1 ligne de ventilation (pas de PD-only car 512X introuvable)
     $totalLignes = TransactionLigne::where('transaction_id', $transaction->id)->count();
     expect($totalLignes)->toBe(1, 'Skip gracieux : seulement la ligne de ventilation sans double écriture');
-});
-
-// ---------------------------------------------------------------------------
-// Scénario 11 — Fix #1 : garde-fou XOR observer via chemin Eloquent
-// Vérifie que l'enrichissement legacy déclenche bien l'observer saving()
-// et que debit > 0 ET credit > 0 simultanément lève une InvalidArgumentException.
-// ---------------------------------------------------------------------------
-
-it('Fix #1 — enrichissement legacy déclenche observer XOR : debit ET credit > 0 lève une exception', function () {
-    // On crée directement une TransactionLigne avec compte_id = null (ligne legacy),
-    // puis on tente de l'enrichir via fill/save avec debit ET credit > 0.
-    // L'observer TransactionLigneObserver::saving() doit intercepter la violation XOR.
-
-    $transaction = Transaction::create([
-        'association_id' => $this->association->id,
-        'type' => TypeTransaction::Recette,
-        'date' => '2025-10-15',
-        'libelle' => 'Recette test XOR',
-        'montant_total' => 100.00,
-        'mode_paiement' => ModePaiement::Cheque,
-        'saisi_par' => $this->user->id,
-        'equilibree' => false,
-        'type_ecriture' => 'normale',
-    ]);
-
-    // Ligne legacy : compte_id null — l'observer l'ignore lors de la création
-    $ligne = $transaction->lignes()->create([
-        'sous_categorie_id' => $this->scRecette->id,
-        'montant' => 100.0,
-    ]);
-    expect($ligne->compte_id)->toBeNull('Ligne legacy créée sans compte_id — observer ne vérifie pas encore');
-
-    // Tentative d'enrichissement avec debit > 0 ET credit > 0 (violation XOR)
-    // L'observer saving() doit lever une InvalidArgumentException
-    expect(fn () => $ligne->fill([
-        'compte_id' => $this->compte706->id,
-        'debit' => 100.0,
-        'credit' => 50.0,  // ← violation XOR : les deux > 0
-    ])->save())->toThrow(
-        InvalidArgumentException::class,
-        "viole l'invariant partie double"
-    );
 });
 
 // ---------------------------------------------------------------------------

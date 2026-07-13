@@ -137,7 +137,6 @@ test('pourReglement — miroir recette extourne (411 C) → 411 D / portage C + 
         'tiers_id' => (int) $tiers->id,
         'libelle' => 'Miroir extourne 411 C',
         'montant' => 0,
-        'sous_categorie_id' => null,
     ]);
 
     // Ligne d'équilibre 706 D
@@ -149,7 +148,6 @@ test('pourReglement — miroir recette extourne (411 C) → 411 D / portage C + 
         'tiers_id' => null,
         'libelle' => 'Miroir extourne 706 D',
         'montant' => 180.0,
-        'sous_categorie_id' => null,
     ]);
 
     $t2 = $this->ecritureGen->pourReglement(
@@ -207,7 +205,6 @@ test('pourReglement — miroir dépense extourne (401 D) → portage D / 401 C +
         'tiers_id' => (int) $tiers->id,
         'libelle' => 'Miroir extourne 401 D',
         'montant' => 0,
-        'sous_categorie_id' => null,
     ]);
 
     // Ligne d'équilibre 606 C
@@ -219,7 +216,6 @@ test('pourReglement — miroir dépense extourne (401 D) → portage D / 401 C +
         'tiers_id' => null,
         'libelle' => 'Miroir extourne 606 C',
         'montant' => 240.0,
-        'sous_categorie_id' => null,
     ]);
 
     $t2 = $this->ecritureGen->pourReglement(

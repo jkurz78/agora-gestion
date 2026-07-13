@@ -7,7 +7,6 @@ use App\Enums\StatutNoteDeFrais;
 use App\Enums\UsageComptable;
 use App\Livewire\Portail\NoteDeFrais\Form;
 use App\Models\Association;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
@@ -139,7 +138,6 @@ it('étape 2 km valide CV + km + bareme + libellé', function () {
 });
 
 it('confirme la ligne km et l\'ajoute au tableau des lignes', function () {
-    $cat = Categorie::factory()->create(['association_id' => $this->asso->id]);
     (function () {
         $c = Compte::create([
             'association_id' => TenantContext::currentId(),

@@ -53,19 +53,19 @@ afterEach(function (): void {
 // ─── BDD §2 Scénario #13 : Compte de résultat reflète l'annulation (AC-13) ──
 
 /**
- * Test : le compte de résultat post-annulation affiche ∑ sous-catégorie = 0 €.
+ * Test : le compte de résultat post-annulation affiche ∑ compte = 0 €.
  *
- * Le CompteResultatBuilder agrège les montants par sous-catégorie via SUM(transaction_lignes.montant).
+ * Le CompteResultatBuilder agrège les montants par compte via SUM(transaction_lignes.montant).
  * Après annulation :
- *   - Tg contribue +80 € à la sous-catégorie
- *   - Tm (extourne) contribue -80 € à la même sous-catégorie (copierLignesInversees)
+ *   - Tg contribue +80 € à le compte
+ *   - Tm (extourne) contribue -80 € à le même compte (copierLignesInversees)
  *   → ∑ = 0 €
  *
  * Note : le builder ne retourne pas le détail ligne par ligne — il fournit uniquement le montant
- * agrégé par sous-catégorie (montant_n). Pour vérifier les 2 écritures (+80 et -80), on asserté
+ * agrégé par compte (montant_n). Pour vérifier les 2 écritures (+80 et -80), on asserté
  * directement les 2 TransactionLigne en base (sanity check).
  */
-test('le compte de résultat reflète une annulation par +X et -X dans la même sous-catégorie', function (): void {
+test('le compte de résultat reflète une annulation par +X et -X dans le même compte', function (): void {
     // ── Setup compte de résultat recette ──────────────────────────────────────
     $compte = Compte::factory()->numero('706')->create(['intitule' => 'Cotisations séance']);
 
@@ -102,38 +102,38 @@ test('le compte de résultat reflète une annulation par +X et -X dans la même 
     $factureFraiche = $facture->fresh();
     expect($factureFraiche->statut)->toBe(StatutFacture::Annulee);
 
-    // ── Sanity check : 2 TransactionLigne dans la sous-catégorie (+80 et -80) ─
+    // ── Sanity check : 2 TransactionLigne dans le compte (+80 et -80) ─
     $lignes = TransactionLigne::where('compte_id', $compte->id)->get();
     expect($lignes)->toHaveCount(2, '2 lignes attendues : origine +80 et extourne -80');
 
     $montants = $lignes->pluck('montant')->map(fn ($m) => (float) $m)->sort()->values()->all();
     expect($montants)->toBe([-80.0, 80.0], 'Les 2 lignes doivent être +80 et -80');
 
-    // ── Compte de résultat — ∑ sous-catégorie = 0 € ───────────────────────────
+    // ── Compte de résultat — ∑ compte = 0 € ───────────────────────────
     $result = $this->builder->compteDeResultat($this->exerciceCourant);
 
-    $produits = collect($result['produits'])->flatMap(fn ($c) => $c['sous_categories'] ?? []);
-    $scResult = $produits->firstWhere('sous_categorie_id', $compte->id);
+    $produits = collect($result['produits'])->flatMap(fn ($c) => $c['comptes'] ?? []);
+    $scResult = $produits->firstWhere('compte_id', $compte->id);
 
-    // Cas 1 : la sous-catégorie n'apparaît pas du tout (somme exactement 0, éliminée par la DB)
+    // Cas 1 : le compte n'apparaît pas du tout (somme exactement 0, éliminée par la DB)
     // Cas 2 : elle apparaît avec montant_n = 0.0
     // Les deux sont acceptables ; l'invariant est ∑ = 0
     if ($scResult !== null) {
         expect((float) $scResult['montant_n'])->toBe(
             0.0,
-            'La somme nette de la sous-catégorie doit être 0 € après annulation'
+            'La somme nette de le compte doit être 0 € après annulation'
         );
     }
     // Si $scResult === null : la DB a renvoyé SUM = 0 et la ligne n'est pas remontée.
-    // C'est aussi valide — la sous-catégorie n'a plus de contribution nette.
+    // C'est aussi valide — le compte n'a plus de contribution nette.
     // Le sanity check ci-dessus confirme déjà que les 2 lignes DB existent.
 });
 
 /**
- * Vérification additionnelle : la somme des TransactionLigne sur la sous-catégorie est bien 0.
+ * Vérification additionnelle : la somme des TransactionLigne sur le compte est bien 0.
  * Test de second opinion sur les données brutes (indépendant du builder).
  */
-test('la somme des TransactionLigne de la sous-catégorie est 0 après annulation', function (): void {
+test('la somme des TransactionLigne de le compte est 0 après annulation', function (): void {
     $compte = Compte::factory()->numero('707')->create(['intitule' => 'Cotisations séance 2']);
 
     $tiers = Tiers::factory()->create(['pour_recettes' => true]);

@@ -208,10 +208,10 @@ it('model: NoteDeFraisLigne has noteDeFrais() BelongsTo relation', function () {
     expect($ligne->noteDeFrais())->toBeInstanceOf(BelongsTo::class);
 });
 
-it('model: NoteDeFraisLigne has sousCategorie() BelongsTo relation', function () {
+it('model: NoteDeFraisLigne has compte() BelongsTo relation', function () {
     $ligne = new NoteDeFraisLigne;
 
-    expect($ligne->sousCategorie())->toBeInstanceOf(BelongsTo::class);
+    expect($ligne->compte())->toBeInstanceOf(BelongsTo::class);
 });
 
 it('model: NoteDeFraisLigne has operation() BelongsTo relation', function () {

@@ -17,10 +17,8 @@ use App\Enums\Espace;
 use App\Enums\ModePaiement;
 use App\Livewire\TransactionForm;
 use App\Models\Association;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -49,15 +47,7 @@ beforeEach(function () {
     // Tiers recette
     $this->tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
 
-    // Catégorie + sous-catégorie recette (classe 7)
-    $this->categorie = Categorie::factory()->recette()->create(['association_id' => $this->association->id]);
-    $this->sousCategorie = SousCategorie::create([
-        'association_id' => $this->association->id,
-        'categorie_id' => $this->categorie->id,
-        'nom' => 'Cotisations',
-        'code_cerfa' => '706',
-    ]);
-    // DC-8 : le sélecteur de ventilation émet un id de COMPTE (miroir de la sous-catégorie)
+    // Compte de ventilation recette (classe 7)
     $this->compteVentilation = Compte::firstOrCreate(
         ['association_id' => $this->association->id, 'numero_pcg' => '706'],
         [
@@ -67,7 +57,6 @@ beforeEach(function () {
             'actif' => true,
             'est_systeme' => false,
             'pour_inscriptions' => false,
-            'categorie_id' => $this->categorie->id,
         ]
     );
 

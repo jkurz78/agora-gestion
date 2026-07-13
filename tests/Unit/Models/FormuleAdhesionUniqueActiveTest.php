@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Models\Compte;
 use App\Models\FormuleAdhesion;
 
-it('refuse l\'activation d\'une 2e formule sur la même sous-catégorie', function (): void {
+it('refuse l\'activation d\'une 2e formule sur le même compte', function (): void {
     $sc = Compte::factory()->pourCotisations()->create();
     FormuleAdhesion::factory()->create(['compte_id' => $sc->id, 'actif' => true]);
 
@@ -15,7 +15,7 @@ it('refuse l\'activation d\'une 2e formule sur la même sous-catégorie', functi
     ]))->toThrow(DomainException::class, 'déjà une formule active');
 });
 
-it('autorise une 2e formule inactive sur la même sous-cat', function (): void {
+it('autorise une 2e formule inactive sur le même compte', function (): void {
     $sc = Compte::factory()->pourCotisations()->create();
     FormuleAdhesion::factory()->create(['compte_id' => $sc->id, 'actif' => true]);
 
@@ -55,7 +55,7 @@ it('autorise l\'édition de la formule active elle-même (pas un faux doublon)',
     expect($formule->fresh()->nom)->toBe('Nom modifié');
 });
 
-it('autorise N formules HelloAsso actives sur la même sous-cat (4 paliers d\'un form Membership)', function (): void {
+it('autorise N formules HelloAsso actives sur le même compte (4 paliers d\'un form Membership)', function (): void {
     $sc = Compte::factory()->pourCotisations()->create();
 
     // 1 formule manuelle active
@@ -66,7 +66,7 @@ it('autorise N formules HelloAsso actives sur la même sous-cat (4 paliers d\'un
         'nom' => 'Adhésion manuelle',
     ]);
 
-    // N formules HelloAsso actives sur la même sous-cat — autorisé
+    // N formules HelloAsso actives sur le même compte — autorisé
     foreach ([['Adulte', 1], ['Étudiant', 2], ['Bienfaiteur', 3], ['Famille', 4]] as [$nom, $tierId]) {
         $formule = FormuleAdhesion::factory()->create([
             'compte_id' => $sc->id,
@@ -82,7 +82,7 @@ it('autorise N formules HelloAsso actives sur la même sous-cat (4 paliers d\'un
     expect(FormuleAdhesion::where('compte_id', $sc->id)->where('actif', true)->count())->toBe(5);
 });
 
-it('refuse une 2e formule MANUELLE active même si une HelloAsso existe sur la sous-cat', function (): void {
+it('refuse une 2e formule MANUELLE active même si une HelloAsso existe sur le compte', function (): void {
     $sc = Compte::factory()->pourCotisations()->create();
 
     FormuleAdhesion::factory()->create([

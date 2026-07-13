@@ -17,7 +17,7 @@ use App\Models\NoteDeFraisLigne;
 use App\Models\Operation;
 use App\Models\Tiers;
 use App\Models\Transaction;
-use App\Models\UsageSousCategorie;
+use App\Models\UsageCompte;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\NoteDeFrais\NoteDeFraisValidationService;
 use App\Services\NoteDeFrais\ValidationData;
@@ -132,7 +132,7 @@ it('cree deux transactions (depense + don) reglees pour un abandon de creance', 
 
 // ---------------------------------------------------------------------------
 // 1b. Le Don clone les lignes de la Dépense (operation, seance, notes, montant)
-//     seule la sous-catégorie diffère → pointe sur AbandonCreance
+//     seule le compte diffère → pointe sur AbandonCreance
 // ---------------------------------------------------------------------------
 
 it('clone les lignes de la Depense vers le Don (operation, seance, notes, montant)', function (): void {
@@ -214,12 +214,12 @@ it('met le Don sur le meme compte que la Depense', function (): void {
 });
 
 // ---------------------------------------------------------------------------
-// 2. Pas de sous-cat AbandonCreance désignée → DomainException + rollback
+// 2. Pas de compte AbandonCreance désignée → DomainException + rollback
 // ---------------------------------------------------------------------------
 
-it('leve DomainException si aucune sous-categorie AbandonCreance configuree', function (): void {
+it('leve DomainException si aucun compte AbandonCreance configuree', function (): void {
     // Supprimer le lien pivot créé dans beforeEach
-    UsageSousCategorie::where('compte_id', $this->scAbandon->id)
+    UsageCompte::where('compte_id', $this->scAbandon->id)
         ->where('usage', UsageComptable::AbandonCreance->value)
         ->delete();
 
@@ -251,7 +251,7 @@ it('leve DomainException si la NDF nest pas en statut Soumise', function (): voi
 });
 
 // ---------------------------------------------------------------------------
-// 4. Plusieurs sous-cat AbandonCreance → DomainException (cas pathologique)
+// 4. Plusieurs comptes AbandonCreance → DomainException (cas pathologique)
 // ---------------------------------------------------------------------------
 
 it('leve DomainException si plusieurs comptes AbandonCreance sont designes', function (): void {
@@ -277,7 +277,7 @@ it('leve DomainException si plusieurs comptes AbandonCreance sont designes', fun
 
 it('rollback atomique : aucune transaction si la creation du don echoue', function (): void {
     // Supprimer le pivot pour déclencher DomainException dans la transaction
-    UsageSousCategorie::where('compte_id', $this->scAbandon->id)->delete();
+    UsageCompte::where('compte_id', $this->scAbandon->id)->delete();
 
     $ndf = makeNdfSoumise($this->asso, $this->tiers, $this->scDepense);
     $initial = Transaction::count();

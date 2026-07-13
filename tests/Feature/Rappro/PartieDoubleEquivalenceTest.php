@@ -30,12 +30,10 @@ use App\Enums\ModePaiement;
 use App\Enums\StatutFacture;
 use App\Enums\TypeLigneFacture;
 use App\Models\Association;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
 use App\Models\FactureLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -109,17 +107,7 @@ beforeEach(function () {
         ->where('association_id', $this->association->id)
         ->firstOrFail();
 
-    // ── Catégorie + sous-catégorie + compte 706 (recettes)
-    $this->catRecette = Categorie::factory()->recette()->create([
-        'association_id' => $this->association->id,
-        'nom' => 'Prestations',
-    ]);
-    $this->sc706 = SousCategorie::create([
-        'association_id' => $this->association->id,
-        'categorie_id' => $this->catRecette->id,
-        'nom' => 'Cotisations membres',
-        'code_cerfa' => '706',
-    ]);
+    // ── Comptes de ventilation PCG
     $this->compte706 = Compte::firstOrCreate(
         ['association_id' => $this->association->id, 'numero_pcg' => '706'],
         [
@@ -129,21 +117,9 @@ beforeEach(function () {
             'actif' => true,
             'est_systeme' => false,
             'pour_inscriptions' => false,
-            'categorie_id' => $this->catRecette->id,
         ]
     );
 
-    // ── Catégorie + sous-catégorie + compte 606 (dépenses)
-    $this->catDepense = Categorie::factory()->depense()->create([
-        'association_id' => $this->association->id,
-        'nom' => 'Charges de fonctionnement',
-    ]);
-    $this->sc606 = SousCategorie::create([
-        'association_id' => $this->association->id,
-        'categorie_id' => $this->catDepense->id,
-        'nom' => 'Fournitures et petits matériels',
-        'code_cerfa' => '606',
-    ]);
     $this->compte606 = Compte::firstOrCreate(
         ['association_id' => $this->association->id, 'numero_pcg' => '606'],
         [
@@ -153,7 +129,6 @@ beforeEach(function () {
             'actif' => true,
             'est_systeme' => false,
             'pour_inscriptions' => false,
-            'categorie_id' => $this->catDepense->id,
         ]
     );
 

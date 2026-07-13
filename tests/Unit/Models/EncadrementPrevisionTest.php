@@ -16,7 +16,7 @@ beforeEach(function (): void {
     TenantContext::boot($this->association);
 });
 
-it('persiste un montant prévu par (operation, tiers, sous-catégorie, séance)', function (): void {
+it('persiste un montant prévu par (operation, tiers, compte, séance)', function (): void {
     $operation = Operation::factory()->create();
     $tiers = Tiers::factory()->create();
     $sc = Compte::factory()->depense()->create();
@@ -54,7 +54,7 @@ it('exclut les prévisions des autres associations via le scope global', functio
     expect(EncadrementPrevision::count())->toBe(0);
 });
 
-it('rejette deux prévisions pour le même (operation, tiers, sous-cat, séance)', function (): void {
+it('rejette deux prévisions pour le même (operation, tiers, compte, séance)', function (): void {
     $operation = Operation::factory()->create();
     $tiers = Tiers::factory()->create();
     $sc = Compte::factory()->depense()->create();

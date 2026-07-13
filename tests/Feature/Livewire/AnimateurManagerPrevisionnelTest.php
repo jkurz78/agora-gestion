@@ -49,7 +49,7 @@ it('ajoute un encadrant en créant une 1re ligne prévision à 0', function (): 
         ->and((int) EncadrementPrevision::first()->seance_id)->toBe((int) $this->seance1->id);
 });
 
-it('ajoute une 2e ligne sous-catégorie sur un encadrant existant', function (): void {
+it('ajoute une 2e ligne compte sur un encadrant existant', function (): void {
     EncadrementPrevision::create([
         'operation_id' => $this->operation->id,
         'tiers_id' => $this->tiers->id,
@@ -90,7 +90,7 @@ it('recopie le montant de la 1re séance sur les autres', function (): void {
         ->and((float) EncadrementPrevision::where('seance_id', $this->seance3->id)->first()->montant_prevu)->toBe(200.0);
 });
 
-it('supprime une ligne sous-catégorie sans réalisé', function (): void {
+it('supprime une ligne compte sans réalisé', function (): void {
     EncadrementPrevision::create([
         'operation_id' => $this->operation->id,
         'tiers_id' => $this->tiers->id,

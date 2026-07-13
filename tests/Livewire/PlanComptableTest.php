@@ -195,7 +195,6 @@ it('refuse la suppression d un compte porteur d écritures', function () {
     // la suppression passerait silencieusement en orphelinant l'écriture.
     TransactionLigne::factory()->create([
         'compte_id' => $compte->id,
-        'sous_categorie_id' => null,
         'debit' => 0,
         'credit' => 100,
     ]);
@@ -218,13 +217,9 @@ it('supprime un compte propre', function () {
     expect(Compte::withTrashed()->where('numero_pcg', '758')->exists())->toBeFalse();
 });
 
-// ── 8. Anciennes routes ──────────────────────────────────────────
+// ── 8. Redirection de l'ancienne route comptes ───────────────────
 
-it('redirige les anciennes routes en 301 vers le plan comptable', function () {
-    $this->get('/parametres/sous-categories')
-        ->assertStatus(301)
-        ->assertRedirect('/parametres/plan-comptable');
-
+it('redirige la route comptes en 301 vers le plan comptable', function () {
     $this->get('/parametres/comptes')
         ->assertStatus(301)
         ->assertRedirect('/parametres/plan-comptable');

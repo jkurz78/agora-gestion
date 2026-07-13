@@ -19,7 +19,7 @@ it('returns zero total for empty matrix', function (): void {
     expect($m->isEmpty())->toBeTrue();
 });
 
-it('aggregates by sous-categorie', function (): void {
+it('aggregates by compte', function (): void {
     $m = new ProjectionMatrix;
     // SC 1: 2 tiers × 2 séances = 4 cells
     $m->set(1, 10, 1, 100, 10.0);

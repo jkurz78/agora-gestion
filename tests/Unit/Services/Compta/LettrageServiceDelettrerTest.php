@@ -50,7 +50,6 @@ function makePaireEquilibree(Compte $compte, float $montant = 100.00): array
         'debit' => $montant,
         'credit' => '0.00',
         'montant' => $montant,
-        'sous_categorie_id' => null,
     ]);
 
     $l2 = TransactionLigne::create([
@@ -59,7 +58,6 @@ function makePaireEquilibree(Compte $compte, float $montant = 100.00): array
         'debit' => '0.00',
         'credit' => $montant,
         'montant' => $montant,
-        'sous_categorie_id' => null,
     ]);
 
     return [$l1, $l2];
@@ -149,7 +147,6 @@ test('delettrerParLigne délettre toutes les lignes du groupe, pas seulement la 
         'debit' => '100.00',
         'credit' => '0.00',
         'montant' => 100,
-        'sous_categorie_id' => null,
     ]);
 
     $l2 = TransactionLigne::create([
@@ -158,7 +155,6 @@ test('delettrerParLigne délettre toutes les lignes du groupe, pas seulement la 
         'debit' => '50.00',
         'credit' => '0.00',
         'montant' => 50,
-        'sous_categorie_id' => null,
     ]);
 
     $l3 = TransactionLigne::create([
@@ -167,7 +163,6 @@ test('delettrerParLigne délettre toutes les lignes du groupe, pas seulement la 
         'debit' => '0.00',
         'credit' => '150.00',
         'montant' => 150,
-        'sous_categorie_id' => null,
     ]);
 
     $service = app(LettrageService::class);
@@ -196,7 +191,6 @@ test('delettrerParLigne sur ligne sans lettrage_code → LigneNonLettreeExceptio
         'debit' => '100.00',
         'credit' => '0.00',
         'montant' => 100,
-        'sous_categorie_id' => null,
         // lettrage_code = null (pas de lettrage)
     ]);
 
@@ -220,7 +214,6 @@ test('cas combiné : lettrer 3 lignes puis delettrerParLigne → 3 délettrées 
         'debit' => '200.00',
         'credit' => '0.00',
         'montant' => 200,
-        'sous_categorie_id' => null,
     ]);
 
     $l2 = TransactionLigne::create([
@@ -229,7 +222,6 @@ test('cas combiné : lettrer 3 lignes puis delettrerParLigne → 3 délettrées 
         'debit' => '100.00',
         'credit' => '0.00',
         'montant' => 100,
-        'sous_categorie_id' => null,
     ]);
 
     $l3 = TransactionLigne::create([
@@ -238,7 +230,6 @@ test('cas combiné : lettrer 3 lignes puis delettrerParLigne → 3 délettrées 
         'debit' => '0.00',
         'credit' => '300.00',
         'montant' => 300,
-        'sous_categorie_id' => null,
     ]);
 
     $service = app(LettrageService::class);

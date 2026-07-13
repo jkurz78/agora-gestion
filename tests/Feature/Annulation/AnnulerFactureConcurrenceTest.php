@@ -50,7 +50,7 @@ afterEach(function (): void {
 
 /**
  * Crée et valide une facture portant 1 ligne MontantManuel.
- * Bypasse les guards de valider() (mode_paiement_prevu + sous_categorie_id) en
+ * Bypasse les guards de valider() (mode_paiement_prevu + compte_id) en
  * injectant directement en DB, puis appelle valider() qui génère la TX.
  *
  * Pour les besoins du test de concurrence, on bypasse valider() et on crée

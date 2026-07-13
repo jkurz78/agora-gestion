@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Models\Association;
 use App\Models\Compte;
-use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Services\Compta\Migrations\BancairesSeeder;
 use App\Services\Compta\Migrations\SystemeSeeder;
@@ -355,15 +354,14 @@ it('lignes() returns TransactionLignes belonging to the compte', function () {
         'updated_at' => now(),
     ]);
 
-    // Use factories to satisfy the non-nullable FKs on transaction_lignes.
     $transaction = Transaction::factory()->create(['association_id' => $association->id]);
-    $sousCategorie = SousCategorie::factory()->create();
 
     DB::table('transaction_lignes')->insert([
         'transaction_id' => $transaction->id,
-        'sous_categorie_id' => $sousCategorie->id,
         'compte_id' => $compteId,
         'montant' => '100.00',
+        'debit' => '0.00',
+        'credit' => '100.00',
     ]);
 
     $compte = Compte::find($compteId);

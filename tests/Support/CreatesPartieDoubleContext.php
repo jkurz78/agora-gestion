@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace Tests\Support;
 
 use App\Models\Association;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
-use App\Models\SousCategorie;
 use App\Models\User;
 use App\Services\Compta\Migrations\BancairesSeeder;
 use App\Services\Compta\Migrations\SystemeSeeder;
@@ -31,7 +29,7 @@ use Illuminate\Support\Facades\DB;
  * Expose sur $this :
  * - association, user (admin)
  * - iban, compteBancaire, compte512X
- * - sc706, compte706 (catégorie recette 706)
+ * - compte706 (produit de classe 7)
  */
 trait CreatesPartieDoubleContext
 {
@@ -42,7 +40,7 @@ trait CreatesPartieDoubleContext
      * - Boote TenantContext + session
      * - Seed comptes système (411, 401, 5112) + force 530
      * - Crée un CompteBancaire avec IBAN connu + Compte 512X via BancairesSeeder
-     * - Crée une catégorie recette + sous-catégorie 706 + Compte 706
+     * - Crée les comptes de ventilation 706 et 606
      * - Active config('compta.use_partie_double') = true
      */
     public function setupPartieDoubleContext(): void
@@ -84,17 +82,7 @@ trait CreatesPartieDoubleContext
             ->where('association_id', $this->association->id)
             ->firstOrFail();
 
-        // Catégorie recette + sous-catégorie 706 + Compte 706
-        $categorie = Categorie::factory()->recette()->create([
-            'association_id' => $this->association->id,
-            'nom' => 'Prestations',
-        ]);
-        $this->sc706 = SousCategorie::create([
-            'association_id' => $this->association->id,
-            'categorie_id' => $categorie->id,
-            'nom' => 'Cotisations',
-            'code_cerfa' => '706',
-        ]);
+        // Compte de produit 706
         $this->compte706 = Compte::firstOrCreate(
             ['association_id' => $this->association->id, 'numero_pcg' => '706'],
             [
@@ -107,17 +95,7 @@ trait CreatesPartieDoubleContext
             ]
         );
 
-        // Catégorie dépense + sous-catégorie 606 + Compte 606
-        $categorieDep = Categorie::factory()->depense()->create([
-            'association_id' => $this->association->id,
-            'nom' => 'Charges diverses',
-        ]);
-        $this->sc606 = SousCategorie::create([
-            'association_id' => $this->association->id,
-            'categorie_id' => $categorieDep->id,
-            'nom' => 'Achats fournitures',
-            'code_cerfa' => '606',
-        ]);
+        // Compte de charge 606
         $this->compte606 = Compte::firstOrCreate(
             ['association_id' => $this->association->id, 'numero_pcg' => '606'],
             [

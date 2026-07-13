@@ -43,7 +43,6 @@ function extourneMakeRecette(StatutReglement $statut, float $montant = 80.0, ?ar
 
     TransactionLigne::create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => null,
         'montant' => $montant,
     ]);
 
@@ -109,7 +108,7 @@ test('extourner copie tiers, compte, libellé et inverse les lignes', function (
     expect($lignesMiroir)->toHaveCount($lignesOrigine->count());
     foreach ($lignesMiroir as $i => $ligneM) {
         expect((float) $ligneM->montant)->toBe(-1 * (float) $lignesOrigine[$i]->montant);
-        expect($ligneM->sous_categorie_id)->toBe($lignesOrigine[$i]->sous_categorie_id);
+        expect($ligneM->compte_id)->toBe($lignesOrigine[$i]->compte_id);
     }
 });
 

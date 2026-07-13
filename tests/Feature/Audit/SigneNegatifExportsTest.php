@@ -62,7 +62,7 @@ afterEach(function () {
 // ── Test 1 — Excel compte de résultat ────────────────────────────────────────
 
 it('export_excel_compte_resultat_somme_negatifs', function () {
-    // +100 € et -40 € dans même sous-cat → total net attendu = 60 €
+    // +100 € et -40 € dans même compte → total net attendu = 60 €
     $this->makeAuditTransaction('recette', 100.0, $this->sc, $this->compte, 2025);
     $this->makeAuditTransaction('recette', -40.0, $this->sc, $this->compte, 2025);
 
@@ -76,7 +76,7 @@ it('export_excel_compte_resultat_somme_negatifs', function () {
     // Vérification 1 : le builder retourne 60 (algébrique, pas abs)
     expect((float) $totalProduitsN)->toBe(60.0);
 
-    // Vérification 2 : le total net de la sous-catégorie vaut 60
+    // Vérification 2 : le total net de le compte vaut 60
     $scMontants = collect($data['produits'])
         ->flatMap(fn ($cat) => collect($cat['comptes'])->pluck('montant_n'));
     expect($scMontants->sum())->toBe(60.0);
@@ -189,9 +189,9 @@ it('pdf_compte_resultat_somme_negatifs', function () {
     );
 });
 
-// ── Test 3 — PDF compte de résultat : sous-catégorie à montant strictement négatif ──
+// ── Test 3 — PDF compte de résultat : compte à montant strictement négatif ──
 
-it('pdf_compte_resultat_sous_categorie_negative_visible', function () {
+it('pdf_compte_resultat_compte_negative_visible', function () {
     $compteRecette2 = Compte::factory()->numero('758')->create();
 
     $this->makeAuditTransaction('recette', -40.0, $compteRecette2, $this->compte, 2025);
@@ -232,10 +232,10 @@ it('pdf_compte_resultat_sous_categorie_negative_visible', function () {
 
     // Le montant -40 € doit apparaître dans le HTML.
     // Avant patch : le filtre `$sc['montant_n'] > 0` excluait silencieusement
-    // les sous-catégories à montant négatif — elles étaient invisibles dans le PDF.
+    // les comptes à montant négatif — elles étaient invisibles dans le PDF.
     // Après patch : `$sc['montant_n'] != 0` les inclut correctement.
     expect(str_contains($html, '-40,00 €'))->toBeTrue(
-        'La sous-catégorie avec montant -40 € doit être visible dans le PDF (filtre != 0, pas > 0)'
+        'Le compte avec montant -40 € doit être visible dans le PDF (filtre != 0, pas > 0)'
     );
 });
 
@@ -343,7 +343,7 @@ it('export_excel_flux_tresorerie_somme_negatifs', function () {
 // ── Test 6 — Builder Excel compte de résultat : valeur cellule exacte ─────────
 
 it('export_excel_compte_resultat_builder_valeurs_cellules', function () {
-    // 3 transactions dans même sous-cat : +100, -40, +20 → net = 80
+    // 3 transactions dans même compte : +100, -40, +20 → net = 80
     $this->makeAuditTransaction('recette', 100.0, $this->sc, $this->compte, 2025);
     $this->makeAuditTransaction('recette', -40.0, $this->sc, $this->compte, 2025);
     $this->makeAuditTransaction('recette', 20.0, $this->sc, $this->compte, 2025);
@@ -355,7 +355,7 @@ it('export_excel_compte_resultat_builder_valeurs_cellules', function () {
     $totalProduits = collect($data['produits'])->sum('montant_n');
     expect((float) $totalProduits)->toBe(80.0);
 
-    // La sous-catégorie unique doit avoir montant_n = 80
+    // Le compte unique doit avoir montant_n = 80
     $scMontant = collect($data['produits'])
         ->flatMap(fn ($cat) => collect($cat['comptes']))
         ->first()['montant_n'];

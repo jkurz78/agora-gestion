@@ -303,9 +303,9 @@ it('confirmValidation avec choix=normal valide normalement et ferme le miniForm'
     expect($ndf->getRawOriginal('statut'))->toBe(StatutNoteDeFrais::Validee->value);
 });
 
-// ── 8. Échec service — pas de sous-cat AbandonCreance → flash error, NDF Soumise
+// ── 8. Échec service — pas de compte AbandonCreance → flash error, NDF Soumise
 
-it('confirmValidation avec choix=abandon flash error si aucune sous-cat AbandonCreance', function (): void {
+it('confirmValidation avec choix=abandon flash error si aucun compte AbandonCreance', function (): void {
     Storage::fake('local');
 
     $association = Association::factory()->create();

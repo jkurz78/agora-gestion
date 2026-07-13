@@ -58,7 +58,7 @@ beforeEach(function () {
         'compte_helloasso_id' => $this->compte->id,
     ]);
 
-    // Form mappings portent maintenant les sous-catégories par formulaire
+    // Form mappings portent maintenant les comptes par formulaire
     HelloAssoFormMapping::create([
         'helloasso_parametres_id' => $this->parametres->id,
         'form_slug' => 'dons-libres',

@@ -331,7 +331,7 @@ it('[G] marquerRecu skip si Tx déjà pointée (isLockedByRapprochement = statut
 
 it('[H] comptabiliserSeance ignore les Reglement cross-tenant (même seance_id par corruption)', function () {
     // Association 2 distincte — toutes les FK créées via raw insert pour éviter
-    // les contraintes NOT NULL du factory (sous_categorie_id sur type_operations).
+    // les contraintes NOT NULL du factory (compte_id sur type_operations).
     $asso2 = Association::factory()->create();
 
     $operation2Id = DB::table('operations')->insertGetId([

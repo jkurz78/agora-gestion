@@ -81,7 +81,7 @@ it('soft-delete préserve les données pour historique', function (): void {
     expect(FormuleAdhesion::withTrashed()->count())->toBe(1);
 });
 
-// Tests formuleAdhesionActive() sur SousCategorie — TRIAGE DC-10b-3 (relation SousCategorie)
+// Tests formuleAdhesionActive() sur Compte — TRIAGE DC-10b-3 (relation Compte)
 
 it('caste duree_mois en int', function (): void {
     $sc = Compte::factory()->pourCotisations()->create();
