@@ -79,6 +79,7 @@ Expected: exit 0.
 ### Task 2: Lecteurs applicatifs compte-first
 
 **Files:**
+- Modify: `app/Console/Commands/BackfillPartieDoubleCommand.php`
 - Modify: `app/Console/Commands/DumpTransactionCommand.php`
 - Modify: `app/Console/Commands/SmokeTestV5Command.php`
 - Modify: `app/Console/Commands/ComptaCheckIntegrityCommand.php`
@@ -86,8 +87,10 @@ Expected: exit 0.
 - Delete or rewrite: `app/Console/Commands/FixProdJuin2026Command.php`
 - Modify: `app/Livewire/OperationList.php`
 - Modify: `app/Livewire/OperationDetail.php`
+- Modify: `app/Livewire/Dashboard.php`
 - Modify: `app/Livewire/TypeOperationList.php`
 - Modify: `app/Livewire/ParticipantTable.php`
+- Modify: `app/Livewire/Parametres/Adhesions/FormulesList.php`
 - Modify: `app/Services/ProvisionService.php`
 - Modify: `resources/views/components/operation-breadcrumb.blade.php`
 - Modify: `resources/views/livewire/dashboard.blade.php`
