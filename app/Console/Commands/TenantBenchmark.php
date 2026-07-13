@@ -106,8 +106,9 @@ final class TenantBenchmark extends Command
                 ->join('transactions', 'transactions.id', '=', 'transaction_lignes.transaction_id')
                 ->where('transactions.association_id', $targetId)
                 ->whereNull('transaction_lignes.deleted_at')
-                ->select('transaction_lignes.sous_categorie_id', DB::raw('SUM(transaction_lignes.montant) as total'), DB::raw('COUNT(*) as nb'))
-                ->groupBy('transaction_lignes.sous_categorie_id')
+                ->whereHas('compte', fn ($query) => $query->whereIn('classe', [6, 7]))
+                ->select('transaction_lignes.compte_id', DB::raw('SUM(transaction_lignes.montant) as total'), DB::raw('COUNT(*) as nb'))
+                ->groupBy('transaction_lignes.compte_id')
                 ->get(),
         ];
 

@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Log;
  *
  * Affiche :
  *   - En-tête : identité de la transaction (type, mode, montant, date, tiers, compte, équilibre)
- *   - Tableau des lignes (PCG, intitulé, débit, crédit, sous-catégorie, code lettrage)
+ *   - Tableau des lignes (PCG, intitulé, débit, crédit, classe, code lettrage)
  *   - Lettrages actifs avec les paires de lignes appariées
  *   - Transactions liées (remise, facture, encaissement T1↔T2, extourne)
  *   - Sources consolidées si la transaction est une T4 de remise bancaire
@@ -57,7 +57,6 @@ final class DumpTransactionCommand extends Command
         // --- Charger la transaction avec ses relations ---
         $tx = Transaction::with([
             'lignes.compte',
-            'lignes.sousCategorie',
             'lignes.tiers',
             'lignes.operation',
             'tiers',
@@ -188,9 +187,7 @@ final class DumpTransactionCommand extends Command
             $credit = $ligne->credit !== null && (float) $ligne->credit > 0
                 ? number_format((float) $ligne->credit, 2)
                 : '';
-            $sousCat = $ligne->sousCategorie
-                ? mb_strimwidth($ligne->sousCategorie->nom, 0, 12, '…').' (#'.(int) $ligne->sous_categorie_id.')'
-                : '-';
+            $classe = $ligne->compte !== null ? (string) $ligne->compte->classe : '-';
             $tiers = $ligne->tiers
                 ? mb_strimwidth($ligne->tiers->displayName(), 0, 14, '…').' (#'.(int) $ligne->tiers_id.')'
                 : '-';
@@ -211,7 +208,7 @@ final class DumpTransactionCommand extends Command
                 $intitule,
                 $debit,
                 $credit,
-                $sousCat,
+                $classe,
                 $tiers,
                 $operation,
                 $seance,
@@ -234,7 +231,7 @@ final class DumpTransactionCommand extends Command
         ];
 
         $this->table(
-            ['Ligne', 'PCG', 'Intitulé', 'Débit', 'Crédit', 'Sous-cat', 'Tiers', 'Opération', 'Séance', 'Lettrage'],
+            ['Ligne', 'PCG', 'Intitulé', 'Débit', 'Crédit', 'Classe', 'Tiers', 'Opération', 'Séance', 'Lettrage'],
             $rows
         );
 

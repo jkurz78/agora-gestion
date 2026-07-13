@@ -11,12 +11,12 @@
 @php
     $badgeBg = '#f0f0f0';
     $badgeText = '#555';
-    if ($operation?->typeOperation?->sousCategorie) {
-        $sousCategorieName = $operation->typeOperation->sousCategorie->nom;
-        if (str_contains($sousCategorieName, 'thérapeutique')) {
+    if ($operation?->typeOperation?->compte) {
+        $compteName = $operation->typeOperation->compte->intitule;
+        if (str_contains($compteName, 'thérapeutique')) {
             $badgeBg = '#e8f0fe';
             $badgeText = '#1a56db';
-        } elseif (str_contains($sousCategorieName, 'Formation')) {
+        } elseif (str_contains($compteName, 'Formation')) {
             $badgeBg = '#fce8f0';
             $badgeText = '#A9014F';
         }
@@ -26,9 +26,9 @@
 
 <div class="d-flex justify-content-between align-items-center mb-2" style="font-size: 13px; min-height: 31px;">
     <div class="d-flex align-items-center gap-2 flex-wrap">
-        @if ($operation && !$participant && $operation->typeOperation?->sousCategorie)
+        @if ($operation && !$participant && $operation->typeOperation?->compte)
             <span class="badge rounded-pill" style="background-color: {{ $badgeBg }}; color: {{ $badgeText }}; font-size: 11px;">
-                {{ $operation->typeOperation->sousCategorie->nom }}
+                {{ $operation->typeOperation->compte->intitule }}
             </span>
         @endif
         @if ($meta)

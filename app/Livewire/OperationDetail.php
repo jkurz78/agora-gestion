@@ -27,7 +27,7 @@ final class OperationDetail extends Component
 
     public function mount(Operation $operation): void
     {
-        $this->operation = $operation->loadMissing('typeOperation.sousCategorie');
+        $this->operation = $operation->loadMissing('typeOperation.compte');
         if (! in_array($this->activeTab, self::ONGLETS, true)) {
             $this->activeTab = 'participants';
         }
@@ -56,11 +56,11 @@ final class OperationDetail extends Component
             ->sum('montant');
         $totalRecettes = (float) $operation->transactionLignes()
             ->whereHas('transaction', fn ($q) => $q->where('type', 'recette'))
-            ->whereDoesntHave('sousCategorie', fn ($q) => $q->whereHas('usages', fn ($u) => $u->where('usage', UsageComptable::Don->value)))
+            ->whereDoesntHave('compte.usages', fn ($q) => $q->where('usage', UsageComptable::Don->value))
             ->sum('montant');
         $totalDons = (float) $operation->transactionLignes()
             ->whereHas('transaction', fn ($q) => $q->where('type', 'recette'))
-            ->whereHas('sousCategorie', fn ($q) => $q->whereHas('usages', fn ($u) => $u->where('usage', UsageComptable::Don->value)))
+            ->whereHas('compte.usages', fn ($q) => $q->where('usage', UsageComptable::Don->value))
             ->sum('montant');
         $solde = ($totalRecettes + $totalDons) - $totalDepenses;
 

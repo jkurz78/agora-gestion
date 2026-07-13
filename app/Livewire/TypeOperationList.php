@@ -40,7 +40,7 @@ final class TypeOperationList extends Component
 
     public function render(): View
     {
-        $query = TypeOperation::with(['sousCategorie', 'tarifs'])
+        $query = TypeOperation::with(['compte', 'tarifs'])
             ->withCount('operations');
 
         if ($this->filter === 'actif') {

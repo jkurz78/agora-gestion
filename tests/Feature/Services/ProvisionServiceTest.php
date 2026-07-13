@@ -18,7 +18,7 @@ beforeEach(function () {
     $this->service = app(ProvisionService::class);
 });
 
-it('returns provisions grouped by sous-categorie for exercice N', function () {
+it('returns provisions grouped by account for exercice N', function () {
     Provision::factory()->create([
         'exercice' => 2025,
         'type' => TypeTransaction::Depense,

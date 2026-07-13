@@ -15,8 +15,7 @@ final class ProvisionService
     /**
      * Provisions de l'exercice N, avec montant signé et infos compte/famille.
      *
-     * DC-5 — lit compte_id/compte (dissolution sous_categories → comptes) au lieu de
-     * sous_categorie/categorie. Clés de payload conservées (sous_categorie_id,
+     * Lit compte_id/compte et la famille dérivée. Clés de payload conservées (sous_categorie_id,
      * sous_categorie_nom, categorie_nom) pour ne pas casser les consommateurs Livewire —
      * bascule des clés en DC-6/8.
      *
@@ -75,9 +74,9 @@ final class ProvisionService
                 'type' => $p->type->value,
                 'montant' => (float) $p->montant,
                 'montant_signe' => $montantSigne($p),
-                'sous_categorie_id' => $p->compte_id ?? $p->sous_categorie_id,
-                'sous_categorie_nom' => $compte->intitule ?? $p->sousCategorie->nom,
-                'categorie_nom' => $famille?->libelle() ?? $compte?->numero_pcg ?? $p->sousCategorie->categorie->nom,
+                'sous_categorie_id' => (int) $p->compte_id,
+                'sous_categorie_nom' => $compte?->intitule ?? 'Compte supprimé',
+                'categorie_nom' => $famille?->libelle() ?? $compte?->numero_pcg ?? 'Famille inconnue',
             ];
         });
     }

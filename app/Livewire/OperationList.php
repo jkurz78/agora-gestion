@@ -141,7 +141,7 @@ final class OperationList extends Component
         $range = $exerciceService->dateRange($exercice);
 
         $operationsQuery = Operation::query()
-            ->with('typeOperation.sousCategorie')
+            ->with('typeOperation.compte')
             ->withCount('participants')
             ->where(function ($q) use ($range): void {
                 $q->where(function ($inner) use ($range): void {
@@ -173,9 +173,9 @@ final class OperationList extends Component
 
         $operations = $operationsQuery->orderBy('date_debut')->get();
 
-        // Grouper par sous-catégorie → type d'opération
+        // Grouper par compte → type d'opération
         $grouped = $operations
-            ->groupBy(fn ($op) => $op->typeOperation?->sousCategorie?->nom ?? 'Sans catégorie')
+            ->groupBy(fn ($op) => $op->typeOperation?->compte?->intitule ?? 'Sans compte')
             ->map(fn ($ops) => $ops->groupBy(fn ($op) => $op->typeOperation?->nom ?? 'Sans type'))
             ->sortKeys();
 

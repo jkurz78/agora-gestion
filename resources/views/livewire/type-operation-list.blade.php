@@ -51,7 +51,7 @@
                         <td class="small" data-sort="{{ $type->nom }}">
                             <a href="{{ route('operations.types-operation.show', $type) }}" class="text-decoration-none">{{ $type->nom }}</a>
                         </td>
-                        <td class="small">{{ $type->sousCategorie?->nom ?? '—' }}</td>
+                        <td class="small">{{ $type->compte ? $type->compte->numero_pcg.' — '.$type->compte->intitule : 'Compte supprimé' }}</td>
                         <td class="text-center small">{{ $type->nombre_seances ?? '—' }}</td>
                         <td class="text-center">
                             @if($type->formulaire_actif)

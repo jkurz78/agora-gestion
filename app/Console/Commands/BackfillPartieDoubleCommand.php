@@ -207,7 +207,7 @@ final class BackfillPartieDoubleCommand extends Command
      * Utilisé par --force pour permettre la re-conversion totale.
      *
      * Actions :
-     *   1. Supprimer les lignes PD-only (sous_categorie_id null, compte_id non null) des Tx de l'exercice.
+     *   1. Supprimer les lignes PD-only (comptes de classe 4/5) des Tx de l'exercice.
      *   2. Reset les colonnes PD (compte_id, debit, credit, tiers_id, lettrage_code) sur les lignes de ventilation.
      *   3. Marquer toutes les Tx de l'exercice equilibree=FALSE.
      *   4. Supprimer les entrées lettrage_audit avec motif='backfill' pour ce tenant ET cet exercice.
@@ -244,13 +244,13 @@ final class BackfillPartieDoubleCommand extends Command
                 ->all();
 
             // 1a-bis. Capturer les T2 séparées (encaissement/règlement) créées par le backfill
-            //         (chantier 2b/3b). Critère : journal=Banque, remise_id null (pas une T4),
-            //         PD-pure (aucune ligne avec sous_categorie_id), pas une T4.
+            //         (chantier 2b/3b). Critère : remise_id null (pas une T4),
+            //         PD-pure (toutes les lignes sont classe 4/5, aucune classe 6/7).
             $t2Ids = Transaction::whereIn('id', $txIds)
                 ->whereNotIn('id', $t4Ids)
                 ->whereNull('remise_id')
                 ->whereDoesntHave('lignes', fn (Builder $q): Builder => $q
-                    ->whereNotNull('sous_categorie_id')
+                    ->whereHas('compte', fn (Builder $c): Builder => $c->whereIn('classe', [6, 7]))
                     ->whereNull('deleted_at'))
                 ->whereHas('lignes', fn (Builder $q): Builder => $q
                     ->whereNotNull('compte_id')
@@ -258,10 +258,9 @@ final class BackfillPartieDoubleCommand extends Command
                 ->pluck('id')
                 ->all();
 
-            // 1b. Supprimer les lignes PD-only (sous_categorie_id null + compte_id non null)
+            // 1b. Supprimer les lignes PD-only (classe 4/5 — contreparties techniques)
             TransactionLigne::whereIn('transaction_id', $txIds)
-                ->whereNull('sous_categorie_id')
-                ->whereNotNull('compte_id')
+                ->whereHas('compte', fn (Builder $q): Builder => $q->whereIn('classe', [4, 5]))
                 ->forceDelete();
 
             // 1c. Supprimer les rows T4 et T2 orphelines (lignes PD purgées ci-dessus, mais

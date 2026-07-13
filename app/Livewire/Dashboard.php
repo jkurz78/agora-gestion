@@ -121,7 +121,7 @@ final class Dashboard extends Component
         // Opérations de l'exercice (hors terminées)
         $range = $exerciceService->dateRange($exercice);
         $operations = Operation::query()
-            ->with(['typeOperation.compte', 'typeOperation.sousCategorie.categorie'])
+            ->with(['typeOperation.compte'])
             ->withCount('participants')
             ->where('statut', '!=', StatutOperation::Cloturee)
             ->where(function ($q) use ($range): void {
@@ -139,7 +139,7 @@ final class Dashboard extends Component
             })
             ->get()
             ->sortBy([
-                fn ($a, $b) => ($a->typeOperation?->compte?->intitule ?? $a->typeOperation?->sousCategorie?->nom ?? '') <=> ($b->typeOperation?->compte?->intitule ?? $b->typeOperation?->sousCategorie?->nom ?? ''),
+                fn ($a, $b) => ($a->typeOperation?->compte?->intitule ?? '') <=> ($b->typeOperation?->compte?->intitule ?? ''),
                 fn ($a, $b) => ($a->typeOperation?->nom ?? '') <=> ($b->typeOperation?->nom ?? ''),
                 fn ($a, $b) => $a->nom <=> $b->nom,
             ])->values();

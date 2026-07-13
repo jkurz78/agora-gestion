@@ -107,7 +107,7 @@
                                     ]
                                 ])
                             </td>
-                            <td>{{ $ligne->sousCategorie?->nom ?? '—' }}</td>
+                            <td>{{ $ligne->compte?->intitule ?? 'Compte supprimé' }}</td>
                             <td class="text-end">{{ number_format((float) $ligne->montant, 2, ',', ' ') }} €</td>
                             <td>
                                 @if ($ligne->piece_jointe_path)

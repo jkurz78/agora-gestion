@@ -127,9 +127,8 @@
                                                         <div class="d-flex align-items-center gap-2">
                                                             <span class="badge text-bg-success"><i class="bi bi-lock-fill"></i> Importé</span>
                                                             <span class="small text-muted">
-                                                                {{-- DC-8 : lecture compte-first, repli sous-catégorie miroir --}}
-                                                                @if ($fm->compte_id || $fm->sous_categorie_id)
-                                                                    dans {{ $fm->compte?->intitule ?? $fm->sousCategorie?->nom ?? '—' }}
+                                                                @if ($fm->compte_id)
+                                                                    dans {{ $fm->compte?->intitule ?? 'Compte supprimé' }}
                                                                 @endif
                                                             </span>
                                                         </div>

@@ -6,7 +6,7 @@ declare(strict_types=1);
  * Tests compta:dump-transaction
  *
  * [A] Tx introuvable → exit 1 + message d'erreur
- * [B] Tx legacy (sans lignes PD) → tableau affiché, total D=0 / C=0
+ * [B] Tx avec ventilation sans écriture PD → tableau affiché, total D=0 / C=0
  * [C] Tx recette comptant chèque post-backfill → 4+ lignes, paire 411 lettrée
  * [D] Tx T4 remise → section « Sources consolidées » présente
  * [E] Tx encaissement T2 → section « Transactions liées » mentionne T1 source
@@ -18,25 +18,61 @@ use App\Enums\ModePaiement;
 use App\Enums\TypeTransaction;
 use App\Models\Association;
 use App\Models\Compte;
+use App\Models\CompteBancaire;
 use App\Models\RemiseBancaire;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Models\User;
 use App\Services\Compta\EcritureGenerator;
+use App\Services\Compta\Migrations\BancairesSeeder;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\ReglementOperationService;
 use App\Services\TransactionService;
 use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\Support\CreatesPartieDoubleContext;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
-uses(CreatesPartieDoubleContext::class);
+
+function setupDumpTransactionContext(object $ctx): void
+{
+    $ctx->association = Association::factory()->create();
+    $ctx->user = User::factory()->create();
+    $ctx->user->associations()->attach($ctx->association->id, ['role' => 'admin', 'joined_at' => now()]);
+
+    TenantContext::boot($ctx->association);
+    session(['current_association_id' => $ctx->association->id]);
+    $ctx->actingAs($ctx->user);
+    Config::set('compta.use_partie_double', true);
+
+    SystemeSeeder::seed();
+    Compte::factory()->numero('530')->create([
+        'association_id' => (int) $ctx->association->id,
+        'intitule' => 'Caisse (espèces)',
+        'est_systeme' => true,
+        'lettrable' => true,
+    ]);
+
+    $ctx->iban = 'FR7612345000012345678901234';
+    $ctx->compteBancaire = CompteBancaire::factory()->create([
+        'association_id' => (int) $ctx->association->id,
+        'iban' => $ctx->iban,
+    ]);
+    BancairesSeeder::seed();
+    $ctx->compte512X = Compte::where('compte_bancaire_id', (int) $ctx->compteBancaire->id)->firstOrFail();
+    $ctx->compte706 = Compte::factory()->numero('706')->create([
+        'association_id' => (int) $ctx->association->id,
+        'intitule' => 'Cotisations et adhésions',
+    ]);
+}
 
 // ---------------------------------------------------------------------------
-// Helper local : Tx legacy minimale (sans lignes PD)
+// Helper local : Tx avec ventilation mais sans écriture PD
 // ---------------------------------------------------------------------------
 
-function makeLegacyTx(object $ctx): Transaction
+function makeUnpostedTx(object $ctx): Transaction
 {
     $tx = Transaction::create([
         'association_id' => $ctx->association->id,
@@ -49,10 +85,10 @@ function makeLegacyTx(object $ctx): Transaction
         'type_ecriture' => 'normale',
     ]);
 
-    // Une ligne legacy sans compte_id : debit/credit à 0 (pas encore backfillée)
-    TransactionLigne::create([
+    // Une ventilation compte-first sans écriture PD : débit/crédit à 0.
+    DB::table('transaction_lignes')->insert([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $ctx->sc706->id,
+        'compte_id' => $ctx->compte706->id,
         'montant' => 50.00,
         'debit' => 0.00,
         'credit' => 0.00,
@@ -66,7 +102,7 @@ function makeLegacyTx(object $ctx): Transaction
 // ---------------------------------------------------------------------------
 
 test('[A] dump-transaction : Tx introuvable → exit 1 + message erreur', function (): void {
-    $this->setupPartieDoubleContext();
+    setupDumpTransactionContext($this);
 
     $this->artisan('compta:dump-transaction', [
         'id' => 99999,
@@ -77,13 +113,13 @@ test('[A] dump-transaction : Tx introuvable → exit 1 + message erreur', functi
 })->group('dump_tx');
 
 // ---------------------------------------------------------------------------
-// [B] Tx legacy (sans lignes PD) → tableau affiché, totaux 0/0
+// [B] Tx avec ventilation sans lignes PD → tableau affiché, totaux 0/0
 // ---------------------------------------------------------------------------
 
-test('[B] dump-transaction : Tx legacy sans lignes PD → tableau vide lettrage', function (): void {
-    $this->setupPartieDoubleContext();
+test('[B] dump-transaction : Tx avec ventilation sans lignes PD → tableau vide lettrage', function (): void {
+    setupDumpTransactionContext($this);
 
-    $tx = makeLegacyTx($this);
+    $tx = makeUnpostedTx($this);
 
     // On vérifie exit 0 + qu'un contenu caractéristique apparaît.
     // Note : expectsOutputToContain utilise Mockery first-match, donc on limite à 1 assertion output.
@@ -100,7 +136,7 @@ test('[B] dump-transaction : Tx legacy sans lignes PD → tableau vide lettrage'
 // ---------------------------------------------------------------------------
 
 test('[C] dump-transaction : Tx recette chèque PD → lignes + lettrage 411 affichés', function (): void {
-    $this->setupPartieDoubleContext();
+    setupDumpTransactionContext($this);
 
     /** @var TransactionService $service */
     $service = app(TransactionService::class);
@@ -142,7 +178,7 @@ test('[C] dump-transaction : Tx recette chèque PD → lignes + lettrage 411 aff
 // ---------------------------------------------------------------------------
 
 test('[D] dump-transaction : Tx T4 remise → section Sources consolidées', function (): void {
-    $this->setupPartieDoubleContext();
+    setupDumpTransactionContext($this);
 
     /** @var TransactionService $service */
     $service = app(TransactionService::class);
@@ -255,7 +291,7 @@ test('[D] dump-transaction : Tx T4 remise → section Sources consolidées', fun
 // ---------------------------------------------------------------------------
 
 test('[E] dump-transaction : Tx T2 encaissement → section Transactions liées avec T1', function (): void {
-    $this->setupPartieDoubleContext();
+    setupDumpTransactionContext($this);
 
     /** @var TransactionService $service */
     $service = app(TransactionService::class);
@@ -309,9 +345,9 @@ test('[E] dump-transaction : Tx T2 encaissement → section Transactions liées 
 // ---------------------------------------------------------------------------
 
 test('[F] dump-transaction : multi-tenant isolation — --asso=2 ne voit pas Tx asso 1', function (): void {
-    $this->setupPartieDoubleContext();
+    setupDumpTransactionContext($this);
 
-    $tx = makeLegacyTx($this);
+    $tx = makeUnpostedTx($this);
     $txId = $tx->id;
     $asso1Id = $this->association->id;
 
@@ -334,9 +370,9 @@ test('[F] dump-transaction : multi-tenant isolation — --asso=2 ne voit pas Tx 
 // ---------------------------------------------------------------------------
 
 test('[G] dump-transaction : autodétection asso → trouve la bonne asso', function (): void {
-    $this->setupPartieDoubleContext();
+    setupDumpTransactionContext($this);
 
-    $tx = makeLegacyTx($this);
+    $tx = makeUnpostedTx($this);
 
     // Sans --asso, la commande doit trouver la transaction via withoutGlobalScopes
     $this->artisan('compta:dump-transaction', [

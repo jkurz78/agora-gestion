@@ -7,7 +7,7 @@ namespace App\Livewire\Parametres\Adhesions;
 use App\Enums\UsageComptable;
 use App\Models\Compte;
 use App\Models\FormuleAdhesion;
-use App\Models\UsageSousCategorie;
+use App\Models\UsageCompte;
 use DomainException;
 use Illuminate\View\View;
 use Livewire\Component;
@@ -148,7 +148,6 @@ final class FormulesList extends Component
             'duree_jours' => ($this->mode === 'duree' && $this->uniteDuree === 'jours') ? $this->dureeJours : null,
             'montant_par_defaut' => $this->montantParDefaut,
             'deductible_fiscal' => $this->deductibleFiscal,
-            // DC-8 : écrit compte_id, le trait remplit le miroir sous_categorie_id.
             'compte_id' => $this->compteId,
             'actif' => $this->actif,
         ];
@@ -218,7 +217,7 @@ final class FormulesList extends Component
             'lettrable' => false,
         ]);
 
-        UsageSousCategorie::create([
+        UsageCompte::create([
             'compte_id' => $compte->id,
             'usage' => UsageComptable::Cotisation->value,
         ]);

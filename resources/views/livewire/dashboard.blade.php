@@ -77,7 +77,7 @@
                             <tbody style="color:#555">
                                 @forelse ($operations as $op)
                                     @php
-                                        $scNom = $op->typeOperation?->compte?->intitule ?? $op->typeOperation?->sousCategorie?->nom ?? '—';
+                                        $scNom = $op->typeOperation?->compte?->intitule ?? '—';
                                         $typeNom = $op->typeOperation?->nom ?? '—';
 
                                         $debut = $op->date_debut?->format('d/m/Y') ?? '?';

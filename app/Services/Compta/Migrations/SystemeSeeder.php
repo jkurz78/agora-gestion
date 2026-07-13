@@ -26,7 +26,7 @@ use Illuminate\Support\Facades\DB;
  *    Both skip rows that would violate the UNIQUE (association_id, numero_pcg)
  *    constraint introduced in Step 3.
  *
- *  - est_systeme = TRUE, lettrable = TRUE, categorie_id = NULL, actif = TRUE,
+ *  - est_systeme = TRUE, lettrable = TRUE, actif = TRUE,
  *    pour_inscriptions = FALSE, parent_compte_id = NULL, bank attrs all NULL
  *    per spec §3.3.
  *
@@ -62,7 +62,6 @@ final class SystemeSeeder
                 numero_pcg,
                 intitule,
                 classe,
-                categorie_id,
                 parent_compte_id,
                 actif,
                 est_systeme,
@@ -81,7 +80,6 @@ final class SystemeSeeder
                 '{$safePcg}',
                 '{$safeIntitule}',
                 {$classe},
-                NULL,
                 NULL,
                 1,
                 1,
@@ -120,7 +118,6 @@ final class SystemeSeeder
                 numero_pcg,
                 intitule,
                 classe,
-                categorie_id,
                 parent_compte_id,
                 actif,
                 est_systeme,
@@ -139,7 +136,6 @@ final class SystemeSeeder
                 '530',
                 'Caisse (espèces)',
                 5,
-                NULL,
                 NULL,
                 1,
                 1,

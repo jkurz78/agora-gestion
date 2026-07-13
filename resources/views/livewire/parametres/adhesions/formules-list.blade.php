@@ -42,8 +42,7 @@
                 @forelse($formules as $formule)
                     <tr>
                         <td class="small fw-semibold">{{ $formule->nom }}</td>
-                        {{-- DC-8 : lecture compte-first, repli sous-catégorie miroir --}}
-                        <td class="small">{{ $formule->compte?->intitule ?? $formule->sousCategorie?->nom ?? '—' }}</td>
+                        <td class="small">{{ $formule->compte?->intitule ?? 'Compte supprimé' }}</td>
                         <td class="small">
                             @if ($formule->est_helloasso)
                                 <span class="badge text-bg-info"><i class="bi bi-link-45deg"></i> HelloAsso</span>

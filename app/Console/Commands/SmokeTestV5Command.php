@@ -26,7 +26,7 @@ use Illuminate\Support\Facades\Log;
  *   - Vérifie l'invariant d'équilibre (SUM debit = SUM credit) par transaction
  *
  * Volet Rapport (chantier G) — Diagnostic non-échappement PD :
- *   - Liste les transactions qui ont des lignes legacy mais AUCUNE écriture PD
+ *   - Liste les transactions qui ont une ventilation 6/7 mais AUCUNE écriture PD
  *   - Classe par source (HelloAsso, wizard adhésion, NDF, saisie manuelle…)
  *   - Détail optionnel via --detail
  *
@@ -276,12 +276,11 @@ final class SmokeTestV5Command extends Command
     // =========================================================================
 
     /**
-     * Liste les transactions de l'exercice qui ont des lignes legacy
-     * (sous_categorie_id IS NOT NULL) mais AUCUNE écriture PD
+     * Liste les transactions de l'exercice qui ont une ligne de ventilation
+     * (compte de classe 6/7) mais AUCUNE écriture PD
      * (aucune ligne avec compte_id IS NOT NULL et (debit > 0 OR credit > 0)).
      *
-     * Exclut les T2/T4 (journal=banque, pas de sous_categorie_id) — elles n'ont
-     * pas de lignes legacy par construction.
+     * Exclut les T2/T4, qui ne portent que des comptes techniques de classes 4/5.
      *
      * Retourne une collection d'objets avec id, date, type, libelle, montant_total,
      * source (HelloAsso / Adhésion / NDF / Saisie manuelle) et raison probable du skip.
@@ -293,34 +292,36 @@ final class SmokeTestV5Command extends Command
         $dateDebut = "{$annee}-09-01";
         $dateFin = ($annee + 1).'-08-31';
 
-        // Toutes les transactions de l'exercice qui ont au moins une ligne legacy…
+        // Toutes les transactions de l'exercice qui ont au moins une ventilation 6/7…
         // Les transactions à 0 € sont exemptées par design (miroir de
         // TransactionConverter::convertir() : cotisation offerte par code promo
         // HelloAsso etc. — aucune écriture PD possible ni souhaitable).
-        $txAvecLegacy = DB::table('transactions')
+        $txAvecVentilation = DB::table('transactions')
             ->join('transaction_lignes', 'transactions.id', '=', 'transaction_lignes.transaction_id')
+            ->join('comptes', 'comptes.id', '=', 'transaction_lignes.compte_id')
             ->where('transactions.association_id', (int) TenantContext::currentId())
+            ->where('comptes.association_id', (int) TenantContext::currentId())
             ->whereBetween('transactions.date', [$dateDebut, $dateFin])
             ->where('transactions.montant_total', '!=', 0)
             ->whereNull('transaction_lignes.deleted_at')
-            ->whereNotNull('transaction_lignes.sous_categorie_id')
+            ->whereIn('comptes.classe', [6, 7])
             ->groupBy('transactions.id')
             ->pluck('transactions.id');
 
-        if ($txAvecLegacy->isEmpty()) {
+        if ($txAvecVentilation->isEmpty()) {
             return collect();
         }
 
         // …et qui n'ont AUCUNE ligne PD (compte_id non null, debit+credit > 0)
         $txAvecPd = DB::table('transaction_lignes')
-            ->whereIn('transaction_id', $txAvecLegacy)
+            ->whereIn('transaction_id', $txAvecVentilation)
             ->whereNull('deleted_at')
             ->whereNotNull('compte_id')
             ->where(fn ($q) => $q->where('debit', '>', 0)->orWhere('credit', '>', 0))
             ->groupBy('transaction_id')
             ->pluck('transaction_id');
 
-        $txSansPdIds = $txAvecLegacy->diff($txAvecPd);
+        $txSansPdIds = $txAvecVentilation->diff($txAvecPd);
 
         if ($txSansPdIds->isEmpty()) {
             return collect();
@@ -395,30 +396,7 @@ final class SmokeTestV5Command extends Command
             return 'tiers_id null';
         }
 
-        // Vérifier si une ligne a sous_categorie_id null (skip total)
-        $ligneSansSousCat = DB::table('transaction_lignes')
-            ->where('transaction_id', (int) $tx->id)
-            ->whereNull('deleted_at')
-            ->whereNull('sous_categorie_id')
-            ->exists();
-
-        if ($ligneSansSousCat) {
-            return 'ligne sans sous-catégorie';
-        }
-
-        // Vérifier si un usage comptable manque (code_cerfa introuvable → compte null)
-        $ligneSansCompte = DB::table('transaction_lignes')
-            ->where('transaction_id', (int) $tx->id)
-            ->whereNull('deleted_at')
-            ->whereNotNull('sous_categorie_id')
-            ->whereNull('compte_id')
-            ->exists();
-
-        if ($ligneSansCompte) {
-            return 'usage comptable non configuré';
-        }
-
-        return 'bypass TransactionService';
+        return 'ventilation sans débit/crédit';
     }
 
     // =========================================================================

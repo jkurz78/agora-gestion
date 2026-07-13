@@ -35,7 +35,7 @@ use Illuminate\Support\Facades\DB;
  *    — that flag gates manual-entry form selectors, not ledger existence).
  *
  *  - est_systeme = TRUE, lettrable = FALSE, pour_inscriptions = FALSE per spec §3.2.
- *  - categorie_id = NULL, parent_compte_id = NULL (hierarchy in a later step).
+ *  - parent_compte_id = NULL (hierarchy in a later step).
  *  - Bank attributes (iban, bic, domiciliation, solde_initial, date_solde_initial)
  *    are copied verbatim from comptes_bancaires.
  *  - compte_bancaire_id = comptes_bancaires.id — clé de jointure stable utilisée
@@ -67,7 +67,6 @@ final class BancairesSeeder
                 numero_pcg,
                 intitule,
                 classe,
-                categorie_id,
                 parent_compte_id,
                 actif,
                 est_systeme,
@@ -100,7 +99,6 @@ final class BancairesSeeder
                 {$concatExpr},
                 r.nom,
                 5,
-                NULL,
                 NULL,
                 1,
                 1,

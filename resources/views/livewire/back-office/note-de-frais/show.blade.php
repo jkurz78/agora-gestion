@@ -172,8 +172,7 @@
                                             ]
                                         ])
                                     </td>
-                                    {{-- DC-8 : lecture compte-first, repli sous-catégorie miroir --}}
-                                    <td>{{ $ligne->compte?->intitule ?? $ligne->sousCategorie?->nom ?? '—' }}</td>
+                                    <td>{{ $ligne->compte?->intitule ?? 'Compte supprimé' }}</td>
                                     <td>{{ $ligne->operation?->nom ?? '—' }}</td>
                                     <td>{{ $ligne->seance ?? '—' }}</td>
                                     <td class="text-end" data-sort="{{ number_format((float) $ligne->montant, 2, '.', '') }}">

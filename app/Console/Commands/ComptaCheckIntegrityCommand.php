@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\Association;
+use App\Models\TransactionLigne;
 use App\Tenant\TenantContext;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
@@ -136,10 +137,9 @@ final class ComptaCheckIntegrityCommand extends Command
                 ->get(['id', 'montant_total']);
 
             foreach ($txSources as $tx) {
-                $sumLignes = (float) DB::table('transaction_lignes')
+                $sumLignes = (float) TransactionLigne::query()
                     ->where('transaction_id', $tx->id)
-                    ->whereNotNull('sous_categorie_id')
-                    ->whereNull('deleted_at')
+                    ->ventilation()
                     ->sum('montant');
 
                 $diff = (int) round(((float) $tx->montant_total - $sumLignes) * 100);
@@ -162,15 +162,18 @@ final class ComptaCheckIntegrityCommand extends Command
             SELECT t.id, t.montant_total, COALESCE(s.sum_lignes, 0) as sum_lignes
             FROM transactions t
             LEFT JOIN (
-                SELECT transaction_id, SUM(montant) as sum_lignes
-                FROM transaction_lignes
-                WHERE sous_categorie_id IS NOT NULL AND deleted_at IS NULL
-                GROUP BY transaction_id
+                SELECT tl.transaction_id, SUM(tl.montant) as sum_lignes
+                FROM transaction_lignes tl
+                JOIN comptes c ON c.id = tl.compte_id
+                WHERE c.association_id = ?
+                  AND c.classe IN (6, 7)
+                  AND tl.deleted_at IS NULL
+                GROUP BY tl.transaction_id
             ) s ON s.transaction_id = t.id
             WHERE t.association_id = ?
               AND t.deleted_at IS NULL
               AND ROUND(t.montant_total * 100) != ROUND(COALESCE(s.sum_lignes, 0) * 100)
-        ', [TenantContext::currentId()]);
+        ', [TenantContext::currentId(), TenantContext::currentId()]);
 
         foreach ($divergences as $d) {
             $this->issues[] = "TX#{$d->id} : montant_total={$d->montant_total} ≠ sum(lignes)={$d->sum_lignes}";
@@ -196,17 +199,20 @@ final class ComptaCheckIntegrityCommand extends Command
             FROM adhesions a
             JOIN transactions t ON t.id = a.transaction_id
             LEFT JOIN (
-                SELECT transaction_id, SUM(montant) as sum_lignes
-                FROM transaction_lignes
-                WHERE sous_categorie_id IS NOT NULL AND deleted_at IS NULL
-                GROUP BY transaction_id
+                SELECT tl.transaction_id, SUM(tl.montant) as sum_lignes
+                FROM transaction_lignes tl
+                JOIN comptes c ON c.id = tl.compte_id
+                WHERE c.association_id = ?
+                  AND c.classe IN (6, 7)
+                  AND tl.deleted_at IS NULL
+                GROUP BY tl.transaction_id
             ) s ON s.transaction_id = a.transaction_id
             WHERE a.association_id = ?
               AND a.deleted_at IS NULL
               AND a.transaction_id IS NOT NULL
               AND t.deleted_at IS NULL
               AND ROUND(a.montant_facial * 100) != ROUND(COALESCE(s.sum_lignes, 0) * 100)
-        ', [TenantContext::currentId()]);
+        ', [TenantContext::currentId(), TenantContext::currentId()]);
 
         foreach ($divergences as $d) {
             $this->issues[] = "Adhésion #{$d->adhesion_id} (TX#{$d->transaction_id}) : montant_facial={$d->montant_facial} ≠ sum(lignes)={$d->sum_lignes}";
