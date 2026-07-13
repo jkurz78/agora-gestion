@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Support\Demo;
+use App\Support\Demo\SnapshotConfig;
 use App\Support\Demo\SnapshotLoader;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
@@ -77,6 +78,28 @@ final class DemoResetCommand extends Command
             } finally {
                 Artisan::call('up');
             }
+
+            return self::FAILURE;
+        }
+
+        if (is_array($snapshot) && ! array_key_exists('schema_version', $snapshot)) {
+            $this->error(
+                'Snapshot incompatible : clé "schema_version" absente '
+                .'(version '.SnapshotConfig::SCHEMA_VERSION.' attendue).'
+            );
+
+            return self::FAILURE;
+        }
+
+        if (is_array($snapshot) && $snapshot['schema_version'] !== SnapshotConfig::SCHEMA_VERSION) {
+            $receivedVersion = is_scalar($snapshot['schema_version'])
+                ? (string) $snapshot['schema_version']
+                : get_debug_type($snapshot['schema_version']);
+
+            $this->error(
+                "Snapshot incompatible : version {$receivedVersion} reçue, version "
+                .SnapshotConfig::SCHEMA_VERSION.' attendue. Régénérez-le avec demo:capture.'
+            );
 
             return self::FAILURE;
         }

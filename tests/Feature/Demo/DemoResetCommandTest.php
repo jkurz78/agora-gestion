@@ -177,6 +177,53 @@ it('resets DB from valid snapshot with correct date rehydration and password', f
     expect(Hash::check('demo', $user->password))->toBeTrue();
 });
 
+it('refuses a V1 snapshot before maintenance and preserves the database', function (): void {
+    app()->detectEnvironment(fn (): string => 'demo');
+    config(['app.url' => 'https://demo.agoragestion.org']);
+
+    $sentinel = TenantContext::current();
+    $sentinel->update(['nom' => 'Sentinelle V1 intacte']);
+    $snapshotPath = buildMinimalSnapshot(Carbon::parse('2026-04-15T10:00:00+00:00'), [
+        'schema_version' => 1,
+    ]);
+
+    $exitCode = Artisan::call('demo:reset', [
+        '--snapshot' => $snapshotPath,
+        '--skip-migrate' => true,
+    ]);
+
+    expect($exitCode)->not->toBe(0);
+    expect(Artisan::output())->toContain('version 1', 'version 2 attendue');
+
+    expect(DB::table('association')->where('id', $sentinel->id)->value('nom'))
+        ->toBe('Sentinelle V1 intacte');
+    expect(app()->isDownForMaintenance())->toBeFalse();
+});
+
+it('refuses a snapshot without schema version before maintenance and preserves the database', function (): void {
+    app()->detectEnvironment(fn (): string => 'demo');
+    config(['app.url' => 'https://demo.agoragestion.org']);
+
+    $sentinel = TenantContext::current();
+    $sentinel->update(['nom' => 'Sentinelle sans version intacte']);
+    $snapshotPath = buildMinimalSnapshot(Carbon::parse('2026-04-15T10:00:00+00:00'));
+    $snapshot = Yaml::parseFile($snapshotPath);
+    unset($snapshot['schema_version']);
+    file_put_contents($snapshotPath, Yaml::dump($snapshot, 8, 2));
+
+    $exitCode = Artisan::call('demo:reset', [
+        '--snapshot' => $snapshotPath,
+        '--skip-migrate' => true,
+    ]);
+
+    expect($exitCode)->not->toBe(0);
+    expect(Artisan::output())->toContain('schema_version', 'absente');
+
+    expect(DB::table('association')->where('id', $sentinel->id)->value('nom'))
+        ->toBe('Sentinelle sans version intacte');
+    expect(app()->isDownForMaintenance())->toBeFalse();
+});
+
 // ---------------------------------------------------------------------------
 // T3 — try/finally : YAML corrompu → exit ≠ 0 mais app remontée
 // ---------------------------------------------------------------------------
