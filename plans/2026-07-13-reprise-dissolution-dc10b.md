@@ -98,6 +98,7 @@ Expected: exit 0.
 - Modify: `app/Http/Controllers/HelloAssoCallbackController.php`
 - Modify: `app/Services/ProvisionService.php`
 - Modify: `app/Services/FactureService.php`
+- Modify: `app/Services/DevisService.php`
 - Modify: `app/Models/HelloAssoParametres.php`
 - Modify: `database/factories/HelloAssoParametresFactory.php`
 - Modify: `app/Services/Compta/Migrations/SystemeSeeder.php`
@@ -170,6 +171,7 @@ Expected: PASS.
 - Modify: `resources/views/livewire/facture-edit/partials/ligne-manuelle-montant-form.blade.php`
 - Modify: `resources/views/livewire/devis-manuel/devis-edit.blade.php`
 - Modify: `resources/views/livewire/type-operation-show.blade.php`
+- Modify: `resources/views/livewire/exercices/cloture-wizard.blade.php`
 - Test: `tests/Feature/RapportServiceAffectationTest.php`
 - Test: `tests/Livewire/RapportCompteResultatTest.php`
 - Test: `tests/Feature/CsvImportServiceTest.php`
@@ -181,6 +183,9 @@ Expected: PASS.
 - Test: `tests/Feature/Audit/SigneNegatifExportsTest.php`
 - Test: `tests/Feature/Livewire/FactureEditTest.php`
 - Test: `tests/Feature/Livewire/DevisEditTest.php`
+- Test: `tests/Feature/Livewire/ClotureWizardTest.php`
+- Test: `tests/Feature/FactureManuel/AjouterLigneManuelleTest.php`
+- Test: `tests/Feature/Services/DevisServiceLignesAvanceesTest.php`
 
 **Interfaces:**
 - Consumes: payloads compte-first des services.
