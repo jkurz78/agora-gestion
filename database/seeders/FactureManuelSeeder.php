@@ -10,12 +10,12 @@ use App\Enums\StatutFacture;
 use App\Enums\StatutReglement;
 use App\Enums\TypeLigneFacture;
 use App\Enums\TypeTransaction;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Devis;
 use App\Models\DevisLigne;
 use App\Models\Facture;
 use App\Models\FactureLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -67,10 +67,10 @@ final class FactureManuelSeeder extends Seeder
             return;
         }
 
-        $sousCategorie = SousCategorie::where('nom', 'Formations')->first()
-            ?? SousCategorie::orderBy('id')->first();
+        $compteProduit = Compte::where('intitule', 'Formations')->first()
+            ?? Compte::where('classe', 7)->orderBy('id')->first();
 
-        if ($sousCategorie === null) {
+        if ($compteProduit === null) {
             return;
         }
 
@@ -137,7 +137,7 @@ final class FactureManuelSeeder extends Seeder
             'prix_unitaire' => '1200.00',
             'quantite' => '1.000',
             'montant' => '1200.00',
-            'sous_categorie_id' => $sousCategorie->id,
+            'compte_id' => $compteProduit->id,
             'ordre' => 1,
         ]);
 
@@ -148,7 +148,7 @@ final class FactureManuelSeeder extends Seeder
             'prix_unitaire' => '800.00',
             'quantite' => '1.000',
             'montant' => '800.00',
-            'sous_categorie_id' => $sousCategorie->id,
+            'compte_id' => $compteProduit->id,
             'ordre' => 2,
         ]);
 
@@ -182,15 +182,19 @@ final class FactureManuelSeeder extends Seeder
 
         $ligneTx1 = TransactionLigne::create([
             'transaction_id' => $transaction->id,
-            'sous_categorie_id' => $sousCategorie->id,
+            'compte_id' => $compteProduit->id,
             'montant' => 1200.00,
+            'debit' => 0,
+            'credit' => 1200.00,
             'notes' => 'Formation initiale (2 jours)',
         ]);
 
         $ligneTx2 = TransactionLigne::create([
             'transaction_id' => $transaction->id,
-            'sous_categorie_id' => $sousCategorie->id,
+            'compte_id' => $compteProduit->id,
             'montant' => 200.00,
+            'debit' => 0,
+            'credit' => 200.00,
             'notes' => 'Supports pédagogiques',
         ]);
 
@@ -201,7 +205,7 @@ final class FactureManuelSeeder extends Seeder
             'prix_unitaire' => '600.00',
             'quantite' => '2.000',
             'montant' => '1200.00',
-            'sous_categorie_id' => $sousCategorie->id,
+            'compte_id' => $compteProduit->id,
             'transaction_ligne_id' => $ligneTx1->id,
             'ordre' => 1,
         ]);
@@ -213,7 +217,7 @@ final class FactureManuelSeeder extends Seeder
             'prix_unitaire' => '200.00',
             'quantite' => '1.000',
             'montant' => '200.00',
-            'sous_categorie_id' => $sousCategorie->id,
+            'compte_id' => $compteProduit->id,
             'transaction_ligne_id' => $ligneTx2->id,
             'ordre' => 2,
         ]);
@@ -240,8 +244,10 @@ final class FactureManuelSeeder extends Seeder
 
         $ligneTxRef = TransactionLigne::create([
             'transaction_id' => $txRefCas3->id,
-            'sous_categorie_id' => $sousCategorie->id,
+            'compte_id' => $compteProduit->id,
             'montant' => 300.00,
+            'debit' => 0,
+            'credit' => 300.00,
             'notes' => 'Recette à refacturer — ligne démo',
         ]);
 
@@ -277,7 +283,7 @@ final class FactureManuelSeeder extends Seeder
             'prix_unitaire' => '500.00',
             'quantite' => '1.000',
             'montant' => '500.00',
-            'sous_categorie_id' => $sousCategorie->id,
+            'compte_id' => $compteProduit->id,
             'ordre' => 2,
         ]);
 

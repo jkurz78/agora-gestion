@@ -374,7 +374,7 @@ final class TransactionService
                 }
             } elseif ($transaction->isLockedByRapprochement()) {
                 // DC-10a — compte_id arrive pré-résolu dans $ligneData (contrat) : plus besoin
-                // de résoudre sous_categorie_id → compte via un resolver dédié (l'ancienne
+                // de résoudre compte_id → compte via un resolver dédié (l'ancienne
                 // méthode patcherComptesVentilationRapproLocked est supprimée). Si compte_id
                 // change, on recalcule debit/credit au passage — le montant reste gelé (pièce
                 // rapprochée), seule la ventilation (compte) peut changer.
@@ -907,7 +907,7 @@ final class TransactionService
                 throw new \RuntimeException('Le montant d\'une ligne ne peut pas être modifié sur une transaction facturée.');
             }
             if ((int) $existing->compte_id !== (int) $ligneData['compte_id']) {
-                throw new \RuntimeException('La sous-catégorie ne peut pas être modifiée sur une transaction facturée.');
+                throw new \RuntimeException('La compte ne peut pas être modifiée sur une transaction facturée.');
             }
             $existingOpId = $existing->operation_id;
             $newOpId = $ligneData['operation_id'] !== '' && $ligneData['operation_id'] !== null ? (int) $ligneData['operation_id'] : null;

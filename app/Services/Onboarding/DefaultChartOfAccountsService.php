@@ -8,7 +8,7 @@ use App\Enums\UsageComptable;
 use App\Models\Association;
 use App\Models\Compte;
 use App\Models\Famille;
-use App\Models\UsageSousCategorie;
+use App\Models\UsageCompte;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -16,12 +16,7 @@ use Illuminate\Support\Facades\DB;
  */
 final class DefaultChartOfAccountsService
 {
-    /**
-     * @return array<string, int> counts of created rows (compte-first ;
-     *                            'categories'/'sous_categories' reflètent le
-     *                            miroir matérialisé en retour, pour compat
-     *                            ascendante des appelants existants)
-     */
+    /** @return array{familles: int, comptes: int} */
     public function applyTo(Association $association): array
     {
         $data = $this->defaultStructure();
@@ -52,7 +47,7 @@ final class DefaultChartOfAccountsService
                     $comptesCreated++;
 
                     foreach ($usages as $usage) {
-                        UsageSousCategorie::create([
+                        UsageCompte::create([
                             'association_id' => $association->id,
                             'compte_id' => $compte->id,
                             'usage' => $usage->value,
@@ -63,8 +58,6 @@ final class DefaultChartOfAccountsService
         });
 
         return [
-            'categories' => $famillesCreated,
-            'sous_categories' => $comptesCreated,
             'familles' => $famillesCreated,
             'comptes' => $comptesCreated,
         ];
@@ -113,10 +106,8 @@ final class DefaultChartOfAccountsService
                     // (Famille::code sur les 2 premiers caractères de
                     // numero_pcg, pas de FK — voir App\Models\Famille) : un
                     // compte 627 ne peut structurellement PAS appartenir à la
-                    // famille 66, quel que soit le libellé Categorie qu'on lui
-                    // donnait avant DC-9 (bucket cosmétique côté Categorie/
-                    // SousCategorie, aucune contrainte de préfixe). Nichée ici
-                    // pour que la famille dérivée corresponde à son numéro.
+                    // famille 66. Il est donc rangé ici pour que la famille
+                    // dérivée corresponde à son numéro.
                     ['intitule' => 'Frais bancaires', 'numero_pcg' => '627'],
                 ],
             ],

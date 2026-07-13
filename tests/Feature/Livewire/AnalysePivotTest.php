@@ -123,7 +123,7 @@ it('returns financier data with correct fields including temporal dimensions', f
 
     expect($data)->toBeArray()->not->toBeEmpty();
     expect($data[0])->toHaveKeys([
-        'Tiers', 'Date', 'Montant', 'Sous-catégorie', 'Catégorie', 'Type', 'Compte',
+        'Tiers', 'Date', 'Montant', 'Compte comptable', 'Famille', 'Type', 'Compte bancaire',
         'Mois', 'Trimestre', 'Semestre',
     ]);
     expect($data[0]['Montant'])->toBe(-100.0); // dépense → signe négatif (spine)

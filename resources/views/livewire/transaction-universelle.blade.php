@@ -394,8 +394,8 @@
                         @endif
                     </th>
 
-                    {{-- Catégorie --}}
-                    <th>Catégorie</th>
+                    {{-- Compte --}}
+                    <th>Compte</th>
 
                     {{-- Mode paiement --}}
                     <th style="position:relative">
@@ -573,7 +573,7 @@
                         @if((int)$tx->nb_lignes > 1)
                             <i class="bi bi-diagram-2 text-secondary me-1" title="{{ $tx->nb_lignes }} lignes"></i>
                         @endif
-                        {{ $tx->categorie_label ?? '' }}
+                        {{ $tx->compte_ventilation_nom ?? '' }}
                     </td>
                     <td class="small text-muted">{{ $tx->mode_paiement ?? '—' }}</td>
                     <td class="text-end fw-semibold small text-nowrap {{ (float)$tx->montant >= 0 ? 'text-success' : 'text-danger' }}">

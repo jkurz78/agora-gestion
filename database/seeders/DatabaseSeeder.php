@@ -15,7 +15,7 @@ use App\Tenant\TenantContext;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
-class DatabaseSeeder extends Seeder
+final class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
@@ -44,8 +44,7 @@ class DatabaseSeeder extends Seeder
             ],
         );
 
-        // Boot tenant context so sub-seeders can query tenant-scoped models
-        // (SousCategorie, TypeOperation, Tiers, EmailTemplate, etc.).
+        // Boot tenant context so sub-seeders can query tenant-scoped models.
         TenantContext::boot(Association::findOrFail(1));
 
         $admin = User::factory()->create([
@@ -107,10 +106,8 @@ class DatabaseSeeder extends Seeder
             $this->call(FactureManuelSeeder::class);
         }
 
-        // Provisionne la table `comptes` (partie double). Les migrations 2026_05_20_*
-        // tournent avant que les tables source soient peuplées en migrate:fresh --seed ;
-        // on rejoue donc les seeds maintenant que sous_categories / comptes_bancaires /
-        // transactions existent. Idempotent (INSERT IGNORE / NOT EXISTS).
+        // Complète le plan avec les comptes bancaires et système partie double.
+        // Idempotent (INSERT IGNORE / NOT EXISTS).
         app(ComptesProvisioningService::class)->provisionAll();
     }
 }

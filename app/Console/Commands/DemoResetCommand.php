@@ -4,14 +4,10 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Models\Compte;
-use App\Models\Famille;
 use App\Support\Demo;
 use App\Support\Demo\SnapshotLoader;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 
@@ -119,7 +115,6 @@ final class DemoResetCommand extends Command
                 $filesCopied = $this->syncStorage($filesEntries);
             }
 
-            $this->materialiserComptesDepuisSousCategories();
         } finally {
             Artisan::call('up');
         }
@@ -193,69 +188,5 @@ final class DemoResetCommand extends Command
         }
 
         return $copied;
-    }
-
-    private function materialiserComptesDepuisSousCategories(): void
-    {
-        if (! Schema::hasTable('sous_categories')) {
-            return;
-        }
-
-        $sousCategories = DB::table('sous_categories')
-            ->whereNotNull('code_cerfa')
-            ->where('code_cerfa', '!=', '')
-            ->get();
-
-        if ($sousCategories->isEmpty()) {
-            return;
-        }
-
-        $avantComptes = Compte::withoutGlobalScopes()->count();
-        $avantFamilles = Famille::withoutGlobalScopes()->count();
-
-        foreach ($sousCategories as $sc) {
-            $numero = $sc->code_cerfa;
-            $classe = (int) substr($numero, 0, 1);
-            if ($classe !== 6 && $classe !== 7) {
-                continue;
-            }
-
-            $associationId = (int) $sc->association_id;
-            $code = substr($numero, 0, 2);
-
-            Famille::firstOrCreate(
-                ['association_id' => $associationId, 'code' => $code],
-                ['nom' => $code],
-            );
-
-            $existe = Compte::withoutGlobalScopes()
-                ->where('association_id', $associationId)
-                ->where('numero_pcg', $numero)
-                ->exists();
-
-            if ($existe) {
-                continue;
-            }
-
-            Compte::withoutEvents(function () use ($associationId, $numero, $sc, $classe) {
-                Compte::withoutGlobalScopes()->create([
-                    'association_id' => $associationId,
-                    'numero_pcg' => $numero,
-                    'intitule' => $sc->nom,
-                    'classe' => $classe,
-                    'actif' => true,
-                    'est_systeme' => false,
-                    'pour_inscriptions' => false,
-                    'lettrable' => false,
-                ]);
-            });
-        }
-
-        $comptesCreated = Compte::withoutGlobalScopes()->count() - $avantComptes;
-        $famillesCreated = Famille::withoutGlobalScopes()->count() - $avantFamilles;
-
-        if ($comptesCreated > 0 || $famillesCreated > 0) {
-            $this->info("Plan comptable matérialisé : {$comptesCreated} compte(s), {$famillesCreated} famille(s).");
-        }
     }
 }

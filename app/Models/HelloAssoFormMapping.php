@@ -48,11 +48,6 @@ final class HelloAssoFormMapping extends Model
         return $this->belongsTo(Operation::class);
     }
 
-    public function sousCategorie(): BelongsTo
-    {
-        return $this->belongsTo(SousCategorie::class);
-    }
-
     public function compte(): BelongsTo
     {
         return $this->belongsTo(Compte::class, 'compte_id');

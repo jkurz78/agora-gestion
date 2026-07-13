@@ -59,11 +59,6 @@ final class TypeOperation extends TenantModel
         return $query->where('actif', true);
     }
 
-    public function sousCategorie(): BelongsTo
-    {
-        return $this->belongsTo(SousCategorie::class);
-    }
-
     public function compte(): BelongsTo
     {
         return $this->belongsTo(Compte::class, 'compte_id');

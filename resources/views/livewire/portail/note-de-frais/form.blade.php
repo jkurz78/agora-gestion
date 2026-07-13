@@ -71,9 +71,9 @@
                             </td>
                             <td>
                                 @php
-                                    $scNom = $sousCategories->find($ligne['compte_id'])?->intitule ?? '—';
+                                    $compteNom = $comptes->find($ligne['compte_id'])?->intitule ?? '—';
                                 @endphp
-                                {{ $scNom }}
+                                {{ $compteNom }}
                             </td>
                             <td class="text-end" data-sort="{{ $ligne['montant'] }}">
                                 {{ $ligne['montant'] ? number_format((float) str_replace(',', '.', (string) $ligne['montant']), 2, ',', ' ') . ' €' : '—' }}
@@ -271,8 +271,8 @@
                                 <select wire:model.live="draftLigne.compte_id"
                                         class="form-select @error('draftLigne.compte_id') is-invalid @enderror">
                                     <option value="">— choisir —</option>
-                                    @foreach ($sousCategories as $sc)
-                                        <option value="{{ $sc->id }}">{{ $sc->intitule }}</option>
+                                    @foreach ($comptes as $compte)
+                                        <option value="{{ $compte->id }}">{{ $compte->intitule }}</option>
                                     @endforeach
                                 </select>
                                 @error('draftLigne.compte_id')

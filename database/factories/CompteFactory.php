@@ -6,7 +6,7 @@ namespace Database\Factories;
 
 use App\Enums\UsageComptable;
 use App\Models\Compte;
-use App\Models\UsageSousCategorie;
+use App\Models\UsageCompte;
 use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -69,7 +69,7 @@ class CompteFactory extends Factory
 
     public function pourDons(): static
     {
-        return $this->afterCreating(fn (Compte $compte) => UsageSousCategorie::firstOrCreate([
+        return $this->afterCreating(fn (Compte $compte) => UsageCompte::firstOrCreate([
             'association_id' => $compte->association_id,
             'compte_id' => $compte->id,
             'usage' => UsageComptable::Don->value,
@@ -78,7 +78,7 @@ class CompteFactory extends Factory
 
     public function pourCotisations(): static
     {
-        return $this->afterCreating(fn (Compte $compte) => UsageSousCategorie::firstOrCreate([
+        return $this->afterCreating(fn (Compte $compte) => UsageCompte::firstOrCreate([
             'association_id' => $compte->association_id,
             'compte_id' => $compte->id,
             'usage' => UsageComptable::Cotisation->value,
@@ -88,7 +88,7 @@ class CompteFactory extends Factory
     public function pourInscriptions(): static
     {
         return $this->state(['pour_inscriptions' => true])
-            ->afterCreating(fn (Compte $compte) => UsageSousCategorie::firstOrCreate([
+            ->afterCreating(fn (Compte $compte) => UsageCompte::firstOrCreate([
                 'association_id' => $compte->association_id,
                 'compte_id' => $compte->id,
                 'usage' => UsageComptable::Inscription->value,
@@ -97,7 +97,7 @@ class CompteFactory extends Factory
 
     public function pourFraisKilometriques(): static
     {
-        return $this->afterCreating(fn (Compte $compte) => UsageSousCategorie::firstOrCreate([
+        return $this->afterCreating(fn (Compte $compte) => UsageCompte::firstOrCreate([
             'association_id' => $compte->association_id,
             'compte_id' => $compte->id,
             'usage' => UsageComptable::FraisKilometriques->value,
@@ -106,7 +106,7 @@ class CompteFactory extends Factory
 
     public function pourAbandonCreance(): static
     {
-        return $this->afterCreating(fn (Compte $compte) => UsageSousCategorie::firstOrCreate([
+        return $this->afterCreating(fn (Compte $compte) => UsageCompte::firstOrCreate([
             'association_id' => $compte->association_id,
             'compte_id' => $compte->id,
             'usage' => UsageComptable::AbandonCreance->value,

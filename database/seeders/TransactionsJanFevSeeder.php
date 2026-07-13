@@ -12,9 +12,9 @@ use Illuminate\Database\Seeder;
 
 /**
  * Seed de test : 60 dépenses + 20 recettes janvier–février 2026
- * sur le compte courant (id=1), avec les tiers, opérations et sous-catégories existants.
+ * sur le compte courant (id=1), avec les tiers, opérations et comptes existants.
  */
-class TransactionsJanFevSeeder extends Seeder
+final class TransactionsJanFevSeeder extends Seeder
 {
     // IDs présents en base localhost
     private int $compteId = 1;
@@ -26,10 +26,10 @@ class TransactionsJanFevSeeder extends Seeder
     private array $operationIds = [1, 2];
 
     /** @var int[] */
-    private array $sousCatsDepense = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26];
+    private array $compteIdsDepense = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26];
 
     /** @var int[] */
-    private array $sousCatsRecette = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+    private array $compteIdsRecette = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
     /** @var string[] */
     private array $modes = ['virement', 'cheque', 'especes', 'cb', 'prelevement'];
@@ -61,7 +61,7 @@ class TransactionsJanFevSeeder extends Seeder
         for ($i = 0; $i < 60; $i++) {
             $date = $this->randomDate();
             $montant = $this->randomMontant(50, 2500);
-            $scId = $this->pick($this->sousCatsDepense);
+            $compteId = $this->pick($this->compteIdsDepense);
             $opId = $i % 5 === 0 ? null : $this->pick($this->operationIds); // ~80% avec opération
 
             $tx = Transaction::create([
@@ -79,10 +79,12 @@ class TransactionsJanFevSeeder extends Seeder
 
             TransactionLigne::create([
                 'transaction_id' => $tx->id,
-                'sous_categorie_id' => $scId,
+                'compte_id' => $compteId,
                 'operation_id' => $opId,
                 'seance' => $opId !== null && $i % 3 === 0 ? rand(1, 3) : null,
                 'montant' => $montant,
+                'debit' => $montant,
+                'credit' => 0,
             ]);
         }
 
@@ -90,7 +92,7 @@ class TransactionsJanFevSeeder extends Seeder
         for ($i = 0; $i < 20; $i++) {
             $date = $this->randomDate();
             $montant = $this->randomMontant(100, 5000);
-            $scId = $this->pick($this->sousCatsRecette);
+            $compteId = $this->pick($this->compteIdsRecette);
             $opId = $i % 4 === 0 ? null : $this->pick($this->operationIds); // ~75% avec opération
 
             $tx = Transaction::create([
@@ -108,10 +110,12 @@ class TransactionsJanFevSeeder extends Seeder
 
             TransactionLigne::create([
                 'transaction_id' => $tx->id,
-                'sous_categorie_id' => $scId,
+                'compte_id' => $compteId,
                 'operation_id' => $opId,
                 'seance' => $opId !== null && $i % 3 === 0 ? rand(1, 3) : null,
                 'montant' => $montant,
+                'debit' => 0,
+                'credit' => $montant,
             ]);
         }
     }

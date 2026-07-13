@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Enums\UsageComptable;
 use App\Models\Association;
 use App\Models\Compte;
-use App\Models\UsageSousCategorie;
+use App\Models\UsageCompte;
 use App\Tenant\TenantContext;
 
 beforeEach(function (): void {
@@ -52,7 +52,7 @@ it('pourDons() poste le lien d usage avec compte_id', function (): void {
 
     expect($compte->hasUsage(UsageComptable::Don))->toBeTrue();
 
-    $lien = UsageSousCategorie::where('compte_id', $compte->id)
+    $lien = UsageCompte::where('compte_id', $compte->id)
         ->where('usage', UsageComptable::Don->value)
         ->first();
     expect($lien)->not->toBeNull()

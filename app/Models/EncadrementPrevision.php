@@ -37,11 +37,6 @@ final class EncadrementPrevision extends TenantModel
         return $this->belongsTo(Tiers::class);
     }
 
-    public function sousCategorie(): BelongsTo
-    {
-        return $this->belongsTo(SousCategorie::class);
-    }
-
     public function compte(): BelongsTo
     {
         return $this->belongsTo(Compte::class, 'compte_id');

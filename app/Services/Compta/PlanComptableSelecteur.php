@@ -9,8 +9,6 @@ use App\Models\Famille;
 use Illuminate\Support\Collection;
 
 /**
- * DC-8 — dissolution sous_categories → comptes.
- *
  * Source de données PARTAGÉE pour tout écran de sélection de compte de
  * ventilation (dépense ou recette). Reprend le regroupement par famille déjà
  * en place dans `PlanComptable::render()` (préfixe à 2 caractères du numéro

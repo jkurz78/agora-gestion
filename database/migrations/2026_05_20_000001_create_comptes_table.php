@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Services\Compta\Migrations\AuditGuard;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -35,7 +34,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        AuditGuard::assertAuditPassed();
+        $this->assertSourceComplete();
 
         Schema::create('comptes', function (Blueprint $table) {
             $table->id();
@@ -66,11 +65,56 @@ return new class extends Migration
             $table->index(['association_id', 'lettrable'], 'comptes_asso_lettrable_idx');
         });
 
-        DB::statement(AuditGuard::seedFromSousCategoriesSql());
+        DB::statement($this->seedSql());
     }
 
     public function down(): void
     {
         Schema::dropIfExists('comptes');
+    }
+
+    private function assertSourceComplete(): void
+    {
+        if (DB::table('sous_categories')->whereNull('code_cerfa')->exists()) {
+            throw new RuntimeException(
+                'Impossible de créer les comptes : des postes historiques n’ont pas de code PCG.'
+            );
+        }
+    }
+
+    private function seedSql(): string
+    {
+        $intType = DB::getDriverName() === 'sqlite' ? 'INTEGER' : 'SIGNED';
+
+        return <<<SQL
+            INSERT INTO comptes (
+                association_id, numero_pcg, intitule, classe, categorie_id,
+                actif, est_systeme, pour_inscriptions, lettrable,
+                created_at, updated_at
+            )
+            SELECT
+                sc.association_id,
+                sc.code_cerfa,
+                sc.nom,
+                CAST(SUBSTR(sc.code_cerfa, 1, 1) AS {$intType}),
+                sc.categorie_id,
+                1,
+                0,
+                CASE WHEN EXISTS (
+                    SELECT 1 FROM usages_sous_categories usc
+                    WHERE usc.sous_categorie_id = sc.id
+                      AND usc.usage = 'inscription'
+                ) THEN 1 ELSE 0 END,
+                0,
+                CURRENT_TIMESTAMP,
+                CURRENT_TIMESTAMP
+            FROM sous_categories sc
+            WHERE sc.code_cerfa IS NOT NULL
+              AND NOT EXISTS (
+                SELECT 1 FROM comptes c
+                WHERE c.association_id = sc.association_id
+                  AND c.numero_pcg = sc.code_cerfa
+            )
+            SQL;
     }
 };

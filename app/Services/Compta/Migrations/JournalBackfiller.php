@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
  *   - ≥1 ligne de compte classe 6/7 → opérationnel (recette=vente, depense=achat) ;
  *   - sinon (trésorerie/bilan seul) → banque.
  * Idempotent : ne touche que les lignes journal IS NULL. Raw SQL (cross-tenant,
- * comme CompteIdBackfiller) + portable SQLite/MySQL (pas d'alias sur la cible).
+ * portable SQLite/MySQL (pas d'alias sur la cible).
  */
 final class JournalBackfiller
 {

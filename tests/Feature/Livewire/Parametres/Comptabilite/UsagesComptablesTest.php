@@ -3,12 +3,10 @@
 declare(strict_types=1);
 
 use App\Enums\RoleAssociation;
-use App\Enums\TypeCategorie;
 use App\Enums\UsageComptable;
 use App\Livewire\Parametres\Comptabilite\UsagesComptables;
 use App\Models\Association;
 use App\Models\AssociationUser;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\User;
 use App\Services\UsagesComptablesService;
@@ -25,8 +23,6 @@ beforeEach(function () {
         'role' => RoleAssociation::Admin->value,
         'joined_at' => now(),
     ]);
-    $this->catR = Categorie::factory()->for($this->asso, 'association')->create(['type' => TypeCategorie::Recette]);
-    $this->catD = Categorie::factory()->for($this->asso, 'association')->create(['type' => TypeCategorie::Depense]);
     $this->actingAs($this->admin);
 });
 
@@ -87,20 +83,27 @@ it('submitInline creates compte and flags it', function () {
     Livewire::test(UsagesComptables::class)
         ->set('inlineUsage', UsageComptable::Cotisation->value)
         ->set('inlineNom', 'Nouvelle cotisation')
-        ->set('inlineCodeCerfa', '751B')
+        ->set('inlineNumeroPcg', '751B')
         ->call('submitInline');
     $compte = Compte::where('numero_pcg', '751B')->first();
     expect($compte)->not->toBeNull();
     expect($compte->hasUsage(UsageComptable::Cotisation))->toBeTrue();
 });
 
+it('openInline affiche uniquement les champs compte-first', function () {
+    Livewire::test(UsagesComptables::class)
+        ->call('openInline', UsageComptable::Cotisation->value)
+        ->assertSee('Numéro de compte')
+        ->assertDontSee('Catégorie');
+});
+
 it('submitInline surfaces a classe mismatch as a validation error', function () {
     Livewire::test(UsagesComptables::class)
         ->set('inlineUsage', UsageComptable::Cotisation->value)
         ->set('inlineNom', 'Compte invalide')
-        ->set('inlineCodeCerfa', '606')
+        ->set('inlineNumeroPcg', '606')
         ->call('submitInline')
-        ->assertHasErrors(['inlineCodeCerfa']);
+        ->assertHasErrors(['inlineNumeroPcg']);
 });
 
 it('denies non-admin users', function () {

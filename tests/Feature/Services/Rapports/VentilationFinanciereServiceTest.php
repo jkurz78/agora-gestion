@@ -109,7 +109,7 @@ it('ajoute les dimensions temporelles et les colonnes de détail', function () {
 
     expect($rows[0])->toHaveKeys([
         'Date', 'N° pièce', 'Référence', 'Mode paiement', 'Libellé',
-        'Tiers', 'Type tiers', 'Sous-catégorie', 'Catégorie', 'Type', 'Compte',
+        'Tiers', 'Type tiers', 'Compte comptable', 'Famille', 'Type', 'Compte bancaire',
         'Opération', 'Type opération', 'Séance n°', 'Montant',
         'Mois', 'Trimestre', 'Semestre',
     ]);

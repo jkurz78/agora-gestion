@@ -40,7 +40,7 @@ final class AdhesionService
         }
 
         // DC-10a : la détection cotisation lit l'usage porté par le compte de la
-        // ligne (compte_id, source unique) — plus de traversée sous_categories.
+        // ligne (compte_id, source unique) — plus de traversée comptes.
         $ligneCotisation = $tx->lignes()
             ->whereNull('helloasso_option_id')  // exclure les lignes options HA (B1)
             ->whereHas('compte.usages', function ($q): void {

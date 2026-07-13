@@ -96,7 +96,7 @@ final class TransactionForm extends Component
     /**
      * Sens de trésorerie pour l'affichage IHM (« depense » ou « recette »).
      * Différent de $type pour les miroirs d'extourne (recette → depense et vice-versa).
-     * La logique comptable (filtre sous-catégories, save, validation) reste sur $type.
+     * La logique comptable (filtre comptes, save, validation) reste sur $type.
      */
     public string $sensTresorerie = '';
 
@@ -484,7 +484,7 @@ final class TransactionForm extends Component
         $this->isLockedByHelloAsso = $transaction->helloasso_order_id !== null;
 
         // Miroir d'extourne : le sens de trésorerie est inversé par rapport au type comptable.
-        // $type reste le type réel (recette/depense) pour le filtrage sous-catégories 6xx/7xx.
+        // $type reste le type réel (recette/depense) pour le filtrage comptes 6xx/7xx.
         // $sensTresorerie reflète le sens du flux d'argent pour l'IHM.
         $this->isExtourneMiroir = $transaction->type_ecriture === 'extourne';
         $this->sensTresorerie = $this->isExtourneMiroir
@@ -1117,7 +1117,7 @@ final class TransactionForm extends Component
     public function render(): View
     {
         // DC-8 : source des options de ventilation (comptes classe 6/7, groupés par
-        // famille) — remplace l'ex-liste `sousCategories` (déjà morte côté blade, le
+        // famille) — remplace l'ex-liste `comptes` (déjà morte côté blade, le
         // select vit dans <livewire:compte-autocomplete>, gardé pour tout
         // futur consommateur direct de ce render()).
         $groupesComptesVentilation = $this->type !== ''

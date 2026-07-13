@@ -19,12 +19,7 @@ final class HelloassoSyncConfig extends Component
 
     public ?int $compteVersementId = null;
 
-    /**
-     * DC-10a : le sélecteur liste des comptes (usage Don) et la colonne
-     * helloasso_parametres.compte_don_id porte directement l'id de compte
-     * (nom de propriété conservé jusqu'au renommage vocabulaire).
-     */
-    public ?int $sousCategorieDonId = null;
+    public ?int $compteDonId = null;
 
     public ?string $message = null;
 
@@ -36,7 +31,7 @@ final class HelloassoSyncConfig extends Component
         if ($p !== null) {
             $this->compteHelloassoId = $p->compte_helloasso_id;
             $this->compteVersementId = $p->compte_versement_id;
-            $this->sousCategorieDonId = $p->compte_don_id;
+            $this->compteDonId = $p->compte_don_id;
         }
     }
 
@@ -46,7 +41,7 @@ final class HelloassoSyncConfig extends Component
         $this->validate([
             'compteHelloassoId' => ['nullable', 'integer', Rule::exists('comptes_bancaires', 'id')->where('association_id', $associationId)],
             'compteVersementId' => ['nullable', 'integer', Rule::exists('comptes_bancaires', 'id')->where('association_id', $associationId)],
-            'sousCategorieDonId' => ['nullable', 'integer', Rule::exists('comptes', 'id')->where('association_id', $associationId)],
+            'compteDonId' => ['nullable', 'integer', Rule::exists('comptes', 'id')->where('association_id', $associationId)],
         ]);
 
         $p = HelloAssoParametres::query()->first();
@@ -59,7 +54,7 @@ final class HelloassoSyncConfig extends Component
         $p->update([
             'compte_helloasso_id' => $this->compteHelloassoId ?: null,
             'compte_versement_id' => $this->compteVersementId ?: null,
-            'compte_don_id' => $this->sousCategorieDonId ?: null,
+            'compte_don_id' => $this->compteDonId ?: null,
         ]);
 
         $this->dispatch('form-saved');

@@ -67,7 +67,7 @@ final class BudgetExportService
      */
     public function toCsv(array $rows): string
     {
-        $lines = ['exercice;categorie;sous_categorie;montant_prevu'];
+        $lines = ['exercice;famille;compte;montant_prevu'];
 
         foreach ($rows as $row) {
             $escaped = array_map(

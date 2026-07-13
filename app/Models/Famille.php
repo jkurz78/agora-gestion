@@ -8,12 +8,9 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 /**
- * DC-1 du programme « dissolution sous_categories → comptes ».
- *
  * Une famille NOMME un préfixe à 2 chiffres (classes 6/7 du PCG). Le
  * rattachement compte → famille est DÉRIVÉ par préfixe (`Compte::famille()`)
- * — jamais de FK. Remplace la notion de `Categorie` (nom "NN - Libellé")
- * comme regroupement de premier niveau.
+ * — jamais de FK.
  */
 final class Famille extends TenantModel
 {

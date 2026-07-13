@@ -539,14 +539,6 @@
                             </li>
                             @endif
                             <li><hr class="dropdown-divider"></li>
-                            @if (Route::has('parametres.categories.index'))
-                            <li>
-                                <a class="dropdown-item {{ request()->routeIs('parametres.categories.*') ? 'active' : '' }}"
-                                   href="{{ route('parametres.categories.index') }}">
-                                    <i class="bi bi-tags"></i> Catégories
-                                </a>
-                            </li>
-                            @endif
                             @if (Route::has('parametres.plan-comptable'))
                             <li>
                                 <a class="dropdown-item {{ request()->routeIs('parametres.plan-comptable') ? 'active' : '' }}"

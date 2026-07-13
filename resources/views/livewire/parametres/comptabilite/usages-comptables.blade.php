@@ -120,24 +120,14 @@
                     </div>
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label class="form-label">Catégorie</label>
-                            <select class="form-select" wire:model="inlineCategorieId">
-                                <option value="">Sélectionner…</option>
-                                @foreach($this->inlineCategoriesEligibles as $cat)
-                                    <option value="{{ $cat->id }}">{{ $cat->nom }}</option>
-                                @endforeach
-                            </select>
-                            @error('inlineCategorieId') <div class="text-danger small">{{ $message }}</div> @enderror
-                        </div>
-                        <div class="mb-3">
                             <label class="form-label">Intitulé</label>
                             <input type="text" class="form-control" wire:model="inlineNom">
                             @error('inlineNom') <div class="text-danger small">{{ $message }}</div> @enderror
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Numéro de compte <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" wire:model="inlineCodeCerfa" placeholder="ex : 706A">
-                            @error('inlineCodeCerfa') <div class="text-danger small">{{ $message }}</div> @enderror
+                            <input type="text" class="form-control" wire:model="inlineNumeroPcg" placeholder="ex : 706A">
+                            @error('inlineNumeroPcg') <div class="text-danger small">{{ $message }}</div> @enderror
                         </div>
                     </div>
                     <div class="modal-footer">

@@ -1,6 +1,4 @@
 {{--
-    DC-8 — dissolution sous_categories → comptes.
-
     Rend uniquement le contenu (optgroup/option) d'un <select> de compte de
     ventilation — l'écran appelant garde la main sur la balise <select>
     elle-même (wire:model, option "aucun", classes CSS…), qui varie par écran.

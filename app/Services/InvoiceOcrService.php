@@ -208,7 +208,7 @@ final class InvoiceOcrService
             ->map(fn (Tiers $t) => $t->id.': '.$t->displayName())
             ->implode("\n");
 
-        // DC-10a : les comptes de charge (classe 6) remplacent les sous-catégories dépense.
+        // DC-10a : les comptes de charge (classe 6) remplacent les comptes dépense.
         $comptes = Compte::where('classe', 6)
             ->where('actif', true)
             ->orderBy('numero_pcg')

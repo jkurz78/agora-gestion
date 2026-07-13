@@ -36,7 +36,7 @@
     @else
         @foreach($grouped as $sousCatNom => $typeGroups)
             @php
-                // Badge couleur par sous-catégorie
+                // Badge couleur par compte
                 if (str_contains($sousCatNom, 'Parcours')) {
                     $catBg = '#e8f0fe'; $catText = '#1a56db';
                 } elseif (str_contains($sousCatNom, 'Formation')) {
@@ -47,7 +47,7 @@
                 $catCount = $typeGroups->flatten()->count();
             @endphp
 
-            {{-- Niveau 1 : sous-catégorie --}}
+            {{-- Niveau 1 : compte --}}
             <div class="mb-4">
                 <div class="d-flex align-items-center gap-2 mb-2 pb-1" style="border-bottom: 2px solid {{ $catBg }};">
                     <span class="badge rounded-pill px-2 py-1" style="background-color:{{ $catBg }}; color:{{ $catText }}; font-size: .8rem;">

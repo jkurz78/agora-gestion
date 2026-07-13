@@ -43,7 +43,7 @@ use Illuminate\Support\Facades\DB;
  *    ne peut pas servir de clé).
  *
  * Extracted out of the migration so the seed can be replayed in tests without
- * re-running the full migration (same pattern as AuditGuard).
+ * re-running the full migration.
  */
 final class BancairesSeeder
 {

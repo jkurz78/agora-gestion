@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\DB;
  * Design decisions baked into this class:
  *
  *  - Unconditional accounts (411, 401, 5112): one cross-tenant INSERT … SELECT FROM
- *    associations is issued per account. Symmetric with AuditGuard and BancairesSeeder.
+ *    associations is issued per account.
  *
  *  - Conditional account (530): the EXISTS sub-query reads from `transactions`
  *    filtered by association_id, mode_paiement='especes', AND deleted_at IS NULL —
@@ -33,7 +33,7 @@ use Illuminate\Support\Facades\DB;
  *  - classe = 4 for 411/401 (comptes tiers), classe = 5 for 5112/530 (caisse/chèques).
  *
  * Extracted out of the migration so the seed can be replayed in tests without
- * re-running the full migration (same pattern as AuditGuard and BancairesSeeder).
+ * re-running the full migration.
  */
 final class SystemeSeeder
 {

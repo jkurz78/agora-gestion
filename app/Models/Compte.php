@@ -169,7 +169,7 @@ final class Compte extends TenantModel
     }
 
     // -------------------------------------------------------------------------
-    // Usages comptables (DC-8 — dissolution sous_categories → comptes)
+    // Usages comptables
     // -------------------------------------------------------------------------
 
     /**
@@ -189,7 +189,7 @@ final class Compte extends TenantModel
     }
 
     // -------------------------------------------------------------------------
-    // Famille (DC-1 — dissolution sous_categories → comptes)
+    // Famille
     // -------------------------------------------------------------------------
 
     /** Préfixe famille (2 premiers caractères du numéro PCG). */

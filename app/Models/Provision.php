@@ -49,11 +49,6 @@ final class Provision extends TenantModel
         ];
     }
 
-    public function sousCategorie(): BelongsTo
-    {
-        return $this->belongsTo(SousCategorie::class);
-    }
-
     public function compte(): BelongsTo
     {
         return $this->belongsTo(Compte::class, 'compte_id');

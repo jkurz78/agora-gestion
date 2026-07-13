@@ -49,7 +49,7 @@ final class Dashboard extends Component
 
         $totalPrevu = (float) $budgetLines->sum('montant_prevu');
         $totalRealise = 0.0;
-        $budgetParCategorie = []; // ['nomGroupe' => ['type' => 'depense|recette', 'prevu' => float, 'realise' => float]]
+        $budgetParFamille = []; // ['nomGroupe' => ['type' => 'depense|recette', 'prevu' => float, 'realise' => float]]
         foreach ($budgetLines as $line) {
             $r = $line->compte_id !== null ? (float) $budgetService->realise((int) $line->compte_id, $exercice) : 0.0;
             $totalRealise += $r;
@@ -57,21 +57,21 @@ final class Dashboard extends Component
             $compte = $line->compte;
             $famille = $compte !== null ? $familles->get(substr($compte->numero_pcg, 0, 2)) : null;
 
-            $catKey = $famille?->nom ?? '—';
-            if (! isset($budgetParCategorie[$catKey])) {
-                $budgetParCategorie[$catKey] = [
+            $familleKey = $famille?->nom ?? '—';
+            if (! isset($budgetParFamille[$familleKey])) {
+                $budgetParFamille[$familleKey] = [
                     'type' => $famille !== null ? ($famille->estDepense() ? 'depense' : 'recette') : 'depense',
                     'prevu' => 0.0,
                     'realise' => 0.0,
                 ];
             }
-            $budgetParCategorie[$catKey]['prevu'] += (float) $line->montant_prevu;
-            $budgetParCategorie[$catKey]['realise'] += $r;
+            $budgetParFamille[$familleKey]['prevu'] += (float) $line->montant_prevu;
+            $budgetParFamille[$familleKey]['realise'] += $r;
         }
         // Tri : recettes en premier, puis dépenses, alpha dans chaque groupe
-        uksort($budgetParCategorie, function ($a, $b) use ($budgetParCategorie): int {
-            $ta = $budgetParCategorie[$a]['type'] === 'recette' ? 0 : 1;
-            $tb = $budgetParCategorie[$b]['type'] === 'recette' ? 0 : 1;
+        uksort($budgetParFamille, function ($a, $b) use ($budgetParFamille): int {
+            $ta = $budgetParFamille[$a]['type'] === 'recette' ? 0 : 1;
+            $tb = $budgetParFamille[$b]['type'] === 'recette' ? 0 : 1;
 
             return $ta <=> $tb ?: strcasecmp($a, $b);
         });
@@ -158,7 +158,7 @@ final class Dashboard extends Component
             'totalDepenses' => $totalDepenses,
             'totalPrevu' => $totalPrevu,
             'totalRealise' => $totalRealise,
-            'budgetParCategorie' => $budgetParCategorie,
+            'budgetParFamille' => $budgetParFamille,
             'dernieresDepenses' => $dernieresDepenses,
             'dernieresRecettes' => $dernieresRecettes,
             'derniersDons' => $derniersDons,

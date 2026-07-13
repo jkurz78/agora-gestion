@@ -89,11 +89,6 @@ final class FormuleAdhesion extends TenantModel
         });
     }
 
-    public function sousCategorie(): BelongsTo
-    {
-        return $this->belongsTo(SousCategorie::class, 'sous_categorie_id');
-    }
-
     public function compte(): BelongsTo
     {
         return $this->belongsTo(Compte::class, 'compte_id');

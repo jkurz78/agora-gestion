@@ -7,7 +7,7 @@ namespace App\Services;
 use App\Enums\TypeCategorie;
 use App\Enums\UsageComptable;
 use App\Models\Compte;
-use App\Models\UsageSousCategorie;
+use App\Models\UsageCompte;
 use App\Tenant\TenantContext;
 use DomainException;
 use Illuminate\Support\Facades\DB;
@@ -51,9 +51,8 @@ final class UsagesComptablesService
 
     /**
      * Création d'un compte de résultat directement flaggé d'un usage.
-     * Le miroir SousCategorie est matérialisé par CompteObserver (DC-7).
      *
-     * @param  array{intitule: string, numero_pcg: string, categorie_id?: int}  $attrs
+     * @param  array{intitule: string, numero_pcg: string}  $attrs
      */
     public function createAndFlag(array $attrs, UsageComptable $usage): Compte
     {
@@ -99,7 +98,7 @@ final class UsagesComptablesService
     private function setMono(UsageComptable $usage, ?int $compteId): void
     {
         DB::transaction(function () use ($usage, $compteId): void {
-            UsageSousCategorie::where('usage', $usage->value)->delete();
+            UsageCompte::where('usage', $usage->value)->delete();
             if ($compteId !== null) {
                 Compte::findOrFail($compteId);
                 $this->ensureLink($usage, $compteId);
@@ -114,7 +113,7 @@ final class UsagesComptablesService
             if ($active) {
                 $this->ensureLink($usage, $compte->id);
             } else {
-                UsageSousCategorie::where('compte_id', $compte->id)
+                UsageCompte::where('compte_id', $compte->id)
                     ->where('usage', $usage->value)
                     ->delete();
             }
@@ -123,7 +122,7 @@ final class UsagesComptablesService
 
     private function ensureLink(UsageComptable $usage, int $compteId): void
     {
-        UsageSousCategorie::firstOrCreate([
+        UsageCompte::firstOrCreate([
             'association_id' => TenantContext::currentId(),
             'compte_id' => $compteId,
             'usage' => $usage->value,

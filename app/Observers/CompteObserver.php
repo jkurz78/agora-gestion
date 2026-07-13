@@ -9,8 +9,6 @@ use App\Models\Famille;
 use Illuminate\Support\Facades\Log;
 
 /**
- * DC-1 du programme « dissolution sous_categories → comptes ».
- *
  * Le rattachement compte → famille est dérivé par préfixe (pas de FK) : un
  * compte 6/7 dont le préfixe n'a jamais été nommé doit tout de même
  * atterrir dans une famille pour ne pas disparaître de la ventilation.

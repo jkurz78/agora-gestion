@@ -92,9 +92,9 @@ it('refuse les comptes bancaires et le compte de don d’un autre tenant', funct
     Livewire::test(HelloassoSyncConfig::class)
         ->set('compteHelloassoId', (int) $this->compteA->id)
         ->set('compteVersementId', (int) $this->compteA->id)
-        ->set('sousCategorieDonId', (int) $compteDonA->id)
+        ->set('compteDonId', (int) $compteDonA->id)
         ->call('sauvegarder')
-        ->assertHasErrors(['compteHelloassoId', 'compteVersementId', 'sousCategorieDonId']);
+        ->assertHasErrors(['compteHelloassoId', 'compteVersementId', 'compteDonId']);
 
     $parametresB = HelloAssoParametres::query()->findOrFail((int) $this->parametresB->id);
     expect((int) $parametresB->compte_helloasso_id)->toBe((int) $this->compteB->id)

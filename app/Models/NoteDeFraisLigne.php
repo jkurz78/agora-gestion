@@ -57,11 +57,6 @@ final class NoteDeFraisLigne extends Model
         return $this->belongsTo(NoteDeFrais::class);
     }
 
-    public function sousCategorie(): BelongsTo
-    {
-        return $this->belongsTo(SousCategorie::class);
-    }
-
     public function compte(): BelongsTo
     {
         return $this->belongsTo(Compte::class, 'compte_id');

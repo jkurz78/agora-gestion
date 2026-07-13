@@ -23,7 +23,7 @@ final class RapportService
     }
 
     /**
-     * Compte de résultat complet : hiérarchie catégorie/sous-catégorie avec N-1 et budget.
+     * Compte de résultat complet : hiérarchie famille/compte avec N-1 et budget.
      * Pas de filtre opération.
      *
      * @return array{charges: list<array>, produits: list<array>}
@@ -122,7 +122,7 @@ final class RapportService
     }
 
     /**
-     * Rapport par séances : hiérarchie catégorie/sous-catégorie avec une colonne par séance.
+     * Rapport par séances : hiérarchie famille/compte avec une colonne par séance.
      *
      * @param  array<int>  $operationIds
      * @return array{seances: list<int>, charges: list<array>, produits: list<array>}

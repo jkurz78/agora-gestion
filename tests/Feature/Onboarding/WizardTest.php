@@ -4,14 +4,12 @@ declare(strict_types=1);
 
 use App\Livewire\Onboarding\Wizard;
 use App\Models\Association;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Famille;
 use App\Models\HelloAssoParametres;
 use App\Models\IncomingMailParametres;
 use App\Models\SmtpParametres;
-use App\Models\SousCategorie;
 use App\Models\User;
 use App\Services\SmtpService;
 use App\Tenant\TenantContext;
@@ -520,7 +518,7 @@ it('saves step 7 with default plan comptable and advances to step 8', function (
         ->call('saveStep7')
         ->assertSet('currentStep', 8);
 
-    // Comptes/familles = primaire (DC-9). Categorie/SousCategorie = miroir
+    // Comptes et familles constituent le plan comptable.
     // encore lu par le pont CR legacy tant que DC-10 ne les a pas dropées.
     $familleCount = Famille::where('association_id', $this->association->id)->count();
     $compteCount = Compte::where('association_id', $this->association->id)->count();
@@ -538,9 +536,7 @@ it('saves step 7 with empty plan and advances to step 8', function () {
         ->assertSet('currentStep', 8);
 
     $familleCount = Famille::where('association_id', $this->association->id)->count();
-    $catCount = Categorie::where('association_id', $this->association->id)->count();
     expect($familleCount)->toBe(0);
-    expect($catCount)->toBe(0);
 });
 
 it('does not re-apply default plan on step 7 re-submit', function () {
@@ -565,7 +561,7 @@ it('does not re-apply default plan on step 7 re-submit', function () {
     expect($secondCount)->toBe($firstCount);
 });
 
-it('saves step 7 with empty plan leaves zero sous-categories', function () {
+it('saves step 7 with empty plan leaves zero comptes', function () {
     $this->association->update(['wizard_current_step' => 7]);
 
     Livewire::actingAs($this->admin)
@@ -575,9 +571,7 @@ it('saves step 7 with empty plan leaves zero sous-categories', function () {
         ->assertSet('currentStep', 8);
 
     $compteCount = Compte::where('association_id', $this->association->id)->count();
-    $scCount = SousCategorie::where('association_id', $this->association->id)->count();
     expect($compteCount)->toBe(0);
-    expect($scCount)->toBe(0);
 });
 
 it('finalizes wizard and redirects to dashboard', function () {

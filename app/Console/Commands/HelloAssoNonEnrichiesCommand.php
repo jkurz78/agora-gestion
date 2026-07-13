@@ -13,7 +13,7 @@ use Illuminate\Console\Command;
  * Liste les transactions HelloAsso restées en mode legacy (PD non enrichie).
  *
  * Les transactions HelloAsso sont enrichies en partie double au sync via
- * TransactionConverter (best-effort). En cas d'échec (sous-catégorie sans
+ * TransactionConverter (best-effort). En cas d'échec (compte sans
  * code_cerfa, compte 6xx/7xx manquant…), la transaction reste legacy : elle
  * est invisible dans les restitutions PD ET exclue de la garde compta:assert-pd-complete.
  *

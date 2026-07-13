@@ -179,7 +179,7 @@ final class NoteDeFraisService
             ]
         );
 
-        // La sous-catégorie est obligatoire uniquement pour les lignes de type standard.
+        // La compte est obligatoire uniquement pour les lignes de type standard.
         // Pour les lignes kilométriques, elle peut être null (le comptable tranchera).
         $validator->after(function ($v) use ($lignes): void {
             foreach ($lignes as $index => $ligne) {

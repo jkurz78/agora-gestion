@@ -125,7 +125,7 @@ final class NoteDeFraisValidationService
      *
      * Crée deux transactions qui se neutralisent logiquement :
      * 1. Une Transaction Dépense (réglée) portant les lignes NDF.
-     * 2. Une Transaction Don/Recette (réglée) du même montant sur la sous-catégorie
+     * 2. Une Transaction Don/Recette (réglée) du même montant sur la compte
      *    désignée pour l'usage AbandonCreance.
      *
      * Les deux transactions ont statut_reglement = Recu → n'apparaissent pas dans
@@ -135,8 +135,8 @@ final class NoteDeFraisValidationService
      * @return Transaction La Transaction Don (recette)
      *
      * @throws DomainException si la NDF n'est pas Soumise
-     * @throws DomainException si aucune sous-catégorie AbandonCreance n'est configurée
-     * @throws DomainException si plusieurs sous-catégories AbandonCreance sont configurées
+     * @throws DomainException si aucune compte AbandonCreance n'est configurée
+     * @throws DomainException si plusieurs comptes AbandonCreance sont configurées
      */
     public function validerAvecAbandonCreance(
         NoteDeFrais $ndf,

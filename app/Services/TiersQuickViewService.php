@@ -165,7 +165,7 @@ final class TiersQuickViewService
             ->whereNull('tx.deleted_at')
             ->whereNull('tl.deleted_at')
             ->whereNotExists(function ($q): void {
-                $q->from('usages_sous_categories as usc')
+                $q->from('usages_comptes as usc')
                     ->whereColumn('usc.compte_id', 'tl.compte_id')
                     ->whereIn('usc.usage', [
                         UsageComptable::Don->value,
@@ -201,7 +201,7 @@ final class TiersQuickViewService
             ->whereNull('tx.deleted_at')
             ->whereNull('tl.deleted_at')
             ->whereExists(function ($q): void {
-                $q->from('usages_sous_categories as usc')
+                $q->from('usages_comptes as usc')
                     ->whereColumn('usc.compte_id', 'tl.compte_id')
                     ->where('usc.usage', UsageComptable::Don->value);
             })
@@ -234,7 +234,7 @@ final class TiersQuickViewService
             ->whereNull('tx.deleted_at')
             ->whereNull('tl.deleted_at')
             ->whereExists(function ($q): void {
-                $q->from('usages_sous_categories as usc')
+                $q->from('usages_comptes as usc')
                     ->whereColumn('usc.compte_id', 'tl.compte_id')
                     ->where('usc.usage', UsageComptable::Cotisation->value);
             })

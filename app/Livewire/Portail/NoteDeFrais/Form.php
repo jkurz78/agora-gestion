@@ -392,7 +392,7 @@ final class Form extends Component
         $exerciceCourant = app(ExerciceService::class)->current();
 
         // DC-10a : comptes de charge (classe 6) — libellé seul côté portail (D1).
-        $sousCategories = Compte::where('classe', 6)
+        $comptes = Compte::where('classe', 6)
             ->where('actif', true)
             ->orderBy('intitule')
             ->get();
@@ -406,7 +406,7 @@ final class Form extends Component
             : null;
 
         return view('livewire.portail.note-de-frais.form', [
-            'sousCategories' => $sousCategories,
+            'comptes' => $comptes,
             'operations' => $operations,
             'selectedOperation' => $selectedOperation,
         ])->layout('portail.layouts.authenticated');

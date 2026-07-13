@@ -142,8 +142,6 @@ final class TransactionExtourneService
         foreach ($origine->lignes()->get() as $ligne) {
             TransactionLigne::create([
                 'transaction_id' => $miroir->id,
-                // Legacy fields
-                'sous_categorie_id' => $ligne->sous_categorie_id,
                 'operation_id' => $ligne->operation_id,
                 'seance' => $ligne->seance,
                 'montant' => -1 * (float) $ligne->montant,

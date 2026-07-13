@@ -366,7 +366,6 @@ final class EcritureGenerator
                 'tiers_id' => $tiers->id,
                 'libelle' => $libelleEffectif,
                 'montant' => 0,
-                'sous_categorie_id' => null,
             ]);
             $ligne411D->setRelation('compte', $compte411);
             $toutesLignes[] = $ligne411D;
@@ -392,7 +391,6 @@ final class EcritureGenerator
                         // Les lignes techniques (411, portage) restent sans notes.
                         'notes' => $v['notes'] ?? null,
                         'montant' => 0,
-                        'sous_categorie_id' => null,
                     ]);
                     $ligneVent->setRelation('compte', $compteVent);
                     $toutesLignes[] = $ligneVent;
@@ -408,7 +406,6 @@ final class EcritureGenerator
                 'tiers_id' => null,
                 'libelle' => $libelleEffectif,
                 'montant' => 0,
-                'sous_categorie_id' => null,
             ]);
             $lignePortage->setRelation('compte', $comptePortage);
             $toutesLignes[] = $lignePortage;
@@ -422,7 +419,6 @@ final class EcritureGenerator
                 'tiers_id' => $tiers->id,
                 'libelle' => $libelleEffectif,
                 'montant' => 0,
-                'sous_categorie_id' => null,
             ]);
             $ligne411C->setRelation('compte', $compte411);
             $toutesLignes[] = $ligne411C;
@@ -550,7 +546,6 @@ final class EcritureGenerator
                 'tiers_id' => $tiers->id,
                 'libelle' => $libelleEffectif,
                 'montant' => 0,
-                'sous_categorie_id' => null,
             ]);
             $ligne411->setRelation('compte', $compte411);
             $lignes[] = $ligne411;
@@ -575,7 +570,6 @@ final class EcritureGenerator
                         // Fix #4 — notes métier propagées sur les lignes de ventilation (7x).
                         'notes' => $v['notes'] ?? null,
                         'montant' => 0,
-                        'sous_categorie_id' => null,
                     ]);
                     $ligneVent->setRelation('compte', $compteVent);
                     $lignes[] = $ligneVent;
@@ -727,7 +721,6 @@ final class EcritureGenerator
                         // Fix #4 — notes métier propagées sur les lignes de ventilation (6x).
                         'notes' => $v['notes'] ?? null,
                         'montant' => 0,
-                        'sous_categorie_id' => null,
                     ]);
                     $ligneVent->setRelation('compte', $compteVent);
                     $toutesLignes[] = $ligneVent;
@@ -743,7 +736,6 @@ final class EcritureGenerator
                 'tiers_id' => $tiers->id,
                 'libelle' => $libelleEffectif,
                 'montant' => 0,
-                'sous_categorie_id' => null,
             ]);
             $ligne401C->setRelation('compte', $compte401);
             $toutesLignes[] = $ligne401C;
@@ -757,7 +749,6 @@ final class EcritureGenerator
                 'tiers_id' => $tiers->id,
                 'libelle' => $libelleEffectif,
                 'montant' => 0,
-                'sous_categorie_id' => null,
             ]);
             $ligne401D->setRelation('compte', $compte401);
             $toutesLignes[] = $ligne401D;
@@ -771,7 +762,6 @@ final class EcritureGenerator
                 'tiers_id' => null,
                 'libelle' => $libelleEffectif,
                 'montant' => 0,
-                'sous_categorie_id' => null,
             ]);
             $lignePortage->setRelation('compte', $comptePortage);
             $toutesLignes[] = $lignePortage;
@@ -895,7 +885,6 @@ final class EcritureGenerator
                 'tiers_id' => null,
                 'libelle' => $libelleEffectif,
                 'montant' => 0,
-                'sous_categorie_id' => null,
             ]);
             $lignePortage->setRelation('compte', $comptePortage);
 
@@ -908,7 +897,6 @@ final class EcritureGenerator
                 'tiers_id' => $tiers->id,
                 'libelle' => $libelleEffectif,
                 'montant' => 0,
-                'sous_categorie_id' => null,
             ]);
             $ligne411Encaissement->setRelation('compte', $compte411);
 
@@ -1033,7 +1021,6 @@ final class EcritureGenerator
                         // Fix #4 — notes métier propagées sur les lignes de ventilation (6x).
                         'notes' => $v['notes'] ?? null,
                         'montant' => 0,
-                        'sous_categorie_id' => null,
                     ]);
                     $ligneVent->setRelation('compte', $compteVent);
                     $lignes[] = $ligneVent;
@@ -1049,7 +1036,6 @@ final class EcritureGenerator
                 'tiers_id' => $tiers->id,
                 'libelle' => $libelleEffectif,
                 'montant' => 0,
-                'sous_categorie_id' => null,
             ]);
             $ligne401->setRelation('compte', $compte401);
             $lignes[] = $ligne401;
@@ -1164,7 +1150,6 @@ final class EcritureGenerator
                 'tiers_id' => $tiers->id,
                 'libelle' => $libelleEffectif,
                 'montant' => 0,
-                'sous_categorie_id' => null,
             ]);
             $ligne401Reglement->setRelation('compte', $compte401);
 
@@ -1178,7 +1163,6 @@ final class EcritureGenerator
                 'tiers_id' => null,
                 'libelle' => $libelleEffectif,
                 'montant' => 0,
-                'sous_categorie_id' => null,
             ]);
             $lignePortage->setRelation('compte', $comptePortage);
 
@@ -1292,7 +1276,6 @@ final class EcritureGenerator
                     'tiers_id' => null,
                     'libelle' => $libelleEffectif,
                     'montant' => 0,
-                    'sous_categorie_id' => null,
                 ]);
                 $lignePortage->setRelation('compte', $comptePortage);
 
@@ -1304,7 +1287,6 @@ final class EcritureGenerator
                     'tiers_id' => (int) $tiers->id,
                     'libelle' => $libelleEffectif,
                     'montant' => 0,
-                    'sous_categorie_id' => null,
                 ]);
                 $ligneTiersT2->setRelation('compte', $compteTiers);
 
@@ -1319,7 +1301,6 @@ final class EcritureGenerator
                     'tiers_id' => (int) $tiers->id,
                     'libelle' => $libelleEffectif,
                     'montant' => 0,
-                    'sous_categorie_id' => null,
                 ]);
                 $ligneTiersT2->setRelation('compte', $compteTiers);
 
@@ -1331,7 +1312,6 @@ final class EcritureGenerator
                     'tiers_id' => null,
                     'libelle' => $libelleEffectif,
                     'montant' => 0,
-                    'sous_categorie_id' => null,
                 ]);
                 $lignePortage->setRelation('compte', $comptePortage);
 
@@ -1464,7 +1444,6 @@ final class EcritureGenerator
                 'tiers_id' => $tiersId,
                 'libelle' => $libelle,
                 'montant' => 0,
-                'sous_categorie_id' => null,
             ]);
 
             $ligne467C = TransactionLigne::create([
@@ -1475,7 +1454,6 @@ final class EcritureGenerator
                 'tiers_id' => null,
                 'libelle' => $libelle,
                 'montant' => 0,
-                'sous_categorie_id' => null,
             ]);
 
             // ── T2-don (OD) : 467 D / 411 C ──
@@ -1496,7 +1474,6 @@ final class EcritureGenerator
                 'tiers_id' => null,
                 'libelle' => $libelle,
                 'montant' => 0,
-                'sous_categorie_id' => null,
             ]);
 
             $ligne411C = TransactionLigne::create([
@@ -1507,7 +1484,6 @@ final class EcritureGenerator
                 'tiers_id' => $tiersId,
                 'libelle' => $libelle,
                 'montant' => 0,
-                'sous_categorie_id' => null,
             ]);
 
             // ── Lettrage 401 : T1-dep (401C) ↔ T2-dep (401D) ──
@@ -1603,7 +1579,6 @@ final class EcritureGenerator
                 'tiers_id' => null,
                 'libelle' => $libelle,
                 'montant' => 0,
-                'sous_categorie_id' => null,
             ]);
             $ligneDebit->setRelation('compte', $compte512Dest);
 
@@ -1616,7 +1591,6 @@ final class EcritureGenerator
                 'tiers_id' => null,
                 'libelle' => $libelle,
                 'montant' => 0,
-                'sous_categorie_id' => null,
             ]);
             $ligneCredit->setRelation('compte', $compte512Source);
 
@@ -1672,7 +1646,6 @@ final class EcritureGenerator
                 'tiers_id' => null,
                 'libelle' => $libelle,
                 'montant' => 0,
-                'sous_categorie_id' => null,
             ]);
             $ligneDebit->setRelation('compte', $compteDebit);
 
@@ -1684,7 +1657,6 @@ final class EcritureGenerator
                 'tiers_id' => null,
                 'libelle' => $libelle,
                 'montant' => 0,
-                'sous_categorie_id' => null,
             ]);
             $ligneCredit->setRelation('compte', $compteCredit);
 
@@ -1739,7 +1711,6 @@ final class EcritureGenerator
                 'tiers_id' => null,
                 'libelle' => $libelle,
                 'montant' => 0,
-                'sous_categorie_id' => null,
             ]);
             $ligneDebit->setRelation('compte', $compteDebit);
 
@@ -1751,7 +1722,6 @@ final class EcritureGenerator
                 'tiers_id' => null,
                 'libelle' => $libelle,
                 'montant' => 0,
-                'sous_categorie_id' => null,
             ]);
             $ligneCredit->setRelation('compte', $compteCredit);
 
@@ -2036,7 +2006,7 @@ final class EcritureGenerator
             $ligne512 = TransactionLigne::create([
                 'transaction_id' => $t->id, 'compte_id' => $compteCible512->id,
                 'debit' => $total, 'credit' => 0, 'tiers_id' => null,
-                'libelle' => $libelle, 'montant' => 0, 'sous_categorie_id' => null,
+                'libelle' => $libelle, 'montant' => 0,
             ]);
             $ligne512->setRelation('compte', $compteCible512);
             $idsLignes = [$ligne512->id];
@@ -2046,7 +2016,7 @@ final class EcritureGenerator
                 $lignePortage = TransactionLigne::create([
                     'transaction_id' => $t->id, 'compte_id' => $comptePortage->id,
                     'debit' => 0, 'credit' => $montantSource, 'tiers_id' => null,
-                    'libelle' => $libelle, 'montant' => 0, 'sous_categorie_id' => null,
+                    'libelle' => $libelle, 'montant' => 0,
                 ]);
                 $idsLignes[] = $lignePortage->id;
                 $this->lettrageService->lettrer(

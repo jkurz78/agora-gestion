@@ -8,8 +8,6 @@ use App\Models\Compte;
 use App\Models\Famille;
 use App\Tenant\TenantContext;
 use Illuminate\Database\QueryException;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Livewire\Component;
@@ -168,7 +166,7 @@ final class PlanComptable extends Component
 
         // Garde explicite obligatoire : transaction_lignes.compte_id est
         // nullOnDelete — aucune contrainte DB ne protège un compte porteur
-        // d'écritures (contrairement au legacy sous_categorie_id en RESTRICT).
+        // d'écritures.
         if ($compte->lignes()->exists()) {
             $this->flashMessage = 'Suppression impossible : ce compte porte des écritures.';
             $this->flashType = 'danger';
@@ -177,16 +175,7 @@ final class PlanComptable extends Component
         }
 
         try {
-            DB::transaction(function () use ($compte): void {
-                if (Schema::hasTable('sous_categories')) {
-                    DB::table('sous_categories')
-                        ->where('code_cerfa', $compte->numero_pcg)
-                        ->where('association_id', $compte->association_id)
-                        ->delete();
-                }
-
-                $compte->forceDelete();
-            });
+            $compte->forceDelete();
         } catch (QueryException $e) {
             if ($e->getCode() === '23000') {
                 $this->flashMessage = 'Suppression impossible : cet élément est utilisé dans les données de l\'application.';

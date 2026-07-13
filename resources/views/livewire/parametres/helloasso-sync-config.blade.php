@@ -64,7 +64,7 @@
             <div class="row g-3 mb-3">
                 <div class="col-md-6">
                     <label class="form-label small">Don additionnel (Donation libre)</label>
-                    <select wire:model="sousCategorieDonId" class="form-select form-select-sm">
+                    <select wire:model="compteDonId" class="form-select form-select-sm">
                         <option value="">— Aucun —</option>
                         @foreach($comptesDon as $compte)
                             <option value="{{ $compte->id }}">{{ $compte->numero_pcg }} — {{ $compte->intitule }}</option>

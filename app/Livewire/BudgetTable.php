@@ -189,8 +189,7 @@ final class BudgetTable extends Component
         $budgetService = app(BudgetService::class);
         $exercice = app(ExerciceService::class)->current();
 
-        // DC-8 : comptes de résultat groupés par famille (remplace Categorie →
-        // sousCategories comme structure d'affichage).
+        // Comptes de résultat groupés par famille.
         $depenseGroupes = PlanComptableSelecteur::groupesPourType('depense');
         $recetteGroupes = PlanComptableSelecteur::groupesPourType('recette');
 

@@ -12,7 +12,10 @@ use App\Tenant\TenantContext;
 it('seeds 625A with FraisKilometriques and 771 with Don+AbandonCreance', function () {
     $asso = Association::factory()->create();
     TenantContext::boot($asso);
-    (new DefaultChartOfAccountsService)->applyTo($asso);
+    $result = (new DefaultChartOfAccountsService)->applyTo($asso);
+
+    expect($result)->toHaveKeys(['familles', 'comptes'])
+        ->not->toHaveKeys(['categories', 'sous_categories']);
 
     $km = Compte::where('numero_pcg', '625A')->firstOrFail();
     expect($km->hasUsage(UsageComptable::FraisKilometriques))->toBeTrue();
@@ -33,7 +36,7 @@ it('seeds 625A with FraisKilometriques and 771 with Don+AbandonCreance', functio
     }
 });
 
-it('materializes the sous_categories/categories mirror for the legacy CR bridge', function () {
+it('creates the account families derived from PCG prefixes', function () {
     $asso = Association::factory()->create();
     TenantContext::boot($asso);
     (new DefaultChartOfAccountsService)->applyTo($asso);

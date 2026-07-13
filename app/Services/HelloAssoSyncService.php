@@ -145,7 +145,7 @@ final class HelloAssoSyncService
                 throw new \RuntimeException("Tiers non trouvé pour {$firstName} {$lastName} — rapprochez d'abord les tiers");
             }
 
-            // Pre-validate: resolve sous-catégories and opérations for all items
+            // Pre-validate: resolve comptes and opérations for all items
             // For Membership items, auto-create formule before creating lignes
             // (so the AdhesionTransactionLigneObserver can find it)
             $resolvedItems = [];

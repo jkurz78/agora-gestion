@@ -52,7 +52,7 @@ final class ReglementOperationService
      * les écritures partie double via pourRecetteACredit.
      *
      * Skip silencieux (best-effort) si les prérequis partie double ne sont pas satisfaits
-     * (sous_categorie sans code_cerfa, compte classe 7 introuvable, etc.).
+     * (compte de classe 7 introuvable, etc.).
      *
      * @param  Seance  $seance  Séance dont on comptabilise les règlements.
      * @param  int  $compteBancaireId  ID CompteBancaire sélectionné dans l'UI.

@@ -16,9 +16,8 @@ final class TransactionLigneObserver
      * compte_id IS NOT NULL, c'est-à-dire les lignes intentionnellement créées
      * par le nouveau pipeline partie double (Steps 10+).
      *
-     * Les lignes legacy slice-0 (sous_categorie_id uniquement, debit/credit
-     * aux valeurs par défaut 0, compte_id NULL) sont ignorées jusqu'au
-     * backfill du Step 32 qui renseignera compte_id sur toutes ces lignes.
+     * Une ligne sans compte n'est pas soumise aux invariants. Le schéma final
+     * interdit ce cas ; la garde reste utile lors du rejeu des migrations.
      *
      * Note : cet observer ne se déclenche PAS sur les INSERT SQL bruts
      * (DB::table()->insert(), DB::statement()…) — les événements Eloquent

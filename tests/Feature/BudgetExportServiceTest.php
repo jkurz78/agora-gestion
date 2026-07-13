@@ -123,7 +123,7 @@ it('toCsv génère un CSV valide avec en-tête', function () {
     $csv = app(BudgetExportService::class)->toCsv($rows);
 
     expect($csv)
-        ->toContain('exercice;categorie;sous_categorie;montant_prevu')
+        ->toContain('exercice;famille;compte;montant_prevu')
         ->toContain('2026-2027;Charges;Loyers;1200.00')
         ->toContain('2026-2027;Charges;Électricité;');
 });

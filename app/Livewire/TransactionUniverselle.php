@@ -233,7 +233,7 @@ final class TransactionUniverselle extends Component
     public function sortBy(string $column): void
     {
         $allowed = ['id', 'date', 'numero_piece', 'reference', 'tiers', 'libelle',
-            'categorie_label', 'nb_lignes', 'compte_id', 'compte_nom', 'mode_paiement',
+            'compte_ventilation_nom', 'nb_lignes', 'compte_id', 'compte_nom', 'mode_paiement',
             'montant', 'pointe', 'source_type'];
         if (! in_array($column, $allowed, true)) {
             return;

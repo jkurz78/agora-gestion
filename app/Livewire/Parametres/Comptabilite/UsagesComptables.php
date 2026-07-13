@@ -25,7 +25,7 @@ final class UsagesComptables extends Component
 
     public string $inlineNom = '';
 
-    public ?string $inlineCodeCerfa = null;
+    public ?string $inlineNumeroPcg = null;
 
     public function mount(): void
     {
@@ -82,7 +82,7 @@ final class UsagesComptables extends Component
     public function openInline(string $usage): void
     {
         $this->requireAdmin();
-        $this->reset(['inlineNom', 'inlineCodeCerfa']);
+        $this->reset(['inlineNom', 'inlineNumeroPcg']);
         $this->inlineUsage = $usage;
         $this->inlineOpen = true;
     }
@@ -95,16 +95,16 @@ final class UsagesComptables extends Component
         $this->validate([
             'inlineUsage' => 'required|string',
             'inlineNom' => 'required|string|max:255',
-            'inlineCodeCerfa' => 'required|string|max:20',
+            'inlineNumeroPcg' => 'required|string|max:20',
         ]);
         $usage = UsageComptable::from($this->inlineUsage);
         try {
             app(UsagesComptablesService::class)->createAndFlag([
                 'intitule' => $this->inlineNom,
-                'numero_pcg' => $this->inlineCodeCerfa,
+                'numero_pcg' => $this->inlineNumeroPcg,
             ], $usage);
         } catch (DomainException $e) {
-            $this->addError('inlineCodeCerfa', $e->getMessage());
+            $this->addError('inlineNumeroPcg', $e->getMessage());
 
             return;
         }

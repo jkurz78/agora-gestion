@@ -34,7 +34,6 @@ final class TransactionLigne extends Model
 
     protected $fillable = [
         'transaction_id',
-        'sous_categorie_id',
         'operation_id',
         'seance',
         'montant',
@@ -57,7 +56,6 @@ final class TransactionLigne extends Model
         return [
             'montant' => 'decimal:2',
             'transaction_id' => 'integer',
-            'sous_categorie_id' => 'integer',
             'operation_id' => 'integer',
             'seance' => 'integer',
             'helloasso_item_id' => 'integer',
@@ -85,9 +83,7 @@ final class TransactionLigne extends Model
      * Critère (DC-10a) : le compte pointé par `compte_id` est de classe 6 ou 7.
      * Les lignes PD-only pointent toujours vers des comptes système de classe
      * 4 (411/401) ou 5 (512X/5112/530) — jamais 6/7 — donc ce critère les
-     * exclut par construction, indépendamment de `sous_categorie_id` (colonne
-     * legacy conservée jusqu'au drop DC-10b, mais qui n'est plus la source
-     * de vérité de la ventilation).
+     * exclut par construction.
      */
     public function scopeVentilation(Builder $q): Builder
     {
@@ -122,11 +118,6 @@ final class TransactionLigne extends Model
     public function transaction(): BelongsTo
     {
         return $this->belongsTo(Transaction::class);
-    }
-
-    public function sousCategorie(): BelongsTo
-    {
-        return $this->belongsTo(SousCategorie::class);
     }
 
     public function operation(): BelongsTo

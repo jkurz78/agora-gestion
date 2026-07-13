@@ -39,7 +39,7 @@ final class TransactionUniverselleService
         bool $ndfUniquement = false,
     ): array {
         $allowedColumns = ['id', 'date', 'numero_piece', 'reference', 'tiers', 'libelle',
-            'categorie_label', 'nb_lignes', 'compte_id', 'compte_nom', 'mode_paiement',
+            'compte_ventilation_nom', 'nb_lignes', 'compte_id', 'compte_nom', 'mode_paiement',
             'montant', 'pointe', 'source_type', 'tiers_type', 'tiers_id'];
         if (! in_array($sortColumn, $allowedColumns, true)) {
             $sortColumn = 'date';
@@ -138,7 +138,7 @@ final class TransactionUniverselleService
             return DB::table('transactions')->whereRaw('1 = 0')->selectRaw(
                 "id, 'depense' as source_type, NULL as date, NULL as numero_piece, NULL as reference,
                  NULL as tiers, NULL as tiers_type, NULL as tiers_id, NULL as libelle,
-                 NULL as categorie_label, 0 as nb_lignes, NULL as compte_id, NULL as compte_nom,
+                 NULL as compte_ventilation_nom, 0 as nb_lignes, NULL as compte_id, NULL as compte_nom,
                  NULL as mode_paiement, 0 as montant, NULL as pointe,
                  NULL as statut_reglement, NULL as remise_id, NULL as rapprochement_id,
                  NULL as notes, NULL as piece_jointe_path, NULL as piece_jointe_nom, 0 as is_helloasso,
@@ -178,7 +178,7 @@ final class TransactionUniverselleService
                 tx.libelle,
                 (SELECT c.intitule FROM transaction_lignes tl
                  JOIN comptes c ON c.id = tl.compte_id AND c.classe IN (6, 7)
-                 WHERE tl.transaction_id = tx.id ORDER BY tl.id LIMIT 1) as categorie_label,
+                 WHERE tl.transaction_id = tx.id ORDER BY tl.id LIMIT 1) as compte_ventilation_nom,
                 (SELECT COUNT(*) FROM transaction_lignes WHERE transaction_id = tx.id) as nb_lignes,
                 tx.compte_id,
                 cb.nom as compte_nom,
@@ -209,7 +209,7 @@ final class TransactionUniverselleService
             ->when($usageFilter !== null, fn ($q) => $q->whereExists(function ($sub) use ($usageFilter) {
                 $sub->select(DB::raw(1))
                     ->from('transaction_lignes as tl_filter')
-                    ->join('usages_sous_categories as usc_filter', 'usc_filter.compte_id', '=', 'tl_filter.compte_id')
+                    ->join('usages_comptes as usc_filter', 'usc_filter.compte_id', '=', 'tl_filter.compte_id')
                     ->whereColumn('tl_filter.transaction_id', 'tx.id')
                     ->where('usc_filter.usage', $usageFilter->value);
             }))
@@ -244,7 +244,7 @@ final class TransactionUniverselleService
                 tx.libelle,
                 (SELECT c.intitule FROM transaction_lignes tl
                  JOIN comptes c ON c.id = tl.compte_id AND c.classe IN (6, 7)
-                 WHERE tl.transaction_id = tx.id ORDER BY tl.id LIMIT 1) as categorie_label,
+                 WHERE tl.transaction_id = tx.id ORDER BY tl.id LIMIT 1) as compte_ventilation_nom,
                 (SELECT COUNT(*) FROM transaction_lignes WHERE transaction_id = tx.id) as nb_lignes,
                 tx.compte_id,
                 cb.nom as compte_nom,
@@ -275,7 +275,7 @@ final class TransactionUniverselleService
             ->when($usageFilter !== null, fn ($q) => $q->whereExists(function ($sub) use ($usageFilter) {
                 $sub->select(DB::raw(1))
                     ->from('transaction_lignes as tl_filter')
-                    ->join('usages_sous_categories as usc_filter', 'usc_filter.compte_id', '=', 'tl_filter.compte_id')
+                    ->join('usages_comptes as usc_filter', 'usc_filter.compte_id', '=', 'tl_filter.compte_id')
                     ->whereColumn('tl_filter.transaction_id', 'tx.id')
                     ->where('usc_filter.usage', $usageFilter->value);
             }))
@@ -306,7 +306,7 @@ final class TransactionUniverselleService
                 NULL as tiers_type,
                 NULL as tiers_id,
                 CONCAT('Virement vers ', cb_dest.nom) as libelle,
-                NULL as categorie_label,
+                NULL as compte_ventilation_nom,
                 1 as nb_lignes,
                 vi.compte_source_id as compte_id,
                 cb_src.nom as compte_nom,
@@ -353,7 +353,7 @@ final class TransactionUniverselleService
                 NULL as tiers_type,
                 NULL as tiers_id,
                 CONCAT('Virement depuis ', cb_src.nom) as libelle,
-                NULL as categorie_label,
+                NULL as compte_ventilation_nom,
                 1 as nb_lignes,
                 vi.compte_destination_id as compte_id,
                 cb_dest.nom as compte_nom,

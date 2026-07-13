@@ -13,7 +13,7 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 
 final class BudgetImportService
 {
-    private const EXPECTED_HEADERS = ['exercice', 'categorie', 'sous_categorie', 'montant_prevu'];
+    private const EXPECTED_HEADERS = ['exercice', 'famille', 'compte', 'montant_prevu'];
 
     public function import(UploadedFile $file, int $exercice): BudgetImportResult
     {
@@ -54,7 +54,7 @@ final class BudgetImportService
         foreach ($dataRows as $idx => $row) {
             $lineNum = $idx + 2;
             $exerciceCell = trim((string) ($row[0] ?? ''));
-            // col 1 = categorie — ignorée à l'import (lecture seule)
+            // col 1 = famille — ignorée à l'import (lecture seule)
             $compteNom = trim((string) ($row[2] ?? ''));
             $montantCell = trim((string) ($row[3] ?? ''));
 

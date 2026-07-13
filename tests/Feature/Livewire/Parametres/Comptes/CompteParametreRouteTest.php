@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Livewire\PlanComptable;
 use App\Models\Association;
 use App\Models\User;
 use App\Tenant\TenantContext;
@@ -36,4 +37,9 @@ it('[E] route /parametres/sous-categories redirige 301 vers /parametres/plan-com
 
     $response->assertStatus(301);
     $response->assertRedirect('/parametres/plan-comptable');
+});
+
+it('la page hôte comptes rend le plan comptable', function (): void {
+    $this->view('parametres.comptes.index')
+        ->assertSeeLivewire(PlanComptable::class);
 });
