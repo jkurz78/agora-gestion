@@ -177,7 +177,7 @@ final class Compte extends TenantModel
      */
     public function usages(): HasMany
     {
-        return $this->hasMany(UsageSousCategorie::class, 'compte_id');
+        return $this->hasMany(UsageCompte::class, 'compte_id');
     }
 
     /**
