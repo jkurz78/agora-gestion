@@ -95,6 +95,8 @@ Expected: exit 0.
 - Modify: `app/Livewire/BackOffice/NoteDeFrais/Show.php`
 - Modify: `app/Livewire/Banques/HelloAssoSyncWizard.php`
 - Modify: `app/Services/ProvisionService.php`
+- Modify: `app/Models/HelloAssoParametres.php`
+- Modify: `database/factories/HelloAssoParametresFactory.php`
 - Modify: `app/Services/Compta/Migrations/SystemeSeeder.php`
 - Modify: `app/Services/Compta/Migrations/BancairesSeeder.php`
 - Modify: `resources/views/components/operation-breadcrumb.blade.php`
