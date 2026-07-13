@@ -326,6 +326,8 @@ Conserver les tests métier en les réécrivant avec `Compte::factory()` ; suppr
 
 - [ ] **Step 2: Exécuter la suite par domaine après chaque lot**
 
+Traiter d'abord le code de production (Task 4a), puis convertir exhaustivement les tests métier (Task 4b). La liste de fichiers ci-dessus est un point de départ : l'inventaire `rg` courant fait foi et tout test métier restant doit employer `Compte`, `Famille`, `UsageCompte` et les colonnes finales. Les chaînes legacy ne sont tolérées que dans les tests qui construisent explicitement un schéma pré-drop pour exercer une migration historique ; elles ne doivent jamais importer un modèle ou service applicatif supprimé.
+
 Run successivement :
 
 ```bash
