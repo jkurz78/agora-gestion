@@ -156,6 +156,10 @@ final class SnapshotLoader
     {
         if ($driver === 'sqlite') {
             DB::statement('PRAGMA foreign_keys = OFF');
+            // foreign_keys ne peut pas être désactivé au milieu de la transaction
+            // ouverte par RefreshDatabase. Le report global permet néanmoins de
+            // rejouer le snapshot complet avant de vérifier les FK en fin de lot.
+            DB::statement('PRAGMA defer_foreign_keys = ON');
         } else {
             DB::statement('SET FOREIGN_KEY_CHECKS=0');
         }
@@ -164,6 +168,7 @@ final class SnapshotLoader
     private function enableForeignKeys(string $driver): void
     {
         if ($driver === 'sqlite') {
+            DB::statement('PRAGMA defer_foreign_keys = OFF');
             DB::statement('PRAGMA foreign_keys = ON');
         } else {
             DB::statement('SET FOREIGN_KEY_CHECKS=1');

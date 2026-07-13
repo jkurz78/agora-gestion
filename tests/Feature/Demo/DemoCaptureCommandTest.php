@@ -132,8 +132,7 @@ it('produces correct YAML snapshot with one association user and tiers', functio
     // files key exists and is empty array
     expect($data['files'])->toBe([]);
 
-    // schema_version is 1
-    expect($data['schema_version'])->toBe(1);
+    expect($data['schema_version'])->toBe(SnapshotConfig::SCHEMA_VERSION);
 
     // Tables keys are sorted alphabetically
     $tableKeys = array_keys($data['tables']);

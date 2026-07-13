@@ -4,37 +4,33 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
-use App\Enums\TypeTransaction;
-use App\Models\Transaction;
-use App\Models\TransactionLigne;
+use App\Enums\ModePaiement;
+use App\Models\Association;
+use App\Models\Compte;
+use App\Models\Operation;
+use App\Models\Tiers;
 use App\Models\User;
+use App\Services\Compta\EcritureGenerator;
+use App\Tenant\TenantContext;
+use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Seeder;
 
 /**
- * Seed de test : 60 dépenses + 20 recettes janvier–février 2026
- * sur le compte courant (id=1), avec les tiers, opérations et comptes existants.
+ * Seed de démonstration : 60 dépenses + 20 recettes janvier–février 2026.
  */
 final class TransactionsJanFevSeeder extends Seeder
 {
-    // IDs présents en base localhost
-    private int $compteId = 1;
+    /** @var list<ModePaiement> */
+    private array $modes = [
+        ModePaiement::Virement,
+        ModePaiement::Cheque,
+        ModePaiement::Especes,
+        ModePaiement::Cb,
+        ModePaiement::Prelevement,
+    ];
 
-    /** @var int[] */
-    private array $tiersIds = [1, 2, 3, 4, 5, 6];
-
-    /** @var int[] */
-    private array $operationIds = [1, 2];
-
-    /** @var int[] */
-    private array $compteIdsDepense = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26];
-
-    /** @var int[] */
-    private array $compteIdsRecette = [1, 2, 3, 4, 5, 6, 7, 8, 9];
-
-    /** @var string[] */
-    private array $modes = ['virement', 'cheque', 'especes', 'cb', 'prelevement'];
-
-    /** @var string[] */
+    /** @var list<string> */
     private array $libellesDepense = [
         'Location salle janvier', 'Fournitures bureau', 'Frais bancaires',
         'Repas équipe', 'Transport participants', 'Honoraires formateur',
@@ -45,7 +41,7 @@ final class TransactionsJanFevSeeder extends Seeder
         'Développement site', 'Réparation équipement',
     ];
 
-    /** @var string[] */
+    /** @var list<string> */
     private array $libellesRecette = [
         'Parcours thérapeutique janv.', 'Formation groupe', 'Subvention trimestrielle',
         'Vente produits', 'Prestation encadrement', 'Don reçu',
@@ -55,88 +51,139 @@ final class TransactionsJanFevSeeder extends Seeder
 
     public function run(): void
     {
-        $userId = User::first()?->id ?? 1;
+        if (! TenantContext::hasBooted()) {
+            TenantContext::boot(Association::query()->sole());
+        }
 
-        // ── 60 dépenses ───────────────────────────────────────────────────────
+        $tiers = $this->resolveTiers();
+        $operations = Operation::query()->get();
+        $comptesDepense = Compte::where('classe', 6)->where('actif', true)->get();
+        $comptesRecette = Compte::where('classe', 7)->where('actif', true)->get();
+        $compteTresorerie = Compte::bancaires()->orderBy('numero_pcg')->firstOrFail();
+        $compteBancaireId = $compteTresorerie->compte_bancaire_id;
+        $userId = User::query()->orderBy('id')->value('id');
+
+        if ($comptesDepense->isEmpty() || $comptesRecette->isEmpty()) {
+            throw new \LogicException('Le plan comptable doit contenir des comptes actifs de classes 6 et 7.');
+        }
+
+        $this->ensureCaisseAccount();
+        $generator = app(EcritureGenerator::class);
+
         for ($i = 0; $i < 60; $i++) {
-            $date = $this->randomDate();
+            $mode = $this->modes[$i % count($this->modes)];
+            $tiersCourant = $tiers->random();
+            $compteVentilation = $comptesDepense->random();
+            $operation = $i % 5 === 0 || $operations->isEmpty() ? null : $operations->random();
             $montant = $this->randomMontant(50, 2500);
-            $compteId = $this->pick($this->compteIdsDepense);
-            $opId = $i % 5 === 0 ? null : $this->pick($this->operationIds); // ~80% avec opération
+            $libelle = $this->pick($this->libellesDepense).' '.($i + 1);
 
-            $tx = Transaction::create([
-                'type' => TypeTransaction::Depense->value,
-                'date' => $date,
-                'libelle' => $this->pick($this->libellesDepense).' '.($i + 1),
-                'montant_total' => $montant,
-                'mode_paiement' => $this->pick($this->modes),
-                'tiers_id' => $i % 4 === 0 ? null : $this->pick($this->tiersIds),
+            $transaction = $generator->pourDepenseComptant(
+                tiers: $tiersCourant,
+                ventilations: [[
+                    'compte' => $compteVentilation,
+                    'montant' => $montant,
+                    'operation_id' => $operation?->id,
+                    'seance' => $operation !== null && $i % 3 === 0 ? random_int(1, 3) : null,
+                ]],
+                mode: $mode,
+                compteTresorerie: $compteTresorerie,
+                date: new CarbonImmutable($this->randomDate()),
+                libelle: $libelle,
+            );
+
+            $transaction->update([
+                'tiers_id' => $tiersCourant->id,
                 'reference' => 'REF-D-'.str_pad((string) ($i + 1), 3, '0', STR_PAD_LEFT),
-                'compte_id' => $this->compteId,
-                'pointe' => false,
+                'compte_id' => $mode === ModePaiement::Especes ? null : $compteBancaireId,
                 'saisi_par' => $userId,
-            ]);
-
-            TransactionLigne::create([
-                'transaction_id' => $tx->id,
-                'compte_id' => $compteId,
-                'operation_id' => $opId,
-                'seance' => $opId !== null && $i % 3 === 0 ? rand(1, 3) : null,
-                'montant' => $montant,
-                'debit' => $montant,
-                'credit' => 0,
             ]);
         }
 
-        // ── 20 recettes ───────────────────────────────────────────────────────
         for ($i = 0; $i < 20; $i++) {
-            $date = $this->randomDate();
+            $mode = $this->modes[$i % count($this->modes)];
+            $tiersCourant = $tiers->random();
+            $compteVentilation = $comptesRecette->random();
+            $operation = $i % 4 === 0 || $operations->isEmpty() ? null : $operations->random();
             $montant = $this->randomMontant(100, 5000);
-            $compteId = $this->pick($this->compteIdsRecette);
-            $opId = $i % 4 === 0 ? null : $this->pick($this->operationIds); // ~75% avec opération
+            $libelle = $this->pick($this->libellesRecette).' '.($i + 1);
 
-            $tx = Transaction::create([
-                'type' => TypeTransaction::Recette->value,
-                'date' => $date,
-                'libelle' => $this->pick($this->libellesRecette).' '.($i + 1),
-                'montant_total' => $montant,
-                'mode_paiement' => $this->pick($this->modes),
-                'tiers_id' => $i % 3 === 0 ? null : $this->pick($this->tiersIds),
+            $transaction = $generator->pourRecetteComptant(
+                tiers: $tiersCourant,
+                ventilations: [[
+                    'compte' => $compteVentilation,
+                    'montant' => $montant,
+                    'operation_id' => $operation?->id,
+                    'seance' => $operation !== null && $i % 3 === 0 ? random_int(1, 3) : null,
+                ]],
+                mode: $mode,
+                compteTresorerie: $compteTresorerie,
+                date: new CarbonImmutable($this->randomDate()),
+                libelle: $libelle,
+            );
+
+            $transaction->update([
+                'tiers_id' => $tiersCourant->id,
                 'reference' => 'REF-R-'.str_pad((string) ($i + 1), 3, '0', STR_PAD_LEFT),
-                'compte_id' => $this->compteId,
-                'pointe' => false,
+                'compte_id' => $mode === ModePaiement::Especes ? null : $compteBancaireId,
                 'saisi_par' => $userId,
-            ]);
-
-            TransactionLigne::create([
-                'transaction_id' => $tx->id,
-                'compte_id' => $compteId,
-                'operation_id' => $opId,
-                'seance' => $opId !== null && $i % 3 === 0 ? rand(1, 3) : null,
-                'montant' => $montant,
-                'debit' => 0,
-                'credit' => $montant,
             ]);
         }
     }
 
-    /** @param  array<mixed>  $arr */
-    private function pick(array $arr): mixed
+    /** @return Collection<int, Tiers> */
+    private function resolveTiers(): Collection
     {
-        return $arr[array_rand($arr)];
+        $tiers = Tiers::query()->get();
+        if ($tiers->isNotEmpty()) {
+            return $tiers;
+        }
+
+        return new Collection([
+            Tiers::create([
+                'association_id' => (int) TenantContext::currentId(),
+                'type' => 'particulier',
+                'nom' => 'Tiers démo',
+                'pour_depenses' => true,
+                'pour_recettes' => true,
+            ]),
+        ]);
+    }
+
+    private function ensureCaisseAccount(): void
+    {
+        Compte::firstOrCreate(
+            [
+                'association_id' => (int) TenantContext::currentId(),
+                'numero_pcg' => '530',
+            ],
+            [
+                'intitule' => 'Caisse (espèces)',
+                'classe' => 5,
+                'actif' => true,
+                'est_systeme' => true,
+                'pour_inscriptions' => false,
+                'lettrable' => true,
+            ],
+        );
+    }
+
+    /** @param list<string> $values */
+    private function pick(array $values): string
+    {
+        return $values[array_rand($values)];
     }
 
     private function randomDate(): string
     {
-        // Janvier ou février 2026
-        $month = rand(0, 1) === 0 ? '01' : '02';
+        $month = random_int(0, 1) === 0 ? '01' : '02';
         $maxDay = $month === '02' ? 28 : 31;
 
-        return '2026-'.$month.'-'.str_pad((string) rand(1, $maxDay), 2, '0', STR_PAD_LEFT);
+        return '2026-'.$month.'-'.str_pad((string) random_int(1, $maxDay), 2, '0', STR_PAD_LEFT);
     }
 
     private function randomMontant(int $min, int $max): float
     {
-        return round(rand($min * 100, $max * 100) / 100, 2);
+        return round(random_int($min * 100, $max * 100) / 100, 2);
     }
 }

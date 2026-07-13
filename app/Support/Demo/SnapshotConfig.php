@@ -34,7 +34,7 @@ final class SnapshotConfig
      */
     public const DEMO_USER_PASSWORD_HASH = '$2y$12$70r/NnnHK5IpvNqor/8crO/xnNsascPzsKdorcqAASnP3MQkD6tTC';
 
-    public const SCHEMA_VERSION = 1;
+    public const SCHEMA_VERSION = 2;
 
     /**
      * Map of "file path" columns to capture during demo:capture.

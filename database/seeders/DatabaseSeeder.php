@@ -93,6 +93,10 @@ final class DatabaseSeeder extends Seeder
         $this->call(MessageTemplateSeeder::class);
         $this->call(OperationsTiersSeeder::class);
 
+        // Les seeders suivants génèrent des écritures : leurs comptes 401/411,
+        // 5112 et 512X doivent exister avant la première transaction.
+        app(ComptesProvisioningService::class)->provisionAll();
+
         // Create exercice for seeded data
         $exerciceService = app(ExerciceService::class);
         $annee = $exerciceService->current();
@@ -106,8 +110,5 @@ final class DatabaseSeeder extends Seeder
             $this->call(FactureManuelSeeder::class);
         }
 
-        // Complète le plan avec les comptes bancaires et système partie double.
-        // Idempotent (INSERT IGNORE / NOT EXISTS).
-        app(ComptesProvisioningService::class)->provisionAll();
     }
 }

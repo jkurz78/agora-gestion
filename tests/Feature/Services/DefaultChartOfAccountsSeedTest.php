@@ -27,6 +27,9 @@ it('seeds 625A with FraisKilometriques and 771 with Don+AbandonCreance', functio
     $dons = Compte::where('numero_pcg', '754')->firstOrFail();
     expect($dons->hasUsage(UsageComptable::Don))->toBeTrue();
 
+    $mecenat = Compte::where('numero_pcg', '756')->firstOrFail();
+    expect($mecenat->hasUsage(UsageComptable::Don))->toBeTrue();
+
     $coti = Compte::where('numero_pcg', '751')->firstOrFail();
     expect($coti->hasUsage(UsageComptable::Cotisation))->toBeTrue();
 

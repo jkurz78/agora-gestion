@@ -133,7 +133,7 @@ final class DefaultChartOfAccountsService
                 'comptes' => [
                     ['intitule' => 'Cotisations', 'numero_pcg' => '751', 'usages' => [UsageComptable::Cotisation]],
                     ['intitule' => 'Dons manuels', 'numero_pcg' => '754', 'usages' => [UsageComptable::Don]],
-                    ['intitule' => 'Mécénat',     'numero_pcg' => '756'],
+                    ['intitule' => 'Mécénat',     'numero_pcg' => '756', 'usages' => [UsageComptable::Don]],
                 ],
             ],
             [

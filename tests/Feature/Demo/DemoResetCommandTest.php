@@ -13,6 +13,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Symfony\Component\Yaml\Yaml;
 
 afterEach(function (): void {
@@ -47,7 +48,7 @@ function buildMinimalSnapshot(Carbon $ref, array $overrides = []): string
 
     $snapshot = array_merge([
         'captured_at' => $capturedAt,
-        'schema_version' => 1,
+        'schema_version' => SnapshotConfig::SCHEMA_VERSION,
         'tables' => [
             'association' => [
                 [
@@ -317,80 +318,19 @@ it('round-trips data through demo:capture then demo:reset', function (): void {
 });
 
 // ---------------------------------------------------------------------------
-// T6 — DC-9 : un snapshot pré-comptes (contient sous_categories mais pas
-// comptes/familles, comme l'actuel database/demo/snapshot.yaml capturé
-// 2026-04-29) doit voir son miroir plan comptable matérialisé après reset —
-// le replay est un INSERT brut — le plan comptable est matérialisé explicitement.
+// T6 — le snapshot versionné est directement rejouable sur le schéma final.
 // ---------------------------------------------------------------------------
-it('materializes comptes/familles from sous_categories on reset of a pre-comptes snapshot', function (): void {
+it('loads the real V2 snapshot on the final account-first schema', function (): void {
     app()->detectEnvironment(fn (): string => 'demo');
     config(['app.url' => 'https://demo.agoragestion.org']);
 
-    $ref = Carbon::parse('2026-04-15T10:00:00+00:00');
-    $minus1 = DateDelta::toDelta($ref->copy()->subDay(), $ref);
+    $snapshotPath = base_path('database/demo/snapshot.yaml');
+    $snapshot = Yaml::parseFile($snapshotPath);
 
-    $snapshotPath = buildMinimalSnapshot($ref, [
-        'tables' => [
-            'association' => [
-                [
-                    'id' => 1,
-                    'nom' => 'Démo AgoraGestion',
-                    'slug' => 'demo',
-                    'adresse' => '1 rue de la Démo',
-                    'code_postal' => '69001',
-                    'ville' => 'Lyon',
-                    'statut' => 'actif',
-                    'exercice_mois_debut' => 9,
-                    'devis_validite_jours' => 30,
-                    'wizard_completed_at' => $minus1,
-                    'created_at' => $minus1,
-                    'updated_at' => $minus1,
-                ],
-            ],
-            'users' => [
-                [
-                    'id' => 1,
-                    'derniere_association_id' => 1,
-                    'email' => 'admin@demo.fr',
-                    'password' => SnapshotConfig::DEMO_USER_PASSWORD_HASH,
-                    'nom' => 'ADMIN Demo',
-                    'role_systeme' => 'user',
-                    'peut_voir_donnees_sensibles' => 1,
-                    'email_verified_at' => $minus1,
-                    'created_at' => $minus1,
-                    'updated_at' => $minus1,
-                ],
-            ],
-            'categories' => [
-                [
-                    'id' => 1,
-                    'association_id' => 1,
-                    'nom' => '75 - Cotisations et dons',
-                    'type' => 'recette',
-                    'created_at' => $minus1,
-                    'updated_at' => $minus1,
-                ],
-            ],
-            'sous_categories' => [
-                [
-                    'id' => 1,
-                    'association_id' => 1,
-                    'categorie_id' => 1,
-                    'nom' => 'Cotisations',
-                    'code_cerfa' => '751',
-                    'created_at' => $minus1,
-                    'updated_at' => $minus1,
-                ],
-            ],
-        ],
-    ]);
-
-    TenantContext::clear();
-    DB::statement('PRAGMA foreign_keys = OFF');
-    DB::table('association_user')->delete();
-    DB::table('users')->delete();
-    DB::table('association')->delete();
-    DB::statement('PRAGMA foreign_keys = ON');
+    expect(SnapshotConfig::SCHEMA_VERSION)->toBe(2);
+    expect($snapshot['schema_version'])->toBe(2);
+    expect($snapshot['tables'])->toHaveKeys(['comptes', 'familles', 'transaction_lignes']);
+    expect($snapshot['tables'])->not->toHaveKeys(['categories', 'sous_categories']);
 
     $exitCode = $this->artisan('demo:reset', [
         '--snapshot' => $snapshotPath,
@@ -399,13 +339,19 @@ it('materializes comptes/familles from sous_categories on reset of a pre-comptes
 
     expect($exitCode)->toBe(0);
 
-    // The snapshot itself never contained comptes/familles rows — only the
-    // post-replay materialization pass can have created them.
-    $compte = Compte::withoutGlobalScopes()->where('numero_pcg', '751')->first();
-    expect($compte)->not->toBeNull();
-    expect((int) $compte->association_id)->toBe(1);
-    expect($compte->classe)->toBe(7);
+    expect(Schema::hasTable('categories'))->toBeFalse();
+    expect(Schema::hasTable('sous_categories'))->toBeFalse();
+    foreach (['budget_lines', 'devis_lignes', 'facture_lignes', 'transaction_lignes'] as $table) {
+        expect(Schema::hasColumn($table, 'sous_categorie_id'))->toBeFalse();
+    }
 
-    $famille = Famille::withoutGlobalScopes()->where('code', '75')->first();
-    expect($famille)->not->toBeNull();
+    expect(Compte::withoutGlobalScopes()->count())->toBeGreaterThan(0);
+    expect(Famille::withoutGlobalScopes()->count())->toBeGreaterThan(0);
+    expect(DB::table('transactions')->count())->toBeGreaterThan(0);
+    expect(DB::table('transaction_lignes')
+        ->select('transaction_id')
+        ->groupBy('transaction_id')
+        ->havingRaw('ROUND(SUM(debit), 2) <> ROUND(SUM(credit), 2)')
+        ->count())->toBe(0);
+    expect(DB::select('PRAGMA foreign_key_check'))->toBe([]);
 });
