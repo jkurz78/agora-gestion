@@ -5,7 +5,9 @@ declare(strict_types=1);
 use App\Enums\StatutNoteDeFrais;
 use App\Livewire\Portail\NoteDeFrais\Show;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\NoteDeFrais;
+use App\Models\NoteDeFraisLigne;
 use App\Models\Tiers;
 use App\Tenant\TenantContext;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -31,10 +33,17 @@ it('show: brouillon du tiers affiché avec bouton Supprimer', function () {
         'tiers_id' => $this->tiers->id,
         'libelle' => 'Frais brouillon test',
     ]);
+    $compte = Compte::factory()->numero('6251')->create(['association_id' => $this->asso->id]);
+    NoteDeFraisLigne::factory()->create([
+        'note_de_frais_id' => $ndf->id,
+        'compte_id' => $compte->id,
+    ]);
 
     $this->get("/{$this->asso->slug}/portail/notes-de-frais/{$ndf->id}")
         ->assertStatus(200)
         ->assertSeeText('Brouillon')
+        ->assertSeeText('Compte')
+        ->assertDontSeeText('Sous-catégorie')
         ->assertSee('Supprimer');
 });
 

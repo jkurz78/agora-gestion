@@ -565,7 +565,7 @@ final class HelloassoSyncWizard extends Component
 
         $p = HelloAssoParametres::where('association_id', 1)->first();
 
-        $query = $p?->formMappings()->orderBy('form_title');
+        $query = $p?->formMappings()->with('compte')->orderBy('form_title');
 
         if ($query && ! $this->showAllForms) {
             $query->where(function ($q) use ($exerciceStart) {

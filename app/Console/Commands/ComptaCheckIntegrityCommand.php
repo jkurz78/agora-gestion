@@ -89,15 +89,18 @@ final class ComptaCheckIntegrityCommand extends Command
 
             $netTx = (float) DB::table('transactions')
                 ->where('rapprochement_id', $r->id)
+                ->where('association_id', TenantContext::currentId())
                 ->selectRaw("COALESCE(SUM(CASE WHEN type = 'depense' THEN -montant_total ELSE montant_total END), 0) as total")
                 ->value('total');
 
             $netVirementEntrant = (float) DB::table('virements_internes')
                 ->where('rapprochement_destination_id', $r->id)
+                ->where('association_id', TenantContext::currentId())
                 ->sum('montant');
 
             $netVirementSortant = (float) DB::table('virements_internes')
                 ->where('rapprochement_source_id', $r->id)
+                ->where('association_id', TenantContext::currentId())
                 ->sum('montant');
 
             $soldePointage = round($soldeOuverture + $netTx + $netVirementEntrant - $netVirementSortant, 2);
@@ -120,20 +123,40 @@ final class ComptaCheckIntegrityCommand extends Command
             ->get();
 
         foreach ($remises as $remise) {
+            $t4 = DB::table('transactions as t')
+                ->join('transaction_lignes as tl', 'tl.transaction_id', '=', 't.id')
+                ->join('comptes as c', 'c.id', '=', 'tl.compte_id')
+                ->where('t.association_id', TenantContext::currentId())
+                ->where('c.association_id', TenantContext::currentId())
+                ->where('t.remise_id', $remise->id)
+                ->whereNull('t.deleted_at')
+                ->whereNull('tl.deleted_at')
+                ->where('c.classe', 5)
+                ->where('c.numero_pcg', 'like', '512_%')
+                ->where('tl.debit', '>', 0)
+                ->select('t.id', 't.montant_total')
+                ->first();
+
             $sourcesTotal = (float) DB::table('transactions')
                 ->where('remise_id', $remise->id)
+                ->where('association_id', TenantContext::currentId())
                 ->where('type', 'recette')
                 ->whereNull('deleted_at')
-                ->where('libelle', 'not like', 'Remise%')
+                ->when($t4 !== null, fn ($query) => $query->where('id', '!=', $t4->id))
                 ->sum('montant_total');
+
+            if ($t4 !== null && (int) round(((float) $t4->montant_total - $sourcesTotal) * 100) !== 0) {
+                $this->issues[] = "Remise #{$remise->id} : T4#{$t4->id} montant_total={$t4->montant_total} ≠ somme sources={$sourcesTotal}";
+            }
 
             // Le montant affiché de la remise = somme des sources opérationnelles
             // Vérifier que les sources sont cohérentes (chaque TX.montant_total = sum lignes)
             $txSources = DB::table('transactions')
                 ->where('remise_id', $remise->id)
+                ->where('association_id', TenantContext::currentId())
                 ->where('type', 'recette')
                 ->whereNull('deleted_at')
-                ->where('libelle', 'not like', 'Remise%')
+                ->when($t4 !== null, fn ($query) => $query->where('id', '!=', $t4->id))
                 ->get(['id', 'montant_total']);
 
             foreach ($txSources as $tx) {
@@ -161,7 +184,7 @@ final class ComptaCheckIntegrityCommand extends Command
         $divergences = DB::select('
             SELECT t.id, t.montant_total, COALESCE(s.sum_lignes, 0) as sum_lignes
             FROM transactions t
-            LEFT JOIN (
+            JOIN (
                 SELECT tl.transaction_id, SUM(tl.montant) as sum_lignes
                 FROM transaction_lignes tl
                 JOIN comptes c ON c.id = tl.compte_id
@@ -172,17 +195,20 @@ final class ComptaCheckIntegrityCommand extends Command
             ) s ON s.transaction_id = t.id
             WHERE t.association_id = ?
               AND t.deleted_at IS NULL
-              AND ROUND(t.montant_total * 100) != ROUND(COALESCE(s.sum_lignes, 0) * 100)
+              AND ROUND(t.montant_total * 100) != ROUND(s.sum_lignes * 100)
         ', [TenantContext::currentId(), TenantContext::currentId()]);
 
         foreach ($divergences as $d) {
             $this->issues[] = "TX#{$d->id} : montant_total={$d->montant_total} ≠ sum(lignes)={$d->sum_lignes}";
 
             if ($shouldFix) {
-                DB::table('transactions')->where('id', $d->id)->update([
-                    'montant_total' => $d->sum_lignes,
-                    'updated_at' => now(),
-                ]);
+                DB::table('transactions')
+                    ->where('id', $d->id)
+                    ->where('association_id', TenantContext::currentId())
+                    ->update([
+                        'montant_total' => $d->sum_lignes,
+                        'updated_at' => now(),
+                    ]);
                 $this->warn("  → TX#{$d->id} corrigée : {$d->montant_total} → {$d->sum_lignes}");
             }
         }
@@ -208,11 +234,12 @@ final class ComptaCheckIntegrityCommand extends Command
                 GROUP BY tl.transaction_id
             ) s ON s.transaction_id = a.transaction_id
             WHERE a.association_id = ?
+              AND t.association_id = ?
               AND a.deleted_at IS NULL
               AND a.transaction_id IS NOT NULL
               AND t.deleted_at IS NULL
               AND ROUND(a.montant_facial * 100) != ROUND(COALESCE(s.sum_lignes, 0) * 100)
-        ', [TenantContext::currentId(), TenantContext::currentId()]);
+        ', [TenantContext::currentId(), TenantContext::currentId(), TenantContext::currentId()]);
 
         foreach ($divergences as $d) {
             $this->issues[] = "Adhésion #{$d->adhesion_id} (TX#{$d->transaction_id}) : montant_facial={$d->montant_facial} ≠ sum(lignes)={$d->sum_lignes}";

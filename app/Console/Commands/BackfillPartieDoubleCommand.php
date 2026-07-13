@@ -168,11 +168,11 @@ final class BackfillPartieDoubleCommand extends Command
         ));
 
         $this->line('');
-        $this->line('Sous-catégories sans code_cerfa ('.count($rapport['sc_sans_code_cerfa']).')');
-        if (! empty($rapport['sc_sans_code_cerfa'])) {
+        $this->line('Ventilations sans compte valide ('.count($rapport['ventilations_invalides']).')');
+        if (! empty($rapport['ventilations_invalides'])) {
             $this->table(['ID', 'Nom'], array_map(
                 fn (array $sc): array => [$sc['id'], $sc['nom']],
-                $rapport['sc_sans_code_cerfa']
+                $rapport['ventilations_invalides']
             ));
         } else {
             $this->line('  (aucune)');
@@ -250,8 +250,11 @@ final class BackfillPartieDoubleCommand extends Command
                 ->whereNotIn('id', $t4Ids)
                 ->whereNull('remise_id')
                 ->whereDoesntHave('lignes', fn (Builder $q): Builder => $q
-                    ->whereHas('compte', fn (Builder $c): Builder => $c->whereIn('classe', [6, 7]))
-                    ->whereNull('deleted_at'))
+                    ->whereNull('deleted_at')
+                    ->where(function (Builder $ligne): void {
+                        $ligne->whereNull('compte_id')
+                            ->orWhereHas('compte', fn (Builder $c): Builder => $c->whereNotIn('classe', [4, 5]));
+                    }))
                 ->whereHas('lignes', fn (Builder $q): Builder => $q
                     ->whereNotNull('compte_id')
                     ->whereNull('deleted_at'))

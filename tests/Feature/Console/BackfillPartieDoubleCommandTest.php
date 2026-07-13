@@ -17,17 +17,16 @@ declare(strict_types=1);
  * Test [I] : rollback — si invariant échoue, DB::transaction rollback complet.
  */
 
+use App\Console\Commands\BackfillPartieDoubleCommand;
 use App\Enums\JournalComptable;
 use App\Enums\ModePaiement;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Models\Association;
-use App\Models\Categorie;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
 use App\Models\RemiseBancaire;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -89,17 +88,7 @@ function setupBackfillFixtureStep32(object $ctx): void
         ->where('association_id', $ctx->association->id)
         ->firstOrFail();
 
-    // Catégorie + sous-catégorie AVEC code_cerfa (recette 706)
-    $ctx->catRecette = Categorie::factory()->recette()->create([
-        'association_id' => $ctx->association->id,
-        'nom' => 'Prestations',
-    ]);
-    $ctx->sc706 = SousCategorie::create([
-        'association_id' => $ctx->association->id,
-        'categorie_id' => $ctx->catRecette->id,
-        'nom' => 'Cotisations membres',
-        'code_cerfa' => '706',
-    ]);
+    // Compte de ventilation recette 706.
     $ctx->compte706 = Compte::firstOrCreate(
         ['association_id' => $ctx->association->id, 'numero_pcg' => '706'],
         [
@@ -109,17 +98,8 @@ function setupBackfillFixtureStep32(object $ctx): void
             'actif' => true,
             'est_systeme' => false,
             'pour_inscriptions' => false,
-            'categorie_id' => $ctx->catRecette->id,
         ]
     );
-
-    // Sous-catégorie SANS code_cerfa (pour tester la section bloquante)
-    $ctx->scSansCode = SousCategorie::create([
-        'association_id' => $ctx->association->id,
-        'categorie_id' => $ctx->catRecette->id,
-        'nom' => 'Dons libres',
-        'code_cerfa' => null,
-    ]);
 
     // Tiers
     $ctx->tiersA = Tiers::factory()->create(['association_id' => $ctx->association->id]);
@@ -139,7 +119,7 @@ function setupBackfillFixtureStep32(object $ctx): void
         'tiers_id' => $ctx->tiersA->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
-        ['compte_id' => $ctx->compte706->id, 'sous_categorie_id' => $ctx->sc706->id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte706->id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 
     $ctx->txVirement = $ctx->txService->create([
@@ -152,7 +132,7 @@ function setupBackfillFixtureStep32(object $ctx): void
         'tiers_id' => $ctx->tiersA->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
-        ['compte_id' => $ctx->compte706->id, 'sous_categorie_id' => $ctx->sc706->id, 'montant' => '250.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte706->id, 'montant' => '250.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 }
 
@@ -229,7 +209,7 @@ test('[C] sortie console contient les sections clés du rapport dry-run', functi
     ])
         ->expectsOutputToContain('RAPPORT DRY-RUN')
         ->expectsOutputToContain('transactions à convertir')
-        ->expectsOutputToContain('Sous-catégories sans code_cerfa')
+        ->expectsOutputToContain('Ventilations sans compte valide')
         ->expectsOutputToContain('Modes non couverts');
 })->group('backfill');
 
@@ -246,16 +226,6 @@ function setupBackfillFixtureStep33Legacy(object $ctx): void
     setupBackfillFixtureStep32($ctx);
 
     // Créer aussi une dépense comptant
-    $catDepense = Categorie::factory()->depense()->create([
-        'association_id' => $ctx->association->id,
-        'nom' => 'Charges diverses',
-    ]);
-    $ctx->sc606 = SousCategorie::create([
-        'association_id' => $ctx->association->id,
-        'categorie_id' => $catDepense->id,
-        'nom' => 'Fournitures',
-        'code_cerfa' => '606',
-    ]);
     Compte::firstOrCreate(
         ['association_id' => $ctx->association->id, 'numero_pcg' => '606'],
         [
@@ -265,7 +235,6 @@ function setupBackfillFixtureStep33Legacy(object $ctx): void
             'actif' => true,
             'est_systeme' => false,
             'pour_inscriptions' => false,
-            'categorie_id' => $catDepense->id,
         ]
     );
 
@@ -281,7 +250,7 @@ function setupBackfillFixtureStep33Legacy(object $ctx): void
         'tiers_id' => $ctx->tiersA->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
-        ['compte_id' => $ctx->compte606->id, 'sous_categorie_id' => $ctx->sc606->id, 'montant' => '75.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte606->id, 'montant' => '75.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 
     // Chantier 2a — purge des T2 d'encaissement séparées AVANT la remise en legacy.
@@ -307,10 +276,8 @@ function setupBackfillFixtureStep33Legacy(object $ctx): void
     Transaction::query()
         ->where('association_id', $ctx->association->id)
         ->each(function (Transaction $tx) {
-            // Supprimer les lignes PD-only (411, 401, 512X) : montant=0, sous_categorie_id null
-            // Note: les lignes legacy (ventilations) ont sous_categorie_id non null
             TransactionLigne::where('transaction_id', $tx->id)
-                ->whereNull('sous_categorie_id')
+                ->whereHas('compte', fn ($query) => $query->whereIn('classe', [4, 5]))
                 ->forceDelete();
 
             // Reset: debit/credit sur les lignes de ventilation restantes
@@ -717,12 +684,12 @@ test('[N] --all convertit l\'exercice courant ET l\'exercice précédent', funct
         'tiers_id' => $this->tiersA->id,
         'compte_id' => $this->compteBancaire->id,
     ], [
-        ['compte_id' => $this->compte706->id, 'sous_categorie_id' => $this->sc706->id, 'montant' => '500.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $this->compte706->id, 'montant' => '500.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 
     // Remettre cette Tx en état legacy (les autres le sont déjà via le helper).
     TransactionLigne::where('transaction_id', $txExercice2024->id)
-        ->whereNull('sous_categorie_id')
+        ->whereHas('compte', fn ($query) => $query->whereIn('classe', [4, 5]))
         ->forceDelete();
     TransactionLigne::where('transaction_id', $txExercice2024->id)
         ->update(['debit' => 0, 'credit' => 0, 'tiers_id' => null, 'lettrage_code' => null]);
@@ -780,10 +747,12 @@ test('[J] skip montant_total = 0 — transaction gratuite non convertie, aucune 
         'statut_reglement' => StatutReglement::Recu->value,
     ]);
 
-    TransactionLigne::create([
+    DB::table('transaction_lignes')->insert([
         'transaction_id' => $txZero->id,
-        'sous_categorie_id' => $this->sc706->id,
+        'compte_id' => $this->compte706->id,
         'montant' => '0.00',
+        'debit' => '0.00',
+        'credit' => '0.00',
     ]);
 
     $nbLignesAvant = TransactionLigne::where('transaction_id', $txZero->id)->count();
@@ -814,13 +783,7 @@ function setupFixtureBugA(object $ctx): void
 {
     setupBackfillFixtureStep32($ctx);
 
-    // Sous-catégorie 751B (utilisée dans les tests AC #2/#5/#6 pour distinguer des tests génériques)
-    $ctx->sc751B = SousCategorie::create([
-        'association_id' => $ctx->association->id,
-        'categorie_id' => $ctx->catRecette->id,
-        'nom' => 'Cotisations 751B',
-        'code_cerfa' => '706',
-    ]);
+    // Le compte 706 de la fixture distingue déjà ces scénarios.
 }
 
 /**
@@ -838,7 +801,6 @@ function simulerLegacySurTx(Transaction $tx): void
     // On repère les T2 par les lignes PD-only lettrées sur T1 qui pointent sur
     // une transaction différente via le même lettrage_code.
     $lettrageCodesT1 = TransactionLigne::where('transaction_id', $tx->id)
-        ->whereNull('sous_categorie_id')
         ->whereNotNull('compte_id')
         ->whereNotNull('lettrage_code')
         ->pluck('lettrage_code')
@@ -865,8 +827,7 @@ function simulerLegacySurTx(Transaction $tx): void
 
     // Étape 1 : supprimer les lignes PD-only de T1 (411/401, sous_cat=null, compte_id not null)
     TransactionLigne::where('transaction_id', $tx->id)
-        ->whereNull('sous_categorie_id')
-        ->whereNotNull('compte_id')
+        ->whereHas('compte', fn ($query) => $query->whereIn('classe', [4, 5]))
         ->forceDelete();
 
     // Étape 2 : reset colonnes PD sur les lignes de ventilation
@@ -897,7 +858,7 @@ test('[AC1] recette en_attente avec mode → créance only — 411D/706C, aucune
         'tiers_id' => $this->tiersA->id,
         'compte_id' => $this->compteBancaire->id,
     ], [
-        ['compte_id' => $this->compte706->id, 'sous_categorie_id' => $this->sc706->id, 'montant' => '200.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $this->compte706->id, 'montant' => '200.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 
     // En mode PD inconditionnel, TransactionService crée T1+T2 et letters le 411.
@@ -991,7 +952,7 @@ test('[AC2] chèque recu avec remise_id → portage 5112, 411 pair lettré', fun
         'tiers_id' => $this->tiersA->id,
         'compte_id' => $this->compteBancaire->id,
     ], [
-        ['compte_id' => $this->compte706->id, 'sous_categorie_id' => $this->sc706->id, 'montant' => '120.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $this->compte706->id, 'montant' => '120.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 
     // Poser remise_id sur la transaction (cas 2)
@@ -1075,7 +1036,7 @@ test('[AC5] chèque pointe rapprochement_id non null → portage 512X (pas 5112)
         'tiers_id' => $this->tiersA->id,
         'compte_id' => $this->compteBancaire->id,
     ], [
-        ['compte_id' => $this->compte706->id, 'sous_categorie_id' => $this->sc706->id, 'montant' => '150.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $this->compte706->id, 'montant' => '150.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 
     // Poser rapprochement_id sur la transaction (cas 1 — pointé direct)
@@ -1154,7 +1115,7 @@ test('[AC6] chèque recu sans remise ni rapprochement → portage 5112, 411 lett
         'tiers_id' => $this->tiersA->id,
         'compte_id' => $this->compteBancaire->id,
     ], [
-        ['compte_id' => $this->compte706->id, 'sous_categorie_id' => $this->sc706->id, 'montant' => '80.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $this->compte706->id, 'montant' => '80.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 
     // Vérification : remise_id et rapprochement_id doivent être null
@@ -1268,7 +1229,7 @@ function setupFixtureRemiseBackfill(object $ctx, bool $avecRapprochement = false
         'tiers_id' => $ctx->tiersA->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
-        ['compte_id' => $ctx->compte706->id, 'sous_categorie_id' => $ctx->sc706->id, 'montant' => '120.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte706->id, 'montant' => '120.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 
     // Source 2 : chèque recu remisé — 100€
@@ -1283,7 +1244,7 @@ function setupFixtureRemiseBackfill(object $ctx, bool $avecRapprochement = false
         'tiers_id' => $ctx->tiersB->id,
         'compte_id' => $ctx->compteBancaire->id,
     ], [
-        ['compte_id' => $ctx->compte706->id, 'sous_categorie_id' => $ctx->sc706->id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+        ['compte_id' => $ctx->compte706->id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ]);
 
     // Lier les sources à la remise. Par défaut avec reference (comme comptabiliser()).
@@ -1383,6 +1344,52 @@ test('[AC3] backfill phase 2 : T4 créée avec 512X D total / 5112 C par source,
         expect($ligne5112Source)->not->toBeNull("Source #{$source->id} : ligne 5112 sur T2 doit être lettrée après T4");
     }
 })->group('backfill', 'remise-backfill');
+
+test('[Régression T2] --force préserve une transaction qui porte une ligne de classe 1', function (): void {
+    $association = Association::factory()->create();
+    TenantContext::boot($association);
+    $compteClasse1 = Compte::factory()->numero('101')->create(['association_id' => $association->id]);
+    $compteClasse4 = Compte::factory()->numero('411')->create(['association_id' => $association->id]);
+    $transaction = Transaction::forceCreate([
+        'association_id' => $association->id, 'type' => 'recette', 'date' => '2025-10-01',
+        'libelle' => 'Écriture non T2', 'montant_total' => 100, 'mode_paiement' => 'virement',
+        'type_ecriture' => 'normale',
+    ]);
+    foreach ([$compteClasse1, $compteClasse4] as $compte) {
+        TransactionLigne::forceCreate([
+            'transaction_id' => $transaction->id, 'compte_id' => $compte->id,
+            'montant' => 0, 'debit' => 100, 'credit' => 0,
+        ]);
+    }
+
+    (new ReflectionMethod(BackfillPartieDoubleCommand::class, 'resetExercice'))
+        ->invoke(app(BackfillPartieDoubleCommand::class), 2025);
+
+    expect(Transaction::query()->find($transaction->id))->not->toBeNull();
+})->group('backfill');
+
+test('[Régression T2] --force purge une transaction dont toutes les lignes actives sont classes 4 et 5', function (): void {
+    $association = Association::factory()->create();
+    TenantContext::boot($association);
+    $compteClasse4 = Compte::factory()->numero('411')->create(['association_id' => $association->id]);
+    $compteClasse5 = Compte::factory()->numero('5112')->create(['association_id' => $association->id]);
+    $transaction = Transaction::forceCreate([
+        'association_id' => $association->id, 'type' => 'recette', 'date' => '2025-10-01',
+        'libelle' => 'Encaissement T2', 'montant_total' => 100, 'mode_paiement' => 'cheque',
+        'type_ecriture' => 'normale',
+    ]);
+    foreach ([$compteClasse4, $compteClasse5] as $compte) {
+        TransactionLigne::forceCreate([
+            'transaction_id' => $transaction->id, 'compte_id' => $compte->id,
+            'montant' => 0, 'debit' => 100, 'credit' => 0,
+        ]);
+    }
+
+    (new ReflectionMethod(BackfillPartieDoubleCommand::class, 'resetExercice'))
+        ->invoke(app(BackfillPartieDoubleCommand::class), 2025);
+
+    expect(Transaction::withTrashed()->find($transaction->id))->toBeNull();
+})->group('backfill');
 
 // AC #3b — sources prod sans reference : la T4 doit quand même être construite.
 // Régression Finding 2 (cutover 2026-05-31) : queryT4 discriminait la T4 par

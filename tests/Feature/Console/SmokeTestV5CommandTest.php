@@ -100,3 +100,30 @@ test('[C] smoke-test-v5 : Tx déséquilibrée → exit 1', function (): void {
     $this->artisan('compta:smoke-test-v5', ['--asso' => [$asso->id]])
         ->assertExitCode(1);
 })->group('smoke_v5');
+
+test('[D] smoke-test-v5 : ignore les transactions déséquilibrées d’un autre tenant', function (): void {
+    $assoA = setupSmokeTestTenant();
+    $assoB = Association::factory()->create();
+
+    $txB = DB::table('transactions')->insertGetId([
+        'association_id' => (int) $assoB->id,
+        'date' => now()->format('Y-m-d'),
+        'type' => 'recette',
+        'montant_total' => 100.00,
+        'equilibree' => 1,
+        'libelle' => 'Déséquilibre autre tenant',
+        'mode_paiement' => 'virement',
+        'type_ecriture' => 'normale',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    DB::table('transaction_lignes')->insert([
+        'transaction_id' => $txB,
+        'montant' => 0.00,
+        'debit' => 100.00,
+        'credit' => 0.00,
+    ]);
+
+    $this->artisan('compta:smoke-test-v5', ['--asso' => [$assoA->id]])
+        ->assertExitCode(0);
+})->group('smoke_v5');

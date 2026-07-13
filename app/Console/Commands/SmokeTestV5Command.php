@@ -314,12 +314,14 @@ final class SmokeTestV5Command extends Command
 
         // …et qui n'ont AUCUNE ligne PD (compte_id non null, debit+credit > 0)
         $txAvecPd = DB::table('transaction_lignes')
-            ->whereIn('transaction_id', $txAvecVentilation)
-            ->whereNull('deleted_at')
-            ->whereNotNull('compte_id')
-            ->where(fn ($q) => $q->where('debit', '>', 0)->orWhere('credit', '>', 0))
-            ->groupBy('transaction_id')
-            ->pluck('transaction_id');
+            ->join('transactions', 'transactions.id', '=', 'transaction_lignes.transaction_id')
+            ->whereIn('transaction_lignes.transaction_id', $txAvecVentilation)
+            ->where('transactions.association_id', (int) TenantContext::currentId())
+            ->whereNull('transaction_lignes.deleted_at')
+            ->whereNotNull('transaction_lignes.compte_id')
+            ->where(fn ($q) => $q->where('transaction_lignes.debit', '>', 0)->orWhere('transaction_lignes.credit', '>', 0))
+            ->groupBy('transaction_lignes.transaction_id')
+            ->pluck('transaction_lignes.transaction_id');
 
         $txSansPdIds = $txAvecVentilation->diff($txAvecPd);
 
@@ -330,6 +332,7 @@ final class SmokeTestV5Command extends Command
         // Charger les détails pour le diagnostic
         $transactions = DB::table('transactions')
             ->whereIn('id', $txSansPdIds)
+            ->where('association_id', (int) TenantContext::currentId())
             ->select('id', 'date', 'type', 'libelle', 'montant_total', 'tiers_id',
                 'helloasso_order_id', 'journal', 'mode_paiement')
             ->get();
@@ -337,18 +340,24 @@ final class SmokeTestV5Command extends Command
         // Identifier les transactions issues du wizard adhésion
         $txIdsAdhesion = DB::table('adhesions')
             ->whereIn('transaction_id', $txSansPdIds)
+            ->where('association_id', (int) TenantContext::currentId())
             ->pluck('transaction_id')
+            ->map(fn ($id): int => (int) $id)
             ->all();
 
         // Identifier les transactions issues de NDF
         $txIdsNdf = DB::table('notes_de_frais')
             ->whereIn('transaction_id', $txSansPdIds)
+            ->where('association_id', (int) TenantContext::currentId())
             ->pluck('transaction_id')
+            ->map(fn ($id): int => (int) $id)
             ->all();
 
         $txIdsDonNdf = DB::table('notes_de_frais')
             ->whereIn('don_transaction_id', $txSansPdIds)
+            ->where('association_id', (int) TenantContext::currentId())
             ->pluck('don_transaction_id')
+            ->map(fn ($id): int => (int) $id)
             ->all();
 
         return $transactions->map(function (object $tx) use ($txIdsAdhesion, $txIdsNdf, $txIdsDonNdf): object {
@@ -412,6 +421,7 @@ final class SmokeTestV5Command extends Command
         // sur les lignes non supprimées.
         $result = DB::table('transaction_lignes')
             ->join('transactions', 'transactions.id', '=', 'transaction_lignes.transaction_id')
+            ->where('transactions.association_id', (int) TenantContext::currentId())
             ->whereBetween('transactions.date', [$dateDebut, $dateFin])
             ->whereNull('transaction_lignes.deleted_at')
             ->groupBy('transaction_lignes.transaction_id')

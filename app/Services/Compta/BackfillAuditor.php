@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
  * Utilisé par BackfillPartieDoubleCommand en mode --dry-run.
  * Entièrement en lecture seule — aucune écriture en base.
  *
- * Step 32 : audit pour dry-run (nb Tx à convertir, SC sans code_cerfa, modes non couverts).
+ * Step 32 : audit pour dry-run (nb Tx à convertir, ventilations invalides, modes non couverts).
  */
 final class BackfillAuditor
 {
@@ -24,7 +24,7 @@ final class BackfillAuditor
      *
      * @return array{
      *     nb_transactions_a_convertir: int,
-     *     sc_sans_code_cerfa: list<array{id: int, nom: string}>,
+     *     ventilations_invalides: list<array{id: int, nom: string}>,
      *     modes_non_couverts: list<array{mode_paiement: string, count: int}>,
      *     modes_non_couverts_count: int,
      * }
@@ -48,16 +48,26 @@ final class BackfillAuditor
             })
             ->count();
 
-        // -- SC sans code_cerfa dans ce tenant --
-        $scSansCode = DB::table('sous_categories')
-            ->where('association_id', $associationId)
-            ->whereNull('code_cerfa')
-            ->select('id', 'nom')
-            ->orderBy('id')
+        // -- Lignes de ventilation sans compte 6/7 valide dans cet exercice --
+        $ventilationsInvalides = DB::table('transaction_lignes as tl')
+            ->join('transactions as t', 't.id', '=', 'tl.transaction_id')
+            ->leftJoin('comptes as c', 'c.id', '=', 'tl.compte_id')
+            ->where('t.association_id', $associationId)
+            ->whereBetween('t.date', [$dateDebut, $dateFin])
+            ->whereNull('t.deleted_at')
+            ->whereNull('tl.deleted_at')
+            ->where('tl.montant', '!=', 0)
+            ->where(function ($query) use ($associationId): void {
+                $query->whereNull('c.id')
+                    ->orWhere('c.association_id', '!=', $associationId)
+                    ->orWhereNotIn('c.classe', [6, 7]);
+            })
+            ->select('tl.id', 'tl.libelle')
+            ->orderBy('tl.id')
             ->get()
             ->map(fn ($r): array => [
                 'id' => (int) $r->id,
-                'nom' => (string) $r->nom,
+                'nom' => (string) ($r->libelle ?? 'Ligne sans libellé'),
             ])
             ->all();
 
@@ -80,7 +90,7 @@ final class BackfillAuditor
 
         return [
             'nb_transactions_a_convertir' => $nbAConvertir,
-            'sc_sans_code_cerfa' => $scSansCode,
+            'ventilations_invalides' => $ventilationsInvalides,
             'modes_non_couverts' => $modesNonCouverts,
             'modes_non_couverts_count' => count($modesNonCouverts),
         ];

@@ -120,14 +120,20 @@ test('[B] dump-transaction : Tx avec ventilation sans lignes PD → tableau vide
     setupDumpTransactionContext($this);
 
     $tx = makeUnpostedTx($this);
+    $ligneId = DB::table('transaction_lignes')->where('transaction_id', $tx->id)->value('id');
 
-    // On vérifie exit 0 + qu'un contenu caractéristique apparaît.
-    // Note : expectsOutputToContain utilise Mockery first-match, donc on limite à 1 assertion output.
+    // Vérifie les métadonnées du compte de ventilation, pas uniquement le pied de page.
     $this->artisan('compta:dump-transaction', [
         'id' => $tx->id,
         '--asso' => $this->association->id,
     ])
-        ->expectsOutputToContain('Lettrages actifs')
+        ->expectsTable(
+            ['Ligne', 'PCG', 'Intitulé', 'Débit', 'Crédit', 'Classe', 'Tiers', 'Opération', 'Séance', 'Lettrage'],
+            [
+                ['#'.(int) $ligneId, '706', 'Cotisations et …', '', '', '7', '-', '-', '-', '-'],
+                ['TOTAL', '', '', '0.00', '0.00', '', '', '', '', ''],
+            ],
+        )
         ->assertExitCode(0);
 })->group('dump_tx');
 

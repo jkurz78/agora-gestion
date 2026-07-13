@@ -88,7 +88,7 @@
                 <thead class="table-light">
                     <tr>
                         <th>Libellé</th>
-                        <th>Sous-catégorie</th>
+                        <th>Compte</th>
                         <th class="text-end">Montant</th>
                         <th>Justificatif</th>
                     </tr>

@@ -52,6 +52,17 @@ it('mettreAJourAction sauvegarde "ignore" sur le form mapping', function (): voi
         ->assertSet("formActions.{$this->formMembership->id}", 'ignore');
 });
 
+it('charge le compte des mappings avec la liste des formulaires', function (): void {
+    $this->formMembership->update(['compte_id' => (int) $this->compteCotisation->id]);
+
+    $component = Livewire::actingAs($this->user)
+        ->test(HelloassoSyncWizard::class)
+        ->set('formsLoaded', true);
+
+    $mapping = $component->viewData('formMappings')->firstWhere('id', $this->formMembership->id);
+    expect($mapping->relationLoaded('compte'))->toBeTrue();
+});
+
 it('sauvegarderEtSuite persiste ignore sur le form mapping', function (): void {
     Livewire::actingAs($this->user)
         ->test(HelloassoSyncWizard::class)

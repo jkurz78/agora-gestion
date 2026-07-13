@@ -30,7 +30,6 @@ final class HelloAssoParametres extends Model
         'callback_token',
         'compte_helloasso_id',
         'compte_versement_id',
-        'sous_categorie_don_id',
         'compte_don_id',
     ];
 
@@ -43,7 +42,6 @@ final class HelloAssoParametres extends Model
             'environnement' => HelloAssoEnvironnement::class,
             'compte_helloasso_id' => 'integer',
             'compte_versement_id' => 'integer',
-            'sous_categorie_don_id' => 'integer',
             'compte_don_id' => 'integer',
         ];
     }

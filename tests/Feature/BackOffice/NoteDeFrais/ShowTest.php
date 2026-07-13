@@ -65,13 +65,15 @@ it('shows header, lines and Valider/Rejeter buttons for a Soumise NDF', function
 
     $this->actingAs($admin);
 
-    Livewire::test(Show::class, ['noteDeFrais' => $ndf])
+    $component = Livewire::test(Show::class, ['noteDeFrais' => $ndf])
         ->assertSee('Frais déplacement test')
         ->assertSee('Billet train')
         ->assertSee('55')
         ->assertSee('Valider')
         ->assertSee('Rejeter')
         ->assertOk();
+
+    expect($component->instance()->ndf->lignes->first()->relationLoaded('compte'))->toBeTrue();
 });
 
 // ── 2. Comptable voit NDF Validée → panneau Transaction ──────────────────────

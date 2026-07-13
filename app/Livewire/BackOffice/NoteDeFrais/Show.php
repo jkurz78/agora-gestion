@@ -194,7 +194,7 @@ final class Show extends Component
 
     public function render(): View
     {
-        $this->ndf->loadMissing(['tiers', 'lignes', 'transaction', 'association']);
+        $this->ndf->loadMissing(['tiers', 'lignes.compte', 'transaction', 'association']);
 
         return view('livewire.back-office.note-de-frais.show', [
             'comptesBancaires' => $this->comptesBancaires(),
