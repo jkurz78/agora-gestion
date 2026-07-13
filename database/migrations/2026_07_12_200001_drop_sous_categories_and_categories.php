@@ -35,6 +35,17 @@ return new class extends Migration
         $this->backfillHelloAssoDonationAccount();
         $this->assertNoUnresolvedAttachments();
 
+        // MySQL requires foreign keys to be removed before their supporting indexes.
+        foreach (array_diff(self::TABLES_WITH_SOUS_CATEGORIE, ['usages_sous_categories']) as $tableName) {
+            Schema::table($tableName, function (Blueprint $table): void {
+                $table->dropForeign(['sous_categorie_id']);
+            });
+        }
+
+        Schema::table('transaction_lignes', function (Blueprint $table): void {
+            $table->index('transaction_id', 'transaction_lignes_transaction_id_index');
+        });
+
         // SQLite requires indexes referencing a column to be removed before the column.
         Schema::table('transaction_lignes', function (Blueprint $table): void {
             $table->dropIndex('tl_tx_sc_idx');
@@ -45,7 +56,7 @@ return new class extends Migration
 
         foreach (array_diff(self::TABLES_WITH_SOUS_CATEGORIE, ['usages_sous_categories']) as $tableName) {
             Schema::table($tableName, function (Blueprint $table): void {
-                $table->dropConstrainedForeignId('sous_categorie_id');
+                $table->dropColumn('sous_categorie_id');
             });
         }
 

@@ -235,6 +235,19 @@ it('keeps the tenant usage lookup index', function (): void {
         ->and($index['unique'])->toBeFalse();
 });
 
+it('keeps a final transaction lookup index after dropping the legacy composite', function (): void {
+    withDc10bLegacyFinalMigrationDatabase(function (Migration $migration): void {
+        $migration->up();
+
+        $index = collect(Schema::getIndexes('transaction_lignes'))
+            ->firstWhere('name', 'transaction_lignes_transaction_id_index');
+
+        expect($index)->not->toBeNull()
+            ->and($index['columns'])->toBe(['transaction_id'])
+            ->and($index['unique'])->toBeFalse();
+    });
+});
+
 it('does not create a parasite account when the usage factory receives one', function (): void {
     $compte = Compte::factory()->create();
     $countBefore = DB::table('comptes')->count();
