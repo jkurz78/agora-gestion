@@ -33,7 +33,7 @@ function withBackfillCompteLegacySchema(Closure $test): mixed
     });
 }
 
-it('backfills compte_id from the tenant PCG mapping', function (): void {
+it('backfills null compte_id without overwriting a pre-existing different account', function (): void {
     withBackfillCompteLegacySchema(function ($migration): void {
         $sousCategorieId = DB::table('sous_categories')->insertGetId([
             'association_id' => 1,
@@ -47,34 +47,65 @@ it('backfills compte_id from the tenant PCG mapping', function (): void {
             'sous_categorie_id' => $sousCategorieId,
             'compte_id' => null,
         ]);
+        $autreCompteId = DB::table('comptes')->insertGetId([
+            'association_id' => 1,
+            'numero_pcg' => '758',
+        ]);
+        $lignePreexistanteId = DB::table('transaction_lignes')->insertGetId([
+            'sous_categorie_id' => $sousCategorieId,
+            'compte_id' => $autreCompteId,
+        ]);
 
         $migration->up();
 
         expect((int) DB::table('transaction_lignes')->where('id', $ligneId)->value('compte_id'))
-            ->toBe($compteId);
+            ->toBe($compteId)
+            ->and((int) DB::table('transaction_lignes')->where('id', $lignePreexistanteId)->value('compte_id'))
+            ->toBe($autreCompteId);
     });
 });
 
-it('leaves unresolved and soft-deleted rows untouched', function (): void {
+it('maps active rows but deliberately excludes resolvable soft-deleted rows', function (): void {
     withBackfillCompteLegacySchema(function ($migration): void {
-        $orphanId = DB::table('sous_categories')->insertGetId([
+        $sousCategorieId = DB::table('sous_categories')->insertGetId([
             'association_id' => 1,
-            'code_cerfa' => null,
+            'code_cerfa' => '707',
+        ]);
+        $compteId = DB::table('comptes')->insertGetId([
+            'association_id' => 1,
+            'numero_pcg' => '707',
         ]);
         $activeLine = DB::table('transaction_lignes')->insertGetId([
-            'sous_categorie_id' => $orphanId,
+            'sous_categorie_id' => $sousCategorieId,
             'compte_id' => null,
         ]);
         $deletedLine = DB::table('transaction_lignes')->insertGetId([
-            'sous_categorie_id' => $orphanId,
+            'sous_categorie_id' => $sousCategorieId,
             'compte_id' => null,
             'deleted_at' => now(),
         ]);
 
         $migration->up();
 
-        expect(DB::table('transaction_lignes')->where('id', $activeLine)->value('compte_id'))->toBeNull()
+        expect((int) DB::table('transaction_lignes')->where('id', $activeLine)->value('compte_id'))->toBe($compteId)
             ->and(DB::table('transaction_lignes')->where('id', $deletedLine)->value('compte_id'))->toBeNull();
+    });
+});
+
+it('leaves an active orphan without a matching account unresolved', function (): void {
+    withBackfillCompteLegacySchema(function ($migration): void {
+        $orphanId = DB::table('sous_categories')->insertGetId([
+            'association_id' => 1,
+            'code_cerfa' => null,
+        ]);
+        $ligneId = DB::table('transaction_lignes')->insertGetId([
+            'sous_categorie_id' => $orphanId,
+            'compte_id' => null,
+        ]);
+
+        $migration->up();
+
+        expect(DB::table('transaction_lignes')->where('id', $ligneId)->value('compte_id'))->toBeNull();
     });
 });
 

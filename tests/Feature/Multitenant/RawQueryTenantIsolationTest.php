@@ -6,6 +6,7 @@ use App\Models\Association;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Services\Rapports\CompteResultatBuilder;
 use App\Services\TransactionUniverselleService;
 use App\Tenant\TenantContext;
@@ -76,32 +77,51 @@ it('TransactionUniverselleService does not expose other-tenant recettes', functi
 // ── CompteResultatBuilder ─────────────────────────────────────────────────────
 
 it('CompteResultatBuilder::compteDeResultat does not aggregate other-tenant charges', function () {
-    // Tenant A : 1 dépense on exercice 2024 (date sept 2024 - août 2025)
     TenantContext::boot($this->assoA);
-    $compteA = CompteBancaire::factory()->create(['solde_initial' => 0]);
+    $compteBancaireA = CompteBancaire::factory()->create(['solde_initial' => 0]);
+    $compteChargeA = Compte::factory()->depense()->numero('606A')->create(['intitule' => 'Charge tenant A']);
     $txA = Transaction::factory()->asDepense()->create([
-        'compte_id' => $compteA->id,
+        'compte_id' => $compteBancaireA->id,
         'date' => '2025-01-10',
         'montant_total' => 100.00,
     ]);
+    $txA->lignes()->forceDelete();
+    TransactionLigne::factory()->create([
+        'transaction_id' => $txA->id,
+        'compte_id' => $compteChargeA->id,
+        'montant' => 100.00,
+        'debit' => 100.00,
+        'credit' => 0.00,
+    ]);
 
-    // Tenant B : 1 dépense with same date range but a distinct large amount
     TenantContext::boot($this->assoB);
-    $compteB = CompteBancaire::factory()->create(['solde_initial' => 0]);
-    Transaction::factory()->asDepense()->create([
-        'compte_id' => $compteB->id,
+    $compteBancaireB = CompteBancaire::factory()->create(['solde_initial' => 0]);
+    $compteChargeB = Compte::factory()->depense()->numero('606B')->create(['intitule' => 'Charge tenant B']);
+    $txB = Transaction::factory()->asDepense()->create([
+        'compte_id' => $compteBancaireB->id,
         'date' => '2025-01-11',
         'montant_total' => 9876.00,
     ]);
+    $txB->lignes()->forceDelete();
+    TransactionLigne::factory()->create([
+        'transaction_id' => $txB->id,
+        'compte_id' => $compteChargeB->id,
+        'montant' => 9876.00,
+        'debit' => 9876.00,
+        'credit' => 0.00,
+    ]);
 
-    // Requête depuis la perspective du tenant A
     TenantContext::boot($this->assoA);
     $builder = app(CompteResultatBuilder::class);
-    $result = $builder->compteDeResultat(2024); // exercice 2024-2025
+    $result = $builder->compteDeResultat(2024);
+    $charges = collect($result['charges'])->flatMap(fn (array $famille): array => $famille['comptes']);
+    $chargeA = $charges->firstWhere('compte_id', (int) $compteChargeA->id);
 
-    // The total of all charges for tenant A must not include tenant B's 9876€
-    $totalCharges = (float) collect($result['charges'])->sum('montant_n');
-    expect($totalCharges)->not->toBeGreaterThanOrEqual(9876.0);
+    expect($charges)->toHaveCount(1)
+        ->and($chargeA)->not->toBeNull()
+        ->and((float) $chargeA['montant_n'])->toBe(100.0)
+        ->and($charges->pluck('compte_id')->all())->not->toContain((int) $compteChargeB->id)
+        ->and((float) collect($result['charges'])->sum('montant_n'))->toBe(100.0);
 });
 
 it('CompteResultatBuilder fetchBudgetMap does not leak cross-tenant budget lines', function () {

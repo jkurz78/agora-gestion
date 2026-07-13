@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\QueryException;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -82,7 +83,7 @@ it('blocks creation while a source account has no PCG number', function (): void
     });
 });
 
-it('keeps identical PCG numbers isolated by tenant and rolls back cleanly', function (): void {
+it('enforces tenant-scoped PCG uniqueness and creates the expected indexes', function (): void {
     withCreateComptesLegacySchema(function (): void {
         DB::table('association')->insert([['id' => 1], ['id' => 2]]);
         DB::table('sous_categories')->insert([
@@ -105,6 +106,24 @@ it('keeps identical PCG numbers isolated by tenant and rolls back cleanly', func
         expect(DB::table('comptes')->where('numero_pcg', '706')->count())->toBe(2)
             ->and(DB::table('comptes')->where('association_id', 1)->value('intitule'))->toBe('Prestations A')
             ->and(DB::table('comptes')->where('association_id', 2)->value('intitule'))->toBe('Prestations B');
+
+        expect(fn () => DB::table('comptes')->insert([
+            'association_id' => 1,
+            'numero_pcg' => '706',
+            'intitule' => 'Doublon tenant A',
+            'classe' => 7,
+        ]))->toThrow(QueryException::class);
+
+        $indexes = collect(Schema::getIndexes('comptes'))->keyBy('name');
+        expect($indexes)->toHaveKeys([
+            'comptes_asso_numero_pcg_unique',
+            'comptes_asso_classe_idx',
+            'comptes_asso_lettrable_idx',
+        ])
+            ->and($indexes['comptes_asso_numero_pcg_unique']['unique'])->toBeTrue()
+            ->and($indexes['comptes_asso_numero_pcg_unique']['columns'])->toBe(['association_id', 'numero_pcg'])
+            ->and($indexes['comptes_asso_classe_idx']['columns'])->toBe(['association_id', 'classe'])
+            ->and($indexes['comptes_asso_lettrable_idx']['columns'])->toBe(['association_id', 'lettrable']);
 
         $migration->down();
         expect(Schema::hasTable('comptes'))->toBeFalse();
