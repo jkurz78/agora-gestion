@@ -96,6 +96,16 @@ Expected: exit 0.
 - Modify: `resources/views/livewire/banques/helloasso-sync-wizard.blade.php`
 - Modify: `resources/views/livewire/back-office/note-de-frais/show.blade.php`
 - Modify: `resources/views/livewire/portail/note-de-frais/show.blade.php`
+- Test: `tests/Feature/Console/DumpTransactionCommandTest.php`
+- Test: `tests/Feature/Console/SmokeTestV5CommandTest.php`
+- Test: `tests/Feature/Console/SmokeTestV5SansPdTest.php`
+- Test: `tests/Feature/Commands/TenantBenchmarkCommandTest.php`
+- Create: `tests/Feature/Console/ComptaCheckIntegrityCommandTest.php`
+- Test: `tests/Feature/GestionOperationNavigationTest.php`
+- Test: `tests/Feature/GestionOperationsTest.php`
+- Test: `tests/Feature/Livewire/ParticipantTableTest.php`
+- Test: `tests/Feature/TypeOperationTest.php`
+- Test: `tests/Feature/Services/ProvisionServiceTest.php`
 
 **Interfaces:**
 - Consumes: relations `compte()` des modèles de ventilation et `Compte::usages()`.
@@ -103,7 +113,7 @@ Expected: exit 0.
 
 - [ ] **Step 1: Exécuter les tests ciblés pour capturer les régressions**
 
-Run: `./vendor/bin/sail artisan test tests/Feature/Console/DumpTransactionCommandTest.php tests/Feature/Livewire tests/Feature/Models/CompteTest.php --stop-on-failure`
+Run: `./vendor/bin/sail artisan test tests/Feature/Console/DumpTransactionCommandTest.php tests/Feature/Console/SmokeTestV5CommandTest.php tests/Feature/Console/SmokeTestV5SansPdTest.php tests/Feature/Commands/TenantBenchmarkCommandTest.php tests/Feature/GestionOperationNavigationTest.php tests/Feature/GestionOperationsTest.php tests/Feature/Livewire/ParticipantTableTest.php tests/Feature/TypeOperationTest.php tests/Feature/Services/ProvisionServiceTest.php --stop-on-failure`
 
 Expected: au moins un échec sur une relation ou un attribut legacy supprimé.
 
@@ -113,7 +123,7 @@ Utiliser `typeOperation.compte`, `ligne.compte`, `TransactionLigne::whereHas('co
 
 - [ ] **Step 3: Vérifier les tests ciblés**
 
-Run: `./vendor/bin/sail artisan test tests/Feature/Console/DumpTransactionCommandTest.php tests/Feature/Livewire tests/Feature/Models/CompteTest.php`
+Run: `./vendor/bin/sail artisan test tests/Feature/Console/DumpTransactionCommandTest.php tests/Feature/Console/SmokeTestV5CommandTest.php tests/Feature/Console/SmokeTestV5SansPdTest.php tests/Feature/Commands/TenantBenchmarkCommandTest.php tests/Feature/Console/ComptaCheckIntegrityCommandTest.php tests/Feature/GestionOperationNavigationTest.php tests/Feature/GestionOperationsTest.php tests/Feature/Livewire/ParticipantTableTest.php tests/Feature/TypeOperationTest.php tests/Feature/Services/ProvisionServiceTest.php`
 
 Expected: PASS.
 
