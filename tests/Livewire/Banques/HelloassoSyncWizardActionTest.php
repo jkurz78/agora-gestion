@@ -8,11 +8,13 @@ use App\Models\Association;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\HelloAssoFormMapping;
+use App\Models\HelloAssoNotification;
 use App\Models\HelloAssoParametres;
 use App\Models\Operation;
 use App\Models\TypeOperation;
 use App\Models\User;
 use App\Tenant\TenantContext;
+use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 
 beforeEach(function (): void {
@@ -171,6 +173,9 @@ it('un form imported_at est verrouillé : son action ne peut plus être changée
 });
 
 it('isole config résumé et formulaires HelloAsso sur le tenant courant hors association 1', function (): void {
+    $typeOperationA = TypeOperation::factory()->create();
+    $operationA = Operation::factory()->create(['type_operation_id' => (int) $typeOperationA->id]);
+    HelloAssoNotification::create(['association_id' => 1, 'event_type' => 'Form', 'libelle' => 'Notification A', 'payload' => []]);
     $associationB = Association::factory()->create();
     $this->user->associations()->attach((int) $associationB->id, ['role' => 'admin', 'joined_at' => now()]);
 
@@ -194,6 +199,12 @@ it('isole config résumé et formulaires HelloAsso sur le tenant courant hors as
         'form_type' => 'Membership',
         'form_title' => 'Cotisation tenant B',
     ]);
+    $mappingCompteB = HelloAssoFormMapping::create([
+        'helloasso_parametres_id' => (int) $parametresB->id,
+        'form_slug' => 'don-b',
+        'form_type' => 'Donation',
+        'form_title' => 'Don tenant B',
+    ]);
     $typeOperationB = TypeOperation::factory()->create(['association_id' => (int) $associationB->id]);
     $operationB = Operation::factory()->create([
         'association_id' => (int) $associationB->id,
@@ -206,6 +217,7 @@ it('isole config résumé et formulaires HelloAsso sur le tenant courant hors as
         'form_title' => 'Événement tenant B',
         'operation_id' => (int) $operationB->id,
     ]);
+    HelloAssoNotification::create(['association_id' => (int) $associationB->id, 'event_type' => 'Form', 'libelle' => 'Notification B', 'payload' => []]);
 
     expect(HelloAssoParametres::query()->pluck('id')->map(fn ($id): int => (int) $id)->all())
         ->toBe([(int) $parametresB->id]);
@@ -215,10 +227,45 @@ it('isole config résumé et formulaires HelloAsso sur le tenant courant hors as
         ->set('formsLoaded', true)
         ->set('tiersFetched', true);
 
+    expect(HelloAssoNotification::query()->pluck('association_id')->map(fn ($id): int => (int) $id)->all())
+        ->toBe([1]);
+
     expect($component->get('configWarnings'))
         ->toContain('Le compte de versement n\'est pas configuré — les versements (cashouts) ne seront pas traités.');
     expect($component->viewData('formMappings')->pluck('id')->map(fn ($id): int => (int) $id)->all())
-        ->toBe([(int) $mappingB->id, (int) $eventMappingB->id]);
-    $component->call('sauvegarderEtSuite')
-        ->assertSet('stepOneSummary', '2 formulaires, 1 mappés');
+        ->toBe([(int) $mappingB->id, (int) $mappingCompteB->id, (int) $eventMappingB->id]);
+
+    $component->call('openCreateOperation', (int) $this->formMembership->id)
+        ->assertSet('creatingOperationForMapping', null)
+        ->assertSet('newOperationNom', '');
+
+    $component->call('mettreAJourAction', (int) $this->formMembership->id, 'ignore')
+        ->call('mettreAJourAction', (int) $mappingB->id, 'ignore')
+        ->call('mettreAJourAction', (int) $mappingCompteB->id, 'souscat:'.$this->compteCotisation->id)
+        ->call('mettreAJourAction', (int) $eventMappingB->id, 'operation:'.$operationA->id)
+        ->call('sauvegarderEtSuite')
+        ->assertSet('stepOneSummary', '3 formulaires, 1 mappés');
+
+    expect($mappingB->fresh()->ignore)->toBeTrue()
+        ->and($mappingCompteB->fresh()->compte_id)->toBeNull()
+        ->and((int) $eventMappingB->fresh()->operation_id)->toBe((int) $operationB->id)
+        ->and($this->formMembership->fresh()->ignore)->toBeFalse();
+
+    expect($parametresB->formMappings()->pluck('id')->map(fn ($id): int => (int) $id)->all())
+        ->each->toBeInt();
+
+    Http::fake([
+        '*oauth2/token' => Http::response(['access_token' => 'token-b']),
+        '*v5/organizations/asso-b/forms*' => Http::sequence()
+            ->push(['data' => [[
+                'formSlug' => 'nouveau-b', 'formType' => 'Membership', 'title' => 'Nouveau B',
+            ]]])
+            ->push(['data' => []]),
+    ]);
+    $component->call('loadFormulaires')->assertSet('formsLoaded', true);
+    expect($parametresB->formMappings()->where('form_slug', 'nouveau-b')->exists())->toBeTrue();
+    Http::assertSent(fn ($request): bool => str_contains($request->url(), '/organizations/asso-b/forms'));
+
+    expect(file_get_contents(app_path('Livewire/Banques/HelloassoSyncWizard.php')))
+        ->not->toContain("association_id', 1", 'HelloAssoFormMapping::find');
 });

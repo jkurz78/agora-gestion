@@ -56,7 +56,6 @@ final class BackfillAuditor
             ->whereBetween('t.date', [$dateDebut, $dateFin])
             ->whereNull('t.deleted_at')
             ->whereNull('tl.deleted_at')
-            ->where('tl.montant', '!=', 0)
             ->where(function ($query) use ($associationId): void {
                 $query->whereNull('c.id')
                     ->orWhere('c.association_id', '!=', $associationId)
@@ -66,7 +65,7 @@ final class BackfillAuditor
                             ->where('c.classe', '!=', 7);
                     })
                     ->orWhere(function ($classe): void {
-                        $classe->where('t.type', 'depense')
+                        $classe->where('t.type', '!=', 'recette')
                             ->where('c.classe', '!=', 6);
                     });
             })

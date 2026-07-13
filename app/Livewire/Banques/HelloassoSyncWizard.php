@@ -8,7 +8,6 @@ use App\Enums\StatutOperation;
 use App\Enums\UsageComptable;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\Compte;
-use App\Models\HelloAssoFormMapping;
 use App\Models\HelloAssoNotification;
 use App\Models\HelloAssoParametres;
 use App\Models\Operation;
@@ -18,6 +17,7 @@ use App\Services\ExerciceService;
 use App\Services\HelloAssoApiClient;
 use App\Services\HelloAssoSyncService;
 use App\Services\HelloAssoTiersResolver;
+use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\On;
@@ -91,7 +91,7 @@ final class HelloassoSyncWizard extends Component
 
     public function mount(): void
     {
-        HelloAssoNotification::where('association_id', 1)->delete();
+        HelloAssoNotification::where('association_id', TenantContext::currentId())->delete();
         $this->checkConfig();
     }
 
@@ -113,7 +113,7 @@ final class HelloassoSyncWizard extends Component
         $this->formsLoading = true;
         $this->formErreur = null;
 
-        $p = HelloAssoParametres::where('association_id', 1)->first();
+        $p = HelloAssoParametres::query()->first();
         if ($p === null || $p->client_id === null) {
             $this->formErreur = 'Paramètres HelloAsso non configurés.';
             $this->formsLoading = false;
@@ -132,7 +132,7 @@ final class HelloassoSyncWizard extends Component
         }
 
         foreach ($forms as $form) {
-            HelloAssoFormMapping::updateOrCreate(
+            $p->formMappings()->updateOrCreate(
                 [
                     'helloasso_parametres_id' => $p->id,
                     'form_slug' => $form['formSlug'],
@@ -167,11 +167,14 @@ final class HelloassoSyncWizard extends Component
 
     public function openCreateOperation(int $mappingId): void
     {
-        $mapping = HelloAssoFormMapping::find($mappingId);
+        $mapping = HelloAssoParametres::query()->first()?->formMappings()->find($mappingId);
+        if ($mapping === null) {
+            return;
+        }
         $this->creatingOperationForMapping = $mappingId;
-        $this->newOperationNom = $mapping?->form_title ?? '';
-        $this->newOperationDateDebut = $mapping?->start_date?->format('Y-m-d');
-        $this->newOperationDateFin = $mapping?->end_date?->format('Y-m-d');
+        $this->newOperationNom = $mapping->form_title;
+        $this->newOperationDateDebut = $mapping->start_date?->format('Y-m-d');
+        $this->newOperationDateFin = $mapping->end_date?->format('Y-m-d');
     }
 
     public function cancelCreateOperation(): void
@@ -212,15 +215,16 @@ final class HelloassoSyncWizard extends Component
 
     public function sauvegarderEtSuite(): void
     {
-        $p = HelloAssoParametres::where('association_id', 1)->first();
-        $validIds = $p?->formMappings()->pluck('id')->all() ?? [];
+        $p = HelloAssoParametres::query()->first();
+        $mappings = $p?->formMappings()->whereIn('id', array_keys($this->formActions))->get()->keyBy('id') ?? collect();
+        $validIds = $mappings->keys()->map(fn ($id): int => (int) $id)->all();
 
         foreach ($this->formActions as $mappingId => $action) {
             if (! in_array((int) $mappingId, $validIds, true)) {
                 continue;
             }
 
-            $mapping = HelloAssoFormMapping::find($mappingId);
+            $mapping = $mappings->get((int) $mappingId);
             if ($mapping === null || $mapping->imported_at !== null) {
                 continue; // verrouillé
             }
@@ -233,6 +237,9 @@ final class HelloassoSyncWizard extends Component
                 ]);
             } elseif (str_starts_with($action, 'souscat:')) {
                 $compteId = (int) substr($action, 8);
+                if (Compte::find($compteId) === null) {
+                    continue;
+                }
                 $mapping->update([
                     'ignore' => false,
                     'compte_id' => $compteId,
@@ -240,6 +247,9 @@ final class HelloassoSyncWizard extends Component
                 ]);
             } elseif (str_starts_with($action, 'operation:')) {
                 $opId = (int) substr($action, 10);
+                if (Operation::find($opId) === null) {
+                    continue;
+                }
                 $mapping->update([
                     'ignore' => false,
                     'compte_id' => null,
@@ -262,7 +272,7 @@ final class HelloassoSyncWizard extends Component
         $this->tiersLoading = true;
         $this->tiersErreur = null;
 
-        $p = HelloAssoParametres::where('association_id', 1)->first();
+        $p = HelloAssoParametres::query()->first();
 
         try {
             $client = new HelloAssoApiClient($p);
@@ -425,7 +435,7 @@ final class HelloassoSyncWizard extends Component
         $this->syncResult = null;
         $this->syncErreur = null;
 
-        $parametres = HelloAssoParametres::where('association_id', 1)->first();
+        $parametres = HelloAssoParametres::query()->first();
         $exercice = app(ExerciceService::class)->current();
         $exerciceService = app(ExerciceService::class);
 

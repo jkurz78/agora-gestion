@@ -1637,13 +1637,13 @@ test('[Régression auditeur] dry-run applique la même matrice de comptes que le
     $compte7 = Compte::factory()->numero('7061')->create(['association_id' => (int) $association->id]);
     $compte7Supprime = Compte::factory()->numero('7062')->create(['association_id' => (int) $association->id]);
 
-    $creerTransaction = function (string $type, Compte $compte, string $libelle) use ($association, $tiers): array {
+    $creerTransaction = function (string $type, Compte $compte, string $libelle, float $montant = 100) use ($association, $tiers): array {
         $transaction = Transaction::forceCreate([
             'association_id' => (int) $association->id,
             'type' => $type,
             'date' => '2025-10-15',
             'libelle' => $libelle,
-            'montant_total' => 100,
+            'montant_total' => $montant,
             'mode_paiement' => ModePaiement::Virement->value,
             'statut_reglement' => StatutReglement::EnAttente->value,
             'tiers_id' => (int) $tiers->id,
@@ -1654,7 +1654,7 @@ test('[Régression auditeur] dry-run applique la même matrice de comptes que le
             'transaction_id' => (int) $transaction->id,
             'compte_id' => (int) $compte->id,
             'libelle' => $libelle,
-            'montant' => 100,
+            'montant' => $montant,
             'debit' => 0,
             'credit' => 0,
         ]);
@@ -1665,6 +1665,8 @@ test('[Régression auditeur] dry-run applique la même matrice de comptes que le
     [$recetteSur6, $ligneRecetteSur6] = $creerTransaction('recette', $compte6, 'Recette sur classe 6');
     [$depenseSur7, $ligneDepenseSur7] = $creerTransaction('depense', $compte7, 'Dépense sur classe 7');
     [$recetteCompteSupprime, $ligneCompteSupprime] = $creerTransaction('recette', $compte7Supprime, 'Recette compte supprimé');
+    [, $ligneZeroMauvaiseClasse] = $creerTransaction('recette', $compte6, 'Recette zéro sur classe 6', 0);
+    [, $ligneVirementSur7] = $creerTransaction('virement', $compte7, 'Virement sur classe 7');
     [, $ligneRecetteValide] = $creerTransaction('recette', $compte7, 'Recette valide');
     [, $ligneDepenseValide] = $creerTransaction('depense', $compte6, 'Dépense valide');
     $compte7Supprime->delete();
@@ -1672,14 +1674,14 @@ test('[Régression auditeur] dry-run applique la même matrice de comptes que le
     $rapport = app(BackfillAuditor::class)->auditer((int) $association->id, 2025);
 
     expect(array_column($rapport['ventilations_invalides'], 'id'))
-        ->toBe([$ligneRecetteSur6, $ligneDepenseSur7, $ligneCompteSupprime])
+        ->toBe([$ligneRecetteSur6, $ligneDepenseSur7, $ligneCompteSupprime, $ligneZeroMauvaiseClasse, $ligneVirementSur7])
         ->not->toContain($ligneRecetteValide, $ligneDepenseValide);
 
     $this->artisan('compta:backfill-partie-double', [
         '--exercice' => '2025',
         '--dry-run' => true,
         '--asso' => (int) $association->id,
-    ])->expectsOutputToContain('Ventilations sans compte valide (3)')
+    ])->expectsOutputToContain('Ventilations sans compte valide (5)')
         ->assertSuccessful();
 
     $converter = app(TransactionConverter::class);

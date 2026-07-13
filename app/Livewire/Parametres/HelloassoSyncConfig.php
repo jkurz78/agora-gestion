@@ -8,7 +8,9 @@ use App\Enums\UsageComptable;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\HelloAssoParametres;
+use App\Tenant\TenantContext;
 use Illuminate\Contracts\View\View;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 
 final class HelloassoSyncConfig extends Component
@@ -40,6 +42,13 @@ final class HelloassoSyncConfig extends Component
 
     public function sauvegarder(): void
     {
+        $associationId = (int) TenantContext::currentId();
+        $this->validate([
+            'compteHelloassoId' => ['nullable', 'integer', Rule::exists('comptes_bancaires', 'id')->where('association_id', $associationId)],
+            'compteVersementId' => ['nullable', 'integer', Rule::exists('comptes_bancaires', 'id')->where('association_id', $associationId)],
+            'sousCategorieDonId' => ['nullable', 'integer', Rule::exists('comptes', 'id')->where('association_id', $associationId)],
+        ]);
+
         $p = HelloAssoParametres::query()->first();
         if ($p === null) {
             $this->erreur = 'Paramètres HelloAsso non configurés.';

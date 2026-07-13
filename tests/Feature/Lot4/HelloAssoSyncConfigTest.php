@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Livewire\Parametres\HelloassoSyncConfig;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\HelloAssoParametres;
 use App\Tenant\TenantContext;
@@ -81,4 +82,22 @@ it('saves sync config only for the current tenant', function (): void {
         ->toBe((int) $nouveauCompteB->id);
     expect((int) HelloAssoParametres::withoutGlobalScopes()->findOrFail((int) $this->parametresA->id)->compte_helloasso_id)
         ->toBe((int) $this->compteA->id);
+});
+
+it('refuse les comptes bancaires et le compte de don d’un autre tenant', function (): void {
+    $compteDonA = Compte::factory()->numero('7541')->create([
+        'association_id' => (int) $this->associationA->id,
+    ]);
+
+    Livewire::test(HelloassoSyncConfig::class)
+        ->set('compteHelloassoId', (int) $this->compteA->id)
+        ->set('compteVersementId', (int) $this->compteA->id)
+        ->set('sousCategorieDonId', (int) $compteDonA->id)
+        ->call('sauvegarder')
+        ->assertHasErrors(['compteHelloassoId', 'compteVersementId', 'sousCategorieDonId']);
+
+    $parametresB = HelloAssoParametres::query()->findOrFail((int) $this->parametresB->id);
+    expect((int) $parametresB->compte_helloasso_id)->toBe((int) $this->compteB->id)
+        ->and($parametresB->compte_versement_id)->toBeNull()
+        ->and($parametresB->compte_don_id)->toBeNull();
 });
