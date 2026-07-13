@@ -94,6 +94,8 @@ Expected: exit 0.
 - Modify: `app/Livewire/Portail/NoteDeFrais/Show.php`
 - Modify: `app/Livewire/BackOffice/NoteDeFrais/Show.php`
 - Modify: `app/Livewire/Banques/HelloAssoSyncWizard.php`
+- Modify: `app/Livewire/Parametres/HelloassoSyncConfig.php`
+- Modify: `app/Http/Controllers/HelloAssoCallbackController.php`
 - Modify: `app/Services/ProvisionService.php`
 - Modify: `app/Models/HelloAssoParametres.php`
 - Modify: `database/factories/HelloAssoParametresFactory.php`
@@ -120,6 +122,9 @@ Expected: exit 0.
 - Test: `tests/Feature/Services/ProvisionServiceTest.php`
 - Test: `tests/Feature/BackOffice/NoteDeFrais/ShowTest.php`
 - Test: `tests/Livewire/Banques/HelloassoSyncWizardActionTest.php`
+- Test: `tests/Feature/Lot4/HelloAssoSyncConfigTest.php`
+- Test: `tests/Feature/HelloAssoCallbackTest.php`
+- Test: `tests/Feature/Webhooks/HelloAssoCallbackTenantContextTest.php`
 
 **Interfaces:**
 - Consumes: relations `compte()` des modèles de ventilation et `Compte::usages()`.
@@ -134,6 +139,8 @@ Expected: au moins un échec sur une relation ou un attribut legacy supprimé.
 - [ ] **Step 2: Basculer chaque lecteur sur compte/famille**
 
 Utiliser `typeOperation.compte`, `ligne.compte`, `TransactionLigne::whereHas('compte.usages', ...)` et les propriétés `compte_id`, `numero_pcg`, `intitule`. Les commandes de contrôle identifient une ventilation par les classes 6/7, et non par la présence d'une colonne supprimée.
+
+`HelloAssoParametres` devient tenant-scopé. Le callback public résout donc le token chiffré sans scope uniquement pendant la phase pré-authentification, puis boote immédiatement le `TenantContext` correspondant avant toute lecture ou écriture tenant. Les écrans authentifiés utilisent exclusivement le scope tenant courant, sans ID d'association codé en dur.
 
 - [ ] **Step 3: Vérifier les tests ciblés**
 
