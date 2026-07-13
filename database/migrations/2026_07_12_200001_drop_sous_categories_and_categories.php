@@ -32,6 +32,7 @@ return new class extends Migration
     public function up(): void
     {
         $this->backfillTransactionLignes();
+        $this->backfillHelloAssoDonationAccount();
         $this->assertNoUnresolvedAttachments();
 
         // SQLite requires indexes referencing a column to be removed before the column.
@@ -131,12 +132,54 @@ return new class extends Migration
             }
         }
 
+        $helloAssoCount = DB::table('helloasso_parametres')
+            ->whereNotNull('sous_categorie_don_id')
+            ->whereNull('compte_don_id')
+            ->count();
+
+        if ($helloAssoCount > 0) {
+            $unresolved['helloasso_parametres'] = $helloAssoCount;
+        }
+
         if ($unresolved !== []) {
             throw new RuntimeException(
                 'Migration interrompue : rattachements compte_id non résolus ('.
                 collect($unresolved)->map(fn (int $count, string $table): string => "{$table}: {$count}")->implode(', ').
                 ').'
             );
+        }
+    }
+
+    private function backfillHelloAssoDonationAccount(): void
+    {
+        $rows = DB::table('helloasso_parametres')
+            ->whereNotNull('sous_categorie_don_id')
+            ->whereNull('compte_don_id')
+            ->get(['id', 'association_id', 'sous_categorie_don_id']);
+
+        foreach ($rows as $row) {
+            $codeCerfa = DB::table('sous_categories')
+                ->where('id', $row->sous_categorie_don_id)
+                ->where('association_id', $row->association_id)
+                ->value('code_cerfa');
+
+            if ($codeCerfa === null) {
+                continue;
+            }
+
+            $compteId = DB::table('comptes')
+                ->where('association_id', $row->association_id)
+                ->where('numero_pcg', $codeCerfa)
+                ->value('id');
+
+            if ($compteId === null) {
+                continue;
+            }
+
+            DB::table('helloasso_parametres')
+                ->where('id', $row->id)
+                ->whereNull('compte_don_id')
+                ->update(['compte_don_id' => $compteId]);
         }
     }
 };
