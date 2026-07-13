@@ -10,33 +10,33 @@
         $fmt = fn(?float $v): string => $v !== null ? number_format($v, 2, ',', ' ') . ' €' : '—';
         $hasAdjustments = $provisions->isNotEmpty() || $provisionsN1->isNotEmpty() || $extournes->isNotEmpty() || $extournesN1->isNotEmpty();
 
-        // Merge extournes N and N-1 by key (libelle|sous_categorie_id)
+        // Merge extournes N and N-1 by key (libelle|compte_id)
         $extournesMerged = collect();
         foreach ($extournesN1 as $e) {
-            $key = $e['libelle'] . '|' . $e['sous_categorie_id'];
-            $extournesMerged[$key] = ['libelle' => $e['libelle'], 'sous_categorie_nom' => $e['sous_categorie_nom'], 'montant_n1' => $e['montant_signe'], 'montant_n' => null];
+            $key = $e['libelle'] . '|' . $e['compte_id'];
+            $extournesMerged[$key] = ['libelle' => $e['libelle'], 'compte_nom' => $e['compte_nom'], 'montant_n1' => $e['montant_signe'], 'montant_n' => null];
         }
         foreach ($extournes as $e) {
-            $key = $e['libelle'] . '|' . $e['sous_categorie_id'];
+            $key = $e['libelle'] . '|' . $e['compte_id'];
             if ($extournesMerged->has($key)) {
                 $extournesMerged[$key] = array_merge($extournesMerged[$key], ['montant_n' => $e['montant_signe']]);
             } else {
-                $extournesMerged[$key] = ['libelle' => $e['libelle'], 'sous_categorie_nom' => $e['sous_categorie_nom'], 'montant_n1' => null, 'montant_n' => $e['montant_signe']];
+                $extournesMerged[$key] = ['libelle' => $e['libelle'], 'compte_nom' => $e['compte_nom'], 'montant_n1' => null, 'montant_n' => $e['montant_signe']];
             }
         }
 
-        // Merge provisions N and N-1 by key (libelle|sous_categorie_id)
+        // Merge provisions N and N-1 by key (libelle|compte_id)
         $provisionsMerged = collect();
         foreach ($provisionsN1 as $p) {
-            $key = $p['libelle'] . '|' . $p['sous_categorie_id'];
-            $provisionsMerged[$key] = ['libelle' => $p['libelle'], 'sous_categorie_nom' => $p['sous_categorie_nom'], 'montant_n1' => $p['montant_signe'], 'montant_n' => null];
+            $key = $p['libelle'] . '|' . $p['compte_id'];
+            $provisionsMerged[$key] = ['libelle' => $p['libelle'], 'compte_nom' => $p['compte_nom'], 'montant_n1' => $p['montant_signe'], 'montant_n' => null];
         }
         foreach ($provisions as $p) {
-            $key = $p['libelle'] . '|' . $p['sous_categorie_id'];
+            $key = $p['libelle'] . '|' . $p['compte_id'];
             if ($provisionsMerged->has($key)) {
                 $provisionsMerged[$key] = array_merge($provisionsMerged[$key], ['montant_n' => $p['montant_signe']]);
             } else {
-                $provisionsMerged[$key] = ['libelle' => $p['libelle'], 'sous_categorie_nom' => $p['sous_categorie_nom'], 'montant_n1' => null, 'montant_n' => $p['montant_signe']];
+                $provisionsMerged[$key] = ['libelle' => $p['libelle'], 'compte_nom' => $p['compte_nom'], 'montant_n1' => null, 'montant_n' => $p['montant_signe']];
             }
         }
     @endphp
@@ -59,7 +59,7 @@
             @foreach ($extournesMerged as $ext)
             <tr class="cr-sub">
                 <td style="width:20px;"></td>
-                <td>{{ $ext['libelle'] }} ({{ $ext['sous_categorie_nom'] }})</td>
+                <td>{{ $ext['libelle'] }} ({{ $ext['compte_nom'] }})</td>
                 @if($compareN1)
                 <td class="text-right" style="width:90px;">{!! $fmt($ext['montant_n1']) !!}</td>
                 @endif
@@ -102,7 +102,7 @@
             </tr>
             @foreach ($section['data'] as $cat)
                 @php
-                    $scVisibles = collect($cat['sous_categories'])->filter(fn($sc) =>
+                    $scVisibles = collect($cat['comptes'])->filter(fn($sc) =>
                         $sc['montant_n'] != 0 || ($sc['montant_n1'] !== null && $sc['montant_n1'] != 0) || ($sc['budget'] !== null && $sc['budget'] != 0)
                     );
                 @endphp
@@ -197,7 +197,7 @@
             @foreach ($provisionsMerged as $prov)
             <tr class="cr-sub">
                 <td style="width:20px;"></td>
-                <td>{{ $prov['libelle'] }} ({{ $prov['sous_categorie_nom'] }})</td>
+                <td>{{ $prov['libelle'] }} ({{ $prov['compte_nom'] }})</td>
                 @if($compareN1)
                 <td class="text-right" style="width:90px;">{!! $fmt($prov['montant_n1']) !!}</td>
                 @endif

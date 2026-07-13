@@ -41,7 +41,7 @@
         <div class="col-md-3">
             <label class="form-label form-label-sm">Compte</label>
             <select class="form-select form-select-sm"
-                    wire:model="nouvelleLigneMontantSousCategorieId">
+                    wire:model="nouvelleLigneMontantCompteId">
                 <option value="">— Aucun —</option>
                 @include('partials.select-compte-options', ['groupes' => $groupesComptesRecette])
             </select>

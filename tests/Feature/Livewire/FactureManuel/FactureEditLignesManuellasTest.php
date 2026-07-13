@@ -83,7 +83,7 @@ it('ajouterLigneManuelle crée une ligne MontantManuel et recalcule le total', f
         ->set('nouvelleLigneMontantLibelle', 'Mission audit')
         ->set('nouvelleLigneMontantPrixUnitaire', '800')
         ->set('nouvelleLigneMontantQuantite', '3')
-        ->set('nouvelleLigneMontantSousCategorieId', $this->compteVentilation->id)
+        ->set('nouvelleLigneMontantCompteId', $this->compteVentilation->id)
         ->call('ajouterLigneManuelle')
         ->assertHasNoErrors();
 
@@ -105,7 +105,7 @@ it('ajouterLigneTexteManuelle crée une ligne Texte sans modifier le total', fun
         ->set('nouvelleLigneMontantLibelle', 'Prestation de base')
         ->set('nouvelleLigneMontantPrixUnitaire', '500')
         ->set('nouvelleLigneMontantQuantite', '1')
-        ->set('nouvelleLigneMontantSousCategorieId', $this->compteVentilation->id)
+        ->set('nouvelleLigneMontantCompteId', $this->compteVentilation->id)
         ->call('ajouterLigneManuelle');
 
     $this->facture->refresh();
@@ -207,7 +207,7 @@ it('mix Montant ref + MontantManuel + Texte donne les 3 types et un total cohér
         ->set('nouvelleLigneMontantLibelle', 'Frais annexes')
         ->set('nouvelleLigneMontantPrixUnitaire', '100')
         ->set('nouvelleLigneMontantQuantite', '1')
-        ->set('nouvelleLigneMontantSousCategorieId', $this->compteVentilation->id)
+        ->set('nouvelleLigneMontantCompteId', $this->compteVentilation->id)
         ->call('ajouterLigneManuelle');
 
     // Ajouter ligne Texte

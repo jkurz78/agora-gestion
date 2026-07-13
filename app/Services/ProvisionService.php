@@ -15,11 +15,10 @@ final class ProvisionService
     /**
      * Provisions de l'exercice N, avec montant signé et infos compte/famille.
      *
-     * Lit compte_id/compte et la famille dérivée. Clés de payload conservées (sous_categorie_id,
-     * sous_categorie_nom, categorie_nom) pour ne pas casser les consommateurs Livewire —
-     * bascule des clés en DC-6/8.
+     * Lit compte_id/compte et la famille dérivée. Le payload compte-first expose
+     * compte_id, compte_nom et famille_nom aux consommateurs de rapports.
      *
-     * @return Collection<int, array{id: int, libelle: string, type: string, montant: float, montant_signe: float, sous_categorie_id: int, sous_categorie_nom: string, categorie_nom: string}>
+     * @return Collection<int, array{id: int, libelle: string, type: string, montant: float, montant_signe: float, compte_id: int, compte_nom: string, famille_nom: string}>
      */
     public function provisionsExercice(int $annee): Collection
     {
@@ -36,7 +35,7 @@ final class ProvisionService
     /**
      * Extournes = provisions de N−1, montant signé inversé.
      *
-     * @return Collection<int, array{id: int, libelle: string, type: string, montant: float, montant_signe: float, sous_categorie_id: int, sous_categorie_nom: string, categorie_nom: string}>
+     * @return Collection<int, array{id: int, libelle: string, type: string, montant: float, montant_signe: float, compte_id: int, compte_nom: string, famille_nom: string}>
      */
     public function extournesExercice(int $annee): Collection
     {
@@ -56,7 +55,7 @@ final class ProvisionService
      *
      * @param  Collection<int, Provision>  $provisions
      * @param  callable(Provision): float  $montantSigne
-     * @return Collection<int, array{id: int, libelle: string, type: string, montant: float, montant_signe: float, sous_categorie_id: int, sous_categorie_nom: string, categorie_nom: string}>
+     * @return Collection<int, array{id: int, libelle: string, type: string, montant: float, montant_signe: float, compte_id: int, compte_nom: string, famille_nom: string}>
      */
     private function mapper(Collection $provisions, callable $montantSigne): Collection
     {
@@ -74,9 +73,9 @@ final class ProvisionService
                 'type' => $p->type->value,
                 'montant' => (float) $p->montant,
                 'montant_signe' => $montantSigne($p),
-                'sous_categorie_id' => (int) $p->compte_id,
-                'sous_categorie_nom' => $compte?->intitule ?? 'Compte supprimé',
-                'categorie_nom' => $famille?->libelle() ?? $compte?->numero_pcg ?? 'Famille inconnue',
+                'compte_id' => (int) $p->compte_id,
+                'compte_nom' => $compte?->intitule ?? 'Compte supprimé',
+                'famille_nom' => $famille?->libelle() ?? $compte?->numero_pcg ?? 'Famille inconnue',
             ];
         });
     }

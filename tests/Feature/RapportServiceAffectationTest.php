@@ -14,7 +14,7 @@ use App\Services\RapportService;
 use App\Tenant\TenantContext;
 
 /**
- * DC-4 : CompteResultatBuilder retourne désormais 'sous_categorie_id' = compte_id.
+ * DC-4 : CompteResultatBuilder retourne désormais 'compte_id' = compte_id.
  * Avec Compte::factory() directement, le compte_id est déjà connu — ce helper
  * ne fait plus qu'exposer l'id sous forme entière pour les assertions.
  */
@@ -57,6 +57,25 @@ afterEach(function () {
     TenantContext::clear();
 });
 
+it('expose une hiérarchie famille et comptes sans clés historiques', function () {
+    $recette = Transaction::factory()->asRecette()->create([
+        'compte_id' => $this->compte->id,
+        'date' => '2025-10-15',
+        'montant_total' => 2500.00,
+    ]);
+    $recette->lignes()->forceDelete();
+    affectationLigne($recette, $this->compteVentilation, 2500.00, (int) $this->op1->id);
+
+    $rapport = $this->service->compteDeResultatOperations(2025, [$this->op1->id]);
+    $famille = collect($rapport['produits'])->first();
+    $compte = collect($famille['comptes'] ?? [])->first();
+
+    expect($famille)->toHaveKeys(['famille_id', 'label', 'comptes'])
+        ->not->toHaveKey('categorie_id')
+        ->and($compte)->toHaveKeys(['compte_id', 'label', 'montant'])
+        ->not->toHaveKey('sous_categorie_id');
+});
+
 it('le rapport onglet 2 prend en compte les affectations au lieu de operation_id ligne', function () {
     // Recette de 20 000 sans opération directe
     $recette = Transaction::factory()->asRecette()->create([
@@ -78,11 +97,11 @@ it('le rapport onglet 2 prend en compte les affectations au lieu de operation_id
 
     $rapport = $this->service->compteDeResultatOperations(2025, [$this->op1->id]);
 
-    // $rapport['produits'] est une liste de catégories, chaque catégorie ayant une clé 'sous_categories'.
+    // $rapport['produits'] est une liste de catégories, chaque catégorie ayant une clé 'comptes'.
     $produits = collect($rapport['produits'] ?? []);
-    $cat = $produits->first(fn ($c) => collect($c['sous_categories'] ?? [])->contains('sous_categorie_id', affectationCompteIdPour($this->compteVentilation))
+    $cat = $produits->first(fn ($c) => collect($c['comptes'] ?? [])->contains('compte_id', affectationCompteIdPour($this->compteVentilation))
     );
-    $scRow = collect($cat['sous_categories'] ?? [])->firstWhere('sous_categorie_id', affectationCompteIdPour($this->compteVentilation));
+    $scRow = collect($cat['comptes'] ?? [])->firstWhere('compte_id', affectationCompteIdPour($this->compteVentilation));
     // Le rapport doit voir 8000 sur op1, pas 0 (car la ligne avait operation_id null)
     expect((float) ($scRow['montant'] ?? 0))->toBe(8000.0);
 });
@@ -99,9 +118,9 @@ it('une ligne sans affectation continue d\'utiliser son operation_id direct', fu
     $rapport = $this->service->compteDeResultatOperations(2025, [$this->op1->id]);
 
     $produits = collect($rapport['produits'] ?? []);
-    $cat = $produits->first(fn ($c) => collect($c['sous_categories'] ?? [])->contains('sous_categorie_id', affectationCompteIdPour($this->compteVentilation))
+    $cat = $produits->first(fn ($c) => collect($c['comptes'] ?? [])->contains('compte_id', affectationCompteIdPour($this->compteVentilation))
     );
-    $scRow = collect($cat['sous_categories'] ?? [])->firstWhere('sous_categorie_id', affectationCompteIdPour($this->compteVentilation));
+    $scRow = collect($cat['comptes'] ?? [])->firstWhere('compte_id', affectationCompteIdPour($this->compteVentilation));
     expect((float) ($scRow['montant'] ?? 0))->toBe(5000.0);
 });
 
@@ -127,9 +146,9 @@ it('le rapport onglet 2 prend en compte les affectations de dépenses', function
     $rapport = $this->service->compteDeResultatOperations(2025, [$this->op1->id]);
 
     $charges = collect($rapport['charges'] ?? []);
-    $cat = $charges->first(fn ($c) => collect($c['sous_categories'] ?? [])->contains('sous_categorie_id', affectationCompteIdPour($compteDepense))
+    $cat = $charges->first(fn ($c) => collect($c['comptes'] ?? [])->contains('compte_id', affectationCompteIdPour($compteDepense))
     );
-    $scRow = collect($cat['sous_categories'] ?? [])->firstWhere('sous_categorie_id', affectationCompteIdPour($compteDepense));
+    $scRow = collect($cat['comptes'] ?? [])->firstWhere('compte_id', affectationCompteIdPour($compteDepense));
     expect((float) ($scRow['montant'] ?? 0))->toBe(7000.0);
 });
 
@@ -153,14 +172,14 @@ it('le rapport onglet 3 prend en compte les affectations de recettes avec séanc
     $rapport = $this->service->rapportSeances(2025, [$this->op1->id]);
 
     // rapportSeances retourne ['seances' => [...], 'charges' => [...], 'produits' => [...]]
-    // 'produits' est une liste de catégories, chacune avec 'sous_categories'
+    // 'produits' est une liste de catégories, chacune avec 'comptes'
     // et chaque sous-catégorie a une clé 'seances' = [seance_num => montant]
     expect($rapport['seances'])->toContain(2);
 
     $produits = collect($rapport['produits'] ?? []);
-    $cat = $produits->first(fn ($c) => collect($c['sous_categories'] ?? [])->contains('sous_categorie_id', affectationCompteIdPour($this->compteVentilation))
+    $cat = $produits->first(fn ($c) => collect($c['comptes'] ?? [])->contains('compte_id', affectationCompteIdPour($this->compteVentilation))
     );
-    $scRow = collect($cat['sous_categories'] ?? [])->firstWhere('sous_categorie_id', affectationCompteIdPour($this->compteVentilation));
+    $scRow = collect($cat['comptes'] ?? [])->firstWhere('compte_id', affectationCompteIdPour($this->compteVentilation));
     expect((float) ($scRow['seances'][2] ?? 0))->toBe(3000.0);
 });
 
@@ -194,8 +213,8 @@ it('compteDeResultat global : recette ventilée partiellement sans opération �
     $rapport = $this->service->compteDeResultat(2025);
 
     $produits = collect($rapport['produits'] ?? []);
-    $cat = $produits->first(fn ($c) => collect($c['sous_categories'] ?? [])->contains('sous_categorie_id', affectationCompteIdPour($this->compteVentilation)));
-    $scRow = collect($cat['sous_categories'] ?? [])->firstWhere('sous_categorie_id', affectationCompteIdPour($this->compteVentilation));
+    $cat = $produits->first(fn ($c) => collect($c['comptes'] ?? [])->contains('compte_id', affectationCompteIdPour($this->compteVentilation)));
+    $scRow = collect($cat['comptes'] ?? [])->firstWhere('compte_id', affectationCompteIdPour($this->compteVentilation));
     expect((float) ($scRow['montant_n'] ?? 0))->toBe(20000.0);
 });
 
@@ -219,8 +238,8 @@ it('compteDeResultat global : recette ventilée entièrement sans opération —
     $rapport = $this->service->compteDeResultat(2025);
 
     $produits = collect($rapport['produits'] ?? []);
-    $cat = $produits->first(fn ($c) => collect($c['sous_categories'] ?? [])->contains('sous_categorie_id', affectationCompteIdPour($this->compteVentilation)));
-    $scRow = collect($cat['sous_categories'] ?? [])->firstWhere('sous_categorie_id', affectationCompteIdPour($this->compteVentilation));
+    $cat = $produits->first(fn ($c) => collect($c['comptes'] ?? [])->contains('compte_id', affectationCompteIdPour($this->compteVentilation)));
+    $scRow = collect($cat['comptes'] ?? [])->firstWhere('compte_id', affectationCompteIdPour($this->compteVentilation));
     expect((float) ($scRow['montant_n'] ?? 0))->toBe(10000.0);
 });
 
@@ -253,8 +272,8 @@ it('compteDeResultat global : dépense ventilée partiellement sans opération �
     $rapport = $this->service->compteDeResultat(2025);
 
     $charges = collect($rapport['charges'] ?? []);
-    $cat = $charges->first(fn ($c) => collect($c['sous_categories'] ?? [])->contains('sous_categorie_id', affectationCompteIdPour($compteDepense)));
-    $scRow = collect($cat['sous_categories'] ?? [])->firstWhere('sous_categorie_id', affectationCompteIdPour($compteDepense));
+    $cat = $charges->first(fn ($c) => collect($c['comptes'] ?? [])->contains('compte_id', affectationCompteIdPour($compteDepense)));
+    $scRow = collect($cat['comptes'] ?? [])->firstWhere('compte_id', affectationCompteIdPour($compteDepense));
     expect((float) ($scRow['montant_n'] ?? 0))->toBe(9000.0);
 });
 
@@ -286,8 +305,8 @@ it('compteDeResultatOperations filtré : affectation sans opération n\'apparaî
     $rapport = $this->service->compteDeResultatOperations(2025, [$this->op1->id]);
 
     $produits = collect($rapport['produits'] ?? []);
-    $cat = $produits->first(fn ($c) => collect($c['sous_categories'] ?? [])->contains('sous_categorie_id', affectationCompteIdPour($this->compteVentilation)));
-    $scRow = collect($cat['sous_categories'] ?? [])->firstWhere('sous_categorie_id', affectationCompteIdPour($this->compteVentilation));
+    $cat = $produits->first(fn ($c) => collect($c['comptes'] ?? [])->contains('compte_id', affectationCompteIdPour($this->compteVentilation)));
+    $scRow = collect($cat['comptes'] ?? [])->firstWhere('compte_id', affectationCompteIdPour($this->compteVentilation));
     // Seuls les 5 000 rattachés à op1 doivent apparaître, pas les 15 000 sans opération
     expect((float) ($scRow['montant'] ?? 0))->toBe(5000.0);
 });
@@ -316,8 +335,8 @@ it('le rapport onglet 3 prend en compte les affectations de dépenses avec séan
     expect($rapport['seances'])->toContain(3);
 
     $charges = collect($rapport['charges'] ?? []);
-    $cat = $charges->first(fn ($c) => collect($c['sous_categories'] ?? [])->contains('sous_categorie_id', affectationCompteIdPour($compteDepense))
+    $cat = $charges->first(fn ($c) => collect($c['comptes'] ?? [])->contains('compte_id', affectationCompteIdPour($compteDepense))
     );
-    $scRow = collect($cat['sous_categories'] ?? [])->firstWhere('sous_categorie_id', affectationCompteIdPour($compteDepense));
+    $scRow = collect($cat['comptes'] ?? [])->firstWhere('compte_id', affectationCompteIdPour($compteDepense));
     expect((float) ($scRow['seances'][3] ?? 0))->toBe(4000.0);
 });

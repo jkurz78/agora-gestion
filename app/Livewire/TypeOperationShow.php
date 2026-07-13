@@ -13,9 +13,11 @@ use App\Models\TypeOperation;
 use App\Models\TypeOperationSeance;
 use App\Models\TypeOperationTarif;
 use App\Support\TenantAsset;
+use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -36,7 +38,7 @@ final class TypeOperationShow extends Component
 
     public string $description = '';
 
-    public string $sous_categorie_id = '';
+    public string $compte_id = '';
 
     public string $nombre_seances = '';
 
@@ -124,8 +126,7 @@ final class TypeOperationShow extends Component
         $this->nom = $type->nom;
         $this->libelle_article = $type->libelle_article ?? '';
         $this->description = $type->description ?? '';
-        // DC-8 : le sélecteur porte un id de compte (nom de propriété conservé jusqu'à DC-10).
-        $this->sous_categorie_id = (string) $type->compte_id;
+        $this->compte_id = (string) $type->compte_id;
         $this->nombre_seances = $type->nombre_seances !== null ? (string) $type->nombre_seances : '';
         $this->formulaireActif = (bool) $type->formulaire_actif;
         $this->formulairePrescripteur = (bool) $type->formulaire_prescripteur;
@@ -228,7 +229,12 @@ final class TypeOperationShow extends Component
         $rules = [
             'nom' => 'required|string|max:150|unique:type_operations,nom'.($this->typeOperationId ? ','.$this->typeOperationId : ''),
             'description' => 'nullable|string|max:1000',
-            'sous_categorie_id' => 'required|exists:comptes,id',
+            'compte_id' => [
+                'required',
+                Rule::exists('comptes', 'id')
+                    ->where('association_id', TenantContext::currentId())
+                    ->whereNull('deleted_at'),
+            ],
             'nombre_seances' => 'nullable|integer|min:1',
             'logo' => 'nullable|image|max:512',
             'attestationMedicale' => 'nullable|file|mimes:pdf,doc,docx|max:5120',
@@ -243,8 +249,7 @@ final class TypeOperationShow extends Component
                 'nom' => $this->nom,
                 'libelle_article' => $this->libelle_article !== '' ? $this->libelle_article : null,
                 'description' => $this->description !== '' ? $this->description : null,
-                // DC-8 : écrit compte_id, le trait remplit le miroir sous_categorie_id.
-                'compte_id' => (int) $this->sous_categorie_id,
+                'compte_id' => (int) $this->compte_id,
                 'nombre_seances' => $this->nombre_seances !== '' ? (int) $this->nombre_seances : null,
                 'formulaire_actif' => $this->formulaireActif,
                 'formulaire_prescripteur' => $this->formulairePrescripteur,

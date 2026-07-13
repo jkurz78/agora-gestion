@@ -27,8 +27,8 @@ use Illuminate\Support\Str;
 final class CsvImportService
 {
     private const EXPECTED_HEADERS = [
-        'date', 'reference', 'sous_categorie', 'montant_ligne',
-        'mode_paiement', 'compte', 'libelle', 'tiers', 'operation',
+        'date', 'reference', 'compte', 'montant_ligne',
+        'mode_paiement', 'compte_bancaire', 'libelle', 'tiers', 'operation',
         'seance', 'notes',
     ];
 
@@ -65,7 +65,7 @@ final class CsvImportService
         array_shift($rows); // Retirer la ligne d'en-tête
 
         // Charger les lookups DB une seule fois (case-insensitive via lowercase key)
-        // Colonne CSV « sous_categorie » (format conservé) résolue contre les comptes
+        // Colonne CSV « compte » résolue contre les comptes de ventilation
         // PCG de la classe attendue — dépense → classe 6, recette → classe 7.
         $classeVentilation = $type === 'depense' ? 6 : 7;
         $flagField = $type === 'depense' ? 'pour_depenses' : 'pour_recettes';
@@ -76,7 +76,7 @@ final class CsvImportService
             ->get()
             ->keyBy(fn ($c) => Str::lower(trim($c->intitule)));
 
-        $comptes = CompteBancaire::saisieManuelle()
+        $comptesBancaires = CompteBancaire::saisieManuelle()
             ->get()
             ->keyBy(fn ($c) => Str::lower(trim($c->nom)));
 
@@ -109,8 +109,8 @@ final class CsvImportService
             $reference = trim($row[1]);
             $groupKey = $date.'|'.$reference;
 
-            $compteNomLigne = Str::lower(trim($row[2]));
-            $compteVentilation = $comptesVentilation[$compteNomLigne];
+            $compteVentilationNom = Str::lower(trim($row[2]));
+            $compteVentilation = $comptesVentilation[$compteVentilationNom];
             $montant = trim($row[3]);
             $operationNom = Str::lower(trim($row[8] ?? ''));
             $operation = $operationNom !== '' ? ($operations[$operationNom] ?? null) : null;
@@ -129,9 +129,9 @@ final class CsvImportService
             }
 
             if (! isset($groups[$groupKey])) {
-                // Première ligne de ce groupe : mode_paiement et compte sont obligatoires
+                // Première ligne de ce groupe : mode_paiement et compte_bancaire sont obligatoires
                 $mode = trim($row[4] ?? '');
-                $compteNom = Str::lower(trim($row[5] ?? ''));
+                $compteBancaireNom = Str::lower(trim($row[5] ?? ''));
 
                 if ($mode === '') {
                     $errors[] = ['line' => $csvLine, 'message' => 'Colonne mode_paiement : obligatoire sur la première ligne d\'une transaction.'];
@@ -145,14 +145,14 @@ final class CsvImportService
                     continue;
                 }
 
-                if ($compteNom === '') {
-                    $errors[] = ['line' => $csvLine, 'message' => 'Colonne compte : obligatoire sur la première ligne d\'une transaction.'];
+                if ($compteBancaireNom === '') {
+                    $errors[] = ['line' => $csvLine, 'message' => 'Colonne compte_bancaire : obligatoire sur la première ligne d\'une transaction.'];
 
                     continue;
                 }
 
-                if (! isset($comptes[$compteNom])) {
-                    $errors[] = ['line' => $csvLine, 'message' => 'Colonne compte : "'.trim($row[5]).'" inconnu ou inactif (actif_recettes_depenses = false).'];
+                if (! isset($comptesBancaires[$compteBancaireNom])) {
+                    $errors[] = ['line' => $csvLine, 'message' => 'Colonne compte_bancaire : "'.trim($row[5]).'" inconnu ou inactif (actif_recettes_depenses = false).'];
 
                     continue;
                 }
@@ -171,7 +171,7 @@ final class CsvImportService
                         'reference' => $reference,
                         'libelle' => trim($row[6] ?? '') !== '' ? trim($row[6]) : null,
                         'mode_paiement' => $mode,
-                        'compte_id' => $comptes[$compteNom]->id,
+                        'compte_id' => $comptesBancaires[$compteBancaireNom]->id,
                         'tiers_id' => $tiersId,
                         'montant_total' => 0.0,
                     ],
@@ -292,7 +292,7 @@ final class CsvImportService
     }
 
     /**
-     * Valide les champs d'une ligne (hors mode_paiement et compte, validés lors du groupement).
+     * Valide les champs d'une ligne (hors mode_paiement et compte_bancaire, validés lors du groupement).
      *
      * @param  array<string, list<Tiers>>  $tiersMap
      * @return list<array{line: int, message: string}>
@@ -323,12 +323,12 @@ final class CsvImportService
             $errors[] = ['line' => $csvLine, 'message' => 'Colonne reference : valeur trop longue (max 100 caractères).'];
         }
 
-        // sous_categorie (col 2) — résolue contre un compte de ventilation (classe 6/7)
+        // compte (col 2) — résolu contre un compte de ventilation (classe 6/7)
         $compteNom = Str::lower(trim($row[2] ?? ''));
         if ($compteNom === '') {
-            $errors[] = ['line' => $csvLine, 'message' => 'Colonne sous_categorie : valeur vide (champ obligatoire).'];
+            $errors[] = ['line' => $csvLine, 'message' => 'Colonne compte : valeur vide (champ obligatoire).'];
         } elseif (! isset($comptesVentilation[$compteNom])) {
-            $errors[] = ['line' => $csvLine, 'message' => "Colonne sous_categorie : compte \"{$row[2]}\" inconnu ou de mauvaise classe."];
+            $errors[] = ['line' => $csvLine, 'message' => "Colonne compte : \"{$row[2]}\" inconnu ou de mauvaise classe."];
         }
 
         // montant_ligne (col 3)

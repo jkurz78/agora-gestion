@@ -17,7 +17,7 @@ final class CompteResultatBuilder
     // ── Public API ────────────────────────────────────────────────────────────
 
     /**
-     * Compte de résultat complet : hiérarchie catégorie/sous-catégorie avec N-1 et budget.
+     * Compte de résultat complet : hiérarchie famille/compte avec N-1 et budget.
      * Pas de filtre opération.
      *
      * @return array{charges: list<array>, produits: list<array>}
@@ -168,7 +168,7 @@ final class CompteResultatBuilder
     }
 
     /**
-     * Rapport par séances : hiérarchie catégorie/sous-catégorie avec une colonne par séance.
+     * Rapport par séances : hiérarchie famille/compte avec une colonne par séance.
      *
      * @param  array<int>  $operationIds
      * @return array{seances: list<int>, charges: list<array>, produits: list<array>}
@@ -295,17 +295,17 @@ final class CompteResultatBuilder
         $categories = [];
 
         foreach ($map as $entry) {
-            $catId = $entry['categorie_id'];
-            $scId = $entry['sous_categorie_id'];
+            $catId = $entry['famille_id'];
+            $scId = $entry['compte_id'];
             $montant = (float) $entry['montant'];
 
-            // ── Init catégorie ───────────────────────────────────────────────
+            // ── Initialisation famille ───────────────────────────────────────
             if (! isset($categories[$catId])) {
                 $categories[$catId] = [
-                    'categorie_id' => $catId,
-                    'label' => $entry['categorie_nom'],
+                    'famille_id' => $catId,
+                    'label' => $entry['famille_nom'],
                     'montant' => 0.0,
-                    'sous_categories_map' => [],
+                    'comptes_map' => [],
                 ];
                 if ($withSeance) {
                     $categories[$catId]['seances'] = array_fill_keys($allSeances, 0.0);
@@ -318,11 +318,11 @@ final class CompteResultatBuilder
                 }
             }
 
-            // ── Init sous-catégorie ──────────────────────────────────────────
-            if (! isset($categories[$catId]['sous_categories_map'][$scId])) {
+            // ── Initialisation compte ────────────────────────────────────────
+            if (! isset($categories[$catId]['comptes_map'][$scId])) {
                 $scEntry = [
-                    'sous_categorie_id' => $scId,
-                    'label' => $entry['sous_categorie_nom'],
+                    'compte_id' => $scId,
+                    'label' => $entry['compte_nom'],
                     'montant' => 0.0,
                 ];
                 if ($withSeance) {
@@ -337,13 +337,13 @@ final class CompteResultatBuilder
                 if ($withTiers) {
                     $scEntry['tiers_map'] = [];
                 }
-                $categories[$catId]['sous_categories_map'][$scId] = $scEntry;
+                $categories[$catId]['comptes_map'][$scId] = $scEntry;
             }
 
             // ── Init & accumulate tiers ──────────────────────────────────────
             if ($withTiers) {
                 $tiersId = $entry['tiers_id'];
-                if (! isset($categories[$catId]['sous_categories_map'][$scId]['tiers_map'][$tiersId])) {
+                if (! isset($categories[$catId]['comptes_map'][$scId]['tiers_map'][$tiersId])) {
                     $tEntry = [
                         'tiers_id' => $tiersId,
                         'label' => $this->formatTiersLabel($entry),
@@ -359,47 +359,47 @@ final class CompteResultatBuilder
                     if ($withSeance && $withOperation) {
                         $tEntry['seance_operations'] = [];
                     }
-                    $categories[$catId]['sous_categories_map'][$scId]['tiers_map'][$tiersId] = $tEntry;
+                    $categories[$catId]['comptes_map'][$scId]['tiers_map'][$tiersId] = $tEntry;
                 }
 
-                $categories[$catId]['sous_categories_map'][$scId]['tiers_map'][$tiersId]['montant'] += $montant;
+                $categories[$catId]['comptes_map'][$scId]['tiers_map'][$tiersId]['montant'] += $montant;
                 if ($withSeance) {
-                    $categories[$catId]['sous_categories_map'][$scId]['tiers_map'][$tiersId]['seances'][$entry['seance']] += $montant;
+                    $categories[$catId]['comptes_map'][$scId]['tiers_map'][$tiersId]['seances'][$entry['seance']] += $montant;
                 }
                 if ($withOperation) {
                     $opId = $entry['operation_id'];
-                    $categories[$catId]['sous_categories_map'][$scId]['tiers_map'][$tiersId]['operations'][$opId]
-                        = ($categories[$catId]['sous_categories_map'][$scId]['tiers_map'][$tiersId]['operations'][$opId] ?? 0.0) + $montant;
+                    $categories[$catId]['comptes_map'][$scId]['tiers_map'][$tiersId]['operations'][$opId]
+                        = ($categories[$catId]['comptes_map'][$scId]['tiers_map'][$tiersId]['operations'][$opId] ?? 0.0) + $montant;
                 }
                 if ($withSeance && $withOperation) {
                     $seance = $entry['seance'];
                     $opId = $entry['operation_id'];
-                    $categories[$catId]['sous_categories_map'][$scId]['tiers_map'][$tiersId]['seance_operations'][$seance][$opId]
-                        = ($categories[$catId]['sous_categories_map'][$scId]['tiers_map'][$tiersId]['seance_operations'][$seance][$opId] ?? 0.0) + $montant;
+                    $categories[$catId]['comptes_map'][$scId]['tiers_map'][$tiersId]['seance_operations'][$seance][$opId]
+                        = ($categories[$catId]['comptes_map'][$scId]['tiers_map'][$tiersId]['seance_operations'][$seance][$opId] ?? 0.0) + $montant;
                 }
             }
 
             // ── Accumulate SC + cat ──────────────────────────────────────────
-            $categories[$catId]['sous_categories_map'][$scId]['montant'] += $montant;
+            $categories[$catId]['comptes_map'][$scId]['montant'] += $montant;
             $categories[$catId]['montant'] += $montant;
 
             if ($withSeance) {
                 $seance = $entry['seance'];
-                $categories[$catId]['sous_categories_map'][$scId]['seances'][$seance] += $montant;
+                $categories[$catId]['comptes_map'][$scId]['seances'][$seance] += $montant;
                 $categories[$catId]['seances'][$seance] += $montant;
             }
             if ($withOperation) {
                 $opId = $entry['operation_id'];
-                $categories[$catId]['sous_categories_map'][$scId]['operations'][$opId]
-                    = ($categories[$catId]['sous_categories_map'][$scId]['operations'][$opId] ?? 0.0) + $montant;
+                $categories[$catId]['comptes_map'][$scId]['operations'][$opId]
+                    = ($categories[$catId]['comptes_map'][$scId]['operations'][$opId] ?? 0.0) + $montant;
                 $categories[$catId]['operations'][$opId]
                     = ($categories[$catId]['operations'][$opId] ?? 0.0) + $montant;
             }
             if ($withSeance && $withOperation) {
                 $seance = $entry['seance'];
                 $opId = $entry['operation_id'];
-                $categories[$catId]['sous_categories_map'][$scId]['seance_operations'][$seance][$opId]
-                    = ($categories[$catId]['sous_categories_map'][$scId]['seance_operations'][$seance][$opId] ?? 0.0) + $montant;
+                $categories[$catId]['comptes_map'][$scId]['seance_operations'][$seance][$opId]
+                    = ($categories[$catId]['comptes_map'][$scId]['seance_operations'][$seance][$opId] ?? 0.0) + $montant;
                 $categories[$catId]['seance_operations'][$seance][$opId]
                     = ($categories[$catId]['seance_operations'][$seance][$opId] ?? 0.0) + $montant;
             }
@@ -409,7 +409,7 @@ final class CompteResultatBuilder
         $result = [];
         foreach ($categories as $cat) {
             $scs = [];
-            foreach ($cat['sous_categories_map'] as $sc) {
+            foreach ($cat['comptes_map'] as $sc) {
                 if ($withTiers) {
                     $tiers = array_values($sc['tiers_map']);
                     usort($tiers, fn ($a, $b) => strcmp($a['label'], $b['label']));
@@ -419,8 +419,8 @@ final class CompteResultatBuilder
                 $scs[] = $sc;
             }
             usort($scs, fn ($a, $b) => strcmp($a['label'], $b['label']));
-            $cat['sous_categories'] = $scs;
-            unset($cat['sous_categories_map']);
+            $cat['comptes'] = $scs;
+            unset($cat['comptes_map']);
             $result[] = $cat;
         }
         usort($result, fn ($a, $b) => strcmp($a['label'], $b['label']));
@@ -476,16 +476,16 @@ final class CompteResultatBuilder
      */
     private function buildHierarchyFull(Collection $flatN, Collection $flatN1, array $budgetMap): array
     {
-        // Map intermédiaire keyed by sous_categorie_id
+        // Map intermédiaire keyed by compte_id
         /** @var array<int, array> */
         $map = [];
 
         foreach ($flatN as $row) {
-            $scId = (int) $row->sous_categorie_id;
+            $scId = (int) $row->compte_id;
             $map[$scId] = [
-                'categorie_id' => (int) $row->categorie_id,
-                'categorie_nom' => $row->categorie_nom,
-                'sous_categorie_nom' => $row->sous_categorie_nom,
+                'famille_id' => (int) $row->famille_id,
+                'famille_nom' => $row->famille_nom,
+                'compte_nom' => $row->compte_nom,
                 'montant_n' => (float) $row->montant,
                 'montant_n1' => null,
                 'budget' => $budgetMap[$scId] ?? null,
@@ -493,15 +493,15 @@ final class CompteResultatBuilder
         }
 
         foreach ($flatN1 as $row) {
-            $scId = (int) $row->sous_categorie_id;
+            $scId = (int) $row->compte_id;
             if (isset($map[$scId])) {
                 $map[$scId]['montant_n1'] = (float) $row->montant;
             } else {
-                // Sous-cat présente en N-1 mais pas en N
+                // Compte présent en N-1 mais pas en N
                 $map[$scId] = [
-                    'categorie_id' => (int) $row->categorie_id,
-                    'categorie_nom' => $row->categorie_nom,
-                    'sous_categorie_nom' => $row->sous_categorie_nom,
+                    'famille_id' => (int) $row->famille_id,
+                    'famille_nom' => $row->famille_nom,
+                    'compte_nom' => $row->compte_nom,
                     'montant_n' => 0.0,
                     'montant_n1' => (float) $row->montant,
                     'budget' => $budgetMap[$scId] ?? null,
@@ -509,7 +509,7 @@ final class CompteResultatBuilder
             }
         }
 
-        return $this->groupByCategorie($map, true);
+        return $this->groupByFamille($map, true);
     }
 
     /**
@@ -521,19 +521,19 @@ final class CompteResultatBuilder
      */
     private function buildHierarchySeances(Collection $flat, array $allSeances): array
     {
-        // Map keyed by sous_categorie_id
+        // Map keyed by compte_id
         /** @var array<int, array> */
         $map = [];
 
         foreach ($flat as $row) {
-            $scId = (int) $row->sous_categorie_id;
+            $scId = (int) $row->compte_id;
             $seance = (int) $row->seance;
 
             if (! isset($map[$scId])) {
                 $map[$scId] = [
-                    'categorie_id' => (int) $row->categorie_id,
-                    'categorie_nom' => $row->categorie_nom,
-                    'sous_categorie_nom' => $row->sous_categorie_nom,
+                    'famille_id' => (int) $row->famille_id,
+                    'famille_nom' => $row->famille_nom,
+                    'compte_nom' => $row->compte_nom,
                     'seances' => [],
                     'total' => 0.0,
                 ];
@@ -542,22 +542,22 @@ final class CompteResultatBuilder
             $map[$scId]['total'] += (float) $row->montant;
         }
 
-        // Group by catégorie
+        // Regroupement par famille
         /** @var array<int, array> */
         $categories = [];
         foreach ($map as $scId => $sc) {
-            $catId = $sc['categorie_id'];
+            $catId = $sc['famille_id'];
             if (! isset($categories[$catId])) {
                 $categories[$catId] = [
-                    'categorie_id' => $catId,
-                    'label' => $sc['categorie_nom'],
+                    'famille_id' => $catId,
+                    'label' => $sc['famille_nom'],
                     'seances' => array_fill_keys($allSeances, 0.0),
                     'total' => 0.0,
-                    'sous_categories' => [],
+                    'comptes' => [],
                 ];
             }
 
-            // Pad sous-catégorie séances avec 0.0 pour séances manquantes
+            // Complète les séances manquantes du compte avec 0.0
             $scSeances = [];
             foreach ($allSeances as $s) {
                 $scSeances[$s] = $sc['seances'][$s] ?? 0.0;
@@ -568,9 +568,9 @@ final class CompteResultatBuilder
             }
             $categories[$catId]['total'] += $sc['total'];
 
-            $categories[$catId]['sous_categories'][] = [
-                'sous_categorie_id' => $scId,
-                'label' => $sc['sous_categorie_nom'],
+            $categories[$catId]['comptes'][] = [
+                'compte_id' => $scId,
+                'label' => $sc['compte_nom'],
                 'seances' => $scSeances,
                 'total' => $sc['total'],
             ];
@@ -578,32 +578,32 @@ final class CompteResultatBuilder
 
         usort($categories, fn ($a, $b) => strcmp($a['label'], $b['label']));
         foreach ($categories as &$cat) {
-            usort($cat['sous_categories'], fn ($a, $b) => strcmp($a['label'], $b['label']));
+            usort($cat['comptes'], fn ($a, $b) => strcmp($a['label'], $b['label']));
         }
 
         return array_values($categories);
     }
 
     /**
-     * Regroupe la map plate en hiérarchie catégorie → sous-catégories.
+     * Regroupe la map plate en hiérarchie famille → comptes.
      *
-     * @param  array<int, array>  $map  Keyed by sous_categorie_id
+     * @param  array<int, array>  $map  Keyed by compte_id
      * @param  bool  $withN1Budget  Inclure montant_n1 et budget dans le retour
      * @return list<array>
      */
-    private function groupByCategorie(array $map, bool $withN1Budget): array
+    private function groupByFamille(array $map, bool $withN1Budget): array
     {
         /** @var array<int, array> */
         $categories = [];
 
         foreach ($map as $scId => $sc) {
-            $catId = $sc['categorie_id'];
+            $catId = $sc['famille_id'];
 
             if (! isset($categories[$catId])) {
                 $cat = [
-                    'categorie_id' => $catId,
-                    'label' => $sc['categorie_nom'],
-                    'sous_categories' => [],
+                    'famille_id' => $catId,
+                    'label' => $sc['famille_nom'],
+                    'comptes' => [],
                 ];
                 if ($withN1Budget) {
                     $cat['montant_n'] = 0.0;
@@ -623,18 +623,18 @@ final class CompteResultatBuilder
                 if ($sc['budget'] !== null) {
                     $categories[$catId]['budget'] = ($categories[$catId]['budget'] ?? 0.0) + $sc['budget'];
                 }
-                $categories[$catId]['sous_categories'][] = [
-                    'sous_categorie_id' => $scId,
-                    'label' => $sc['sous_categorie_nom'],
+                $categories[$catId]['comptes'][] = [
+                    'compte_id' => $scId,
+                    'label' => $sc['compte_nom'],
                     'montant_n' => $sc['montant_n'],
                     'montant_n1' => $sc['montant_n1'],
                     'budget' => $sc['budget'],
                 ];
             } else {
                 $categories[$catId]['montant'] += $sc['montant'];
-                $categories[$catId]['sous_categories'][] = [
-                    'sous_categorie_id' => $scId,
-                    'label' => $sc['sous_categorie_nom'],
+                $categories[$catId]['comptes'][] = [
+                    'compte_id' => $scId,
+                    'label' => $sc['compte_nom'],
                     'montant' => $sc['montant'],
                 ];
             }
@@ -642,7 +642,7 @@ final class CompteResultatBuilder
 
         usort($categories, fn ($a, $b) => strcmp($a['label'], $b['label']));
         foreach ($categories as &$cat) {
-            usort($cat['sous_categories'], fn ($a, $b) => strcmp($a['label'], $b['label']));
+            usort($cat['comptes'], fn ($a, $b) => strcmp($a['label'], $b['label']));
         }
 
         return array_values($categories);
@@ -672,7 +672,7 @@ final class CompteResultatBuilder
      *   Ce scénario sera couvert par PartieDoubleEquivalenceTest au Step 28.
      *
      * @param  array<int>|null  $operationIds  null = pas de filtre opération
-     * @return Collection<int, object> Colonnes : categorie_id (id famille), categorie_nom (libellé famille), sous_categorie_id (id compte), sous_categorie_nom, montant
+     * @return Collection<int, object> Colonnes : famille_id (id famille), famille_nom (libellé famille), compte_id (id compte), compte_nom, montant
      */
     private function fetchClasseRowsPD(string $start, string $end, int $classe, ?array $operationIds = null): Collection
     {
@@ -695,11 +695,11 @@ final class CompteResultatBuilder
             ->whereBetween('t.date', [$start, $end])
             ->when(TenantContext::hasBooted(), fn ($q) => $q->where('c.association_id', TenantContext::currentId()))
             ->select([
-                DB::raw('COALESCE(f.id, 0) as categorie_id'),
-                DB::raw("COALESCE(CONCAT(f.code, ' — ', f.nom), '(sans famille)') as categorie_nom"),
-                // En mode PD, sous_categorie_id = compte_id (mapping transparent pour les builders hiérarchie)
-                DB::raw('c.id as sous_categorie_id'),
-                DB::raw('c.intitule as sous_categorie_nom'),
+                DB::raw('COALESCE(f.id, 0) as famille_id'),
+                DB::raw("COALESCE(CONCAT(f.code, ' — ', f.nom), '(sans famille)') as famille_nom"),
+                // En mode PD, compte_id = compte_id (mapping transparent pour les builders hiérarchie)
+                DB::raw('c.id as compte_id'),
+                DB::raw('c.intitule as compte_nom'),
                 $montantExpr,
             ])
             ->groupBy('c.id', 'c.intitule', 'f.id', 'f.code', 'f.nom');
@@ -750,10 +750,10 @@ final class CompteResultatBuilder
             ->whereIn('tl.operation_id', $operationIds)
             ->when(TenantContext::hasBooted(), fn ($q) => $q->where('c.association_id', TenantContext::currentId()))
             ->select([
-                DB::raw('COALESCE(f.id, 0) as categorie_id'),
-                DB::raw("COALESCE(CONCAT(f.code, ' — ', f.nom), '(sans famille)') as categorie_nom"),
-                DB::raw('c.id as sous_categorie_id'),
-                DB::raw('c.intitule as sous_categorie_nom'),
+                DB::raw('COALESCE(f.id, 0) as famille_id'),
+                DB::raw("COALESCE(CONCAT(f.code, ' — ', f.nom), '(sans famille)') as famille_nom"),
+                DB::raw('c.id as compte_id'),
+                DB::raw('c.intitule as compte_nom'),
                 DB::raw('COALESCE(tl.seance, 0) as seance'),
                 $montantExpr,
             ])
@@ -777,10 +777,10 @@ final class CompteResultatBuilder
             ->whereIn('tla2.operation_id', $operationIds)
             ->when(TenantContext::hasBooted(), fn ($q) => $q->where('c.association_id', TenantContext::currentId()))
             ->select([
-                DB::raw('COALESCE(f.id, 0) as categorie_id'),
-                DB::raw("COALESCE(CONCAT(f.code, ' — ', f.nom), '(sans famille)') as categorie_nom"),
-                DB::raw('c.id as sous_categorie_id'),
-                DB::raw('c.intitule as sous_categorie_nom'),
+                DB::raw('COALESCE(f.id, 0) as famille_id'),
+                DB::raw("COALESCE(CONCAT(f.code, ' — ', f.nom), '(sans famille)') as famille_nom"),
+                DB::raw('c.id as compte_id'),
+                DB::raw('c.intitule as compte_nom'),
                 DB::raw('COALESCE(tla2.seance, 0) as seance'),
                 DB::raw('SUM(tla2.montant) as montant'),
             ])
@@ -818,10 +818,10 @@ final class CompteResultatBuilder
         $isSigne7 = $classe === 7;
 
         $baseCols = [
-            DB::raw('COALESCE(f.id, 0) as categorie_id'),
-            DB::raw("COALESCE(CONCAT(f.code, ' — ', f.nom), '(sans famille)') as categorie_nom"),
-            DB::raw('c.id as sous_categorie_id'),
-            DB::raw('c.intitule as sous_categorie_nom'),
+            DB::raw('COALESCE(f.id, 0) as famille_id'),
+            DB::raw("COALESCE(CONCAT(f.code, ' — ', f.nom), '(sans famille)') as famille_nom"),
+            DB::raw('c.id as compte_id'),
+            DB::raw('c.intitule as compte_nom'),
         ];
         $baseGroup = ['c.id', 'c.intitule', 'f.id', 'f.code', 'f.nom'];
 
@@ -914,7 +914,7 @@ final class CompteResultatBuilder
         $map = [];
         foreach ([$q1->get(), $q2->get()] as $rows) {
             foreach ($rows as $row) {
-                $key = (string) $row->sous_categorie_id;
+                $key = (string) $row->compte_id;
                 if ($withTiers) {
                     $key .= '_'.$row->tiers_id;
                 }
@@ -929,10 +929,10 @@ final class CompteResultatBuilder
                     $map[$key]['montant'] += (float) $row->montant;
                 } else {
                     $entry = [
-                        'categorie_id' => (int) $row->categorie_id,
-                        'categorie_nom' => $row->categorie_nom,
-                        'sous_categorie_id' => (int) $row->sous_categorie_id,
-                        'sous_categorie_nom' => $row->sous_categorie_nom,
+                        'famille_id' => (int) $row->famille_id,
+                        'famille_nom' => $row->famille_nom,
+                        'compte_id' => (int) $row->compte_id,
+                        'compte_nom' => $row->compte_nom,
                         'montant' => (float) $row->montant,
                     ];
                     if ($withSeance) {
@@ -959,7 +959,7 @@ final class CompteResultatBuilder
     // ── Prévisionnel ──────────────────────────────────────────────────────────
 
     /**
-     * Injecte les catégories/SC qui existent dans les prévisions mais pas dans le réalisé,
+     * Injecte les familles/comptes qui existent dans les prévisions mais pas dans le réalisé,
      * avec des montants à zéro, pour qu'elles apparaissent dans l'affichage.
      *
      * @param  list<array<string, mixed>>  $realise
@@ -970,29 +970,29 @@ final class CompteResultatBuilder
     {
         $byCatId = [];
         foreach ($realise as $cat) {
-            $byCatId[(int) ($cat['categorie_id'] ?? $cat['id'] ?? 0)] = $cat;
+            $byCatId[(int) ($cat['famille_id'] ?? $cat['id'] ?? 0)] = $cat;
         }
 
         foreach ($previsions as $prevCat) {
-            $catId = (int) ($prevCat['categorie_id'] ?? $prevCat['id'] ?? 0);
+            $catId = (int) ($prevCat['famille_id'] ?? $prevCat['id'] ?? 0);
             if (! isset($byCatId[$catId])) {
                 $byCatId[$catId] = [
-                    'categorie_id' => $catId,
+                    'famille_id' => $catId,
                     'label' => $prevCat['label'],
-                    'sous_categories' => [],
+                    'comptes' => [],
                     'montant' => 0.0,
                 ];
             }
 
             $byScId = [];
-            foreach ($byCatId[$catId]['sous_categories'] as $sc) {
-                $byScId[(int) ($sc['sous_categorie_id'] ?? 0)] = $sc;
+            foreach ($byCatId[$catId]['comptes'] as $sc) {
+                $byScId[(int) ($sc['compte_id'] ?? 0)] = $sc;
             }
-            foreach ($prevCat['sous_categories'] as $prevSc) {
-                $scId = (int) ($prevSc['sous_categorie_id'] ?? 0);
+            foreach ($prevCat['comptes'] as $prevSc) {
+                $scId = (int) ($prevSc['compte_id'] ?? 0);
                 if (! isset($byScId[$scId])) {
                     $byScId[$scId] = [
-                        'sous_categorie_id' => $scId,
+                        'compte_id' => $scId,
                         'label' => $prevSc['label'],
                         'montant' => 0.0,
                         'tiers' => [],
@@ -1018,7 +1018,7 @@ final class CompteResultatBuilder
                     }
                 }
             }
-            $byCatId[$catId]['sous_categories'] = array_values($byScId);
+            $byCatId[$catId]['comptes'] = array_values($byScId);
         }
 
         return array_values($byCatId);
@@ -1028,7 +1028,7 @@ final class CompteResultatBuilder
      * Charges prévisionnelles depuis encadrement_previsions.
      *
      * @param  array<int>  $operationIds
-     * @return list<array{label: string, id: int, sous_categories: list<array<string, mixed>>, seances?: array<int, float>, operations?: array<int, float>, total?: float, montant?: float}>
+     * @return list<array{label: string, id: int, comptes: list<array<string, mixed>>, seances?: array<int, float>, operations?: array<int, float>, total?: float, montant?: float}>
      */
     private function buildPrevisionsCharges(array $operationIds, bool $parSeances, bool $parTiers, bool $parOperations = false): array
     {
@@ -1041,10 +1041,10 @@ final class CompteResultatBuilder
         $this->joinFamille($q);
 
         $selects = [
-            DB::raw('COALESCE(f.id, 0) as categorie_id'),
-            DB::raw("COALESCE(CONCAT(f.code, ' — ', f.nom), cpt.numero_pcg) as categorie_nom"),
-            DB::raw('cpt.id as sous_categorie_id'),
-            DB::raw('cpt.intitule as sous_categorie_nom'),
+            DB::raw('COALESCE(f.id, 0) as famille_id'),
+            DB::raw("COALESCE(CONCAT(f.code, ' — ', f.nom), cpt.numero_pcg) as famille_nom"),
+            DB::raw('cpt.id as compte_id'),
+            DB::raw('cpt.intitule as compte_nom'),
             DB::raw('SUM(ep.montant_prevu) as montant'),
         ];
         $groupBy = ['f.id', 'f.code', 'f.nom', 'cpt.numero_pcg', 'cpt.id', 'cpt.intitule'];
@@ -1076,7 +1076,7 @@ final class CompteResultatBuilder
      * Produits prévisionnels depuis reglements.montant_prevu.
      *
      * @param  array<int>  $operationIds
-     * @return list<array{label: string, id: int, sous_categories: list<array<string, mixed>>, seances?: array<int, float>, operations?: array<int, float>, total?: float, montant?: float}>
+     * @return list<array{label: string, id: int, comptes: list<array<string, mixed>>, seances?: array<int, float>, operations?: array<int, float>, total?: float, montant?: float}>
      */
     private function buildPrevisionsProduits(array $operationIds, bool $parSeances, bool $parTiers, bool $parOperations = false): array
     {
@@ -1093,10 +1093,10 @@ final class CompteResultatBuilder
         $this->joinFamille($q);
 
         $selects = [
-            DB::raw('COALESCE(f.id, 0) as categorie_id'),
-            DB::raw("COALESCE(CONCAT(f.code, ' — ', f.nom), cpt.numero_pcg) as categorie_nom"),
-            DB::raw('cpt.id as sous_categorie_id'),
-            DB::raw('cpt.intitule as sous_categorie_nom'),
+            DB::raw('COALESCE(f.id, 0) as famille_id'),
+            DB::raw("COALESCE(CONCAT(f.code, ' — ', f.nom), cpt.numero_pcg) as famille_nom"),
+            DB::raw('cpt.id as compte_id'),
+            DB::raw('cpt.intitule as compte_nom'),
             DB::raw('SUM(r.montant_prevu) as montant'),
         ];
         $groupBy = ['f.id', 'f.code', 'f.nom', 'cpt.numero_pcg', 'cpt.id', 'cpt.intitule'];
@@ -1140,14 +1140,14 @@ final class CompteResultatBuilder
 
         $tree = [];
         foreach ($rows as $row) {
-            $catId = (int) $row->categorie_id;
-            $scId = (int) $row->sous_categorie_id;
+            $catId = (int) $row->famille_id;
+            $scId = (int) $row->compte_id;
 
             if (! isset($tree[$catId])) {
                 $tree[$catId] = [
-                    'categorie_id' => $catId,
-                    'label' => $row->categorie_nom,
-                    'sous_categories' => [],
+                    'famille_id' => $catId,
+                    'label' => $row->famille_nom,
+                    'comptes' => [],
                     'seances' => [],
                     'montant' => 0.0,
                 ];
@@ -1155,16 +1155,16 @@ final class CompteResultatBuilder
                     $tree[$catId]['operations'] = $zeroOps;
                 }
             }
-            if (! isset($tree[$catId]['sous_categories'][$scId])) {
-                $tree[$catId]['sous_categories'][$scId] = [
-                    'sous_categorie_id' => $scId,
-                    'label' => $row->sous_categorie_nom,
+            if (! isset($tree[$catId]['comptes'][$scId])) {
+                $tree[$catId]['comptes'][$scId] = [
+                    'compte_id' => $scId,
+                    'label' => $row->compte_nom,
                     'seances' => [],
                     'montant' => 0.0,
                     'tiers' => [],
                 ];
                 if ($parOperations) {
-                    $tree[$catId]['sous_categories'][$scId]['operations'] = $zeroOps;
+                    $tree[$catId]['comptes'][$scId]['operations'] = $zeroOps;
                 }
             }
 
@@ -1173,22 +1173,22 @@ final class CompteResultatBuilder
             if ($parSeances) {
                 $seanceNum = (int) ($row->seance ?? 0);
                 $tree[$catId]['seances'][$seanceNum] = ($tree[$catId]['seances'][$seanceNum] ?? 0) + $montant;
-                $tree[$catId]['sous_categories'][$scId]['seances'][$seanceNum] = ($tree[$catId]['sous_categories'][$scId]['seances'][$seanceNum] ?? 0) + $montant;
+                $tree[$catId]['comptes'][$scId]['seances'][$seanceNum] = ($tree[$catId]['comptes'][$scId]['seances'][$seanceNum] ?? 0) + $montant;
             }
             $tree[$catId]['montant'] += $montant;
-            $tree[$catId]['sous_categories'][$scId]['montant'] += $montant;
+            $tree[$catId]['comptes'][$scId]['montant'] += $montant;
 
             if ($parOperations) {
                 $opId = (int) ($row->operation_id ?? 0);
                 $tree[$catId]['operations'][$opId] = ($tree[$catId]['operations'][$opId] ?? 0.0) + $montant;
-                $tree[$catId]['sous_categories'][$scId]['operations'][$opId] = ($tree[$catId]['sous_categories'][$scId]['operations'][$opId] ?? 0.0) + $montant;
+                $tree[$catId]['comptes'][$scId]['operations'][$opId] = ($tree[$catId]['comptes'][$scId]['operations'][$opId] ?? 0.0) + $montant;
             }
 
             if ($parTiers) {
                 $tId = (int) ($row->tiers_id ?? 0);
                 $tLabel = $row->tiers_label ?? '—';
-                if (! isset($tree[$catId]['sous_categories'][$scId]['tiers'][$tId])) {
-                    $tree[$catId]['sous_categories'][$scId]['tiers'][$tId] = [
+                if (! isset($tree[$catId]['comptes'][$scId]['tiers'][$tId])) {
+                    $tree[$catId]['comptes'][$scId]['tiers'][$tId] = [
                         'tiers_id' => $tId,
                         'label' => $tLabel,
                         'type' => null,
@@ -1198,18 +1198,18 @@ final class CompteResultatBuilder
                 }
                 if ($parSeances) {
                     $seanceNum = (int) ($row->seance ?? 0);
-                    $tree[$catId]['sous_categories'][$scId]['tiers'][$tId]['seances'][$seanceNum] = ($tree[$catId]['sous_categories'][$scId]['tiers'][$tId]['seances'][$seanceNum] ?? 0) + $montant;
+                    $tree[$catId]['comptes'][$scId]['tiers'][$tId]['seances'][$seanceNum] = ($tree[$catId]['comptes'][$scId]['tiers'][$tId]['seances'][$seanceNum] ?? 0) + $montant;
                 }
-                $tree[$catId]['sous_categories'][$scId]['tiers'][$tId]['montant'] += $montant;
+                $tree[$catId]['comptes'][$scId]['tiers'][$tId]['montant'] += $montant;
             }
         }
 
         foreach ($tree as &$cat) {
-            $cat['sous_categories'] = array_values(array_map(function (array $sc): array {
+            $cat['comptes'] = array_values(array_map(function (array $sc): array {
                 $sc['tiers'] = array_values($sc['tiers']);
 
                 return $sc;
-            }, $cat['sous_categories']));
+            }, $cat['comptes']));
         }
 
         return array_values($tree);
@@ -1238,13 +1238,13 @@ final class CompteResultatBuilder
             $reelGrid = []; // [sc][tiers][seance][op] = montant
             $scToCat = [];
             foreach ($reelMap as $row) {
-                $scId = (int) $row['sous_categorie_id'];
+                $scId = (int) $row['compte_id'];
                 $tiersId = (int) $row['tiers_id'];
                 $seance = (int) $row['seance'];
                 $opId = (int) $row['operation_id'];
                 $reelGrid[$scId][$tiersId][$seance][$opId] = (float) $row['montant'];
                 if (! isset($scToCat[$scId])) {
-                    $scToCat[$scId] = (int) $row['categorie_id'];
+                    $scToCat[$scId] = (int) $row['famille_id'];
                 }
             }
 
@@ -1312,7 +1312,7 @@ final class CompteResultatBuilder
      * Prévisions charges (encadrement_previsions) au grain plat : [compte_id][tiers][séance][op] = montant.
      *
      * Clé de grain alignée sur {@see fetchOperationRows} (DC-4 : compte_id, résolu depuis
-     * sous_categorie_id via code_cerfa = numero_pcg) — indispensable pour que
+     * compte_id via code_cerfa = numero_pcg) — indispensable pour que
      * {@see computeProjections} puisse fusionner réel et prévu sur la même clé.
      *
      * @param  array<int>  $operationIds
@@ -1328,7 +1328,7 @@ final class CompteResultatBuilder
         $this->joinFamille($q);
         $rows = $q
             ->select([
-                DB::raw('cpt.id as sous_categorie_id'),
+                DB::raw('cpt.id as compte_id'),
                 DB::raw('COALESCE(ep.tiers_id, 0) as tiers_id'),
                 's.numero as seance',
                 'ep.operation_id',
@@ -1339,7 +1339,7 @@ final class CompteResultatBuilder
 
         $grid = [];
         foreach ($rows as $row) {
-            $grid[(int) $row->sous_categorie_id][(int) $row->tiers_id][(int) $row->seance][(int) $row->operation_id]
+            $grid[(int) $row->compte_id][(int) $row->tiers_id][(int) $row->seance][(int) $row->operation_id]
                 = (float) $row->montant;
         }
 
@@ -1369,7 +1369,7 @@ final class CompteResultatBuilder
         $this->joinFamille($q);
         $rows = $q
             ->select([
-                DB::raw('cpt.id as sous_categorie_id'),
+                DB::raw('cpt.id as compte_id'),
                 DB::raw('COALESCE(p.tiers_id, 0) as tiers_id'),
                 's.numero as seance',
                 'p.operation_id',
@@ -1380,7 +1380,7 @@ final class CompteResultatBuilder
 
         $grid = [];
         foreach ($rows as $row) {
-            $grid[(int) $row->sous_categorie_id][(int) $row->tiers_id][(int) $row->seance][(int) $row->operation_id]
+            $grid[(int) $row->compte_id][(int) $row->tiers_id][(int) $row->seance][(int) $row->operation_id]
                 = (float) $row->montant;
         }
 

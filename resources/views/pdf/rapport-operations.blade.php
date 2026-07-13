@@ -63,8 +63,8 @@
         $buildPrevIdx = function (array $hierarchy): array {
             $idx = ['sc' => [], 'tiers' => []];
             foreach ($hierarchy as $cat) {
-                foreach ($cat['sous_categories'] as $sc) {
-                    $scId = (int) ($sc['sous_categorie_id'] ?? 0);
+                foreach ($cat['comptes'] as $sc) {
+                    $scId = (int) ($sc['compte_id'] ?? 0);
                     $idx['sc'][$scId] = (float) ($sc['montant'] ?? 0);
                     foreach ($sc['tiers'] ?? [] as $t) {
                         $tId = (int) ($t['tiers_id'] ?? 0);
@@ -127,7 +127,7 @@
             @php $sectionPrevIdx = $section['label'] === 'DÉPENSES' ? $prevIdxCharges : $prevIdxProduits; @endphp
             @foreach ($section['data'] as $cat)
                 @php
-                    $scVisibles = collect($cat['sous_categories'])->filter(function ($sc) use ($mode, $sectionPrevIdx) {
+                    $scVisibles = collect($cat['comptes'])->filter(function ($sc) use ($mode, $sectionPrevIdx) {
                         $realise = (float) ($sc['montant'] ?? 0);
                         if ($realise > 0 || collect($sc['operations'] ?? [])->sum() > 0) {
                             return true;
@@ -135,7 +135,7 @@
                         if ($mode === 'realise') {
                             return false;
                         }
-                        return ((float) ($sectionPrevIdx['sc'][$sc['sous_categorie_id'] ?? 0] ?? 0)) > 0;
+                        return ((float) ($sectionPrevIdx['sc'][$sc['compte_id'] ?? 0] ?? 0)) > 0;
                     });
                 @endphp
                 @if (! $scVisibles->isEmpty())
@@ -143,12 +143,12 @@
                     <tr class="cr-cat">
                         <td colspan="2">{{ $cat['label'] }}</td>
                         @if ($combinedMode)
-                            @php $catId = (int) ($cat['categorie_id'] ?? 0); @endphp
+                            @php $catId = (int) ($cat['famille_id'] ?? 0); @endphp
                             @foreach ($operationNames as $opId => $opNom)
                                 @foreach ($seancesParOperation[$opId] ?? [] as $s)
                                     @php
                                         $val = ($mode === 'projection' && $projMatrix)
-                                            ? collect($cat['sous_categories'])->sum(fn ($__sc) => (float) ($projMatrix->byScSeanceOp()[(int) ($__sc['sous_categorie_id'] ?? 0)][$s][$opId] ?? 0))
+                                            ? collect($cat['comptes'])->sum(fn ($__sc) => (float) ($projMatrix->byScSeanceOp()[(int) ($__sc['compte_id'] ?? 0)][$s][$opId] ?? 0))
                                             : (float) ($cat['seance_operations'][$s][$opId] ?? 0);
                                     @endphp
                                     <td class="text-right" style="padding:{{ $pad }};white-space:nowrap;font-size:{{ $fontSizeSub }};">{{ $val > 0 ? $fmt($val) : '—' }}</td>
@@ -167,7 +167,7 @@
                             @endphp
                             <td class="text-right" style="padding:{{ $pad }};white-space:nowrap;">{{ $fmt($grandTot) }}</td>
                         @elseif ($parOperations)
-                            @php $catId = (int) ($cat['categorie_id'] ?? 0); @endphp
+                            @php $catId = (int) ($cat['famille_id'] ?? 0); @endphp
                             @foreach ($operationNames as $opId => $opNom)
                                 @if ($mode === 'projection' && $projMatrix)
                                     <td class="text-right" style="padding:{{ $pad }};white-space:nowrap;">{{ $fmt((float) ($projMatrix->byCatOp()[$catId][$opId] ?? 0)) }}</td>
@@ -181,15 +181,15 @@
                                 <td class="text-right" style="padding:{{ $pad }};white-space:nowrap;">{{ $fmt($cat['montant']) }}</td>
                             @endif
                         @elseif ($parSeances)
-                            @php $catId = (int) ($cat['categorie_id'] ?? 0); @endphp
+                            @php $catId = (int) ($cat['famille_id'] ?? 0); @endphp
                             @foreach ($seances as $s)
                                 @php $catSeanceReal = (float) ($cat['seances'][$s] ?? 0); @endphp
                                 <td class="text-right" style="padding:{{ $pad }};white-space:nowrap;">
                                     @if ($mode === 'projection' && $projMatrix)
                                         @php
                                             $catSeanceProj = 0.0;
-                                            foreach ($cat['sous_categories'] as $_sc) {
-                                                $_scId = (int) ($_sc['sous_categorie_id'] ?? $_sc['id'] ?? 0);
+                                            foreach ($cat['comptes'] as $_sc) {
+                                                $_scId = (int) ($_sc['compte_id'] ?? $_sc['id'] ?? 0);
                                                 $catSeanceProj += (float) ($projMatrix->byScSeance()[$_scId][$s] ?? 0);
                                             }
                                         @endphp
@@ -209,7 +209,7 @@
                         @else
                             <td class="text-right">
                                 @if ($mode === 'projection' && $projMatrix)
-                                    @php $catId = (int) ($cat['categorie_id'] ?? 0); @endphp
+                                    @php $catId = (int) ($cat['famille_id'] ?? 0); @endphp
                                     {{ $fmt((float) ($projMatrix->byCat()[$catId] ?? $cat['montant'])) }}
                                 @else
                                     {{ $fmt($cat['montant']) }}
@@ -220,7 +220,7 @@
 
                     @foreach ($scVisibles as $sc)
                         @php
-                            $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
+                            $scId = (int) ($sc['compte_id'] ?? $sc['id'] ?? 0);
                         @endphp
                         @if ($combinedMode)
                         {{-- Combined mode: column-based SC row --}}
@@ -468,8 +468,8 @@
                                 @php
                                     $secSeanceProj = 0.0;
                                     foreach ($section['data'] as $_cat) {
-                                        foreach ($_cat['sous_categories'] as $_sc) {
-                                            $_scId = (int) ($_sc['sous_categorie_id'] ?? $_sc['id'] ?? 0);
+                                        foreach ($_cat['comptes'] as $_sc) {
+                                            $_scId = (int) ($_sc['compte_id'] ?? $_sc['id'] ?? 0);
                                             $secSeanceProj += (float) ($projMatrix->byScSeance()[$_scId][$s] ?? 0);
                                         }
                                     }

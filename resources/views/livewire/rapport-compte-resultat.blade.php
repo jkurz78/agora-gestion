@@ -85,9 +85,9 @@
                         <td colspan="{{ 4 + ($compareN1 ? 1 : 0) + ($compareBudget ? 3 : 0) }}">EXTOURNES PROVISIONS N&minus;1</td>
                     </tr>
                     @php
-                        // Build a merged list keyed by libelle+sous_cat for alignment
-                        $extN1ByKey = $extournesN1->keyBy(fn($e) => $e['libelle'].'|'.$e['sous_categorie_id']);
-                        $extNByKey  = $extournes->keyBy(fn($e) => $e['libelle'].'|'.$e['sous_categorie_id']);
+                        // Fusion par libellé et compte pour aligner les deux exercices
+                        $extN1ByKey = $extournesN1->keyBy(fn($e) => $e['libelle'].'|'.$e['compte_id']);
+                        $extNByKey  = $extournes->keyBy(fn($e) => $e['libelle'].'|'.$e['compte_id']);
                         $extAllKeys = $extN1ByKey->keys()->merge($extNByKey->keys())->unique();
                     @endphp
                     @foreach($extAllKeys as $key)
@@ -98,7 +98,7 @@
                         @endphp
                         <tr class="cr-sub">
                             <td></td>
-                            <td style="padding-left:32px;">{{ $item['libelle'] }} <span class="text-muted">({{ $item['sous_categorie_nom'] }})</span></td>
+                            <td style="padding-left:32px;">{{ $item['libelle'] }} <span class="text-muted">({{ $item['compte_nom'] }})</span></td>
                             @if($compareN1)<td class="text-end cr-n1">{!! $extN1 ? number_format($extN1['montant_signe'], 2, ',', ' ').' &euro;' : '<span class="text-muted">&mdash;</span>' !!}</td>@endif
                             <td class="text-end">{!! $extN ? number_format($extN['montant_signe'], 2, ',', ' ').' &euro;' : '<span class="text-muted">&mdash;</span>' !!}</td>
                             @if($compareBudget)
@@ -149,8 +149,8 @@
 
                     @foreach ($section['data'] as $cat)
                         @php
-                            // Regle d'affichage : sous-cat visible si montant_n > 0, ou N-1 > 0, ou budget defini
-                            $scVisibles = collect($cat['sous_categories'])->filter(function($sc) {
+                            // Règle d'affichage : compte visible si N, N-1 ou budget est positif
+                            $scVisibles = collect($cat['comptes'])->filter(function($sc) {
                                 return $sc['montant_n'] > 0
                                     || ($sc['montant_n1'] !== null && $sc['montant_n1'] > 0)
                                     || ($sc['budget'] !== null && $sc['budget'] > 0);
@@ -244,8 +244,8 @@
                         <td colspan="{{ 4 + ($compareN1 ? 1 : 0) + ($compareBudget ? 3 : 0) }}">PROVISIONS FIN D&#039;EXERCICE</td>
                     </tr>
                     @php
-                        $provN1ByKey = $provisionsN1->keyBy(fn($p) => $p['libelle'].'|'.$p['sous_categorie_id']);
-                        $provNByKey  = $provisions->keyBy(fn($p) => $p['libelle'].'|'.$p['sous_categorie_id']);
+                        $provN1ByKey = $provisionsN1->keyBy(fn($p) => $p['libelle'].'|'.$p['compte_id']);
+                        $provNByKey  = $provisions->keyBy(fn($p) => $p['libelle'].'|'.$p['compte_id']);
                         $provAllKeys = $provN1ByKey->keys()->merge($provNByKey->keys())->unique();
                     @endphp
                     @foreach($provAllKeys as $key)
@@ -256,7 +256,7 @@
                         @endphp
                         <tr class="cr-sub">
                             <td></td>
-                            <td style="padding-left:32px;">{{ $item['libelle'] }} <span class="text-muted">({{ $item['sous_categorie_nom'] }})</span></td>
+                            <td style="padding-left:32px;">{{ $item['libelle'] }} <span class="text-muted">({{ $item['compte_nom'] }})</span></td>
                             @if($compareN1)<td class="text-end cr-n1">{!! $provN1 ? number_format($provN1['montant_signe'], 2, ',', ' ').' &euro;' : '<span class="text-muted">&mdash;</span>' !!}</td>@endif
                             <td class="text-end">{!! $provN ? number_format($provN['montant_signe'], 2, ',', ' ').' &euro;' : '<span class="text-muted">&mdash;</span>' !!}</td>
                             @if($compareBudget)

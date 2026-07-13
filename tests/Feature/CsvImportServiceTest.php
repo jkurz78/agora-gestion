@@ -40,8 +40,8 @@ afterEach(function () {
     TenantContext::clear();
 });
 
-it('importe un CSV valide avec une transaction simple', function () {
-    $csv = "date;reference;sous_categorie;montant_ligne;mode_paiement;compte;libelle;tiers;operation;seance;notes\n"
+it('importe un CSV valide avec des colonnes compte et compte_bancaire non ambiguës', function () {
+    $csv = "date;reference;compte;montant_ligne;mode_paiement;compte_bancaire;libelle;tiers;operation;seance;notes\n"
          ."2024-09-15;FAC-001;Fournitures;100.00;virement;Compte principal;Achat test;;;;\n";
 
     $result = app(CsvImportService::class)->import(makeCsvFile($csv), 'depense');
@@ -57,10 +57,20 @@ it('importe un CSV valide avec une transaction simple', function () {
         ->and((float) $ligne->credit)->toBe(0.0);
 });
 
+it('refuse explicitement les anciens en-têtes comptables', function () {
+    $csv = "date;reference;sous_categorie;montant_ligne;mode_paiement;compte_bancaire;libelle;tiers;operation;seance;notes\n"
+        ."2024-09-15;FAC-001;Fournitures;100.00;virement;Compte principal;Achat test;;;;\n";
+
+    $result = app(CsvImportService::class)->import(makeCsvFile($csv), 'depense');
+
+    expect($result->success)->toBeFalse()
+        ->and($result->errors[0]['message'])->toContain('compte');
+});
+
 it('regroupe plusieurs lignes CSV en une seule transaction', function () {
     Compte::factory()->depense()->create(['intitule' => 'Communication']);
 
-    $csv = "date;reference;sous_categorie;montant_ligne;mode_paiement;compte;libelle;tiers;operation;seance;notes\n"
+    $csv = "date;reference;compte;montant_ligne;mode_paiement;compte_bancaire;libelle;tiers;operation;seance;notes\n"
          ."2024-09-15;FAC-001;Fournitures;100.00;virement;Compte principal;Test;;;;\n"
          ."2024-09-15;FAC-001;Communication;50.00;;;;\n";
 
@@ -75,7 +85,7 @@ it('regroupe des lignes non-contigues de meme date+reference en une seule transa
     Compte::factory()->depense()->create(['intitule' => 'Communication']);
 
     // FAC-001 apparaît en lignes 2 et 4 (non-contigus), FAC-002 en ligne 3
-    $csv = "date;reference;sous_categorie;montant_ligne;mode_paiement;compte;libelle;tiers;operation;seance;notes\n"
+    $csv = "date;reference;compte;montant_ligne;mode_paiement;compte_bancaire;libelle;tiers;operation;seance;notes\n"
          ."2024-09-15;FAC-001;Fournitures;100.00;virement;Compte principal;Test1;;;;\n"
          ."2024-09-16;FAC-002;Fournitures;50.00;cheque;Compte principal;Test2;;;;\n"
          ."2024-09-15;FAC-001;Communication;30.00;;;;\n";
@@ -89,7 +99,7 @@ it('regroupe des lignes non-contigues de meme date+reference en une seule transa
 
 it('rejette un fichier avec un encodage non-UTF8', function () {
     $content = iconv('UTF-8', 'ISO-8859-1',
-        "date;reference;sous_categorie;montant_ligne;mode_paiement;compte;libelle;tiers;operation;seance;notes\n"
+        "date;reference;compte;montant_ligne;mode_paiement;compte_bancaire;libelle;tiers;operation;seance;notes\n"
         ."2024-09-15;FAC-001;Catégorie;100.00;virement;Compte;Libellé;;;;\n"
     );
 
@@ -101,7 +111,7 @@ it('rejette un fichier avec un encodage non-UTF8', function () {
 
 it('ignore le BOM UTF-8 en debut de fichier', function () {
     $bom = "\xEF\xBB\xBF";
-    $csv = $bom."date;reference;sous_categorie;montant_ligne;mode_paiement;compte;libelle;tiers;operation;seance;notes\n"
+    $csv = $bom."date;reference;compte;montant_ligne;mode_paiement;compte_bancaire;libelle;tiers;operation;seance;notes\n"
          ."2024-09-15;FAC-001;Fournitures;100.00;virement;Compte principal;Test;;;;\n";
 
     $result = app(CsvImportService::class)->import(makeCsvFile($csv), 'depense');
@@ -111,7 +121,7 @@ it('ignore le BOM UTF-8 en debut de fichier', function () {
 
 it('rejette un CSV avec un en-tete manquant', function () {
     $result = app(CsvImportService::class)->import(
-        makeCsvFile("date;reference;sous_categorie;montant_ligne\n2024-09-15;FAC-001;Fournitures;100.00\n"),
+        makeCsvFile("date;reference;compte;montant_ligne\n2024-09-15;FAC-001;Fournitures;100.00\n"),
         'depense'
     );
 
@@ -120,7 +130,7 @@ it('rejette un CSV avec un en-tete manquant', function () {
 });
 
 it('rejette une date invalide avec le bon numero de ligne', function () {
-    $csv = "date;reference;sous_categorie;montant_ligne;mode_paiement;compte;libelle;tiers;operation;seance;notes\n"
+    $csv = "date;reference;compte;montant_ligne;mode_paiement;compte_bancaire;libelle;tiers;operation;seance;notes\n"
          ."32/13/2024;FAC-001;Fournitures;100.00;virement;Compte principal;Test;;;;\n";
 
     $result = app(CsvImportService::class)->import(makeCsvFile($csv), 'depense');
@@ -131,7 +141,7 @@ it('rejette une date invalide avec le bon numero de ligne', function () {
 });
 
 it('rejette un mode_paiement invalide', function () {
-    $csv = "date;reference;sous_categorie;montant_ligne;mode_paiement;compte;libelle;tiers;operation;seance;notes\n"
+    $csv = "date;reference;compte;montant_ligne;mode_paiement;compte_bancaire;libelle;tiers;operation;seance;notes\n"
          ."2024-09-15;FAC-001;Fournitures;100.00;carte;Compte principal;Test;;;;\n";
 
     $result = app(CsvImportService::class)->import(makeCsvFile($csv), 'depense');
@@ -142,7 +152,7 @@ it('rejette un mode_paiement invalide', function () {
 });
 
 it('rejette un mode_paiement vide sur la premiere ligne dun groupe', function () {
-    $csv = "date;reference;sous_categorie;montant_ligne;mode_paiement;compte;libelle;tiers;operation;seance;notes\n"
+    $csv = "date;reference;compte;montant_ligne;mode_paiement;compte_bancaire;libelle;tiers;operation;seance;notes\n"
          ."2024-09-15;FAC-001;Fournitures;100.00;;Compte principal;Test;;;;\n";
 
     $result = app(CsvImportService::class)->import(makeCsvFile($csv), 'depense');
@@ -152,7 +162,7 @@ it('rejette un mode_paiement vide sur la premiere ligne dun groupe', function ()
 });
 
 it('rejette un compte vide sur la premiere ligne dun groupe', function () {
-    $csv = "date;reference;sous_categorie;montant_ligne;mode_paiement;compte;libelle;tiers;operation;seance;notes\n"
+    $csv = "date;reference;compte;montant_ligne;mode_paiement;compte_bancaire;libelle;tiers;operation;seance;notes\n"
          ."2024-09-15;FAC-001;Fournitures;100.00;virement;;Test;;;;\n";
 
     $result = app(CsvImportService::class)->import(makeCsvFile($csv), 'depense');
@@ -161,8 +171,8 @@ it('rejette un compte vide sur la premiere ligne dun groupe', function () {
         ->and($result->errors[0]['message'])->toContain('compte');
 });
 
-it('rejette une sous-categorie inconnue', function () {
-    $csv = "date;reference;sous_categorie;montant_ligne;mode_paiement;compte;libelle;tiers;operation;seance;notes\n"
+it('rejette un compte de ventilation inconnu', function () {
+    $csv = "date;reference;compte;montant_ligne;mode_paiement;compte_bancaire;libelle;tiers;operation;seance;notes\n"
          ."2024-09-15;FAC-001;Toto;100.00;virement;Compte principal;Test;;;;\n";
 
     $result = app(CsvImportService::class)->import(makeCsvFile($csv), 'depense');
@@ -171,8 +181,8 @@ it('rejette une sous-categorie inconnue', function () {
         ->and($result->errors[0]['message'])->toContain('Toto');
 });
 
-it('rejette un compte inconnu', function () {
-    $csv = "date;reference;sous_categorie;montant_ligne;mode_paiement;compte;libelle;tiers;operation;seance;notes\n"
+it('rejette un compte bancaire inconnu', function () {
+    $csv = "date;reference;compte;montant_ligne;mode_paiement;compte_bancaire;libelle;tiers;operation;seance;notes\n"
          ."2024-09-15;FAC-001;Fournitures;100.00;virement;Compte inexistant;Test;;;;\n";
 
     $result = app(CsvImportService::class)->import(makeCsvFile($csv), 'depense');
@@ -185,7 +195,7 @@ it('rejette un tiers homonyme', function () {
     Tiers::factory()->create(['type' => 'particulier', 'nom' => 'DUPONT', 'prenom' => 'Jean', 'pour_depenses' => true]);
     Tiers::factory()->create(['type' => 'particulier', 'nom' => 'DUPONT', 'prenom' => 'Jean', 'pour_depenses' => true]);
 
-    $csv = "date;reference;sous_categorie;montant_ligne;mode_paiement;compte;libelle;tiers;operation;seance;notes\n"
+    $csv = "date;reference;compte;montant_ligne;mode_paiement;compte_bancaire;libelle;tiers;operation;seance;notes\n"
          ."2024-09-15;FAC-001;Fournitures;100.00;virement;Compte principal;Test;Jean DUPONT;;;\n";
 
     $result = app(CsvImportService::class)->import(makeCsvFile($csv), 'depense');
@@ -203,7 +213,7 @@ it('rejette un tiers sans le flag pour_depenses', function () {
         'pour_recettes' => true,
     ]);
 
-    $csv = "date;reference;sous_categorie;montant_ligne;mode_paiement;compte;libelle;tiers;operation;seance;notes\n"
+    $csv = "date;reference;compte;montant_ligne;mode_paiement;compte_bancaire;libelle;tiers;operation;seance;notes\n"
          ."2024-09-15;FAC-001;Fournitures;100.00;virement;Compte principal;Test;Paul MARTIN;;;\n";
 
     $result = app(CsvImportService::class)->import(makeCsvFile($csv), 'depense');
@@ -214,7 +224,7 @@ it('rejette un tiers sans le flag pour_depenses', function () {
 });
 
 it('rejette un doublon en base de donnees', function () {
-    $csv = "date;reference;sous_categorie;montant_ligne;mode_paiement;compte;libelle;tiers;operation;seance;notes\n"
+    $csv = "date;reference;compte;montant_ligne;mode_paiement;compte_bancaire;libelle;tiers;operation;seance;notes\n"
          ."2024-09-15;FAC-001;Fournitures;100.00;virement;Compte principal;Test;;;;\n";
 
     $result1 = app(CsvImportService::class)->import(makeCsvFile($csv), 'depense');
@@ -226,7 +236,7 @@ it('rejette un doublon en base de donnees', function () {
 });
 
 it('collecte toutes les erreurs avant de rejeter', function () {
-    $csv = "date;reference;sous_categorie;montant_ligne;mode_paiement;compte;libelle;tiers;operation;seance;notes\n"
+    $csv = "date;reference;compte;montant_ligne;mode_paiement;compte_bancaire;libelle;tiers;operation;seance;notes\n"
          ."invalide;FAC-001;Fournitures;100.00;virement;Compte principal;Test;;;;\n"
          ."2024-09-16;FAC-002;SousCatInconnue;100.00;virement;Compte principal;Test;;;;\n";
 
@@ -237,7 +247,7 @@ it('collecte toutes les erreurs avant de rejeter', function () {
 });
 
 it('ignore les lignes vides', function () {
-    $csv = "date;reference;sous_categorie;montant_ligne;mode_paiement;compte;libelle;tiers;operation;seance;notes\n"
+    $csv = "date;reference;compte;montant_ligne;mode_paiement;compte_bancaire;libelle;tiers;operation;seance;notes\n"
          ."\n"
          ."2024-09-15;FAC-001;Fournitures;100.00;virement;Compte principal;Test;;;;\n"
          ."\n";
@@ -248,8 +258,8 @@ it('ignore les lignes vides', function () {
         ->and($result->transactionsCreated)->toBe(1);
 });
 
-it('est insensible a la casse pour sous_categorie et compte', function () {
-    $csv = "date;reference;sous_categorie;montant_ligne;mode_paiement;compte;libelle;tiers;operation;seance;notes\n"
+it('est insensible a la casse pour compte et compte_bancaire', function () {
+    $csv = "date;reference;compte;montant_ligne;mode_paiement;compte_bancaire;libelle;tiers;operation;seance;notes\n"
          ."2024-09-15;FAC-001;FOURNITURES;100.00;virement;COMPTE PRINCIPAL;Test;;;;\n";
 
     $result = app(CsvImportService::class)->import(makeCsvFile($csv), 'depense');

@@ -41,7 +41,9 @@ it('returns provisions grouped by account for exercice N', function () {
 
     $result = $this->service->provisionsExercice(2025);
 
-    expect($result)->toHaveCount(2);
+    expect($result)->toHaveCount(2)
+        ->and($result->first())->toHaveKeys(['compte_id', 'compte_nom', 'famille_nom'])
+        ->not->toHaveKeys(['sous_categorie_id', 'sous_categorie_nom', 'categorie_nom']);
 });
 
 it('returns extournes as inverted provisions from N-1', function () {

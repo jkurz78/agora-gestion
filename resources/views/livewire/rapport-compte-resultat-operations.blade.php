@@ -145,8 +145,8 @@
             $indexPrevisions = function (array $hierarchy): array {
                 $idx = ['sc' => [], 'tiers' => []];
                 foreach ($hierarchy as $cat) {
-                    foreach ($cat['sous_categories'] as $sc) {
-                        $scId = (int) ($sc['sous_categorie_id'] ?? 0);
+                    foreach ($cat['comptes'] as $sc) {
+                        $scId = (int) ($sc['compte_id'] ?? 0);
                         $idx['sc'][$scId] = (float) ($sc['montant'] ?? 0);
                         foreach ($sc['tiers'] ?? [] as $t) {
                             $tId = (int) ($t['tiers_id'] ?? 0);
@@ -268,7 +268,7 @@
 
                         @foreach ($section['data'] as $cat)
                             @php
-                                $scVisibles = collect($cat['sous_categories'])->filter(function ($sc) use ($mode, $sectionIdx) {
+                                $scVisibles = collect($cat['comptes'])->filter(function ($sc) use ($mode, $sectionIdx) {
                                     $realise = (float) ($sc['montant'] ?? 0);
                                     if ($realise > 0) {
                                         return true;
@@ -276,21 +276,21 @@
                                     if ($mode === 'realise') {
                                         return false;
                                     }
-                                    return ((float) ($sectionIdx['sc'][$sc['sous_categorie_id']] ?? 0)) > 0;
+                                    return ((float) ($sectionIdx['sc'][$sc['compte_id']] ?? 0)) > 0;
                                 });
                             @endphp
                             @if (! $scVisibles->isEmpty())
-                                {{-- Ligne catégorie --}}
+                                {{-- Ligne famille --}}
                                 <tr style="background:#dce6f0;">
                                     <td></td>
                                     <td style="font-weight:600;color:#1e3a5f;padding:7px 12px;">{{ $cat['label'] }}</td>
                                     @if ($combinedMode)
-                                        @php $catId = (int) ($cat['categorie_id'] ?? 0); @endphp
+                                        @php $catId = (int) ($cat['famille_id'] ?? 0); @endphp
                                         @foreach ($operationNames as $opId => $opNom)
                                             @foreach ($seancesParOperation[$opId] ?? [] as $s)
                                                 @php
                                                     $val = ($mode === 'projection' && $section['proj'])
-                                                        ? collect($cat['sous_categories'])->sum(fn ($__sc) => (float) ($section['proj']->byScSeanceOp()[(int) ($__sc['sous_categorie_id'] ?? 0)][$s][$opId] ?? 0))
+                                                        ? collect($cat['comptes'])->sum(fn ($__sc) => (float) ($section['proj']->byScSeanceOp()[(int) ($__sc['compte_id'] ?? 0)][$s][$opId] ?? 0))
                                                         : (float) ($cat['seance_operations'][$s][$opId] ?? 0);
                                                 @endphp
                                                 <td class="text-end fw-bold" style="padding:5px 4px;font-size:11px;">{{ $val > 0 ? number_format($val, 2, ',', ' ').' €' : '—' }}</td>
@@ -313,8 +313,8 @@
                                             @if ($mode === 'projection')
                                                 @php
                                                     $projCatSeance = 0.0;
-                                                    foreach ($cat['sous_categories'] as $__sc) {
-                                                        $__scId = (int) ($__sc['sous_categorie_id'] ?? 0);
+                                                    foreach ($cat['comptes'] as $__sc) {
+                                                        $__scId = (int) ($__sc['compte_id'] ?? 0);
                                                         $projCatSeance += (float) ($section['proj']->byScSeance()[$__scId][$s] ?? 0);
                                                     }
                                                 @endphp
@@ -337,7 +337,7 @@
                                         @endforeach
                                         {{-- Total séances --}}
                                         @if ($mode === 'projection')
-                                            @php $projCatTotal = (float) ($section['proj']->byCat()[$cat['categorie_id']] ?? 0); @endphp
+                                            @php $projCatTotal = (float) ($section['proj']->byCat()[$cat['famille_id']] ?? 0); @endphp
                                             <td class="text-end fw-bold" style="padding:7px 8px;">
                                                 {{ number_format($projCatTotal, 2, ',', ' ') }} &euro;
                                             </td>
@@ -347,7 +347,7 @@
                                     @elseif ($parOperations)
                                         @foreach ($operationNames as $opId => $opNom)
                                             @if ($mode === 'projection')
-                                                @php $projVal = (float) ($section['proj']->byCatOp()[$cat['categorie_id']][$opId] ?? 0); @endphp
+                                                @php $projVal = (float) ($section['proj']->byCatOp()[$cat['famille_id']][$opId] ?? 0); @endphp
                                                 <td class="text-end fw-bold" style="padding:7px 8px;font-size:12px;">
                                                     {{ $projVal > 0 ? number_format($projVal, 2, ',', ' ').' €' : '—' }}
                                                 </td>
@@ -360,14 +360,14 @@
                                         @endforeach
                                         {{-- Total opérations --}}
                                         @if ($mode === 'projection')
-                                            @php $projCatTotal = (float) ($section['proj']->byCat()[$cat['categorie_id']] ?? 0); @endphp
+                                            @php $projCatTotal = (float) ($section['proj']->byCat()[$cat['famille_id']] ?? 0); @endphp
                                             <td class="text-end fw-bold" style="padding:7px 8px;">{{ number_format($projCatTotal, 2, ',', ' ') }} &euro;</td>
                                         @else
                                             <td class="text-end fw-bold" style="padding:7px 8px;">{{ number_format($cat['montant'], 2, ',', ' ') }} &euro;</td>
                                         @endif
                                     @else
                                         @if ($mode === 'projection')
-                                            @php $projCat = (float) ($section['proj']->byCat()[$cat['categorie_id']] ?? 0); @endphp
+                                            @php $projCat = (float) ($section['proj']->byCat()[$cat['famille_id']] ?? 0); @endphp
                                             <td class="text-end fw-bold" style="padding:7px 12px;">{{ number_format($projCat, 2, ',', ' ') }} &euro;</td>
                                         @else
                                             <td class="text-end fw-bold" style="padding:7px 12px;">{{ number_format($cat['montant'], 2, ',', ' ') }} &euro;</td>
@@ -376,12 +376,12 @@
                                 </tr>
 
                                 @foreach ($scVisibles as $sc)
-                                    {{-- Ligne sous-catégorie --}}
+                                    {{-- Ligne compte --}}
                                     <tr style="background:#f7f9fc;">
                                         <td></td>
                                         <td style="padding:5px 12px 5px 32px;color:#444;">{{ $sc['label'] }}</td>
                                         @if ($combinedMode)
-                                            @php $__scIdC = (int) ($sc['sous_categorie_id'] ?? 0); @endphp
+                                            @php $__scIdC = (int) ($sc['compte_id'] ?? 0); @endphp
                                             @foreach ($operationNames as $opId => $opNom)
                                                 @foreach ($seancesParOperation[$opId] ?? [] as $s)
                                                     @php
@@ -408,7 +408,7 @@
                                             @foreach ($seances as $s)
                                                 @if ($mode === 'projection')
                                                     @php
-                                                        $projScSeanceVal = (float) ($section['proj']->byScSeance()[$sc['sous_categorie_id']][$s] ?? 0);
+                                                        $projScSeanceVal = (float) ($section['proj']->byScSeance()[$sc['compte_id']][$s] ?? 0);
                                                         $rVal = (float) ($sc['seances'][$s] ?? 0);
                                                         $projColor = ($rVal <= 0 && $projScSeanceVal > 0) ? '#1565C0' : 'inherit';
                                                     @endphp
@@ -431,7 +431,7 @@
                                             @endforeach
                                             {{-- Total sc séances --}}
                                             @if ($mode === 'projection')
-                                                @php $projScTotal = (float) ($section['proj']->bySc()[$sc['sous_categorie_id']] ?? 0); @endphp
+                                                @php $projScTotal = (float) ($section['proj']->bySc()[$sc['compte_id']] ?? 0); @endphp
                                                 <td class="text-end fw-bold" style="padding:5px 8px;">{{ number_format($projScTotal, 2, ',', ' ') }} &euro;</td>
                                             @else
                                                 <td class="text-end fw-bold" style="padding:5px 8px;">{{ number_format($sc['montant'], 2, ',', ' ') }} &euro;</td>
@@ -439,7 +439,7 @@
                                         @elseif ($parOperations)
                                             @foreach ($operationNames as $opId => $opNom)
                                                 @if ($mode === 'projection')
-                                                    @php $projVal = (float) ($section['proj']->byScOp()[$sc['sous_categorie_id']][$opId] ?? 0); @endphp
+                                                    @php $projVal = (float) ($section['proj']->byScOp()[$sc['compte_id']][$opId] ?? 0); @endphp
                                                     <td class="text-end" style="padding:5px 8px;font-size:12px;color:#444;">
                                                         {{ $projVal > 0 ? number_format($projVal, 2, ',', ' ').' €' : '—' }}
                                                     </td>
@@ -452,14 +452,14 @@
                                             @endforeach
                                             {{-- Total sc opérations --}}
                                             @if ($mode === 'projection')
-                                                @php $projScTotal = (float) ($section['proj']->bySc()[$sc['sous_categorie_id']] ?? 0); @endphp
+                                                @php $projScTotal = (float) ($section['proj']->bySc()[$sc['compte_id']] ?? 0); @endphp
                                                 <td class="text-end fw-bold" style="padding:5px 8px;color:#444;">{{ number_format($projScTotal, 2, ',', ' ') }} &euro;</td>
                                             @else
                                                 <td class="text-end fw-bold" style="padding:5px 8px;color:#444;">{{ number_format($sc['montant'], 2, ',', ' ') }} &euro;</td>
                                             @endif
                                         @else
                                             @if ($mode === 'projection')
-                                                @php $projSc = (float) ($section['proj']->bySc()[$sc['sous_categorie_id']] ?? 0); @endphp
+                                                @php $projSc = (float) ($section['proj']->bySc()[$sc['compte_id']] ?? 0); @endphp
                                                 <td class="text-end" style="padding:5px 12px;color:#444;">{{ number_format($projSc, 2, ',', ' ') }} &euro;</td>
                                             @else
                                                 <td class="text-end" style="padding:5px 12px;color:#444;">{{ number_format($sc['montant'], 2, ',', ' ') }} &euro;</td>
@@ -472,7 +472,7 @@
                                         @foreach ($sc['tiers'] as $t)
                                             @php
                                                 $tRealise = (float) ($t['montant'] ?? 0);
-                                                $tPrev = (float) ($sectionIdx['tiers'][$sc['sous_categorie_id']][$t['tiers_id'] ?? -1] ?? 0);
+                                                $tPrev = (float) ($sectionIdx['tiers'][$sc['compte_id']][$t['tiers_id'] ?? -1] ?? 0);
                                                 $tVisible = $tRealise > 0 || ($mode !== 'realise' && $tPrev > 0);
                                             @endphp
                                             @if ($tVisible)
@@ -492,7 +492,7 @@
                                                 </td>
                                                 @if ($combinedMode)
                                                     @php
-                                                        $__scIdTC = (int) ($sc['sous_categorie_id'] ?? 0);
+                                                        $__scIdTC = (int) ($sc['compte_id'] ?? 0);
                                                         $__tIdTC = (int) ($t['tiers_id'] ?? 0);
                                                         $projTSO = ($mode === 'projection' && $section['proj'])
                                                             ? ($section['proj']->byScTiersSeanceOp($__scIdTC)[$__tIdTC] ?? [])
@@ -522,7 +522,7 @@
                                                     <td class="text-end" style="padding:3px 8px;color:{{ $tRealise > 0 ? '#666' : '#1565C0' }};font-size:10px;">{{ $tGrand > 0 ? number_format($tGrand, 2, ',', ' ').' €' : '—' }}</td>
                                                 @elseif ($parOperations)
                                                     @php
-                                                        $__scIdTOp = (int) ($sc['sous_categorie_id'] ?? 0);
+                                                        $__scIdTOp = (int) ($sc['compte_id'] ?? 0);
                                                         $__tIdTOp = (int) ($t['tiers_id'] ?? 0);
                                                         $projTiersOps = ($mode === 'projection' && $section['proj'])
                                                             ? ($section['proj']->byScTiersOp($__scIdTOp)[$__tIdTOp] ?? [])
@@ -541,7 +541,7 @@
                                                     {{-- Total tiers opérations --}}
                                                     @if ($mode === 'projection')
                                                         @php
-                                                            $scIdT = (int) ($sc['sous_categorie_id'] ?? 0);
+                                                            $scIdT = (int) ($sc['compte_id'] ?? 0);
                                                             $tIdT = (int) ($t['tiers_id'] ?? 0);
                                                             $tProjGrand = (float) ($section['proj']->byScTiers($scIdT)[$tIdT] ?? 0);
                                                         @endphp
@@ -555,7 +555,7 @@
                                                     @foreach ($seances as $s)
                                                         @if ($mode === 'projection')
                                                             @php
-                                                                $__scIdTs = (int) ($sc['sous_categorie_id'] ?? 0);
+                                                                $__scIdTs = (int) ($sc['compte_id'] ?? 0);
                                                                 $__tIdTs = (int) ($t['tiers_id'] ?? 0);
                                                                 $projVal = (float) ($section['proj']->byScTiersSeance($__scIdTs)[$__tIdTs][$s] ?? 0);
                                                                 $rVal = (float) ($t['seances'][$s] ?? 0);
@@ -581,7 +581,7 @@
                                                     {{-- Total tiers séances --}}
                                                     @if ($mode === 'projection')
                                                         @php
-                                                            $__scIdTt = (int) ($sc['sous_categorie_id'] ?? 0);
+                                                            $__scIdTt = (int) ($sc['compte_id'] ?? 0);
                                                             $__tIdTt = (int) ($t['tiers_id'] ?? 0);
                                                             $projTTotal = (float) ($section['proj']->byScTiers($__scIdTt)[$__tIdTt] ?? 0);
                                                         @endphp
@@ -592,7 +592,7 @@
                                                 @else
                                                     @if ($mode === 'projection')
                                                         @php
-                                                            $__scIdTm = (int) ($sc['sous_categorie_id'] ?? 0);
+                                                            $__scIdTm = (int) ($sc['compte_id'] ?? 0);
                                                             $__tIdTm = (int) ($t['tiers_id'] ?? 0);
                                                             $projT = (float) ($section['proj']->byScTiers($__scIdTm)[$__tIdTm] ?? 0);
                                                         @endphp
@@ -675,8 +675,8 @@
                                         @php
                                             $projTotSeance = 0.0;
                                             foreach ($section['data'] as $__cat) {
-                                                foreach ($__cat['sous_categories'] as $__sc) {
-                                                    $projTotSeance += (float) ($section['proj']->byScSeance()[(int) ($__sc['sous_categorie_id'] ?? 0)][$s] ?? 0);
+                                                foreach ($__cat['comptes'] as $__sc) {
+                                                    $projTotSeance += (float) ($section['proj']->byScSeance()[(int) ($__sc['compte_id'] ?? 0)][$s] ?? 0);
                                                 }
                                             }
                                         @endphp

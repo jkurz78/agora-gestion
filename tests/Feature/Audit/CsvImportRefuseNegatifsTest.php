@@ -60,7 +60,7 @@ it('csv_import_rejette_montant_negatif_avec_message_dans_rapport', function (): 
     // 3 lignes : +50 (ligne 2 CSV), -30 (ligne 3 CSV), +20 (ligne 4 CSV)
     // Toutes ont des références différentes → 3 transactions distinctes si toutes valides.
     // La ligne -30 doit être rejetée ; les 2 autres doivent être importées.
-    $csv = "date;reference;sous_categorie;montant_ligne;mode_paiement;compte;libelle;tiers;operation;seance;notes\n"
+    $csv = "date;reference;compte;montant_ligne;mode_paiement;compte_bancaire;libelle;tiers;operation;seance;notes\n"
          ."2024-09-15;FAC-POS50;Charges test;50.00;virement;Compte test négatif;Ligne positive 50;;;;\n"
          ."2024-09-16;FAC-NEG30;Charges test;-30.00;virement;Compte test négatif;Ligne négative 30;;;;\n"
          ."2024-09-17;FAC-POS20;Charges test;20.00;virement;Compte test négatif;Ligne positive 20;;;;\n";
@@ -87,7 +87,7 @@ it('csv_import_rejette_montant_negatif_avec_message_dans_rapport', function (): 
 it('csv_import_rejette_montant_negatif_avec_message_standardise', function (): void {
     // Vérifier que le message contient le texte standardisé défini dans MontantValidation.
     // Le service CsvImportService utilise MontantValidation::MESSAGE dans l'erreur de rapport.
-    $csv = "date;reference;sous_categorie;montant_ligne;mode_paiement;compte;libelle;tiers;operation;seance;notes\n"
+    $csv = "date;reference;compte;montant_ligne;mode_paiement;compte_bancaire;libelle;tiers;operation;seance;notes\n"
          ."2024-09-16;FAC-NEG;Charges test;-30.00;virement;Compte test négatif;Négatif;;;;\n";
 
     $result = app(CsvImportService::class)->import(makeAuditCsvFile($csv), 'depense');
@@ -105,7 +105,7 @@ it('csv_import_emet_un_log_warning_avec_numero_de_ligne_et_raison', function ():
             Mockery::on(fn (array $ctx): bool => isset($ctx['csv_line']) && $ctx['csv_line'] === 3),
         );
 
-    $csv = "date;reference;sous_categorie;montant_ligne;mode_paiement;compte;libelle;tiers;operation;seance;notes\n"
+    $csv = "date;reference;compte;montant_ligne;mode_paiement;compte_bancaire;libelle;tiers;operation;seance;notes\n"
          ."2024-09-15;FAC-POS;Charges test;50.00;virement;Compte test négatif;Positif;;;;\n"
          ."2024-09-16;FAC-NEG;Charges test;-30.00;virement;Compte test négatif;Négatif;;;;\n";
 
@@ -114,7 +114,7 @@ it('csv_import_emet_un_log_warning_avec_numero_de_ligne_et_raison', function ():
 
 it('csv_import_rejette_montant_zero', function (): void {
     // Montant = 0 est également invalide (doit être strictement positif).
-    $csv = "date;reference;sous_categorie;montant_ligne;mode_paiement;compte;libelle;tiers;operation;seance;notes\n"
+    $csv = "date;reference;compte;montant_ligne;mode_paiement;compte_bancaire;libelle;tiers;operation;seance;notes\n"
          ."2024-09-16;FAC-ZERO;Charges test;0.00;virement;Compte test négatif;Zéro;;;;\n";
 
     $result = app(CsvImportService::class)->import(makeAuditCsvFile($csv), 'depense');

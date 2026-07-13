@@ -36,7 +36,7 @@ final class DevisEdit extends Component
 
     public string $nouvelleLigneQuantite = '1';
 
-    public ?int $nouvelleLigneSousCategorieId = null;
+    public ?int $nouvelleLigneCompteId = null;
 
     // ── New ligne texte form ──────────────────────────────────────────────────
 
@@ -139,14 +139,13 @@ final class DevisEdit extends Component
                 'libelle' => $this->nouvelleLigneLibelle,
                 'prix_unitaire' => $this->nouvelleLignePrixUnitaire !== '' ? $this->nouvelleLignePrixUnitaire : '0',
                 'quantite' => $this->nouvelleLigneQuantite !== '' ? $this->nouvelleLigneQuantite : '1',
-                // DC-8 : la propriété (nom conservé jusqu'à DC-10) porte un id de compte.
-                'compte_id' => $this->nouvelleLigneSousCategorieId,
+                'compte_id' => $this->nouvelleLigneCompteId,
             ]);
 
             $this->nouvelleLigneLibelle = '';
             $this->nouvelleLignePrixUnitaire = '';
             $this->nouvelleLigneQuantite = '1';
-            $this->nouvelleLigneSousCategorieId = null;
+            $this->nouvelleLigneCompteId = null;
 
             $this->devis->refresh();
             session()->flash('success', 'Ligne ajoutée.');

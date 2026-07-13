@@ -49,7 +49,7 @@ final class FactureEdit extends Component
 
     public string $nouvelleLigneMontantQuantite = '1';
 
-    public ?int $nouvelleLigneMontantSousCategorieId = null;
+    public ?int $nouvelleLigneMontantCompteId = null;
 
     public ?int $nouvelleLigneMontantOperationId = null;
 
@@ -227,7 +227,7 @@ final class FactureEdit extends Component
         }
     }
 
-    public function updateSousCategorie(int $ligneId, ?string $value): void
+    public function updateCompte(int $ligneId, ?string $value): void
     {
         if (! $this->canEdit) {
             return;
@@ -237,7 +237,7 @@ final class FactureEdit extends Component
         $compteId = ($value === '' || $value === null) ? null : (int) $value;
 
         try {
-            app(FactureService::class)->majSousCategorieLigne($this->facture, $ligneId, $compteId);
+            app(FactureService::class)->majCompteLigne($this->facture, $ligneId, $compteId);
             $this->facture->refresh();
         } catch (\RuntimeException $e) {
             session()->flash('error', $e->getMessage());
@@ -362,8 +362,7 @@ final class FactureEdit extends Component
                 'libelle' => $this->nouvelleLigneMontantLibelle,
                 'prix_unitaire' => $prixUnitaire,
                 'quantite' => $quantite,
-                // DC-8 : la propriété (nom conservé jusqu'à DC-10) porte un id de compte.
-                'compte_id' => $this->nouvelleLigneMontantSousCategorieId,
+                'compte_id' => $this->nouvelleLigneMontantCompteId,
                 'operation_id' => $this->nouvelleLigneMontantOperationId,
                 'seance' => $this->nouvelleLigneMontantSeance !== null ? (int) $this->nouvelleLigneMontantSeance : null,
             ]);
@@ -432,7 +431,7 @@ final class FactureEdit extends Component
         $this->nouvelleLigneMontantLibelle = '';
         $this->nouvelleLigneMontantPrixUnitaire = '';
         $this->nouvelleLigneMontantQuantite = '1';
-        $this->nouvelleLigneMontantSousCategorieId = null;
+        $this->nouvelleLigneMontantCompteId = null;
         $this->nouvelleLigneMontantOperationId = null;
         $this->nouvelleLigneMontantSeance = null;
     }

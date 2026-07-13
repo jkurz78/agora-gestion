@@ -159,13 +159,13 @@ final class RapportExportController extends Controller
         $sheet->setTitle('Compte de résultat');
 
         $row = 1;
-        $sheet->fromArray([['Type', 'Catégorie', 'Sous-catégorie', $labelN1, $label, 'Budget', 'Écart']], null, 'A'.$row);
+        $sheet->fromArray([['Type', 'Famille', 'Compte', $labelN1, $label, 'Budget', 'Écart']], null, 'A'.$row);
         $sheet->getStyle('A1:G1')->getFont()->setBold(true);
         $row++;
 
         foreach ([['Charge', $data['charges']], ['Produit', $data['produits']]] as [$type, $sections]) {
             foreach ($sections as $cat) {
-                foreach ($cat['sous_categories'] as $sc) {
+                foreach ($cat['comptes'] as $sc) {
                     $ecart = ($sc['budget'] !== null && $sc['montant_n'] !== null)
                         ? (float) $sc['montant_n'] - (float) $sc['budget']
                         : null;
@@ -200,14 +200,14 @@ final class RapportExportController extends Controller
 
         // Extournes section
         if ($extournes->isNotEmpty() || $extournesN1->isNotEmpty()) {
-            $extournesN1Keyed = $extournesN1->keyBy(fn (array $e) => $e['libelle'].'|'.$e['sous_categorie_id']);
-            $extournesNKeyed = $extournes->keyBy(fn (array $e) => $e['libelle'].'|'.$e['sous_categorie_id']);
+            $extournesN1Keyed = $extournesN1->keyBy(fn (array $e) => $e['libelle'].'|'.$e['compte_id']);
+            $extournesNKeyed = $extournes->keyBy(fn (array $e) => $e['libelle'].'|'.$e['compte_id']);
             $allExtourneKeys = $extournesN1Keyed->keys()->merge($extournesNKeyed->keys())->unique();
 
             foreach ($allExtourneKeys as $key) {
                 $eN = $extournesNKeyed->get($key);
                 $eN1 = $extournesN1Keyed->get($key);
-                $scNom = $eN['sous_categorie_nom'] ?? $eN1['sous_categorie_nom'];
+                $scNom = $eN['compte_nom'] ?? $eN1['compte_nom'];
                 $libelle = $eN['libelle'] ?? $eN1['libelle'];
                 $sheet->fromArray([[
                     'Extourne',
@@ -250,14 +250,14 @@ final class RapportExportController extends Controller
 
         // Provisions section
         if ($provisions->isNotEmpty() || $provisionsN1->isNotEmpty()) {
-            $provisionsN1Keyed = $provisionsN1->keyBy(fn (array $p) => $p['libelle'].'|'.$p['sous_categorie_id']);
-            $provisionsNKeyed = $provisions->keyBy(fn (array $p) => $p['libelle'].'|'.$p['sous_categorie_id']);
+            $provisionsN1Keyed = $provisionsN1->keyBy(fn (array $p) => $p['libelle'].'|'.$p['compte_id']);
+            $provisionsNKeyed = $provisions->keyBy(fn (array $p) => $p['libelle'].'|'.$p['compte_id']);
             $allProvisionKeys = $provisionsN1Keyed->keys()->merge($provisionsNKeyed->keys())->unique();
 
             foreach ($allProvisionKeys as $key) {
                 $pN = $provisionsNKeyed->get($key);
                 $pN1 = $provisionsN1Keyed->get($key);
-                $scNom = $pN['sous_categorie_nom'] ?? $pN1['sous_categorie_nom'];
+                $scNom = $pN['compte_nom'] ?? $pN1['compte_nom'];
                 $libelle = $pN['libelle'] ?? $pN1['libelle'];
                 $sheet->fromArray([[
                     'Provision',
@@ -301,7 +301,7 @@ final class RapportExportController extends Controller
         // Format number columns (covers all rows including provisions/extournes)
         $sheet->getStyle('D2:G'.$row)->getNumberFormat()->setFormatCode('#,##0.00');
 
-        // Colonnes : A Type | B Catégorie | C Sous-catégorie | D N-1 | E N | F Budget | G Écart
+        // Colonnes : A Type | B Famille | C Compte | D N-1 | E N | F Budget | G Écart
         if (! $compareBudget) {
             $sheet->removeColumn('F', 2); // Budget + Écart
         }
@@ -345,8 +345,8 @@ final class RapportExportController extends Controller
         $buildPrevIdx = function (array $hierarchy) use ($parOperations): array {
             $idx = [];
             foreach ($hierarchy as $cat) {
-                foreach ($cat['sous_categories'] as $sc) {
-                    $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
+                foreach ($cat['comptes'] as $sc) {
+                    $scId = (int) ($sc['compte_id'] ?? $sc['id'] ?? 0);
                     $entry = [
                         'montant' => (float) ($sc['montant'] ?? 0),
                         'seances' => $sc['seances'] ?? [],
@@ -380,7 +380,7 @@ final class RapportExportController extends Controller
 
         // ── combinedMode: 2-level header (op → séances) with merge cells ────────
         if ($combinedMode) {
-            $labelCols = ['Type', 'Catégorie', 'Sous-catégorie'];
+            $labelCols = ['Type', 'Famille', 'Compte'];
             if ($parTiers) {
                 $labelCols[] = 'Tiers';
             }
@@ -427,8 +427,8 @@ final class RapportExportController extends Controller
                 $projMatrix = $projMatrixFor($sectionLabel);
 
                 foreach ($sections as $cat) {
-                    foreach ($cat['sous_categories'] as $sc) {
-                        $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
+                    foreach ($cat['comptes'] as $sc) {
+                        $scId = (int) ($sc['compte_id'] ?? $sc['id'] ?? 0);
 
                         if ($parTiers && ! empty($sc['tiers'])) {
                             foreach ($sc['tiers'] as $t) {
@@ -477,11 +477,11 @@ final class RapportExportController extends Controller
                     if ($parTiers) {
                         $catValues[] = '';
                     }
-                    $catId = (int) ($cat['categorie_id'] ?? 0);
+                    $catId = (int) ($cat['famille_id'] ?? 0);
                     foreach ($operationNames as $opId => $opName) {
                         foreach ($seancesParOperation[$opId] ?? [] as $s) {
                             $catValues[] = ($mode === 'projection' && $projMatrix)
-                                ? collect($cat['sous_categories'])->sum(fn ($__sc) => (float) ($projMatrix->byScSeanceOp()[(int) ($__sc['sous_categorie_id'] ?? 0)][$s][$opId] ?? 0))
+                                ? collect($cat['comptes'])->sum(fn ($__sc) => (float) ($projMatrix->byScSeanceOp()[(int) ($__sc['compte_id'] ?? 0)][$s][$opId] ?? 0))
                                 : (float) ($cat['seance_operations'][$s][$opId] ?? 0);
                         }
                         $catValues[] = ($mode === 'projection' && $projMatrix)
@@ -565,7 +565,7 @@ final class RapportExportController extends Controller
 
         // ── parOperations: header and data rows ──────────────────────────────────
         if ($parOperations) {
-            $labelCols = ['Type', 'Catégorie', 'Sous-catégorie'];
+            $labelCols = ['Type', 'Famille', 'Compte'];
             if ($parSeances) {
                 $labelCols[] = 'Séance';
             }
@@ -587,8 +587,8 @@ final class RapportExportController extends Controller
 
             foreach ([['Charge', $data['charges'], $prevChargesIdx, 'DÉPENSES'], ['Produit', $data['produits'], $prevProduitsIdx, 'RECETTES']] as [$type, $sections, $prevIdx, $sectionLabel]) {
                 foreach ($sections as $cat) {
-                    foreach ($cat['sous_categories'] as $sc) {
-                        $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
+                    foreach ($cat['comptes'] as $sc) {
+                        $scId = (int) ($sc['compte_id'] ?? $sc['id'] ?? 0);
 
                         // Séance sub-rows (combined mode)
                         if ($parSeances) {
@@ -687,7 +687,7 @@ final class RapportExportController extends Controller
 
                     $projMatrix = $projMatrixFor($sectionLabel);
                     if ($mode === 'projection' && $projMatrix) {
-                        $catId = (int) ($cat['categorie_id'] ?? 0);
+                        $catId = (int) ($cat['famille_id'] ?? 0);
                         foreach ($operationNames as $opId => $opName) {
                             $catValues[] = (float) ($projMatrix->byCatOp()[$catId][$opId] ?? 0);
                         }
@@ -783,7 +783,7 @@ final class RapportExportController extends Controller
 
         // ── Standard (non-parOperations) header ──────────────────────────────────
         if ($parSeances) {
-            $headers = ['Type', 'Catégorie', 'Sous-catégorie'];
+            $headers = ['Type', 'Famille', 'Compte'];
             if ($parTiers) {
                 $headers[] = 'Tiers';
             }
@@ -792,7 +792,7 @@ final class RapportExportController extends Controller
             }
             $headers[] = 'Total';
         } else {
-            $headers = ['Type', 'Catégorie', 'Sous-catégorie'];
+            $headers = ['Type', 'Famille', 'Compte'];
             if ($parTiers) {
                 $headers[] = 'Tiers';
             }
@@ -811,8 +811,8 @@ final class RapportExportController extends Controller
 
         foreach ([['Charge', $data['charges'], $prevChargesIdx, 'DÉPENSES'], ['Produit', $data['produits'], $prevProduitsIdx, 'RECETTES']] as [$type, $sections, $prevIdx, $sectionLabel]) {
             foreach ($sections as $cat) {
-                foreach ($cat['sous_categories'] as $sc) {
-                    $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
+                foreach ($cat['comptes'] as $sc) {
+                    $scId = (int) ($sc['compte_id'] ?? $sc['id'] ?? 0);
 
                     if ($parTiers && ! empty($sc['tiers'])) {
                         $projMatrix = $projMatrixFor($sectionLabel);
@@ -843,7 +843,7 @@ final class RapportExportController extends Controller
                             $row++;
                         }
                     }
-                    // Sous-catégorie subtotal row
+                    // Sous-total du compte
                     $values = [$type, $cat['label'], $sc['label']];
                     if ($parTiers) {
                         $values[] = 'TOTAL';
@@ -879,14 +879,14 @@ final class RapportExportController extends Controller
                 if ($parTiers) {
                     $values[] = '';
                 }
-                $catId = (int) ($cat['categorie_id'] ?? 0);
+                $catId = (int) ($cat['famille_id'] ?? 0);
                 $projMatrix = $projMatrixFor($sectionLabel);
                 if ($parSeances) {
                     if ($mode === 'projection' && $projMatrix) {
                         foreach ($seances as $s) {
                             $catSeanceProjected = 0.0;
-                            foreach ($cat['sous_categories'] as $sc) {
-                                $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
+                            foreach ($cat['comptes'] as $sc) {
+                                $scId = (int) ($sc['compte_id'] ?? $sc['id'] ?? 0);
                                 $catSeanceProjected += (float) ($projMatrix->byScSeance()[$scId][$s] ?? 0);
                             }
                             $values[] = $catSeanceProjected;
@@ -923,8 +923,8 @@ final class RapportExportController extends Controller
                     foreach ($seances as $s) {
                         $seanceTotal = 0.0;
                         foreach ($sections as $cat) {
-                            foreach ($cat['sous_categories'] as $sc) {
-                                $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
+                            foreach ($cat['comptes'] as $sc) {
+                                $scId = (int) ($sc['compte_id'] ?? $sc['id'] ?? 0);
                                 $seanceTotal += (float) ($projMatrix->byScSeance()[$scId][$s] ?? 0);
                             }
                         }

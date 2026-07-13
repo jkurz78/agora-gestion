@@ -395,7 +395,7 @@ final class FactureService
      * @throws \RuntimeException si la facture n'est pas brouillon, si le tenant ne correspond pas,
      *                           ou si la ligne n'est pas de type MontantManuel
      */
-    public function majSousCategorieLigne(Facture $facture, int $ligneId, ?int $compteId): void
+    public function majCompteLigne(Facture $facture, int $ligneId, ?int $compteId): void
     {
         $this->assertBrouillon($facture);
         $this->assertTenantOwnership($facture);

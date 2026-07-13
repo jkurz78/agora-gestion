@@ -150,7 +150,7 @@
                                                     <div class="row g-2 mt-1 ps-4">
                                                         <div class="col-md-4">
                                                             <select class="form-select form-select-sm @if ($ligne->compte_id === null) is-invalid @endif"
-                                                                    wire:change="updateSousCategorie({{ $ligne->id }}, $event.target.value)">
+                                                                    wire:change="updateCompte({{ $ligne->id }}, $event.target.value)">
                                                                 <option value="">— Compte (requis) —</option>
                                                                 @include('partials.select-compte-options', ['groupes' => $groupesComptesRecette, 'selectedId' => $ligne->compte_id])
                                                             </select>

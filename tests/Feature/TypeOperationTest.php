@@ -49,7 +49,7 @@ it('displays the type operations list', function () {
 it('creates a new type operation', function () {
     Livewire::test(TypeOperationShow::class)
         ->set('nom', 'Nouveau type')
-        ->set('sous_categorie_id', $this->compte->id)
+        ->set('compte_id', (string) $this->compte->id)
         ->call('save');
 
     expect(TypeOperation::where('nom', 'Nouveau type')->exists())->toBeTrue();
@@ -58,7 +58,7 @@ it('creates a new type operation', function () {
 it('creates a type operation with tarifs', function () {
     Livewire::test(TypeOperationShow::class)
         ->set('nom', 'Yoga thérapeutique')
-        ->set('sous_categorie_id', $this->compte->id)
+        ->set('compte_id', $this->compte->id)
         ->set('nombre_seances', '10')
         ->set('formulaireParcoursTherapeutique', true)
         ->set('formulaireActif', true)
@@ -83,9 +83,24 @@ it('creates a type operation with tarifs', function () {
 it('validates required fields', function () {
     Livewire::test(TypeOperationShow::class)
         ->set('nom', '')
-        ->set('sous_categorie_id', '')
+        ->set('compte_id', '')
         ->call('save')
-        ->assertHasErrors(['nom', 'sous_categorie_id']);
+        ->assertHasErrors(['nom', 'compte_id']);
+});
+
+it('refuse un compte appartenant à une autre association', function () {
+    $autreAssociation = Association::factory()->create();
+    TenantContext::boot($autreAssociation);
+    $compteExterne = Compte::factory()->numero('706')->pourInscriptions()->create();
+    TenantContext::boot($this->association);
+
+    Livewire::test(TypeOperationShow::class)
+        ->set('nom', 'Type avec compte externe')
+        ->set('compte_id', (string) $compteExterne->id)
+        ->call('save')
+        ->assertHasErrors(['compte_id']);
+
+    expect(TypeOperation::where('nom', 'Type avec compte externe')->exists())->toBeFalse();
 });
 
 it('edits a type operation', function () {
@@ -167,7 +182,7 @@ it('uploads a logo', function () {
 
     Livewire::test(TypeOperationShow::class)
         ->set('nom', 'Test logo')
-        ->set('sous_categorie_id', $this->compte->id)
+        ->set('compte_id', $this->compte->id)
         ->set('logo', $file)
         ->call('save');
 
@@ -216,7 +231,7 @@ it('enforces unique nom', function () {
 
     Livewire::test(TypeOperationShow::class)
         ->set('nom', 'Nom dupliqué')
-        ->set('sous_categorie_id', $this->compte->id)
+        ->set('compte_id', $this->compte->id)
         ->call('save')
         ->assertHasErrors(['nom']);
 });
