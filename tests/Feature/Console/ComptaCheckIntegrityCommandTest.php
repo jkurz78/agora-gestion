@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\Association;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
+use App\Models\RapprochementBancaire;
 use App\Models\RemiseBancaire;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -83,6 +84,87 @@ it('signale une divergence sur une ventilation compte-first', function (): void 
     $this->artisan('compta:check-integrity', ['--quiet-ok' => true])
         ->expectsOutputToContain('montant_total=100')
         ->assertExitCode(1);
+});
+
+it('ne compte pas deux fois une écriture opérationnelle et son règlement bancaire', function (): void {
+    config()->set('compta.use_partie_double', true);
+
+    $user = User::factory()->create();
+    $compteBancaire = CompteBancaire::factory()->create([
+        'association_id' => (int) $this->association->id,
+        'solde_initial' => 0,
+    ]);
+    $compteBanque = Compte::factory()->numero('5121')->create([
+        'association_id' => (int) $this->association->id,
+        'compte_bancaire_id' => (int) $compteBancaire->id,
+    ]);
+
+    $rapprochement = RapprochementBancaire::create([
+        'association_id' => (int) $this->association->id,
+        'compte_id' => (int) $compteBancaire->id,
+        'date_fin' => '2026-01-31',
+        'solde_ouverture' => 0,
+        'solde_fin' => 100,
+        'statut' => 'verrouille',
+        'type' => 'bancaire',
+        'saisi_par' => (int) $user->id,
+        'verrouille_at' => now(),
+    ]);
+
+    $operationnelle = Transaction::forceCreate([
+        'association_id' => (int) $this->association->id,
+        'type' => 'recette',
+        'date' => '2026-01-15',
+        'libelle' => 'Créance réglée',
+        'montant_total' => 100,
+        'type_ecriture' => 'normale',
+        'journal' => 'vente',
+        'compte_id' => (int) $compteBancaire->id,
+        'rapprochement_id' => (int) $rapprochement->id,
+    ]);
+    TransactionLigne::forceCreate([
+        'transaction_id' => (int) $operationnelle->id,
+        'compte_id' => (int) $this->compteProduit->id,
+        'montant' => 100,
+        'debit' => 0,
+        'credit' => 100,
+    ]);
+    TransactionLigne::forceCreate([
+        'transaction_id' => (int) $operationnelle->id,
+        'compte_id' => (int) $this->compteClient->id,
+        'montant' => 0,
+        'debit' => 100,
+        'credit' => 0,
+    ]);
+
+    $reglement = Transaction::forceCreate([
+        'association_id' => (int) $this->association->id,
+        'type' => 'recette',
+        'date' => '2026-01-15',
+        'libelle' => 'Encaissement bancaire',
+        'montant_total' => 100,
+        'type_ecriture' => 'normale',
+        'journal' => 'banque',
+        'compte_id' => (int) $compteBancaire->id,
+        'rapprochement_id' => (int) $rapprochement->id,
+    ]);
+    TransactionLigne::forceCreate([
+        'transaction_id' => (int) $reglement->id,
+        'compte_id' => (int) $this->compteClient->id,
+        'montant' => 0,
+        'debit' => 0,
+        'credit' => 100,
+    ]);
+    TransactionLigne::forceCreate([
+        'transaction_id' => (int) $reglement->id,
+        'compte_id' => (int) $compteBanque->id,
+        'montant' => 0,
+        'debit' => 100,
+        'credit' => 0,
+    ]);
+
+    $this->artisan('compta:check-integrity', ['--quiet-ok' => true])
+        ->assertExitCode(0);
 });
 
 it('ignore les transactions techniques T2 et T4 même avec --fix', function (): void {

@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\Association;
+use App\Models\RapprochementBancaire;
 use App\Models\TransactionLigne;
+use App\Services\RapprochementBancaireService;
 use App\Tenant\TenantContext;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
@@ -31,7 +33,7 @@ final class ComptaCheckIntegrityCommand extends Command
     /** @var list<string> */
     private array $issues = [];
 
-    public function handle(): int
+    public function handle(RapprochementBancaireService $rapprochementService): int
     {
         $associations = Association::all();
         $globalIssues = false;
@@ -40,7 +42,7 @@ final class ComptaCheckIntegrityCommand extends Command
             TenantContext::boot($association);
             $this->issues = [];
 
-            $this->checkRapprochements();
+            $this->checkRapprochements($rapprochementService);
             $this->checkRemises();
             $this->checkTransactionTotals();
             $this->checkAdhesionMontants();
@@ -76,35 +78,15 @@ final class ComptaCheckIntegrityCommand extends Command
     /**
      * CHECK 1 — Tous les rapprochements verrouillés doivent avoir un écart de 0.
      */
-    private function checkRapprochements(): void
+    private function checkRapprochements(RapprochementBancaireService $rapprochementService): void
     {
-        $rapprochements = DB::table('rapprochements_bancaires')
+        $rapprochements = RapprochementBancaire::query()
             ->where('statut', 'verrouille')
             ->where('association_id', TenantContext::currentId())
             ->get();
 
         foreach ($rapprochements as $r) {
-            $soldeOuverture = (float) $r->solde_ouverture;
-            $soldeFin = (float) $r->solde_fin;
-
-            $netTx = (float) DB::table('transactions')
-                ->where('rapprochement_id', $r->id)
-                ->where('association_id', TenantContext::currentId())
-                ->selectRaw("COALESCE(SUM(CASE WHEN type = 'depense' THEN -montant_total ELSE montant_total END), 0) as total")
-                ->value('total');
-
-            $netVirementEntrant = (float) DB::table('virements_internes')
-                ->where('rapprochement_destination_id', $r->id)
-                ->where('association_id', TenantContext::currentId())
-                ->sum('montant');
-
-            $netVirementSortant = (float) DB::table('virements_internes')
-                ->where('rapprochement_source_id', $r->id)
-                ->where('association_id', TenantContext::currentId())
-                ->sum('montant');
-
-            $soldePointage = round($soldeOuverture + $netTx + $netVirementEntrant - $netVirementSortant, 2);
-            $ecart = round($soldeFin - $soldePointage, 2);
+            $ecart = $rapprochementService->calculerEcart($r);
 
             if ((int) round($ecart * 100) !== 0) {
                 $dateFin = substr((string) $r->date_fin, 0, 10);

@@ -109,9 +109,10 @@ déjà, la suite reste verte lot par lot.
   confirme l'absence des tables et colonnes historiques, les FK/nullabilités attendues,
   les index finaux et l'unicité d'encadrement sur `compte_id`.
 - [x] `compta:smoke-test-v5 --detail` et `compta:assert-pd-complete --check` passent.
-  `compta:check-integrity` signale séparément 13 écarts de rapprochements déjà présents
-  dans les données du clone ; la répétition reste saine (delta CR et rapprochements du
-  smoke à 0, aucune transaction déséquilibrée ou sans partie double).
+  `compta:check-integrity` passe également sur le clone final. Les 13 écarts initialement
+  signalés étaient des faux positifs : son ancienne formule additionnait la transaction
+  opérationnelle T1 et son règlement bancaire T2. La commande délègue désormais le calcul
+  à `RapprochementBancaireService`, comme le smoke-test et le verrouillage métier.
 - [x] `database/schema/mysql-schema.sql` régénéré depuis le schéma final, sans `--prune`.
   Une seconde base MySQL vide charge ce dump puis répond `Nothing to migrate` et ne
   contient aucune table ou colonne historique.
