@@ -98,13 +98,19 @@ final class PlanComptable extends Component
 
     // ── Édition inline ───────────────────────────────────────────
 
-    public function updateField(int $id, string $field, string $value): void
+    /**
+     * Le booléen retourné permet au blade (Alpine) de restaurer la valeur
+     * d'origine dans la cellule quand le serveur refuse — sans lui, la
+     * cellule wire:ignore.self continue d'afficher la valeur refusée et
+     * l'utilisateur croit la modification acceptée (constat recette R-3).
+     */
+    public function updateField(int $id, string $field, string $value): bool
     {
         // Garde serveur : intitulé toujours éditable ; numéro éditable tant
         // que le compte est vierge (D3 : l'identité devient immuable dès la
         // première écriture). Tout autre champ forgé est ignoré ici.
         if (! in_array($field, ['intitule', 'numero_pcg'], true)) {
-            return;
+            return false;
         }
 
         $compte = Compte::findOrFail($id);
@@ -113,13 +119,11 @@ final class PlanComptable extends Component
             $this->flashMessage = 'Ce compte système ne peut pas être modifié.';
             $this->flashType = 'danger';
 
-            return;
+            return false;
         }
 
         if ($field === 'numero_pcg') {
-            $this->renumeroter($compte, $value);
-
-            return;
+            return $this->renumeroter($compte, $value);
         }
 
         $validator = validator(['intitule' => $value], ['intitule' => 'required|string|max:255']);
@@ -128,10 +132,12 @@ final class PlanComptable extends Component
             $this->flashMessage = $validator->errors()->first('intitule');
             $this->flashType = 'danger';
 
-            return;
+            return false;
         }
 
         $compte->update(['intitule' => $value]);
+
+        return true;
     }
 
     /**
@@ -139,13 +145,13 @@ final class PlanComptable extends Component
      * La classe est conservée : les usages (dons, cotisations…), budgets et
      * formules qui pointent ce compte supposent sa polarité 6/7.
      */
-    private function renumeroter(Compte $compte, string $numero): void
+    private function renumeroter(Compte $compte, string $numero): bool
     {
         if ($compte->lignes()->exists()) {
             $this->flashMessage = 'Renumérotation impossible : ce compte porte des écritures.';
             $this->flashType = 'danger';
 
-            return;
+            return false;
         }
 
         $validator = validator(
@@ -169,19 +175,21 @@ final class PlanComptable extends Component
             $this->flashMessage = $validator->errors()->first('numero_pcg');
             $this->flashType = 'danger';
 
-            return;
+            return false;
         }
 
         if ((int) substr($numero, 0, 1) !== (int) $compte->classe) {
             $this->flashMessage = "Le numéro doit rester en classe {$compte->classe}.";
             $this->flashType = 'danger';
 
-            return;
+            return false;
         }
 
         $compte->update(['numero_pcg' => $numero]);
         // La famille orpheline du nouveau préfixe se matérialise via
         // CompteObserver::updated.
+
+        return true;
     }
 
     /**

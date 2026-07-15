@@ -70,9 +70,9 @@
                                         <input x-ref="input" type="text" x-model="value"
                                                class="form-control form-control-sm font-monospace" style="max-width:120px"
                                                maxlength="6"
-                                               @keydown.enter="if (value.trim()) { $wire.updateField({{ $compte->id }}, 'numero_pcg', value.trim().toUpperCase()); editing = false; original = value } else { value = original; editing = false }"
+                                               @keydown.enter="if (value.trim()) { $wire.updateField({{ $compte->id }}, 'numero_pcg', value.trim().toUpperCase()).then(ok => { if (ok) { original = value } else { value = original } }); editing = false } else { value = original; editing = false }"
                                                @keydown.escape="value = original; editing = false"
-                                               @blur="if (value.trim() && value !== original) { $wire.updateField({{ $compte->id }}, 'numero_pcg', value.trim().toUpperCase()); original = value }; editing = false"
+                                               @blur="if (value.trim() && value !== original) { $wire.updateField({{ $compte->id }}, 'numero_pcg', value.trim().toUpperCase()).then(ok => { if (ok) { original = value } else { value = original } }) }; editing = false"
                                                @click.stop>
                                     </template>
                                 </td>
@@ -98,9 +98,9 @@
                                         <input x-ref="input" type="text" x-model="value"
                                                class="form-control form-control-sm"
                                                maxlength="255"
-                                               @keydown.enter="if (value.trim()) { $wire.updateField({{ $compte->id }}, 'intitule', value); editing = false; original = value } else { value = original; editing = false }"
+                                               @keydown.enter="if (value.trim()) { $wire.updateField({{ $compte->id }}, 'intitule', value).then(ok => { if (ok) { original = value } else { value = original } }); editing = false } else { value = original; editing = false }"
                                                @keydown.escape="value = original; editing = false"
-                                               @blur="if (value.trim() && value !== original) { $wire.updateField({{ $compte->id }}, 'intitule', value); original = value }; editing = false"
+                                               @blur="if (value.trim() && value !== original) { $wire.updateField({{ $compte->id }}, 'intitule', value).then(ok => { if (ok) { original = value } else { value = original } }) }; editing = false"
                                                @click.stop>
                                     </template>
                                 </td>

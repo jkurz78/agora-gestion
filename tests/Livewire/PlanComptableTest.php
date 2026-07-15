@@ -159,8 +159,11 @@ it('édite le nom de famille inline, avec création défensive à la volée', fu
 it('renumérote un compte sans écritures', function () {
     $compte = dc7CreerCompte('706', 'Prestations');
 
+    // Le retour true/false pilote la restauration de la valeur dans la
+    // cellule Alpine (constat recette R-3).
     Livewire::test(PlanComptable::class)
-        ->call('updateField', $compte->id, 'numero_pcg', '706B');
+        ->call('updateField', $compte->id, 'numero_pcg', '706B')
+        ->assertReturned(true);
 
     expect($compte->fresh()->numero_pcg)->toBe('706B');
 });
@@ -187,7 +190,8 @@ it('refuse la renumérotation d un compte porteur d écritures', function () {
 
     Livewire::test(PlanComptable::class)
         ->call('updateField', $compte->id, 'numero_pcg', '706B')
-        ->assertSet('flashType', 'danger');
+        ->assertSet('flashType', 'danger')
+        ->assertReturned(false);
 
     expect($compte->fresh()->numero_pcg)->toBe('706');
 });
@@ -197,7 +201,8 @@ it('refuse un changement de classe à la renumérotation', function () {
 
     Livewire::test(PlanComptable::class)
         ->call('updateField', $compte->id, 'numero_pcg', '606')
-        ->assertSet('flashType', 'danger');
+        ->assertSet('flashType', 'danger')
+        ->assertReturned(false);
 
     expect($compte->fresh()->numero_pcg)->toBe('706');
 });
