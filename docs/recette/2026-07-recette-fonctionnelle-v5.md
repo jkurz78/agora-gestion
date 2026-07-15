@@ -38,7 +38,7 @@
 
 - [x] Dépense comptant (virement) avec tiers — *vérifié 2026-07-15 (form + reproduction serveur)*
   - [x] Écritures 6x débit / 401 crédit + T2 401/512X lettrées — *vérifié SQL : 606 Fournitures D 80 / 401 Fournisseurs C 80 (tiers, lettrage AADG), T2 = 401 D 80 / 5121 C 80, equilibree=1*
-  - [x] ⚠️ Observation N-3 : une dépense **sans tiers** produit une transaction PD-incomplète (606 seul, equilibree=false) — `enrichirPartieDouble` skippe la contrepartie si `tiers_id` null (design PD : le 401/411 porte le tiers). Antérieur au chantier dissolution. À vérifier : le formulaire doit-il rendre le tiers **obligatoire** pour une dépense/recette comptant ? (voir Journal N-3)
+  - [x] N-3 CORRIGÉ : le tiers est désormais **obligatoire** pour toute recette/dépense (le 401/411 porte la contrepartie). Sans lui, l'écriture ne pouvait pas s'équilibrer — le formulaire rejette maintenant la saisie. (voir Journal N-3)
 - [ ] Recette comptant (espèces) : vérifier portage caisse (530)
 - [ ] Recette en attente (créance) puis « Marquer reçu » → T2 générée à l'encaissement, date correcte
 - [ ] Recette chèque → remise en banque **multi-source** (au moins 2 chèques + espèces)
@@ -125,4 +125,4 @@
 | R-3 | 2026-07-15 | 5 | Après un refus de renumérotation, la cellule affichait la valeur refusée (état Alpine local) — l'utilisateur croyait la modification acceptée. Découvert lors de la vérification in-app | ✅ Corrigé | `ca8639b6` |
 | N-1 | 2026-07-15 | 5 | Note (pas un bug) : familles « 68 — 68 » et « 78 — 78 » jamais nommées (orphelines auto-créées) — à renommer via l'édition d'en-tête de groupe | 📝 À faire (choix de libellé utilisateur) | — |
 | N-2 | 2026-07-15 | 5 | Note UX mineure : le message de refus s'affiche en haut du composant — hors viewport quand on est scrollé en bas d'un long plan comptable. Piste : toast ou scroll-to-alert | 📋 Parqué | — |
-| N-3 | 2026-07-15 | 2 | Une dépense/recette comptant **sans tiers** produit une transaction PD-incomplète (ventilation 6x/7x seule, pas de contrepartie 401/411, equilibree=false). `TransactionService::enrichirPartieDouble` skippe volontairement si `tiers_id` null. Comportement PD antérieur à la dissolution. À trancher : rendre le tiers obligatoire à la saisie comptant côté formulaire, ou générer une contrepartie « tiers générique ». | ❓ À décider (pas un régression dissolution) | — |
+| N-3 | 2026-07-15 | 2 | Une recette/dépense **sans tiers** produisait une transaction PD-incomplète (ventilation 6x/7x seule, pas de contrepartie 401/411, equilibree=false). `TransactionService::enrichirPartieDouble` skippe si `tiers_id` null, et le formulaire autorisait `tiers_id` nullable. **0 cas légitime dans le clone prod** (seule la tx de repro 420 « sans tiers »). Décision : **interdire** — tiers rendu obligatoire à la saisie recette/dépense (comptant et créance). | ✅ Corrigé | (commit ci-dessous) |
