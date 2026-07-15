@@ -36,6 +36,7 @@ final class PlanComptable extends Component
     public function render(): View
     {
         $comptes = Compte::whereIn('classe', [6, 7])
+            ->withCount('lignes')
             ->orderBy('numero_pcg')
             ->get();
 
@@ -99,11 +100,10 @@ final class PlanComptable extends Component
 
     public function updateField(int $id, string $field, string $value): void
     {
-        // Garde serveur : seule l'édition de l'intitulé est permise. Le numéro
-        // PCG est l'identité du compte — un compte porteur d'écritures
-        // (transaction_lignes.compte_id) ne doit jamais être renuméroté.
-        // L'UI ne l'expose pas ; tout payload forgé est ignoré ici.
-        if ($field !== 'intitule') {
+        // Garde serveur : intitulé toujours éditable ; numéro éditable tant
+        // que le compte est vierge (D3 : l'identité devient immuable dès la
+        // première écriture). Tout autre champ forgé est ignoré ici.
+        if (! in_array($field, ['intitule', 'numero_pcg'], true)) {
             return;
         }
 
@@ -112,6 +112,12 @@ final class PlanComptable extends Component
         if ($compte->est_systeme) {
             $this->flashMessage = 'Ce compte système ne peut pas être modifié.';
             $this->flashType = 'danger';
+
+            return;
+        }
+
+        if ($field === 'numero_pcg') {
+            $this->renumeroter($compte, $value);
 
             return;
         }
@@ -126,6 +132,56 @@ final class PlanComptable extends Component
         }
 
         $compte->update(['intitule' => $value]);
+    }
+
+    /**
+     * Renumérote un compte vierge (D3 : immuable dès la première écriture).
+     * La classe est conservée : les usages (dons, cotisations…), budgets et
+     * formules qui pointent ce compte supposent sa polarité 6/7.
+     */
+    private function renumeroter(Compte $compte, string $numero): void
+    {
+        if ($compte->lignes()->exists()) {
+            $this->flashMessage = 'Renumérotation impossible : ce compte porte des écritures.';
+            $this->flashType = 'danger';
+
+            return;
+        }
+
+        $validator = validator(
+            ['numero_pcg' => $numero],
+            [
+                'numero_pcg' => [
+                    'required',
+                    'regex:/^[67][0-9A-Z]{2,5}$/',
+                    Rule::unique('comptes', 'numero_pcg')
+                        ->where('association_id', TenantContext::currentId())
+                        ->ignore($compte->id),
+                ],
+            ],
+            [
+                'numero_pcg.regex' => 'Le numéro doit commencer par 6 ou 7 (3 à 6 caractères alphanumériques majuscules).',
+                'numero_pcg.unique' => 'Ce numéro de compte existe déjà.',
+            ],
+        );
+
+        if ($validator->fails()) {
+            $this->flashMessage = $validator->errors()->first('numero_pcg');
+            $this->flashType = 'danger';
+
+            return;
+        }
+
+        if ((int) substr($numero, 0, 1) !== (int) $compte->classe) {
+            $this->flashMessage = "Le numéro doit rester en classe {$compte->classe}.";
+            $this->flashType = 'danger';
+
+            return;
+        }
+
+        $compte->update(['numero_pcg' => $numero]);
+        // La famille orpheline du nouveau préfixe se matérialise via
+        // CompteObserver::updated.
     }
 
     /**

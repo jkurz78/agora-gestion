@@ -154,15 +154,79 @@ it('édite le nom de famille inline, avec création défensive à la volée', fu
     expect(Famille::where('code', '76')->first()->nom)->toBe('Produits financiers');
 });
 
-it('ne permet pas de changer le numéro d un compte depuis l écran', function () {
+// ── 4bis. Renumérotation (D3 : identité immuable dès la première écriture) ──
+
+it('renumérote un compte sans écritures', function () {
     $compte = dc7CreerCompte('706', 'Prestations');
 
-    // Le numéro est l'identité : l'UI ne l'expose pas, et la garde serveur
-    // ignore tout payload forgé visant un autre champ que l'intitulé.
     Livewire::test(PlanComptable::class)
-        ->call('updateField', $compte->id, 'numero_pcg', '799999');
+        ->call('updateField', $compte->id, 'numero_pcg', '706B');
+
+    expect($compte->fresh()->numero_pcg)->toBe('706B');
+});
+
+it('matérialise la famille orpheline du nouveau préfixe à la renumérotation', function () {
+    $compte = dc7CreerCompte('706', 'Prestations');
+    expect(Famille::where('code', '75')->exists())->toBeFalse();
+
+    Livewire::test(PlanComptable::class)
+        ->call('updateField', $compte->id, 'numero_pcg', '758');
+
+    expect($compte->fresh()->numero_pcg)->toBe('758')
+        ->and(Famille::where('code', '75')->first()->nom)->toBe('75');
+});
+
+it('refuse la renumérotation d un compte porteur d écritures', function () {
+    $compte = dc7CreerCompte('706', 'Prestations');
+
+    TransactionLigne::factory()->create([
+        'compte_id' => $compte->id,
+        'debit' => 0,
+        'credit' => 100,
+    ]);
+
+    Livewire::test(PlanComptable::class)
+        ->call('updateField', $compte->id, 'numero_pcg', '706B')
+        ->assertSet('flashType', 'danger');
 
     expect($compte->fresh()->numero_pcg)->toBe('706');
+});
+
+it('refuse un changement de classe à la renumérotation', function () {
+    $compte = dc7CreerCompte('706', 'Prestations');
+
+    Livewire::test(PlanComptable::class)
+        ->call('updateField', $compte->id, 'numero_pcg', '606')
+        ->assertSet('flashType', 'danger');
+
+    expect($compte->fresh()->numero_pcg)->toBe('706');
+});
+
+it('refuse un numéro invalide ou en doublon à la renumérotation', function () {
+    dc7CreerCompte('758', 'Existant');
+    $compte = dc7CreerCompte('706', 'Prestations');
+
+    // Regex (minuscule interdite)
+    Livewire::test(PlanComptable::class)
+        ->call('updateField', $compte->id, 'numero_pcg', '706a')
+        ->assertSet('flashType', 'danger');
+    expect($compte->fresh()->numero_pcg)->toBe('706');
+
+    // Doublon dans l'association
+    Livewire::test(PlanComptable::class)
+        ->call('updateField', $compte->id, 'numero_pcg', '758')
+        ->assertSet('flashType', 'danger');
+    expect($compte->fresh()->numero_pcg)->toBe('706');
+});
+
+it('refuse la renumérotation d un compte système', function () {
+    $compte = dc7CreerCompte('681', 'Dotations aux amortissements', systeme: true);
+
+    Livewire::test(PlanComptable::class)
+        ->call('updateField', $compte->id, 'numero_pcg', '682')
+        ->assertSet('flashType', 'danger');
+
+    expect($compte->fresh()->numero_pcg)->toBe('681');
 });
 
 // ── 5. Compte système ────────────────────────────────────────────

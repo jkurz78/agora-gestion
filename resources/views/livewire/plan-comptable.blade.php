@@ -54,8 +54,29 @@
 
                     @foreach ($comptes as $compte)
                         <tr wire:key="compte-{{ $compte->id }}">
-                            {{-- Numéro (identité : non éditable) --}}
-                            <td class="font-monospace">{{ $compte->numero_pcg }}</td>
+                            {{-- Numéro (identité : éditable tant qu'aucune écriture — D3) --}}
+                            @if ($compte->est_systeme || $compte->lignes_count > 0)
+                                <td class="font-monospace">{{ $compte->numero_pcg }}</td>
+                            @else
+                                <td class="font-monospace" wire:ignore.self
+                                    x-data="{ editing: false, value: @js($compte->numero_pcg), original: @js($compte->numero_pcg) }"
+                                    @click="if (!editing) { editing = true; $nextTick(() => $refs.input.focus()) }"
+                                    style="cursor:pointer"
+                                    title="Renuméroter (possible tant que le compte ne porte aucune écriture)">
+                                    <template x-if="!editing">
+                                        <span x-text="value">{{ $compte->numero_pcg }}</span>
+                                    </template>
+                                    <template x-if="editing">
+                                        <input x-ref="input" type="text" x-model="value"
+                                               class="form-control form-control-sm font-monospace" style="max-width:120px"
+                                               maxlength="6"
+                                               @keydown.enter="if (value.trim()) { $wire.updateField({{ $compte->id }}, 'numero_pcg', value.trim().toUpperCase()); editing = false; original = value } else { value = original; editing = false }"
+                                               @keydown.escape="value = original; editing = false"
+                                               @blur="if (value.trim() && value !== original) { $wire.updateField({{ $compte->id }}, 'numero_pcg', value.trim().toUpperCase()); original = value }; editing = false"
+                                               @click.stop>
+                                    </template>
+                                </td>
+                            @endif
 
                             {{-- Intitulé --}}
                             @if ($compte->est_systeme)

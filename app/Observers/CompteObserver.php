@@ -19,6 +19,19 @@ final class CompteObserver
 {
     public function created(Compte $compte): void
     {
+        $this->materialiserFamille($compte);
+    }
+
+    public function updated(Compte $compte): void
+    {
+        // Renumérotation (compte vierge, D3) : le nouveau préfixe peut être orphelin.
+        if ($compte->wasChanged('numero_pcg')) {
+            $this->materialiserFamille($compte);
+        }
+    }
+
+    private function materialiserFamille(Compte $compte): void
+    {
         if (! in_array((int) $compte->classe, [6, 7], true)) {
             return;
         }
