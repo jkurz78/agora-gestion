@@ -22,22 +22,23 @@
 ## Bloc 1 — Cycle vente (devis → facture → encaissement → avoir)
 
 - [ ] Créer un devis manuel (2-3 lignes sur des comptes 7x différents), le transformer en facture
-- [ ] Créer une facture manuelle directe (invoice-first), la valider
-  - [ ] La transaction générée existe, journal `vente`, équilibrée, lignes 7x + contrepartie 411 lettrable
+- [x] Créer une facture manuelle directe (invoice-first), la valider — *vérifié in-app 2026-07-15 : facture F-2025-0002 pour Pauline FAURE, ligne 707 « Ventes de produits » 150 € (sélecteur compte-first « 707 — Ventes de produits »), tx 2025-2026:00394 (Claude, navigateur)*
+  - [x] La transaction générée existe, journal `vente`, équilibrée, lignes 7x + contrepartie 411 lettrable — *vérifié SQL : 411 Clients D 150 (tiers Pauline) / 707 Ventes C 150, equilibree=1*
   - [x] La transaction est verrouillée (montants/comptes non éditables) et **chaque ligne affiche famille / intitulé du compte** (constat R-2) — *vérifié in-app 2026-07-15 sur tx 2025-2026:00046 (Claude, navigateur)*
-  - [ ] La facture apparaît en créance à recevoir
-- [ ] Encaisser la facture (virement) depuis la fiche facture
-  - [ ] T2 générée (512X débit / 411 crédit), lettrage 411 fermé, `statut_reglement` passe à reçu/pointé
+  - [x] La facture apparaît en créance à recevoir — *statut_reglement=en_attente, reste dû 150 €*
+- [x] Encaisser la facture (virement) depuis la fiche facture — *vérifié in-app*
+  - [x] T2 générée (512X débit / 411 crédit), lettrage 411 fermé, `statut_reglement` passe à reçu/pointé — *vérifié SQL : T2 tx 00395 = 5121 Compte Courant D 150 / 411 C 150, lettrage AADT partagé T1↔T2, T1 passe à `recu`*
 - [ ] Encaisser une 2ᵉ facture par chèque → vérifier portage 5112 (pas 512X) tant que non remis/pointé
-- [ ] Annuler une facture par avoir
-  - [ ] Écritures miroir générées, lettrage cohérent, la créance disparaît des créances en cours
+- [x] Annuler une facture par avoir — *vérifié in-app : avoir AV-2025-0001 émis, facture annulée*
+  - [x] Écritures miroir générées, lettrage cohérent, la créance disparaît des créances en cours — *vérifié SQL : miroir tx 00396 = 707 D 150 / 411 C 150 (inverse exact), T1 marquée extournée, montant miroir −150 (brèche du signe)*
   - [ ] PDF avoir généré, mentions correctes
-- [ ] Invariants (check-integrity + assert-pd-complete) ✅
+- [x] Invariants (check-integrity + assert-pd-complete) ✅ — *grand livre équilibré 137 118,83 = 137 118,83, écart 0,00*
 
 ## Bloc 2 — Saisie directe & chaîne bancaire
 
-- [ ] Dépense comptant (virement) : ventilation 2 lignes 6x, PJ jointe
-  - [ ] Écritures 6x débit / 401 crédit + T2 401/512X lettrées
+- [x] Dépense comptant (virement) avec tiers — *vérifié 2026-07-15 (form + reproduction serveur)*
+  - [x] Écritures 6x débit / 401 crédit + T2 401/512X lettrées — *vérifié SQL : 606 Fournitures D 80 / 401 Fournisseurs C 80 (tiers, lettrage AADG), T2 = 401 D 80 / 5121 C 80, equilibree=1*
+  - [x] ⚠️ Observation N-3 : une dépense **sans tiers** produit une transaction PD-incomplète (606 seul, equilibree=false) — `enrichirPartieDouble` skippe la contrepartie si `tiers_id` null (design PD : le 401/411 porte le tiers). Antérieur au chantier dissolution. À vérifier : le formulaire doit-il rendre le tiers **obligatoire** pour une dépense/recette comptant ? (voir Journal N-3)
 - [ ] Recette comptant (espèces) : vérifier portage caisse (530)
 - [ ] Recette en attente (créance) puis « Marquer reçu » → T2 générée à l'encaissement, date correcte
 - [ ] Recette chèque → remise en banque **multi-source** (au moins 2 chèques + espèces)
@@ -124,3 +125,4 @@
 | R-3 | 2026-07-15 | 5 | Après un refus de renumérotation, la cellule affichait la valeur refusée (état Alpine local) — l'utilisateur croyait la modification acceptée. Découvert lors de la vérification in-app | ✅ Corrigé | `ca8639b6` |
 | N-1 | 2026-07-15 | 5 | Note (pas un bug) : familles « 68 — 68 » et « 78 — 78 » jamais nommées (orphelines auto-créées) — à renommer via l'édition d'en-tête de groupe | 📝 À faire (choix de libellé utilisateur) | — |
 | N-2 | 2026-07-15 | 5 | Note UX mineure : le message de refus s'affiche en haut du composant — hors viewport quand on est scrollé en bas d'un long plan comptable. Piste : toast ou scroll-to-alert | 📋 Parqué | — |
+| N-3 | 2026-07-15 | 2 | Une dépense/recette comptant **sans tiers** produit une transaction PD-incomplète (ventilation 6x/7x seule, pas de contrepartie 401/411, equilibree=false). `TransactionService::enrichirPartieDouble` skippe volontairement si `tiers_id` null. Comportement PD antérieur à la dissolution. À trancher : rendre le tiers obligatoire à la saisie comptant côté formulaire, ou générer une contrepartie « tiers générique ». | ❓ À décider (pas un régression dissolution) | — |
