@@ -317,8 +317,22 @@
                                     <tr wire:key="ligne-{{ $index }}">
                                         <td style="min-width:220px">
                                             @if ($isLockedByFacture || $isExtourneMiroir)
-                                                @php $compteLigne = \App\Models\Compte::find($ligne['compte_id']); @endphp
-                                                <span class="form-control-plaintext">{{ $compteLigne?->intitule ?? '—' }}</span>
+                                                {{-- Même rendu que le chip CompteAutocomplete : famille + intitulé --}}
+                                                @php
+                                                    $compteLigne = \App\Models\Compte::find($ligne['compte_id']);
+                                                    $familleLigne = $compteLigne?->famille();
+                                                @endphp
+                                                @if ($compteLigne)
+                                                    <div class="form-control-plaintext d-flex align-items-center gap-2 py-1">
+                                                        @if ($familleLigne)
+                                                            <span class="text-muted small">{{ $familleLigne->libelle() }}</span>
+                                                            <span class="text-muted">/</span>
+                                                        @endif
+                                                        <span class="fw-medium">{{ $compteLigne->intitule }}</span>
+                                                    </div>
+                                                @else
+                                                    <span class="form-control-plaintext">—</span>
+                                                @endif
                                             @else
                                                 <livewire:compte-autocomplete
                                                     :key="'sc-tx-'.$index.'-'.($usageFilter ?? 'all')"
