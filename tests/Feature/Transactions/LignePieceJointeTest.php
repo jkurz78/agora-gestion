@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Livewire\TransactionForm;
 use App\Models\Association;
 use App\Models\Compte;
+use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Tenant\TenantContext;
@@ -22,9 +23,14 @@ beforeEach(function () {
     session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
 
+    $this->tiers = Tiers::factory()->create([
+        'association_id' => $this->association->id,
+    ]);
+
     $this->tx = Transaction::factory()->asDepense()->create([
         'association_id' => $this->association->id,
         'date' => '2025-10-01',
+        'tiers_id' => $this->tiers->id,
     ]);
     // Prendre la première ligne créée par la factory
     $this->ligne = $this->tx->lignes()->first();
@@ -157,6 +163,7 @@ it('persiste la PJ de ligne lors du create', function () {
         ->set('date', '2025-10-01')
         ->set('libelle', 'Test create PJ ligne')
         ->set('mode_paiement', 'virement')
+        ->set('tiers_id', $this->tiers->id)
         ->set('lignes.0.compte_id', (string) $compteVentilation->id)
         ->set('lignes.0.montant', '50')
         ->set('lignes.0.notes', 'recu-achat')

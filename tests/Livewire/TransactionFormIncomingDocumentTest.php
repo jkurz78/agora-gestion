@@ -8,6 +8,7 @@ use App\Models\Association;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\IncomingDocument;
+use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Tenant\TenantContext;
@@ -173,6 +174,7 @@ it('save transfère le fichier inbox vers transactions/{tid} et supprime l\'Inco
     ]);
 
     $compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $doc = createInboxDocument('FAKE PDF BYTES');
     $incomingFullPath = $doc->incomingFullPath();
 
@@ -181,6 +183,7 @@ it('save transfère le fichier inbox vers transactions/{tid} et supprime l\'Inco
         ->set('date', '2025-11-22')
         ->set('mode_paiement', 'virement')
         ->set('compte_id', $compte->id)
+        ->set('tiers_id', $tiers->id)
         ->call('save')
         ->assertHasNoErrors();
 
@@ -270,6 +273,7 @@ it('save flash un warning et crée la dépense sans justificatif si le fichier i
     ]);
 
     $compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $doc = createInboxDocument();
 
     // Simuler la disparition du fichier entre le dispatch et le save
@@ -282,6 +286,7 @@ it('save flash un warning et crée la dépense sans justificatif si le fichier i
         ->set('date', '2025-11-22')
         ->set('mode_paiement', 'virement')
         ->set('compte_id', $compte->id)
+        ->set('tiers_id', $tiers->id)
         ->call('save')
         ->assertHasNoErrors();
 

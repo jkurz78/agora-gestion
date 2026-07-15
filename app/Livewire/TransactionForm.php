@@ -578,7 +578,11 @@ final class TransactionForm extends Component
                     'nullable',
                     'in:virement,cheque,especes,cb,prelevement',
                 ],
-                'tiers_id' => ['nullable', 'exists:tiers,id'],
+                // Tiers obligatoire : toute recette/dépense génère sa contrepartie
+                // via le compte de tiers (411 client / 401 fournisseur), qui porte
+                // le tiers. Sans tiers, EcritureGenerator ne peut pas équilibrer
+                // l'écriture — la transaction resterait déséquilibrée (equilibree=false).
+                'tiers_id' => ['required', 'exists:tiers,id'],
                 'compte_id' => ['nullable', 'exists:comptes_bancaires,id'],
                 'lignes' => ['required', 'array', 'min:1'],
                 // DC-10a : ventilation compte-first (classe 6/7 via le sélecteur).
@@ -592,6 +596,7 @@ final class TransactionForm extends Component
                 [
                     'date.after_or_equal' => 'La date doit être dans l\'exercice en cours (à partir du '.$range['start']->format('d/m/Y').').',
                     'date.before_or_equal' => 'La date doit être dans l\'exercice en cours (jusqu\'au '.$range['end']->format('d/m/Y').').',
+                    'tiers_id.required' => 'Un tiers est obligatoire : il porte la contrepartie comptable de l\'écriture.',
                 ],
                 MontantValidation::messages(['lignes.*.montant'])
             )

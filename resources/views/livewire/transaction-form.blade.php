@@ -156,7 +156,7 @@
                         </div>
                         <div class="col-md-2">
                             <label class="form-label">
-                                Tiers
+                                Tiers <span class="text-danger">*</span>
                                 @if ($isLockedByHelloAsso || $isExtourneMiroir) <i class="bi bi-lock text-warning" title="Champ verrouillé"></i> @endif
                             </label>
                             @if ($isLockedByHelloAsso || $isExtourneMiroir)

@@ -27,6 +27,7 @@ beforeEach(function () {
 
     $this->compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
     $this->compteRecette = Compte::factory()->numero('706')->create();
+    $this->tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
 });
 
 afterEach(fn () => TenantContext::clear());
@@ -39,6 +40,7 @@ test('une recette accepte une PJ header au save', function () {
         ->set('date', '2025-10-15')
         ->set('mode_paiement', 'cheque')
         ->set('compte_id', $this->compte->id)
+        ->set('tiers_id', $this->tiers->id)
         ->set('lignes.0.compte_id', (string) $this->compteRecette->id)
         ->set('lignes.0.montant', '100.00')
         ->set('pieceJointe', UploadedFile::fake()->create('justificatif.pdf', 100, 'application/pdf'))

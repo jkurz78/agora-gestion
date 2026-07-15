@@ -6,6 +6,7 @@ use App\Livewire\TransactionForm;
 use App\Models\Association;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
+use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Tenant\TenantContext;
@@ -80,12 +81,14 @@ it('rejects save when a source field (compte_id) is modified on HelloAsso transa
 });
 
 it('allows editing notes on HelloAsso transaction', function () {
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $tx = Transaction::factory()->create([
         'association_id' => $this->association->id,
         'compte_id' => $this->compteHelloasso->id,
         'helloasso_order_id' => 12345,
         'notes' => 'ancienne note',
         'date' => '2025-10-01',
+        'tiers_id' => $tiers->id,
     ]);
 
     // DC-10a : l'hydratation du formulaire lit compte_id (classe 6/7 via

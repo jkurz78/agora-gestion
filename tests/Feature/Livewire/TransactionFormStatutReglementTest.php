@@ -20,8 +20,10 @@ use App\Livewire\TransactionForm;
 use App\Models\Association;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
+use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
@@ -37,12 +39,21 @@ beforeEach(function () {
     session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
 
+    // Comptes système (411, 401, 512X…) : nécessaires à la génération PD dès
+    // qu'un tiers est présent (le tiers est désormais obligatoire).
+    SystemeSeeder::seed();
+
     // Compte bancaire utilisé dans les formulaires
     $this->compte = CompteBancaire::factory()->create([
         'association_id' => $this->association->id,
     ]);
 
     $this->compteRecette = Compte::factory()->numero('706')->create();
+
+    // Tiers obligatoire pour toute recette/dépense (porte la contrepartie 411/401).
+    $this->tiers = Tiers::factory()->create([
+        'association_id' => $this->association->id,
+    ]);
 });
 
 afterEach(function () {
@@ -69,8 +80,10 @@ it('[QF-B] une recette comptant (paiementRecu=true) est créée avec statut_regl
         ->set('date', dateExercice())
         ->set('libelle', 'Cotisation annuelle')
         ->set('paiementRecu', true)
-        ->set('mode_paiement', 'cheque')
+        // virement → 512X → statut dérivé Recu (un chèque irait en 5112 → EnMain).
+        ->set('mode_paiement', 'virement')
         ->set('compte_id', $this->compte->id)
+        ->set('tiers_id', $this->tiers->id)
         ->set('lignes', [[
             'compte_id' => (string) $this->compteRecette->id,
             'operation_id' => '',
@@ -82,10 +95,9 @@ it('[QF-B] une recette comptant (paiementRecu=true) est créée avec statut_regl
         ]])
         ->call('save');
 
-    // Récupérer la transaction créée dans ce tenant
+    // Récupérer la T1 opérationnelle (le libellé distingue de la T2 d'encaissement).
     $tx = Transaction::where('association_id', $this->association->id)
-        ->where('type', 'recette')
-        ->latest('id')
+        ->where('libelle', 'Cotisation annuelle')
         ->firstOrFail();
 
     expect($tx->statut_reglement)->toBe(StatutReglement::Recu);
@@ -103,6 +115,7 @@ it('une recette créance (paiementRecu=false) est créée avec statut_reglement 
         ->set('paiementRecu', false)
         ->set('mode_paiement', '') // pas de mode pour une créance
         ->set('compte_id', $this->compte->id)
+        ->set('tiers_id', $this->tiers->id)
         ->set('lignes', [[
             'compte_id' => (string) $this->compteRecette->id,
             'operation_id' => '',
@@ -115,8 +128,7 @@ it('une recette créance (paiementRecu=false) est créée avec statut_reglement 
         ->call('save');
 
     $tx = Transaction::where('association_id', $this->association->id)
-        ->where('type', 'recette')
-        ->latest('id')
+        ->where('libelle', 'Créance à encaisser')
         ->firstOrFail();
 
     expect($tx->statut_reglement)->toBe(StatutReglement::EnAttente);
@@ -172,6 +184,7 @@ it('une recette comptant créée via TransactionForm a statut_reglement->isEncai
         ->set('paiementRecu', true)
         ->set('mode_paiement', 'virement')
         ->set('compte_id', $this->compte->id)
+        ->set('tiers_id', $this->tiers->id)
         ->set('lignes', [[
             'compte_id' => (string) $this->compteRecette->id,
             'operation_id' => '',
@@ -184,8 +197,7 @@ it('une recette comptant créée via TransactionForm a statut_reglement->isEncai
         ->call('save');
 
     $tx = Transaction::where('association_id', $this->association->id)
-        ->where('type', 'recette')
-        ->latest('id')
+        ->where('libelle', 'Recette encaissée')
         ->firstOrFail();
 
     expect($tx->statut_reglement->isEncaisse())->toBeTrue();
