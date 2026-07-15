@@ -24,7 +24,7 @@
 - [ ] Créer un devis manuel (2-3 lignes sur des comptes 7x différents), le transformer en facture
 - [ ] Créer une facture manuelle directe (invoice-first), la valider
   - [ ] La transaction générée existe, journal `vente`, équilibrée, lignes 7x + contrepartie 411 lettrable
-  - [ ] La transaction est verrouillée (montants/comptes non éditables) et **chaque ligne affiche famille / intitulé du compte** (constat R-2)
+  - [x] La transaction est verrouillée (montants/comptes non éditables) et **chaque ligne affiche famille / intitulé du compte** (constat R-2) — *vérifié in-app 2026-07-15 sur tx 2025-2026:00046 (Claude, navigateur)*
   - [ ] La facture apparaît en créance à recevoir
 - [ ] Encaisser la facture (virement) depuis la fiche facture
   - [ ] T2 générée (512X débit / 411 crédit), lettrage 411 fermé, `statut_reglement` passe à reçu/pointé
@@ -76,9 +76,9 @@
 
 - [ ] Créer un compte 7x avec un préfixe nouveau → famille orpheline auto-créée (nom = code)
 - [ ] Renommer la famille depuis l'en-tête de groupe
-- [ ] **Renuméroter un compte vierge** (clic sur le numéro — constat R-1)
-  - [ ] Refus si numéro en doublon, si changement de classe (7x→6x), si minuscules
-  - [ ] Le compte porteur d'écritures et le compte système restent non renumérables (pas de curseur d'édition)
+- [x] **Renuméroter un compte vierge** (clic sur le numéro — constat R-1) — *vérifié in-app 2026-07-15 : 706Z→706Y→706Z, famille inchangée, base contrôlée en SQL (Claude, navigateur)*
+  - [x] Refus si numéro en doublon, si changement de classe (7x→6x) — *vérifié in-app : messages « Ce numéro de compte existe déjà. » et « Le numéro doit rester en classe 7. », base intacte. Minuscules non testables via l'UI (uppercase automatique côté client), couvert par test Livewire*
+  - [x] Le compte porteur d'écritures et le compte système restent non renumérables (pas de curseur d'édition) — *vérifié in-app : clic sur 706B (66 écritures) inerte, 681 badgé système sans action*
 - [ ] Supprimer un compte propre ✅ / tenter la suppression d'un compte utilisé → refus explicite
 - [ ] Créer un compte à la volée depuis l'autocomplete d'une saisie (modale) → numéro requis, famille OK
 - [ ] Paramètres → Usages comptables : déplacer un usage (ex. FraisKm) vers un autre compte, vérifier l'effet sur le wizard km
@@ -121,3 +121,6 @@
 |---|------|------|---------|--------|--------|
 | R-1 | 2026-07-15 | 5 | Numéro de compte non modifiable même sans écriture (écart design D3) | ✅ Corrigé | `792c9fed` |
 | R-2 | 2026-07-15 | 1 | Transaction verrouillée par facture : compte affiché sans famille (tx 2025-2026:00046) | ✅ Corrigé | `d0bcd3c3` |
+| R-3 | 2026-07-15 | 5 | Après un refus de renumérotation, la cellule affichait la valeur refusée (état Alpine local) — l'utilisateur croyait la modification acceptée. Découvert lors de la vérification in-app | ✅ Corrigé | `ca8639b6` |
+| N-1 | 2026-07-15 | 5 | Note (pas un bug) : familles « 68 — 68 » et « 78 — 78 » jamais nommées (orphelines auto-créées) — à renommer via l'édition d'en-tête de groupe | 📝 À faire (choix de libellé utilisateur) | — |
+| N-2 | 2026-07-15 | 5 | Note UX mineure : le message de refus s'affiche en haut du composant — hors viewport quand on est scrollé en bas d'un long plan comptable. Piste : toast ou scroll-to-alert | 📋 Parqué | — |
