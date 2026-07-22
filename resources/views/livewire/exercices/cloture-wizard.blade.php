@@ -247,11 +247,52 @@
         </div>
         @if ($step === 3)
             <div class="card-body">
+                @isset($aNouveauPreview)
+                    <h6>Aperçu des à-nouveaux au {{ $aNouveauPreview->dateCible->format('d/m/Y') }}</h6>
+                    <div class="table-responsive mb-4">
+                        <table class="table table-sm align-middle">
+                            <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
+                                <tr>
+                                    <th>Compte</th>
+                                    <th>Libellé / tiers</th>
+                                    <th class="text-end">Débit</th>
+                                    <th class="text-end">Crédit</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($aNouveauPreview->lignes as $ligne)
+                                    <tr>
+                                        <td class="text-nowrap">{{ $ligne['numero_pcg'] }}</td>
+                                        <td>
+                                            {{ $ligne['libelle'] }}
+                                            @if ($ligne['tiers_id'] !== null)
+                                                <span class="d-block small text-muted">
+                                                    Tiers : {{ $aNouveauTiers[$ligne['tiers_id']] ?? '#'.$ligne['tiers_id'] }}
+                                                </span>
+                                            @endif
+                                        </td>
+                                        <td class="text-end">{{ $ligne['debit'] !== '0.00' ? number_format((float) $ligne['debit'], 2, ',', ' ') : '—' }}</td>
+                                        <td class="text-end">{{ $ligne['credit'] !== '0.00' ? number_format((float) $ligne['credit'], 2, ',', ' ') : '—' }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                            <tfoot class="fw-bold">
+                                <tr>
+                                    <td colspan="2">Totaux</td>
+                                    <td class="text-end">{{ number_format((float) $aNouveauPreview->totalDebit, 2, ',', ' ') }}</td>
+                                    <td class="text-end">{{ number_format((float) $aNouveauPreview->totalCredit, 2, ',', ' ') }}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                @endisset
+
                 <div class="alert alert-warning">
                     <i class="bi bi-exclamation-triangle me-1"></i>
                     <strong>Conséquences de la clôture :</strong>
                     <ul class="mb-0 mt-1">
                         <li>L'exercice sera marqué comme clôturé</li>
+                        <li>Une pièce équilibrée sera créée dans le journal des à-nouveaux au premier jour de l'exercice suivant</li>
                         <li>Aucune modification possible sur les transactions et virements</li>
                         <li>Possibilité de réouvrir si nécessaire</li>
                     </ul>
@@ -259,10 +300,29 @@
 
                 <div class="d-flex justify-content-between mt-3">
                     <button class="btn btn-outline-secondary" wire:click="goToStep(2)"><i class="bi bi-arrow-left"></i> Retour</button>
-                    <button class="btn btn-danger" wire:click="cloturer"
-                            wire:confirm="Êtes-vous sûr de vouloir clôturer l'exercice {{ $exerciceLabel }} ?">
+                    <button class="btn btn-danger" type="button" data-bs-toggle="modal" data-bs-target="#confirmerClotureModal">
                         <i class="bi bi-lock"></i> Clôturer l'exercice {{ $exerciceLabel }}
                     </button>
+                </div>
+            </div>
+
+            <div wire:ignore.self class="modal fade" id="confirmerClotureModal" tabindex="-1" aria-labelledby="confirmerClotureLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="confirmerClotureLabel">Confirmer la clôture</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                        </div>
+                        <div class="modal-body">
+                            Clôturer l'exercice {{ $exerciceLabel }} et générer sa pièce d'à-nouveaux ?
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+                            <button type="button" class="btn btn-danger" wire:click="cloturer" data-bs-dismiss="modal">
+                                <i class="bi bi-lock me-1"></i> Confirmer la clôture
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         @endif

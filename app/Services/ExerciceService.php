@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\OrigineANouveau;
 use App\Enums\StatutExercice;
 use App\Enums\TypeActionExercice;
 use App\Exceptions\ExerciceCloturedException;
 use App\Models\Exercice;
 use App\Models\ExerciceAction;
 use App\Models\User;
+use App\Services\Compta\ANouveau\ANouveauPreviewBuilder;
+use App\Services\Compta\ANouveau\ANouveauService;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
@@ -132,6 +135,24 @@ final class ExerciceService
     public function cloturer(Exercice $exercice, User $user): void
     {
         DB::transaction(function () use ($exercice, $user): void {
+            if (config('compta.use_partie_double')) {
+                $exerciceCible = Exercice::query()
+                    ->where('annee', (int) $exercice->annee + 1)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($exerciceCible?->isCloture()) {
+                    throw new \RuntimeException('Impossible de générer les à-nouveaux : l’exercice cible est clôturé.');
+                }
+
+                $preview = app(ANouveauPreviewBuilder::class)->build((int) $exercice->annee);
+                app(ANouveauService::class)->persister(
+                    $preview,
+                    OrigineANouveau::Cloture,
+                    $user,
+                );
+            }
+
             $exercice->update([
                 'statut' => StatutExercice::Cloture,
                 'date_cloture' => now(),
@@ -152,6 +173,10 @@ final class ExerciceService
     public function reouvrir(Exercice $exercice, User $user, string $commentaire): void
     {
         DB::transaction(function () use ($exercice, $user, $commentaire): void {
+            if (config('compta.use_partie_double')) {
+                app(ANouveauService::class)->invalider($exercice, $user, $commentaire);
+            }
+
             $exercice->update([
                 'statut' => StatutExercice::Ouvert,
                 'date_cloture' => null,

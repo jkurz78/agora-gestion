@@ -22,6 +22,7 @@
             <p class="mt-3 mb-1"><strong>Conséquences de la réouverture :</strong></p>
             <ul class="mb-0">
                 <li>Les modifications sur les transactions et virements redeviennent possibles</li>
+                <li>La pièce d’à-nouveaux sera invalidée immédiatement et conservée dans la piste d’audit</li>
                 <li>Les documents de clôture éventuellement édités peuvent ne plus être valides</li>
                 <li>Cette action sera enregistrée dans la piste d'audit de l'exercice</li>
             </ul>
@@ -44,12 +45,33 @@
         <div class="mb-4">
             <button
                 class="btn btn-danger"
-                wire:click="reouvrir"
-                wire:confirm="Êtes-vous sûr de vouloir réouvrir l'exercice {{ $exercice->label() }} ? Cette action sera enregistrée dans l'audit."
+                type="button"
+                data-bs-toggle="modal"
+                data-bs-target="#confirmerReouvertureModal"
             >
                 <i class="bi bi-unlock me-1"></i>
                 Réouvrir l'exercice {{ $exercice->label() }}
             </button>
+        </div>
+
+        <div wire:ignore.self class="modal fade" id="confirmerReouvertureModal" tabindex="-1" aria-labelledby="confirmerReouvertureLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="confirmerReouvertureLabel">Confirmer la réouverture</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                    </div>
+                    <div class="modal-body">
+                        Réouvrir l'exercice {{ $exercice->label() }} et invalider sa pièce d'à-nouveaux ?
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+                        <button type="button" class="btn btn-danger" wire:click="reouvrir" data-bs-dismiss="modal">
+                            <i class="bi bi-unlock me-1"></i> Confirmer la réouverture
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     @endif
 
