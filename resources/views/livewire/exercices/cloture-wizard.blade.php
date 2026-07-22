@@ -6,6 +6,20 @@
         </div>
     @endif
 
+    @php
+        $controleOuverture = collect($checkResult->bloquants)
+            ->first(fn ($check) => $check->nom === 'Soldes d’ouverture');
+    @endphp
+    @if ($controleOuverture && ! $controleOuverture->ok)
+        <div class="alert alert-danger d-flex align-items-start gap-2" role="alert">
+            <i class="bi bi-exclamation-octagon-fill"></i>
+            <div>
+                <strong>Soldes d’ouverture indisponibles</strong>
+                <div class="small">Reclôturez l’exercice précédent avant de clôturer celui-ci.</div>
+            </div>
+        </div>
+    @endif
+
     <h4 class="mb-3">Clôture de l'exercice {{ $exerciceLabel }}</h4>
 
     {{-- Step 1: Contrôles pré-clôture --}}

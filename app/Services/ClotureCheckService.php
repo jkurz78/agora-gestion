@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Enums\JournalComptable;
 use App\Enums\StatutRapprochement;
+use App\Models\ANouveauGeneration;
 use App\Models\BudgetLine;
 use App\Models\CompteBancaire;
 use App\Models\Exercice;
@@ -31,6 +32,7 @@ final class ClotureCheckService
 
         return new ClotureCheckResult(
             bloquants: [
+                $this->checkOuverturePrecedente($annee),
                 $this->checkRapprochementsEnCours($start, $end),
                 $this->checkLignesSansCompte($annee),
                 $this->checkVirementsDesequilibres($start, $end),
@@ -43,6 +45,38 @@ final class ClotureCheckService
                 $this->checkMouvementsExerciceCible($annee),
             ],
             soldesComptes: $this->calculerSoldesComptes($annee),
+        );
+    }
+
+    public function checkOuverturePrecedente(int $annee): CheckItem
+    {
+        if (! config('compta.use_partie_double')) {
+            return new CheckItem(
+                'Soldes d’ouverture',
+                true,
+                'Contrôle des soldes d’ouverture non requis en mode comptable historique',
+            );
+        }
+
+        $precedent = Exercice::query()->where('annee', $annee - 1)->first();
+        if ($precedent === null) {
+            return new CheckItem(
+                'Soldes d’ouverture',
+                true,
+                'Aucun exercice précédent enregistré',
+            );
+        }
+
+        $generationActive = ANouveauGeneration::activePourCible($annee);
+        $disponibles = $precedent->isCloture() && $generationActive !== null;
+
+        return new CheckItem(
+            nom: 'Soldes d’ouverture',
+            ok: $disponibles,
+            message: $disponibles
+                ? 'Les soldes d’ouverture sont disponibles'
+                : 'Soldes d’ouverture indisponibles : reclôturez l’exercice '
+                    .$this->exerciceService->label($annee - 1).' pour régénérer ses à-nouveaux',
         );
     }
 

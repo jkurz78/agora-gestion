@@ -10,6 +10,10 @@
     $exerciceLabel   = $exerciceService->label($exerciceActif);
     $exerciceModel   = $exerciceService->exerciceAffiche();
     $exerciceCloture = $exerciceModel?->isCloture() ?? false;
+    $routeComptable  = request()->routeIs('comptabilite.*', 'rapports.*', 'exercices.*');
+    $controleOuverture = $routeComptable
+        ? app(\App\Services\ClotureCheckService::class)->checkOuverturePrecedente($exerciceActif)
+        : null;
 @endphp
 <!DOCTYPE html>
 <html lang="fr">
@@ -331,6 +335,13 @@
             {{-- Bandeau HelloAsso (sous le header, pleine largeur) --}}
             <livewire:helloasso-notification-banner />
             @include('partials.integrity-alert')
+            @if ($controleOuverture && ! $controleOuverture->ok)
+                <div class="alert alert-danger rounded-0 border-start-0 border-end-0 mb-0 py-2 px-3" role="alert">
+                    <i class="bi bi-exclamation-octagon-fill me-1"></i>
+                    <strong>Soldes d’ouverture indisponibles.</strong>
+                    Reclôturez l’exercice précédent pour régénérer ses à-nouveaux.
+                </div>
+            @endif
 
             {{-- Contenu --}}
             <div class="container-fluid px-4 py-3 pb-5">
