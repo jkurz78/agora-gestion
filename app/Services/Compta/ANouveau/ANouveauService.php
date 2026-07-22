@@ -36,12 +36,14 @@ final class ANouveauService
         return DB::transaction(function () use ($preview, $origine, $acteur): ANouveauGeneration {
             $this->verrouillerTenant();
 
-            Exercice::query()
+            $exerciceSource = Exercice::query()
                 ->where('annee', $preview->exerciceSource)
                 ->lockForUpdate()
-                ->firstOr(function (): never {
-                    throw new ANouveauInvalideException('L’exercice source des à-nouveaux est introuvable.');
-                });
+                ->first();
+
+            if ($exerciceSource === null && $origine !== OrigineANouveau::RepriseInitiale) {
+                throw new ANouveauInvalideException('L’exercice source des à-nouveaux est introuvable.');
+            }
 
             $existante = ANouveauGeneration::query()
                 ->where('exercice_cible', $preview->exerciceCible)
