@@ -111,6 +111,7 @@ final class RapprochementBancaireService
 
             if (! empty($transactionIds)) {
                 Transaction::whereIn('id', $transactionIds)
+                    ->where('journal', '!=', JournalComptable::AN->value)
                     ->update([
                         'rapprochement_id' => $rapprochement->id,
                         'statut_reglement' => StatutReglement::Pointe->value,
@@ -153,6 +154,7 @@ final class RapprochementBancaireService
                 $mouvement = (float) TransactionLigne::where('transaction_lignes.compte_id', $compte512X->id)
                     ->join('transactions', 'transactions.id', '=', 'transaction_lignes.transaction_id')
                     ->where('transactions.rapprochement_id', $rapprochement->id)
+                    ->where('transactions.journal', '!=', JournalComptable::AN->value)
                     ->selectRaw('SUM(transaction_lignes.debit) - SUM(transaction_lignes.credit) as net')
                     ->value('net');
 
@@ -179,6 +181,7 @@ final class RapprochementBancaireService
             // remisés réels (prod) ont reference = NULL, ce qui faisait rater l'exclusion par l'ancien
             // critère `reference IS NOT NULL` → double-comptage T1 + T4 (Finding 2, cutover 2026-05-31).
             $solde += (float) Transaction::where('rapprochement_id', $rapprochement->id)
+                ->where('journal', '!=', JournalComptable::AN->value)
                 ->whereNot(function (Builder $q): void {
                     $q->whereNotNull('remise_id')
                         ->whereDoesntHave('lignes', fn (Builder $l): Builder => $l
@@ -242,6 +245,9 @@ final class RapprochementBancaireService
                 'depense', 'recette' => Transaction::findOrFail($id),
                 default => throw new \InvalidArgumentException("Type de transaction inconnu : {$type}"),
             };
+            if ($model->journal === JournalComptable::AN) {
+                throw new \InvalidArgumentException('Une écriture d’à-nouveaux ne peut pas être pointée.');
+            }
             $appartientAuCompte = (int) $model->compte_id === (int) $rapprochement->compte_id;
 
             if (! $appartientAuCompte && config('compta.use_partie_double')) {

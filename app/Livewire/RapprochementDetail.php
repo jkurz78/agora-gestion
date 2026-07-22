@@ -194,6 +194,7 @@ final class RapprochementDetail extends Component
         $usePdFilter = config('compta.use_partie_double') && $compte512X !== null;
 
         $txRows = Transaction::query()
+            ->where('journal', '!=', JournalComptable::AN->value)
             ->when(
                 $usePdFilter,
                 fn ($q) => $q->where(function ($w) use ($compte512X, $compte) {
