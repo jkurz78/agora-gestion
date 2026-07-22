@@ -20,6 +20,7 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\VirementInterne;
+use App\Services\Compta\ANouveau\PosteReporteResolver;
 use App\Services\NumeroPieceService;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
@@ -54,7 +55,10 @@ use Illuminate\Support\Str;
  */
 final class EcritureGenerator
 {
-    public function __construct(private readonly LettrageService $lettrageService) {}
+    public function __construct(
+        private readonly LettrageService $lettrageService,
+        private readonly PosteReporteResolver $posteReporteResolver,
+    ) {}
 
     // =========================================================================
     // Invariants partagés (publics en Step 14 — voir note de visibilité ci-dessus)
@@ -826,15 +830,20 @@ final class EcritureGenerator
         // --- Résolution ligne 411 source dans T1 (toujours depuis la DB pour avoir l'état frais) ---
         // On requête directement la DB pour garantir que lettrage_code est à jour
         // (la relation en mémoire sur $transactionCreance peut être stale si mise à jour depuis l'extérieur).
-        $ligne411Source = TransactionLigne::where('transaction_id', $transactionCreance->id)
+        $ligne411Origine = TransactionLigne::where('transaction_id', $transactionCreance->id)
             ->where('compte_id', $compte411->id)
             ->first();
 
-        if ($ligne411Source === null || $ligne411Source->tiers_id === null) {
+        if ($ligne411Origine === null || $ligne411Origine->tiers_id === null) {
             throw new \InvalidArgumentException(
                 "La transaction #{$transactionCreance->id} ne contient pas de ligne 411 avec un tiers — ce n'est pas une créance valide."
             );
         }
+
+        $ligne411Source = $this->posteReporteResolver->depuisLigne(
+            $ligne411Origine,
+            Carbon::instance($datePaiement),
+        );
 
         // --- Refus si ligne 411 source déjà lettrée (créance déjà encaissée) ---
         if ($ligne411Source->lettrage_code !== null) {
@@ -1092,15 +1101,20 @@ final class EcritureGenerator
         $compte401 = Compte::ofNumeroSysteme('401');
 
         // --- Résolution ligne 401 source dans T1 (DB fraîche pour lettrage_code à jour) ---
-        $ligne401Source = TransactionLigne::where('transaction_id', $transactionDette->id)
+        $ligne401Origine = TransactionLigne::where('transaction_id', $transactionDette->id)
             ->where('compte_id', $compte401->id)
             ->first();
 
-        if ($ligne401Source === null || $ligne401Source->tiers_id === null) {
+        if ($ligne401Origine === null || $ligne401Origine->tiers_id === null) {
             throw new \InvalidArgumentException(
                 "La transaction #{$transactionDette->id} ne contient pas de ligne 401 avec un tiers — ce n'est pas une dette fournisseur valide."
             );
         }
+
+        $ligne401Source = $this->posteReporteResolver->depuisLigne(
+            $ligne401Origine,
+            Carbon::instance($datePaiement),
+        );
 
         // --- Refus si ligne 401 source déjà lettrée (dette déjà réglée) ---
         if ($ligne401Source->lettrage_code !== null) {
@@ -1205,13 +1219,12 @@ final class EcritureGenerator
         ?string $libelle = null,
     ): Transaction {
         // --- Trouver la ligne tiers ouverte (411 ou 401, non lettrée, avec tiers) ---
-        $ligneTiersSource = TransactionLigne::where('transaction_id', (int) $t1->id)
-            ->whereNull('lettrage_code')
-            ->whereNotNull('tiers_id')
-            ->whereHas('compte', fn ($q) => $q->whereIn('numero_pcg', ['411', '401']))
-            ->first();
+        $ligneTiersSource = $this->posteReporteResolver->pourTransaction(
+            $t1,
+            Carbon::instance($datePaiement),
+        );
 
-        if ($ligneTiersSource === null) {
+        if ($ligneTiersSource === null || $ligneTiersSource->lettrage_code !== null) {
             throw new \InvalidArgumentException(
                 "La transaction #{$t1->id} ne contient pas de ligne tiers (411/401) ouverte — pas de règlement possible."
             );

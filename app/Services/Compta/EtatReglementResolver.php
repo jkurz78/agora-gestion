@@ -7,6 +7,7 @@ namespace App\Services\Compta;
 use App\Enums\StatutReglement;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Services\Compta\ANouveau\PosteReporteResolver;
 use App\Services\ReglementOperationService;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -27,6 +28,7 @@ final class EtatReglementResolver
 {
     public function __construct(
         private readonly ReglementOperationService $reglementService,
+        private readonly PosteReporteResolver $posteReporteResolver,
     ) {}
 
     public function resolve(Transaction $t1): StatutReglement
@@ -41,9 +43,7 @@ final class EtatReglementResolver
         // Recherche directe de la ligne tiers (411 ou 401) — agnostique au type.
         // Fonctionne pour recettes normales (411 D), dépenses normales (401 C),
         // et miroirs extourne (411 C ou 401 D — inversés).
-        $ligneTiers = TransactionLigne::where('transaction_id', (int) $t1->id)
-            ->whereHas('compte', fn ($q) => $q->whereIn('numero_pcg', ['411', '401']))
-            ->first();
+        $ligneTiers = $this->posteReporteResolver->dernierePourTransaction($t1);
 
         if ($ligneTiers === null) {
             return $t1->statut_reglement; // legacy/HelloAsso : pas de ligne PD

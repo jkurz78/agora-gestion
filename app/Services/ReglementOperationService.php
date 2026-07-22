@@ -16,6 +16,7 @@ use App\Models\Seance;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Services\Compta\ANouveau\PosteReporteResolver;
 use App\Services\Compta\CompteTresorerieResolver;
 use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\EtatReglementResolver;
@@ -42,6 +43,7 @@ final class ReglementOperationService
     public function __construct(
         private readonly EcritureGenerator $ecritureGenerator,
         private readonly NumeroPieceService $numeroPiece,
+        private readonly PosteReporteResolver $posteReporteResolver,
     ) {}
 
     /**
@@ -266,13 +268,9 @@ final class ReglementOperationService
         }
 
         // Trouver la ligne tiers ouverte (411 ou 401, non lettrée, avec tiers)
-        $ligneTiers = TransactionLigne::where('transaction_id', (int) $transaction->id)
-            ->whereNull('lettrage_code')
-            ->whereNotNull('tiers_id')
-            ->whereHas('compte', fn ($q) => $q->whereIn('numero_pcg', ['411', '401']))
-            ->first();
+        $ligneTiers = $this->posteReporteResolver->dernierePourTransaction($transaction);
 
-        if ($ligneTiers === null) {
+        if ($ligneTiers === null || $ligneTiers->lettrage_code !== null) {
             Log::info('[PartieDouble][ReglementOperationService] — skip reglerOuEncaisser : pas de ligne tiers ouverte (legacy ou déjà lettrée)', [
                 'transaction_id' => (int) $transaction->id,
             ]);
@@ -294,11 +292,16 @@ final class ReglementOperationService
             return;
         }
 
+        $datePaiement = $transaction->date;
+        if ((int) $ligneTiers->transaction_id !== (int) $transaction->id) {
+            $datePaiement = $ligneTiers->transaction()->firstOrFail()->date;
+        }
+
         $this->ecritureGenerator->pourReglement(
             t1: $transaction,
             mode: $mode,
             compteTresorerie: $compteTresorerie,
-            datePaiement: $transaction->date,
+            datePaiement: $datePaiement,
         );
     }
 
@@ -363,19 +366,18 @@ final class ReglementOperationService
             return null;
         }
 
-        $ligne411T1 = TransactionLigne::where('transaction_id', (int) $t1->id)
-            ->where('compte_id', (int) $compte411->id)
-            ->whereNotNull('lettrage_code')
-            ->first();
+        $ligne411T1 = $this->posteReporteResolver->dernierePourTransaction($t1);
 
-        if ($ligne411T1 === null) {
+        if ($ligne411T1 === null
+            || (int) $ligne411T1->compte_id !== (int) $compte411->id
+            || $ligne411T1->lettrage_code === null) {
             return null; // Pas encore lettré → pas de T2
         }
 
         // Chercher la ligne 411 partageant le même code sur une AUTRE transaction
         $ligne411T2 = TransactionLigne::where('lettrage_code', $ligne411T1->lettrage_code)
             ->where('compte_id', (int) $compte411->id)
-            ->where('transaction_id', '!=', (int) $t1->id)
+            ->where('transaction_id', '!=', (int) $ligne411T1->transaction_id)
             ->first();
 
         if ($ligne411T2 === null) {
@@ -402,19 +404,18 @@ final class ReglementOperationService
             return null;
         }
 
-        $ligne401T1 = TransactionLigne::where('transaction_id', (int) $t1->id)
-            ->where('compte_id', (int) $compte401->id)
-            ->whereNotNull('lettrage_code')
-            ->first();
+        $ligne401T1 = $this->posteReporteResolver->dernierePourTransaction($t1);
 
-        if ($ligne401T1 === null) {
+        if ($ligne401T1 === null
+            || (int) $ligne401T1->compte_id !== (int) $compte401->id
+            || $ligne401T1->lettrage_code === null) {
             return null; // Pas encore lettré → pas de T2
         }
 
         // Chercher la ligne 401 partageant le même code sur une AUTRE transaction
         $ligne401T2 = TransactionLigne::where('lettrage_code', $ligne401T1->lettrage_code)
             ->where('compte_id', (int) $compte401->id)
-            ->where('transaction_id', '!=', (int) $t1->id)
+            ->where('transaction_id', '!=', (int) $ligne401T1->transaction_id)
             ->first();
 
         if ($ligne401T2 === null) {
@@ -436,18 +437,15 @@ final class ReglementOperationService
      */
     public function trouverT2(Transaction $t1): ?Transaction
     {
-        $ligneTiers = TransactionLigne::where('transaction_id', (int) $t1->id)
-            ->whereNotNull('lettrage_code')
-            ->whereHas('compte', fn ($q) => $q->whereIn('numero_pcg', ['411', '401']))
-            ->first();
+        $ligneTiers = $this->posteReporteResolver->dernierePourTransaction($t1);
 
-        if ($ligneTiers === null) {
+        if ($ligneTiers === null || $ligneTiers->lettrage_code === null) {
             return null;
         }
 
         $ligneT2 = TransactionLigne::where('lettrage_code', $ligneTiers->lettrage_code)
             ->where('compte_id', (int) $ligneTiers->compte_id)
-            ->where('transaction_id', '!=', (int) $t1->id)
+            ->where('transaction_id', '!=', (int) $ligneTiers->transaction_id)
             ->first();
 
         return $ligneT2 !== null ? Transaction::find($ligneT2->transaction_id) : null;
