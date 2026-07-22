@@ -43,7 +43,7 @@ final class EtatReglementResolver
         // Recherche directe de la ligne tiers (411 ou 401) — agnostique au type.
         // Fonctionne pour recettes normales (411 D), dépenses normales (401 C),
         // et miroirs extourne (411 C ou 401 D — inversés).
-        $ligneTiers = $this->posteReporteResolver->dernierePourTransaction($t1);
+        $ligneTiers = $this->posteReporteResolver->dernierePourTransaction($t1, exigerTiers: false);
 
         if ($ligneTiers === null) {
             return $t1->statut_reglement; // legacy/HelloAsso : pas de ligne PD

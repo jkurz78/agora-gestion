@@ -43,9 +43,11 @@ final class PosteReporteResolver
         return $origine?->ligneAN ?? $ligne;
     }
 
-    public function dernierePourTransaction(Transaction $transaction): ?TransactionLigne
-    {
-        $ligne = $this->ligneTiers($transaction);
+    public function dernierePourTransaction(
+        Transaction $transaction,
+        bool $exigerTiers = true,
+    ): ?TransactionLigne {
+        $ligne = $this->ligneTiers($transaction, $exigerTiers);
         if ($ligne === null) {
             return null;
         }
@@ -60,15 +62,19 @@ final class PosteReporteResolver
         return $origine?->ligneAN ?? $ligne;
     }
 
-    private function ligneTiers(Transaction $transaction): ?TransactionLigne
+    private function ligneTiers(Transaction $transaction, bool $exigerTiers = true): ?TransactionLigne
     {
-        return TransactionLigne::query()
+        $query = TransactionLigne::query()
             ->with('compte')
             ->where('transaction_id', (int) $transaction->id)
-            ->whereNotNull('tiers_id')
             ->whereHas('compte', fn (Builder $query) => $query->whereIn('numero_pcg', ['401', '411']))
-            ->orderBy('id')
-            ->first();
+            ->orderBy('id');
+
+        if ($exigerTiers) {
+            $query->whereNotNull('tiers_id');
+        }
+
+        return $query->first();
     }
 
     private function racineId(TransactionLigne $ligne): int

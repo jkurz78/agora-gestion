@@ -366,7 +366,7 @@ final class ReglementOperationService
             return null;
         }
 
-        $ligne411T1 = $this->posteReporteResolver->dernierePourTransaction($t1);
+        $ligne411T1 = $this->posteReporteResolver->dernierePourTransaction($t1, exigerTiers: false);
 
         if ($ligne411T1 === null
             || (int) $ligne411T1->compte_id !== (int) $compte411->id
@@ -404,7 +404,7 @@ final class ReglementOperationService
             return null;
         }
 
-        $ligne401T1 = $this->posteReporteResolver->dernierePourTransaction($t1);
+        $ligne401T1 = $this->posteReporteResolver->dernierePourTransaction($t1, exigerTiers: false);
 
         if ($ligne401T1 === null
             || (int) $ligne401T1->compte_id !== (int) $compte401->id
@@ -437,7 +437,7 @@ final class ReglementOperationService
      */
     public function trouverT2(Transaction $t1): ?Transaction
     {
-        $ligneTiers = $this->posteReporteResolver->dernierePourTransaction($t1);
+        $ligneTiers = $this->posteReporteResolver->dernierePourTransaction($t1, exigerTiers: false);
 
         if ($ligneTiers === null || $ligneTiers->lettrage_code === null) {
             return null;
