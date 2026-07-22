@@ -3,14 +3,18 @@
 declare(strict_types=1);
 
 use App\Enums\JournalComptable;
+use App\Enums\OrigineANouveau;
+use App\Enums\StatutANouveau;
 use App\Enums\StatutExercice;
 use App\Enums\TypeTransaction;
 use App\Livewire\Exercices\ClotureWizard;
+use App\Models\ANouveauGeneration;
 use App\Models\Compte;
 use App\Models\Exercice;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Services\ClotureCheckService;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\ExerciceService;
 use App\Tenant\TenantContext;
@@ -98,4 +102,35 @@ it('signale et bloque N plus 1 entre la reouverture et la recloture de N', funct
     $this->get(route('exercices.cloture'))
         ->assertOk()
         ->assertDontSee('Soldes d’ouverture indisponibles');
+});
+
+it('accepte une reprise initiale active meme si l exercice historique reste ouvert', function (): void {
+    config(['compta.use_partie_double' => true]);
+
+    $user = User::factory()->create();
+    Exercice::create(['annee' => 2024, 'statut' => StatutExercice::Ouvert]);
+    Exercice::create(['annee' => 2025, 'statut' => StatutExercice::Ouvert]);
+    $transaction = Transaction::create([
+        'type' => TypeTransaction::AN,
+        'date' => '2025-09-01',
+        'libelle' => 'Reprise initiale AN',
+        'montant_total' => '0.00',
+        'mode_paiement' => null,
+        'equilibree' => true,
+        'type_ecriture' => 'normale',
+        'journal' => JournalComptable::AN,
+    ]);
+    ANouveauGeneration::create([
+        'exercice_source' => 2024,
+        'exercice_cible' => 2025,
+        'transaction_id' => $transaction->id,
+        'origine' => OrigineANouveau::RepriseInitiale,
+        'statut' => StatutANouveau::Active,
+        'cree_par_id' => $user->id,
+    ]);
+
+    $controle = app(ClotureCheckService::class)->checkOuverturePrecedente(2025);
+
+    expect($controle->ok)->toBeTrue()
+        ->and($controle->message)->toBe('Les soldes d’ouverture sont disponibles');
 });

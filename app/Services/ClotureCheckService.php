@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\JournalComptable;
+use App\Enums\OrigineANouveau;
 use App\Enums\StatutRapprochement;
 use App\Models\ANouveauGeneration;
 use App\Models\BudgetLine;
@@ -68,7 +69,8 @@ final class ClotureCheckService
         }
 
         $generationActive = ANouveauGeneration::activePourCible($annee);
-        $disponibles = $precedent->isCloture() && $generationActive !== null;
+        $disponibles = $generationActive !== null
+            && ($precedent->isCloture() || $generationActive->origine === OrigineANouveau::RepriseInitiale);
 
         return new CheckItem(
             nom: 'Soldes d’ouverture',
