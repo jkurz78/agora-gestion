@@ -10,6 +10,7 @@ enum JournalComptable: string
     case Achat = 'achat';
     case Banque = 'banque';
     case Od = 'od';
+    case AN = 'an';
 
     public function label(): string
     {
@@ -18,6 +19,7 @@ enum JournalComptable: string
             self::Achat => 'Journal des achats',
             self::Banque => 'Journal de banque',
             self::Od => 'Journal des opérations diverses',
+            self::AN => 'Journal des à-nouveaux',
         };
     }
 }

@@ -166,6 +166,15 @@ final class SystemeSeeder
      */
     public static function seed(): void
     {
+        // Unconditional: 102 Fonds associatifs sans droit de reprise (classe 1)
+        DB::statement(self::unconditionalSql('102', 'Fonds associatifs sans droit de reprise', 1, false));
+
+        // Unconditional: 120 Résultat de l'exercice (excédent) (classe 1)
+        DB::statement(self::unconditionalSql('120', 'Résultat de l’exercice (excédent)', 1, false));
+
+        // Unconditional: 129 Résultat de l'exercice (déficit) (classe 1)
+        DB::statement(self::unconditionalSql('129', 'Résultat de l’exercice (déficit)', 1, false));
+
         // Unconditional: 411 Clients (classe 4)
         DB::statement(self::unconditionalSql('411', 'Clients', 4));
 

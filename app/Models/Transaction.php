@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
+use LogicException;
 
 final class Transaction extends TenantModel
 {
@@ -101,6 +102,7 @@ final class Transaction extends TenantModel
                 TypeTransaction::Recette => JournalComptable::Vente,
                 TypeTransaction::Depense => JournalComptable::Achat,
                 TypeTransaction::Virement => JournalComptable::Banque,
+                TypeTransaction::AN => JournalComptable::AN,
             };
         });
     }
@@ -229,6 +231,7 @@ final class Transaction extends TenantModel
         $sensNaturel = match ($this->type) {
             TypeTransaction::Recette, TypeTransaction::Virement => Sens::Recette,
             TypeTransaction::Depense => Sens::Depense,
+            TypeTransaction::AN => throw new LogicException('Une écriture AN n’a pas de sens de trésorerie opérationnel.'),
         };
 
         return $this->type_ecriture === 'extourne'

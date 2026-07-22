@@ -9,6 +9,7 @@ enum TypeTransaction: string
     case Depense = 'depense';
     case Recette = 'recette';
     case Virement = 'virement';
+    case AN = 'an';
 
     public function label(): string
     {
@@ -16,6 +17,7 @@ enum TypeTransaction: string
             self::Depense => 'Dépense',
             self::Recette => 'Recette',
             self::Virement => 'Virement',
+            self::AN => 'À-nouveau',
         };
     }
 }
