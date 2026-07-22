@@ -137,8 +137,13 @@ final class ClotureCheckService
 
     private function checkTransactionsNonPointees(string $start, string $end): CheckItem
     {
-        $count = Transaction::whereNull('rapprochement_id')
-            ->whereBetween('date', [$start, $end])
+        $count = Transaction::query()
+            ->operationnel()
+            ->whereDate('date', '>=', $start)
+            ->whereDate('date', '<=', $end)
+            ->whereDoesntHave('rapprochement', fn ($query) => $query
+                ->where('statut', StatutRapprochement::Verrouille)
+                ->whereDate('date_fin', '<=', $end))
             ->count();
 
         return new CheckItem(

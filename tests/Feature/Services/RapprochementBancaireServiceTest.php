@@ -11,6 +11,7 @@ use App\Models\Transaction;
 use App\Models\User;
 use App\Services\RapprochementBancaireService;
 use App\Tenant\TenantContext;
+use Carbon\CarbonImmutable;
 
 beforeEach(function () {
     $this->association = Association::factory()->create();
@@ -44,6 +45,30 @@ test('calculerSoldeOuverture retourne solde_fin du dernier rapprochement verroui
     ]);
     $solde = $this->service->calculerSoldeOuverture($this->compte);
     expect($solde)->toBe(1500.0);
+});
+
+test('calculerSoldeRapprochementAu ignore les rapprochements postérieurs à la date demandée', function () {
+    RapprochementBancaire::factory()->create([
+        'compte_id' => $this->compte->id,
+        'solde_fin' => 1200.00,
+        'statut' => StatutRapprochement::Verrouille,
+        'date_fin' => '2025-10-31',
+        'saisi_par' => $this->user->id,
+    ]);
+    RapprochementBancaire::factory()->create([
+        'compte_id' => $this->compte->id,
+        'solde_fin' => 1500.00,
+        'statut' => StatutRapprochement::Verrouille,
+        'date_fin' => '2026-01-31',
+        'saisi_par' => $this->user->id,
+    ]);
+
+    $solde = $this->service->calculerSoldeRapprochementAu(
+        $this->compte,
+        CarbonImmutable::parse('2025-12-31'),
+    );
+
+    expect($solde)->toBe(1200.0);
 });
 
 test('create crée un rapprochement avec le bon solde_ouverture', function () {

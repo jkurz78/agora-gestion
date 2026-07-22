@@ -66,22 +66,22 @@ final class SoldeService
 
         $entrees =
             (float) $compte->recettes()
-                ->where('date', '>=', $dateRef)
-                ->when($dateFin, fn ($query) => $query->where('date', '<=', $dateFin))
+                ->whereDate('date', '>=', $dateRef)
+                ->when($dateFin, fn ($query) => $query->whereDate('date', '<=', $dateFin))
                 ->sum('montant_total')
             + (float) VirementInterne::where('compte_destination_id', $compte->id)
-                ->where('date', '>=', $dateRef)
-                ->when($dateFin, fn ($query) => $query->where('date', '<=', $dateFin))
+                ->whereDate('date', '>=', $dateRef)
+                ->when($dateFin, fn ($query) => $query->whereDate('date', '<=', $dateFin))
                 ->sum('montant');
 
         $sorties =
             (float) $compte->depenses()
-                ->where('date', '>=', $dateRef)
-                ->when($dateFin, fn ($query) => $query->where('date', '<=', $dateFin))
+                ->whereDate('date', '>=', $dateRef)
+                ->when($dateFin, fn ($query) => $query->whereDate('date', '<=', $dateFin))
                 ->sum('montant_total')
             + (float) VirementInterne::where('compte_source_id', $compte->id)
-                ->where('date', '>=', $dateRef)
-                ->when($dateFin, fn ($query) => $query->where('date', '<=', $dateFin))
+                ->whereDate('date', '>=', $dateRef)
+                ->when($dateFin, fn ($query) => $query->whereDate('date', '<=', $dateFin))
                 ->sum('montant');
 
         return round((float) $compte->solde_initial + $entrees - $sorties, 2);

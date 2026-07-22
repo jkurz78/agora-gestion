@@ -15,6 +15,7 @@ use App\Models\TransactionLigne;
 use App\Models\VirementInterne;
 use App\Services\Compta\EtatReglementResolver;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -44,6 +45,24 @@ final class RapprochementBancaireService
     {
         $dernier = RapprochementBancaire::where('compte_id', $compte->id)
             ->where('statut', StatutRapprochement::Verrouille)
+            ->orderByDesc('date_fin')
+            ->orderByDesc('id')
+            ->first();
+
+        return $dernier ? (float) $dernier->solde_fin : (float) $compte->solde_initial;
+    }
+
+    /**
+     * Retourne le solde du dernier rapprochement verrouillé connu à une date,
+     * ou le solde initial du compte si aucun rapprochement n'existait encore.
+     */
+    public function calculerSoldeRapprochementAu(
+        CompteBancaire $compte,
+        CarbonInterface $dateLimite,
+    ): float {
+        $dernier = RapprochementBancaire::where('compte_id', $compte->id)
+            ->where('statut', StatutRapprochement::Verrouille)
+            ->whereDate('date_fin', '<=', $dateLimite->toDateString())
             ->orderByDesc('date_fin')
             ->orderByDesc('id')
             ->first();

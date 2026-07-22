@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use App\Enums\StatutExercice;
 use App\Enums\StatutRapprochement;
+use App\Enums\StatutReglement;
+use App\Enums\TypeTransaction;
 use App\Models\Association;
 use App\Models\BudgetLine;
 use App\Models\Compte;
@@ -97,6 +99,40 @@ describe('contrôles avertissement', function () {
         $result = $this->service->executer(2025);
         $avert = collect($result->avertissements)->firstWhere('nom', 'Transactions non pointées');
         expect($avert->ok)->toBeFalse();
+    });
+
+    it('transactions non pointées: respecte la date de clôture et exclut les AN', function () {
+        $compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
+        $rapprochementFutur = RapprochementBancaire::factory()->create([
+            'compte_id' => $compte->id,
+            'date_fin' => '2026-09-30',
+            'statut' => StatutRapprochement::Verrouille,
+            'saisi_par' => $this->user->id,
+        ]);
+        Transaction::factory()->asRecette()->create([
+            'date' => '2026-08-31',
+            'compte_id' => $compte->id,
+            'rapprochement_id' => $rapprochementFutur->id,
+            'statut_reglement' => StatutReglement::Pointe,
+        ]);
+        Transaction::factory()->asDepense()->create([
+            'date' => '2026-08-31',
+            'compte_id' => $compte->id,
+            'rapprochement_id' => $rapprochementFutur->id,
+            'statut_reglement' => StatutReglement::Pointe,
+        ]);
+        Transaction::factory()->create([
+            'type' => TypeTransaction::AN,
+            'date' => '2025-09-01',
+            'compte_id' => null,
+            'rapprochement_id' => null,
+        ]);
+
+        $result = $this->service->executer(2025);
+        $avert = collect($result->avertissements)->firstWhere('nom', 'Transactions non pointées');
+
+        expect($avert->ok)->toBeFalse()
+            ->and($avert->message)->toBe('2 transaction(s) non pointée(s)');
     });
 
     it('budget absent: warns when no budget lines exist', function () {

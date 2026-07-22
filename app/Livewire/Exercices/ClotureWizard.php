@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Exercices;
 
+use App\Enums\StatutRapprochement;
 use App\Models\CompteBancaire;
 use App\Models\Tiers;
 use App\Models\Transaction;
@@ -141,8 +142,11 @@ final class ClotureWizard extends Component
             $soldeOuverture = round($soldeReel - $recettesCompte + $depensesCompte - $virementsIn + $virementsOut, 2);
             $mouvements = round($recettesCompte - $depensesCompte + $virementsIn - $virementsOut, 2);
 
-            // Solde dernier rapprochement verrouillé
-            $soldeRapprochement = $rapprochementService->calculerSoldeOuverture($compte);
+            // Solde du dernier rapprochement verrouillé connu à la clôture.
+            $soldeRapprochement = $rapprochementService->calculerSoldeRapprochementAu(
+                $compte,
+                $range['end'],
+            );
 
             $comptesData[] = [
                 'nom' => $compte->nom,
@@ -169,8 +173,13 @@ final class ClotureWizard extends Component
         $resultat = round($totalRecettes - $totalDepenses, 2);
 
         // Écritures non pointées (transactions)
-        $nonPointeesTx = Transaction::whereNull('rapprochement_id')
-            ->whereBetween('date', [$start, $end])
+        $nonPointeesTx = Transaction::query()
+            ->operationnel()
+            ->whereDate('date', '>=', $start)
+            ->whereDate('date', '<=', $end)
+            ->whereDoesntHave('rapprochement', fn ($query) => $query
+                ->where('statut', StatutRapprochement::Verrouille)
+                ->whereDate('date_fin', '<=', $end))
             ->selectRaw("
                 COUNT(*) as nombre,
                 SUM(CASE WHEN type = 'recette' THEN montant_total ELSE 0 END) as total_recettes,
