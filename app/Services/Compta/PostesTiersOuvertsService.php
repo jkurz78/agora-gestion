@@ -200,12 +200,15 @@ final class PostesTiersOuvertsService
             ->whereNotNull('lettrage_code')
             ->get();
 
-        $codes = $lignesPoste
-            ->pluck('lettrage_code')
-            ->filter()
-            ->unique()
+        $clesLettrage = $lignesPoste
+            ->filter(fn (TransactionLigne $ligne): bool => $ligne->lettrage_code !== null)
+            ->map(fn (TransactionLigne $ligne): array => [
+                'compte_id' => (int) $ligne->compte_id,
+                'lettrage_code' => (string) $ligne->lettrage_code,
+            ])
+            ->unique(fn (array $cle): string => $cle['compte_id'].'|'.$cle['lettrage_code'])
             ->values();
-        if ($codes->isEmpty()) {
+        if ($clesLettrage->isEmpty()) {
             return collect();
         }
 
@@ -217,7 +220,15 @@ final class PostesTiersOuvertsService
 
         return TransactionLigne::query()
             ->with(['compte', 'transaction'])
-            ->whereIn('lettrage_code', $codes->all())
+            ->where(function (Builder $query) use ($clesLettrage): void {
+                $clesLettrage->each(function (array $cle) use ($query): void {
+                    $query->orWhere(function (Builder $paire) use ($cle): void {
+                        $paire
+                            ->where('compte_id', $cle['compte_id'])
+                            ->where('lettrage_code', $cle['lettrage_code']);
+                    });
+                });
+            })
             ->whereNotIn('transaction_id', $transactionsPoste)
             ->whereHas(
                 'compte',
@@ -267,7 +278,7 @@ final class PostesTiersOuvertsService
             ELSE ROUND(ouverte.credit * 100) - ROUND(ouverte.debit * 100)
         END)";
 
-        return DB::table('transaction_lignes as ouverte')
+        $postes = DB::table('transaction_lignes as ouverte')
             ->join('transactions as active_tx', 'active_tx.id', '=', 'ouverte.transaction_id')
             ->join('comptes', function (JoinClause $join) use ($associationId): void {
                 $join
@@ -280,7 +291,6 @@ final class PostesTiersOuvertsService
                     ->on('tiers.id', '=', 'ouverte.tiers_id')
                     ->where('tiers.association_id', $associationId);
             })
-            ->leftJoin('transaction_lignes as parent', 'parent.id', '=', 'ouverte.poste_tiers_parent_id')
             ->leftJoin('a_nouveau_ligne_origines as origine', function (JoinClause $join) use (
                 $associationId,
                 $canoniqueSql,
@@ -300,7 +310,6 @@ final class PostesTiersOuvertsService
                 "COALESCE(MAX(CASE WHEN ouverte.id = {$canoniqueSql} THEN ouverte.id END), MIN(ouverte.id))
                     as ligne_action_id"
             )
-            ->selectRaw('GROUP_CONCAT(ouverte.id) as ligne_ids_ouvertes')
             ->selectRaw("{$soldeSql} as solde_centimes")
             ->selectRaw('comptes.id as compte_id, comptes.numero_pcg as numero_compte')
             ->selectRaw('ouverte.tiers_id as tiers_id')
@@ -331,24 +340,32 @@ final class PostesTiersOuvertsService
             ])
             ->groupBy(DB::raw($canoniqueSql), 'comptes.id', 'comptes.numero_pcg', 'ouverte.tiers_id')
             ->havingRaw("{$soldeSql} > 0")
-            ->get()
-            ->map(function (object $ligne) use ($exercice, $range): PosteTiersOuvert {
+            ->get();
+        $ligneIdsOuvertes = $this->ligneIdsOuvertes(
+            $postes,
+            $associationId,
+            $range['start'],
+            $range['end'],
+        );
+
+        return $postes
+            ->map(function (object $ligne) use ($exercice, $range, $ligneIdsOuvertes): PosteTiersOuvert {
                 $estReporte = (int) $ligne->est_reporte === 1;
                 $dateOrigine = CarbonImmutable::parse(
                     $estReporte && $ligne->racine_date !== null
                         ? (string) $ligne->racine_date
                         : (string) $ligne->active_date
                 );
-                $ligneIds = collect(explode(',', (string) $ligne->ligne_ids_ouvertes))
-                    ->map(fn (string $id): int => (int) $id)
-                    ->sort()
-                    ->values()
-                    ->all();
+                $clePoste = $this->clePoste(
+                    (int) $ligne->ligne_canonique_id,
+                    (int) $ligne->compte_id,
+                    (int) $ligne->tiers_id,
+                );
 
                 return new PosteTiersOuvert(
                     ligneActionId: (int) $ligne->ligne_action_id,
                     ligneCanoniqueId: (int) $ligne->ligne_canonique_id,
-                    ligneIdsOuvertes: $ligneIds,
+                    ligneIdsOuvertes: $ligneIdsOuvertes->get($clePoste, []),
                     transactionOrigineId: (int) (
                         $estReporte && $ligne->racine_transaction_id !== null
                             ? $ligne->racine_transaction_id
@@ -372,6 +389,60 @@ final class PostesTiersOuvertsService
                 );
             })
             ->values();
+    }
+
+    /**
+     * @param  Collection<int, object>  $postes
+     * @return Collection<string, array<int>>
+     */
+    private function ligneIdsOuvertes(
+        Collection $postes,
+        int $associationId,
+        CarbonImmutable $dateDebut,
+        CarbonImmutable $dateFin,
+    ): Collection {
+        if ($postes->isEmpty()) {
+            return collect();
+        }
+
+        $canoniqueSql = 'COALESCE(ouverte.poste_tiers_parent_id, ouverte.id)';
+        $ligneCanoniques = $postes
+            ->pluck('ligne_canonique_id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        return DB::table('transaction_lignes as ouverte')
+            ->join('transactions as active_tx', 'active_tx.id', '=', 'ouverte.transaction_id')
+            ->selectRaw("{$canoniqueSql} as ligne_canonique_id")
+            ->addSelect(['ouverte.id', 'ouverte.compte_id', 'ouverte.tiers_id'])
+            ->whereIn(DB::raw($canoniqueSql), $ligneCanoniques)
+            ->whereNotNull('ouverte.tiers_id')
+            ->whereNull('ouverte.lettrage_code')
+            ->whereNull('ouverte.deleted_at')
+            ->whereNull('active_tx.deleted_at')
+            ->where('active_tx.association_id', $associationId)
+            ->whereBetween('active_tx.date', [
+                $dateDebut->toDateString(),
+                $dateFin->toDateString(),
+            ])
+            ->orderBy('ouverte.id')
+            ->get()
+            ->groupBy(fn (object $ligne): string => $this->clePoste(
+                (int) $ligne->ligne_canonique_id,
+                (int) $ligne->compte_id,
+                (int) $ligne->tiers_id,
+            ))
+            ->map(fn (Collection $lignes): array => $lignes
+                ->pluck('id')
+                ->map(fn (mixed $id): int => (int) $id)
+                ->all());
+    }
+
+    private function clePoste(int $ligneCanoniqueId, int $compteId, int $tiersId): string
+    {
+        return $ligneCanoniqueId.'|'.$compteId.'|'.$tiersId;
     }
 
     private function ligneTiers(Transaction $transaction): ?TransactionLigne

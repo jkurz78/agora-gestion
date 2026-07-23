@@ -21,6 +21,7 @@ use App\Services\Compta\PostesTiersOuvertsService;
 use App\Tenant\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 
 beforeEach(function (): void {
     SystemeSeeder::seed();
@@ -234,6 +235,56 @@ it('regroupe les fractions ouvertes sous leur ligne canonique', function (): voi
         )->is($parent))->toBeTrue();
 });
 
+it('recupere de nombreuses fractions sans aggregation tronquable ni requete N plus 1', function (): void {
+    $t1 = creerCreancePostesTiers(Tiers::factory()->create());
+    $parent = $t1->lignes->first(
+        fn (TransactionLigne $ligne): bool => $ligne->compte?->numero_pcg === '411'
+    );
+    $parent->update(['lettrage_code' => 'PARENT-FRACTIONNE']);
+
+    TransactionLigne::query()->insert(
+        collect(range(1, 300))
+            ->map(fn (): array => [
+                'transaction_id' => $t1->id,
+                'compte_id' => $parent->compte_id,
+                'debit' => '0.01',
+                'credit' => '0.00',
+                'tiers_id' => $parent->tiers_id,
+                'poste_tiers_parent_id' => $parent->id,
+                'libelle' => $parent->libelle,
+                'montant' => '0.00',
+            ])
+            ->all()
+    );
+    $idsAttendus = TransactionLigne::query()
+        ->where('poste_tiers_parent_id', (int) $parent->id)
+        ->orderBy('id')
+        ->pluck('id')
+        ->map(fn (mixed $id): int => (int) $id)
+        ->all();
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+    $poste = app(PostesTiersOuvertsService::class)->chercher(2025, null, null, null, null)->sole();
+    $requêtes = collect(DB::getQueryLog())
+        ->pluck('query')
+        ->filter(function (string $sql): bool {
+            $sqlNormalisé = strtolower(str_replace(['"', '`'], '', $sql));
+
+            return str_contains($sqlNormalisé, 'transaction_lignes as ouverte');
+        })
+        ->values();
+    DB::disableQueryLog();
+    $sqlNormalisé = strtolower(str_replace(['"', '`'], '', $requêtes->implode(' ')));
+
+    expect($poste->ligneIdsOuvertes)->toBe($idsAttendus)
+        ->and($poste->ligneIdsOuvertes)->toHaveCount(300)
+        ->and($poste->soldeCentimes)->toBe(300)
+        ->and($requêtes)->toHaveCount(2)
+        ->and($sqlNormalisé)->not->toContain('group_concat')
+        ->and($sqlNormalisé)->not->toContain('join transaction_lignes as parent');
+});
+
 it('restitue une fois chaque reglement et detecte un portage remis non annulable', function (): void {
     $t1 = creerCreancePostesTiers(Tiers::factory()->create());
     $banque = compteMetierPostesTiers('512-PT', 5);
@@ -260,4 +311,42 @@ it('restitue une fois chaque reglement et detecte un portage remis non annulable
         ->update(['lettrage_code' => 'REMISE-PORTAGE']);
 
     expect($service->reglements($t1)->sole()->annulable)->toBeFalse();
+});
+
+it('apparie les reglements par compte et code de lettrage en cas de collision 401 411', function (): void {
+    $generator = app(EcritureGenerator::class);
+    $banque = compteMetierPostesTiers('512-COLLISION', 5);
+    $creance = creerCreancePostesTiers(Tiers::factory()->create(), 100.00);
+    $dette = creerDettePostesTiers(Tiers::factory()->create(), 45.50);
+    $t2Creance = $generator->pourEncaissementCreance(
+        transactionCreance: $creance,
+        mode: ModePaiement::Virement,
+        compteTresorerie: $banque,
+        datePaiement: new DateTimeImmutable('2026-08-25'),
+    );
+    $t2Dette = $generator->pourReglementFournisseur(
+        transactionDette: $dette,
+        mode: ModePaiement::Virement,
+        compteTresorerie: $banque,
+        datePaiement: new DateTimeImmutable('2026-08-26'),
+    );
+    $codePartagé = 'COLLISION-401-411';
+
+    foreach ([
+        [$creance, compteSysteme('411')],
+        [$t2Creance, compteSysteme('411')],
+        [$dette, compteSysteme('401')],
+        [$t2Dette, compteSysteme('401')],
+    ] as [$transaction, $compte]) {
+        $transaction->lignes()
+            ->where('compte_id', (int) $compte->id)
+            ->update(['lettrage_code' => $codePartagé]);
+    }
+
+    $service = app(PostesTiersOuvertsService::class);
+
+    expect($service->reglements($creance)->pluck('transactionId')->all())
+        ->toBe([(int) $t2Creance->id])
+        ->and($service->reglements($dette)->pluck('transactionId')->all())
+        ->toBe([(int) $t2Dette->id]);
 });
