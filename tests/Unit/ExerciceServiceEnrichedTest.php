@@ -13,6 +13,7 @@ use App\Services\ExerciceService;
 use App\Tenant\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
     $association = Association::factory()->create();
@@ -87,6 +88,30 @@ describe('cloturer()', function () {
             ->and($exercice->cloture_par_id)->toBe($this->user->id)
             ->and(ExerciceAction::where('exercice_id', $exercice->id)
                 ->where('action', TypeActionExercice::Cloture)->exists())->toBeTrue();
+    });
+
+    it('verrouille le tenant puis l exercice source dans le même ordre que les à nouveaux', function () {
+        $exercice = Exercice::create(['annee' => 2025, 'statut' => StatutExercice::Ouvert]);
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        $this->service->cloturer($exercice, $this->user);
+
+        $requetes = collect(DB::getQueryLog())
+            ->pluck('query')
+            ->map(fn (string $sql): string => strtolower(str_replace(['"', '`'], '', $sql)))
+            ->values();
+        DB::disableQueryLog();
+        $indexTenant = $requetes->search(
+            fn (string $sql): bool => str_contains($sql, 'from association')
+        );
+        $indexExercice = $requetes->search(
+            fn (string $sql): bool => str_contains($sql, 'from exercices')
+        );
+
+        expect($indexTenant)->not->toBeFalse()
+            ->and($indexExercice)->not->toBeFalse()
+            ->and((int) $indexTenant)->toBeLessThan((int) $indexExercice);
     });
 });
 

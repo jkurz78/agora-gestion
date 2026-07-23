@@ -2,11 +2,14 @@
 
 declare(strict_types=1);
 
+use App\DTOs\Compta\PosteTiersReglementData;
 use App\Enums\ModePaiement;
 use App\Enums\OrigineANouveau;
 use App\Enums\StatutExercice;
 use App\Enums\StatutReglement;
+use App\Models\Association;
 use App\Models\Compte;
+use App\Models\CompteBancaire;
 use App\Models\Exercice;
 use App\Models\Tiers;
 use App\Models\Transaction;
@@ -15,8 +18,11 @@ use App\Services\Compta\ANouveau\ANouveauPreviewBuilder;
 use App\Services\Compta\ANouveau\ANouveauService;
 use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\PostesTiersOuvertsService;
+use App\Services\Compta\PosteTiersReglementService;
 use App\Services\ReglementOperationService;
 use App\Tenant\TenantContext;
+use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Tests\Support\CreatesPartieDoubleContext;
 
 uses(CreatesPartieDoubleContext::class);
@@ -240,5 +246,80 @@ test('marquerRecu — wrapper historique date un règlement AN au jour de la pi�
     expect($source411->fresh()->lettrage_code)->toBeNull()
         ->and($ligneAN->fresh()->lettrage_code)->not->toBeNull()
         ->and($t2->date->toDateString())->toBe('2026-09-01')
+        ->and($t1->fresh()->statut_reglement)->toBe(StatutReglement::Recu);
+});
+
+test('les wrappers refusent un compte bancaire étranger avant de créer ou modifier une écriture', function () {
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
+    $t1 = $this->ecritureGen->pourRecetteACredit(
+        tiers: $tiers,
+        ventilations: [['compte' => $this->compte706, 'montant' => '25.00']],
+        dateConstatation: new DateTimeImmutable('2025-10-03'),
+        libelle: 'Créance compte étranger',
+    );
+    $t1->update(['statut_reglement' => StatutReglement::EnAttente]);
+    $associationLocale = $this->association;
+    $associationEtrangere = Association::factory()->create();
+    TenantContext::boot($associationEtrangere);
+    $compteEtranger = CompteBancaire::factory()->create([
+        'association_id' => $associationEtrangere->id,
+    ]);
+    TenantContext::boot($associationLocale);
+    $transactionsAvant = Transaction::withoutGlobalScopes()->count();
+
+    expect(fn () => $this->service->marquerRecu(
+        $t1->fresh(),
+        ModePaiement::Cheque,
+        (int) $compteEtranger->id,
+    ))->toThrow(ModelNotFoundException::class);
+
+    expect($t1->fresh()->mode_paiement)->toBeNull()
+        ->and($t1->fresh()->compte_id)->toBeNull()
+        ->and(Transaction::withoutGlobalScopes()->count())->toBe($transactionsAvant);
+
+    $t1->update([
+        'mode_paiement' => ModePaiement::Cheque,
+        'compte_id' => (int) $compteEtranger->id,
+    ]);
+
+    expect(fn () => $this->service->reglerOuEncaisser($t1->fresh()))
+        ->toThrow(ModelNotFoundException::class);
+
+    expect(Transaction::withoutGlobalScopes()->count())->toBe($transactionsAvant);
+});
+
+test('marquerRecu relit le reliquat courant après un règlement partiel concurrent', function () {
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
+    $t1 = $this->ecritureGen->pourRecetteACredit(
+        tiers: $tiers,
+        ventilations: [['compte' => $this->compte706, 'montant' => '100.00']],
+        dateConstatation: new DateTimeImmutable('2025-10-03'),
+        libelle: 'Créance reliquat frais',
+    );
+    $t1->update(['statut_reglement' => StatutReglement::EnAttente]);
+    $ligne411 = $t1->lignes->first(
+        fn (TransactionLigne $ligne): bool => $ligne->compte?->numero_pcg === '411'
+    );
+
+    app(PosteTiersReglementService::class)->regler(new PosteTiersReglementData(
+        ligneId: (int) $ligne411->id,
+        montantCentimes: 3000,
+        date: CarbonImmutable::parse('2025-10-03'),
+        mode: ModePaiement::Virement,
+        compteBancaireId: (int) $this->compteBancaire->id,
+        exercice: 2025,
+    ));
+
+    $this->service->marquerRecu(
+        $t1,
+        ModePaiement::Virement,
+        (int) $this->compteBancaire->id,
+    );
+
+    expect(app(PostesTiersOuvertsService::class)->reglements($t1->fresh())
+        ->pluck('montantCentimes')
+        ->sort()
+        ->values()
+        ->all())->toBe([3000, 7000])
         ->and($t1->fresh()->statut_reglement)->toBe(StatutReglement::Recu);
 });

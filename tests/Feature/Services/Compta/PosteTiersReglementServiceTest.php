@@ -10,6 +10,7 @@ use App\Enums\StatutReglement;
 use App\Exceptions\ExerciceCloturedException;
 use App\Models\Association;
 use App\Models\Compte;
+use App\Models\CompteBancaire;
 use App\Models\Exercice;
 use App\Models\Tiers;
 use App\Models\Transaction;
@@ -20,9 +21,11 @@ use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\Compta\PostesTiersOuvertsService;
 use App\Services\Compta\PosteTiersReglementService;
+use App\Support\MontantDecimal;
 use App\Tenant\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
 use Tests\Support\CreatesPartieDoubleContext;
 
 uses(CreatesPartieDoubleContext::class);
@@ -43,7 +46,7 @@ afterEach(function (): void {
 function creerPostePourReglementTask4(object $contexte, string $numeroCompte, int $montantCentimes = 10000): array
 {
     $tiers = Tiers::factory()->create(['association_id' => $contexte->association->id]);
-    $montant = $montantCentimes / 100;
+    $montant = MontantDecimal::depuisCentimes($montantCentimes);
 
     $transaction = $numeroCompte === '411'
         ? $contexte->generatorReglementPoste->pourRecetteACredit(
@@ -88,8 +91,8 @@ function commandeReglementTask4(
 function montantLigneCentimesTask4(TransactionLigne $ligne): int
 {
     return abs(
-        (int) round((float) $ligne->debit * 100)
-        - (int) round((float) $ligne->credit * 100)
+        MontantDecimal::versCentimes((string) $ligne->debit)
+        - MontantDecimal::versCentimes((string) $ligne->credit)
     );
 }
 
@@ -126,8 +129,14 @@ it('encaisse partiellement une créance 411 en conservant le reliquat canonique 
         ->and($t2->compte_id)->toBe((int) $this->compteBancaire->id)
         ->and($t1->fresh()->statut_reglement)->toBe(StatutReglement::EnAttente)
         ->and(montantLigneCentimesTask4($ligneProduitAvant->fresh()))->toBe(10000)
-        ->and((int) round((float) $lignesSource->sum('debit') * 100))
-        ->toBe((int) round((float) $lignesSource->sum('credit') * 100))
+        ->and($lignesSource->reduce(
+            fn (string $total, TransactionLigne $ligne): string => bcadd($total, (string) $ligne->debit, 2),
+            '0.00',
+        ))
+        ->toBe($lignesSource->reduce(
+            fn (string $total, TransactionLigne $ligne): string => bcadd($total, (string) $ligne->credit, 2),
+            '0.00',
+        ))
         ->and($ligneProduitAvant->affectations()->sole()->is($affectation))->toBeTrue()
         ->and($affectation->fresh()->only(['seance', 'montant', 'notes']))->toBe([
             'seance' => 7,
@@ -148,11 +157,11 @@ it('règle partiellement une dette 401 du même côté crédit', function (): vo
     $ligne401->refresh();
     $fraction = $ligne401->fractionsPosteTiers()->sole();
 
-    expect((int) round((float) $ligne401->debit * 100))->toBe(0)
-        ->and((int) round((float) $ligne401->credit * 100))->toBe(7450)
-        ->and((int) round((float) $fraction->debit * 100))->toBe(0)
-        ->and((int) round((float) $fraction->credit * 100))->toBe(2550)
-        ->and((int) round((float) $t2->montant_total * 100))->toBe(2550)
+    expect(montantLigneCentimesTask4($ligne401))->toBe(7450)
+        ->and($ligne401->debit)->toBe('0.00')
+        ->and(montantLigneCentimesTask4($fraction))->toBe(2550)
+        ->and($fraction->debit)->toBe('0.00')
+        ->and(MontantDecimal::versCentimes((string) $t2->montant_total))->toBe(2550)
         ->and($t1->fresh()->statut_reglement)->toBe(StatutReglement::EnAttente);
 });
 
@@ -167,7 +176,7 @@ it('solde totalement un poste sans créer de sœur', function (): void {
 
     expect($ligne411->fresh()->lettrage_code)->not->toBeNull()
         ->and($ligne411->fractionsPosteTiers()->count())->toBe(0)
-        ->and((int) round((float) $t2->montant_total * 100))->toBe(10000)
+        ->and(MontantDecimal::versCentimes((string) $t2->montant_total))->toBe(10000)
         ->and($t1->fresh()->statut_reglement)->toBe(StatutReglement::Recu)
         ->and(app(PostesTiersOuvertsService::class)->pourTransaction($t1->fresh(), 2025))->toBeNull();
 });
@@ -225,8 +234,14 @@ it('consolide toutes les fractions ouvertes avant un nouveau découpage sans dé
         ->and(montantLigneCentimesTask4($ligne411))->toBe(7000)
         ->and($fractionsActives)->toHaveCount(1)
         ->and(montantLigneCentimesTask4($fractionsActives->sole()))->toBe(3000)
-        ->and((int) round((float) $lignesActives->sum('debit') * 100))
-        ->toBe((int) round((float) $lignesActives->sum('credit') * 100));
+        ->and($lignesActives->reduce(
+            fn (string $total, TransactionLigne $ligne): string => bcadd($total, (string) $ligne->debit, 2),
+            '0.00',
+        ))
+        ->toBe($lignesActives->reduce(
+            fn (string $total, TransactionLigne $ligne): string => bcadd($total, (string) $ligne->credit, 2),
+            '0.00',
+        ));
 });
 
 it('règle partiellement le descendant AN actif sans modifier la ligne historique', function (): void {
@@ -264,7 +279,7 @@ it('règle partiellement le descendant AN actif sans modifier la ligne historiqu
         ->and(montantLigneCentimesTask4($fractionPayee))->toBe(3000)
         ->and((int) $fractionPayee->poste_tiers_parent_id)->toBe((int) $ligneAN->id)
         ->and($fractionPayee->lettrage_code)->not->toBeNull()
-        ->and((int) round((float) $t2->montant_total * 100))->toBe(3000)
+        ->and(MontantDecimal::versCentimes((string) $t2->montant_total))->toBe(3000)
         ->and($t2->date->toDateString())->toBe('2026-09-05')
         ->and($t1->fresh()->statut_reglement)->toBe(StatutReglement::EnAttente);
 });
@@ -318,7 +333,7 @@ it('refuse un règlement dans un exercice clôturé', function (): void {
     expect($ligne401->fresh()->lettrage_code)->toBeNull();
 });
 
-it('annule tout le découpage si le compte de trésorerie est introuvable', function (): void {
+it('annule tout le découpage si le compte bancaire est introuvable', function (): void {
     [$t1, $ligne411] = creerPostePourReglementTask4($this, '411');
     $transactionsAvant = Transaction::count();
 
@@ -326,7 +341,7 @@ it('annule tout le découpage si le compte de trésorerie est introuvable', func
         $ligne411,
         3000,
         999999999,
-    )))->toThrow(RuntimeException::class, 'Aucun compte de trésorerie');
+    )))->toThrow(ModelNotFoundException::class);
 
     expect(montantLigneCentimesTask4($ligne411->fresh()))->toBe(10000)
         ->and($ligne411->fractionsPosteTiers()->count())->toBe(0)
@@ -377,4 +392,100 @@ it('refuse un poste appartenant à une autre association sans fuite ni mutation'
                 ->findOrFail((int) $ligneEtrangere->id)
                 ->lettrage_code
         )->toBeNull();
+});
+
+it('refuse un compte bancaire d une autre association avant toute mutation même pour un chèque', function (): void {
+    [$t1, $ligne411] = creerPostePourReglementTask4($this, '411');
+    $associationLocale = $this->association;
+    $associationEtrangere = Association::factory()->create();
+    TenantContext::boot($associationEtrangere);
+    $compteBancaireEtranger = CompteBancaire::factory()->create([
+        'association_id' => $associationEtrangere->id,
+    ]);
+    TenantContext::boot($associationLocale);
+    $transactionsAvant = Transaction::withoutGlobalScopes()->count();
+
+    expect(fn () => $this->serviceReglementPoste->regler(commandeReglementTask4(
+        $ligne411,
+        3000,
+        (int) $compteBancaireEtranger->id,
+        ModePaiement::Cheque,
+    )))->toThrow(ModelNotFoundException::class);
+
+    expect(Transaction::withoutGlobalScopes()->count())->toBe($transactionsAvant)
+        ->and($ligne411->fresh()->debit)->toBe('100.00')
+        ->and($ligne411->fresh()->lettrage_code)->toBeNull()
+        ->and($ligne411->fractionsPosteTiers()->count())->toBe(0)
+        ->and($t1->fresh()->compte_id)->not->toBe((int) $compteBancaireEtranger->id);
+});
+
+it('reprend depuis la racine quand la fraction ciblée a déjà été consolidée par une tentative concurrente', function (): void {
+    [, $racine] = creerPostePourReglementTask4($this, '411');
+    $racine->update(['debit' => '60.00']);
+    $fractionDisparue = $racine->replicate(['id', 'lettrage_code', 'deleted_at']);
+    $fractionDisparue->fill([
+        'debit' => '40.00',
+        'credit' => '0.00',
+        'poste_tiers_parent_id' => (int) $racine->id,
+    ]);
+    $fractionDisparue->save();
+    $fractionDisparue->delete();
+
+    $t2 = $this->serviceReglementPoste->regler(commandeReglementTask4(
+        $fractionDisparue,
+        1000,
+        (int) $this->compteBancaire->id,
+    ));
+
+    expect($racine->fresh()->debit)->toBe('50.00')
+        ->and($racine->fractionsPosteTiers()->sole()->debit)->toBe('10.00')
+        ->and($t2->montant_total)->toBe('10.00');
+});
+
+it('conserve exactement les centimes sans décision monétaire en virgule flottante', function (): void {
+    [, $ligne411] = creerPostePourReglementTask4($this, '411', 29);
+
+    $t2 = $this->serviceReglementPoste->regler(commandeReglementTask4(
+        $ligne411,
+        1,
+        (int) $this->compteBancaire->id,
+    ));
+
+    $fraction = $ligne411->fractionsPosteTiers()->sole();
+
+    expect($ligne411->fresh()->debit)->toBe('0.28')
+        ->and($fraction->debit)->toBe('0.01')
+        ->and($t2->montant_total)->toBe('0.01')
+        ->and($t2->lignes()->orderBy('id')->pluck('debit')->all())->toBe(['0.01', '0.00'])
+        ->and($t2->lignes()->orderBy('id')->pluck('credit')->all())->toBe(['0.00', '0.01']);
+});
+
+it('verrouille l exercice source avant de charger le lot de lignes du poste', function (): void {
+    Exercice::create(['annee' => 2025, 'statut' => StatutExercice::Ouvert]);
+    [, $ligne411] = creerPostePourReglementTask4($this, '411');
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+
+    $this->serviceReglementPoste->regler(commandeReglementTask4(
+        $ligne411,
+        10000,
+        (int) $this->compteBancaire->id,
+    ));
+
+    $requetes = collect(DB::getQueryLog())
+        ->pluck('query')
+        ->map(fn (string $sql): string => strtolower(str_replace(['"', '`'], '', $sql)))
+        ->values();
+    DB::disableQueryLog();
+    $indexExercice = $requetes->search(
+        fn (string $sql): bool => str_contains($sql, 'from exercices')
+    );
+    $indexLot = $requetes->search(
+        fn (string $sql): bool => str_contains($sql, 'from transaction_lignes')
+            && str_contains($sql, 'poste_tiers_parent_id')
+    );
+
+    expect($indexExercice)->not->toBeFalse()
+        ->and($indexLot)->not->toBeFalse()
+        ->and((int) $indexExercice)->toBeLessThan((int) $indexLot);
 });

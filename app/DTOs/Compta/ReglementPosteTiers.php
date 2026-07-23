@@ -13,7 +13,7 @@ final readonly class ReglementPosteTiers
         public int $transactionId,
         public int $montantCentimes,
         public CarbonImmutable $date,
-        public ModePaiement $mode,
+        public ?ModePaiement $mode,
         public bool $annulable,
     ) {}
 }

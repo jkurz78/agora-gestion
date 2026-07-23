@@ -11,6 +11,8 @@ use App\Models\Tiers;
 use App\Models\TransactionLigne;
 use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\EtatReglementResolver;
+use App\Services\Compta\LettrageService;
+use App\Services\Compta\PostesTiersOuvertsService;
 use App\Services\Compta\PosteTiersReglementService;
 use App\Services\ReglementOperationService;
 use App\Services\TransactionService;
@@ -169,3 +171,71 @@ it('agrège plusieurs T2 en EnMain si au moins un portage reste non remis', func
 
     expect($t1->fresh()->statut_reglement)->toBe(StatutReglement::EnMain);
 });
+
+it('agrège une branche lumped en main avec une T2 séparée pointée', function (?ModePaiement $modeSource) {
+    $t1 = app(EcritureGenerator::class)->pourRecetteACredit(
+        tiers: $this->tiers,
+        ventilations: [['compte' => $this->compte706, 'montant' => 100.0]],
+        dateConstatation: new DateTimeImmutable('2025-10-15'),
+    );
+    $t1->update([
+        'statut_reglement' => StatutReglement::EnAttente,
+        'mode_paiement' => $modeSource,
+    ]);
+    $ligne411 = $t1->lignes->first(
+        fn (TransactionLigne $ligne): bool => $ligne->compte?->numero_pcg === '411'
+    );
+    $ligne411->update(['debit' => '30.00']);
+    $fraction = $ligne411->replicate(['id', 'lettrage_code', 'deleted_at']);
+    $fraction->fill([
+        'debit' => '70.00',
+        'credit' => '0.00',
+        'poste_tiers_parent_id' => (int) $ligne411->id,
+    ]);
+    $fraction->save();
+
+    $ligneLumped = TransactionLigne::create([
+        'transaction_id' => (int) $t1->id,
+        'compte_id' => (int) $ligne411->compte_id,
+        'debit' => '0.00',
+        'credit' => '30.00',
+        'tiers_id' => (int) $ligne411->tiers_id,
+        'libelle' => 'Contrepartie lumped',
+        'montant' => '0.00',
+    ]);
+    TransactionLigne::create([
+        'transaction_id' => (int) $t1->id,
+        'compte_id' => (int) compteSysteme('5112')->id,
+        'debit' => '30.00',
+        'credit' => '0.00',
+        'libelle' => 'Chèque en main',
+        'montant' => '0.00',
+    ]);
+    app(LettrageService::class)->lettrer(
+        collect([$ligne411->fresh(), $ligneLumped]),
+    );
+
+    $t2 = app(PosteTiersReglementService::class)->regler(new PosteTiersReglementData(
+        ligneId: (int) $fraction->id,
+        montantCentimes: 7000,
+        date: CarbonImmutable::parse('2026-07-22'),
+        mode: ModePaiement::Virement,
+        compteBancaireId: (int) $this->compteBancaire->id,
+        exercice: 2025,
+    ));
+    $rapprochement = RapprochementBancaire::factory()->create([
+        'association_id' => $this->association->id,
+        'compte_id' => $this->compteBancaire->id,
+        'saisi_par' => $this->user->id,
+    ]);
+    $t2->update(['rapprochement_id' => (int) $rapprochement->id]);
+
+    app(EtatReglementResolver::class)->syncer($t1->fresh());
+
+    expect($t1->fresh()->statut_reglement)->toBe(StatutReglement::EnMain)
+        ->and(app(PostesTiersOuvertsService::class)->reglements($t1->fresh()))
+        ->toHaveCount(2);
+})->with([
+    'mode explicite' => ModePaiement::Cheque,
+    'branche legacy sans mode' => null,
+]);

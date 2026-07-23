@@ -22,6 +22,7 @@ use App\Models\TransactionLigne;
 use App\Models\VirementInterne;
 use App\Services\Compta\ANouveau\PosteReporteResolver;
 use App\Services\NumeroPieceService;
+use App\Support\MontantDecimal;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -1218,6 +1219,7 @@ final class EcritureGenerator
         \DateTimeInterface $datePaiement,
         ?string $libelle = null,
         ?TransactionLigne $ligneTiersSource = null,
+        bool $heriterCompteBancaireSource = true,
     ): Transaction {
         $ligneTiersSource ??= $this->posteReporteResolver->pourTransaction(
             $t1,
@@ -1233,6 +1235,7 @@ final class EcritureGenerator
             $compteTresorerie,
             $datePaiement,
             $libelle,
+            $heriterCompteBancaireSource,
         );
     }
 
@@ -1306,9 +1309,10 @@ final class EcritureGenerator
         Compte $compteTresorerie,
         \DateTimeInterface $datePaiement,
         ?string $libelle,
+        bool $heriterCompteBancaireSource,
     ): Transaction {
         // --- Direction D/C → sens du flux ---
-        $tiersAuDebit = (float) $ligneTiersSource->debit > 0;
+        $tiersAuDebit = MontantDecimal::versCentimes((string) $ligneTiersSource->debit) > 0;
         // Debit = argent entrant (encaissement créance), Credit = argent sortant (règlement dette)
 
         /** @var Tiers $tiers */
@@ -1326,8 +1330,8 @@ final class EcritureGenerator
 
         // --- Montant = valeur absolue de la ligne tiers ---
         $montant = $tiersAuDebit
-            ? (float) $ligneTiersSource->debit
-            : (float) $ligneTiersSource->credit;
+            ? (string) $ligneTiersSource->debit
+            : (string) $ligneTiersSource->credit;
 
         // --- Invariant tenant (fail-fast avant DB::transaction) ---
         $this->assertTenantCoherence(
@@ -1337,7 +1341,8 @@ final class EcritureGenerator
 
         return DB::transaction(function () use (
             $t1, $tiers, $compteTiers, $comptePortage, $montant,
-            $mode, $datePaiement, $libelle, $ligneTiersSource, $tiersAuDebit
+            $mode, $datePaiement, $libelle, $ligneTiersSource, $tiersAuDebit,
+            $heriterCompteBancaireSource
         ): Transaction {
             $libelleEffectif = $libelle ?? ($tiersAuDebit
                 ? "Encaissement créance #{$t1->id}"
@@ -1352,7 +1357,7 @@ final class EcritureGenerator
                 journal: JournalComptable::Banque,
             );
 
-            if ($t1->compte_id !== null) {
+            if ($heriterCompteBancaireSource && $t1->compte_id !== null) {
                 $t2->update(['compte_id' => $t1->compte_id]);
             }
 
@@ -1899,7 +1904,7 @@ final class EcritureGenerator
         TypeTransaction $type,
         \DateTimeInterface $date,
         string $libelle,
-        float $montant,
+        float|string $montant,
         ?ModePaiement $modePaiement,
         string $typeEcriture = 'normale',
         ?JournalComptable $journal = null,

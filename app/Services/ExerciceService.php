@@ -124,9 +124,23 @@ final class ExerciceService
     {
         $exercice = Exercice::where('annee', $annee)->first();
 
-        if ($exercice !== null && $exercice->isCloture()) {
-            throw new ExerciceCloturedException($annee);
-        }
+        $this->assertModeleOuvert($exercice, $annee);
+    }
+
+    /**
+     * Verrouille l'exercice source pendant une écriture comptable.
+     *
+     * L'ordre canonique partagé avec cloturer() est : exercice source, exercice
+     * cible éventuel, puis écritures. Le verrou reste porté par la transaction
+     * appelante jusqu'au commit.
+     */
+    public function assertOuvertVerrouille(int $annee): void
+    {
+        $exercice = Exercice::where('annee', $annee)
+            ->lockForUpdate()
+            ->first();
+
+        $this->assertModeleOuvert($exercice, $annee);
     }
 
     /**
@@ -135,9 +149,21 @@ final class ExerciceService
     public function cloturer(Exercice $exercice, User $user): void
     {
         DB::transaction(function () use ($exercice, $user): void {
+            // Même premier verrou qu'ANouveauService::persister() afin d'éviter
+            // l'inversion tenant → exercice / exercice → tenant.
+            DB::table('association')
+                ->where('id', TenantContext::currentId())
+                ->lockForUpdate()
+                ->first();
+
+            $exerciceVerrouille = Exercice::query()
+                ->whereKey((int) $exercice->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
             if (config('compta.use_partie_double')) {
                 $exerciceCible = Exercice::query()
-                    ->where('annee', (int) $exercice->annee + 1)
+                    ->where('annee', (int) $exerciceVerrouille->annee + 1)
                     ->lockForUpdate()
                     ->first();
 
@@ -145,7 +171,7 @@ final class ExerciceService
                     throw new \RuntimeException('Impossible de générer les à-nouveaux : l’exercice cible est clôturé.');
                 }
 
-                $preview = app(ANouveauPreviewBuilder::class)->build((int) $exercice->annee);
+                $preview = app(ANouveauPreviewBuilder::class)->build((int) $exerciceVerrouille->annee);
                 app(ANouveauService::class)->persister(
                     $preview,
                     OrigineANouveau::Cloture,
@@ -153,18 +179,25 @@ final class ExerciceService
                 );
             }
 
-            $exercice->update([
+            $exerciceVerrouille->update([
                 'statut' => StatutExercice::Cloture,
                 'date_cloture' => now(),
                 'cloture_par_id' => $user->id,
             ]);
 
             ExerciceAction::create([
-                'exercice_id' => $exercice->id,
+                'exercice_id' => $exerciceVerrouille->id,
                 'action' => TypeActionExercice::Cloture,
                 'user_id' => $user->id,
             ]);
         });
+    }
+
+    private function assertModeleOuvert(?Exercice $exercice, int $annee): void
+    {
+        if ($exercice !== null && $exercice->isCloture()) {
+            throw new ExerciceCloturedException($annee);
+        }
     }
 
     /**

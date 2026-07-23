@@ -6,12 +6,12 @@ namespace App\Services\Compta;
 
 use App\DTOs\Compta\PosteTiersOuvert;
 use App\DTOs\Compta\ReglementPosteTiers;
-use App\Enums\ModePaiement;
 use App\Models\ANouveauLigneOrigine;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\Compta\ANouveau\PosteReporteResolver;
 use App\Services\ExerciceService;
+use App\Support\MontantDecimal;
 use App\Tenant\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -212,8 +212,8 @@ final class PostesTiersOuvertsService
             return collect();
         }
 
-        $transactionsPoste = $lignesPoste
-            ->pluck('transaction_id')
+        $ligneIdsPoste = $lignesPoste
+            ->pluck('id')
             ->map(fn (mixed $id): int => (int) $id)
             ->unique()
             ->all();
@@ -229,28 +229,29 @@ final class PostesTiersOuvertsService
                     });
                 });
             })
-            ->whereNotIn('transaction_id', $transactionsPoste)
+            ->whereNotIn('id', $ligneIdsPoste)
             ->whereHas(
                 'compte',
                 fn (Builder $query): Builder => $query->whereIn('numero_pcg', ['401', '411'])
             )
             ->get()
-            ->filter(fn (TransactionLigne $ligne): bool => $ligne->transaction?->mode_paiement instanceof ModePaiement)
-            ->unique(fn (TransactionLigne $ligne): int => (int) $ligne->transaction_id)
-            ->map(function (TransactionLigne $ligne): ReglementPosteTiers {
+            ->groupBy(fn (TransactionLigne $ligne): int => (int) $ligne->transaction_id)
+            ->map(function (Collection $lignes): ReglementPosteTiers {
+                /** @var TransactionLigne $ligne */
+                $ligne = $lignes->first();
                 /** @var Transaction $transaction */
                 $transaction = $ligne->transaction;
-                /** @var ModePaiement $mode */
-                $mode = $transaction->mode_paiement;
 
                 return new ReglementPosteTiers(
                     transactionId: (int) $transaction->id,
-                    montantCentimes: abs(
-                        (int) round((float) $ligne->debit * 100)
-                        - (int) round((float) $ligne->credit * 100)
+                    montantCentimes: $lignes->sum(
+                        fn (TransactionLigne $ligne): int => abs(
+                            MontantDecimal::versCentimes((string) $ligne->debit)
+                            - MontantDecimal::versCentimes((string) $ligne->credit)
+                        )
                     ),
                     date: CarbonImmutable::parse($transaction->date->toDateString()),
-                    mode: $mode,
+                    mode: $transaction->mode_paiement,
                     annulable: $this->estReglementAnnulable($transaction),
                 );
             })
@@ -375,7 +376,7 @@ final class PostesTiersOuvertsService
                     numeroCompte: (string) $ligne->numero_compte,
                     tiersId: (int) $ligne->tiers_id,
                     tiersNom: $this->nomTiers($ligne),
-                    soldeCentimes: (int) round((float) $ligne->solde_centimes),
+                    soldeCentimes: (int) $ligne->solde_centimes,
                     dateOrigine: $dateOrigine,
                     dateAffichage: $estReporte
                         ? CarbonImmutable::instance($range['start'])
@@ -465,8 +466,8 @@ final class PostesTiersOuvertsService
             return 0;
         }
 
-        $debit = (int) round((float) $ligne->debit * 100);
-        $credit = (int) round((float) $ligne->credit * 100);
+        $debit = MontantDecimal::versCentimes((string) $ligne->debit);
+        $credit = MontantDecimal::versCentimes((string) $ligne->credit);
 
         return $ligne->compte?->numero_pcg === '411'
             ? $debit - $credit

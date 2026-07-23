@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\DTOs\Compta\PosteTiersReglementData;
 use App\Enums\ModePaiement;
 use App\Enums\Sens;
 use App\Enums\StatutReglement;
@@ -22,11 +21,12 @@ use App\Services\Compta\CompteTresorerieResolver;
 use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\EtatReglementResolver;
 use App\Services\Compta\PartieDoubleGuard;
-use App\Services\Compta\PostesTiersOuvertsService;
 use App\Services\Compta\PosteTiersReglementService;
+use App\Support\MontantDecimal;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -44,7 +44,6 @@ final class ReglementOperationService
         private readonly EcritureGenerator $ecritureGenerator,
         private readonly NumeroPieceService $numeroPiece,
         private readonly PosteReporteResolver $posteReporteResolver,
-        private readonly PostesTiersOuvertsService $postesOuverts,
         private readonly PosteTiersReglementService $posteTiersReglementService,
         private readonly ExerciceService $exerciceService,
     ) {}
@@ -271,8 +270,14 @@ final class ReglementOperationService
             return;
         }
 
+        if ($transaction->compte_id !== null) {
+            CompteBancaire::query()->findOrFail((int) $transaction->compte_id);
+        }
+
         // Direction D/C → Sens pour CompteTresorerieResolver
-        $sens = (float) $ligneTiers->debit > 0 ? Sens::Recette : Sens::Depense;
+        $sens = MontantDecimal::versCentimes((string) $ligneTiers->debit) > 0
+            ? Sens::Recette
+            : Sens::Depense;
 
         $compteTresorerie = CompteTresorerieResolver::resoudre(
             compteBancaireId: $transaction->compte_id !== null ? (int) $transaction->compte_id : null,
@@ -323,62 +328,65 @@ final class ReglementOperationService
             return;
         }
 
-        $modeEffectif = $transaction->mode_paiement ?? $mode;
+        $transactionId = (int) $transaction->id;
+        $transactionCourante = Transaction::findOrFail($transactionId);
+        if ($transactionCourante->statut_reglement !== StatutReglement::EnAttente
+            || $transactionCourante->isLockedByRapprochement()
+            || $transactionCourante->isLockedByFacture()) {
+            return;
+        }
+
+        $ligneTiersCourante = $this->posteReporteResolver->dernierePourTransaction($transactionCourante);
+        if ($ligneTiersCourante === null) {
+            return;
+        }
+
+        $modeEffectif = $transactionCourante->mode_paiement ?? $mode;
         if ($modeEffectif === null) {
             return;
         }
 
-        $compteIdEffectif = $transaction->compte_id;
-        if ($transaction->mode_paiement === null && $mode !== null && $compteId !== null) {
+        $compteIdEffectif = $transactionCourante->compte_id;
+        if ($transactionCourante->mode_paiement === null && $mode !== null && $compteId !== null) {
             $compteIdEffectif = $compteId;
         }
-        $transactionId = (int) $transaction->id;
-        $transactionUpdate = null;
-        if ($transaction->mode_paiement === null && $mode !== null) {
-            $transactionUpdate = ['mode_paiement' => $mode->value];
-            if ($compteId !== null) {
-                $transactionUpdate['compte_id'] = $compteId;
-            }
-        }
 
-        $datePaiement = CarbonImmutable::parse($transaction->date->toDateString());
-        if ((int) $ligneTiers->transaction_id !== (int) $transaction->id) {
-            $transactionActive = $ligneTiers->transaction()->firstOrFail();
+        $datePaiement = CarbonImmutable::parse($transactionCourante->date->toDateString());
+        if ((int) $ligneTiersCourante->transaction_id !== (int) $transactionCourante->id) {
+            $transactionActive = $ligneTiersCourante->transaction()->firstOrFail();
             $datePaiement = CarbonImmutable::parse($transactionActive->date->toDateString());
         }
 
         $exercice = $this->exerciceService->anneeForDate($datePaiement);
-        $poste = $this->postesOuverts->pourTransaction($transaction, $exercice);
-        if ($poste === null) {
-            app(EtatReglementResolver::class)->syncer($transaction->fresh());
 
-            return;
-        }
-
-        DB::transaction(function () use (
-            $modeEffectif,
-            $compteIdEffectif,
-            $datePaiement,
-            $exercice,
-            $poste,
-            $transactionId,
-            $transactionUpdate,
-        ): void {
-            $this->posteTiersReglementService->regler(new PosteTiersReglementData(
-                ligneId: $poste->ligneActionId,
-                montantCentimes: $poste->soldeCentimes,
+        try {
+            $this->posteTiersReglementService->reglerReliquat(
+                ligneId: (int) $ligneTiersCourante->id,
                 date: $datePaiement,
                 mode: $modeEffectif,
                 compteBancaireId: $compteIdEffectif !== null ? (int) $compteIdEffectif : null,
                 exercice: $exercice,
-            ));
-
-            if ($transactionUpdate !== null) {
-                Transaction::query()
-                    ->whereKey($transactionId)
-                    ->update($transactionUpdate);
+            );
+        } catch (ModelNotFoundException $exception) {
+            if ($exception->getModel() !== TransactionLigne::class) {
+                throw $exception;
             }
-        }, 3);
+
+            app(EtatReglementResolver::class)->syncer($transactionCourante->fresh());
+
+            return;
+        }
+
+        if ($transactionCourante->mode_paiement === null && $mode !== null) {
+            $transactionUpdate = ['mode_paiement' => $mode->value];
+            if ($compteId !== null) {
+                $transactionUpdate['compte_id'] = $compteId;
+            }
+
+            Transaction::query()
+                ->whereKey($transactionId)
+                ->update($transactionUpdate);
+        }
     }
 
     private function marquerLegacyCommeReglee(
@@ -391,6 +399,7 @@ final class ReglementOperationService
         if ($transaction->mode_paiement === null && $mode !== null) {
             $updateData['mode_paiement'] = $mode->value;
             if ($compteId !== null) {
+                CompteBancaire::query()->findOrFail($compteId);
                 $updateData['compte_id'] = $compteId;
             }
         }

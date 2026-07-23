@@ -62,17 +62,18 @@ final class LettrageService
 
         $ids = $lignes->pluck('id')->all();
         $compteId = (int) $lignes->first()->compte_id;
-        $code ??= self::nextCodeForCompte($compteId);
 
-        DB::transaction(function () use ($ids, $compteId, $code, $motif): void {
+        return DB::transaction(function () use ($ids, $compteId, $code, $motif): string {
+            $codeEffectif = $code ?? $this->reserverProchainCode($compteId);
+
             // 1. Insérer ligne audit (append-only)
-            $this->writeAudit('lettre', $code, $compteId, $ids, $motif);
+            $this->writeAudit('lettre', $codeEffectif, $compteId, $ids, $motif);
 
             // 2. Appliquer le code sur les lignes (atomique)
-            TransactionLigne::whereIn('id', $ids)->update(['lettrage_code' => $code]);
-        });
+            TransactionLigne::whereIn('id', $ids)->update(['lettrage_code' => $codeEffectif]);
 
-        return $code;
+            return $codeEffectif;
+        });
     }
 
     /**
@@ -344,41 +345,70 @@ final class LettrageService
      * Séquence : AAAA, AAAB, AAAC, … AAAZ, AABA, … ZZZZ (456 976 combinaisons).
      * Scopé par compte_id → chaque compte a sa propre séquence.
      */
-    private static function nextCodeForCompte(int $compteId): string
+    private function reserverProchainCode(int $compteId): string
     {
-        $maxCode = TransactionLigne::where('compte_id', $compteId)
-            ->whereNotNull('lettrage_code')
-            ->max('lettrage_code');
+        $associationId = (int) TenantContext::currentId();
 
-        if ($maxCode === null) {
-            return 'AAAA';
+        DB::table('lettrage_sequences')->insertOrIgnore([
+            'association_id' => $associationId,
+            'compte_id' => $compteId,
+            'next_value' => 0,
+        ]);
+
+        $sequence = DB::table('lettrage_sequences')
+            ->where('association_id', $associationId)
+            ->where('compte_id', $compteId)
+            ->lockForUpdate()
+            ->first();
+
+        if ($sequence === null) {
+            throw new \RuntimeException("Impossible de réserver le code de lettrage du compte #{$compteId}.");
         }
 
-        return self::incrementCode($maxCode);
+        $plusGrandIndexExistant = TransactionLigne::where('compte_id', $compteId)
+            ->whereNotNull('lettrage_code')
+            ->pluck('lettrage_code')
+            ->reduce(function (int $maximum, mixed $code): int {
+                $index = self::indexDepuisCode((string) $code);
+
+                return $index === null ? $maximum : max($maximum, $index);
+            }, -1);
+        $indexReserve = max((int) $sequence->next_value, $plusGrandIndexExistant + 1);
+
+        if ($indexReserve >= 26 ** 4) {
+            throw new \RuntimeException('La séquence de lettrage alphabétique est épuisée.');
+        }
+
+        DB::table('lettrage_sequences')
+            ->where('association_id', $associationId)
+            ->where('compte_id', $compteId)
+            ->update(['next_value' => $indexReserve + 1]);
+
+        return self::codeDepuisIndex($indexReserve);
     }
 
-    /**
-     * Incrémente un code alphabétique (base 26, A-Z).
-     *
-     * AAA → AAB, AAZ → ABA, AZZ → BAA, ZZZ → AAAA.
-     */
-    private static function incrementCode(string $code): string
+    private static function indexDepuisCode(string $code): ?int
     {
-        $chars = str_split($code);
-        $i = count($chars) - 1;
-
-        while ($i >= 0) {
-            if ($chars[$i] === 'Z') {
-                $chars[$i] = 'A';
-                $i--;
-            } else {
-                $chars[$i] = chr(ord($chars[$i]) + 1);
-
-                return implode('', $chars);
-            }
+        if (preg_match('/^[A-Z]{4}$/', $code) !== 1) {
+            return null;
         }
 
-        // Overflow (ZZZ → AAAA) — ajoute une lettre
-        return 'A'.implode('', $chars);
+        return collect(str_split($code))
+            ->reduce(
+                fn (int $index, string $caractere): int => ($index * 26) + ord($caractere) - ord('A'),
+                0,
+            );
+    }
+
+    private static function codeDepuisIndex(int $index): string
+    {
+        $caracteres = array_fill(0, 4, 'A');
+
+        for ($position = 3; $position >= 0; $position--) {
+            $caracteres[$position] = chr(ord('A') + ($index % 26));
+            $index = intdiv($index, 26);
+        }
+
+        return implode('', $caracteres);
     }
 }

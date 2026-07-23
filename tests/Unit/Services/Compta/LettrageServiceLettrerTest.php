@@ -112,6 +112,52 @@ test('lettrer deux lignes equilibrees sans code → code généré de 20 caract�
     expect(TransactionLigne::find($ligne2->id)->lettrage_code)->toBe($code);
 });
 
+test('réserve séquentiellement les codes générés dans une séquence tenant compte atomique', function () {
+    $compte = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '411-SEQ',
+        'intitule' => 'Clients séquence',
+        'classe' => 4,
+        'lettrable' => true,
+        'actif' => true,
+        'est_systeme' => false,
+        'pour_inscriptions' => false,
+    ]);
+    $service = app(LettrageService::class);
+    $codes = collect();
+
+    foreach ([100, 200] as $montant) {
+        $montantDecimal = intdiv($montant, 100).'.'.str_pad(
+            (string) ($montant % 100),
+            2,
+            '0',
+            STR_PAD_LEFT,
+        );
+        $tx = Transaction::factory()->create(['association_id' => TenantContext::currentId()]);
+        $debit = TransactionLigne::create([
+            'transaction_id' => $tx->id,
+            'compte_id' => $compte->id,
+            'debit' => $montantDecimal,
+            'credit' => '0.00',
+            'montant' => 0,
+        ]);
+        $credit = TransactionLigne::create([
+            'transaction_id' => $tx->id,
+            'compte_id' => $compte->id,
+            'debit' => '0.00',
+            'credit' => $montantDecimal,
+            'montant' => 0,
+        ]);
+        $codes->push($service->lettrer(collect([$debit, $credit])));
+    }
+
+    expect($codes->all())->toBe(['AAAA', 'AAAB'])
+        ->and(DB::table('lettrage_sequences')
+            ->where('association_id', TenantContext::currentId())
+            ->where('compte_id', (int) $compte->id)
+            ->value('next_value'))->toBe(2);
+});
+
 // ---------------------------------------------------------------------------
 // Test 3 : compte non lettrable → CompteNonLettrableException, aucune écriture
 // ---------------------------------------------------------------------------
