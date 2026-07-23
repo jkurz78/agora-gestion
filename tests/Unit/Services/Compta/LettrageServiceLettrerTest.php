@@ -72,9 +72,9 @@ test('lettrer deux lignes equilibrees sur compte lettrable avec code fourni → 
 });
 
 // ---------------------------------------------------------------------------
-// Test 2 : lettrage sans code → code généré (20 chars)
+// Test 2 : lettrage sans code → code alphabétique séquentiel
 // ---------------------------------------------------------------------------
-test('lettrer deux lignes equilibrees sans code → code généré de 20 caractères', function () {
+test('lettrer deux lignes equilibrees sans code → premier code séquentiel AAAA', function () {
     $compte = Compte::create([
         'association_id' => TenantContext::currentId(),
         'numero_pcg' => '401',

@@ -8,6 +8,7 @@ use App\DTOs\Compta\PosteTiersOuvert;
 use App\DTOs\Compta\PosteTiersReglementData;
 use App\Enums\ModePaiement;
 use App\Enums\Sens;
+use App\Enums\StatutReglement;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Transaction;
@@ -60,6 +61,58 @@ final class PosteTiersReglementService
         );
     }
 
+    /**
+     * Solde le reliquat depuis une transaction historique dont le mode et le
+     * compte bancaire doivent être relus sous verrou.
+     *
+     * @return Transaction|null Null si aucun mode de paiement n'est enregistré.
+     */
+    public function reglerReliquatDepuisTransaction(
+        int $ligneId,
+        int $transactionSourceId,
+        CarbonImmutable $date,
+        int $exercice,
+    ): ?Transaction {
+        return $this->executerDepuisTransaction(
+            ligneId: $ligneId,
+            transactionSourceId: $transactionSourceId,
+            date: $date,
+            modePropose: null,
+            compteBancaireIdPropose: null,
+            exercice: $exercice,
+            exigerTransactionEnAttente: false,
+        );
+    }
+
+    /**
+     * Solde le reliquat et renseigne atomiquement le mode/compte de la T1.
+     *
+     * Les valeurs proposées ne remplacent jamais un mode déjà enregistré :
+     * chaque retry relit la transaction sous verrou et recalcule les valeurs
+     * effectives à partir de l'état courant.
+     *
+     * @return Transaction|null Null si la transaction n'est plus éligible ou
+     *                          si aucun mode effectif n'est disponible.
+     */
+    public function reglerReliquatEtRenseignerTransaction(
+        int $ligneId,
+        int $transactionSourceId,
+        CarbonImmutable $date,
+        ?ModePaiement $modePropose,
+        ?int $compteBancaireIdPropose,
+        int $exercice,
+    ): ?Transaction {
+        return $this->executerDepuisTransaction(
+            ligneId: $ligneId,
+            transactionSourceId: $transactionSourceId,
+            date: $date,
+            modePropose: $modePropose,
+            compteBancaireIdPropose: $compteBancaireIdPropose,
+            exercice: $exercice,
+            exigerTransactionEnAttente: true,
+        );
+    }
+
     private function executer(
         int $ligneId,
         ?int $montantCentimes,
@@ -68,13 +121,7 @@ final class PosteTiersReglementService
         ?int $compteBancaireId,
         int $exercice,
     ): Transaction {
-        // Résolution sans verrou avant l'ouverture de la transaction : on ne
-        // verrouille jamais une fraction cible avant sa racine, et cette
-        // lecture ne fige pas un snapshot InnoDB qui survivrait à un retry.
-        $ligneReference = TransactionLigne::query()
-            ->withTrashed()
-            ->findOrFail($ligneId);
-        $ligneCanoniqueId = (int) ($ligneReference->poste_tiers_parent_id ?? $ligneReference->id);
+        $ligneCanoniqueId = $this->resoudreLigneCanoniqueId($ligneId);
 
         return DB::transaction(function () use (
             $ligneCanoniqueId,
@@ -86,46 +133,158 @@ final class PosteTiersReglementService
         ): Transaction {
             $this->exerciceService->assertOuvertVerrouille($exercice);
             $this->assertDateDansExercice($date, $exercice);
-            $this->assertCompteBancaireDuTenant($compteBancaireId);
 
             $lignesVerrouillees = $this->verrouillerLotCanonique($ligneCanoniqueId);
+            $this->assertCompteBancaireDuTenant($compteBancaireId);
 
-            $poste = $this->postesOuverts->trouver($ligneCanoniqueId, $exercice);
-            $montantEffectif = $montantCentimes ?? $poste->soldeCentimes;
-            $this->assertMontant($montantEffectif, $poste->soldeCentimes);
-
-            $ligneALettrer = $this->preparerPartPayee(
-                $poste,
-                $montantEffectif,
-                $lignesVerrouillees
-                    ->filter(fn (TransactionLigne $ligne): bool => $ligne->deleted_at === null)
-                    ->whereNull('lettrage_code')
-                    ->values(),
-            );
-            $compteTresorerie = $this->resoudreCompteTresorerie(
-                $ligneALettrer,
-                $mode,
-                $compteBancaireId,
-            );
-            $t1 = Transaction::findOrFail($poste->transactionOrigineId);
-
-            $t2 = $this->ecritureGenerator->pourReglement(
-                t1: $t1,
+            return $this->creerReglementVerrouille(
+                ligneCanoniqueId: $ligneCanoniqueId,
+                lignesVerrouillees: $lignesVerrouillees,
+                montantCentimes: $montantCentimes,
+                date: $date,
                 mode: $mode,
-                compteTresorerie: $compteTresorerie,
-                datePaiement: $date,
-                ligneTiersSource: $ligneALettrer,
-                heriterCompteBancaireSource: false,
+                compteBancaireId: $compteBancaireId,
+                exercice: $exercice,
             );
+        }, 3);
+    }
 
-            if ($t2->compte_id !== $compteBancaireId) {
-                $t2->update(['compte_id' => $compteBancaireId]);
+    private function executerDepuisTransaction(
+        int $ligneId,
+        int $transactionSourceId,
+        CarbonImmutable $date,
+        ?ModePaiement $modePropose,
+        ?int $compteBancaireIdPropose,
+        int $exercice,
+        bool $exigerTransactionEnAttente,
+    ): ?Transaction {
+        $ligneCanoniqueId = $this->resoudreLigneCanoniqueId($ligneId);
+
+        return DB::transaction(function () use (
+            $ligneCanoniqueId,
+            $transactionSourceId,
+            $date,
+            $modePropose,
+            $compteBancaireIdPropose,
+            $exercice,
+            $exigerTransactionEnAttente,
+        ): ?Transaction {
+            $this->exerciceService->assertOuvertVerrouille($exercice);
+            $this->assertDateDansExercice($date, $exercice);
+
+            $lignesVerrouillees = $this->verrouillerLotCanonique($ligneCanoniqueId);
+            $transactionSource = Transaction::query()
+                ->whereKey($transactionSourceId)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($exigerTransactionEnAttente
+                && (
+                    $transactionSource->statut_reglement !== StatutReglement::EnAttente
+                    || $transactionSource->isLockedByRapprochement()
+                    || $transactionSource->isLockedByFacture()
+                )) {
+                return null;
             }
 
-            $this->etatReglementResolver->syncer($t1->fresh());
+            $modeEffectif = $transactionSource->mode_paiement ?? $modePropose;
+            if ($modeEffectif === null) {
+                return null;
+            }
+
+            $compteBancaireIdEffectif = $transactionSource->compte_id;
+            $doitRenseignerSource = $transactionSource->mode_paiement === null && $modePropose !== null;
+            if ($doitRenseignerSource && $compteBancaireIdPropose !== null) {
+                $compteBancaireIdEffectif = $compteBancaireIdPropose;
+            }
+
+            $this->assertCompteBancaireDuTenant(
+                $compteBancaireIdEffectif !== null ? (int) $compteBancaireIdEffectif : null
+            );
+
+            $t2 = $this->creerReglementVerrouille(
+                ligneCanoniqueId: $ligneCanoniqueId,
+                lignesVerrouillees: $lignesVerrouillees,
+                montantCentimes: null,
+                date: $date,
+                mode: $modeEffectif,
+                compteBancaireId: $compteBancaireIdEffectif !== null
+                    ? (int) $compteBancaireIdEffectif
+                    : null,
+                exercice: $exercice,
+            );
+
+            if ($doitRenseignerSource) {
+                $transactionUpdate = ['mode_paiement' => $modeEffectif->value];
+                if ($compteBancaireIdPropose !== null) {
+                    $transactionUpdate['compte_id'] = $compteBancaireIdPropose;
+                }
+
+                $transactionSource->update($transactionUpdate);
+            }
 
             return $t2;
         }, 3);
+    }
+
+    private function resoudreLigneCanoniqueId(int $ligneId): int
+    {
+        // Lecture sans verrou avant la transaction : chaque retry verrouille
+        // ensuite la racine et toutes ses fractions dans l'ordre des IDs.
+        $ligneReference = TransactionLigne::query()
+            ->withTrashed()
+            ->findOrFail($ligneId);
+
+        return (int) ($ligneReference->poste_tiers_parent_id ?? $ligneReference->id);
+    }
+
+    /**
+     * @param  Collection<int, TransactionLigne>  $lignesVerrouillees
+     */
+    private function creerReglementVerrouille(
+        int $ligneCanoniqueId,
+        Collection $lignesVerrouillees,
+        ?int $montantCentimes,
+        CarbonImmutable $date,
+        ModePaiement $mode,
+        ?int $compteBancaireId,
+        int $exercice,
+    ): Transaction {
+        $poste = $this->postesOuverts->trouver($ligneCanoniqueId, $exercice);
+        $montantEffectif = $montantCentimes ?? $poste->soldeCentimes;
+        $this->assertMontant($montantEffectif, $poste->soldeCentimes);
+
+        $ligneALettrer = $this->preparerPartPayee(
+            $poste,
+            $montantEffectif,
+            $lignesVerrouillees
+                ->filter(fn (TransactionLigne $ligne): bool => $ligne->deleted_at === null)
+                ->whereNull('lettrage_code')
+                ->values(),
+        );
+        $compteTresorerie = $this->resoudreCompteTresorerie(
+            $ligneALettrer,
+            $mode,
+            $compteBancaireId,
+        );
+        $t1 = Transaction::findOrFail($poste->transactionOrigineId);
+
+        $t2 = $this->ecritureGenerator->pourReglement(
+            t1: $t1,
+            mode: $mode,
+            compteTresorerie: $compteTresorerie,
+            datePaiement: $date,
+            ligneTiersSource: $ligneALettrer,
+            heriterCompteBancaireSource: false,
+        );
+
+        if ($t2->compte_id !== $compteBancaireId) {
+            $t2->update(['compte_id' => $compteBancaireId]);
+        }
+
+        $this->etatReglementResolver->syncer($t1->fresh());
+
+        return $t2;
     }
 
     private function assertCompteBancaireDuTenant(?int $compteBancaireId): void

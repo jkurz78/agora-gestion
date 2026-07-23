@@ -38,7 +38,8 @@ final class LettrageService
      *
      * @param  Collection<int, TransactionLigne>  $lignes  Toutes sur le même compte, même tenant.
      *                                                     Accepte Illuminate\Support\Collection ou Eloquent\Collection.
-     * @param  string|null  $code  Si null, généré (UUID-short 20 chars).
+     * @param  string|null  $code  Si null, généré par séquence alphabétique
+     *                             propre au compte (AAAA, AAAB, …, ZZZZ).
      * @param  string|null  $motif  Optionnel, écrit en lettrage_audit.
      * @return string Le code de lettrage utilisé.
      *
@@ -117,8 +118,8 @@ final class LettrageService
      *
      * Résolution tenant : on charge les lignes via `whereHas('compte')` qui
      * applique le TenantScope sur `comptes.association_id` (fail-closed).
-     * Cela exclut silencieusement tout code cross-tenant (cryptographiquement
-     * improbable sur 20 chars aléatoires, mais défensif par construction).
+     * Un code séquentiel pouvant exister sur plusieurs comptes ou tenants,
+     * le filtrage tenant et le compte optionnel font partie de l'identité du groupe.
      *
      * @throws LettrageInexistantException si aucune ligne trouvée pour ce code (et ce tenant).
      */

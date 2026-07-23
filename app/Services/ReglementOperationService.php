@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\ModePaiement;
-use App\Enums\Sens;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Models\Compte;
@@ -17,12 +16,10 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\Compta\ANouveau\PosteReporteResolver;
-use App\Services\Compta\CompteTresorerieResolver;
 use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\EtatReglementResolver;
 use App\Services\Compta\PartieDoubleGuard;
 use App\Services\Compta\PosteTiersReglementService;
-use App\Support\MontantDecimal;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
@@ -249,16 +246,6 @@ final class ReglementOperationService
      */
     public function reglerOuEncaisser(Transaction $transaction): void
     {
-        $mode = $transaction->mode_paiement;
-
-        if ($mode === null) {
-            Log::warning('[PartieDouble][ReglementOperationService] — skip reglerOuEncaisser : mode_paiement null sur T1', [
-                'transaction_id' => (int) $transaction->id,
-            ]);
-
-            return;
-        }
-
         // Trouver la ligne tiers ouverte (411 ou 401, non lettrée, avec tiers)
         $ligneTiers = $this->posteReporteResolver->dernierePourTransaction($transaction);
 
@@ -270,37 +257,36 @@ final class ReglementOperationService
             return;
         }
 
-        if ($transaction->compte_id !== null) {
-            CompteBancaire::query()->findOrFail((int) $transaction->compte_id);
-        }
-
-        // Direction D/C → Sens pour CompteTresorerieResolver
-        $sens = MontantDecimal::versCentimes((string) $ligneTiers->debit) > 0
-            ? Sens::Recette
-            : Sens::Depense;
-
-        $compteTresorerie = CompteTresorerieResolver::resoudre(
-            compteBancaireId: $transaction->compte_id !== null ? (int) $transaction->compte_id : null,
-            mode: $mode,
-            contextLog: 'ReglementOperationService::reglerOuEncaisser',
-            sens: $sens,
-        );
-
-        if ($compteTresorerie === null) {
-            return;
-        }
-
         $datePaiement = $transaction->date;
         if ((int) $ligneTiers->transaction_id !== (int) $transaction->id) {
             $datePaiement = $ligneTiers->transaction()->firstOrFail()->date;
         }
 
-        $this->ecritureGenerator->pourReglement(
-            t1: $transaction,
-            mode: $mode,
-            compteTresorerie: $compteTresorerie,
-            datePaiement: $datePaiement,
-        );
+        $datePaiementImmutable = CarbonImmutable::parse($datePaiement->toDateString());
+        $exercice = $this->exerciceService->anneeForDate($datePaiementImmutable);
+
+        try {
+            $t2 = $this->posteTiersReglementService->reglerReliquatDepuisTransaction(
+                ligneId: (int) $ligneTiers->id,
+                transactionSourceId: (int) $transaction->id,
+                date: $datePaiementImmutable,
+                exercice: $exercice,
+            );
+        } catch (ModelNotFoundException $exception) {
+            if ($exception->getModel() !== TransactionLigne::class) {
+                throw $exception;
+            }
+
+            app(EtatReglementResolver::class)->syncer($transaction->fresh());
+
+            return;
+        }
+
+        if ($t2 === null) {
+            Log::warning('[PartieDouble][ReglementOperationService] — skip reglerOuEncaisser : mode_paiement null sur T1', [
+                'transaction_id' => (int) $transaction->id,
+            ]);
+        }
     }
 
     /**
@@ -341,16 +327,6 @@ final class ReglementOperationService
             return;
         }
 
-        $modeEffectif = $transactionCourante->mode_paiement ?? $mode;
-        if ($modeEffectif === null) {
-            return;
-        }
-
-        $compteIdEffectif = $transactionCourante->compte_id;
-        if ($transactionCourante->mode_paiement === null && $mode !== null && $compteId !== null) {
-            $compteIdEffectif = $compteId;
-        }
-
         $datePaiement = CarbonImmutable::parse($transactionCourante->date->toDateString());
         if ((int) $ligneTiersCourante->transaction_id !== (int) $transactionCourante->id) {
             $transactionActive = $ligneTiersCourante->transaction()->firstOrFail();
@@ -360,11 +336,12 @@ final class ReglementOperationService
         $exercice = $this->exerciceService->anneeForDate($datePaiement);
 
         try {
-            $this->posteTiersReglementService->reglerReliquat(
+            $this->posteTiersReglementService->reglerReliquatEtRenseignerTransaction(
                 ligneId: (int) $ligneTiersCourante->id,
+                transactionSourceId: $transactionId,
                 date: $datePaiement,
-                mode: $modeEffectif,
-                compteBancaireId: $compteIdEffectif !== null ? (int) $compteIdEffectif : null,
+                modePropose: $mode,
+                compteBancaireIdPropose: $compteId,
                 exercice: $exercice,
             );
         } catch (ModelNotFoundException $exception) {
@@ -375,17 +352,6 @@ final class ReglementOperationService
             app(EtatReglementResolver::class)->syncer($transactionCourante->fresh());
 
             return;
-        }
-
-        if ($transactionCourante->mode_paiement === null && $mode !== null) {
-            $transactionUpdate = ['mode_paiement' => $mode->value];
-            if ($compteId !== null) {
-                $transactionUpdate['compte_id'] = $compteId;
-            }
-
-            Transaction::query()
-                ->whereKey($transactionId)
-                ->update($transactionUpdate);
         }
     }
 

@@ -97,4 +97,29 @@ Vérifications complémentaires :
 - revue indépendante finale : zéro finding critique ou important ;
 - `git diff --check` et Pint : OK.
 
-La suite complète s’arrête dans `AnimateurManagerPrevisionnelTest` sur le plafond mémoire PHP de 512 Mo configuré par le runner. Le même fichier passe intégralement isolé ; cet arrêt n’est pas lié aux chemins comptables modifiés.
+Une première exécution de la suite complète s'est arrêtée dans
+`AnimateurManagerPrevisionnelTest` sur le plafond mémoire PHP de 512 Mo.
+La relance contrôleur avec `php -d memory_limit=1G` est verte : exit 0,
+15 009 assertions en 212,77 s.
+
+## Correctifs de re-revue des wrappers
+
+La re-revue indépendante a encore identifié deux chemins historiques :
+
+- `reglerOuEncaisser()` réservait les séquences avant de verrouiller le poste
+  tiers et ne verrouillait pas l'exercice ;
+- `marquerRegle()` pouvait committer T2 et le lettrage avant la mise à jour du
+  mode et du compte bancaire de T1.
+
+Les deux wrappers délèguent désormais au service commun. Celui-ci verrouille
+l'exercice, le lot canonique puis T1, relit le mode et le compte sous verrou,
+et exécute T2, lettrage, statut et mise à jour de T1 dans une seule transaction
+retryable. Un trigger sentinelle vérifie que l'échec de mise à jour de T1
+annule aussi T2 et le lettrage.
+
+Vérification locale après reprise de la session interrompue :
+
+- 55 tests ciblés, 191 assertions, exit 0 ;
+- Pint sur les cinq fichiers concernés : OK ;
+- documentation du code de lettrage mise à jour pour la séquence
+  alphabétique `AAAA` à `ZZZZ`.

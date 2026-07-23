@@ -23,6 +23,8 @@ use App\Services\ReglementOperationService;
 use App\Tenant\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use Tests\Support\CreatesPartieDoubleContext;
 
 uses(CreatesPartieDoubleContext::class);
@@ -124,6 +126,52 @@ test('reglerOuEncaisser — no-op si ligne tiers déjà lettrée (idempotence)',
     $this->service->reglerOuEncaisser($t1->fresh());
 
     expect(Transaction::count())->toBe($txCountBefore);
+});
+
+test('reglerOuEncaisser relit la transaction en base et verrouille l exercice avant le poste tiers', function () {
+    Exercice::create(['annee' => 2025, 'statut' => StatutExercice::Ouvert]);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
+    $t1 = $this->ecritureGen->pourRecetteACredit(
+        tiers: $tiers,
+        ventilations: [['compte' => $this->compte706, 'montant' => '42.00']],
+        dateConstatation: new DateTimeImmutable('2025-10-01'),
+        libelle: 'Créance wrapper avec modèle périmé',
+    );
+    $transactionPerimee = $t1->fresh();
+
+    Transaction::query()
+        ->whereKey((int) $t1->id)
+        ->update([
+            'mode_paiement' => ModePaiement::Virement->value,
+            'compte_id' => (int) $this->compteBancaire->id,
+        ]);
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+
+    $this->service->reglerOuEncaisser($transactionPerimee);
+
+    $requetes = collect(DB::getQueryLog())
+        ->pluck('query')
+        ->map(fn (string $sql): string => strtolower(str_replace(['"', '`'], '', $sql)))
+        ->values();
+    DB::disableQueryLog();
+    $indexExercice = $requetes->search(
+        fn (string $sql): bool => str_contains($sql, 'from exercices')
+    );
+    $indexLot = $requetes->search(
+        fn (string $sql): bool => str_contains($sql, 'from transaction_lignes')
+            && str_contains($sql, 'poste_tiers_parent_id')
+    );
+
+    expect($indexExercice)->not->toBeFalse()
+        ->and($indexLot)->not->toBeFalse()
+        ->and((int) $indexExercice)->toBeLessThan((int) $indexLot)
+        ->and(
+            $t1->lignes()
+                ->whereNotNull('lettrage_code')
+                ->exists()
+        )->toBeTrue();
 });
 
 test('marquerRegle — recette EnAttente → statut dérivé + T2', function () {
@@ -322,4 +370,44 @@ test('marquerRecu relit le reliquat courant après un règlement partiel concurr
         ->values()
         ->all())->toBe([3000, 7000])
         ->and($t1->fresh()->statut_reglement)->toBe(StatutReglement::Recu);
+});
+
+test('marquerRecu annule T2 et le lettrage si la mise à jour du mode de T1 échoue', function () {
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
+    $t1 = $this->ecritureGen->pourRecetteACredit(
+        tiers: $tiers,
+        ventilations: [['compte' => $this->compte706, 'montant' => '73.00']],
+        dateConstatation: new DateTimeImmutable('2025-10-03'),
+        libelle: 'Créance rollback wrapper',
+    );
+    $t1->update(['statut_reglement' => StatutReglement::EnAttente]);
+    $ligne411 = $t1->lignes->first(
+        fn (TransactionLigne $ligne): bool => $ligne->compte?->numero_pcg === '411'
+    );
+    $transactionsAvant = Transaction::count();
+    DB::statement(
+        "CREATE TRIGGER echec_mode_t1
+        BEFORE UPDATE OF mode_paiement ON transactions
+        WHEN OLD.mode_paiement IS NULL AND NEW.mode_paiement IS NOT NULL
+        BEGIN
+            SELECT RAISE(ABORT, 'Échec sentinelle mise à jour mode T1');
+        END"
+    );
+
+    try {
+        expect(fn () => $this->service->marquerRecu(
+            $t1->fresh(),
+            ModePaiement::Virement,
+            (int) $this->compteBancaire->id,
+        ))->toThrow(QueryException::class, 'Échec sentinelle');
+    } finally {
+        DB::statement('DROP TRIGGER echec_mode_t1');
+    }
+
+    expect(Transaction::count())->toBe($transactionsAvant)
+        ->and($ligne411->fresh()->lettrage_code)->toBeNull()
+        ->and($ligne411->fractionsPosteTiers()->count())->toBe(0)
+        ->and($t1->fresh()->mode_paiement)->toBeNull()
+        ->and($t1->fresh()->compte_id)->toBeNull()
+        ->and($t1->fresh()->statut_reglement)->toBe(StatutReglement::EnAttente);
 });
