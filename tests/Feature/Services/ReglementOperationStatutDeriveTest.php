@@ -2,12 +2,19 @@
 
 declare(strict_types=1);
 
+use App\DTOs\Compta\PosteTiersReglementData;
 use App\Enums\ModePaiement;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
+use App\Models\RapprochementBancaire;
 use App\Models\Tiers;
+use App\Models\TransactionLigne;
+use App\Services\Compta\EcritureGenerator;
+use App\Services\Compta\EtatReglementResolver;
+use App\Services\Compta\PosteTiersReglementService;
 use App\Services\ReglementOperationService;
 use App\Services\TransactionService;
+use Carbon\CarbonImmutable;
 use Tests\Support\CreatesPartieDoubleContext;
 
 uses(CreatesPartieDoubleContext::class);
@@ -82,4 +89,83 @@ it('marquerPaye virement sur dette → statut dérivé Recu (réglé)', function
     );
 
     expect($dette->fresh()->statut_reglement)->toBe(StatutReglement::Recu);
+});
+
+it('agrège plusieurs T2 bancaires en Recu puis Pointe seulement quand toutes sont rapprochées', function () {
+    $t1 = app(EcritureGenerator::class)->pourRecetteACredit(
+        tiers: $this->tiers,
+        ventilations: [['compte' => $this->compte706, 'montant' => 100.0]],
+        dateConstatation: new DateTimeImmutable('2025-10-15'),
+    );
+    $t1->update(['statut_reglement' => StatutReglement::EnAttente]);
+    $ligne411 = $t1->lignes->first(
+        fn (TransactionLigne $ligne): bool => $ligne->compte?->numero_pcg === '411'
+    );
+    $service = app(PosteTiersReglementService::class);
+
+    $t2Premiere = $service->regler(new PosteTiersReglementData(
+        ligneId: (int) $ligne411->id,
+        montantCentimes: 3000,
+        date: CarbonImmutable::parse('2026-07-21'),
+        mode: ModePaiement::Virement,
+        compteBancaireId: (int) $this->compteBancaire->id,
+        exercice: 2025,
+    ));
+    $t2Seconde = $service->regler(new PosteTiersReglementData(
+        ligneId: (int) $ligne411->id,
+        montantCentimes: 7000,
+        date: CarbonImmutable::parse('2026-07-22'),
+        mode: ModePaiement::Virement,
+        compteBancaireId: (int) $this->compteBancaire->id,
+        exercice: 2025,
+    ));
+
+    expect($t1->fresh()->statut_reglement)->toBe(StatutReglement::Recu);
+
+    $rapprochement = RapprochementBancaire::factory()->create([
+        'association_id' => $this->association->id,
+        'compte_id' => $this->compteBancaire->id,
+        'saisi_par' => $this->user->id,
+    ]);
+    $t2Premiere->update(['rapprochement_id' => (int) $rapprochement->id]);
+    app(EtatReglementResolver::class)->syncer($t1->fresh());
+
+    expect($t1->fresh()->statut_reglement)->toBe(StatutReglement::Recu);
+
+    $t2Seconde->update(['rapprochement_id' => (int) $rapprochement->id]);
+    app(EtatReglementResolver::class)->syncer($t1->fresh());
+
+    expect($t1->fresh()->statut_reglement)->toBe(StatutReglement::Pointe);
+});
+
+it('agrège plusieurs T2 en EnMain si au moins un portage reste non remis', function () {
+    $t1 = app(EcritureGenerator::class)->pourRecetteACredit(
+        tiers: $this->tiers,
+        ventilations: [['compte' => $this->compte706, 'montant' => 100.0]],
+        dateConstatation: new DateTimeImmutable('2025-10-15'),
+    );
+    $t1->update(['statut_reglement' => StatutReglement::EnAttente]);
+    $ligne411 = $t1->lignes->first(
+        fn (TransactionLigne $ligne): bool => $ligne->compte?->numero_pcg === '411'
+    );
+    $service = app(PosteTiersReglementService::class);
+
+    $service->regler(new PosteTiersReglementData(
+        ligneId: (int) $ligne411->id,
+        montantCentimes: 3000,
+        date: CarbonImmutable::parse('2026-07-21'),
+        mode: ModePaiement::Cheque,
+        compteBancaireId: (int) $this->compteBancaire->id,
+        exercice: 2025,
+    ));
+    $service->regler(new PosteTiersReglementData(
+        ligneId: (int) $ligne411->id,
+        montantCentimes: 7000,
+        date: CarbonImmutable::parse('2026-07-22'),
+        mode: ModePaiement::Virement,
+        compteBancaireId: (int) $this->compteBancaire->id,
+        exercice: 2025,
+    ));
+
+    expect($t1->fresh()->statut_reglement)->toBe(StatutReglement::EnMain);
 });

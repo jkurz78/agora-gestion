@@ -3,12 +3,18 @@
 declare(strict_types=1);
 
 use App\Enums\ModePaiement;
+use App\Enums\OrigineANouveau;
+use App\Enums\StatutExercice;
 use App\Enums\StatutReglement;
 use App\Models\Compte;
+use App\Models\Exercice;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Services\Compta\ANouveau\ANouveauPreviewBuilder;
+use App\Services\Compta\ANouveau\ANouveauService;
 use App\Services\Compta\EcritureGenerator;
+use App\Services\Compta\PostesTiersOuvertsService;
 use App\Services\ReglementOperationService;
 use App\Tenant\TenantContext;
 use Tests\Support\CreatesPartieDoubleContext;
@@ -160,4 +166,79 @@ test('marquerRegle — dépense EnAttente → statut dérivé + T2', function ()
         ->where('compte_id', (int) Compte::ofNumeroSysteme('401')->id)
         ->first();
     expect($ligne401->lettrage_code)->not->toBeNull();
+});
+
+test('marquerRecu — wrapper historique délègue le solde agrégé à la date de la transaction', function () {
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
+    $t1 = $this->ecritureGen->pourRecetteACredit(
+        tiers: $tiers,
+        ventilations: [['compte' => $this->compte706, 'montant' => 100.0]],
+        dateConstatation: new DateTimeImmutable('2025-10-03'),
+        libelle: 'Créance fractionnée avant wrapper',
+    );
+    $t1->update(['statut_reglement' => StatutReglement::EnAttente]);
+    $ligne411 = $t1->lignes->first(
+        fn (TransactionLigne $ligne): bool => $ligne->compte?->numero_pcg === '411'
+    );
+    $ligne411->update(['debit' => '60.00']);
+    $fractionOuverte = $ligne411->replicate(['id', 'lettrage_code', 'deleted_at']);
+    $fractionOuverte->fill([
+        'debit' => '40.00',
+        'credit' => '0.00',
+        'poste_tiers_parent_id' => (int) $ligne411->id,
+    ]);
+    $fractionOuverte->save();
+
+    $this->service->marquerRecu(
+        $t1->fresh(),
+        ModePaiement::Virement,
+        (int) $this->compteBancaire->id,
+    );
+
+    $reglement = app(PostesTiersOuvertsService::class)->reglements($t1->fresh())->sole();
+    $t2 = Transaction::findOrFail($reglement->transactionId);
+
+    expect($reglement->montantCentimes)->toBe(10000)
+        ->and($t2->date->toDateString())->toBe('2025-10-03')
+        ->and($t1->fresh()->statut_reglement)->toBe(StatutReglement::Recu)
+        ->and(app(PostesTiersOuvertsService::class)->pourTransaction($t1->fresh(), 2025))->toBeNull();
+});
+
+test('marquerRecu — wrapper historique date un règlement AN au jour de la pièce active', function () {
+    Exercice::create(['annee' => 2025, 'statut' => StatutExercice::Ouvert]);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
+    $t1 = $this->ecritureGen->pourRecetteACredit(
+        tiers: $tiers,
+        ventilations: [['compte' => $this->compte706, 'montant' => 80.0]],
+        dateConstatation: new DateTimeImmutable('2026-08-20'),
+        libelle: 'Créance reportée avant wrapper',
+    );
+    $t1->update(['statut_reglement' => StatutReglement::EnAttente]);
+    $source411 = $t1->lignes->first(
+        fn (TransactionLigne $ligne): bool => $ligne->compte?->numero_pcg === '411'
+    );
+    $generation = app(ANouveauService::class)->persister(
+        app(ANouveauPreviewBuilder::class)->build(2025),
+        OrigineANouveau::Cloture,
+        $this->user,
+    );
+    $ligneAN = $generation->origines()
+        ->with('ligneAN')
+        ->where('ligne_racine_id', (int) $source411->id)
+        ->firstOrFail()
+        ->ligneAN;
+
+    $this->service->marquerRecu(
+        $t1->fresh(),
+        ModePaiement::Virement,
+        (int) $this->compteBancaire->id,
+    );
+
+    $reglement = app(PostesTiersOuvertsService::class)->reglements($t1->fresh())->sole();
+    $t2 = Transaction::findOrFail($reglement->transactionId);
+
+    expect($source411->fresh()->lettrage_code)->toBeNull()
+        ->and($ligneAN->fresh()->lettrage_code)->not->toBeNull()
+        ->and($t2->date->toDateString())->toBe('2026-09-01')
+        ->and($t1->fresh()->statut_reglement)->toBe(StatutReglement::Recu);
 });

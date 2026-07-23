@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Services\Compta;
 
+use App\DTOs\Compta\ReglementPosteTiers;
+use App\Enums\JournalComptable;
 use App\Enums\StatutReglement;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\Compta\ANouveau\PosteReporteResolver;
-use App\Services\ReglementOperationService;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
@@ -27,7 +28,7 @@ use Illuminate\Database\Eloquent\Builder;
 final class EtatReglementResolver
 {
     public function __construct(
-        private readonly ReglementOperationService $reglementService,
+        private readonly PostesTiersOuvertsService $postesOuverts,
         private readonly PosteReporteResolver $posteReporteResolver,
     ) {}
 
@@ -49,6 +50,10 @@ final class EtatReglementResolver
             return $t1->statut_reglement; // legacy/HelloAsso : pas de ligne PD
         }
 
+        if ($this->postesOuverts->soldeActifPourTransaction($t1) > 0) {
+            return StatutReglement::EnAttente;
+        }
+
         // Étape « ouvert » : ligne de tiers non lettrée.
         if ($ligneTiers->lettrage_code === null) {
             return StatutReglement::EnAttente;
@@ -56,7 +61,7 @@ final class EtatReglementResolver
 
         // Lettré → localiser la transaction qui porte la trésorerie.
         // T2 séparée si elle existe, sinon la T1 elle-même (encaissement lumpé).
-        $t2 = $this->reglementService->trouverT2($t1);
+        $t2 = $this->trouverT2($ligneTiers);
 
         // Guard cancellation pair : si le « T2 » trouvé est en fait l'origine extournée
         // (tiers cross-lettré par ExtourneService), c'est une annulation comptable pure → Pointé.
@@ -64,6 +69,11 @@ final class EtatReglementResolver
         // et conclurait incorrectement « Recu » (abandon de créance).
         if ($t2 !== null && $t2->extournee_at !== null) {
             return StatutReglement::Pointe;
+        }
+
+        $statutAgrege = $this->statutAgregeDesReglements($t1);
+        if ($statutAgrege !== null) {
+            return $statutAgrege;
         }
 
         $txPortage = $t2 ?? $t1;
@@ -111,6 +121,61 @@ final class EtatReglementResolver
             $t1->statut_reglement = $derive;
             $t1->save();
         }
+    }
+
+    private function statutAgregeDesReglements(Transaction $t1): ?StatutReglement
+    {
+        if ($t1->journal === JournalComptable::Banque) {
+            return null;
+        }
+
+        $reglements = $this->postesOuverts->reglements($t1);
+        if ($reglements->isEmpty()) {
+            return null;
+        }
+
+        $statuts = $reglements
+            ->map(function (ReglementPosteTiers $reglement): StatutReglement {
+                $transaction = Transaction::find($reglement->transactionId);
+                if ($transaction === null) {
+                    return StatutReglement::Recu;
+                }
+
+                $ligneTresorerie = TransactionLigne::with('compte')
+                    ->where('transaction_id', (int) $transaction->id)
+                    ->whereHas('compte', fn (Builder $query): Builder => $query->where('classe', 5))
+                    ->first();
+
+                return $ligneTresorerie === null
+                    ? StatutReglement::Recu
+                    : $this->statutDepuisTresorerie($ligneTresorerie, $transaction);
+            })
+            ->values();
+
+        if ($statuts->contains(StatutReglement::EnMain)) {
+            return StatutReglement::EnMain;
+        }
+
+        return $statuts->every(
+            fn (StatutReglement $statut): bool => $statut === StatutReglement::Pointe
+        )
+            ? StatutReglement::Pointe
+            : StatutReglement::Recu;
+    }
+
+    private function trouverT2(TransactionLigne $ligneTiers): ?Transaction
+    {
+        if ($ligneTiers->lettrage_code === null) {
+            return null;
+        }
+
+        $ligneT2 = TransactionLigne::query()
+            ->where('lettrage_code', $ligneTiers->lettrage_code)
+            ->where('compte_id', (int) $ligneTiers->compte_id)
+            ->where('transaction_id', '!=', (int) $ligneTiers->transaction_id)
+            ->first();
+
+        return $ligneT2 === null ? null : Transaction::find($ligneT2->transaction_id);
     }
 
     /**

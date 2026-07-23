@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\DTOs\Compta\PosteTiersReglementData;
 use App\Enums\ModePaiement;
 use App\Enums\Sens;
 use App\Enums\StatutReglement;
@@ -21,22 +22,21 @@ use App\Services\Compta\CompteTresorerieResolver;
 use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\EtatReglementResolver;
 use App\Services\Compta\PartieDoubleGuard;
+use App\Services\Compta\PostesTiersOuvertsService;
+use App\Services\Compta\PosteTiersReglementService;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
  * Service métier pour l'onglet Règlements d'une opération (ReglementTable Livewire).
  *
- * Step 26 : branche comptabiliserSeance() + marquerRecu() sur le moteur partie double.
- *
- * Stratégie (alternative pragmatique — voir décisions Step 26) :
- * — comptabiliserSeance : crée Transaction + TransactionLigne legacy directement (pattern FactureService),
- *   puis enrichit via EcritureGenerator::pourRecetteACredit(existingTransaction: $tx).
- *   Pas de modification de TransactionService::enrichirPartieDouble (évite routing implicite EnAttente).
- * — marquerRecu : toggle statut_reglement = Recu + génère T2 via pourEncaissementCreance
- *   + auto-lettrage 411 (pattern Step 24 FactureService::encaisserPartieDouble).
+ * Les anciens boutons marquerRecu/marquerPaye délèguent temporairement au
+ * service daté des postes tiers. Les traitements internes best-effort
+ * reglerOuEncaisser/encaisserSiNonEncaisse restent disponibles jusqu'à la
+ * migration complète des interfaces.
  */
 final class ReglementOperationService
 {
@@ -44,6 +44,9 @@ final class ReglementOperationService
         private readonly EcritureGenerator $ecritureGenerator,
         private readonly NumeroPieceService $numeroPiece,
         private readonly PosteReporteResolver $posteReporteResolver,
+        private readonly PostesTiersOuvertsService $postesOuverts,
+        private readonly PosteTiersReglementService $posteTiersReglementService,
+        private readonly ExerciceService $exerciceService,
     ) {}
 
     /**
@@ -144,24 +147,19 @@ final class ReglementOperationService
     }
 
     /**
-     * Marque une transaction de règlement comme reçue + génère T2 (encaissement) partie double.
+     * Solde le poste client restant via le service de règlement daté.
      *
-     * @deprecated Utiliser marquerRegle() à la place (unifié 411/401, agnostique au type).
-     *
-     * Pattern Step 24 (FactureService::encaisserPartieDouble) reproduit ici.
-     *
-     * Gardes skip silencieux (best-effort — la mise à jour statut_reglement est préservée) :
-     * — mode_paiement null sur T1 et $mode null → skip T2 (encaisserSiNonEncaisse)
-     * — mode nécessitant 512X et compte 512X introuvable (IBAN non matché)
-     * — T1 ne porte pas de ligne 411 (transaction legacy sans double écriture)
-     * — ligne 411 de T1 déjà lettrée (idempotence — voir encaisserSiNonEncaisse)
+     * @deprecated Les interfaces utilisateur doivent ouvrir PosteTiersReglementModal.
      *
      * @param  ModePaiement|null  $mode  Mode d'encaissement fourni pour une créance (mode_paiement null).
      *                                   Si null, comportement rétro-compatible inchangé.
      * @param  int|null  $compteId  Compte bancaire cible optionnel (remplace compte_id si fourni).
      */
-    public function marquerRecu(Transaction $transaction, ?ModePaiement $mode = null, ?int $compteId = null): void
-    {
+    public function marquerRecu(
+        Transaction $transaction,
+        ?ModePaiement $mode = null,
+        ?int $compteId = null,
+    ): void {
         $this->marquerRegle($transaction, $mode, $compteId);
     }
 
@@ -197,24 +195,19 @@ final class ReglementOperationService
     }
 
     /**
-     * Marque une transaction de dépense comme payée + génère T2 (règlement) partie double.
+     * Solde le poste fournisseur restant via le service de règlement daté.
      *
-     * @deprecated Utiliser marquerRegle() à la place (unifié 411/401, agnostique au type).
-     *
-     * Miroir de marquerRecu() pour les dépenses (compte 401 au lieu de 411).
-     *
-     * Gardes skip silencieux (best-effort — la mise à jour statut_reglement est préservée) :
-     * — mode_paiement null sur T1 et $mode null → skip T2 (reglerSiNonRegle)
-     * — mode nécessitant 512X et compte 512X introuvable (IBAN non matché)
-     * — T1 ne porte pas de ligne 401 (transaction legacy sans double écriture)
-     * — ligne 401 de T1 déjà lettrée (idempotence — voir reglerSiNonRegle)
+     * @deprecated Les interfaces utilisateur doivent ouvrir PosteTiersReglementModal.
      *
      * @param  ModePaiement|null  $mode  Mode de règlement fourni pour une dette (mode_paiement null).
      *                                   Si null, comportement rétro-compatible inchangé.
      * @param  int|null  $compteId  Compte bancaire cible optionnel (remplace compte_id si fourni).
      */
-    public function marquerPaye(Transaction $transaction, ?ModePaiement $mode = null, ?int $compteId = null): void
-    {
+    public function marquerPaye(
+        Transaction $transaction,
+        ?ModePaiement $mode = null,
+        ?int $compteId = null,
+    ): void {
         $this->marquerRegle($transaction, $mode, $compteId);
     }
 
@@ -306,10 +299,9 @@ final class ReglementOperationService
     }
 
     /**
-     * Marque une transaction comme réglée + génère T2 partie double.
+     * Marque une transaction comme réglée via le service de poste tiers daté.
      *
-     * Unifie marquerRecu (411) et marquerPaye (401). Agnostique au type.
-     * Opère via reglerOuEncaisser qui lit la ligne tiers ouverte.
+     * @deprecated Les interfaces utilisateur doivent ouvrir PosteTiersReglementModal.
      *
      * @param  ModePaiement|null  $mode  Mode fourni pour une créance/dette sans mode.
      * @param  int|null  $compteId  Compte bancaire cible optionnel.
@@ -324,22 +316,94 @@ final class ReglementOperationService
             return;
         }
 
-        DB::transaction(function () use ($transaction, $mode, $compteId): void {
-            $updateData = ['statut_reglement' => StatutReglement::Recu->value];
-            if ($transaction->mode_paiement === null && $mode !== null) {
-                $updateData['mode_paiement'] = $mode->value;
-                if ($compteId !== null) {
-                    $updateData['compte_id'] = $compteId;
-                }
+        $ligneTiers = $this->posteReporteResolver->dernierePourTransaction($transaction);
+        if ($ligneTiers === null) {
+            $this->marquerLegacyCommeReglee($transaction, $mode, $compteId);
+
+            return;
+        }
+
+        $modeEffectif = $transaction->mode_paiement ?? $mode;
+        if ($modeEffectif === null) {
+            return;
+        }
+
+        $compteIdEffectif = $transaction->compte_id;
+        if ($transaction->mode_paiement === null && $mode !== null && $compteId !== null) {
+            $compteIdEffectif = $compteId;
+        }
+        $transactionId = (int) $transaction->id;
+        $transactionUpdate = null;
+        if ($transaction->mode_paiement === null && $mode !== null) {
+            $transactionUpdate = ['mode_paiement' => $mode->value];
+            if ($compteId !== null) {
+                $transactionUpdate['compte_id'] = $compteId;
             }
+        }
 
-            $transaction->update($updateData);
-            $transaction->refresh();
+        $datePaiement = CarbonImmutable::parse($transaction->date->toDateString());
+        if ((int) $ligneTiers->transaction_id !== (int) $transaction->id) {
+            $transactionActive = $ligneTiers->transaction()->firstOrFail();
+            $datePaiement = CarbonImmutable::parse($transactionActive->date->toDateString());
+        }
 
-            $this->reglerOuEncaisser($transaction);
-
+        $exercice = $this->exerciceService->anneeForDate($datePaiement);
+        $poste = $this->postesOuverts->pourTransaction($transaction, $exercice);
+        if ($poste === null) {
             app(EtatReglementResolver::class)->syncer($transaction->fresh());
-        });
+
+            return;
+        }
+
+        DB::transaction(function () use (
+            $modeEffectif,
+            $compteIdEffectif,
+            $datePaiement,
+            $exercice,
+            $poste,
+            $transactionId,
+            $transactionUpdate,
+        ): void {
+            $this->posteTiersReglementService->regler(new PosteTiersReglementData(
+                ligneId: $poste->ligneActionId,
+                montantCentimes: $poste->soldeCentimes,
+                date: $datePaiement,
+                mode: $modeEffectif,
+                compteBancaireId: $compteIdEffectif !== null ? (int) $compteIdEffectif : null,
+                exercice: $exercice,
+            ));
+
+            if ($transactionUpdate !== null) {
+                Transaction::query()
+                    ->whereKey($transactionId)
+                    ->update($transactionUpdate);
+            }
+        }, 3);
+    }
+
+    private function marquerLegacyCommeReglee(
+        Transaction $transaction,
+        ?ModePaiement $mode,
+        ?int $compteId,
+    ): void {
+        $transactionId = (int) $transaction->id;
+        $updateData = ['statut_reglement' => StatutReglement::Recu->value];
+        if ($transaction->mode_paiement === null && $mode !== null) {
+            $updateData['mode_paiement'] = $mode->value;
+            if ($compteId !== null) {
+                $updateData['compte_id'] = $compteId;
+            }
+        }
+
+        DB::transaction(function () use ($transactionId, $updateData): void {
+            Transaction::query()
+                ->whereKey($transactionId)
+                ->update($updateData);
+
+            app(EtatReglementResolver::class)->syncer(
+                Transaction::findOrFail($transactionId)
+            );
+        }, 3);
     }
 
     /**
