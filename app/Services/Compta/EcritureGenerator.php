@@ -1246,6 +1246,22 @@ final class EcritureGenerator
             );
         }
 
+        $currentTenantId = (int) TenantContext::currentId();
+
+        if (! Transaction::withTrashed()->whereKey((int) $ligneTiersSource->transaction_id)->exists()) {
+            $transactionAssociationId = (int) (
+                Transaction::withoutGlobalScopes()
+                    ->whereKey((int) $ligneTiersSource->transaction_id)
+                    ->value('association_id') ?? 0
+            );
+
+            throw TenantBoundaryException::crossTenantLigne(
+                (int) $ligneTiersSource->id,
+                $transactionAssociationId,
+                $currentTenantId
+            );
+        }
+
         $this->assertTenantCoherence(collect([$ligneTiersSource]));
 
         $compteTiers = $ligneTiersSource->relationLoaded('compte')

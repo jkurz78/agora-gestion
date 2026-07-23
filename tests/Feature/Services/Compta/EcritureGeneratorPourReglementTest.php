@@ -5,10 +5,13 @@ declare(strict_types=1);
 use App\Enums\ModePaiement;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
+use App\Exceptions\Compta\TenantBoundaryException;
+use App\Models\Association;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\Compta\EcritureGenerator;
+use App\Tenant\TenantContext;
 use Tests\Support\CreatesPartieDoubleContext;
 
 uses(CreatesPartieDoubleContext::class);
@@ -308,6 +311,65 @@ test('pourReglement — refuse une ligne explicite issue d une autre racine meti
         datePaiement: new DateTimeImmutable('2026-07-23'),
         ligneTiersSource: $ligneAutreRacine,
     ))->toThrow(InvalidArgumentException::class);
+});
+
+test('pourReglement — refuse une ligne explicite dont la transaction appartient a un autre tenant', function () {
+    $tiersLocal = Tiers::factory()->create(['association_id' => $this->association->id]);
+    $t1 = $this->ecritureGen->pourRecetteACredit(
+        tiers: $tiersLocal,
+        ventilations: [['compte' => $this->compte706, 'montant' => 150.0]],
+        dateConstatation: new DateTimeImmutable('2025-10-01'),
+    );
+    $ligneRacineLocale = $t1->lignes->first(
+        fn (TransactionLigne $ligne): bool => $ligne->compte?->numero_pcg === '411'
+    );
+
+    $associationEtrangere = Association::factory()->create();
+    TenantContext::boot($associationEtrangere);
+
+    $transactionEtrangere = Transaction::create([
+        'association_id' => (int) $associationEtrangere->id,
+        'type' => TypeTransaction::Recette,
+        'date' => '2025-10-02',
+        'libelle' => 'Transaction étrangère',
+        'montant_total' => 35.0,
+        'mode_paiement' => null,
+        'statut_reglement' => StatutReglement::EnAttente,
+        'equilibree' => true,
+        'type_ecriture' => 'normale',
+    ]);
+    $ligneEtrangere = TransactionLigne::create([
+        'transaction_id' => (int) $transactionEtrangere->id,
+        'compte_id' => (int) $ligneRacineLocale->compte_id,
+        'debit' => 35.0,
+        'credit' => 0,
+        'tiers_id' => (int) $tiersLocal->id,
+        'poste_tiers_parent_id' => (int) $ligneRacineLocale->id,
+        'libelle' => 'Fraction étrangère maquillée en poste local',
+        'montant' => 0,
+    ]);
+
+    TenantContext::boot($this->association);
+
+    $ligneEtrangereHorsScope = TransactionLigne::withoutGlobalScopes()
+        ->findOrFail((int) $ligneEtrangere->id);
+    $nombreTransactionsAvant = Transaction::withoutGlobalScopes()->count();
+
+    expect(fn () => $this->ecritureGen->pourReglement(
+        t1: $t1,
+        mode: ModePaiement::Virement,
+        compteTresorerie: $this->compte512X,
+        datePaiement: new DateTimeImmutable('2026-07-23'),
+        ligneTiersSource: $ligneEtrangereHorsScope,
+    ))->toThrow(TenantBoundaryException::class);
+
+    expect(Transaction::withoutGlobalScopes()->count())->toBe($nombreTransactionsAvant)
+        ->and(
+            TransactionLigne::withoutGlobalScopes()
+                ->findOrFail((int) $ligneEtrangere->id)
+                ->lettrage_code
+        )->toBeNull()
+        ->and($ligneRacineLocale->fresh()->lettrage_code)->toBeNull();
 });
 
 test('pourReglement — refuse une ligne explicite deja lettree', function () {
