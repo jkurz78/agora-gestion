@@ -602,25 +602,18 @@ Lorsque le poste est soldé avec plusieurs T2, agréger ainsi : `EnMain` si au m
 
 - [ ] **Step 7: Déléguer les anciens boutons**
 
-Conserver les anciens points d'entrée de `ReglementOperationService` pour les traitements internes, mais leur ajouter une date explicite :
+Le nouveau `PosteTiersReglementService` exige immédiatement une date explicite. Pour éviter de modifier prématurément les composants Livewire qui seront remplacés en tâche 8, conserver temporairement les signatures publiques existantes de `ReglementOperationService::marquerRecu()` et `marquerPaye()`. Ces wrappers de compatibilité délèguent au nouveau service avec la date actuellement dérivée par le flux historique et portent un `@deprecated`.
 
 ```php
+/** @deprecated Les interfaces utilisateur doivent ouvrir PosteTiersReglementModal. */
 public function marquerRecu(
     Transaction $transaction,
-    \DateTimeInterface $datePaiement,
-    ?ModePaiement $mode = null,
-    ?int $compteId = null,
-): void
-
-public function marquerPaye(
-    Transaction $transaction,
-    \DateTimeInterface $datePaiement,
     ?ModePaiement $mode = null,
     ?int $compteId = null,
 ): void
 ```
 
-Mettre à jour les appels internes et leurs tests avec la date connue du flux. Aucun wrapper ne choisit silencieusement aujourd'hui ou la date AN. Les nouvelles interfaces appellent directement `PosteTiersReglementService`.
+La tâche 8 supprime tous les appels UI à ces wrappers au profit de la modale datée. Les traitements internes de rapprochement conservent leur date métier connue. La tâche 10 vérifie avec `rg` qu'aucun composant Livewire n'appelle encore `marquerRecu()`, `marquerPaye()` ou `marquerRegle()`.
 
 - [ ] **Step 8: Vérifier GREEN**
 
@@ -1193,3 +1186,7 @@ git commit -m "test(compta): couvrir les reliquats dans les AN"
 Run: `git status --short`
 
 Expected: seuls les changements utilisateur préexistants restent hors commits ; aucun fichier du lot n'est non suivi.
+
+Run: `rg -n -- "marquer(Recu|Paye|Regle)\\(" app/Livewire`
+
+Expected: aucune interface utilisateur ne crée encore un règlement par les wrappers historiques sans date.
