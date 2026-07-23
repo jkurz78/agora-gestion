@@ -26,8 +26,11 @@ final class PosteReporteResolver
 
     public function depuisLigne(TransactionLigne $ligne, CarbonInterface $date): TransactionLigne
     {
+        $ligneCanonique = $ligne->poste_tiers_parent_id === null
+            ? $ligne
+            : ($ligne->posteTiersParent()->first() ?? $ligne);
         $exerciceCible = $this->exerciceService->anneeForDate(CarbonImmutable::instance($date));
-        $racineId = $this->racineId($ligne);
+        $racineId = $this->racineId($ligneCanonique);
 
         $origine = ANouveauLigneOrigine::query()
             ->with('ligneAN')
@@ -40,7 +43,7 @@ final class PosteReporteResolver
             ->latest('generation_id')
             ->first();
 
-        return $origine?->ligneAN ?? $ligne;
+        return $origine?->ligneAN ?? $ligneCanonique;
     }
 
     public function dernierePourTransaction(
@@ -77,13 +80,14 @@ final class PosteReporteResolver
         return $query->first();
     }
 
-    private function racineId(TransactionLigne $ligne): int
+    public function racineId(TransactionLigne $ligne): int
     {
+        $ligneCanoniqueId = $ligne->poste_tiers_parent_id ?? (int) $ligne->id;
         $origine = ANouveauLigneOrigine::query()
-            ->where('ligne_an_id', (int) $ligne->id)
+            ->where('ligne_an_id', $ligneCanoniqueId)
             ->latest('generation_id')
             ->first();
 
-        return $origine?->ligne_racine_id ?? (int) $ligne->id;
+        return $origine?->ligne_racine_id ?? $ligneCanoniqueId;
     }
 }

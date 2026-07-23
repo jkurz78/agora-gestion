@@ -17,6 +17,7 @@ use App\Services\Compta\ANouveau\ANouveauService;
 use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\EtatReglementResolver;
 use App\Services\Compta\Migrations\SystemeSeeder;
+use App\Services\Compta\PostesTiersOuvertsService;
 use App\Services\ReglementOperationService;
 use App\Tenant\TenantContext;
 
@@ -70,6 +71,9 @@ it('lettre le descendant AN d une creance 411 encaissee en N plus 1', function (
     );
     $generation = genererReportAN($this->acteurReport);
     $ligneAN = $generation->origines()->with('ligneAN.compte')->firstOrFail()->ligneAN;
+    $postesOuverts = app(PostesTiersOuvertsService::class);
+
+    expect($postesOuverts->soldeActifPourTransaction($t1))->toBe(8000);
 
     $t2 = $generator->pourEncaissementCreance(
         transactionCreance: $t1,
@@ -85,7 +89,9 @@ it('lettre le descendant AN d une creance 411 encaissee en N plus 1', function (
         ->and($ligneAN->fresh()->lettrage_code)->not->toBeNull()
         ->and($ligneAN->fresh()->lettrage_code)->toBe($ligne411T2->fresh()->lettrage_code)
         ->and(app(ReglementOperationService::class)->trouverT2($t1)?->is($t2))->toBeTrue()
-        ->and(app(EtatReglementResolver::class)->resolve($t1))->toBe(StatutReglement::Recu);
+        ->and(app(EtatReglementResolver::class)->resolve($t1))->toBe(StatutReglement::Recu)
+        ->and($postesOuverts->soldeActifPourTransaction($t1))->toBe(0)
+        ->and($postesOuverts->reglements($t1)->sole()->transactionId)->toBe((int) $t2->id);
 });
 
 it('lettre le descendant AN d une dette 401 reglee en N plus 1', function (): void {
