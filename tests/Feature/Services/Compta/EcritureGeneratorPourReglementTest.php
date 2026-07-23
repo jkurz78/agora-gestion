@@ -248,3 +248,145 @@ test('pourReglement — miroir dépense extourne (401 D) → portage D / 401 C +
     // Lettrage (recharger depuis DB)
     expect($ligneTiers->fresh()->lettrage_code)->not->toBeNull();
 });
+
+test('pourReglement — cible explicitement une fraction ouverte de la meme racine', function () {
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
+    $t1 = $this->ecritureGen->pourRecetteACredit(
+        tiers: $tiers,
+        ventilations: [['compte' => $this->compte706, 'montant' => 150.0]],
+        dateConstatation: new DateTimeImmutable('2025-10-01'),
+        libelle: 'Facture fractionnée',
+    );
+    $premiereLigne = $t1->lignes->first(
+        fn (TransactionLigne $ligne): bool => $ligne->compte?->numero_pcg === '411'
+    );
+    $secondeLigne = TransactionLigne::create([
+        'transaction_id' => (int) $t1->id,
+        'compte_id' => (int) $premiereLigne->compte_id,
+        'debit' => 35.0,
+        'credit' => 0,
+        'tiers_id' => (int) $tiers->id,
+        'poste_tiers_parent_id' => (int) $premiereLigne->id,
+        'libelle' => 'Seconde fraction 411',
+        'montant' => 0,
+    ]);
+
+    $t2 = $this->ecritureGen->pourReglement(
+        t1: $t1,
+        mode: ModePaiement::Virement,
+        compteTresorerie: $this->compte512X,
+        datePaiement: new DateTimeImmutable('2026-07-23'),
+        ligneTiersSource: $secondeLigne,
+    );
+
+    expect($secondeLigne->fresh()->lettrage_code)->not->toBeNull()
+        ->and($premiereLigne->fresh()->lettrage_code)->toBeNull()
+        ->and($t2->date->toDateString())->toBe('2026-07-23')
+        ->and((float) $t2->montant_total)->toBe(35.0);
+});
+
+test('pourReglement — refuse une ligne explicite issue d une autre racine metier', function () {
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
+    $t1 = $this->ecritureGen->pourRecetteACredit(
+        tiers: $tiers,
+        ventilations: [['compte' => $this->compte706, 'montant' => 150.0]],
+        dateConstatation: new DateTimeImmutable('2025-10-01'),
+    );
+    $autreT1 = $this->ecritureGen->pourRecetteACredit(
+        tiers: $tiers,
+        ventilations: [['compte' => $this->compte706, 'montant' => 35.0]],
+        dateConstatation: new DateTimeImmutable('2025-10-02'),
+    );
+    $ligneAutreRacine = $autreT1->lignes->first(
+        fn (TransactionLigne $ligne): bool => $ligne->compte?->numero_pcg === '411'
+    );
+
+    expect(fn () => $this->ecritureGen->pourReglement(
+        t1: $t1,
+        mode: ModePaiement::Virement,
+        compteTresorerie: $this->compte512X,
+        datePaiement: new DateTimeImmutable('2026-07-23'),
+        ligneTiersSource: $ligneAutreRacine,
+    ))->toThrow(InvalidArgumentException::class);
+});
+
+test('pourReglement — refuse une ligne explicite deja lettree', function () {
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
+    $t1 = $this->ecritureGen->pourRecetteACredit(
+        tiers: $tiers,
+        ventilations: [['compte' => $this->compte706, 'montant' => 150.0]],
+        dateConstatation: new DateTimeImmutable('2025-10-01'),
+    );
+    $ligneLettree = $t1->lignes->first(
+        fn (TransactionLigne $ligne): bool => $ligne->compte?->numero_pcg === '411'
+    );
+    $ligneLettree->update(['lettrage_code' => 'LETTRAGE-DEJA-PRESENT']);
+
+    expect(fn () => $this->ecritureGen->pourReglement(
+        t1: $t1,
+        mode: ModePaiement::Virement,
+        compteTresorerie: $this->compte512X,
+        datePaiement: new DateTimeImmutable('2026-07-23'),
+        ligneTiersSource: $ligneLettree,
+    ))->toThrow(InvalidArgumentException::class);
+});
+
+test('pourReglement — refuse une ligne explicite sans tiers', function () {
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
+    $t1 = $this->ecritureGen->pourRecetteACredit(
+        tiers: $tiers,
+        ventilations: [['compte' => $this->compte706, 'montant' => 150.0]],
+        dateConstatation: new DateTimeImmutable('2025-10-01'),
+    );
+    $ligneRacine = $t1->lignes->first(
+        fn (TransactionLigne $ligne): bool => $ligne->compte?->numero_pcg === '411'
+    );
+    $ligneSansTiers = TransactionLigne::create([
+        'transaction_id' => (int) $t1->id,
+        'compte_id' => (int) $ligneRacine->compte_id,
+        'debit' => 35.0,
+        'credit' => 0,
+        'tiers_id' => null,
+        'poste_tiers_parent_id' => (int) $ligneRacine->id,
+        'libelle' => 'Fraction sans tiers',
+        'montant' => 0,
+    ]);
+
+    expect(fn () => $this->ecritureGen->pourReglement(
+        t1: $t1,
+        mode: ModePaiement::Virement,
+        compteTresorerie: $this->compte512X,
+        datePaiement: new DateTimeImmutable('2026-07-23'),
+        ligneTiersSource: $ligneSansTiers,
+    ))->toThrow(InvalidArgumentException::class);
+});
+
+test('pourReglement — refuse une ligne explicite hors compte 401 ou 411', function () {
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
+    $t1 = $this->ecritureGen->pourRecetteACredit(
+        tiers: $tiers,
+        ventilations: [['compte' => $this->compte706, 'montant' => 150.0]],
+        dateConstatation: new DateTimeImmutable('2025-10-01'),
+    );
+    $ligneRacine = $t1->lignes->first(
+        fn (TransactionLigne $ligne): bool => $ligne->compte?->numero_pcg === '411'
+    );
+    $ligneProduit = TransactionLigne::create([
+        'transaction_id' => (int) $t1->id,
+        'compte_id' => (int) $this->compte706->id,
+        'debit' => 35.0,
+        'credit' => 0,
+        'tiers_id' => (int) $tiers->id,
+        'poste_tiers_parent_id' => (int) $ligneRacine->id,
+        'libelle' => 'Fraction hors compte tiers',
+        'montant' => 0,
+    ]);
+
+    expect(fn () => $this->ecritureGen->pourReglement(
+        t1: $t1,
+        mode: ModePaiement::Virement,
+        compteTresorerie: $this->compte512X,
+        datePaiement: new DateTimeImmutable('2026-07-23'),
+        ligneTiersSource: $ligneProduit,
+    ))->toThrow(InvalidArgumentException::class);
+});

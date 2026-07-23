@@ -1217,19 +1217,80 @@ final class EcritureGenerator
         Compte $compteTresorerie,
         \DateTimeInterface $datePaiement,
         ?string $libelle = null,
+        ?TransactionLigne $ligneTiersSource = null,
     ): Transaction {
-        // --- Trouver la ligne tiers ouverte (411 ou 401, non lettrée, avec tiers) ---
-        $ligneTiersSource = $this->posteReporteResolver->pourTransaction(
+        $ligneTiersSource ??= $this->posteReporteResolver->pourTransaction(
             $t1,
             Carbon::instance($datePaiement),
         );
 
-        if ($ligneTiersSource === null || $ligneTiersSource->lettrage_code !== null) {
+        $this->assertLigneTiersReglable($t1, $ligneTiersSource);
+
+        return $this->creerReglementDepuisLigne(
+            $t1,
+            $ligneTiersSource,
+            $mode,
+            $compteTresorerie,
+            $datePaiement,
+            $libelle,
+        );
+    }
+
+    private function assertLigneTiersReglable(
+        Transaction $t1,
+        ?TransactionLigne $ligneTiersSource,
+    ): void {
+        if ($ligneTiersSource === null) {
             throw new \InvalidArgumentException(
                 "La transaction #{$t1->id} ne contient pas de ligne tiers (411/401) ouverte — pas de règlement possible."
             );
         }
 
+        $this->assertTenantCoherence(collect([$ligneTiersSource]));
+
+        $compteTiers = $ligneTiersSource->relationLoaded('compte')
+            ? $ligneTiersSource->compte
+            : null;
+
+        if ($compteTiers === null || ! in_array($compteTiers->numero_pcg, ['401', '411'], true)) {
+            throw new \InvalidArgumentException(
+                "La ligne #{$ligneTiersSource->id} n'appartient pas à un compte tiers 401 ou 411."
+            );
+        }
+
+        if ($ligneTiersSource->tiers_id === null) {
+            throw new \InvalidArgumentException(
+                "La ligne #{$ligneTiersSource->id} ne porte aucun tiers — pas de règlement possible."
+            );
+        }
+
+        if ($ligneTiersSource->lettrage_code !== null) {
+            throw new \InvalidArgumentException(
+                "La ligne #{$ligneTiersSource->id} est déjà lettrée — pas de règlement possible."
+            );
+        }
+
+        $ligneTiersT1 = $this->posteReporteResolver->dernierePourTransaction($t1);
+
+        if (
+            $ligneTiersT1 === null
+            || $this->posteReporteResolver->racineId($ligneTiersT1)
+                !== $this->posteReporteResolver->racineId($ligneTiersSource)
+        ) {
+            throw new \InvalidArgumentException(
+                "La ligne #{$ligneTiersSource->id} n'appartient pas à la racine métier de la transaction #{$t1->id}."
+            );
+        }
+    }
+
+    private function creerReglementDepuisLigne(
+        Transaction $t1,
+        TransactionLigne $ligneTiersSource,
+        ModePaiement $mode,
+        Compte $compteTresorerie,
+        \DateTimeInterface $datePaiement,
+        ?string $libelle,
+    ): Transaction {
         // --- Direction D/C → sens du flux ---
         $tiersAuDebit = (float) $ligneTiersSource->debit > 0;
         // Debit = argent entrant (encaissement créance), Credit = argent sortant (règlement dette)
