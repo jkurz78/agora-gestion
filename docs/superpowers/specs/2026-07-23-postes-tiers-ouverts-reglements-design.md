@@ -4,7 +4,7 @@
 
 **Branche :** `feat/compta-v5`
 
-**Statut :** conception validée, en attente de relecture du document
+**Statut :** conception et document validés
 
 **Périmètre :** consultation et règlement des dettes et créances 401/411, y compris celles reportées par les à-nouveaux
 
