@@ -48,6 +48,7 @@ final class TransactionLigne extends Model
         'credit',
         'tiers_id',
         'lettrage_code',
+        'poste_tiers_parent_id',
         'libelle',
     ];
 
@@ -66,6 +67,7 @@ final class TransactionLigne extends Model
             'debit' => 'decimal:2',
             'credit' => 'decimal:2',
             'tiers_id' => 'integer',
+            'poste_tiers_parent_id' => 'integer',
         ];
     }
 
@@ -139,6 +141,16 @@ final class TransactionLigne extends Model
     public function tiers(): BelongsTo
     {
         return $this->belongsTo(Tiers::class);
+    }
+
+    public function posteTiersParent(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'poste_tiers_parent_id');
+    }
+
+    public function fractionsPosteTiers(): HasMany
+    {
+        return $this->hasMany(self::class, 'poste_tiers_parent_id');
     }
 
     public function affectations(): HasMany
