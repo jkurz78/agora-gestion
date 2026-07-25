@@ -1,0 +1,174 @@
+<?php
+
+declare(strict_types=1);
+
+use App\DTOs\Compta\PosteTiersReglementData;
+use App\Enums\JournalComptable;
+use App\Enums\ModePaiement;
+use App\Enums\StatutReglement;
+use App\Livewire\TransactionForm;
+use App\Models\Association;
+use App\Models\Compte;
+use App\Models\CompteBancaire;
+use App\Models\Tiers;
+use App\Models\Transaction;
+use App\Models\User;
+use App\Services\Compta\Migrations\SystemeSeeder;
+use App\Services\Compta\PostesTiersOuvertsService;
+use App\Services\Compta\PosteTiersReglementService;
+use App\Services\ExerciceService;
+use App\Services\TransactionService;
+use App\Tenant\TenantContext;
+use Carbon\CarbonImmutable;
+use Livewire\Livewire;
+
+beforeEach(function (): void {
+    $this->association = Association::factory()->create(['exercice_mois_debut' => 9]);
+    $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
+    $this->actingAs($this->user);
+
+    SystemeSeeder::seed();
+    $this->compteBancaire = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
+    Compte::factory()->create([
+        'association_id' => $this->association->id,
+        'numero_pcg' => '512_'.$this->compteBancaire->id,
+        'classe' => 5,
+        'compte_bancaire_id' => $this->compteBancaire->id,
+    ]);
+    $this->compteRecette = Compte::factory()->numero('706')->create();
+    $this->tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
+});
+
+afterEach(function (): void {
+    TenantContext::clear();
+});
+
+it('crée une T1 et son règlement T2 à la date de règlement saisie', function (): void {
+    Livewire::test(TransactionForm::class)
+        ->set('type', 'recette')
+        ->set('date', '2026-07-10')
+        ->set('dateReglement', '2026-07-23')
+        ->set('libelle', 'Cotisation datée')
+        ->set('paiementRecu', true)
+        ->set('mode_paiement', 'virement')
+        ->set('compte_id', $this->compteBancaire->id)
+        ->set('tiers_id', $this->tiers->id)
+        ->set('lignes', [[
+            'compte_id' => (string) $this->compteRecette->id,
+            'operation_id' => '',
+            'seance' => '',
+            'montant' => '50.00',
+            'notes' => '',
+            'piece_jointe_upload' => null,
+            'piece_jointe_remove' => false,
+        ]])
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $t1 = Transaction::where('journal', JournalComptable::Vente->value)->sole();
+    $t2 = Transaction::where('journal', JournalComptable::Banque->value)->sole();
+
+    expect($t1->date->toDateString())->toBe('2026-07-10')
+        ->and($t2->date->toDateString())->toBe('2026-07-23')
+        ->and($t1->mode_paiement)->toBeNull()
+        ->and($t1->statut_reglement)->toBe(StatutReglement::Recu);
+});
+
+it('règle une transaction ouverte lors de son édition', function (): void {
+    $ouverte = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
+        'date' => '2026-07-10',
+        'libelle' => 'Créance à régler',
+        'mode_paiement' => null,
+        'compte_id' => $this->compteBancaire->id,
+        'tiers_id' => $this->tiers->id,
+        'statut_reglement' => StatutReglement::EnAttente,
+    ]);
+    $ouverte->lignes()->forceDelete();
+    $ouverte->lignes()->create([
+        'compte_id' => $this->compteRecette->id,
+        'montant' => '50.00',
+        'debit' => 0,
+        'credit' => 50,
+    ]);
+    app(TransactionService::class)->update($ouverte, [
+        'type' => 'recette', 'date' => '2026-07-10', 'libelle' => 'Créance à régler',
+        'montant_total' => 50, 'mode_paiement' => null, 'tiers_id' => $this->tiers->id,
+        'reference' => null, 'compte_id' => $this->compteBancaire->id, 'notes' => null,
+    ], [[
+        'id' => $ouverte->lignes()->sole()->id, 'compte_id' => $this->compteRecette->id,
+        'operation_id' => null, 'seance' => null, 'montant' => '50.00', 'notes' => null,
+    ]]);
+
+    Livewire::test(TransactionForm::class)
+        ->call('edit', $ouverte->id)
+        ->set('paiementRecu', true)
+        ->set('dateReglement', '2026-07-23')
+        ->set('mode_paiement', 'virement')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect(Transaction::query()->where('journal', JournalComptable::Banque->value)->sole()->date->toDateString())
+        ->toBe('2026-07-23');
+});
+
+it('affiche le reliquat, l’historique et préserve le lettrage lors d’un changement de libellé', function (): void {
+    Livewire::test(TransactionForm::class)
+        ->set('type', 'recette')
+        ->set('date', '2026-07-10')
+        ->set('libelle', 'Créance partielle')
+        ->set('paiementRecu', false)
+        ->set('compte_id', $this->compteBancaire->id)
+        ->set('tiers_id', $this->tiers->id)
+        ->set('lignes', [[
+            'compte_id' => (string) $this->compteRecette->id, 'operation_id' => '', 'seance' => '',
+            'montant' => '50.00', 'notes' => '', 'piece_jointe_upload' => null, 'piece_jointe_remove' => false,
+        ]])
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $t1 = Transaction::query()->where('journal', JournalComptable::Vente->value)->sole();
+    $poste = app(PostesTiersOuvertsService::class)->pourTransaction($t1, app(ExerciceService::class)->current());
+    app(PosteTiersReglementService::class)->regler(new PosteTiersReglementData(
+        ligneId: $poste->ligneActionId,
+        montantCentimes: 2000,
+        date: new CarbonImmutable('2026-07-23'),
+        mode: ModePaiement::Virement,
+        compteBancaireId: $this->compteBancaire->id,
+        exercice: app(ExerciceService::class)->current(),
+    ));
+
+    $component = Livewire::test(TransactionForm::class)
+        ->call('edit', $t1->id)
+        ->assertSet('etatPaiement', 'partiel')
+        ->assertSet('soldeRestantCentimes', 3000)
+        ->assertSee('Partiellement réglé')
+        ->assertSee('Régler le reliquat');
+
+    $t2 = Transaction::query()->where('journal', JournalComptable::Banque->value)->sole();
+    $component->call('annulerReglement', $t2->id)
+        ->assertDispatched('poste-tiers-reglement:annuler', transactionReglementId: $t2->id);
+
+    $component->set('libelle', 'Créance partielle corrigée')->call('save')->assertHasNoErrors();
+    expect($t1->fresh()->libelle)->toBe('Créance partielle corrigée')
+        ->and($t1->fresh()->lignes()->whereNotNull('lettrage_code')->exists())->toBeTrue();
+
+    $poste = app(PostesTiersOuvertsService::class)->pourTransaction($t1->fresh(), app(ExerciceService::class)->current());
+    app(PosteTiersReglementService::class)->regler(new PosteTiersReglementData(
+        ligneId: $poste->ligneActionId,
+        montantCentimes: $poste->soldeCentimes,
+        date: new CarbonImmutable('2026-07-24'),
+        mode: ModePaiement::Virement,
+        compteBancaireId: $this->compteBancaire->id,
+        exercice: app(ExerciceService::class)->current(),
+    ));
+
+    Livewire::test(TransactionForm::class)
+        ->call('edit', $t1->id)
+        ->assertSet('etatPaiement', 'solde')
+        ->assertSet('soldeRestantCentimes', 0)
+        ->assertSee('Reçu');
+});

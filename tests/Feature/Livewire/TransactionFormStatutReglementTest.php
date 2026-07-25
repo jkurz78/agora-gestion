@@ -47,6 +47,12 @@ beforeEach(function () {
     $this->compte = CompteBancaire::factory()->create([
         'association_id' => $this->association->id,
     ]);
+    Compte::factory()->create([
+        'association_id' => $this->association->id,
+        'numero_pcg' => '512_'.$this->compte->id,
+        'classe' => 5,
+        'compte_bancaire_id' => $this->compte->id,
+    ]);
 
     $this->compteRecette = Compte::factory()->numero('706')->create();
 

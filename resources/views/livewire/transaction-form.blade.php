@@ -131,13 +131,18 @@
                             </div>
                         </div>
                     @endif
+                    @if ($isLockedByReglement)
+                        <div class="alert alert-warning small py-2 mb-3">
+                            <i class="bi bi-lock"></i> Des règlements sont enregistrés : annulez-les avant de modifier la date, le tiers, le compte bancaire, les montants ou la ventilation.
+                        </div>
+                    @endif
                     <div class="row g-3 mb-4">
                         <div class="col-md-2">
                             <label for="date" class="form-label">
                                 Date <span class="text-danger">*</span>
-                                @if ($isLocked || $isLockedByHelloAsso) <i class="bi bi-lock text-warning" title="Champ verrouillé"></i> @endif
+                                @if ($isLocked || $isLockedByHelloAsso || $isLockedByReglement) <i class="bi bi-lock text-warning" title="Champ verrouillé"></i> @endif
                             </label>
-                            <x-date-input name="date" wire:model="date" :value="$date" :disabled="$isLocked || $isLockedByHelloAsso || $exerciceCloture" />
+                            <x-date-input name="date" wire:model="date" :value="$date" :disabled="$isLocked || $isLockedByHelloAsso || $isLockedByReglement || $exerciceCloture" />
                             @error('date') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
                         <div class="col-md-2">
@@ -159,7 +164,7 @@
                                 Tiers <span class="text-danger">*</span>
                                 @if ($isLockedByHelloAsso || $isExtourneMiroir) <i class="bi bi-lock text-warning" title="Champ verrouillé"></i> @endif
                             </label>
-                            @if ($isLockedByHelloAsso || $isExtourneMiroir)
+                            @if ($isLockedByHelloAsso || $isExtourneMiroir || $isLockedByReglement)
                                 <input type="text" value="{{ \App\Models\Tiers::find($tiers_id)?->displayName() ?? '—' }}"
                                        class="form-control bg-light" disabled>
                             @else
@@ -167,7 +172,7 @@
                             @endif
                             @error('tiers_id') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                         </div>
-                        @if ($type === 'recette' || $type === 'depense')
+                        @if (($type === 'recette' || $type === 'depense') && ! $isLockedByReglement)
                         <div class="col-md-2">
                             <label class="form-label">
                                 @if ($sensTresorerie === 'depense')
@@ -192,7 +197,7 @@
                             </div>
                         </div>
                         @endif
-                        @if (($type !== 'recette' && $type !== 'depense') || $paiementRecu)
+                        @if (($type !== 'recette' && $type !== 'depense') || ($paiementRecu && ! $isLockedByReglement))
                         <div class="col-md-2">
                             <label for="mode_paiement" class="form-label">Mode paiement <span class="text-danger">*</span></label>
                             <select wire:model="mode_paiement" id="mode_paiement"
@@ -206,12 +211,19 @@
                             @error('mode_paiement') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
                         @endif
+                        @if (($type === 'recette' || $type === 'depense') && $paiementRecu && ! $isLockedByReglement)
+                        <div class="col-md-2">
+                            <label for="dateReglement" class="form-label">Date du règlement <span class="text-danger">*</span></label>
+                            <x-date-input name="dateReglement" wire:model="dateReglement" :value="$dateReglement" :disabled="$exerciceCloture" />
+                            @error('dateReglement') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                        </div>
+                        @endif
                         <div class="col-md-3">
                             <label for="compte_id" class="form-label">
                                 Compte bancaire
-                                @if ($isLocked || $isLockedByFacture || $isLockedByHelloAsso) <i class="bi bi-lock text-warning" title="Champ verrouillé"></i> @endif
+                            @if ($isLocked || $isLockedByFacture || $isLockedByHelloAsso || $isLockedByReglement) <i class="bi bi-lock text-warning" title="Champ verrouillé"></i> @endif
                             </label>
-                            @if ($isLocked || $isLockedByFacture || $isLockedByHelloAsso)
+                            @if ($isLocked || $isLockedByFacture || $isLockedByHelloAsso || $isLockedByReglement)
                                 <input type="text" value="{{ \App\Models\CompteBancaire::find($compte_id)?->nom ?? '—' }}"
                                        class="form-control bg-light" disabled>
                             @else
@@ -293,6 +305,34 @@
                         </div>
                         @endif
                     </div>
+
+                    @if ($transactionId && ($type === 'recette' || $type === 'depense'))
+                        <div class="border rounded p-3 mb-3 bg-light">
+                            @if ($etatPaiement === 'partiel')
+                                <div class="d-flex align-items-center justify-content-between gap-2">
+                                    <span class="fw-semibold">Partiellement réglé — reste {{ number_format($soldeRestantCentimes / 100, 2, ',', ' ') }} €</span>
+                                    <button type="button" wire:click="reglerReliquat" class="btn btn-sm btn-outline-primary">Régler le reliquat</button>
+                                </div>
+                            @elseif ($etatPaiement === 'solde')
+                                <span class="fw-semibold text-success">{{ $sensTresorerie === 'depense' ? 'Payé' : 'Reçu' }}</span>
+                            @else
+                                <span class="text-muted">En attente de règlement</span>
+                            @endif
+
+                            @if ($reglementsEnregistres !== [])
+                                <ul class="list-group list-group-flush mt-2">
+                                    @foreach ($reglementsEnregistres as $reglement)
+                                        <li class="list-group-item bg-light px-0 d-flex justify-content-between align-items-center">
+                                            <span>{{ $reglement['date'] }} — {{ $reglement['montant'] }} € — {{ $reglement['mode'] }}</span>
+                                            @if ($reglement['annulable'])
+                                                <button type="button" wire:click="annulerReglement({{ $reglement['transactionId'] }})" class="btn btn-sm btn-outline-danger">Annuler le règlement</button>
+                                            @endif
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                        </div>
+                    @endif
 
                     {{-- Lignes section --}}
                     <h6 class="mb-2">Lignes de {{ $formEntityLabel ?? ($sensTresorerie === 'depense' ? 'dépense' : 'recette') }}</h6>

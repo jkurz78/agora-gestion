@@ -27,6 +27,8 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\TransactionLigneAffectation;
 use App\Services\Compta\PlanComptableSelecteur;
+use App\Services\Compta\PostesTiersOuvertsService;
+use App\Services\Compta\TransactionAvecReglementService;
 use App\Services\ExerciceService;
 use App\Services\InvoiceOcrService;
 use App\Services\Portail\FacturePartenaireService;
@@ -58,6 +60,19 @@ final class TransactionForm extends Component
     public ?string $libelle = null;
 
     public string $mode_paiement = '';
+
+    public string $dateReglement = '';
+
+    public string $etatPaiement = 'ouvert';
+
+    public int $soldeRestantCentimes = 0;
+
+    public bool $isLockedByReglement = false;
+
+    /** @var array<int, array{transactionId:int,date:string,montant:string,mode:string,annulable:bool}> */
+    public array $reglementsEnregistres = [];
+
+    public ?int $posteTiersLigneId = null;
 
     /**
      * Pour les recettes : true = paiement déjà reçu (comptant), false = recette attendue (créance).
@@ -152,10 +167,16 @@ final class TransactionForm extends Component
         return round(collect($this->lignes)->sum(fn ($l) => (float) ($l['montant'] ?? 0)), 2);
     }
 
+    public function mount(): void
+    {
+        $this->dateReglement = app(ExerciceService::class)->defaultDate();
+    }
+
     public function showNewForm(string $type): void
     {
-        $this->reset(['transactionId', 'type', 'date', 'libelle', 'mode_paiement', 'paiementRecu',
+        $this->reset(['transactionId', 'type', 'date', 'libelle', 'mode_paiement', 'dateReglement', 'paiementRecu',
             'tiers_id', 'reference', 'compte_id', 'notes', 'lignes',
+            'etatPaiement', 'soldeRestantCentimes', 'isLockedByReglement', 'reglementsEnregistres', 'posteTiersLigneId',
             'ventilationLigneId', 'ventilationLigneCompteLabel', 'ventilationLigneMontant', 'affectations',
             'ventilationHasAffectations',
             'pieceJointe', 'existingPieceJointeNom', 'existingPieceJointeUrl',
@@ -169,6 +190,7 @@ final class TransactionForm extends Component
         $this->resetValidation();
         $this->showForm = true;
         $this->date = app(ExerciceService::class)->defaultDate();
+        $this->dateReglement = $this->date;
         $this->compte_id = Transaction::where('saisi_par', auth()->id())
             ->whereNotNull('compte_id')
             ->latest()
@@ -448,8 +470,9 @@ final class TransactionForm extends Component
         $this->type = $transaction->type->value;
         $this->date = $transaction->date->format('Y-m-d');
         $this->libelle = $transaction->libelle;
-        $this->mode_paiement = $transaction->mode_paiement?->value ?? '';
-        $this->paiementRecu = $transaction->mode_paiement !== null;
+        $this->mode_paiement = '';
+        $this->paiementRecu = $transaction->statut_reglement !== StatutReglement::EnAttente;
+        $this->dateReglement = app(ExerciceService::class)->defaultDate();
         $this->tiers_id = $transaction->tiers_id;
         $this->reference = $transaction->reference;
         $this->compte_id = $transaction->compte_id;
@@ -482,6 +505,7 @@ final class TransactionForm extends Component
         $this->isLocked = $transaction->isLockedByRapprochement() || $transaction->isLockedByRemise();
         $this->isLockedByFacture = $transaction->isLockedByFacture();
         $this->isLockedByHelloAsso = $transaction->helloasso_order_id !== null;
+        $this->chargerEtatReglement($transaction);
 
         // Miroir d'extourne : le sens de trésorerie est inversé par rapport au type comptable.
         // $type reste le type réel (recette/depense) pour le filtrage comptes 6xx/7xx.
@@ -497,8 +521,9 @@ final class TransactionForm extends Component
     public function resetForm(): void
     {
         $this->reset([
-            'transactionId', 'type', 'date', 'libelle', 'mode_paiement', 'paiementRecu',
-            'tiers_id', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked', 'isLockedByFacture', 'isLockedByHelloAsso', 'isExtourneMiroir', 'sensTresorerie',
+            'transactionId', 'type', 'date', 'libelle', 'mode_paiement', 'dateReglement', 'paiementRecu',
+            'tiers_id', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked', 'isLockedByFacture', 'isLockedByHelloAsso', 'isLockedByReglement', 'isExtourneMiroir', 'sensTresorerie',
+            'etatPaiement', 'soldeRestantCentimes', 'reglementsEnregistres', 'posteTiersLigneId',
             'ventilationLigneId', 'ventilationLigneCompteLabel', 'ventilationLigneMontant', 'affectations',
             'ventilationHasAffectations',
             'pieceJointe', 'existingPieceJointeNom', 'existingPieceJointeUrl',
@@ -571,12 +596,21 @@ final class TransactionForm extends Component
                 'mode_paiement' => [
                     // Requis sauf : recette non reçue, ou dépense non payée
                     Rule::requiredIf(fn () => match ($this->type) {
-                        'recette' => $this->paiementRecu,
-                        'depense' => $this->paiementRecu,
+                        'recette' => $this->paiementRecu && ! $this->isLockedByReglement,
+                        'depense' => $this->paiementRecu && ! $this->isLockedByReglement,
                         default => true,
                     }),
                     'nullable',
                     'in:virement,cheque,especes,cb,prelevement',
+                ],
+                'dateReglement' => [
+                    Rule::requiredIf(fn (): bool => in_array($this->type, ['recette', 'depense'], true)
+                        && $this->paiementRecu
+                        && ! $this->isLockedByReglement),
+                    'nullable',
+                    'date_format:Y-m-d',
+                    'after_or_equal:'.$dateDebut,
+                    'before_or_equal:'.$dateFin,
                 ],
                 // Tiers obligatoire : toute recette/dépense génère sa contrepartie
                 // via le compte de tiers (411 client / 401 fournisseur), qui porte
@@ -625,42 +659,27 @@ final class TransactionForm extends Component
             $this->validate($lignesPjRules, $lignesPjMessages);
         }
 
-        // Pour une recette non encore reçue (créance) ou une dépense non encore payée (dette),
-        // on force le mode à null afin que TransactionService::enrichirPartieDouble route vers
-        // pourRecetteACredit (recette) ou pourDepenseACredit seul (dépense — dette ouverte).
-        $modeEffectif = (($this->type === 'recette' || $this->type === 'depense') && ! $this->paiementRecu)
-            ? null
-            : ($this->mode_paiement !== '' ? $this->mode_paiement : null);
+        $doitRegler = ($this->type === 'recette' || $this->type === 'depense')
+            && $this->paiementRecu
+            && ! $this->isLockedByReglement;
+        $modeReglement = $this->mode_paiement;
+        $compteReglementId = $this->compte_id;
 
         $data = [
             'type' => $this->type,
             'date' => $this->date,
             'libelle' => $this->libelle,
             'montant_total' => $this->montantTotal,
-            'mode_paiement' => $modeEffectif,
+            // T1 est toujours une créance/dette ouverte ; le règlement est une T2 distincte.
+            'mode_paiement' => null,
             'tiers_id' => $this->tiers_id,
             'reference' => $this->reference,
             'compte_id' => $this->compte_id,
             'notes' => $this->notes ?: null,
         ];
 
-        // Pose statut_reglement explicitement à la création pour les recettes et dépenses.
-        // À l'édition on ne touche pas le champ : un statut Pointe ne doit jamais
-        // être rétrogradé par le formulaire de saisie (stopgap avant statut dérivé
-        // du ledger — chantier 4).
-        if ($this->transactionId === null && $this->type === 'recette') {
-            $data['statut_reglement'] = $this->paiementRecu
-                ? StatutReglement::Recu->value
-                : StatutReglement::EnAttente->value;
-        }
-
-        // Chantier 3a-ii : le toggle « paiement effectué ? » pilote le statut des dépenses.
-        // Dépense payée (comptant) → statut = Recu. Dépense non payée (dette ouverte) → EnAttente.
-        // Garde create-only : ne jamais rétrograde un statut Pointe existant à l'édition.
-        if ($this->transactionId === null && $this->type === 'depense') {
-            $data['statut_reglement'] = $this->paiementRecu
-                ? StatutReglement::Recu->value
-                : StatutReglement::EnAttente->value;
+        if ($this->transactionId === null && in_array($this->type, ['recette', 'depense'], true)) {
+            $data['statut_reglement'] = StatutReglement::EnAttente->value;
         }
 
         // DC-10a : le wire property `compte_id` porte l'id de compte sélectionné,
@@ -708,10 +727,25 @@ final class TransactionForm extends Component
         $createdTransaction = null;
         try {
             if ($this->transactionId) {
-                $transaction = Transaction::findOrFail($this->transactionId);
-                $service->update($transaction, $data, $lignes);
+                $createdTransaction = app(TransactionAvecReglementService::class)->enregistrer(
+                    transaction: Transaction::findOrFail($this->transactionId),
+                    data: $data,
+                    lignes: $lignes,
+                    dateReglement: $doitRegler ? CarbonImmutable::parse($this->dateReglement) : null,
+                    mode: $doitRegler ? ModePaiement::from($modeReglement) : null,
+                    compteBancaireId: $doitRegler ? $compteReglementId : null,
+                    exercice: $exerciceService->current(),
+                );
             } else {
-                $createdTransaction = $service->create($data, $lignes);
+                $createdTransaction = app(TransactionAvecReglementService::class)->enregistrer(
+                    transaction: null,
+                    data: $data,
+                    lignes: $lignes,
+                    dateReglement: $doitRegler ? CarbonImmutable::parse($this->dateReglement) : null,
+                    mode: $doitRegler ? ModePaiement::from($modeReglement) : null,
+                    compteBancaireId: $doitRegler ? $compteReglementId : null,
+                    exercice: $exerciceService->current(),
+                );
             }
         } catch (\RuntimeException $e) {
             $this->addError('lignes', $e->getMessage());
@@ -1117,6 +1151,59 @@ final class TransactionForm extends Component
 
         // Aucune correction possible, garder la date originale
         return $date;
+    }
+
+    #[On('poste-tiers-reglement:enregistre')]
+    #[On('poste-tiers-reglement:annule')]
+    public function rafraichirEtatReglement(): void
+    {
+        if ($this->transactionId === null) {
+            return;
+        }
+
+        $this->chargerEtatReglement(Transaction::findOrFail($this->transactionId));
+    }
+
+    public function reglerReliquat(): void
+    {
+        if ($this->posteTiersLigneId === null) {
+            return;
+        }
+
+        $this->dispatch(
+            'poste-tiers-reglement:ouvrir',
+            ligneId: $this->posteTiersLigneId,
+            exercice: app(ExerciceService::class)->current(),
+        );
+    }
+
+    public function annulerReglement(int $transactionReglementId): void
+    {
+        $this->dispatch('poste-tiers-reglement:annuler', transactionReglementId: $transactionReglementId);
+    }
+
+    private function chargerEtatReglement(Transaction $transaction): void
+    {
+        $service = app(PostesTiersOuvertsService::class);
+        $exercice = app(ExerciceService::class)->current();
+        $poste = $service->pourTransaction($transaction, $exercice);
+        $reglements = $service->reglements($transaction);
+
+        $this->posteTiersLigneId = $poste?->ligneActionId;
+        $this->soldeRestantCentimes = $poste?->soldeCentimes ?? 0;
+        $this->reglementsEnregistres = $reglements
+            ->map(fn ($reglement): array => [
+                'transactionId' => $reglement->transactionId,
+                'date' => $reglement->date->toDateString(),
+                'montant' => number_format($reglement->montantCentimes / 100, 2, ',', ' '),
+                'mode' => $reglement->mode?->label() ?? '—',
+                'annulable' => $reglement->annulable,
+            ])
+            ->all();
+        $this->isLockedByReglement = $reglements->isNotEmpty();
+        $this->etatPaiement = $reglements->isEmpty()
+            ? 'ouvert'
+            : ($poste === null ? 'solde' : 'partiel');
     }
 
     public function render(): View
