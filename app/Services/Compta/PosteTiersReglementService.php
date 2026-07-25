@@ -16,6 +16,7 @@ use App\Models\TransactionLigne;
 use App\Services\ExerciceService;
 use App\Support\MontantDecimal;
 use Carbon\CarbonImmutable;
+use DomainException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -177,6 +178,13 @@ final class PosteTiersReglementService
                 ->whereKey($transactionSourceId)
                 ->lockForUpdate()
                 ->firstOrFail();
+            $poste = $this->postesOuverts->trouver($ligneCanoniqueId, $exercice);
+
+            if ((int) $transactionSource->id !== (int) $poste->transactionOrigineId) {
+                throw new DomainException(
+                    'La transaction source ne correspond pas au poste tiers à régler.'
+                );
+            }
 
             if ($exigerTransactionEnAttente
                 && (

@@ -336,6 +336,47 @@ test('les wrappers refusent un compte bancaire étranger avant de créer ou modi
     expect(Transaction::withoutGlobalScopes()->count())->toBe($transactionsAvant);
 });
 
+test('le service wrapper refuse une transaction source étrangère au poste tiers', function () {
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
+    $t1A = $this->ecritureGen->pourRecetteACredit(
+        tiers: $tiers,
+        ventilations: [['compte' => $this->compte706, 'montant' => '50.00']],
+        dateConstatation: new DateTimeImmutable('2025-10-03'),
+        libelle: 'Créance A',
+    );
+    $t1B = $this->ecritureGen->pourRecetteACredit(
+        tiers: $tiers,
+        ventilations: [['compte' => $this->compte706, 'montant' => '60.00']],
+        dateConstatation: new DateTimeImmutable('2025-10-03'),
+        libelle: 'Créance B',
+    );
+    $t1A->update(['statut_reglement' => StatutReglement::EnAttente]);
+    $t1B->update(['statut_reglement' => StatutReglement::EnAttente]);
+    $ligneA = $t1A->lignes->first(
+        fn (TransactionLigne $ligne): bool => $ligne->compte?->numero_pcg === '411'
+    );
+    $ligneB = $t1B->lignes->first(
+        fn (TransactionLigne $ligne): bool => $ligne->compte?->numero_pcg === '411'
+    );
+    $transactionsAvant = Transaction::count();
+
+    expect(fn () => app(PosteTiersReglementService::class)->reglerReliquatEtRenseignerTransaction(
+        ligneId: (int) $ligneA->id,
+        transactionSourceId: (int) $t1B->id,
+        date: CarbonImmutable::parse('2025-10-03'),
+        modePropose: ModePaiement::Virement,
+        compteBancaireIdPropose: (int) $this->compteBancaire->id,
+        exercice: 2025,
+    ))->toThrow(DomainException::class, 'transaction source ne correspond pas au poste tiers');
+
+    expect(Transaction::count())->toBe($transactionsAvant)
+        ->and($ligneA->fresh()->lettrage_code)->toBeNull()
+        ->and($ligneA->fresh()->fractionsPosteTiers()->count())->toBe(0)
+        ->and($ligneB->fresh()->lettrage_code)->toBeNull()
+        ->and($t1B->fresh()->mode_paiement)->toBeNull()
+        ->and($t1B->fresh()->compte_id)->toBeNull();
+});
+
 test('marquerRecu relit le reliquat courant après un règlement partiel concurrent', function () {
     $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $t1 = $this->ecritureGen->pourRecetteACredit(
