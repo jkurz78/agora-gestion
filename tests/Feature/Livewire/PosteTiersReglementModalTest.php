@@ -7,12 +7,15 @@ use App\Enums\ModePaiement;
 use App\Enums\StatutReglement;
 use App\Livewire\Compta\AnnulationReglementTiersModal;
 use App\Livewire\Compta\PosteTiersReglementModal;
+use App\Models\Association;
+use App\Models\CompteBancaire;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\PosteTiersReglementService;
 use App\Support\MontantDecimal;
+use App\Tenant\TenantContext;
 use Carbon\CarbonImmutable;
 use Livewire\Livewire;
 use Tests\Support\CreatesPartieDoubleContext;
@@ -102,6 +105,47 @@ test('enregistrer crée le règlement et notifie les consommateurs', function ()
         ->where('montant_total', '30.00')
         ->exists())->toBeTrue();
 });
+
+test('enregistrer rejette un compte bancaire d une autre association dès la validation', function (): void {
+    [, $ligne] = creerPosteOuvertPourModaleReglement($this);
+    $autreAssociation = Association::factory()->create();
+    $compteAutreAssociation = CompteBancaire::withoutGlobalScopes()->create([
+        ...CompteBancaire::factory()->make()->toArray(),
+        'association_id' => (int) $autreAssociation->id,
+        'actif_recettes_depenses' => true,
+        'saisie_automatisee' => false,
+    ]);
+
+    Livewire::test(PosteTiersReglementModal::class, ['exercice' => 2025])
+        ->dispatch('poste-tiers-reglement:ouvrir', ligneId: (int) $ligne->id, exercice: 2025)
+        ->set('mode', ModePaiement::Virement->value)
+        ->set('compteBancaireId', (int) $compteAutreAssociation->id)
+        ->call('enregistrer')
+        ->assertHasErrors(['compteBancaireId'])
+        ->assertNotDispatched('poste-tiers-reglement:enregistre');
+});
+
+test('enregistrer rejette un compte bancaire non sélectionnable dès la validation', function (
+    string $attribut,
+    bool $valeur,
+): void {
+    [, $ligne] = creerPosteOuvertPourModaleReglement($this);
+    $compteNonSelectionnable = CompteBancaire::factory()->create([
+        'association_id' => (int) TenantContext::currentId(),
+        $attribut => $valeur,
+    ]);
+
+    Livewire::test(PosteTiersReglementModal::class, ['exercice' => 2025])
+        ->dispatch('poste-tiers-reglement:ouvrir', ligneId: (int) $ligne->id, exercice: 2025)
+        ->set('mode', ModePaiement::Virement->value)
+        ->set('compteBancaireId', (int) $compteNonSelectionnable->id)
+        ->call('enregistrer')
+        ->assertHasErrors(['compteBancaireId'])
+        ->assertNotDispatched('poste-tiers-reglement:enregistre');
+})->with([
+    'désactivé pour les recettes et dépenses' => ['actif_recettes_depenses', false],
+    'alimenté par saisie automatisée' => ['saisie_automatisee', true],
+]);
 
 test('enregistrer affiche les messages métier pour un montant invalide', function (string $montant, string $message): void {
     [, $ligne] = creerPosteOuvertPourModaleReglement($this);

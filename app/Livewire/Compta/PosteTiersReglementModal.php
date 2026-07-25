@@ -11,6 +11,7 @@ use App\Services\Compta\PostesTiersOuvertsService;
 use App\Services\Compta\PosteTiersReglementService;
 use App\Services\ExerciceService;
 use App\Support\MontantDecimal;
+use App\Tenant\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Validation\Rule;
@@ -69,7 +70,14 @@ final class PosteTiersReglementModal extends Component
             'montant' => ['required', 'string'],
             'dateReglement' => ['required', 'date_format:Y-m-d'],
             'mode' => ['required', Rule::enum(ModePaiement::class)],
-            'compteBancaireId' => ['nullable', 'integer', Rule::exists('comptes_bancaires', 'id')],
+            'compteBancaireId' => [
+                'nullable',
+                'integer',
+                Rule::exists('comptes_bancaires', 'id')
+                    ->where('association_id', (int) TenantContext::currentId())
+                    ->where('actif_recettes_depenses', 1)
+                    ->where('saisie_automatisee', 0),
+            ],
         ], [
             'montant.required' => 'Le montant du règlement est obligatoire.',
             'dateReglement.required' => 'La date du règlement est obligatoire.',
