@@ -119,8 +119,8 @@ final class PosteTiersReglementService
                 throw new RuntimeException('Le règlement ne possède pas de ligne tiers lettrée à annuler.');
             }
 
-            /** @var Collection<int, TransactionLigne> $groupeLettrage */
-            $groupeLettrage = TransactionLigne::query()
+            /** @var Collection<int, TransactionLigne> $groupeLettrageComplet */
+            $groupeLettrageComplet = TransactionLigne::query()
                 ->with(['compte', 'transaction'])
                 ->withTrashed()
                 ->where('compte_id', (int) $ligneTiersT2->compte_id)
@@ -128,6 +128,19 @@ final class PosteTiersReglementService
                 ->orderBy('id')
                 ->lockForUpdate()
                 ->get();
+
+            if ($groupeLettrageComplet->contains(
+                fn (TransactionLigne $ligne): bool => $ligne->trashed()
+            )) {
+                throw new RuntimeException(
+                    'Le lettrage du règlement contient une ligne supprimée et ne peut pas être annulé.'
+                );
+            }
+
+            /** @var Collection<int, TransactionLigne> $groupeLettrage */
+            $groupeLettrage = $groupeLettrageComplet
+                ->filter(fn (TransactionLigne $ligne): bool => ! $ligne->trashed())
+                ->values();
 
             if ($groupeLettrage->count() !== 2) {
                 throw new RuntimeException(
@@ -155,16 +168,32 @@ final class PosteTiersReglementService
                 throw new RuntimeException('La contrepartie tiers du règlement est invalide.');
             }
 
+            $montantT2 = $this->montantCentimes($ligneTiersT2);
+            $montantPaire = $this->montantCentimes($lignePaire);
+            if ($montantT2 !== $montantPaire) {
+                throw new RuntimeException(
+                    'Les montants des deux lignes du lettrage ne sont pas égaux.'
+                );
+            }
+
+            $ligneT2AuDebit = MontantDecimal::versCentimes((string) $ligneTiersT2->debit) > 0;
+            $lignePaireAuDebit = MontantDecimal::versCentimes((string) $lignePaire->debit) > 0;
+            if ($montantT2 === 0 || $montantPaire === 0 || $ligneT2AuDebit === $lignePaireAuDebit) {
+                throw new RuntimeException(
+                    'Les deux lignes du lettrage doivent être de sens opposés.'
+                );
+            }
+
             $ligneCanoniqueId = (int) ($lignePaire->poste_tiers_parent_id ?? $lignePaire->id);
             $parent = null;
             if ($lignePaire->poste_tiers_parent_id !== null) {
                 $parent = TransactionLigne::query()
-                    ->withTrashed()
                     ->whereKey((int) $lignePaire->poste_tiers_parent_id)
                     ->lockForUpdate()
-                    ->firstOrFail();
+                    ->first();
 
-                if ((int) $parent->transaction_id !== (int) $lignePaire->transaction_id
+                if ($parent === null
+                    || (int) $parent->transaction_id !== (int) $lignePaire->transaction_id
                     || (int) $parent->compte_id !== (int) $lignePaire->compte_id
                     || ! $this->memesTiers($parent, $lignePaire)
                     || $parent->poste_tiers_parent_id !== null) {

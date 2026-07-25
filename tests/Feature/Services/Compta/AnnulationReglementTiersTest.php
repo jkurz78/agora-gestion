@@ -185,6 +185,51 @@ it('refuse un groupe de lettrage tiers à trois lignes sans aucune mutation', fu
         ->and($t1->fresh()->statut_reglement)->toBe(StatutReglement::Recu);
 });
 
+it('refuse une contrepartie de lettrage supprimée sans aucune mutation', function (): void {
+    [$t1, $parent] = creerPosteAnnulableTask5($this);
+    $t2 = reglerPosteTask5($this, $parent, 10000);
+    $codeLettrage = $parent->fresh()->lettrage_code;
+
+    $parent->delete();
+
+    expect(fn (): mixed => $this->reglements->annuler((int) $t2->id))
+        ->toThrow(RuntimeException::class, 'supprimée');
+
+    expect(Transaction::find((int) $t2->id)?->id)->toBe((int) $t2->id)
+        ->and(TransactionLigne::withTrashed()->findOrFail((int) $parent->id)->lettrage_code)
+        ->toBe($codeLettrage)
+        ->and($t2->lignes()->whereHas('compte', fn ($query) => $query->where('numero_pcg', '411'))
+            ->sole()
+            ->lettrage_code)
+        ->toBe($codeLettrage)
+        ->and($t1->fresh()->statut_reglement)->toBe(StatutReglement::Recu);
+});
+
+it('refuse une paire de lettrage tiers incohérente sans aucune mutation', function (
+    string $debit,
+    string $credit,
+    string $message,
+): void {
+    [$t1, $parent] = creerPosteAnnulableTask5($this);
+    $t2 = reglerPosteTask5($this, $parent, 10000);
+    $codeLettrage = $parent->fresh()->lettrage_code;
+    $ligneTiersT2 = $t2->lignes()
+        ->whereHas('compte', fn ($query) => $query->where('numero_pcg', '411'))
+        ->sole();
+    $ligneTiersT2->update(['debit' => $debit, 'credit' => $credit]);
+
+    expect(fn (): mixed => $this->reglements->annuler((int) $t2->id))
+        ->toThrow(RuntimeException::class, $message);
+
+    expect(Transaction::find((int) $t2->id)?->id)->toBe((int) $t2->id)
+        ->and($parent->fresh()->lettrage_code)->toBe($codeLettrage)
+        ->and($ligneTiersT2->fresh()->lettrage_code)->toBe($codeLettrage)
+        ->and($t1->fresh()->statut_reglement)->toBe(StatutReglement::Recu);
+})->with([
+    'montant différent' => ['0.00', '99.99', 'montants'],
+    'même sens' => ['100.00', '0.00', 'sens'],
+]);
+
 it('restaure le lettrage et les écritures si la suppression échoue après le délettrage', function (): void {
     [$t1, $parent] = creerPosteAnnulableTask5($this);
     $t2 = reglerPosteTask5($this, $parent, 10000);

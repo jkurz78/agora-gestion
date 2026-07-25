@@ -117,3 +117,48 @@ Résultat : succès, 129 assertions (19 dépréciations préexistantes), Pint et
 contrôle de diff réussis.
 
 Commit des correctifs : `3b3453be`.
+
+## Correctif de revue — paire active avant annulation
+
+### RED
+
+Les régressions suivantes ont été ajoutées avant la modification du service :
+
+- une contrepartie source/fraction soft-delete qui conserve le même compte et
+  code de lettrage ;
+- une paire de deux lignes dont les montants diffèrent ;
+- une paire de deux lignes de même sens.
+
+```bash
+php -d memory_limit=1G ./vendor/bin/pest --compact --filter='contrepartie de lettrage supprimée|paire de lettrage tiers incohérente' tests/Feature/Services/Compta/AnnulationReglementTiersTest.php
+```
+
+Résultat RED obtenu : 3 échecs. La ligne supprimée était acceptée jusqu'au
+recalcul du poste, tandis que les paires déséquilibrées ou de même sens étaient
+délettrées puis annulées.
+
+### GREEN
+
+Avant `delettrerParLigne()`, `annuler()` charge sous verrou toutes les lignes
+du même compte/code, y compris les soft-delete, et refuse toute ligne
+supprimée. Il ne poursuit qu'avec exactement deux lignes actives : l'unique
+ligne tiers de la T2 et son unique contrepartie active, de filiation de poste
+tiers cohérente. Les montants en centimes et les sens débit/crédit sont aussi
+validés avant toute mutation.
+
+```bash
+php -d memory_limit=1G ./vendor/bin/pest --compact --filter='contrepartie de lettrage supprimée|paire de lettrage tiers incohérente' tests/Feature/Services/Compta/AnnulationReglementTiersTest.php
+php -d memory_limit=1G ./vendor/bin/pest --compact tests/Feature/Services/Compta/AnnulationReglementTiersTest.php tests/Feature/Services/TransactionServicePartieDoubleTest.php
+```
+
+Résultat : succès, respectivement 18 et 147 assertions ; les 22 dépréciations
+du périmètre complet sont préexistantes et non bloquantes.
+
+### Concurrence
+
+Les tests Pest courants utilisent SQLite en mémoire. Le listener SQL
+déterministe couvre donc le chemin de relecture après verrouillage, sans simuler
+artificiellement deux connexions concurrentes. Une validation complémentaire
+sur MySQL avec deux connexions et les verrous réels reste un candidat de CI ou
+de recette manuelle ; aucun changement du mécanisme de verrouillage n'est
+nécessaire pour cette correction.
