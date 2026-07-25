@@ -199,6 +199,20 @@ final class Transaction extends TenantModel
         return $this->hasMany(TransactionLigne::class);
     }
 
+    public function aUnReglementTiers(): bool
+    {
+        return $this->lignes()
+            ->whereHas('compte', fn (Builder $query) => $query->whereIn('numero_pcg', ['401', '411']))
+            ->where(function (Builder $query): void {
+                $query->whereNotNull('lettrage_code')
+                    ->orWhereHas(
+                        'fractionsPosteTiers',
+                        fn (Builder $fraction) => $fraction->whereNotNull('lettrage_code')
+                    );
+            })
+            ->exists();
+    }
+
     public function adhesions(): HasMany
     {
         return $this->hasMany(Adhesion::class);

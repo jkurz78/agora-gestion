@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\DTOs\Compta\PosteTiersReglementData;
 use App\Enums\ModePaiement;
 use App\Enums\TypeTransaction;
 use App\Models\Compte;
@@ -9,7 +10,9 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\Compta\EcritureGenerator;
+use App\Services\Compta\PosteTiersReglementService;
 use App\Services\TransactionService;
+use Carbon\CarbonImmutable;
 use Tests\Support\CreatesPartieDoubleContext;
 
 uses(CreatesPartieDoubleContext::class);
@@ -594,4 +597,62 @@ it('Fix #4-B — notes propagées sur la ligne de ventilation dans une recette �
         ->first();
     expect($ligne411)->not()->toBeNull();
     expect($ligne411->notes)->toBeNull('Les lignes techniques 411 ne portent pas de notes métier');
+});
+
+it('modifie le libellé d une transaction partiellement réglée sans recréer son ledger', function (): void {
+    $data = [
+        'type' => TypeTransaction::Recette->value,
+        'date' => '2025-10-15',
+        'libelle' => 'Créance à protéger',
+        'montant_total' => '100.00',
+        'mode_paiement' => null,
+        'tiers_id' => $this->tiers->id,
+        'compte_id' => null,
+        'reference' => 'REF-INITIALE',
+        'notes' => 'Note initiale',
+    ];
+    $t1 = $this->service->create($data, [[
+        'compte_id' => $this->compte706->id,
+        'montant' => '100.00',
+        'operation_id' => null,
+        'seance' => null,
+        'notes' => 'Note ventilation initiale',
+    ]]);
+    $parent = $t1->lignes()->whereHas('compte', fn ($query) => $query->where('numero_pcg', '411'))->firstOrFail();
+    $t2 = app(PosteTiersReglementService::class)->regler(new PosteTiersReglementData(
+        ligneId: (int) $parent->id,
+        montantCentimes: 3000,
+        date: CarbonImmutable::parse('2026-07-23'),
+        mode: ModePaiement::Virement,
+        compteBancaireId: (int) $this->compteBancaire->id,
+        exercice: 2025,
+    ));
+    $fraction = $parent->fractionsPosteTiers()->sole();
+    $ventilation = $t1->lignes()->where('compte_id', $this->compte706->id)->firstOrFail();
+    $codeLettrage = $fraction->lettrage_code;
+
+    expect($t1->fresh()->aUnReglementTiers())->toBeTrue();
+
+    $updated = $this->service->update($t1->fresh(), [
+        ...$data,
+        'libelle' => 'Créance renommée',
+        'reference' => 'REF-MODIFIEE',
+        'notes' => 'Note transaction modifiée',
+    ], [[
+        'id' => $ventilation->id,
+        'compte_id' => $ventilation->compte_id,
+        'montant' => '100.00',
+        'operation_id' => null,
+        'seance' => null,
+        'notes' => 'Note ventilation modifiée',
+    ]]);
+
+    expect($updated->libelle)->toBe('Créance renommée')
+        ->and($updated->reference)->toBe('REF-MODIFIEE')
+        ->and($updated->notes)->toBe('Note transaction modifiée')
+        ->and($parent->fresh()->id)->toBe($parent->id)
+        ->and($fraction->fresh()->id)->toBe($fraction->id)
+        ->and($fraction->fresh()->lettrage_code)->toBe($codeLettrage)
+        ->and(Transaction::find($t2->id)?->id)->toBe($t2->id)
+        ->and($ventilation->fresh()->notes)->toBe('Note ventilation modifiée');
 });

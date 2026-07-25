@@ -354,6 +354,24 @@ final class TransactionService
                 $this->assertLockedInvariants($transaction, $data, $lignes);
             }
 
+            if ($transaction->aUnReglementTiers()) {
+                $this->assertReglementTiersInvariants($transaction, $data, $lignes);
+
+                $transaction->update([
+                    'libelle' => $data['libelle'],
+                    'reference' => $data['reference'] ?? null,
+                    'notes' => $data['notes'] ?? null,
+                ]);
+
+                foreach ($lignes as $ligneData) {
+                    $transaction->lignes()
+                        ->whereKey((int) $ligneData['id'])
+                        ->update(['notes' => $ligneData['notes'] ?? null]);
+                }
+
+                return $transaction->fresh();
+            }
+
             // Réversion encaissement : recette « reçue » (mode présent) repassée « non reçue »
             // (mode null) → supprimer la T2 d'encaissement séparée, sinon elle reste orpheline
             // (chèque fantôme en 5112). Fait AVANT update + délettrage (le 411 est encore lettré).
@@ -949,6 +967,62 @@ final class TransactionService
                 throw new \RuntimeException('Le montant d\'une ligne ne peut pas être modifié sur une transaction rapprochée.');
             }
         }
+    }
+
+    /**
+     * Une transaction dont le poste tiers est réglé garde son grand livre figé.
+     * Seuls les libellés, références et notes peuvent évoluer.
+     */
+    private function assertReglementTiersInvariants(Transaction $transaction, array $data, array $lignes): void
+    {
+        if ($transaction->date->format('Y-m-d') !== $data['date']) {
+            throw new \RuntimeException('La date ne peut pas être modifiée sur une transaction réglée.');
+        }
+        if ($transaction->type->value !== $data['type']) {
+            throw new \RuntimeException('Le type ne peut pas être modifié sur une transaction réglée.');
+        }
+        if (! $this->memeIdentifiantNullable($transaction->tiers_id, $data['tiers_id'] ?? null)) {
+            throw new \RuntimeException('Le tiers ne peut pas être modifié sur une transaction réglée.');
+        }
+        if (! $this->memeIdentifiantNullable($transaction->compte_id, $data['compte_id'] ?? null)) {
+            throw new \RuntimeException('Le compte bancaire ne peut pas être modifié sur une transaction réglée.');
+        }
+        if ($transaction->mode_paiement?->value !== ($data['mode_paiement'] ?? null)) {
+            throw new \RuntimeException('Le mode de paiement ne peut pas être modifié sur une transaction réglée.');
+        }
+        if ((int) round((float) $transaction->montant_total * 100) !== (int) round((float) $data['montant_total'] * 100)) {
+            throw new \RuntimeException('Le montant total ne peut pas être modifié sur une transaction réglée.');
+        }
+
+        $lignesExistantes = $transaction->lignes()->ventilation()->get()->keyBy('id');
+        if (count($lignes) !== $lignesExistantes->count()) {
+            throw new \RuntimeException('La ventilation ne peut pas être modifiée sur une transaction réglée.');
+        }
+
+        foreach ($lignes as $ligneData) {
+            $id = $ligneData['id'] ?? null;
+            if ($id === null || ! $lignesExistantes->has($id)) {
+                throw new \RuntimeException('La ventilation ne peut pas être modifiée sur une transaction réglée.');
+            }
+
+            /** @var TransactionLigne $ligneExistante */
+            $ligneExistante = $lignesExistantes->get($id);
+            if (! $this->memeIdentifiantNullable($ligneExistante->compte_id, $ligneData['compte_id'] ?? null)
+                || (int) round((float) $ligneExistante->montant * 100) !== (int) round((float) $ligneData['montant'] * 100)
+                || ! $this->memeIdentifiantNullable($ligneExistante->operation_id, $ligneData['operation_id'] ?? null)
+                || ! $this->memeIdentifiantNullable($ligneExistante->seance, $ligneData['seance'] ?? null)) {
+                throw new \RuntimeException('La ventilation ne peut pas être modifiée sur une transaction réglée.');
+            }
+        }
+    }
+
+    private function memeIdentifiantNullable(mixed $premier, mixed $second): bool
+    {
+        if ($premier === null || $second === null || $second === '') {
+            return $premier === null && ($second === null || $second === '');
+        }
+
+        return (int) $premier === (int) $second;
     }
 
     /**

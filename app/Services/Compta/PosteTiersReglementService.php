@@ -31,6 +31,7 @@ final class PosteTiersReglementService
         private readonly PostesTiersOuvertsService $postesOuverts,
         private readonly EcritureGenerator $ecritureGenerator,
         private readonly EtatReglementResolver $etatReglementResolver,
+        private readonly LettrageService $lettrageService,
     ) {}
 
     public function regler(PosteTiersReglementData $data): Transaction
@@ -60,6 +61,110 @@ final class PosteTiersReglementService
             compteBancaireId: $compteBancaireId,
             exercice: $exercice,
         );
+    }
+
+    /**
+     * Annule un règlement T2 non rapproché et restaure le poste tiers ouvert.
+     */
+    public function annuler(int $transactionReglementId): void
+    {
+        DB::transaction(function () use ($transactionReglementId): void {
+            $t2 = Transaction::query()
+                ->whereKey($transactionReglementId)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $this->exerciceService->assertOuvertVerrouille(
+                $this->exerciceService->anneeForDate(CarbonImmutable::parse($t2->date))
+            );
+
+            if ($t2->rapprochement_id !== null) {
+                throw new RuntimeException(
+                    'Ce règlement est lié à un rapprochement bancaire et ne peut pas être annulé.'
+                );
+            }
+
+            if ($t2->remise_id !== null) {
+                throw new RuntimeException(
+                    'Ce règlement est lié à une remise bancaire et ne peut pas être annulé.'
+                );
+            }
+
+            /** @var Collection<int, TransactionLigne> $lignesT2 */
+            $lignesT2 = TransactionLigne::query()
+                ->with('compte')
+                ->where('transaction_id', (int) $t2->id)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            if ($lignesT2->isEmpty()) {
+                throw new RuntimeException('Le règlement ne contient aucune ligne comptable à annuler.');
+            }
+
+            $portageLettre = $lignesT2->first(function (TransactionLigne $ligne): bool {
+                return in_array($ligne->compte?->numero_pcg, ['5112', '530'], true)
+                    && $ligne->lettrage_code !== null;
+            });
+            if ($portageLettre !== null) {
+                throw new RuntimeException(
+                    'Le règlement a déjà été remis en banque ou rapproché et ne peut pas être annulé.'
+                );
+            }
+
+            $ligneTiersT2 = $lignesT2->first(function (TransactionLigne $ligne): bool {
+                return in_array($ligne->compte?->numero_pcg, ['401', '411'], true)
+                    && $ligne->lettrage_code !== null;
+            });
+            if ($ligneTiersT2 === null) {
+                throw new RuntimeException('Le règlement ne possède pas de ligne tiers lettrée à annuler.');
+            }
+
+            $lignePaire = TransactionLigne::query()
+                ->with(['compte', 'transaction'])
+                ->where('compte_id', (int) $ligneTiersT2->compte_id)
+                ->where('lettrage_code', $ligneTiersT2->lettrage_code)
+                ->where('transaction_id', '!=', (int) $t2->id)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->first();
+            if ($lignePaire === null) {
+                throw new RuntimeException('La contrepartie tiers du règlement est introuvable.');
+            }
+
+            $ligneCanoniqueId = (int) ($lignePaire->poste_tiers_parent_id ?? $lignePaire->id);
+            $parent = null;
+            if ($lignePaire->poste_tiers_parent_id !== null) {
+                $parent = TransactionLigne::query()
+                    ->withTrashed()
+                    ->whereKey((int) $lignePaire->poste_tiers_parent_id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+            }
+
+            $this->lettrageService->delettrerParLigne(
+                $ligneTiersT2,
+                "Annulation du règlement T2 #{$t2->id}"
+            );
+
+            TransactionLigne::query()
+                ->whereIn('id', $lignesT2->pluck('id')->map(static fn ($id): int => (int) $id)->all())
+                ->forceDelete();
+            $t2->forceDelete();
+
+            if ($parent !== null && $parent->lettrage_code === null) {
+                $montantFusionne = $this->montantCentimes($parent) + $this->montantCentimes($lignePaire);
+                $parent->update($this->montantsSelonSens($parent, $montantFusionne));
+                $lignePaire->delete();
+            }
+
+            $poste = $this->postesOuverts->trouver(
+                $ligneCanoniqueId,
+                $this->exerciceService->anneeForDate(CarbonImmutable::parse($t2->date))
+            );
+            $transactionRacine = Transaction::query()
+                ->findOrFail($poste->transactionOrigineId);
+            $this->etatReglementResolver->syncer($transactionRacine);
+        }, 3);
     }
 
     /**
