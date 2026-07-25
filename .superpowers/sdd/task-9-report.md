@@ -70,3 +70,23 @@ Résultat : Pint passe ; Pest passe (21 tests dépréciés, 64 assertions) ; git
 ### Commit
 
 - Bloqué : l’accès à .git/index.lock a été refusé par la limite d’usage ; commit demandé : fix(compta): préserver les transactions réglées dans le formulaire.
+
+## Fix coverage review task 9
+
+### Vérification du finding pointé historique
+
+- Ajout d'une assertion sur le cas `Pointe` historique : une sauvegarde de libellé conserve le mode/statut et ne crée aucune transaction Banque supplémentaire.
+- Résultat : le comportement était déjà sûr ; le défaut était une couverture insuffisante.
+
+### Couverture service ventilation
+
+- Le test de ventilation après règlement appelle désormais directement `TransactionService::affecterLigne()` et `TransactionService::supprimerAffectations()`.
+- Les deux appels lèvent une `RuntimeException` côté service avant la vérification Livewire `403`.
+
+### Tests
+
+~~~text
+php -d memory_limit=1G ./vendor/bin/pest --compact tests/Feature/Livewire/TransactionFormReglementDateTest.php tests/Feature/Livewire/TransactionFormStatutReglementTest.php tests/Feature/Livewire/TransactionFormSensTresorerieTest.php
+~~~
+
+Résultat : Pest passe (21 tests dépréciés, 69 assertions).

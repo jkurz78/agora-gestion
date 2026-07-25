@@ -154,6 +154,15 @@ it('refuse le contournement Livewire de la ventilation après un règlement tier
     $transaction = Transaction::where('libelle', 'Créance ventilée réglée')->sole();
     $ligne = $transaction->lignes()->ventilation()->sole();
 
+    expect(fn () => app(TransactionService::class)->affecterLigne($ligne->fresh(), [[
+        'operation_id' => null,
+        'seance' => null,
+        'montant' => '50.00',
+        'notes' => 'Service interdit',
+    ]]))->toThrow(RuntimeException::class, 'transaction réglée')
+        ->and(fn () => app(TransactionService::class)->supprimerAffectations($ligne->fresh()))
+        ->toThrow(RuntimeException::class, 'transaction réglée');
+
     Livewire::test(TransactionForm::class)
         ->call('edit', $transaction->id)
         ->set('ventilationLigneId', $ligne->id)

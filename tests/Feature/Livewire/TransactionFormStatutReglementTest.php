@@ -167,6 +167,9 @@ it('éditer une transaction déjà Pointe ne rétrograde pas le statut_reglement
         'debit' => 0,
         'credit' => 100.00,
     ]);
+    $nombreT2Avant = Transaction::query()
+        ->where('journal', JournalComptable::Banque->value)
+        ->count();
 
     // Éditer via TransactionForm
     Livewire::test(TransactionForm::class)
@@ -179,7 +182,8 @@ it('éditer une transaction déjà Pointe ne rétrograde pas le statut_reglement
 
     // Le statut doit rester Pointe
     expect($txPointe->mode_paiement?->value)->toBe('cheque')
-        ->and($txPointe->statut_reglement)->toBe(StatutReglement::Pointe);
+        ->and($txPointe->statut_reglement)->toBe(StatutReglement::Pointe)
+        ->and(Transaction::query()->where('journal', JournalComptable::Banque->value)->count())->toBe($nombreT2Avant);
 });
 
 it('préserve le mode et le statut d’une transaction HelloAsso lors d’une sauvegarde sans changement', function (): void {
