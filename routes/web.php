@@ -54,6 +54,7 @@ use App\Livewire\Auth\AssociationSelector;
 use App\Livewire\BackOffice\FacturePartenaire\Index as FpIndex;
 use App\Livewire\BackOffice\NoteDeFrais\Index as NdfIndex;
 use App\Livewire\BackOffice\NoteDeFrais\Show as NdfShow;
+use App\Livewire\Compta\PostesTiersOuverts;
 use App\Livewire\DevisManuel\DevisEdit;
 use App\Livewire\DevisManuel\DevisList;
 use App\Livewire\Newsletter\InscriptionsList;
@@ -268,6 +269,7 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
     ->name('comptabilite.')
     ->group(function (): void {
         Route::view('/transactions', 'transactions.index')->name('transactions');
+        Route::get('/postes-tiers-ouverts', PostesTiersOuverts::class)->name('postes-tiers-ouverts');
         Route::view('/cotisations', 'cotisations.index')->name('cotisations');
         Route::view('/dons', 'dons.index')->name('dons');
         Route::get('/transactions/import/template/{type}', [CsvImportController::class, 'template'])

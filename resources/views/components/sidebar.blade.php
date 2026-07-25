@@ -110,7 +110,7 @@
 
 @php
 $activeGroup = match(true) {
-    request()->routeIs('comptabilite.transactions*', 'comptabilite.budget*', 'comptabilite.ndf.*', 'comptabilite.dons', 'comptabilite.cotisations') => 'comptabilite',
+    request()->routeIs('comptabilite.transactions*', 'comptabilite.postes-tiers-ouverts', 'comptabilite.budget*', 'comptabilite.ndf.*', 'comptabilite.dons', 'comptabilite.cotisations') => 'comptabilite',
     request()->routeIs('banques.rapprochement.*', 'banques.virements.*', 'banques.helloasso-sync',
         'banques.comptes.*', 'banques.remises*') => 'banques',
     request()->routeIs('tiers.*') => 'tiers',
@@ -173,6 +173,13 @@ $activeGroup = match(true) {
                                 <a href="{{ route('comptabilite.transactions') }}"
                                    class="nav-link {{ request()->routeIs('comptabilite.transactions') ? 'active' : '' }}">
                                     <i class="bi bi-list-ul me-1"></i> Recettes &amp; dépenses
+                                </a>
+                            </li>
+
+                            <li class="nav-item">
+                                <a href="{{ route('comptabilite.postes-tiers-ouverts') }}"
+                                   class="nav-link {{ request()->routeIs('comptabilite.postes-tiers-ouverts') ? 'active' : '' }}">
+                                    <i class="bi bi-hourglass-split me-1"></i> Postes tiers ouverts
                                 </a>
                             </li>
 
