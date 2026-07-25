@@ -79,3 +79,41 @@ Résultat : succès.
 `fresh()` recharge une ligne soft-delete hors scope dans cette version de
 Laravel ; le test de fusion vérifie donc explicitement son absence du scope
 normal et son état `trashed()` au lieu de l’attendre à `null`.
+
+## Correctifs de revue — concurrence et groupe de lettrage
+
+### RED
+
+Les deux régressions ont été ajoutées avant les changements de production :
+
+```bash
+php -d memory_limit=1G ./vendor/bin/pest --compact --filter='refuse un groupe de lettrage tiers à trois lignes' tests/Feature/Services/Compta/AnnulationReglementTiersTest.php
+php -d memory_limit=1G ./vendor/bin/pest --compact --filter='relit le poste tiers verrouillé' tests/Feature/Services/TransactionServicePartieDoubleTest.php
+```
+
+Résultats RED obtenus : l’annulation ne levait aucune exception face au groupe
+à trois lignes ; le contrôle d’édition ne verrouillait pas le lot canonique,
+donc le point d’injection déterministe ne se déclenchait pas.
+
+### GREEN
+
+`TransactionService::update()` reprend l’ordre de verrouillage du règlement :
+exercice, lot canonique 401/411 (racine et fractions), puis T1. L’état est
+ensuite relu avant toute suppression/recréation de ligne. Le test utilise un
+listener SQL, accroché au chargement ordonné du lot canonique ; il crée une T2
+à cet instant et vérifie que l’édition préserve T2, fraction et lettrage.
+
+`PosteTiersReglementService::annuler()` verrouille et valide le groupe complet
+avant toute mutation : deux lignes exactement, une unique ligne tiers de la
+T2, et une contrepartie dont la filiation de fraction est cohérente.
+
+```bash
+php -d memory_limit=1G ./vendor/bin/pest --compact tests/Feature/Services/Compta/AnnulationReglementTiersTest.php tests/Feature/Services/TransactionServicePartieDoubleTest.php
+./vendor/bin/pint --test app/Services/Compta/PosteTiersReglementService.php app/Services/TransactionService.php tests/Feature/Services/Compta/AnnulationReglementTiersTest.php tests/Feature/Services/TransactionServicePartieDoubleTest.php
+git diff --check
+```
+
+Résultat : succès, 129 assertions (19 dépréciations préexistantes), Pint et
+contrôle de diff réussis.
+
+Commit des correctifs : `3b3453be`.
