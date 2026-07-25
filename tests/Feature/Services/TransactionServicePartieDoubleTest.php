@@ -13,6 +13,9 @@ use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\PosteTiersReglementService;
 use App\Services\TransactionService;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Events\Dispatcher;
+use Illuminate\Support\Facades\DB;
 use Tests\Support\CreatesPartieDoubleContext;
 
 uses(CreatesPartieDoubleContext::class);
@@ -655,4 +658,79 @@ it('modifie le libellé d une transaction partiellement réglée sans recréer s
         ->and($fraction->fresh()->lettrage_code)->toBe($codeLettrage)
         ->and(Transaction::find($t2->id)?->id)->toBe($t2->id)
         ->and($ventilation->fresh()->notes)->toBe('Note ventilation modifiée');
+});
+
+it('relit le poste tiers verrouillé avant de réécrire une transaction devenue réglée', function (): void {
+    $data = [
+        'type' => TypeTransaction::Recette->value,
+        'date' => '2025-10-15',
+        'libelle' => 'Créance exposée à une course',
+        'montant_total' => '100.00',
+        'mode_paiement' => null,
+        'tiers_id' => $this->tiers->id,
+        'compte_id' => null,
+        'reference' => null,
+        'notes' => null,
+    ];
+    $t1 = $this->service->create($data, [[
+        'compte_id' => $this->compte706->id,
+        'montant' => '100.00',
+        'operation_id' => null,
+        'seance' => null,
+        'notes' => 'Ventilation initiale',
+    ]]);
+    $parent = $t1->lignes()->whereHas('compte', fn ($query) => $query->where('numero_pcg', '411'))->firstOrFail();
+    $ventilation = $t1->lignes()->where('compte_id', $this->compte706->id)->firstOrFail();
+    $injectionDeclenchee = false;
+    $t2Creee = null;
+
+    $connection = DB::connection();
+    $dispatcherPrecedent = $connection->getEventDispatcher();
+    $connection->setEventDispatcher(new Dispatcher($this->app));
+    $connection->listen(function (QueryExecuted $query) use (&$injectionDeclenchee, &$t2Creee, $parent): void {
+        $sql = strtolower($query->sql);
+        if ($injectionDeclenchee
+            || ! str_contains($sql, 'transaction_lignes')
+            || ! str_contains($sql, 'poste_tiers_parent_id')
+            || ! str_contains($sql, 'order by')) {
+            return;
+        }
+
+        $injectionDeclenchee = true;
+        $t2Creee = app(PosteTiersReglementService::class)->regler(new PosteTiersReglementData(
+            ligneId: (int) $parent->id,
+            montantCentimes: 3000,
+            date: CarbonImmutable::parse('2026-07-23'),
+            mode: ModePaiement::Virement,
+            compteBancaireId: (int) $this->compteBancaire->id,
+            exercice: 2025,
+        ));
+    });
+
+    try {
+        $updated = $this->service->update($t1->fresh(), [
+            ...$data,
+            'libelle' => 'Créance réglée pendant l édition',
+        ], [[
+            'id' => $ventilation->id,
+            'compte_id' => $ventilation->compte_id,
+            'montant' => '100.00',
+            'operation_id' => null,
+            'seance' => null,
+            'notes' => 'Ventilation modifiée sans réécriture',
+        ]]);
+    } finally {
+        $connection->setEventDispatcher($dispatcherPrecedent);
+    }
+
+    expect($injectionDeclenchee)->toBeTrue();
+
+    $fraction = $parent->fractionsPosteTiers()->sole();
+
+    expect($updated->libelle)->toBe('Créance réglée pendant l édition')
+        ->and($t2Creee)->not->toBeNull()
+        ->and(Transaction::find((int) $t2Creee->id)?->id)->toBe((int) $t2Creee->id)
+        ->and($parent->fresh()->id)->toBe((int) $parent->id)
+        ->and($fraction->fresh()->lettrage_code)->not->toBeNull()
+        ->and($ventilation->fresh()->notes)->toBe('Ventilation modifiée sans réécriture');
 });

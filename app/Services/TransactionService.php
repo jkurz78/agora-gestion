@@ -340,6 +340,14 @@ final class TransactionService
         $this->validateInscriptionRequiresOperation($lignes);
 
         return DB::transaction(function () use ($transaction, $data, $lignes) {
+            // Même ordre que PosteTiersReglementService::regler() : exercice,
+            // lot canonique, puis transaction source. Ainsi, un règlement T2 ne
+            // peut pas s'intercaler entre le contrôle aUnReglementTiers() et la
+            // réécriture destructive des lignes de la T1.
+            $this->exerciceService->assertOuvertVerrouille(
+                $this->exerciceService->anneeForDate(CarbonImmutable::parse($transaction->date))
+            );
+            $transaction = $this->verrouillerPostesTiersEtTransaction($transaction);
             $transaction->load(['rapprochement' => fn ($q) => $q->lockForUpdate()]);
 
             if ($transaction->isLockedByRemise()) {
@@ -1036,5 +1044,46 @@ final class TransactionService
     {
         $motif = "Auto-délettrage suite à update de TX#{$transaction->id}";
         $this->lettrageService->autoDelettrerLignesDe($transaction, $motif);
+    }
+
+    /**
+     * Verrouille les lots canoniques 401/411 de la T1 avant de verrouiller son
+     * en-tête, conformément à l'ordre utilisé par les règlements tiers.
+     */
+    private function verrouillerPostesTiersEtTransaction(Transaction $transaction): Transaction
+    {
+        $lignesTiers = TransactionLigne::query()
+            ->where('transaction_id', (int) $transaction->id)
+            ->whereHas('compte', fn ($query) => $query->whereIn('numero_pcg', ['401', '411']))
+            ->orderBy('id')
+            ->get(['id', 'poste_tiers_parent_id']);
+
+        $lignesCanoniquesIds = $lignesTiers
+            ->map(
+                static fn (TransactionLigne $ligne): int => (int) (
+                    $ligne->poste_tiers_parent_id ?? $ligne->id
+                )
+            )
+            ->unique()
+            ->sort()
+            ->values();
+
+        foreach ($lignesCanoniquesIds as $ligneCanoniqueId) {
+            TransactionLigne::query()
+                ->withTrashed()
+                ->where(function ($query) use ($ligneCanoniqueId): void {
+                    $query
+                        ->whereKey((int) $ligneCanoniqueId)
+                        ->orWhere('poste_tiers_parent_id', (int) $ligneCanoniqueId);
+                })
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+        }
+
+        return Transaction::query()
+            ->whereKey((int) $transaction->id)
+            ->lockForUpdate()
+            ->firstOrFail();
     }
 }

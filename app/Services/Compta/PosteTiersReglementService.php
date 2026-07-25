@@ -119,16 +119,40 @@ final class PosteTiersReglementService
                 throw new RuntimeException('Le règlement ne possède pas de ligne tiers lettrée à annuler.');
             }
 
-            $lignePaire = TransactionLigne::query()
+            /** @var Collection<int, TransactionLigne> $groupeLettrage */
+            $groupeLettrage = TransactionLigne::query()
                 ->with(['compte', 'transaction'])
+                ->withTrashed()
                 ->where('compte_id', (int) $ligneTiersT2->compte_id)
                 ->where('lettrage_code', $ligneTiersT2->lettrage_code)
-                ->where('transaction_id', '!=', (int) $t2->id)
                 ->orderBy('id')
                 ->lockForUpdate()
-                ->first();
-            if ($lignePaire === null) {
-                throw new RuntimeException('La contrepartie tiers du règlement est introuvable.');
+                ->get();
+
+            if ($groupeLettrage->count() !== 2) {
+                throw new RuntimeException(
+                    'Le lettrage du règlement doit contenir exactement deux lignes tiers.'
+                );
+            }
+
+            $lignesT2DuGroupe = $groupeLettrage->filter(
+                fn (TransactionLigne $ligne): bool => (int) $ligne->transaction_id === (int) $t2->id
+            );
+            if ($lignesT2DuGroupe->count() !== 1
+                || (int) $lignesT2DuGroupe->first()->id !== (int) $ligneTiersT2->id) {
+                throw new RuntimeException(
+                    'Le lettrage du règlement ne référence pas une unique ligne tiers de la T2.'
+                );
+            }
+
+            $lignePaire = $groupeLettrage->first(
+                fn (TransactionLigne $ligne): bool => (int) $ligne->id !== (int) $ligneTiersT2->id
+            );
+            if ($lignePaire === null
+                || (int) $lignePaire->transaction_id === (int) $t2->id
+                || (int) $lignePaire->compte_id !== (int) $ligneTiersT2->compte_id
+                || ! $this->memesTiers($lignePaire, $ligneTiersT2)) {
+                throw new RuntimeException('La contrepartie tiers du règlement est invalide.');
             }
 
             $ligneCanoniqueId = (int) ($lignePaire->poste_tiers_parent_id ?? $lignePaire->id);
@@ -139,6 +163,15 @@ final class PosteTiersReglementService
                     ->whereKey((int) $lignePaire->poste_tiers_parent_id)
                     ->lockForUpdate()
                     ->firstOrFail();
+
+                if ((int) $parent->transaction_id !== (int) $lignePaire->transaction_id
+                    || (int) $parent->compte_id !== (int) $lignePaire->compte_id
+                    || ! $this->memesTiers($parent, $lignePaire)
+                    || $parent->poste_tiers_parent_id !== null) {
+                    throw new RuntimeException(
+                        'La contrepartie tiers du règlement ne respecte pas la filiation attendue.'
+                    );
+                }
             }
 
             $this->lettrageService->delettrerParLigne(
@@ -572,6 +605,15 @@ final class PosteTiersReglementService
             MontantDecimal::versCentimes((string) $ligne->debit)
             - MontantDecimal::versCentimes((string) $ligne->credit)
         );
+    }
+
+    private function memesTiers(TransactionLigne $premiere, TransactionLigne $seconde): bool
+    {
+        if ($premiere->tiers_id === null || $seconde->tiers_id === null) {
+            return $premiere->tiers_id === null && $seconde->tiers_id === null;
+        }
+
+        return (int) $premiere->tiers_id === (int) $seconde->tiers_id;
     }
 
     /**

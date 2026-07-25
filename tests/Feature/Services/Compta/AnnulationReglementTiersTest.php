@@ -157,6 +157,34 @@ it('refuse d annuler une T2 liée à une remise sans mutation', function (): voi
         ->and($parent->fresh()->lettrage_code)->not->toBeNull();
 });
 
+it('refuse un groupe de lettrage tiers à trois lignes sans aucune mutation', function (): void {
+    [$t1, $parent] = creerPosteAnnulableTask5($this);
+    $t2 = reglerPosteTask5($this, $parent, 10000);
+    $codeLettrage = $parent->fresh()->lettrage_code;
+
+    $intruse = $parent->replicate(['id', 'deleted_at']);
+    $intruse->fill([
+        'debit' => '1.00',
+        'credit' => '0.00',
+        'montant' => '0.00',
+        'lettrage_code' => $codeLettrage,
+        'libelle' => 'Ligne intrusive de contrôle',
+    ]);
+    $intruse->save();
+
+    expect(fn (): mixed => $this->reglements->annuler((int) $t2->id))
+        ->toThrow(RuntimeException::class, 'exactement deux lignes');
+
+    expect(Transaction::find((int) $t2->id)?->id)->toBe((int) $t2->id)
+        ->and($parent->fresh()->lettrage_code)->toBe($codeLettrage)
+        ->and($intruse->fresh()->lettrage_code)->toBe($codeLettrage)
+        ->and(TransactionLigne::query()
+            ->where('compte_id', (int) $parent->compte_id)
+            ->where('lettrage_code', $codeLettrage)
+            ->count())->toBe(3)
+        ->and($t1->fresh()->statut_reglement)->toBe(StatutReglement::Recu);
+});
+
 it('restaure le lettrage et les écritures si la suppression échoue après le délettrage', function (): void {
     [$t1, $parent] = creerPosteAnnulableTask5($this);
     $t2 = reglerPosteTask5($this, $parent, 10000);
