@@ -162,3 +162,35 @@ artificiellement deux connexions concurrentes. Une validation complémentaire
 sur MySQL avec deux connexions et les verrous réels reste un candidat de CI ou
 de recette manuelle ; aucun changement du mécanisme de verrouillage n'est
 nécessaire pour cette correction.
+
+## Correctif de revue — unicité de la ligne tiers lettrée de T2
+
+### RED
+
+La régression crée une T2 malformée avec une seconde ligne 411 lettrée sous un
+code distinct et sa contrepartie source. Avant le correctif, `annuler()`
+sélectionnait seulement la première ligne de T2 et ne levait aucune exception.
+
+```bash
+php -d memory_limit=1G ./vendor/bin/pest --compact --filter='refuse une T2 avec deux lettrages tiers distincts' tests/Feature/Services/Compta/AnnulationReglementTiersTest.php
+```
+
+Résultat RED : 1 échec, `RuntimeException` non levée.
+
+### GREEN
+
+Avant toute mutation, `annuler()` collecte les lignes 401/411 de T2 portant un
+code de lettrage et exige qu'il y en ait exactement une. La validation du groupe
+de ce code unique est ensuite conservée. La régression vérifie que T2 et les
+deux paires de lignes conservent leurs codes après le refus.
+
+```bash
+php -d memory_limit=1G ./vendor/bin/pest --compact tests/Feature/Services/Compta/AnnulationReglementTiersTest.php tests/Feature/Services/TransactionServicePartieDoubleTest.php
+./vendor/bin/pint --test app/Services/Compta/PosteTiersReglementService.php tests/Feature/Services/Compta/AnnulationReglementTiersTest.php
+git diff --check
+```
+
+Résultat : succès, 155 assertions et 23 dépréciations préexistantes ; Pint et
+contrôle de diff réussis.
+
+Commit du correctif : `a3a9ad0c`.
