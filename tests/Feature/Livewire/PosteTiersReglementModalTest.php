@@ -1,0 +1,169 @@
+<?php
+
+declare(strict_types=1);
+
+use App\DTOs\Compta\PosteTiersReglementData;
+use App\Enums\ModePaiement;
+use App\Enums\StatutReglement;
+use App\Livewire\Compta\AnnulationReglementTiersModal;
+use App\Livewire\Compta\PosteTiersReglementModal;
+use App\Models\Tiers;
+use App\Models\Transaction;
+use App\Models\TransactionLigne;
+use App\Services\Compta\EcritureGenerator;
+use App\Services\Compta\PosteTiersReglementService;
+use App\Support\MontantDecimal;
+use Carbon\CarbonImmutable;
+use Livewire\Livewire;
+use Tests\Support\CreatesPartieDoubleContext;
+
+uses(CreatesPartieDoubleContext::class);
+
+beforeEach(function (): void {
+    $this->setupPartieDoubleContext();
+    $this->ecritures = app(EcritureGenerator::class);
+    $this->reglements = app(PosteTiersReglementService::class);
+});
+
+afterEach(function (): void {
+    CarbonImmutable::setTestNow();
+});
+
+/**
+ * @return array{Transaction, TransactionLigne}
+ */
+function creerPosteOuvertPourModaleReglement(object $contexte, int $montantCentimes = 10000): array
+{
+    $tiers = Tiers::factory()->create(['association_id' => $contexte->association->id]);
+    $transaction = $contexte->ecritures->pourRecetteACredit(
+        tiers: $tiers,
+        ventilations: [[
+            'compte' => $contexte->compte706,
+            'montant' => MontantDecimal::depuisCentimes($montantCentimes),
+        ]],
+        dateConstatation: new DateTimeImmutable('2025-10-01'),
+        libelle: 'Cotisation annuelle à encaisser',
+    );
+    $transaction->update(['statut_reglement' => StatutReglement::EnAttente]);
+
+    /** @var TransactionLigne $ligne */
+    $ligne = $transaction->lignes()
+        ->whereHas('compte', fn ($query) => $query->where('numero_pcg', '411'))
+        ->firstOrFail();
+
+    return [$transaction->fresh(), $ligne];
+}
+
+test('ouvrir préremplit le solde et la date du jour dans les bornes de l exercice', function (): void {
+    CarbonImmutable::setTestNow('2026-07-23 10:00:00');
+    [, $ligne] = creerPosteOuvertPourModaleReglement($this);
+
+    Livewire::test(PosteTiersReglementModal::class, ['exercice' => 2025])
+        ->dispatch('poste-tiers-reglement:ouvrir', ligneId: (int) $ligne->id, exercice: 2025)
+        ->assertSet('ligneId', (int) $ligne->id)
+        ->assertSet('montant', '100,00')
+        ->assertSet('dateReglement', '2026-07-23')
+        ->assertSet('titre', 'Règlement tiers')
+        ->assertSet('posteOrigine', fn (string $posteOrigine): bool => str_ends_with(
+            $posteOrigine,
+            'Cotisation annuelle à encaisser',
+        ));
+});
+
+test('ouvrir borne la date par le début et la fin de l exercice', function (string $maintenant, string $dateAttendue): void {
+    CarbonImmutable::setTestNow($maintenant);
+    [, $ligne] = creerPosteOuvertPourModaleReglement($this);
+
+    Livewire::test(PosteTiersReglementModal::class, ['exercice' => 2025])
+        ->dispatch('poste-tiers-reglement:ouvrir', ligneId: (int) $ligne->id, exercice: 2025)
+        ->assertSet('dateReglement', $dateAttendue);
+})->with([
+    'avant le début' => ['2025-08-31 10:00:00', '2025-09-01'],
+    'après la fin' => ['2026-09-01 10:00:00', '2026-08-31'],
+]);
+
+test('enregistrer crée le règlement et notifie les consommateurs', function (): void {
+    CarbonImmutable::setTestNow('2026-07-23 10:00:00');
+    [, $ligne] = creerPosteOuvertPourModaleReglement($this);
+
+    Livewire::test(PosteTiersReglementModal::class, ['exercice' => 2025])
+        ->dispatch('poste-tiers-reglement:ouvrir', ligneId: (int) $ligne->id, exercice: 2025)
+        ->set('montant', '30,00')
+        ->set('mode', ModePaiement::Virement->value)
+        ->set('compteBancaireId', (int) $this->compteBancaire->id)
+        ->call('enregistrer')
+        ->assertHasNoErrors()
+        ->assertDispatched('poste-tiers-reglement:enregistre')
+        ->assertDispatched('poste-tiers-reglement-modal-close');
+
+    expect(Transaction::query()
+        ->where('journal', 'banque')
+        ->whereDate('date', '2026-07-23')
+        ->where('montant_total', '30.00')
+        ->exists())->toBeTrue();
+});
+
+test('enregistrer affiche les messages métier pour un montant invalide', function (string $montant, string $message): void {
+    [, $ligne] = creerPosteOuvertPourModaleReglement($this);
+
+    Livewire::test(PosteTiersReglementModal::class, ['exercice' => 2025])
+        ->dispatch('poste-tiers-reglement:ouvrir', ligneId: (int) $ligne->id, exercice: 2025)
+        ->set('montant', $montant)
+        ->set('mode', ModePaiement::Virement->value)
+        ->set('compteBancaireId', (int) $this->compteBancaire->id)
+        ->call('enregistrer')
+        ->assertHasErrors(['montant'])
+        ->assertSee($message);
+})->with([
+    'nul' => ['0,00', 'Le montant du règlement doit être strictement positif.'],
+    'supérieur au solde' => ['100,01', 'Le montant du règlement ne peut pas dépasser le solde restant.'],
+]);
+
+test('enregistrer affiche le message métier pour une date hors exercice', function (): void {
+    [, $ligne] = creerPosteOuvertPourModaleReglement($this);
+
+    Livewire::test(PosteTiersReglementModal::class, ['exercice' => 2025])
+        ->dispatch('poste-tiers-reglement:ouvrir', ligneId: (int) $ligne->id, exercice: 2025)
+        ->set('dateReglement', '2026-09-01')
+        ->set('mode', ModePaiement::Virement->value)
+        ->set('compteBancaireId', (int) $this->compteBancaire->id)
+        ->call('enregistrer')
+        ->assertHasErrors(['dateReglement'])
+        ->assertSee('La date du règlement doit appartenir à l’exercice 2025-2026.');
+});
+
+test('la modale d annulation confirme explicitement puis annule le règlement', function (): void {
+    [, $ligne] = creerPosteOuvertPourModaleReglement($this);
+    $t2 = $this->reglements->regler(new PosteTiersReglementData(
+        ligneId: (int) $ligne->id,
+        montantCentimes: 3000,
+        date: CarbonImmutable::parse('2026-07-23'),
+        mode: ModePaiement::Virement,
+        compteBancaireId: (int) $this->compteBancaire->id,
+        exercice: 2025,
+    ));
+
+    Livewire::test(AnnulationReglementTiersModal::class)
+        ->dispatch('poste-tiers-reglement:annuler', transactionReglementId: (int) $t2->id)
+        ->assertSet('transactionReglementId', (int) $t2->id)
+        ->assertSet('dateReglement', '2026-07-23')
+        ->assertSet('montantReglement', '30,00 €')
+        ->call('annuler')
+        ->assertHasNoErrors()
+        ->assertDispatched('poste-tiers-reglement:annule')
+        ->assertDispatched('poste-tiers-reglement-annulation-modal-close');
+
+    expect(Transaction::withTrashed()->find((int) $t2->id))->toBeNull();
+});
+
+test('les vues utilisent les modales Bootstrap sans confirmation native', function (): void {
+    $reglement = Livewire::test(PosteTiersReglementModal::class, ['exercice' => 2025])->html();
+    $annulation = Livewire::test(AnnulationReglementTiersModal::class)->html();
+
+    expect($reglement)->toContain('class="modal fade"')
+        ->and($reglement)->toContain('wire:ignore.self')
+        ->and($reglement)->toContain('poste-tiers-reglement-modal-open.window')
+        ->and($annulation)->toContain('class="modal fade"')
+        ->and($annulation)->toContain('Annuler le règlement')
+        ->and($reglement.$annulation)->not->toContain('window.confirm');
+});
