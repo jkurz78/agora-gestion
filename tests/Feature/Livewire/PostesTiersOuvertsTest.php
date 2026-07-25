@@ -42,15 +42,18 @@ function comptePostesTiersOuverts(string $numero, int $classe): Compte
     ]);
 }
 
-function creerCreancePostesTiersOuverts(Tiers $tiers, string $reference): Transaction
-{
+function creerCreancePostesTiersOuverts(
+    Tiers $tiers,
+    string $reference,
+    string $dateConstatation = '2026-08-20',
+): Transaction {
     $transaction = app(EcritureGenerator::class)->pourRecetteACredit(
         tiers: $tiers,
         ventilations: [[
             'compte' => comptePostesTiersOuverts('706-'.str_replace('-', '', $reference), 7),
             'montant' => 100.00,
         ]],
-        dateConstatation: new DateTimeImmutable('2026-08-20'),
+        dateConstatation: new DateTimeImmutable($dateConstatation),
         libelle: 'Créance écran tiers',
     );
     $transaction->update(['reference' => $reference]);
@@ -58,24 +61,33 @@ function creerCreancePostesTiersOuverts(Tiers $tiers, string $reference): Transa
     return $transaction;
 }
 
-function creerDettePostesTiersOuverts(Tiers $tiers): Transaction
-{
+function creerDettePostesTiersOuverts(
+    Tiers $tiers,
+    string $suffixeCompte = 'ECRAN',
+    string $libelle = 'Dette écran tiers',
+): Transaction {
     return app(EcritureGenerator::class)->pourDepenseACredit(
         tiers: $tiers,
         ventilations: [[
-            'compte' => comptePostesTiersOuverts('606-ECRAN', 6),
+            'compte' => comptePostesTiersOuverts('606-'.$suffixeCompte, 6),
             'montant' => 45.50,
         ]],
         dateConstatation: new DateTimeImmutable('2026-08-21'),
-        libelle: 'Dette écran tiers',
+        libelle: $libelle,
     );
 }
 
 it('protege la page et affiche les postes ouverts avec les filtres et le règlement', function (): void {
     $client = Tiers::factory()->create(['nom' => 'Client écran']);
     $fournisseur = Tiers::factory()->create(['nom' => 'Fournisseur écran']);
+    $autreFournisseur = Tiers::factory()->create(['nom' => 'Autre fournisseur écran']);
     $t1 = creerCreancePostesTiersOuverts($client, 'REF-CLIENT-42');
     $t2 = creerDettePostesTiersOuverts($fournisseur);
+    $t3 = creerDettePostesTiersOuverts(
+        $autreFournisseur,
+        'AUTRE-TIERS',
+        'Dette exclue par recherche',
+    );
     $ligne401 = $t2->lignes->first(
         fn (TransactionLigne $ligne): bool => $ligne->compte?->numero_pcg === '401'
     );
@@ -93,12 +105,15 @@ it('protege la page et affiche les postes ouverts avec les filtres et le règlem
         ->assertSee('REF-CLIENT-42')
         ->set('filtreCompte', '401')
         ->assertDontSee('REF-CLIENT-42')
+        ->assertSee($t2->numero_piece)
+        ->assertSee($t3->numero_piece)
         ->set('filtreTiersId', (int) $fournisseur->id)
         ->assertSee($t2->numero_piece)
-        ->set('filtreExerciceOrigine', 2025)
-        ->assertSee($t2->numero_piece)
+        ->assertDontSee($t3->numero_piece)
+        ->set('filtreTiersId', null)
         ->set('recherche', 'dette écran')
         ->assertSee($t2->numero_piece)
+        ->assertDontSee($t3->numero_piece)
         ->call('regler', (int) $ligne401?->id)
         ->assertDispatched(
             'poste-tiers-reglement:ouvrir',
@@ -116,10 +131,20 @@ it('affiche les informations de la transaction d origine pour un report à nouve
         OrigineANouveau::Cloture,
         $this->acteurPostesTiersOuverts,
     );
+    $t2 = creerCreancePostesTiersOuverts(
+        $client,
+        'REF-ORIGINE-2026',
+        '2027-08-20',
+    );
     session(['exercice_actif' => 2026]);
 
     Livewire::test(PostesTiersOuverts::class)
         ->assertSee('Report AN')
         ->assertSee($t1->numero_piece)
-        ->assertSee('REF-REPORT-AN');
+        ->assertSee('REF-REPORT-AN')
+        ->assertSee($t2->numero_piece)
+        ->assertSee('REF-ORIGINE-2026')
+        ->set('filtreExerciceOrigine', 2025)
+        ->assertSee('REF-REPORT-AN')
+        ->assertDontSee('REF-ORIGINE-2026');
 });
