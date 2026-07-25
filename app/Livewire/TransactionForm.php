@@ -339,6 +339,7 @@ final class TransactionForm extends Component
         }
 
         $ligne = TransactionLigne::with('affectations', 'compte')->findOrFail($ligneId);
+        $this->assertVentilationModifiable($ligne);
         $this->ventilationLigneId = $ligneId;
         // DC-10a : libellé lu depuis le compte (source unique de la ventilation).
         $this->ventilationLigneCompteLabel = $ligne->compte?->intitule ?? '';
@@ -410,6 +411,7 @@ final class TransactionForm extends Component
         );
 
         $ligne = TransactionLigne::findOrFail($this->ventilationLigneId);
+        $this->assertVentilationModifiable($ligne);
         $ligneMontantCents = (int) round((float) $ligne->montant * 100);
         $affectationCents = (int) round(collect($this->affectations)->sum(fn ($a) => (float) ($a['montant'] ?? 0)) * 100);
         if ($ligneMontantCents !== $affectationCents) {
@@ -444,6 +446,7 @@ final class TransactionForm extends Component
         }
 
         $ligne = TransactionLigne::findOrFail($this->ventilationLigneId);
+        $this->assertVentilationModifiable($ligne);
         app(TransactionService::class)->supprimerAffectations($ligne);
         $this->fermerVentilation();
         $this->dispatch('transaction-saved');
@@ -470,7 +473,7 @@ final class TransactionForm extends Component
         $this->type = $transaction->type->value;
         $this->date = $transaction->date->format('Y-m-d');
         $this->libelle = $transaction->libelle;
-        $this->mode_paiement = '';
+        $this->mode_paiement = $transaction->mode_paiement?->value ?? '';
         $this->paiementRecu = $transaction->statut_reglement !== StatutReglement::EnAttente;
         $this->dateReglement = app(ExerciceService::class)->defaultDate();
         $this->tiers_id = $transaction->tiers_id;
@@ -659,9 +662,14 @@ final class TransactionForm extends Component
             $this->validate($lignesPjRules, $lignesPjMessages);
         }
 
+        $transactionExistante = $this->transactionId === null
+            ? null
+            : Transaction::findOrFail($this->transactionId);
+
         $doitRegler = ($this->type === 'recette' || $this->type === 'depense')
             && $this->paiementRecu
-            && ! $this->isLockedByReglement;
+            && ! $this->isLockedByReglement
+            && $transactionExistante?->mode_paiement === null;
         $modeReglement = $this->mode_paiement;
         $compteReglementId = $this->compte_id;
 
@@ -670,8 +678,10 @@ final class TransactionForm extends Component
             'date' => $this->date,
             'libelle' => $this->libelle,
             'montant_total' => $this->montantTotal,
-            // T1 est toujours une créance/dette ouverte ; le règlement est une T2 distincte.
-            'mode_paiement' => null,
+            // Les nouvelles T1 et les créances/dettes modernes (mode nul) restent
+            // ouvertes : leur règlement est porté par une T2 distincte. Les flux
+            // historiques gardent en revanche leur mode sur la transaction source.
+            'mode_paiement' => $transactionExistante?->mode_paiement?->value,
             'tiers_id' => $this->tiers_id,
             'reference' => $this->reference,
             'compte_id' => $this->compte_id,
@@ -855,9 +865,7 @@ final class TransactionForm extends Component
             'compte_id' => ['nullable', 'exists:comptes_bancaires,id'],
         ]);
 
-        $modeEffectif = ! $this->paiementRecu
-            ? null
-            : ($this->mode_paiement !== '' ? $this->mode_paiement : null);
+        $modeEffectif = $this->mode_paiement !== '' ? $this->mode_paiement : null;
 
         $transaction = Transaction::findOrFail($this->transactionId);
 
@@ -1204,6 +1212,14 @@ final class TransactionForm extends Component
         $this->etatPaiement = $reglements->isEmpty()
             ? 'ouvert'
             : ($poste === null ? 'solde' : 'partiel');
+    }
+
+    private function assertVentilationModifiable(TransactionLigne $ligne): void
+    {
+        $transaction = Transaction::findOrFail((int) $ligne->transaction_id);
+        if ($transaction->aUnReglementTiers()) {
+            abort(403);
+        }
     }
 
     public function render(): View

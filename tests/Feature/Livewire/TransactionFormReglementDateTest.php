@@ -46,11 +46,25 @@ afterEach(function (): void {
     TenantContext::clear();
 });
 
+function dateT1TransactionFormReglement(): string
+{
+    $range = app(ExerciceService::class)->dateRange(app(ExerciceService::class)->current());
+
+    return $range['start']->addDays(10)->toDateString();
+}
+
+function dateT2TransactionFormReglement(): string
+{
+    $range = app(ExerciceService::class)->dateRange(app(ExerciceService::class)->current());
+
+    return $range['start']->addDays(23)->toDateString();
+}
+
 it('crée une T1 et son règlement T2 à la date de règlement saisie', function (): void {
     Livewire::test(TransactionForm::class)
         ->set('type', 'recette')
-        ->set('date', '2026-07-10')
-        ->set('dateReglement', '2026-07-23')
+        ->set('date', dateT1TransactionFormReglement())
+        ->set('dateReglement', dateT2TransactionFormReglement())
         ->set('libelle', 'Cotisation datée')
         ->set('paiementRecu', true)
         ->set('mode_paiement', 'virement')
@@ -71,8 +85,8 @@ it('crée une T1 et son règlement T2 à la date de règlement saisie', function
     $t1 = Transaction::where('journal', JournalComptable::Vente->value)->sole();
     $t2 = Transaction::where('journal', JournalComptable::Banque->value)->sole();
 
-    expect($t1->date->toDateString())->toBe('2026-07-10')
-        ->and($t2->date->toDateString())->toBe('2026-07-23')
+    expect($t1->date->toDateString())->toBe(dateT1TransactionFormReglement())
+        ->and($t2->date->toDateString())->toBe(dateT2TransactionFormReglement())
         ->and($t1->mode_paiement)->toBeNull()
         ->and($t1->statut_reglement)->toBe(StatutReglement::Recu);
 });
@@ -80,7 +94,7 @@ it('crée une T1 et son règlement T2 à la date de règlement saisie', function
 it('règle une transaction ouverte lors de son édition', function (): void {
     $ouverte = Transaction::factory()->asRecette()->create([
         'association_id' => $this->association->id,
-        'date' => '2026-07-10',
+        'date' => dateT1TransactionFormReglement(),
         'libelle' => 'Créance à régler',
         'mode_paiement' => null,
         'compte_id' => $this->compteBancaire->id,
@@ -95,7 +109,7 @@ it('règle une transaction ouverte lors de son édition', function (): void {
         'credit' => 50,
     ]);
     app(TransactionService::class)->update($ouverte, [
-        'type' => 'recette', 'date' => '2026-07-10', 'libelle' => 'Créance à régler',
+        'type' => 'recette', 'date' => dateT1TransactionFormReglement(), 'libelle' => 'Créance à régler',
         'montant_total' => 50, 'mode_paiement' => null, 'tiers_id' => $this->tiers->id,
         'reference' => null, 'compte_id' => $this->compteBancaire->id, 'notes' => null,
     ], [[
@@ -106,19 +120,59 @@ it('règle une transaction ouverte lors de son édition', function (): void {
     Livewire::test(TransactionForm::class)
         ->call('edit', $ouverte->id)
         ->set('paiementRecu', true)
-        ->set('dateReglement', '2026-07-23')
+        ->set('dateReglement', dateT2TransactionFormReglement())
         ->set('mode_paiement', 'virement')
         ->call('save')
         ->assertHasNoErrors();
 
     expect(Transaction::query()->where('journal', JournalComptable::Banque->value)->sole()->date->toDateString())
-        ->toBe('2026-07-23');
+        ->toBe(dateT2TransactionFormReglement());
+});
+
+it('refuse le contournement Livewire de la ventilation après un règlement tiers', function (): void {
+    Livewire::test(TransactionForm::class)
+        ->set('type', 'recette')
+        ->set('date', dateT1TransactionFormReglement())
+        ->set('dateReglement', dateT2TransactionFormReglement())
+        ->set('libelle', 'Créance ventilée réglée')
+        ->set('paiementRecu', true)
+        ->set('mode_paiement', 'virement')
+        ->set('compte_id', $this->compteBancaire->id)
+        ->set('tiers_id', $this->tiers->id)
+        ->set('lignes', [[
+            'compte_id' => (string) $this->compteRecette->id,
+            'operation_id' => '',
+            'seance' => '',
+            'montant' => '50.00',
+            'notes' => '',
+            'piece_jointe_upload' => null,
+            'piece_jointe_remove' => false,
+        ]])
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $transaction = Transaction::where('libelle', 'Créance ventilée réglée')->sole();
+    $ligne = $transaction->lignes()->ventilation()->sole();
+
+    Livewire::test(TransactionForm::class)
+        ->call('edit', $transaction->id)
+        ->set('ventilationLigneId', $ligne->id)
+        ->set('affectations', [[
+            'operation_id' => '',
+            'seance' => '',
+            'montant' => '50.00',
+            'notes' => 'Contournement interdit',
+        ]])
+        ->call('saveVentilation')
+        ->assertForbidden();
+
+    expect($ligne->fresh()->affectations)->toHaveCount(0);
 });
 
 it('affiche le reliquat, l’historique et préserve le lettrage lors d’un changement de libellé', function (): void {
     Livewire::test(TransactionForm::class)
         ->set('type', 'recette')
-        ->set('date', '2026-07-10')
+        ->set('date', dateT1TransactionFormReglement())
         ->set('libelle', 'Créance partielle')
         ->set('paiementRecu', false)
         ->set('compte_id', $this->compteBancaire->id)
@@ -135,7 +189,7 @@ it('affiche le reliquat, l’historique et préserve le lettrage lors d’un cha
     app(PosteTiersReglementService::class)->regler(new PosteTiersReglementData(
         ligneId: $poste->ligneActionId,
         montantCentimes: 2000,
-        date: new CarbonImmutable('2026-07-23'),
+        date: new CarbonImmutable(dateT2TransactionFormReglement()),
         mode: ModePaiement::Virement,
         compteBancaireId: $this->compteBancaire->id,
         exercice: app(ExerciceService::class)->current(),
@@ -160,7 +214,7 @@ it('affiche le reliquat, l’historique et préserve le lettrage lors d’un cha
     app(PosteTiersReglementService::class)->regler(new PosteTiersReglementData(
         ligneId: $poste->ligneActionId,
         montantCentimes: $poste->soldeCentimes,
-        date: new CarbonImmutable('2026-07-24'),
+        date: new CarbonImmutable(dateT2TransactionFormReglement())->addDay(),
         mode: ModePaiement::Virement,
         compteBancaireId: $this->compteBancaire->id,
         exercice: app(ExerciceService::class)->current(),

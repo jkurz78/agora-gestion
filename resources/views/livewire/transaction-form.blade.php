@@ -509,7 +509,7 @@
                                                     <i class="bi bi-trash"></i>
                                                 </button>
                                             @endif
-                                            @if ($isLocked && ! $isLockedByFacture && ! $exerciceCloture && ($ligne['id'] ?? null) !== null)
+                                            @if ($isLocked && ! $isLockedByFacture && ! $isLockedByReglement && ! $exerciceCloture && ($ligne['id'] ?? null) !== null)
                                                 <button type="button"
                                                         wire:click="ouvrirVentilation({{ $ligne['id'] }})"
                                                         class="btn btn-sm btn-outline-warning ms-1">

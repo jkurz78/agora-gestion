@@ -42,3 +42,31 @@ Non créé : le `git commit` a été bloqué par la limite d'usage lors de l'esc
 ## Concerns
 
 - Le commit demandé reste à créer quand l'accès Git sera à nouveau disponible.
+
+## Fix review task 9
+
+### RED
+
+- L’édition d’une transaction pointée sans ressaisir le mode échouait en validation.
+- Les flux HelloAsso et miroir d’extourne rechargeaient le mode à vide.
+- Une requête Livewire forgée pouvait enregistrer une ventilation après règlement tiers.
+
+### GREEN
+
+- Le formulaire conserve le mode de la transaction source ; seules les T1 modernes sans mode restent forcées à null avant la création éventuelle de T2.
+- Les flux HelloAsso et extourne ne créent ni ne suppriment un règlement lors d’une sauvegarde inchangée.
+- Les actions de ventilation sont bloquées dans le composant et dans TransactionService lorsqu’un règlement tiers existe ; le bouton est masqué dans ce cas.
+
+### Tests
+
+~~~text
+./vendor/bin/pint app/Livewire/TransactionForm.php app/Services/TransactionService.php tests/Feature/Livewire/TransactionFormReglementDateTest.php tests/Feature/Livewire/TransactionFormStatutReglementTest.php
+php -d memory_limit=1G ./vendor/bin/pest --compact tests/Feature/Livewire/TransactionFormReglementDateTest.php tests/Feature/Livewire/TransactionFormStatutReglementTest.php tests/Feature/Livewire/TransactionFormSensTresorerieTest.php
+git diff --check
+~~~
+
+Résultat : Pint passe ; Pest passe (21 tests dépréciés, 64 assertions) ; git diff --check passe.
+
+### Commit
+
+- Bloqué : l’accès à .git/index.lock a été refusé par la limite d’usage ; commit demandé : fix(compta): préserver les transactions réglées dans le formulaire.

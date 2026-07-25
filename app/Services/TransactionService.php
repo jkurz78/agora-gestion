@@ -768,6 +768,7 @@ final class TransactionService
         if ($transaction->isLockedByFacture()) {
             throw new \RuntimeException('Cette transaction est liée à une facture validée. La ventilation ne peut pas être modifiée.');
         }
+        $this->assertVentilationModifiable($transaction);
 
         DB::transaction(function () use ($ligne, $affectations) {
             if (count($affectations) === 0) {
@@ -808,8 +809,16 @@ final class TransactionService
         if ($transaction->isLockedByFacture()) {
             throw new \RuntimeException('Cette transaction est liée à une facture validée. La ventilation ne peut pas être modifiée.');
         }
+        $this->assertVentilationModifiable($transaction);
 
         DB::transaction(fn () => $ligne->affectations()->delete());
+    }
+
+    private function assertVentilationModifiable(Transaction $transaction): void
+    {
+        if ($transaction->fresh()->aUnReglementTiers()) {
+            throw new \RuntimeException('La ventilation ne peut pas être modifiée sur une transaction réglée.');
+        }
     }
 
     public function storePieceJointe(Transaction $transaction, UploadedFile $file): void

@@ -15,6 +15,7 @@ declare(strict_types=1);
  *  4. Recette comptant créée → statut_reglement->isEncaisse() est true
  */
 
+use App\Enums\JournalComptable;
 use App\Enums\StatutReglement;
 use App\Livewire\TransactionForm;
 use App\Models\Association;
@@ -24,6 +25,7 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\Compta\Migrations\SystemeSeeder;
+use App\Services\TransactionService;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
@@ -152,6 +154,8 @@ it('éditer une transaction déjà Pointe ne rétrograde pas le statut_reglement
         'statut_reglement' => StatutReglement::Pointe,
         'mode_paiement' => 'cheque',
         'compte_id' => $this->compte->id,
+        'tiers_id' => $this->tiers->id,
+        'montant_total' => 100,
     ]);
 
     // Lui associer une ligne de ventilation (la factory en crée mais on en crée une propre)
@@ -168,14 +172,75 @@ it('éditer une transaction déjà Pointe ne rétrograde pas le statut_reglement
     Livewire::test(TransactionForm::class)
         ->call('edit', $txPointe->id)
         ->set('libelle', 'Libellé mis à jour')
-        ->set('paiementRecu', true) // l'utilisateur coche "reçu" — ne doit PAS écraser Pointe
-        ->set('mode_paiement', 'cheque')
-        ->call('save');
+        ->call('save')
+        ->assertHasNoErrors();
 
     $txPointe->refresh();
 
     // Le statut doit rester Pointe
-    expect($txPointe->statut_reglement)->toBe(StatutReglement::Pointe);
+    expect($txPointe->mode_paiement?->value)->toBe('cheque')
+        ->and($txPointe->statut_reglement)->toBe(StatutReglement::Pointe);
+});
+
+it('préserve le mode et le statut d’une transaction HelloAsso lors d’une sauvegarde sans changement', function (): void {
+    $transaction = app(TransactionService::class)->create([
+        'type' => 'recette',
+        'date' => dateExercice(),
+        'libelle' => 'Don HelloAsso',
+        'montant_total' => 100,
+        'mode_paiement' => 'virement',
+        'compte_id' => $this->compte->id,
+        'tiers_id' => $this->tiers->id,
+        'reference' => null,
+        'notes' => null,
+    ], [[
+        'compte_id' => $this->compteRecette->id,
+        'operation_id' => null,
+        'seance' => null,
+        'montant' => '100.00',
+        'notes' => null,
+    ]]);
+    $transaction->update(['helloasso_order_id' => 'order-review-task-9']);
+    $nombreT2Avant = Transaction::query()
+        ->where('journal', JournalComptable::Banque->value)
+        ->count();
+
+    Livewire::test(TransactionForm::class)
+        ->call('edit', $transaction->id)
+        ->assertSet('mode_paiement', 'virement')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect($transaction->fresh()->mode_paiement?->value)->toBe('virement')
+        ->and($transaction->fresh()->statut_reglement)->toBe(StatutReglement::Recu)
+        ->and(Transaction::query()->where('journal', JournalComptable::Banque->value)->count())->toBe($nombreT2Avant);
+});
+
+it('préserve le mode d’un miroir d’extourne lors d’une sauvegarde sans changement', function (): void {
+    $transaction = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
+        'date' => dateExercice(),
+        'mode_paiement' => 'virement',
+        'statut_reglement' => StatutReglement::Recu,
+        'compte_id' => $this->compte->id,
+        'tiers_id' => $this->tiers->id,
+        'type_ecriture' => 'extourne',
+    ]);
+    $transaction->lignes()->forceDelete();
+    $transaction->lignes()->create([
+        'compte_id' => $this->compteRecette->id,
+        'montant' => '100.00',
+        'debit' => 0,
+        'credit' => 100,
+    ]);
+
+    Livewire::test(TransactionForm::class)
+        ->call('edit', $transaction->id)
+        ->assertSet('mode_paiement', 'virement')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect($transaction->fresh()->mode_paiement?->value)->toBe('virement');
 });
 
 // ---------------------------------------------------------------------------
