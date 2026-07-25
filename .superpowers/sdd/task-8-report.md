@@ -48,3 +48,45 @@ php -d memory_limit=1G ./vendor/bin/pest --compact \
 
 - La branche `report_an` dépend de l'exercice affiché (`ExerciceService::current()`), conformément aux autres listes comptables.
 - Les filtres compte, usage comptable et NDF excluent volontairement les reports ; les filtres de période, tiers, référence, pièce et sens sont couverts par les tests.
+
+## Fix review task 8
+
+### RED
+
+- `php -d memory_limit=1G ./vendor/bin/pest --compact tests/Feature/TransactionUniverselleServiceTest.php --filter='utilise l exercice demandé'`
+  - échec attendu : aucun report AN lorsque la session est sur 2026 et l'exercice demandé est 2025.
+- `php -d memory_limit=1G ./vendor/bin/pest --compact tests/Feature/Livewire/TransactionUniverselleTest.php --filter='développe le détail'`
+  - échec attendu : la clé `lignes` est absente du détail `report_an`.
+
+### GREEN
+
+- Le composant transmet désormais son exercice fixé au service ; le service utilise cet exercice pour la branche `brancheReportsTransactions()`.
+- L'expansion d'un report AN restitue la ligne comptable (compte 401/411, tiers, montant) et le libellé d'origine lorsqu'il est disponible.
+- Les lignes virtuelles report AN ne rendent plus la poubelle désactivée.
+- Vérification exécutée :
+
+```text
+php -d memory_limit=1G ./vendor/bin/pest --compact \
+  tests/Feature/TransactionUniverselleServiceTest.php \
+  tests/Feature/Livewire/TransactionUniverselleMarquerRecuTest.php \
+  tests/Feature/Livewire/TransactionUniverselleTest.php \
+  tests/Feature/ReglementTableTest.php
+
+44 deprecated, 97 assertions
+```
+
+- `./vendor/bin/pint app/Services/TransactionUniverselleService.php app/Livewire/TransactionUniverselle.php tests/Feature/TransactionUniverselleServiceTest.php tests/Feature/Livewire/TransactionUniverselleTest.php` : succès.
+- `git diff --check` : succès.
+
+### Fichiers touchés
+
+- `app/Services/TransactionUniverselleService.php`
+- `app/Livewire/TransactionUniverselle.php`
+- `resources/views/livewire/transaction-universelle.blade.php`
+- `tests/Feature/TransactionUniverselleServiceTest.php`
+- `tests/Feature/Livewire/TransactionUniverselleTest.php`
+- `.superpowers/sdd/task-8-report.md`
+
+### Commit
+
+`f94c06b0ffce55edb20e2ed1a6dacc221bd1e3ad` — `fix(compta): corriger les reports AN dans les transactions`
