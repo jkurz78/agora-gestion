@@ -143,3 +143,40 @@ it('affiche un report AN et ouvre son règlement daté', function (): void {
 
     expect(Transaction::count())->toBe(2);
 });
+
+it('développe le détail exploitable d un report AN', function (): void {
+    SystemeSeeder::seed();
+    Exercice::create(['annee' => 2025, 'statut' => StatutExercice::Ouvert]);
+    $acteur = User::factory()->create();
+    $acteur->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    $produit = Compte::create([
+        'association_id' => $this->association->id,
+        'numero_pcg' => '706-REPORT-DETAIL',
+        'intitule' => 'Produit report détail',
+        'classe' => 7,
+        'actif' => true,
+        'est_systeme' => false,
+        'pour_inscriptions' => false,
+        'lettrable' => false,
+    ]);
+    app(EcritureGenerator::class)->pourRecetteACredit(
+        tiers: Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Client détail']),
+        ventilations: [['compte' => $produit, 'montant' => 42.00]],
+        dateConstatation: new DateTimeImmutable('2026-08-20'),
+        libelle: 'Créance report détaillée',
+    );
+    $ligneAN = app(ANouveauService::class)->persister(
+        app(ANouveauPreviewBuilder::class)->build(2025),
+        OrigineANouveau::Cloture,
+        $acteur,
+    )->origines()->with('ligneAN')->firstOrFail()->ligneAN;
+    session(['exercice_actif' => 2026]);
+
+    $component = Livewire::test(TransactionUniverselle::class, ['lockedTypes' => ['recette'], 'exercice' => 2026])
+        ->call('toggleDetail', 'report_an', (int) $ligneAN->id);
+
+    $detail = $component->get('expandedDetails')["report_an:{$ligneAN->id}"];
+
+    expect($detail['lignes'])->not->toBeEmpty()
+        ->and($detail['lignes'][0])->toHaveKeys(['compte', 'operation', 'montant', 'notes']);
+});

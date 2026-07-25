@@ -662,7 +662,7 @@
                                     @endif
                                 </button>
                             @endif
-                            @if (! $exerciceCloture)
+                            @if (! $isReportAN && ! $exerciceCloture)
                             @if($estSupprimableSafely || $tx->is_helloasso)
                                 <button type="button"
                                         wire:click="deleteRow('{{ e($tx->source_type) }}', {{ $tx->id }})"

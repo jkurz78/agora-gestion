@@ -244,6 +244,46 @@ it('expose une seule ligne report AN avec les informations de la transaction d o
     expect(collect($resultN['paginator']->items())->where('source_type', 'report_an'))->toBeEmpty();
 });
 
+it('utilise l exercice demandé pour les reports AN plutôt que celui de la session', function (): void {
+    SystemeSeeder::seed();
+    Exercice::create(['annee' => 2024, 'statut' => StatutExercice::Ouvert]);
+    $acteur = User::factory()->create();
+    $acteur->associations()->attach((int) TenantContext::currentId(), ['role' => 'admin', 'joined_at' => now()]);
+    $tiers = Tiers::factory()->create(['nom' => 'Client exercice affiché']);
+    $produit = Compte::create([
+        'numero_pcg' => '706-REPORT-EXERCICE',
+        'intitule' => 'Produit report exercice',
+        'classe' => 7,
+        'actif' => true,
+        'est_systeme' => false,
+        'pour_inscriptions' => false,
+        'lettrable' => false,
+    ]);
+    $transaction = app(EcritureGenerator::class)->pourRecetteACredit(
+        tiers: $tiers,
+        ventilations: [['compte' => $produit, 'montant' => 25.00]],
+        dateConstatation: new DateTimeImmutable('2025-08-20'),
+        libelle: 'Créance exercice affiché',
+    );
+    $ligneAN = app(ANouveauService::class)->persister(
+        app(ANouveauPreviewBuilder::class)->build(2024),
+        OrigineANouveau::Cloture,
+        $acteur,
+    )->origines()->with('ligneAN')->firstOrFail()->ligneAN;
+
+    session(['exercice_actif' => 2026]);
+    $result = $this->svc->paginate(
+        null, null, ['recette'], '2025-09-01', '2026-08-31', null, null, null, null, null, null,
+        null, false, 'date', 'desc', 25, 1, false, 2025,
+    );
+
+    $report = collect($result['paginator']->items())->firstWhere('source_type', 'report_an');
+
+    expect($report)->not->toBeNull()
+        ->and($report->numero_piece)->toBe($transaction->numero_piece)
+        ->and((int) $report->poste_tiers_ligne_id)->toBe((int) $ligneAN->id);
+});
+
 it('filtre les reports AN par bornes, tiers, référence, pièce et sens', function (): void {
     SystemeSeeder::seed();
     Exercice::create(['annee' => 2025, 'statut' => StatutExercice::Ouvert]);

@@ -7,9 +7,11 @@ namespace App\Livewire;
 use App\Enums\ModePaiement;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Livewire\Concerns\WithPerPage;
+use App\Models\ANouveauLigneOrigine;
 use App\Models\CompteBancaire;
 use App\Models\NoteDeFrais;
 use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Models\VirementInterne;
 use App\Services\Compta\PostesTiersOuvertsService;
 use App\Services\ExerciceService;
@@ -258,9 +260,40 @@ final class TransactionUniverselle extends Component
     {
         return match ($sourceType) {
             'depense', 'recette' => $this->fetchTransactionDetail($id),
+            'report_an' => $this->fetchReportANDetail($id),
             'virement_sortant', 'virement_entrant' => [],
             default => [],
         };
+    }
+
+    private function fetchReportANDetail(int $id): array
+    {
+        $ligne = TransactionLigne::with(['compte', 'tiers'])->find($id);
+        if ($ligne === null) {
+            return [];
+        }
+
+        $ligneCanoniqueId = (int) ($ligne->poste_tiers_parent_id ?? $ligne->id);
+        $origine = ANouveauLigneOrigine::with('ligneRacine.transaction')
+            ->where('ligne_an_id', $ligneCanoniqueId)
+            ->first();
+        $transactionOrigine = $origine?->ligneRacine?->transaction;
+
+        return [
+            'lignes' => [[
+                'id' => (int) $ligne->id,
+                'compte' => $ligne->compte?->numero_pcg.' — '.$ligne->compte?->intitule,
+                'operation' => $ligne->tiers?->displayName() ?? 'Tiers non renseigné',
+                'operation_id' => null,
+                'seance' => null,
+                'montant' => (float) $ligne->montant_signe,
+                'notes' => $transactionOrigine?->libelle ?? $ligne->libelle,
+                'libelle' => $transactionOrigine?->libelle ?? $ligne->libelle,
+                'tiers' => $ligne->tiers?->displayName(),
+            ]],
+            'factures' => [],
+            'transaction_id' => $transactionOrigine?->id,
+        ];
     }
 
     private function fetchTransactionDetail(int $id): array
@@ -418,6 +451,7 @@ final class TransactionUniverselle extends Component
             perPage: $this->effectivePerPage(),
             page: $this->getPage(),
             ndfUniquement: $this->filterNdfUniquement,
+            exercice: $this->exercice,
         );
 
         $rows = collect($result['paginator']->items());

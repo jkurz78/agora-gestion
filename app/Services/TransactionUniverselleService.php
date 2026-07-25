@@ -38,6 +38,7 @@ final class TransactionUniverselleService
         int $perPage = 25,
         int $page = 1,
         bool $ndfUniquement = false,
+        ?int $exercice = null,
     ): array {
         $allowedColumns = ['id', 'date', 'numero_piece', 'reference', 'tiers', 'libelle',
             'compte_ventilation_nom', 'nb_lignes', 'compte_id', 'compte_nom', 'mode_paiement',
@@ -47,7 +48,8 @@ final class TransactionUniverselleService
         }
         $sortDirection = $sortDirection === 'asc' ? 'asc' : 'desc';
 
-        $union = $this->buildUnion($compteId, $tiersId, $types, $dateDebut, $dateFin, $usageFilter, $ndfUniquement);
+        $exerciceAffiche = $exercice ?? app(ExerciceService::class)->current();
+        $union = $this->buildUnion($compteId, $tiersId, $types, $dateDebut, $dateFin, $usageFilter, $ndfUniquement, $exerciceAffiche);
 
         $outer = DB::query()->fromSub($union, 't')
             ->when($searchTiers, fn ($q) => $q->where('t.tiers', 'like', "%{$searchTiers}%"))
@@ -77,7 +79,7 @@ final class TransactionUniverselleService
                 $offset = ($paginator->currentPage() - 1) * $perPage;
                 $sumAvant = 0.0;
                 if ($offset > 0) {
-                    $unionForSolde = $this->buildUnion($compteId, $tiersId, $types, $dateDebut, $dateFin, $usageFilter, $ndfUniquement);
+                    $unionForSolde = $this->buildUnion($compteId, $tiersId, $types, $dateDebut, $dateFin, $usageFilter, $ndfUniquement, $exerciceAffiche);
                     $inner = DB::query()->fromSub($unionForSolde, 'u')
                         ->select('montant')
                         ->orderBy("u.{$sortColumn}", $sortDirection)
@@ -107,6 +109,7 @@ final class TransactionUniverselleService
         ?string $dateFin,
         ?string $usageFilter = null,
         bool $ndfUniquement = false,
+        ?int $exercice = null,
     ): Builder {
         // Map external string filter to UsageComptable (preserves external API, eliminates column interpolation)
         $flagToUsage = [
@@ -137,7 +140,7 @@ final class TransactionUniverselleService
             $reports = DB::query()
                 ->fromSub(
                     app(PostesTiersOuvertsService::class)->brancheReportsTransactions(
-                        app(ExerciceService::class)->current()
+                        $exercice ?? app(ExerciceService::class)->current()
                     ),
                     'report_an',
                 )
