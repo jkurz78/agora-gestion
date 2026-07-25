@@ -5,7 +5,21 @@
 - **RED** — `php -d memory_limit=1G ./vendor/bin/pest --compact tests/Feature/Livewire/PostesTiersOuvertsTest.php`
   a échoué comme attendu : route `comptabilite.postes-tiers-ouverts` absente et composant
   `App\\Livewire\\Compta\\PostesTiersOuverts` introuvable.
-- **GREEN** — la même commande passe avec 2 tests et 15 assertions.
+- **GREEN** — la même commande passe avec 2 tests et 22 assertions.
+
+## Complément de couverture des filtres (revue Task 7)
+
+- Le filtre `filtreTiersId` est vérifié avec une seconde dette 401 appartenant à un
+  autre fournisseur : elle est absente après sélection du fournisseur attendu.
+- La recherche est vérifiée avec un libellé distinct : la dette non correspondante
+  est absente après recherche de `dette écran`.
+- Le filtre `filtreExerciceOrigine` est vérifié dans l'exercice 2026 avec un report
+  d'origine 2025 et une créance directe d'origine 2026 : cette dernière est absente
+  après sélection de 2025.
+- Le filtre de compte conserve les assertions sur les deux dettes 401 et l'exclusion
+  de la créance 411.
+
+Commit de couverture : `096fc2db` (`test(compta): couvrir les filtres des postes tiers ouverts`).
 
 ## Fichiers modifiés
 
@@ -26,8 +40,8 @@
 ## Vérifications
 
 - `php -d memory_limit=1G ./vendor/bin/pest --compact tests/Feature/Livewire/PostesTiersOuvertsTest.php`
-  — succès (2 tests, 15 assertions).
-- `./vendor/bin/pint app/Livewire/Compta/PostesTiersOuverts.php routes/web.php tests/Feature/Livewire/PostesTiersOuvertsTest.php`
+  — succès (2 tests, 22 assertions ; 2 dépréciations préexistantes).
+- `./vendor/bin/pint tests/Feature/Livewire/PostesTiersOuvertsTest.php`
   — succès.
 - `php artisan route:list --path=comptabilite/postes-tiers-ouverts`
   — route GET/HEAD présente.
