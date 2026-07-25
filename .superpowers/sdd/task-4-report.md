@@ -123,3 +123,12 @@ Vérification locale après reprise de la session interrompue :
 - Pint sur les cinq fichiers concernés : OK ;
 - documentation du code de lettrage mise à jour pour la séquence
   alphabétique `AAAA` à `ZZZZ`.
+
+## Correctif de filiation de la transaction source
+
+- RED : le test mélangeant la ligne du poste A et la transaction source B
+  échouait comme attendu (`DomainException not thrown`).
+- GREEN : après validation sous verrou de l'ID de T1 avec
+  `transactionOrigineId`, les deux suites ciblées passent : 30 tests,
+  146 assertions, exit 0 ; Pint sur les deux fichiers PHP : OK.
+- Commit du correctif : `d764aebc`.
