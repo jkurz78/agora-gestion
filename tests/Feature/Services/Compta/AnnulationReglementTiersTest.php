@@ -185,6 +185,40 @@ it('refuse un groupe de lettrage tiers à trois lignes sans aucune mutation', fu
         ->and($t1->fresh()->statut_reglement)->toBe(StatutReglement::Recu);
 });
 
+it('refuse une T2 avec deux lettrages tiers distincts sans aucune mutation', function (): void {
+    [$t1, $parent] = creerPosteAnnulableTask5($this);
+    $t2 = reglerPosteTask5($this, $parent, 10000);
+    $codePrincipal = $parent->fresh()->lettrage_code;
+    $codeSecondaire = 'T2-SECOND-LETTRAGE';
+    $ligneTiersT2 = $t2->lignes()
+        ->whereHas('compte', fn ($query) => $query->where('numero_pcg', '411'))
+        ->sole();
+
+    $contrepartieSecondaire = $parent->replicate(['id', 'deleted_at']);
+    $contrepartieSecondaire->fill([
+        'lettrage_code' => $codeSecondaire,
+        'libelle' => 'Contrepartie du second lettrage T2',
+    ]);
+    $contrepartieSecondaire->save();
+
+    $ligneTiersT2Secondaire = $ligneTiersT2->replicate(['id', 'deleted_at']);
+    $ligneTiersT2Secondaire->fill([
+        'lettrage_code' => $codeSecondaire,
+        'libelle' => 'Seconde ligne tiers T2',
+    ]);
+    $ligneTiersT2Secondaire->save();
+
+    expect(fn (): mixed => $this->reglements->annuler((int) $t2->id))
+        ->toThrow(RuntimeException::class, 'unique ligne tiers');
+
+    expect(Transaction::find((int) $t2->id)?->id)->toBe((int) $t2->id)
+        ->and($parent->fresh()->lettrage_code)->toBe($codePrincipal)
+        ->and($ligneTiersT2->fresh()->lettrage_code)->toBe($codePrincipal)
+        ->and($contrepartieSecondaire->fresh()->lettrage_code)->toBe($codeSecondaire)
+        ->and($ligneTiersT2Secondaire->fresh()->lettrage_code)->toBe($codeSecondaire)
+        ->and($t1->fresh()->statut_reglement)->toBe(StatutReglement::Recu);
+});
+
 it('refuse une contrepartie de lettrage supprimée sans aucune mutation', function (): void {
     [$t1, $parent] = creerPosteAnnulableTask5($this);
     $t2 = reglerPosteTask5($this, $parent, 10000);

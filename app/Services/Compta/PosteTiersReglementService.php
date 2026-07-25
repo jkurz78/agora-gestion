@@ -111,13 +111,20 @@ final class PosteTiersReglementService
                 );
             }
 
-            $ligneTiersT2 = $lignesT2->first(function (TransactionLigne $ligne): bool {
-                return in_array($ligne->compte?->numero_pcg, ['401', '411'], true)
-                    && $ligne->lettrage_code !== null;
-            });
-            if ($ligneTiersT2 === null) {
-                throw new RuntimeException('Le règlement ne possède pas de ligne tiers lettrée à annuler.');
+            /** @var Collection<int, TransactionLigne> $lignesTiersLettreesT2 */
+            $lignesTiersLettreesT2 = $lignesT2
+                ->filter(fn (TransactionLigne $ligne): bool => in_array($ligne->compte?->numero_pcg, ['401', '411'], true)
+                    && $ligne->lettrage_code !== null
+                )
+                ->values();
+            if ($lignesTiersLettreesT2->count() !== 1) {
+                throw new RuntimeException(
+                    'Le règlement doit posséder exactement une unique ligne tiers lettrée à annuler.'
+                );
             }
+
+            /** @var TransactionLigne $ligneTiersT2 */
+            $ligneTiersT2 = $lignesTiersLettreesT2->sole();
 
             /** @var Collection<int, TransactionLigne> $groupeLettrageComplet */
             $groupeLettrageComplet = TransactionLigne::query()
