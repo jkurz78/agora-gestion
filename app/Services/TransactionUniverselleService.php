@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Enums\UsageComptable;
 use App\Models\CompteBancaire;
 use App\Models\Tiers;
+use App\Services\Compta\PostesTiersOuvertsService;
 use App\Tenant\TenantContext;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Query\Builder;
@@ -132,6 +133,28 @@ final class TransactionUniverselleService
             $queries[] = $this->brancheVirementSortant($compteId, $tiersId, $dateDebut, $dateFin);
             $queries[] = $this->brancheVirementEntrant($compteId, $tiersId, $dateDebut, $dateFin);
         }
+        if ($compteId === null && $usage === null && ! $ndfUniquement && ($include['depense'] || $include['recette'])) {
+            $reports = DB::query()
+                ->fromSub(
+                    app(PostesTiersOuvertsService::class)->brancheReportsTransactions(
+                        app(ExerciceService::class)->current()
+                    ),
+                    'report_an',
+                )
+                ->select('report_an.*')
+                ->when($tiersId !== null, fn (Builder $query) => $query->where('report_an.tiers_id', $tiersId))
+                ->when($dateDebut, fn (Builder $query) => $query->where('report_an.date', '>=', $dateDebut))
+                ->when($dateFin, fn (Builder $query) => $query->where('report_an.date', '<=', $dateFin));
+
+            if (! $include['depense']) {
+                $reports->where('report_an.sens_tresorerie', 'recette');
+            }
+            if (! $include['recette']) {
+                $reports->where('report_an.sens_tresorerie', 'depense');
+            }
+
+            $queries[] = $reports;
+        }
 
         if (empty($queries)) {
             // No types selected — return a query that yields no rows
@@ -143,7 +166,7 @@ final class TransactionUniverselleService
                  NULL as statut_reglement, NULL as remise_id, NULL as rapprochement_id,
                  NULL as notes, NULL as piece_jointe_path, NULL as piece_jointe_nom, 0 as is_helloasso,
                  NULL as extournee_at, 0 as is_extourne_miroir, NULL as reglement_id, 0 as is_locked_by_facture,
-                 'depense' as sens_tresorerie"
+                 'depense' as sens_tresorerie, NULL as poste_tiers_ligne_id, 0 as is_report_an"
             );
         }
 
@@ -196,7 +219,9 @@ final class TransactionUniverselleService
                 EXISTS(SELECT 1 FROM extournes e WHERE e.transaction_extourne_id = tx.id AND e.deleted_at IS NULL) as is_extourne_miroir,
                 tx.reglement_id,
                 EXISTS(SELECT 1 FROM facture_transaction ft JOIN factures f ON f.id = ft.facture_id WHERE ft.transaction_id = tx.id AND f.statut = 'validee') as is_locked_by_facture,
-                CASE WHEN tx.type_ecriture = 'extourne' THEN 'recette' ELSE 'depense' END AS sens_tresorerie
+                CASE WHEN tx.type_ecriture = 'extourne' THEN 'recette' ELSE 'depense' END AS sens_tresorerie,
+                NULL as poste_tiers_ligne_id,
+                0 as is_report_an
             ")
             ->where('tx.type', 'depense')
             ->whereIn('tx.journal', ['vente', 'achat'])
@@ -262,7 +287,9 @@ final class TransactionUniverselleService
                 EXISTS(SELECT 1 FROM extournes e WHERE e.transaction_extourne_id = tx.id AND e.deleted_at IS NULL) as is_extourne_miroir,
                 tx.reglement_id,
                 EXISTS(SELECT 1 FROM facture_transaction ft JOIN factures f ON f.id = ft.facture_id WHERE ft.transaction_id = tx.id AND f.statut = 'validee') as is_locked_by_facture,
-                CASE WHEN tx.type_ecriture = 'extourne' THEN 'depense' ELSE 'recette' END AS sens_tresorerie
+                CASE WHEN tx.type_ecriture = 'extourne' THEN 'depense' ELSE 'recette' END AS sens_tresorerie,
+                NULL as poste_tiers_ligne_id,
+                0 as is_report_an
             ")
             ->where('tx.type', 'recette')
             ->whereIn('tx.journal', ['vente', 'achat', 'od'])
@@ -324,7 +351,9 @@ final class TransactionUniverselleService
                 0 as is_extourne_miroir,
                 NULL as reglement_id,
                 0 as is_locked_by_facture,
-                'virement' AS sens_tresorerie
+                'virement' AS sens_tresorerie,
+                NULL as poste_tiers_ligne_id,
+                0 as is_report_an
             ")
             ->whereNull('vi.deleted_at')
             ->when(TenantContext::hasBooted(), fn ($q) => $q->where('vi.association_id', TenantContext::currentId()))
@@ -371,7 +400,9 @@ final class TransactionUniverselleService
                 0 as is_extourne_miroir,
                 NULL as reglement_id,
                 0 as is_locked_by_facture,
-                'virement' AS sens_tresorerie
+                'virement' AS sens_tresorerie,
+                NULL as poste_tiers_ligne_id,
+                0 as is_report_an
             ")
             ->whereNull('vi.deleted_at')
             ->when(TenantContext::hasBooted(), fn ($q) => $q->where('vi.association_id', TenantContext::currentId()))

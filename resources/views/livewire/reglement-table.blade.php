@@ -363,4 +363,6 @@
             </div>
         </div>
     </div>
+
+    <livewire:compta.poste-tiers-reglement-modal />
 </div>

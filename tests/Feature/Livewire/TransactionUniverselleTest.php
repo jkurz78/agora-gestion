@@ -2,12 +2,20 @@
 
 declare(strict_types=1);
 
+use App\Enums\OrigineANouveau;
+use App\Enums\StatutExercice;
 use App\Livewire\TransactionUniverselle;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
+use App\Models\Exercice;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\Compta\ANouveau\ANouveauPreviewBuilder;
+use App\Services\Compta\ANouveau\ANouveauService;
+use App\Services\Compta\EcritureGenerator;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
@@ -98,4 +106,40 @@ it('la page /cotisations rend TransactionUniverselle avec usageFilter pour_cotis
 
     Livewire::test(TransactionUniverselle::class, ['usageFilter' => 'pour_cotisations'])
         ->assertSet('usageFilter', 'pour_cotisations');
+});
+
+it('affiche un report AN et ouvre son règlement daté', function (): void {
+    SystemeSeeder::seed();
+    Exercice::create(['annee' => 2025, 'statut' => StatutExercice::Ouvert]);
+    $acteur = User::factory()->create();
+    $acteur->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    $produit = Compte::create([
+        'association_id' => $this->association->id,
+        'numero_pcg' => '706-REPORT-ECRAN',
+        'intitule' => 'Produit report écran',
+        'classe' => 7,
+        'actif' => true,
+        'est_systeme' => false,
+        'pour_inscriptions' => false,
+        'lettrable' => false,
+    ]);
+    $t1 = app(EcritureGenerator::class)->pourRecetteACredit(
+        tiers: Tiers::factory()->create(['association_id' => $this->association->id]),
+        ventilations: [['compte' => $produit, 'montant' => 42.00]],
+        dateConstatation: new DateTimeImmutable('2026-08-20'),
+        libelle: 'Créance report écran',
+    );
+    $ligneAN = app(ANouveauService::class)->persister(
+        app(ANouveauPreviewBuilder::class)->build(2025),
+        OrigineANouveau::Cloture,
+        $acteur,
+    )->origines()->with('ligneAN')->firstOrFail()->ligneAN;
+    session(['exercice_actif' => 2026]);
+
+    Livewire::test(TransactionUniverselle::class, ['lockedTypes' => ['recette'], 'exercice' => 2026])
+        ->assertSee('Report AN')
+        ->call('marquerRecu', (int) $ligneAN->id, 'report_an', (int) $ligneAN->id)
+        ->assertDispatched('poste-tiers-reglement:ouvrir', ligneId: (int) $ligneAN->id, exercice: 2026);
+
+    expect(Transaction::count())->toBe(2);
 });

@@ -8,7 +8,6 @@ use App\Enums\CategorieEmail;
 use App\Enums\Espace;
 use App\Enums\ModePaiement;
 use App\Enums\RoleAssociation;
-use App\Enums\StatutReglement;
 use App\Enums\TypeDocumentPrevisionnel;
 use App\Livewire\Concerns\MontantValidation;
 use App\Mail\DocumentMail;
@@ -19,8 +18,10 @@ use App\Models\Operation;
 use App\Models\Reglement;
 use App\Models\Seance;
 use App\Models\Transaction;
+use App\Services\Compta\PostesTiersOuvertsService;
 use App\Services\DocumentPrevisionnelService;
 use App\Services\Email\EmailLogStorageService;
+use App\Services\ExerciceService;
 use App\Services\ReglementOperationService;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
@@ -31,6 +32,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 final class ReglementTable extends Component
@@ -241,19 +243,22 @@ final class ReglementTable extends Component
             return;
         }
 
-        $tx = Transaction::findOrFail($transactionId);
-
-        if ($tx->statut_reglement !== StatutReglement::EnAttente) {
-            return; // Already received or reconciled
-        }
-
-        if ($tx->isLockedByRapprochement() || $tx->isLockedByFacture()) {
+        $transaction = Transaction::find($transactionId);
+        if ($transaction === null || $transaction->isLockedByRapprochement() || $transaction->isLockedByFacture()) {
             return;
         }
 
-        // Délègue au service métier (Step 26) : toggle statut + génère T2 partie double
-        app(ReglementOperationService::class)->marquerRecu($tx);
+        $exercice = app(ExerciceService::class)->current();
+        $poste = app(PostesTiersOuvertsService::class)->pourTransaction($transaction, $exercice);
+        if ($poste === null) {
+            return;
+        }
+
+        $this->dispatch('poste-tiers-reglement:ouvrir', ligneId: $poste->ligneActionId, exercice: $exercice);
     }
+
+    #[On('poste-tiers-reglement:enregistre')]
+    public function onPosteTiersReglementEnregistre(): void {}
 
     public function ouvrirComptabiliser(int $seanceId): void
     {

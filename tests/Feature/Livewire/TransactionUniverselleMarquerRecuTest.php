@@ -48,10 +48,10 @@ beforeEach(function () {
 });
 
 // ---------------------------------------------------------------------------
-// AC #9 — Bug B : marquerRecu via TransactionUniverselle génère T2 + auto-lettrage 411
+// AC #9 — le règlement depuis Transactions ouvre la modale datée du poste tiers
 // ---------------------------------------------------------------------------
 
-it('[AC9] TransactionUniverselle::marquerRecu génère T2 (portage D + 411 C) et auto-lettre la paire 411', function () {
+it('[AC9] TransactionUniverselle::marquerRecu ouvre la modale datée sans générer T2', function () {
     // Arrange : T1 avec ligne 411 (cheque, montant 80)
     $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $participant = Participant::create([
@@ -75,44 +75,15 @@ it('[AC9] TransactionUniverselle::marquerRecu génère T2 (portage D + 411 C) et
     $ligne411T1 = TransactionLigne::where('transaction_id', $t1->id)
         ->where('compte_id', $compte411->id)
         ->firstOrFail();
-    expect($ligne411T1->lettrage_code)->toBeNull(); // non lettrée avant l'action
+    expect($ligne411T1->lettrage_code)->toBeNull();
 
-    // Act : appel via Livewire (miroir de la correction Bug B)
+    // Act : le règlement doit être saisi dans la modale commune, à une date choisie.
     Livewire::test(TransactionUniverselle::class)
-        ->call('marquerRecu', $t1->id);
+        ->call('marquerRecu', $t1->id)
+        ->assertDispatched('poste-tiers-reglement:ouvrir', ligneId: (int) $ligne411T1->id, exercice: 2025);
 
-    // Assert : statut_reglement dérivé — chèque reçu non remis = EnMain (chantier 4)
-    $t1->refresh();
-    expect($t1->statut_reglement)->toBe(StatutReglement::EnMain);
-
-    // Assert : T2 générée (on a maintenant 2 transactions)
-    expect(Transaction::count())->toBe(2);
-
-    $t2 = Transaction::where('id', '!=', $t1->id)->firstOrFail();
-    $lignesT2 = TransactionLigne::where('transaction_id', $t2->id)->get();
-    expect($lignesT2)->toHaveCount(2);
-
-    $compte5112 = compteSysteme('5112');
-
-    // Portage 5112 D (chèque → placeholder)
-    $lignePortage = $lignesT2->firstWhere('compte_id', $compte5112->id);
-    expect($lignePortage)->not->toBeNull();
-    expect((float) $lignePortage->debit)->toBe(80.0);
-    expect((float) $lignePortage->credit)->toBe(0.0);
-    expect($lignePortage->tiers_id)->toBeNull(); // FEC : pas de tiers sur 5x
-
-    // 411 C tiers sur T2
-    $ligne411T2 = $lignesT2->firstWhere('compte_id', $compte411->id);
-    expect($ligne411T2)->not->toBeNull();
-    expect((float) $ligne411T2->credit)->toBe(80.0);
-    expect((float) $ligne411T2->debit)->toBe(0.0);
-    expect($ligne411T2->tiers_id)->not->toBeNull();
-
-    // Auto-lettrage : T1.ligne411 et T2.ligne411 partagent le même code
-    $ligne411T1->refresh();
-    $ligne411T2->refresh();
-    expect($ligne411T1->lettrage_code)->not->toBeNull();
-    expect($ligne411T1->lettrage_code)->toBe($ligne411T2->lettrage_code);
+    expect(Transaction::count())->toBe(1)
+        ->and($ligne411T1->fresh()->lettrage_code)->toBeNull();
 });
 
 // ---------------------------------------------------------------------------

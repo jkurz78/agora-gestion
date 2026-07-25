@@ -17,6 +17,7 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\TypeOperation;
 use App\Models\User;
+use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Tenant\TenantContext;
 use Illuminate\Database\QueryException;
@@ -135,6 +136,35 @@ it('cycles through reglement payment modes', function () {
 it('renders reglement table', function () {
     Livewire::test(ReglementTable::class, ['operation' => $this->operation])
         ->assertOk();
+});
+
+it('ouvre la modale de règlement daté sans créer de T2', function (): void {
+    SystemeSeeder::seed();
+    $produit = Compte::create([
+        'numero_pcg' => '706-REGLEMENT-TABLE',
+        'intitule' => 'Produit règlement table',
+        'classe' => 7,
+        'actif' => true,
+        'est_systeme' => false,
+        'pour_inscriptions' => false,
+        'lettrable' => false,
+    ]);
+    $t1 = app(EcritureGenerator::class)->pourRecetteACredit(
+        tiers: Tiers::factory()->create(),
+        ventilations: [['compte' => $produit, 'montant' => 30.00]],
+        dateConstatation: new DateTimeImmutable('2025-12-01'),
+        libelle: 'Créance depuis règlements',
+    );
+    $ligne411 = $t1->lignes->first(
+        fn (TransactionLigne $ligne): bool => $ligne->compte?->numero_pcg === '411'
+    );
+
+    Livewire::test(ReglementTable::class, ['operation' => $this->operation])
+        ->call('marquerRecu', (int) $t1->id)
+        ->assertDispatched('poste-tiers-reglement:ouvrir', ligneId: (int) $ligne411?->id, exercice: 2025);
+
+    expect(Transaction::count())->toBe(1)
+        ->and($ligne411?->fresh()->lettrage_code)->toBeNull();
 });
 
 it('can cycle mode paiement', function () {

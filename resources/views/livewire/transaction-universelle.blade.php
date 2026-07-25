@@ -496,6 +496,7 @@
                     };
                     $isLocked = (bool) $tx->pointe;
                     $statutReglement = $tx->statut_reglement ?? null; // null for virements
+                    $isReportAN = $tx->source_type === 'report_an';
                 @endphp
                 @php
                     // Indicateurs Slice 1 — extourne. extournee_at non null = origine
@@ -548,6 +549,9 @@
                             </span>
                         @else
                             {{ $tx->libelle ?? '—' }}
+                        @endif
+                        @if($isReportAN)
+                            <span class="badge text-bg-secondary ms-1" style="font-size:.6rem">Report AN</span>
                         @endif
                         @if($isExtourneOrigine)
                             <span class="badge text-bg-warning ms-1" style="font-size:.6rem"
@@ -606,24 +610,26 @@
                     @endif
                     <td>
                         <div class="d-flex gap-1 align-items-center" @click.stop>
-                            <button type="button"
-                                    wire:click="openEdit('{{ e($tx->source_type) }}', {{ $tx->id }})"
-                                    class="btn btn-sm btn-outline-primary"
-                                    style="padding:.15rem .3rem;font-size:.7rem"
-                                    title="{{ $isExtourneMiroir || $exerciceCloture ? 'Visualiser' : 'Modifier' }}">
-                                <i class="bi bi-{{ $isExtourneMiroir || $exerciceCloture ? 'eye' : 'pencil' }}"></i>
-                            </button>
+                            @if(! $isReportAN)
+                                <button type="button"
+                                        wire:click="openEdit('{{ e($tx->source_type) }}', {{ $tx->id }})"
+                                        class="btn btn-sm btn-outline-primary"
+                                        style="padding:.15rem .3rem;font-size:.7rem"
+                                        title="{{ $isExtourneMiroir || $exerciceCloture ? 'Visualiser' : 'Modifier' }}">
+                                    <i class="bi bi-{{ $isExtourneMiroir || $exerciceCloture ? 'eye' : 'pencil' }}"></i>
+                                </button>
+                            @endif
                             @php
                                 // Mutex poubelle/annuler — Slice 1 amendement :
                                 //   - Tx supprimable « safely » : EnAttente sans aucun attachement banque/règlement/remise/facture
                                 //   - Sinon : annulation comptable (extourne) si éligible
                                 $hasAttachement = $tx->remise_id || $tx->reglement_id || $tx->rapprochement_id || ! empty($tx->is_locked_by_facture);
-                                $estSupprimableSafely = ! $exerciceCloture
+                                $estSupprimableSafely = ! $isReportAN && ! $exerciceCloture
                                     && ($statutReglement === 'en_attente' || $tx->source_type === 'virement_sortant' || $tx->source_type === 'virement_entrant')
                                     && ! $hasAttachement
                                     && empty($tx->extournee_at)
                                     && empty($tx->is_extourne_miroir);
-                                $isExtournableUI = ! $exerciceCloture
+                                $isExtournableUI = ! $isReportAN && ! $exerciceCloture
                                     && in_array($tx->source_type, ['recette', 'depense'], true)
                                     && ! $tx->is_helloasso
                                     && empty($tx->extournee_at)
@@ -641,12 +647,12 @@
                                 </button>
                             @endif
                             {{-- Bouton Marquer reçu / payé (en_attente non verrouillé) --}}
-                            @if(! $exerciceCloture && $statutReglement === 'en_attente' && in_array($tx->source_type, ['recette', 'depense'], true))
+                            @if(! $exerciceCloture && $statutReglement === 'en_attente' && in_array($tx->source_type, ['recette', 'depense', 'report_an'], true))
                                 @php
                                     $sensTreso = $tx->sens_tresorerie ?? $tx->source_type;
                                 @endphp
                                 <button type="button"
-                                        wire:click="marquerRecu({{ $tx->id }})"
+                                        wire:click="marquerRecu({{ $tx->id }}, '{{ e($tx->source_type) }}', {{ $tx->poste_tiers_ligne_id ?? 'null' }})"
                                         class="btn btn-sm btn-outline-success"
                                         style="padding:.15rem .3rem;font-size:.7rem"
                                         title="{{ $sensTreso === 'depense' ? 'Marquer comme payé' : ($tx->mode_paiement === null ? 'Enregistrer l\'encaissement (choisir le mode)' : 'Marquer comme reçu') }}">
@@ -758,97 +764,5 @@
     {{-- Modale d'annulation de transaction (Slice 1 — extourne) --}}
     <livewire:extournes.annuler-transaction-modal />
 
-    {{-- Modale « Marquer reçu » — capture du mode pour les créances (mode_paiement null) --}}
-    <div class="modal fade" id="marquerRecuModal" tabindex="-1"
-         wire:ignore.self
-         x-data
-         x-on:marquer-recu-modal-open.window="bootstrap.Modal.getOrCreateInstance($el).show()"
-         x-on:marquer-recu-modal-close.window="bootstrap.Modal.getOrCreateInstance($el).hide()">
-        <div class="modal-dialog modal-sm">
-            <div class="modal-content">
-                <div class="modal-header py-2">
-                    <h6 class="modal-title"><i class="bi bi-check-lg me-1"></i>Enregistrer l'encaissement</h6>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    @error('recuMode')
-                        <div class="alert alert-danger py-1 px-2 small mb-2">{{ $message }}</div>
-                    @enderror
-                    <div class="mb-3">
-                        <label class="form-label small mb-1 fw-semibold">Mode de paiement <span class="text-danger">*</span></label>
-                        <select wire:model="recuMode" class="form-select form-select-sm @error('recuMode') is-invalid @enderror">
-                            <option value="">— Sélectionner —</option>
-                            @foreach($modesPaiement as $mode)
-                                <option value="{{ $mode->value }}">{{ ucfirst($mode->value) }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="mb-1">
-                        <label class="form-label small mb-1">Compte bancaire <span class="text-muted">(optionnel)</span></label>
-                        <select wire:model="recuCompteId" class="form-select form-select-sm">
-                            <option value="">— Conserver le compte actuel —</option>
-                            @foreach($comptesBancaires as $cb)
-                                <option value="{{ $cb->id }}">{{ $cb->nom }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                </div>
-                <div class="modal-footer py-2">
-                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                    <button wire:click="confirmerRecu" class="btn btn-sm btn-success"
-                            wire:loading.attr="disabled">
-                        <span wire:loading.remove wire:target="confirmerRecu"><i class="bi bi-check-lg me-1"></i>Confirmer</span>
-                        <span wire:loading wire:target="confirmerRecu"><i class="bi bi-hourglass-split"></i> Enregistrement...</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    {{-- Modale « Marquer payé » — capture du mode pour les dettes fournisseurs (dépenses en attente) --}}
-    <div class="modal fade" id="marquerPayeModal" tabindex="-1"
-         wire:ignore.self
-         x-data
-         x-on:marquer-paye-modal-open.window="bootstrap.Modal.getOrCreateInstance($el).show()"
-         x-on:marquer-paye-modal-close.window="bootstrap.Modal.getOrCreateInstance($el).hide()">
-        <div class="modal-dialog modal-sm">
-            <div class="modal-content">
-                <div class="modal-header py-2">
-                    <h6 class="modal-title"><i class="bi bi-check-lg me-1"></i>Enregistrer le paiement</h6>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    @error('payeMode')
-                        <div class="alert alert-danger py-1 px-2 small mb-2">{{ $message }}</div>
-                    @enderror
-                    <div class="mb-3">
-                        <label class="form-label small mb-1 fw-semibold">Mode de paiement <span class="text-danger">*</span></label>
-                        <select wire:model="payeMode" class="form-select form-select-sm @error('payeMode') is-invalid @enderror">
-                            <option value="">— Sélectionner —</option>
-                            @foreach($modesPaiement as $mode)
-                                <option value="{{ $mode->value }}">{{ ucfirst($mode->value) }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="mb-1">
-                        <label class="form-label small mb-1">Compte bancaire <span class="text-muted">(optionnel)</span></label>
-                        <select wire:model="payeCompteId" class="form-select form-select-sm">
-                            <option value="">— Conserver le compte actuel —</option>
-                            @foreach($comptesBancaires as $cb)
-                                <option value="{{ $cb->id }}">{{ $cb->nom }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                </div>
-                <div class="modal-footer py-2">
-                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                    <button wire:click="confirmerPaye" class="btn btn-sm btn-success"
-                            wire:loading.attr="disabled">
-                        <span wire:loading.remove wire:target="confirmerPaye"><i class="bi bi-check-lg me-1"></i>Confirmer</span>
-                        <span wire:loading wire:target="confirmerPaye"><i class="bi bi-hourglass-split"></i> Enregistrement...</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
+    <livewire:compta.poste-tiers-reglement-modal />
 </div>
