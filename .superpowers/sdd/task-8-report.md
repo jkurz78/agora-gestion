@@ -90,3 +90,35 @@ php -d memory_limit=1G ./vendor/bin/pest --compact \
 ### Commit
 
 `f94c06b0ffce55edb20e2ed1a6dacc221bd1e3ad` — `fix(compta): corriger les reports AN dans les transactions`
+
+## Fix coverage review task 8
+
+### Couverture ajoutée
+
+- Le rendu HTML d'une ligne `report_an` n'expose ni édition, ni suppression, ni extourne, ni poubelle désactivée.
+- Après `toggleDetail('report_an', ligneId)`, le HTML contient le tableau de détail et ses données de ligne.
+- Un composant monté avec `exercice = 2025` affiche les reports de 2025 même lorsque la session vise 2026.
+
+Les tests sont une couverture post-fix : le comportement applicatif était déjà corrigé, ils sont donc passés dès leur première exécution utile et aucun fichier de production n'a été modifié.
+
+### Vérifications
+
+```text
+./vendor/bin/pint tests/Feature/Livewire/TransactionUniverselleTest.php
+pass
+
+php -d memory_limit=1G ./vendor/bin/pest --compact \
+  tests/Feature/TransactionUniverselleServiceTest.php \
+  tests/Feature/Livewire/TransactionUniverselleMarquerRecuTest.php \
+  tests/Feature/Livewire/TransactionUniverselleTest.php \
+  tests/Feature/ReglementTableTest.php
+
+45 deprecated (109 assertions)
+
+git diff --check
+sans sortie
+```
+
+### Commit
+
+`test(compta): couvrir le rendu des reports AN transactions`

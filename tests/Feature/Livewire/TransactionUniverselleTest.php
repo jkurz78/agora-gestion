@@ -108,7 +108,7 @@ it('la page /cotisations rend TransactionUniverselle avec usageFilter pour_cotis
         ->assertSet('usageFilter', 'pour_cotisations');
 });
 
-it('affiche un report AN et ouvre son règlement daté', function (): void {
+it('affiche un report AN immuable et ouvre son règlement daté', function (): void {
     SystemeSeeder::seed();
     Exercice::create(['annee' => 2025, 'statut' => StatutExercice::Ouvert]);
     $acteur = User::factory()->create();
@@ -136,10 +136,23 @@ it('affiche un report AN et ouvre son règlement daté', function (): void {
     )->origines()->with('ligneAN')->firstOrFail()->ligneAN;
     session(['exercice_actif' => 2026]);
 
-    Livewire::test(TransactionUniverselle::class, ['lockedTypes' => ['recette'], 'exercice' => 2026])
+    $component = Livewire::test(TransactionUniverselle::class, ['lockedTypes' => ['recette'], 'exercice' => 2026])
         ->assertSee('Report AN')
         ->call('marquerRecu', (int) $ligneAN->id, 'report_an', (int) $ligneAN->id)
         ->assertDispatched('poste-tiers-reglement:ouvrir', ligneId: (int) $ligneAN->id, exercice: 2026);
+
+    preg_match(
+        "/<tr[^>]*wire:click=\"toggleDetail\('report_an', {$ligneAN->id}\)\".*?<\\/tr>/s",
+        $component->html(),
+        $matches,
+    );
+
+    expect($matches)->toHaveCount(1)
+        ->and($matches[0])->not->toContain("openEdit('report_an'")
+        ->not->toContain("deleteRow('report_an'")
+        ->not->toContain('extourne:open')
+        ->not->toContain('Cette transaction ne peut être ni supprimée ni annulée')
+        ->not->toContain('bi bi-trash');
 
     expect(Transaction::count())->toBe(2);
 });
@@ -177,6 +190,45 @@ it('développe le détail exploitable d un report AN', function (): void {
 
     $detail = $component->get('expandedDetails')["report_an:{$ligneAN->id}"];
 
+    $component
+        ->assertSeeHtml('<th>Compte</th>')
+        ->assertSee($detail['lignes'][0]['compte'])
+        ->assertSee($detail['lignes'][0]['operation'])
+        ->assertSee($detail['lignes'][0]['notes']);
+
     expect($detail['lignes'])->not->toBeEmpty()
         ->and($detail['lignes'][0])->toHaveKeys(['compte', 'operation', 'montant', 'notes']);
+});
+
+it('affiche les reports AN de l exercice fixé même si la session vise un autre exercice', function (): void {
+    SystemeSeeder::seed();
+    Exercice::create(['annee' => 2024, 'statut' => StatutExercice::Ouvert]);
+    $acteur = User::factory()->create();
+    $acteur->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    $produit = Compte::create([
+        'association_id' => $this->association->id,
+        'numero_pcg' => '706-REPORT-EXERCICE-COMPOSANT',
+        'intitule' => 'Produit report exercice composant',
+        'classe' => 7,
+        'actif' => true,
+        'est_systeme' => false,
+        'pour_inscriptions' => false,
+        'lettrable' => false,
+    ]);
+    app(EcritureGenerator::class)->pourRecetteACredit(
+        tiers: Tiers::factory()->create(['association_id' => $this->association->id]),
+        ventilations: [['compte' => $produit, 'montant' => 25.00]],
+        dateConstatation: new DateTimeImmutable('2025-08-20'),
+        libelle: 'Créance exercice fixé composant',
+    );
+    app(ANouveauService::class)->persister(
+        app(ANouveauPreviewBuilder::class)->build(2024),
+        OrigineANouveau::Cloture,
+        $acteur,
+    );
+    session(['exercice_actif' => 2026]);
+
+    Livewire::test(TransactionUniverselle::class, ['lockedTypes' => ['recette'], 'exercice' => 2025])
+        ->assertSee('Report AN')
+        ->assertSee('Créance exercice fixé composant');
 });
