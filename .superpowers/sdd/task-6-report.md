@@ -51,3 +51,23 @@ Les deux commandes réussissent.
 ## Point d’attention
 
 Le test runner affiche une dépréciation par scénario, issue de Laravel sous PHP 8.5 : `PDO::MYSQL_ATTR_SSL_CA` est dépréciée. Elle est localisée dans `vendor/laravel/framework/config/database.php` et ne provient pas des changements de cette tâche.
+
+## Correctif de revue — validation du compte bancaire
+
+### RED
+
+Après ajout des cas Livewire pour un compte d’une autre association et pour les deux
+états non sélectionnables (`actif_recettes_depenses=false`, `saisie_automatisee=true`) :
+
+```bash
+php -d memory_limit=1G ./vendor/bin/pest --compact tests/Feature/Livewire/PosteTiersReglementModalTest.php
+```
+
+Résultat : échec attendu, 3 scénarios sans erreur de validation sur `compteBancaireId`.
+
+### GREEN
+
+La règle `exists` impose désormais l’`association_id` du `TenantContext` et les
+critères de saisie manuelle. La même commande réussit : 12 tests, 48 assertions.
+
+Commit du correctif : `353a2230a4bac7d294a7e9ff4b8cf999922ac243`.
