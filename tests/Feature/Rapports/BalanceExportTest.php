@@ -76,6 +76,9 @@ it('exporte la balance en Excel avec les filtres et colonnes demandés', functio
         'comptes' => '411',
         'colonnes' => '6',
         'exercice' => 2025,
+        // Balance auxiliaire : sans ce drapeau, le compte collectif 411 est
+        // exporté en une seule ligne, sans le tiers.
+        'detail_tiers' => 1,
     ]));
 
     $response->assertOk()

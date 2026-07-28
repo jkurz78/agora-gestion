@@ -27,6 +27,10 @@ final class RapportBalance extends Component
     #[Url(as: 'non_soldes')]
     public bool $uniquementNonSoldes = false;
 
+    /** Balance auxiliaire : une ligne par tiers sur les comptes 401/411. */
+    #[Url(as: 'detail_tiers')]
+    public bool $detailParTiers = false;
+
     public function mount(ExerciceService $exerciceService): void
     {
         $range = $exerciceService->dateRange($exerciceService->current());
@@ -73,6 +77,7 @@ final class RapportBalance extends Component
             'comptes' => $this->comptes,
             'colonnes' => $this->colonnes,
             'non_soldes' => $this->uniquementNonSoldes ? 1 : 0,
+            'detail_tiers' => $this->detailParTiers ? 1 : 0,
         ]);
     }
 
@@ -95,6 +100,7 @@ final class RapportBalance extends Component
                 $this->dateFin,
                 $this->prefixesComptes(),
                 $this->uniquementNonSoldes,
+                $this->detailParTiers,
             ),
         ]);
     }

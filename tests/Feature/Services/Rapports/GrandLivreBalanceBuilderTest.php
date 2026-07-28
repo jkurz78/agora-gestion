@@ -77,8 +77,9 @@ function creerScenarioGrandLivreBalance(object $contexte): Tiers
 it('calcule une balance par compte et par tiers pour les comptes 401 et 411', function (): void {
     $tiers = creerScenarioGrandLivreBalance($this);
 
+    // Balance auxiliaire : détail explicite par tiers.
     $balance = app(BalanceComptableBuilder::class)
-        ->balance('2025-10-01', '2025-10-31', ['411']);
+        ->balance('2025-10-01', '2025-10-31', ['411'], detailParTiers: true);
 
     expect($balance['lignes'])->toHaveCount(1);
 
@@ -505,13 +506,13 @@ it('masque les comptes soldés quand le filtre est actif', function (): void {
 
     // Sans filtre : les deux tiers sont présents.
     $balanceComplete = app(BalanceComptableBuilder::class)
-        ->balance('2025-09-01', '2026-08-31', ['411']);
+        ->balance('2025-09-01', '2026-08-31', ['411'], detailParTiers: true);
     expect($balanceComplete['lignes'])->toHaveCount(2)
         ->and($balanceComplete['uniquement_non_soldes'])->toBeFalse();
 
     // Avec filtre : seul le tiers encore débiteur subsiste.
     $balanceFiltree = app(BalanceComptableBuilder::class)
-        ->balance('2025-09-01', '2026-08-31', ['411'], true);
+        ->balance('2025-09-01', '2026-08-31', ['411'], true, detailParTiers: true);
 
     expect($balanceFiltree['lignes'])->toHaveCount(1)
         ->and($balanceFiltree['uniquement_non_soldes'])->toBeTrue()
@@ -526,4 +527,69 @@ it('masque les comptes soldés quand le filtre est actif', function (): void {
     expect($grandLivreFiltre['comptes'])->toHaveCount(1)
         ->and($grandLivreFiltre['comptes'][0]['tiers'])->toContain('OUVERT')
         ->and($grandLivreFiltre['comptes'][0]['solde_fin_centimes'])->toBe(7000);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Balance générale (défaut) vs balance auxiliaire : le compte collectif 411 est
+// présenté en une ligne, sauf détail par tiers explicite.
+// ─────────────────────────────────────────────────────────────────────────────
+
+it('présente le compte collectif en une seule ligne par défaut', function (): void {
+    foreach (['Client Un', 'Client Deux'] as $index => $nom) {
+        $tiers = Tiers::factory()->create([
+            'association_id' => (int) $this->association->id,
+            'nom' => $nom,
+        ]);
+
+        $this->ecritures->pourRecetteACredit(
+            tiers: $tiers,
+            ventilations: [[
+                'compte' => $this->compte706,
+                'montant' => MontantDecimal::depuisCentimes(10000 * ($index + 1)),
+            ]],
+            dateConstatation: new DateTimeImmutable('2025-10-05'),
+            libelle: 'Créance '.$nom,
+        );
+    }
+
+    // Balance générale : un 411 unique, cumul des deux tiers, sans étiquette tiers.
+    $generale = app(BalanceComptableBuilder::class)
+        ->balance('2025-09-01', '2026-08-31', ['411']);
+
+    expect($generale['lignes'])->toHaveCount(1)
+        ->and($generale['detail_par_tiers'])->toBeFalse()
+        ->and($generale['lignes'][0]['numero_compte'])->toBe('411')
+        ->and($generale['lignes'][0]['tiers_id'])->toBeNull()
+        ->and($generale['lignes'][0]['tiers'])->toBeNull()
+        ->and($generale['lignes'][0]['solde_fin_debit_centimes'])->toBe(30000);
+
+    // Balance auxiliaire : une ligne par tiers, même total.
+    $auxiliaire = app(BalanceComptableBuilder::class)
+        ->balance('2025-09-01', '2026-08-31', ['411'], detailParTiers: true);
+
+    expect($auxiliaire['lignes'])->toHaveCount(2)
+        ->and($auxiliaire['detail_par_tiers'])->toBeTrue()
+        ->and($auxiliaire['totaux']['solde_fin_debit_centimes'])
+        ->toBe($generale['totaux']['solde_fin_debit_centimes']);
+});
+
+it('détaille toujours le grand livre par tiers, quel que soit le mode de la balance', function (): void {
+    foreach (['Client Un', 'Client Deux'] as $nom) {
+        $tiers = Tiers::factory()->create([
+            'association_id' => (int) $this->association->id,
+            'nom' => $nom,
+        ]);
+
+        $this->ecritures->pourRecetteACredit(
+            tiers: $tiers,
+            ventilations: [['compte' => $this->compte706, 'montant' => MontantDecimal::depuisCentimes(10000)]],
+            dateConstatation: new DateTimeImmutable('2025-10-05'),
+            libelle: 'Créance '.$nom,
+        );
+    }
+
+    $grandLivre = app(GrandLivreBuilder::class)
+        ->grandLivre('2025-09-01', '2026-08-31', ['411']);
+
+    expect($grandLivre['comptes'])->toHaveCount(2);
 });

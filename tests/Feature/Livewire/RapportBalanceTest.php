@@ -49,6 +49,9 @@ it('affiche la balance filtrée par comptes avec le tiers des comptes 411', func
         ->set('dateDebut', '2025-09-01')
         ->set('dateFin', '2026-08-31')
         ->set('comptes', '411')
+        // Balance auxiliaire : le détail par tiers est explicite (par défaut,
+        // la balance générale présente le compte collectif 411 en une ligne).
+        ->set('detailParTiers', true)
         ->assertOk()
         ->assertSet('dateDebut', '2025-09-01')
         ->assertSet('dateFin', '2026-08-31')

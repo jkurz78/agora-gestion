@@ -59,16 +59,30 @@
                 </div>
 
                 <div class="col-md-2 d-flex align-items-end">
-                    <div class="form-check mb-1">
-                        <input
-                            type="checkbox"
-                            class="form-check-input"
-                            id="balanceNonSoldes"
-                            wire:model.live="uniquementNonSoldes"
-                        >
-                        <label class="form-check-label balance-filter-label" for="balanceNonSoldes">
-                            Comptes non soldés
-                        </label>
+                    <div class="mb-1">
+                        <div class="form-check">
+                            <input
+                                type="checkbox"
+                                class="form-check-input"
+                                id="balanceNonSoldes"
+                                wire:model.live="uniquementNonSoldes"
+                            >
+                            <label class="form-check-label balance-filter-label" for="balanceNonSoldes">
+                                Comptes non soldés
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input
+                                type="checkbox"
+                                class="form-check-input"
+                                id="balanceDetailTiers"
+                                wire:model.live="detailParTiers"
+                            >
+                            <label class="form-check-label balance-filter-label" for="balanceDetailTiers"
+                                   title="Détaille les comptes collectifs 401 et 411 par tiers (balance auxiliaire)">
+                                Détail par tiers
+                            </label>
+                        </div>
                     </div>
                 </div>
 

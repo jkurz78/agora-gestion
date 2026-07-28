@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\ModePaiement;
 use App\Livewire\TransactionForm;
 use App\Models\Association;
 use App\Models\Compte;
@@ -44,11 +45,16 @@ beforeEach(function () {
         'association_id' => $this->association->id,
     ]);
 
+    // Mode de paiement figé : la factory en tire un au hasard, et « espèces »
+    // exige le compte 530 que SystemeSeeder ne crée que si une transaction en
+    // espèces existe déjà — ici le seeder tourne avant. Le sujet de ce fichier
+    // étant les pièces jointes, on fixe le virement (compte 512 créé ci-dessus).
     $this->tx = Transaction::factory()->asDepense()->create([
         'association_id' => $this->association->id,
         'date' => '2025-10-01',
         'tiers_id' => $this->tiers->id,
         'compte_id' => $this->compteBancaire->id,
+        'mode_paiement' => ModePaiement::Virement,
     ]);
     // Prendre la première ligne créée par la factory
     $this->ligne = $this->tx->lignes()->first();

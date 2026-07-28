@@ -18,13 +18,17 @@ final class BalanceComptableBuilder
      * @param  bool  $uniquementNonSoldes  N'affiche que les comptes (et tiers
      *                                     auxiliaires) dont le solde de fin
      *                                     n'est pas nul.
-     * @return array{date_debut: string, date_fin: string, prefixes_comptes: array<int, string>, uniquement_non_soldes: bool, lignes: list<array<string, mixed>>, totaux: array<string, int>}
+     * @param  bool  $detailParTiers  Balance auxiliaire (une ligne par tiers sur
+     *                                les comptes collectifs 401/411) au lieu de
+     *                                la balance générale.
+     * @return array{date_debut: string, date_fin: string, prefixes_comptes: array<int, string>, uniquement_non_soldes: bool, detail_par_tiers: bool, lignes: list<array<string, mixed>>, totaux: array<string, int>}
      */
     public function balance(
         string $dateDebut,
         string $dateFin,
         array $prefixesComptes = [],
         bool $uniquementNonSoldes = false,
+        bool $detailParTiers = false,
     ): array {
         $debut = CarbonImmutable::parse($dateDebut)->startOfDay();
         $fin = CarbonImmutable::parse($dateFin)->startOfDay();
@@ -48,8 +52,8 @@ final class BalanceComptableBuilder
                 continue;
             }
 
-            $cle = $this->cleRegroupement($ligne);
-            $groupes[$cle] ??= $this->ligneVide($ligne);
+            $cle = $this->cleRegroupement($ligne, $detailParTiers);
+            $groupes[$cle] ??= $this->ligneVide($ligne, $detailParTiers);
 
             if ($estOuverture) {
                 $groupes[$cle]['ouverture_debit_centimes'] += $this->centimes($ligne->debit);
@@ -76,6 +80,7 @@ final class BalanceComptableBuilder
             'date_fin' => $fin->toDateString(),
             'prefixes_comptes' => $prefixes,
             'uniquement_non_soldes' => $uniquementNonSoldes,
+            'detail_par_tiers' => $detailParTiers,
             'lignes' => $lignesBalance,
             // Les totaux portent sur la sélection affichée, comme pour le
             // filtre par préfixe de comptes.
@@ -86,17 +91,21 @@ final class BalanceComptableBuilder
     /**
      * @return array<string, mixed>
      */
-    private function ligneVide(TransactionLigne $ligne): array
+    private function ligneVide(TransactionLigne $ligne, bool $detailParTiers): array
     {
         /** @var Compte $compte */
         $compte = $ligne->compte;
+        // En balance générale, le compte collectif ne porte aucun tiers : sans
+        // cette remise à zéro, le premier tiers rencontré étiquetterait à tort
+        // l'ensemble du regroupement.
+        $tiersId = $this->tiersAuxiliaire($ligne, $detailParTiers);
 
         return [
             'compte_id' => (int) $compte->id,
             'numero_compte' => (string) $compte->numero_pcg,
             'intitule_compte' => (string) $compte->intitule,
-            'tiers_id' => $ligne->tiers_id !== null ? (int) $ligne->tiers_id : null,
-            'tiers' => $ligne->tiers?->displayName(),
+            'tiers_id' => $tiersId !== 0 ? $tiersId : null,
+            'tiers' => $tiersId !== 0 ? $ligne->tiers?->displayName() : null,
             'ouverture_debit_centimes' => 0,
             'ouverture_credit_centimes' => 0,
             'mouvement_debit_centimes' => 0,
