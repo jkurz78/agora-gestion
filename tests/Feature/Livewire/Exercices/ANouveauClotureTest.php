@@ -11,12 +11,14 @@ use App\Livewire\Exercices\ClotureWizard;
 use App\Models\ANouveauGeneration;
 use App\Models\Compte;
 use App\Models\Exercice;
+use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\ExerciceService;
 use App\Tenant\TenantContext;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
 beforeEach(function (): void {
@@ -58,6 +60,7 @@ function ecritureClotureAN(
     Compte $debit,
     Compte $credit,
     string $date = '2026-08-31',
+    ?int $tiersDebit = null,
     ?int $tiersCredit = null,
 ): Transaction {
     $transaction = Transaction::create([
@@ -77,6 +80,7 @@ function ecritureClotureAN(
         'debit' => '50.00',
         'credit' => '0.00',
         'montant' => '50.00',
+        'tiers_id' => $tiersDebit,
     ]);
     TransactionLigne::create([
         'transaction_id' => $transaction->id,
@@ -125,6 +129,43 @@ it('laisse l exercice ouvert si l apercu AN est invalide', function (): void {
 
     expect($this->sourceClotureAN->fresh()->statut)->toBe(StatutExercice::Ouvert)
         ->and(ANouveauGeneration::count())->toBe(0);
+});
+
+it('ne génère aucune ligne AN pour une créance déjà soldée à la clôture', function (): void {
+    $tiers = Tiers::factory()->create();
+    $compte411 = Compte::ofNumeroSysteme('411');
+    $banque = compteClotureAN('512-SOLDE', 5);
+    $produit = compteClotureAN('706-SOLDE', 7);
+    $creance = ecritureClotureAN(
+        $compte411,
+        $produit,
+        tiersDebit: (int) $tiers->id,
+    );
+    $reglement = ecritureClotureAN(
+        $banque,
+        $compte411,
+        tiersCredit: (int) $tiers->id,
+    );
+    $lignes411 = TransactionLigne::query()
+        ->whereIn('transaction_id', [(int) $creance->id, (int) $reglement->id])
+        ->where('compte_id', (int) $compte411->id)
+        ->pluck('id');
+    DB::table('transaction_lignes')
+        ->whereIn('id', $lignes411)
+        ->update(['lettrage_code' => 'LT-CLOTURE-SOLDEE']);
+
+    Livewire::test(ClotureWizard::class)
+        ->call('suite')
+        ->call('suite')
+        ->call('cloturer')
+        ->assertRedirect(route('exercices.changer'));
+
+    $generation = ANouveauGeneration::activePourCible(2026);
+
+    expect($generation)->not->toBeNull()
+        ->and($generation?->transaction?->lignes()
+            ->where('compte_id', (int) $compte411->id)
+            ->exists())->toBeFalse();
 });
 
 it('avertit des mouvements en N plus 1 et bloque si la cible est cloturee', function (): void {

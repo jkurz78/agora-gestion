@@ -132,6 +132,63 @@ it('reporte chaque poste auxiliaire ouvert meme si le compte est globalement sol
         ->and($preview->equilibree())->toBeTrue();
 });
 
+it('ne reporte que le reliquat non lettré d une créance partiellement encaissée', function (): void {
+    $compte411 = Compte::ofNumeroSysteme('411');
+    $produit = compteANP('706-R', 7);
+    $tiers = Tiers::factory()->create();
+
+    [$creance] = ecritureANP('2026-08-20', [
+        ['compte' => $compte411, 'debit' => '100.00', 'tiers_id' => (int) $tiers->id],
+        ['compte' => $produit, 'credit' => '100.00'],
+    ]);
+    $creance->update(['debit' => '70.00', 'credit' => '0.00', 'montant' => '70.00']);
+
+    $fractionReglee = $creance->replicate(['id', 'lettrage_code', 'deleted_at']);
+    $fractionReglee->fill([
+        'debit' => '30.00',
+        'credit' => '0.00',
+        'montant' => '30.00',
+        'poste_tiers_parent_id' => (int) $creance->id,
+        'lettrage_code' => 'LT-ANP-RELIQUAT',
+    ]);
+    $fractionReglee->save();
+
+    $preview = app(ANouveauPreviewBuilder::class)->build(2025);
+    $poste411 = collect($preview->lignes)
+        ->first(fn (array $ligne): bool => $ligne['numero_pcg'] === '411');
+
+    expect($poste411)->not->toBeNull()
+        ->and($poste411['tiers_id'])->toBe((int) $tiers->id)
+        ->and($poste411['debit'])->toBe('70.00')
+        ->and($poste411['credit'])->toBe('0.00');
+});
+
+it('ne reporte pas un poste tiers entièrement lettré', function (): void {
+    $compte411 = Compte::ofNumeroSysteme('411');
+    $produit = compteANP('706-S', 7);
+    $banque = compteANP('512-S', 5);
+    $tiers = Tiers::factory()->create();
+
+    [$creance] = ecritureANP('2026-08-20', [
+        ['compte' => $compte411, 'debit' => '100.00', 'tiers_id' => (int) $tiers->id],
+        ['compte' => $produit, 'credit' => '100.00'],
+    ]);
+    [, $reglement] = ecritureANP('2026-08-21', [
+        ['compte' => $banque, 'debit' => '100.00'],
+        ['compte' => $compte411, 'credit' => '100.00', 'tiers_id' => (int) $tiers->id],
+    ]);
+    DB::table('transaction_lignes')
+        ->whereIn('id', [(int) $creance->id, (int) $reglement->id])
+        ->update(['lettrage_code' => 'LT-ANP-SOLDE']);
+
+    $preview = app(ANouveauPreviewBuilder::class)->build(2025);
+
+    expect(collect($preview->lignes)->contains(
+        fn (array $ligne): bool => $ligne['numero_pcg'] === '411'
+            && $ligne['tiers_id'] === (int) $tiers->id
+    ))->toBeFalse();
+});
+
 it('porte un deficit au debit du compte 129 au centime exact', function (): void {
     $banque = compteANP('512D', 5);
     $charge = compteANP('606D', 6);
