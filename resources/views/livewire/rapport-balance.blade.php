@@ -45,7 +45,7 @@
                     >
                 </div>
 
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label for="balanceColonnes" class="form-label balance-filter-label">Format</label>
                     <select
                         id="balanceColonnes"
@@ -58,35 +58,7 @@
                     </select>
                 </div>
 
-                <div class="col-md-2 d-flex align-items-end">
-                    <div class="mb-1">
-                        <div class="form-check">
-                            <input
-                                type="checkbox"
-                                class="form-check-input"
-                                id="balanceNonSoldes"
-                                wire:model.live="uniquementNonSoldes"
-                            >
-                            <label class="form-check-label balance-filter-label" for="balanceNonSoldes">
-                                Comptes non soldés
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <input
-                                type="checkbox"
-                                class="form-check-input"
-                                id="balanceDetailTiers"
-                                wire:model.live="detailParTiers"
-                            >
-                            <label class="form-check-label balance-filter-label" for="balanceDetailTiers"
-                                   title="Détaille les comptes collectifs 401 et 411 par tiers (balance auxiliaire)">
-                                Détail par tiers
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-md-1 d-grid">
+                <div class="col-md-2 d-flex justify-content-end align-items-end">
                     <div class="btn-group">
                         <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-download me-1"></i>Exporter
@@ -95,6 +67,35 @@
                             <li><a class="dropdown-item" href="{{ $this->exportUrl('xlsx') }}"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Excel</a></li>
                             <li><a class="dropdown-item" href="{{ $this->exportUrl('pdf') }}" target="_blank"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</a></li>
                         </ul>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Options d'affichage : seconde ligne, cases côte à côte. --}}
+            <div class="row mt-2">
+                <div class="col-12 d-flex flex-wrap column-gap-4 row-gap-1">
+                    <div class="form-check">
+                        <input
+                            type="checkbox"
+                            class="form-check-input"
+                            id="balanceNonSoldes"
+                            wire:model.live="uniquementNonSoldes"
+                        >
+                        <label class="form-check-label balance-filter-label" for="balanceNonSoldes">
+                            Comptes non soldés
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input
+                            type="checkbox"
+                            class="form-check-input"
+                            id="balanceDetailTiers"
+                            wire:model.live="detailParTiers"
+                        >
+                        <label class="form-check-label balance-filter-label" for="balanceDetailTiers"
+                               title="Détaille les comptes collectifs 401 et 411 par tiers (balance auxiliaire)">
+                            Détail par tiers
+                        </label>
                     </div>
                 </div>
             </div>

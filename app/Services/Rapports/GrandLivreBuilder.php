@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Rapports;
 
+use App\Enums\ModePaiement;
 use App\Models\Compte;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -150,11 +151,42 @@ final class GrandLivreBuilder
             'libelle' => $ligne->libelle ?: $transaction->libelle,
             'tiers_id' => $ligne->tiers_id !== null ? (int) $ligne->tiers_id : null,
             'tiers' => $ligne->tiers?->displayName(),
+            'mode_paiement' => $this->modePaiement($transaction),
+            'justificatif_url' => $this->urlJustificatif($ligne, $transaction),
             'debit_centimes' => $this->centimes($ligne->debit),
             'credit_centimes' => $this->centimes($ligne->credit),
             'lettrage_code' => $ligne->lettrage_code,
             'solde_progressif_centimes' => 0,
         ];
+    }
+
+    private function modePaiement(Transaction $transaction): ?string
+    {
+        $mode = $transaction->mode_paiement;
+
+        if ($mode instanceof ModePaiement) {
+            return $mode->label();
+        }
+
+        return $mode !== null ? (string) $mode : null;
+    }
+
+    /**
+     * Lien vers le justificatif : celui de la ligne s'il existe (ventilation
+     * détaillée), sinon celui porté par la transaction.
+     */
+    private function urlJustificatif(TransactionLigne $ligne, Transaction $transaction): ?string
+    {
+        if ($ligne->piece_jointe_path !== null) {
+            return route('comptabilite.transactions.piece-jointe-ligne', [
+                'transaction' => (int) $transaction->id,
+                'ligne' => (int) $ligne->id,
+            ]);
+        }
+
+        return $transaction->piece_jointe_path !== null
+            ? route('transactions.piece-jointe', ['transaction' => (int) $transaction->id])
+            : null;
     }
 
     /**

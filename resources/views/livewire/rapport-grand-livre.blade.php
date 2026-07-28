@@ -37,7 +37,7 @@
                     >
                 </div>
 
-                <div class="col-md-5">
+                <div class="col-md-6">
                     <label for="grandLivreComptes" class="form-label gl-filter-label">Comptes</label>
                     <input
                         type="text"
@@ -48,38 +48,61 @@
                     >
                 </div>
 
-                <div class="col-md-2 d-flex align-items-end">
-                    <div class="mb-1">
-                        <div class="form-check">
-                            <input
-                                type="checkbox"
-                                class="form-check-input"
-                                id="grandLivreNonSoldes"
-                                wire:model.live="uniquementNonSoldes"
-                            >
-                            <label class="form-check-label gl-filter-label" for="grandLivreNonSoldes">
-                                Comptes non soldés
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <input
-                                type="checkbox"
-                                class="form-check-input"
-                                id="grandLivreNonLettrees"
-                                wire:model.live="uniquementNonLettrees"
-                            >
-                            <label class="form-check-label gl-filter-label" for="grandLivreNonLettrees"
-                                   title="N'affiche que les écritures non lettrées : le solde obtenu est la position restant ouverte">
-                                Écritures non lettrées
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-md-1 d-grid">
+                <div class="col-md-2 d-flex justify-content-end align-items-end">
                     <button type="button" class="btn btn-outline-secondary btn-sm" disabled title="Exports Grand Livre à brancher">
                         <i class="bi bi-download me-1"></i>Exporter
                     </button>
+                </div>
+            </div>
+
+            {{-- Options d'affichage : seconde ligne, cases côte à côte. --}}
+            <div class="row mt-2">
+                <div class="col-12 d-flex flex-wrap column-gap-4 row-gap-1">
+                    <div class="form-check">
+                        <input
+                            type="checkbox"
+                            class="form-check-input"
+                            id="grandLivreNonSoldes"
+                            wire:model.live="uniquementNonSoldes"
+                        >
+                        <label class="form-check-label gl-filter-label" for="grandLivreNonSoldes">
+                            Comptes non soldés
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input
+                            type="checkbox"
+                            class="form-check-input"
+                            id="grandLivreNonLettrees"
+                            wire:model.live="uniquementNonLettrees"
+                        >
+                        <label class="form-check-label gl-filter-label" for="grandLivreNonLettrees"
+                               title="N'affiche que les écritures non lettrées : le solde obtenu est la position restant ouverte">
+                            Écritures non lettrées
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input
+                            type="checkbox"
+                            class="form-check-input"
+                            id="grandLivreModeReglement"
+                            wire:model.live="afficherModeReglement"
+                        >
+                        <label class="form-check-label gl-filter-label" for="grandLivreModeReglement">
+                            Mode de règlement
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input
+                            type="checkbox"
+                            class="form-check-input"
+                            id="grandLivreJustificatif"
+                            wire:model.live="afficherJustificatif"
+                        >
+                        <label class="form-check-label gl-filter-label" for="grandLivreJustificatif">
+                            Justificatif
+                        </label>
+                    </div>
                 </div>
             </div>
         </div>
@@ -105,9 +128,15 @@
                                 <th style="width:105px;">Date</th>
                                 <th style="width:90px;">Journal</th>
                                 <th style="width:120px;">Pièce</th>
+                                @if($afficherModeReglement)
+                                    <th style="width:110px;">Règlement</th>
+                                @endif
                                 <th>Libellé</th>
                                 <th style="width:160px;">Tiers</th>
                                 <th class="text-center" style="width:80px;" title="Code de lettrage : relie une créance à son encaissement (ou une dette à son règlement)">Lettrage</th>
+                                @if($afficherJustificatif)
+                                    <th class="text-center" style="width:70px;">Justif.</th>
+                                @endif
                                 <th class="text-end" style="width:115px;">Débit</th>
                                 <th class="text-end" style="width:115px;">Crédit</th>
                                 <th class="text-end" style="width:125px;">Solde</th>
@@ -115,7 +144,7 @@
                         </thead>
                         <tbody>
                             <tr class="gl-opening">
-                                <td colspan="8">Solde ouverture</td>
+                                <td colspan="{{ $this->nombreColonnes() - 1 }}">Solde ouverture</td>
                                 <td class="text-end">{{ $this->formatCentimes((int) $compte['solde_ouverture_centimes']) }}</td>
                             </tr>
 
@@ -124,6 +153,15 @@
                                     <td data-sort="{{ $ligne['date'] }}">{{ \Carbon\Carbon::parse($ligne['date'])->format('d/m/Y') }}</td>
                                     <td>{{ $ligne['journal'] }}</td>
                                     <td>{{ $ligne['numero_piece'] ?? $ligne['reference'] ?? '—' }}</td>
+                                    @if($afficherModeReglement)
+                                        <td>
+                                            @if($ligne['mode_paiement'] !== null)
+                                                {{ $ligne['mode_paiement'] }}
+                                            @else
+                                                <span class="gl-zero">—</span>
+                                            @endif
+                                        </td>
+                                    @endif
                                     <td>{{ $ligne['libelle'] }}</td>
                                     <td>
                                         @if($ligne['tiers'] !== null)
@@ -139,6 +177,18 @@
                                             <span class="gl-zero">—</span>
                                         @endif
                                     </td>
+                                    @if($afficherJustificatif)
+                                        <td class="text-center">
+                                            @if($ligne['justificatif_url'] !== null)
+                                                <a href="{{ $ligne['justificatif_url'] }}" target="_blank" rel="noopener"
+                                                   title="Ouvrir le justificatif">
+                                                    <i class="bi bi-paperclip"></i>
+                                                </a>
+                                            @else
+                                                <span class="gl-zero">—</span>
+                                            @endif
+                                        </td>
+                                    @endif
                                     <td class="text-end" data-sort="{{ $ligne['debit_centimes'] }}">
                                         <span class="{{ $ligne['debit_centimes'] === 0 ? 'gl-zero' : '' }}">
                                             {{ $this->formatCentimes((int) $ligne['debit_centimes']) }}
@@ -155,7 +205,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="9" class="text-center text-muted py-4">
+                                    <td colspan="{{ $this->nombreColonnes() }}" class="text-center text-muted py-4">
                                         Aucun mouvement sur la période.
                                     </td>
                                 </tr>
@@ -163,7 +213,7 @@
                         </tbody>
                         <tfoot>
                             <tr class="gl-total">
-                                <td colspan="6">TOTAL MOUVEMENTS</td>
+                                <td colspan="{{ $this->nombreColonnes() - 3 }}">TOTAL MOUVEMENTS</td>
                                 <td class="text-end">{{ $this->formatCentimes((int) $compte['mouvement_debit_centimes']) }}</td>
                                 <td class="text-end">{{ $this->formatCentimes((int) $compte['mouvement_credit_centimes']) }}</td>
                                 <td class="text-end">{{ $this->formatCentimes((int) $compte['solde_fin_centimes']) }}</td>

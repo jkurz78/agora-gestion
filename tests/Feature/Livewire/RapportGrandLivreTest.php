@@ -67,3 +67,35 @@ it('expose le grand livre dans les routes rapports', function (): void {
         ->assertOk()
         ->assertSeeLivewire(RapportGrandLivre::class);
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Colonnes optionnelles : mode de règlement et justificatif. Purement
+// présentation — elles ne touchent ni aux soldes ni au périmètre des écritures.
+// ─────────────────────────────────────────────────────────────────────────────
+
+it('masque les colonnes optionnelles par défaut et les affiche à la demande', function (): void {
+    // Les en-têtes ne sont rendus que si un compte a des écritures.
+    creerCreancePourGrandLivreEcran($this);
+
+    $composant = Livewire::test(RapportGrandLivre::class)
+        ->set('dateDebut', '2025-09-01')
+        ->set('dateFin', '2026-08-31')
+        ->set('comptes', '411');
+
+    // Par défaut : ni « Règlement » ni « Justif. », et 9 colonnes.
+    $composant
+        ->assertSet('afficherModeReglement', false)
+        ->assertSet('afficherJustificatif', false)
+        ->assertDontSee('Règlement')
+        ->assertDontSee('Justif.');
+
+    expect($composant->instance()->nombreColonnes())->toBe(9);
+
+    // Chaque option ajoute sa colonne — les colspans des lignes de synthèse
+    // suivent, sinon l'ouverture et le total se décalent.
+    $composant->set('afficherModeReglement', true)->assertSee('Règlement');
+    expect($composant->instance()->nombreColonnes())->toBe(10);
+
+    $composant->set('afficherJustificatif', true)->assertSee('Justif.');
+    expect($composant->instance()->nombreColonnes())->toBe(11);
+});

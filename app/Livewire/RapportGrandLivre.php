@@ -28,6 +28,22 @@ final class RapportGrandLivre extends Component
     #[Url(as: 'non_lettrees')]
     public bool $uniquementNonLettrees = false;
 
+    // Colonnes optionnelles : purement présentation, sans effet sur les soldes.
+
+    #[Url(as: 'mode_reglement')]
+    public bool $afficherModeReglement = false;
+
+    #[Url(as: 'justificatif')]
+    public bool $afficherJustificatif = false;
+
+    /** Nombre de colonnes du tableau, pour les colspans des lignes de synthèse. */
+    public function nombreColonnes(): int
+    {
+        return 9
+            + ($this->afficherModeReglement ? 1 : 0)
+            + ($this->afficherJustificatif ? 1 : 0);
+    }
+
     public function mount(ExerciceService $exerciceService): void
     {
         $range = $exerciceService->dateRange($exerciceService->current());
