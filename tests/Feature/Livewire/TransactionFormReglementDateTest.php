@@ -91,6 +91,68 @@ it('crée une T1 et son règlement T2 à la date de règlement saisie', function
         ->and($t1->statut_reglement)->toBe(StatutReglement::Recu);
 });
 
+it('libelle en français les erreurs de date de règlement hors exercice', function (): void {
+    $range = app(ExerciceService::class)->dateRange(app(ExerciceService::class)->current());
+
+    $composant = Livewire::test(TransactionForm::class)
+        ->set('type', 'recette')
+        ->set('date', dateT1TransactionFormReglement())
+        ->set('dateReglement', $range['start']->subDay()->toDateString())
+        ->set('libelle', 'Règlement daté hors exercice')
+        ->set('paiementRecu', true)
+        ->set('mode_paiement', 'virement')
+        ->set('compte_id', $this->compteBancaire->id)
+        ->set('tiers_id', $this->tiers->id)
+        ->set('lignes', [[
+            'compte_id' => (string) $this->compteRecette->id,
+            'operation_id' => '',
+            'seance' => '',
+            'montant' => '50.00',
+            'notes' => '',
+            'piece_jointe_upload' => null,
+            'piece_jointe_remove' => false,
+        ]])
+        ->call('save')
+        ->assertHasErrors(['dateReglement' => 'after_or_equal']);
+
+    expect($composant->errors()->first('dateReglement'))
+        ->toBe('La date de règlement doit être dans l\'exercice en cours (à partir du '.$range['start']->format('d/m/Y').').');
+
+    $composant->set('dateReglement', $range['end']->addDay()->toDateString())
+        ->call('save')
+        ->assertHasErrors(['dateReglement' => 'before_or_equal']);
+
+    expect($composant->errors()->first('dateReglement'))
+        ->toBe('La date de règlement doit être dans l\'exercice en cours (jusqu\'au '.$range['end']->format('d/m/Y').').');
+});
+
+it('nomme le champ « date de règlement » en français quand il est manquant', function (): void {
+    $composant = Livewire::test(TransactionForm::class)
+        ->set('type', 'recette')
+        ->set('date', dateT1TransactionFormReglement())
+        ->set('dateReglement', '')
+        ->set('libelle', 'Règlement sans date')
+        ->set('paiementRecu', true)
+        ->set('mode_paiement', 'virement')
+        ->set('compte_id', $this->compteBancaire->id)
+        ->set('tiers_id', $this->tiers->id)
+        ->set('lignes', [[
+            'compte_id' => (string) $this->compteRecette->id,
+            'operation_id' => '',
+            'seance' => '',
+            'montant' => '50.00',
+            'notes' => '',
+            'piece_jointe_upload' => null,
+            'piece_jointe_remove' => false,
+        ]])
+        ->call('save')
+        ->assertHasErrors(['dateReglement' => 'required']);
+
+    expect($composant->errors()->first('dateReglement'))
+        ->toContain('date de règlement')
+        ->not->toContain('dateReglement');
+});
+
 it('règle une transaction ouverte lors de son édition', function (): void {
     $ouverte = Transaction::factory()->asRecette()->create([
         'association_id' => $this->association->id,

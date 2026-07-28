@@ -633,6 +633,8 @@ final class TransactionForm extends Component
                 [
                     'date.after_or_equal' => 'La date doit être dans l\'exercice en cours (à partir du '.$range['start']->format('d/m/Y').').',
                     'date.before_or_equal' => 'La date doit être dans l\'exercice en cours (jusqu\'au '.$range['end']->format('d/m/Y').').',
+                    'dateReglement.after_or_equal' => 'La date de règlement doit être dans l\'exercice en cours (à partir du '.$range['start']->format('d/m/Y').').',
+                    'dateReglement.before_or_equal' => 'La date de règlement doit être dans l\'exercice en cours (jusqu\'au '.$range['end']->format('d/m/Y').').',
                     'tiers_id.required' => 'Un tiers est obligatoire : il porte la contrepartie comptable de l\'écriture.',
                 ],
                 MontantValidation::messages(['lignes.*.montant'])
