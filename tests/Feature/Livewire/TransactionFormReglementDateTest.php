@@ -211,6 +211,9 @@ it('affiche le reliquat, l’historique et préserve le lettrage lors d’un cha
         ->assertSee('Partiellement réglé')
         ->assertSee('Régler le reliquat');
 
+    expect($component->html())->toContain('poste-tiers-reglement-modal')
+        ->and($component->html())->toContain('poste-tiers-reglement-annulation-modal');
+
     $t2 = Transaction::query()->where('journal', JournalComptable::Banque->value)->sole();
     $component->call('annulerReglement', $t2->id)
         ->assertDispatched('poste-tiers-reglement:annuler', transactionReglementId: $t2->id);

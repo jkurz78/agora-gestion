@@ -667,4 +667,6 @@
         </div>
     @endif
 
+    <livewire:compta.poste-tiers-reglement-modal />
+    <livewire:compta.annulation-reglement-tiers-modal />
 </div>

@@ -10,6 +10,7 @@ Mémoires de référence :
 - `project_compta_v5_sous_slice_1b.md` — Services EcritureGenerator + LettrageService
 - `project_compta_v5_sous_slice_1c.md` — Branchements UI, rapports, extournes
 - `project_compta_v5_sous_slice_1d.md` — Backfill, renommage UI, cleanup
+- [`docs/compta-etats-reglement.md`](compta-etats-reglement.md) — matrice de référence des statuts, libellés UI et étapes comptables
 
 ---
 

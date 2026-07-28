@@ -46,7 +46,7 @@
 
                 <div class="mb-3">
                     <label for="poste-tiers-reglement-mode" class="form-label">Mode de paiement</label>
-                    <select id="poste-tiers-reglement-mode" class="form-select @error('mode') is-invalid @enderror" wire:model="mode">
+                    <select id="poste-tiers-reglement-mode" class="form-select @error('mode') is-invalid @enderror" wire:model.live="mode">
                         <option value="">Sélectionner un mode</option>
                         @foreach($modesPaiement as $modePaiement)
                             <option value="{{ $modePaiement->value }}">{{ $modePaiement->label() }}</option>
@@ -55,16 +55,21 @@
                     @error('mode') <div class="invalid-feedback">{{ $message }}</div> @enderror
                 </div>
 
-                <div class="mb-0">
-                    <label for="poste-tiers-reglement-compte" class="form-label">Compte bancaire</label>
-                    <select id="poste-tiers-reglement-compte" class="form-select @error('compteBancaireId') is-invalid @enderror" wire:model="compteBancaireId">
-                        <option value="">Aucun compte bancaire</option>
-                        @foreach($comptesBancaires as $compteBancaire)
-                            <option value="{{ $compteBancaire->id }}">{{ $compteBancaire->nom }}</option>
-                        @endforeach
-                    </select>
-                    @error('compteBancaireId') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                </div>
+                @if($compteBancaireRequis)
+                    <div class="mb-0">
+                        <label for="poste-tiers-reglement-compte" class="form-label">
+                            Compte bancaire <span class="text-danger">*</span>
+                        </label>
+                        <select id="poste-tiers-reglement-compte" class="form-select @error('compteBancaireId') is-invalid @enderror" wire:model="compteBancaireId">
+                            <option value="">Sélectionner un compte bancaire</option>
+                            @foreach($comptesBancaires as $compteBancaire)
+                                <option value="{{ $compteBancaire->id }}">{{ $compteBancaire->nom }}</option>
+                            @endforeach
+                        </select>
+                        @error('compteBancaireId') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                        <div class="form-text">{{ $aideCompteBancaire }}</div>
+                    </div>
+                @endif
             </div>
 
             <div class="modal-footer">

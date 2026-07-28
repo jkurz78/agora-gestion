@@ -294,6 +294,18 @@
                                 </a>
                             </li>
                             <li>
+                                <a class="dropdown-item {{ request()->routeIs('rapports.balance') ? 'active' : '' }}"
+                                   href="{{ route('rapports.balance') }}">
+                                    <i class="bi bi-list-columns-reverse me-1"></i>Balance comptable
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item {{ request()->routeIs('rapports.grand-livre') ? 'active' : '' }}"
+                                   href="{{ route('rapports.grand-livre') }}">
+                                    <i class="bi bi-book me-1"></i>Grand livre
+                                </a>
+                            </li>
+                            <li>
                                 <a class="dropdown-item {{ request()->routeIs('rapports.operations') ? 'active' : '' }}"
                                    href="{{ route('rapports.operations') }}">
                                     <i class="bi bi-diagram-3 me-1"></i>Compte de résultat par opérations

@@ -8,17 +8,21 @@ use App\Http\Controllers\Concerns\ResolvesLogos;
 use App\Livewire\AnalysePivot;
 use App\Models\Association;
 use App\Services\ExerciceService;
+use App\Services\Rapports\BalanceComptableBuilder;
 use App\Services\Rapports\ProjectionMatrix;
 use App\Services\Rapports\VentilationFinanciereService;
 use App\Services\RapportService;
 use App\Support\CurrentAssociation;
 use App\Support\PdfFooterRenderer;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -31,6 +35,7 @@ final class RapportExportController extends Controller
     /** Rapports and their allowed formats */
     private const RAPPORTS = [
         'compte-resultat' => ['xlsx', 'pdf'],
+        'balance' => ['xlsx', 'pdf'],
         'operations' => ['xlsx', 'pdf'],
         'flux-tresorerie' => ['xlsx', 'pdf'],
         'analyse-financier' => ['xlsx'],
@@ -40,6 +45,7 @@ final class RapportExportController extends Controller
     /** PDF orientations */
     private const PDF_ORIENTATION = [
         'compte-resultat' => 'portrait',
+        'balance' => 'landscape',
         'operations' => 'landscape',
         'flux-tresorerie' => 'portrait',
     ];
@@ -47,6 +53,7 @@ final class RapportExportController extends Controller
     /** Human-readable rapport names (for filenames and titles) */
     private const TITLES = [
         'compte-resultat' => 'Compte de resultat',
+        'balance' => 'Balance comptable',
         'operations' => 'CR par operations',
         'flux-tresorerie' => 'Flux de tresorerie',
         'analyse-financier' => 'Analyse financiere',
@@ -72,7 +79,7 @@ final class RapportExportController extends Controller
 
         return match ($format) {
             'xlsx' => $this->exportXlsx($rapport, $exercice, $label, $request, $rapportService, $exerciceService, $filename),
-            'pdf' => $this->exportPdf($rapport, $exercice, $label, $request, $rapportService, $association, $filename),
+            'pdf' => $this->exportPdf($rapport, $exercice, $label, $request, $rapportService, $exerciceService, $association, $filename),
         };
     }
 
@@ -104,6 +111,7 @@ final class RapportExportController extends Controller
                 $request->boolean('n1', true),
                 $request->boolean('budget', true),
             ),
+            'balance' => $this->xlsxBalance($request, $exercice, $exerciceService),
             'operations' => $this->xlsxOperations($rapportService, $exercice, $request),
             'flux-tresorerie' => $this->xlsxFluxTresorerie($rapportService, $exercice),
             'analyse-financier' => $this->xlsxAnalyse('financier', $exercice, $exerciceService),
@@ -307,6 +315,76 @@ final class RapportExportController extends Controller
         }
         if (! $compareN1) {
             $sheet->removeColumn('D', 1); // N-1
+        }
+
+        return $spreadsheet;
+    }
+
+    private function xlsxBalance(Request $request, int $exercice, ExerciceService $exerciceService): Spreadsheet
+    {
+        $params = $this->balanceParams($request, $exercice, $exerciceService);
+        $balance = app(BalanceComptableBuilder::class)->balance(
+            $params['date_debut'],
+            $params['date_fin'],
+            $params['prefixes'],
+        );
+
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Balance');
+
+        $headers = $this->balanceHeaders($params['colonnes']);
+        $lastCol = Coordinate::stringFromColumnIndex(count($headers));
+
+        $sheet->setCellValue('A1', 'Balance comptable');
+        $sheet->mergeCells('A1:'.$lastCol.'1');
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+
+        $sheet->fromArray([['Période', $this->periodeLabel($params['date_debut'], $params['date_fin'])]], null, 'A2');
+        $sheet->fromArray([['Comptes', $params['comptes']]], null, 'A3');
+        $sheet->getStyle('A2:A3')->getFont()->setBold(true);
+
+        $headerRow = 5;
+        $sheet->fromArray([$headers], null, 'A'.$headerRow);
+        $sheet->getStyle('A'.$headerRow.':'.$lastCol.$headerRow)->applyFromArray([
+            'font' => [
+                'bold' => true,
+                'color' => ['rgb' => 'FFFFFF'],
+            ],
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['rgb' => '3D5473'],
+            ],
+        ]);
+
+        $row = $headerRow + 1;
+
+        foreach ($balance['lignes'] as $ligne) {
+            $sheet->fromArray([$this->balanceRow($ligne, $params['colonnes'])], null, 'A'.$row);
+            $sheet->setCellValueExplicit('A'.$row, (string) $ligne['numero_compte'], DataType::TYPE_STRING);
+            $row++;
+        }
+
+        if ($balance['lignes'] !== []) {
+            $totalRow = $this->balanceTotalRow($balance, $params['colonnes']);
+            $sheet->fromArray([$totalRow], null, 'A'.$row);
+            $sheet->getStyle('A'.$row.':'.$lastCol.$row)->applyFromArray([
+                'font' => [
+                    'bold' => true,
+                    'color' => ['rgb' => 'FFFFFF'],
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => '5A7FA8'],
+                ],
+            ]);
+        }
+
+        if ($row > $headerRow + 1) {
+            $firstAmountCol = Coordinate::stringFromColumnIndex(4);
+            $sheet->getStyle($firstAmountCol.($headerRow + 1).':'.$lastCol.$row)
+                ->getNumberFormat()
+                ->setFormatCode('#,##0.00');
         }
 
         return $spreadsheet;
@@ -1106,6 +1184,7 @@ final class RapportExportController extends Controller
         string $label,
         Request $request,
         RapportService $rapportService,
+        ExerciceService $exerciceService,
         ?Association $association,
         string $filename,
     ): Response {
@@ -1116,6 +1195,7 @@ final class RapportExportController extends Controller
 
         $viewData = match ($rapport) {
             'compte-resultat' => $this->pdfCompteResultatData($rapportService, $exercice, $label, $request),
+            'balance' => $this->pdfBalanceData($request, $exercice, $exerciceService),
             'operations' => $this->pdfOperationsData($rapportService, $exercice, $request),
             'flux-tresorerie' => $this->pdfFluxTresorerieData($rapportService, $exercice),
         };
@@ -1257,7 +1337,155 @@ final class RapportExportController extends Controller
         return $rapportService->fluxTresorerie($exercice);
     }
 
+    private function pdfBalanceData(Request $request, int $exercice, ExerciceService $exerciceService): array
+    {
+        $params = $this->balanceParams($request, $exercice, $exerciceService);
+        $balance = app(BalanceComptableBuilder::class)->balance(
+            $params['date_debut'],
+            $params['date_fin'],
+            $params['prefixes'],
+        );
+
+        return [
+            'subtitle' => $this->periodeLabel($params['date_debut'], $params['date_fin']),
+            'balance' => $balance,
+            'colonnes' => $params['colonnes'],
+            'dateDebut' => $params['date_debut'],
+            'dateFin' => $params['date_fin'],
+            'comptes' => $params['comptes'],
+        ];
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────────
+
+    /**
+     * @return array{date_debut: string, date_fin: string, comptes: string, prefixes: array<int, string>, colonnes: int}
+     */
+    private function balanceParams(Request $request, int $exercice, ExerciceService $exerciceService): array
+    {
+        $range = $exerciceService->dateRange($exercice);
+        $comptes = trim((string) $request->query('comptes', '1,2,3,4,5,6,7'));
+
+        if ($comptes === '') {
+            $comptes = '1,2,3,4,5,6,7';
+        }
+
+        return [
+            'date_debut' => (string) $request->query('du', $range['start']->toDateString()),
+            'date_fin' => (string) $request->query('au', $range['end']->toDateString()),
+            'comptes' => $comptes,
+            'prefixes' => $this->balancePrefixes($comptes),
+            'colonnes' => $this->balanceColonnes($request->integer('colonnes', 6)),
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function balancePrefixes(string $comptes): array
+    {
+        return collect(preg_split('/[,\s;]+/', $comptes) ?: [])
+            ->map(fn (string $prefixe): string => trim($prefixe))
+            ->filter(fn (string $prefixe): bool => $prefixe !== '')
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function balanceColonnes(int $colonnes): int
+    {
+        return in_array($colonnes, [2, 4, 6], true) ? $colonnes : 6;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function balanceHeaders(int $colonnes): array
+    {
+        $headers = ['Compte', 'Intitulé', 'Tiers'];
+
+        if ($colonnes >= 4) {
+            $headers[] = 'Ouverture débit';
+            $headers[] = 'Ouverture crédit';
+        }
+
+        if ($colonnes === 6) {
+            $headers[] = 'Mouvement débit';
+            $headers[] = 'Mouvement crédit';
+        }
+
+        $headers[] = 'Solde final débit';
+        $headers[] = 'Solde final crédit';
+
+        return $headers;
+    }
+
+    /**
+     * @param  array<string, mixed>  $ligne
+     * @return list<string|float|null>
+     */
+    private function balanceRow(array $ligne, int $colonnes): array
+    {
+        $row = [
+            (string) $ligne['numero_compte'],
+            (string) $ligne['intitule_compte'],
+            $ligne['tiers'] !== null ? (string) $ligne['tiers'] : null,
+        ];
+
+        if ($colonnes >= 4) {
+            $row[] = $this->euros((int) $ligne['solde_ouverture_debit_centimes']);
+            $row[] = $this->euros((int) $ligne['solde_ouverture_credit_centimes']);
+        }
+
+        if ($colonnes === 6) {
+            $row[] = $this->euros((int) $ligne['mouvement_debit_centimes']);
+            $row[] = $this->euros((int) $ligne['mouvement_credit_centimes']);
+        }
+
+        $row[] = $this->euros((int) $ligne['solde_fin_debit_centimes']);
+        $row[] = $this->euros((int) $ligne['solde_fin_credit_centimes']);
+
+        return $row;
+    }
+
+    /**
+     * @param  array{lignes: list<array<string, mixed>>, totaux: array<string, int>}  $balance
+     * @return list<string|float|null>
+     */
+    private function balanceTotalRow(array $balance, int $colonnes): array
+    {
+        $lignes = $balance['lignes'];
+        $totaux = $balance['totaux'];
+        $row = ['TOTAL', null, null];
+
+        if ($colonnes >= 4) {
+            $row[] = $this->euros((int) collect($lignes)->sum('solde_ouverture_debit_centimes'));
+            $row[] = $this->euros((int) collect($lignes)->sum('solde_ouverture_credit_centimes'));
+        }
+
+        if ($colonnes === 6) {
+            $row[] = $this->euros((int) $totaux['mouvement_debit_centimes']);
+            $row[] = $this->euros((int) $totaux['mouvement_credit_centimes']);
+        }
+
+        $row[] = $this->euros((int) $totaux['solde_fin_debit_centimes']);
+        $row[] = $this->euros((int) $totaux['solde_fin_credit_centimes']);
+
+        return $row;
+    }
+
+    private function euros(int $centimes): float
+    {
+        return $centimes / 100;
+    }
+
+    private function periodeLabel(string $dateDebut, string $dateFin): string
+    {
+        return 'Du '
+            .CarbonImmutable::parse($dateDebut)->format('d/m/Y')
+            .' au '
+            .CarbonImmutable::parse($dateFin)->format('d/m/Y');
+    }
 
     private function autoSizeColumns(Spreadsheet $spreadsheet): void
     {

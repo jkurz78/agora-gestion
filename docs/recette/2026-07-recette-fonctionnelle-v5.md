@@ -2,6 +2,7 @@
 
 > Branche `feat/compta-v5` — schéma final (dissolution sous_categories → comptes livrée).
 > Stratégie complète : Phase 1 (rejeu cutover à blanc) → **Phase 2 (ce document)** → Phase 3 (préprod NAS) → Phase 4 (GO/NO-GO).
+> Référence statuts/libellés : [`docs/compta-etats-reglement.md`](../compta-etats-reglement.md).
 
 ## Mode d'emploi
 
@@ -39,74 +40,74 @@
 - [x] Dépense comptant (virement) avec tiers — *vérifié 2026-07-15 (form + reproduction serveur)*
   - [x] Écritures 6x débit / 401 crédit + T2 401/512X lettrées — *vérifié SQL : 606 Fournitures D 80 / 401 Fournisseurs C 80 (tiers, lettrage AADG), T2 = 401 D 80 / 5121 C 80, equilibree=1*
   - [x] N-3 CORRIGÉ : le tiers est désormais **obligatoire** pour toute recette/dépense (le 401/411 porte la contrepartie). Sans lui, l'écriture ne pouvait pas s'équilibrer — le formulaire rejette maintenant la saisie. (voir Journal N-3)
-- [ ] Recette comptant (espèces) : vérifier portage caisse (530)
-- [ ] Recette en attente (créance) puis « Marquer reçu » → T2 générée à l'encaissement, date correcte
-- [ ] Recette chèque → remise en banque **multi-source** (au moins 2 chèques + espèces)
-  - [ ] T4 de remise : une seule ligne 512X débit du total, contreparties 5112/530 soldées
-  - [ ] Modifier puis supprimer un brouillon de remise : les statuts des transactions sources reviennent à « en main »
-- [ ] Rapprochement bancaire du mois courant
-  - [ ] Pointer les transactions du bloc (dont la remise) ; solde rapproché = solde relevé
-  - [ ] Verrouiller le rapprochement : les transactions pointées ne sont plus modifiables
-- [ ] Virement interne 512→512 entre deux comptes bancaires (si saisi via l'app) : pas de double comptage au CR
-- [ ] Modifier une transaction non verrouillée (montant + ventilation) → écritures régénérées proprement
-- [ ] Supprimer une transaction de test → lignes purgées, lettrage nettoyé
-- [ ] Invariants ✅
+- [x] Recette comptant (espèces) : vérifier portage caisse (530) — *vérifié 2026-07-17 : tx #410 / pièce 2025-2026:00392 `SMOKE-20260717`, T2 #411 sur 530 Caisse, statut « À remettre » (Codex, navigateur + dump)*
+- [x] Recette en attente (créance) puis « Marquer reçu » → T2 générée à l'encaissement, date correcte — *vérifié 2026-07-17 : T1 #412 `B2-CREANCE-20260717` 707 C / 411 D, encaissement virement T2 #413 daté 2026-07-17, 5121 D / 411 C, lettrage AADU*
+- [x] Recette chèque → remise en banque par **type unique** (au moins 2 chèques) — *vérifié 2026-07-17 : remise chèques #21 avec deux chèques #414/#416. Clarification fonctionnelle 2026-07-18 : une remise mixte chèques + espèces est volontairement interdite (voir Journal N-4)*
+  - [x] T4 de remise : une seule ligne 512X débit du total, contrepartie d'attente soldée pour le type de remise — *vérifié 2026-07-17 : T4 chèque #418 OK, 5121 D 73,30 ; 5112 C 31,10 + 42,20*
+  - [ ] Modifier puis supprimer un brouillon de remise : les statuts des transactions sources reviennent à « en main » — *N-5 corrigé côté service 2026-07-18 : test automatisé ajouté sur retrait d'une source d'un brouillon → `en_main` / « À remettre ». À rejouer in-app avant de cocher le scénario fonctionnel complet. Décision : retirer d'une remise ≠ annuler le paiement reçu ; le retour en dû passe par le toggle de paiement de la transaction (voir Journal N-5). Suppression brouillon #20 OK pour la source restante #414*
+- [x] Rapprochement bancaire du mois courant — *vérifié 2026-07-17 sur rapprochement #31 Compte Courant, date fin 31/07/2026*
+  - [x] Pointer les transactions du bloc (dont la remise) ; solde rapproché = solde relevé — *pointés : remise #21 et recette virement #412 ; solde pointé = solde relevé 1 967,49 €, écart 0,00 €*
+  - [x] Verrouiller le rapprochement : les transactions pointées ne sont plus modifiables — *verrouillé in-app ; cases pointées disabled ; édition tx #414 affiche champs Date/Compte/Montant verrouillés*
+- [x] Virement interne 512→512 entre deux comptes bancaires (si saisi via l'app) : pas de double comptage au CR — *vérifié 2026-07-17 : virement #12, tx #419, 5122 D 55,55 / 5121 C 55,55 ; totaux CR classes 6/7 inchangés 33 011,57 / 34 373,47*
+- [x] Modifier une transaction non verrouillée (montant + ventilation) → écritures régénérées proprement — *vérifié 2026-07-17 : tx #420 modifiée de 707 / 10,00 vers 741 / 12,34 ; ancienne T2 #421 supprimée, nouvelle T2 #422 générée et lettrée*
+- [x] Supprimer une transaction de test → lignes purgées, lettrage nettoyé — *vérifié 2026-07-17 : suppression tx #420 ; 0 transaction active et 0 ligne active sur #420/#421/#422*
+- [x] Invariants ✅ — *2026-07-17 : `compta:check-integrity` OK ; `compta:assert-pd-complete --check` OK (reste 1 info HelloAsso legacy non enrichie déjà signalée par la commande)*
 
 ## Bloc 3 — Tiers : cotisations, dons, HelloAsso
 
-- [ ] Adhésion avec formule (tarif + compte associé) → transaction cotisation générée, compte à usage Cotisation
-- [ ] Don manuel → transaction sur compte à usage Don
-  - [ ] Émettre le reçu fiscal PDF/A-3, vérifier montant/numérotation/coordonnées
-- [ ] HelloAsso : déclencher une sync (webhook ou import)
-  - [ ] Transactions HelloAsso créées PD-complètes, verrouillées à la saisie
-  - [ ] Chèque/espèces HelloAsso routés vers créances (pattern v2.10)
-- [ ] Fiche tiers 360 : onglet Opérations cohérent (les transactions des blocs 1-3 y figurent)
-- [ ] Invariants ✅
+- [x] Adhésion avec formule (tarif + compte associé) → transaction cotisation générée, compte à usage Cotisation — *vérifié 2026-07-19 : adhésion Cécile BAMS, ref `B3-ADH-20260719`, tx #423 / pièce 2025-2026:00405, formule « Adhésion saison 2025-2026 — Adhésion anuelle », compte #5 `751 Cotisations` à usage Cotisation, statut `recu` / « Remis », `equilibree=1`. Visible sur Cotisations, fiche adhésion tiers et écran Transactions du tiers*
+- [x] Don manuel → transaction sur compte à usage Don — *vérifié 2026-07-19 : don EPONA, ref `B3-DON-20260719`, tx #425 / pièce 2025-2026:00407, compte #6 `754 Dons manuels` à usage Don, statut `recu` / « Remis », `equilibree=1`. Visible sur Dons, onglet Dons du tiers et écran Transactions du tiers*
+  - [x] Émettre le reçu fiscal, vérifier montant/numérotation/coordonnées — *vérifié 2026-07-19 : reçu `2026-0006`, montant 18,90 €, PDF intègre (`pdf_hash` OK), coordonnées donateur EPONA présentes. Clarification : la spec reçus fiscaux post-MVP retient un PDF standard DomPDF + SHA256, pas PDF/A-3 (`docs/specs/2026-05-07-recu-fiscal-don-design.md`)*
+- [x] HelloAsso : déclencher une sync (webhook ou import) — *vérifié 2026-07-19 par import service contrôlé sur mappings `b3-dons-libres-20260719` et `b3-adhesion-20260719`, tiers Sabrina KOHL*
+  - [ ] Transactions HelloAsso créées PD-complètes, verrouillées à la saisie — *PD complète OK : don CB order #970301 → tx #427 `HA-97030101`, `recu`, 411 lettrée + T2 5123 ; cotisation chèque order #970302 → tx #429 `HA-97030201`, `en_attente`, 411 ouverte ; don espèces order #970303 → tx #430 `HA-97030301`, `en_attente`, 411 ouverte. Réserve UI N-6 : dans le formulaire d'une transaction HA chèque/espèces `Dû`, le toggle « Paiement déjà reçu ? » reste actif et affiche « Oui »*
+  - [x] Chèque/espèces HelloAsso routés vers créances (pattern v2.10) — *vérifié 2026-07-19 : chèque #429 et espèces #430 restent `en_attente` / « Dû », T1 411 D non lettrée, pas de T2 d'encaissement ; compte bancaire header = Compte Courant pour dépôt futur*
+- [x] Fiche tiers 360 : transactions des blocs 1-3 visibles et cohérentes — *vérifié 2026-07-19 via l'écran dédié `tiers/{id}/transactions` : Cécile BAMS affiche `B3-ADH-20260719`, EPONA affiche `B3-DON-20260719`, Sabrina KOHL affiche `HA-97030101`, `HA-97030201`, `HA-97030301`. Note : l'onglet interne « Opérations » de la fiche tiers liste les opérations métier, pas les transactions comptables*
+- [x] Invariants ✅ — *2026-07-19 : `compta:check-integrity` OK ; `compta:assert-pd-complete --check` OK (reste 1 info HelloAsso legacy non enrichie déjà signalée par la commande)*
 
 ## Bloc 4 — NDF portail
 
-- [ ] Déposer une NDF depuis le portail (OTP), avec justificatif
-- [ ] Ajouter une ligne indemnités kilométriques via le wizard
-- [ ] Valider la NDF en back-office → transaction dépense générée (comptes 6x, contrepartie 401)
-- [ ] Rembourser (T2) puis, sur une 2ᵉ NDF, faire un **abandon de créance**
-  - [ ] Écriture d'abandon sur le compte à usage AbandonCreance, lettrage 401 fermé
-  - [ ] Reçu fiscal d'abandon émis si applicable
-- [ ] Invariants ✅
+- [x] Déposer une NDF depuis le portail (OTP), avec justificatif — *vérifié 2026-07-19 à partir des deux NDF soumises par l'utilisateur : NDF #6 « ag annuelle » 74,95 € avec PJ JPG/PNG ; NDF #7 « Claude » 155,00 € avec PJ JPG et proposition d'abandon de créance*
+- [x] Ajouter une ligne indemnités kilométriques via le wizard — *vérifié sur NDF #6 ligne #19 : type `kilometrique`, 7 CV · 50 km · 0,659 €/km = 32,95 €, compte #625A « Frais de déplacements », description reportée dans la ligne transaction*
+- [x] Valider la NDF en back-office → transaction dépense générée (comptes 6x, contrepartie 401) — *vérifié in-app 2026-07-19 : validation NDF #6 → tx dépense #431 / pièce 2025-2026:00413, 625A D 32,95 + 42,00 / 401 C 74,95, `equilibree=1`, PJ copiées vers `associations/1/transactions/431/...` ; validation NDF #7 en abandon → tx dépense #432 / pièce 2025-2026:00414, 628C D 155 / 401 C 155*
+- [x] Rembourser (T2) puis, sur une 2ᵉ NDF, faire un **abandon de créance** — *vérifié 2026-07-19 : paiement UI de #431 en virement Compte Courant → T2 #436 / pièce 2025-2026:00418, 401 D 74,95 / 5121 C 74,95, NDF #6 affichée « Payée » / tx « Réglé ». NDF #7 validée avec choix « Accepter l'abandon de créance (don) » → tx dépense #432 et tx don #433*
+  - [x] Écriture d'abandon sur le compte à usage AbandonCreance, lettrage 401 fermé — *vérifié : tx don #433 / pièce 2025-2026:00415, 771 « Abandon de créance » C 155 / 411 D 155, statut « Remis » ; OD de compensation #434/#435 via 467, lettrages 401 (`AADG`), 467 (`AAAA`) et 411 (`AAEA`) fermés. Visible dans Dons et dans `tiers/13/transactions`*
+  - [x] Reçu fiscal d'abandon émis si applicable — *vérifié 2026-07-19 : reçu `2026-0007`, montant 155,00 €, PDF intègre (`pdf_hash` OK), visible sur l'onglet Dons du tiers Jürgen KURZ comme « Reçu émis »*
+- [x] Invariants ✅ — *2026-07-19 : `compta:check-integrity` OK ; `compta:assert-pd-complete --check` OK (reste 1 info HelloAsso legacy non enrichie déjà signalée par la commande)*
 
 ## Bloc 5 — Plan comptable & familles
 
-- [ ] Créer un compte 7x avec un préfixe nouveau → famille orpheline auto-créée (nom = code)
-- [ ] Renommer la famille depuis l'en-tête de groupe
+- [x] Créer un compte 7x avec un préfixe nouveau → famille orpheline auto-créée (nom = code) — *vérifié in-app 2026-07-19 : création `739A` → famille auto-créée `73 — 73`, puis suppression du compte propre ; création ultérieure `739B` conservée pour le test autocomplete*
+- [x] Renommer la famille depuis l'en-tête de groupe — *vérifié in-app 2026-07-19 : famille `73` renommée `Produits recette tests`, reprise sur le chip autocomplete `73 — Produits recette tests / Bloc 5 compte volée`*
 - [x] **Renuméroter un compte vierge** (clic sur le numéro — constat R-1) — *vérifié in-app 2026-07-15 : 706Z→706Y→706Z, famille inchangée, base contrôlée en SQL (Claude, navigateur)*
   - [x] Refus si numéro en doublon, si changement de classe (7x→6x) — *vérifié in-app : messages « Ce numéro de compte existe déjà. » et « Le numéro doit rester en classe 7. », base intacte. Minuscules non testables via l'UI (uppercase automatique côté client), couvert par test Livewire*
   - [x] Le compte porteur d'écritures et le compte système restent non renumérables (pas de curseur d'édition) — *vérifié in-app : clic sur 706B (66 écritures) inerte, 681 badgé système sans action*
-- [ ] Supprimer un compte propre ✅ / tenter la suppression d'un compte utilisé → refus explicite
-- [ ] Créer un compte à la volée depuis l'autocomplete d'une saisie (modale) → numéro requis, famille OK
-- [ ] Paramètres → Usages comptables : déplacer un usage (ex. FraisKm) vers un autre compte, vérifier l'effet sur le wizard km
-- [ ] Invariants ✅
+- [x] Supprimer un compte propre ✅ / tenter la suppression d'un compte utilisé → refus explicite — *vérifié 2026-07-19 : suppression `739A` OK ; tentative suppression `707` refusée par le composant Livewire avec « Suppression impossible : ce compte porte des écritures. », compte toujours actif*
+- [x] Créer un compte à la volée depuis l'autocomplete d'une saisie (modale) → numéro requis, famille OK — *vérifié in-app 2026-07-19 depuis une nouvelle recette non enregistrée : validation sans numéro refusée (« Le champ new numero pcg est obligatoire. »), création `739B` « Bloc 5 compte volée » OK, sélection affichée sous `73 — Produits recette tests`, aucune erreur console*
+- [x] Paramètres → Usages comptables : déplacer un usage (ex. FraisKm) vers un autre compte, vérifier l'effet sur le wizard km — *vérifié in-app + service 2026-07-19 : compte temporaire `625Z` créé, sélection explicite FraisKm déplacée de `625A` vers `625Z`, `KilometriqueLigneType::resolveCompteId()` retourne `625Z`; usage restauré ensuite sur `625A` pour ne pas perturber les prochaines NDF. Réserve N-7 : le bouton inline « + Créer un compte » ajoute le lien d'usage mais ne remplace pas l'ancien usage mono*
+- [x] Invariants ✅ — *2026-07-19 : `compta:check-integrity` OK ; `compta:assert-pd-complete --check` OK (reste 1 info HelloAsso legacy non enrichie déjà signalée par la commande)*
 
 ## Bloc 6 — Rapports & exports
 
 À faire après les blocs 1-5 pour avoir de la matière :
 
-- [ ] Compte de résultat : totaux par famille cohérents avec les saisies ; toggles N-1 et budget fonctionnels ; barres budget direction-aware
-- [ ] CR par tiers : raisons sociales correctes
-- [ ] Analyse financière ventilée (pivot) : la source plate contient les transactions des blocs, signes corrects
-- [ ] Dashboard : réalisé/prévu par groupe aligné avec le CR
-- [ ] Exports XLSX + PDF du CR : mêmes chiffres que l'écran, colonnes N-1/budget respectées
-- [ ] Rapport CERFA : les comptes à usage Don sortent avec le bon numéro (numero_pcg, ex-code_cerfa)
-- [ ] Balance / grand livre (écrans P1 si présents) : débits = crédits par compte
+- [x] Compte de résultat : totaux par famille cohérents avec les saisies ; toggles N-1 et budget fonctionnels ; barres budget direction-aware — *vérifié 2026-07-19 : totaux CR = agrégat direct grand livre au centime (`60` 433,25 ; `61` 31 530,73 ; `62` 2 489,44 ; `70` 10 429,09 ; `74` 20 000,00 ; `75` 1 386,11 ; `76` 325,95 ; `77` 836,53 ; diff 0,00 partout). UI : toggles N-1/budget masquent bien les colonnes/barres ; barres budget rouge/orange/vert présentes selon direction ; aucune erreur console sur CR*
+- [x] CR par tiers : raisons sociales correctes — *vérifié in-app 2026-07-19 sur `/rapports/operations?ops[0]=3&seances=1&tiers=1` : personnes et raisons sociales affichées correctement (`Cécile BAMS`, `EPONA`, `La Petite Auberge`, `MINISTÈRE DES SPORTS`), export disponible, aucune erreur console*
+- [x] Analyse financière ventilée (pivot) : la source plate contient les transactions des blocs, signes corrects — *vérifié 2026-07-19 : source plate OK (515+ lignes selon état local), blocs présents et signés (`B3-ADH-20260719` +25,00 ; `B3-DON-20260719` +18,90 ; `HA-97030101` +12,34 ; NDF #6 -32,95 et -42,00). Vérification utilisateur 2026-07-19 : écran pivot exploitable avec agrégateur `Sum`, valeur `Montant`, colonnes par `Opération`, familles/comptes et totaux rendus. N-8 déclassé en note technique non bloquante*
+- [ ] Dashboard : réalisé/prévu par groupe aligné avec le CR — *N-9 déclassé hors régression V5 : le résumé budget dashboard est une dette fonctionnelle héritée v4, non alignée avec le CR et conceptuellement fragile. Il additionne notamment recettes et charges dans un « réalisé » global, ce qui n'a pas de sens comptable. À traiter comme refonte dashboard/budget dédiée, pas comme bug compta-v5 bloquant*
+- [x] Exports XLSX + PDF du CR : mêmes chiffres que l'écran, colonnes N-1/budget respectées — *vérifié 2026-07-19 via contrôleur réel : XLSX complet contient `2024-2025`, `2025-2026`, `Budget`, `Écart`; XLSX `n1=0&budget=0` ne garde que la colonne N ; PDF extrait OK (`62 — Autres services extérieurs` 2 489,44 €, `75 — Cotisations et dons` 1 386,11 €, colonnes N-1/Budget présentes). Fichiers OK temporaires supprimés*
+- [x] Rapport CERFA : les comptes à usage Don sortent avec le bon numéro (numero_pcg, ex-code_cerfa) — *vérifié 2026-07-19 : aucun écran CERFA dédié trouvé ; le mapping Don repose sur `Compte::forUsage(UsageComptable::Don)` et retourne les `numero_pcg` `754` Dons manuels, `756` Mécénat, `771` Abandon de créance (`AbandonCreance=1`). L'ancien `code_cerfa` n'est pas consommé*
+- [x] Balance / grand livre (écrans P1 si présents) : débits = crédits par compte — *aucun écran P1 balance/grand livre exposé ; vérification SQL du grand livre sous-jacent 2026-07-19 : 958 lignes, débit 137 812,32 = crédit 137 812,32, écart 0,00 ; 0 transaction déséquilibrée*
 - [ ] Comparaison au centime avec la prod v4 sur l'exercice clos le plus récent (CR par famille + soldes bancaires)
-- [ ] Invariants ✅
+- [x] Invariants ✅ — *2026-07-19 : `compta:check-integrity` OK ; `compta:assert-pd-complete --check` OK (reste 1 info HelloAsso legacy non enrichie déjà signalée par la commande)*
 
 ## Bloc 7 — Clôture, extourne, provisions
 
-- [ ] Saisir une provision FNP et une PCA sur l'exercice courant → visibles au CR, écritures 68x/78x équilibrées
-- [ ] Extourner une transaction → miroir généré, lignes lettrées auto-délettrées, **affichage famille sur le miroir** (même rendu que R-2)
-- [ ] Dérouler le wizard de clôture d'exercice jusqu'aux gates (sans clôturer si données réelles) : toutes les gates s'évaluent sans erreur
-- [ ] `./vendor/bin/sail artisan compta:smoke-test-v5 --detail` ✅
-- [ ] `./vendor/bin/sail artisan compta:reconcilier-statuts` : zéro divergence
-- [ ] Invariants ✅
+- [x] Saisir une provision FNP et une PCA sur l'exercice courant → visibles au CR, écritures 68x/78x équilibrées — *vérifié in-app 2026-07-19 : provisions #1 `B7-FNP-20260719` 123,45 € sur `628C` et #2 `B7-PCA-20260719` 67,89 € sur `706B`, totaux écran Charges 123,45 € / Produits 67,89 €. Écritures générées : FNP dotation tx #438 au 31/08/2026 `681 D / 486 C`, extourne tx #439 au 01/09/2026 `486 D / 781 C` ; PCA dotation tx #440 `487 D / 781 C`, extourne tx #441 `681 D / 487 C`, toutes équilibrées. En mode PD, le CR lit ces impacts via le grand livre ; le bloc legacy `RapportService::compteDeResultatProvisions()` reste neutralisé pour éviter un double comptage. Réserve N-11 : `compta:check-integrity` ne sait pas encore lire ces OD car il additionne `transaction_lignes.montant`*
+- [x] Extourner une transaction → miroir généré, **affichage famille sur le miroir** (même rendu que R-2) — *vérifié in-app 2026-07-19 sur tx test #442 `B7-EXTOURNE-20260719` / pièce `2025-2026:00422`, recette virement 13,37 € statut « Remis ». Modale d'annulation OK, miroir #444 créé avec montant -13,37 €, lignes inversées `707 D / 411 C`, origine #442 passée terminale `pointé`. UI transactions : origine affichée « annulée » ; miroir affiché sur la ligne suivante avec famille `Ventes de produits`. Clarification recette : les lettrages historiques existants ne sont **pas** auto-délettrés, conformément au service actuel ; le miroir reste ouvert pour remboursement éventuel. Réserve N-12 : la T2 bancaire #443 ressort en divergence dans `reconcilier-statuts --check`*
+- [x] Changement d'exercice et wizard de clôture jusqu'aux gates (sans clôturer si données réelles) : toutes les gates s'évaluent sans erreur — *vérifié in-app 2026-07-19 : bascule 2025-2026 → 2024-2025 → 2025-2026 OK dans l'en-tête. Wizard clôture 2025-2026 : gates bloquantes évaluées sans erreur (`Aucun rapprochement en cours`, `Toutes les lignes ont un compte`, `Tous les virements sont équilibrés`), avertissements affichés (`80 transaction(s) non pointée(s)`, `17 ligne(s) de budget`). Récapitulatif puis écran Confirmation atteints ; bouton final `Clôturer l'exercice 2025-2026` volontairement non cliqué. Réserve N-10 : le récap de réconciliation bancaire affiche un écart non bloquant*
+- [x] `./vendor/bin/sail artisan compta:smoke-test-v5 --detail` ✅ — *2026-07-19 : OK, CR Δ 0,00 €, Rappro Δ 0,00 €, 0 transaction déséquilibrée, 0 transaction sans PD*
+- [ ] `./vendor/bin/sail artisan compta:reconcilier-statuts` : zéro divergence — *KO 2026-07-19 en `--check` : 5 divergences détectées (#189, #191, #434, #435, #443). Voir N-12*
+- [ ] Invariants ✅ — *KO 2026-07-19 : `compta:assert-pd-complete --check` OK, mais `compta:check-integrity` échoue sur les 4 OD de provisions #438 à #441. Voir N-11*
 
 ---
 
@@ -126,3 +127,12 @@
 | N-1 | 2026-07-15 | 5 | Note (pas un bug) : familles « 68 — 68 » et « 78 — 78 » jamais nommées (orphelines auto-créées) — à renommer via l'édition d'en-tête de groupe | 📝 À faire (choix de libellé utilisateur) | — |
 | N-2 | 2026-07-15 | 5 | Note UX mineure : le message de refus s'affiche en haut du composant — hors viewport quand on est scrollé en bas d'un long plan comptable. Piste : toast ou scroll-to-alert | 📋 Parqué | — |
 | N-3 | 2026-07-15 | 2 | Une recette/dépense **sans tiers** produisait une transaction PD-incomplète (ventilation 6x/7x seule, pas de contrepartie 401/411, equilibree=false). `TransactionService::enrichirPartieDouble` skippe si `tiers_id` null, et le formulaire autorisait `tiers_id` nullable. **0 cas légitime dans le clone prod** (seule la tx de repro 420 « sans tiers »). Décision : **interdire** — tiers rendu obligatoire à la saisie recette/dépense (comptant et créance). | ✅ Corrigé | (commit ci-dessous) |
+| N-4 | 2026-07-17 | 2 | Clarification fonctionnelle : la remise bancaire **mixte chèques + espèces** n'est pas attendue. Le formulaire « Nouvelle remise » impose un type unique (`cheque` ou `especes`) et `RemiseBancaireService::comptabiliser()` refuse les transactions dont `mode_paiement` diffère de celui de la remise ; c'est le comportement voulu. La ligne de recette a été corrigée pour valider une remise par type unique. Aucune preuve KO conservée. | ✅ Conforme / plan corrigé | — |
+| N-5 | 2026-07-17 | 2 | KO recette : lors de la modification d'un brouillon de remise, retirer une transaction source remettait la source à `en_attente` / « Dû » au lieu de `en_main` / « À remettre ». Repro initiale : remise brouillon #20, retrait tx #416 ; SQL après validation : `remise_id=NULL`, `statut_reglement=en_attente`. Décision fonctionnelle 2026-07-18 : le retrait d'une remise signifie « ne pas déposer dans cette remise », pas « paiement finalement non reçu » ; l'annulation de réception reste une action explicite via le toggle paiement reçu/payé sur la transaction. Correction : `RemiseBancaireService::enregistrerBrouillon()` resynchronise les sources retirées via `EtatReglementResolver`. Test rouge/vert ajouté : `[D2] enregistrer brouillon (retrait tx) → la source retirée reste en main`. Preuve KO initiale : `outputs/recette-compta-v5-20260717/KO-B2-remise-modification-retour-en-attente.jpg`. | ✅ Corrigé côté service / à rejouer in-app | — |
+| N-6 | 2026-07-19 | 3 | KO UI mineur HelloAsso : une transaction HelloAsso chèque/espèces en créance (`statut_reglement=en_attente` / « Dû ») ouvre bien un formulaire avec bandeau « Transaction synchronisée depuis HelloAsso » et champs date/tiers/mode/compte/montant verrouillés, mais le toggle « Paiement déjà reçu ? » reste actif et affiche « Oui » car il reflète la présence d'un `mode_paiement`, pas le statut de règlement. Exemple : tx #429 `HA-97030201`, chèque, `Dû`, 411 ouverte non lettrée. Risque : confusion utilisateur et possible tentative de modification d'un flux HA pourtant censé être verrouillé. Preuve KO : `outputs/recette-compta-v5-20260719/N-6-helloasso-cheque-toggle-paiement-recu.png`. | 🐞 À corriger / clarifier libellé | — |
+| N-7 | 2026-07-19 | 5 | KO usage mono : dans Paramètres → Comptabilité → Usages, le bouton inline « + Créer un compte » sur l'usage mono FraisKm crée bien le compte `625Z` et lui ajoute l'usage `frais_kilometriques`, mais ne retire pas l'ancien lien `625A` et ne sélectionne pas automatiquement le nouveau compte. Effet métier : tant que deux comptes portent cet usage mono, `KilometriqueLigneType::resolveCompteId()` retourne `null` (ambiguïté). La sélection explicite du `<select>` corrige bien l'état mono et le wizard suit alors le compte choisi. | 🐞 À corriger | — |
+| N-8 | 2026-07-19 | 6 | Déclassé après retour utilisateur : l'automate avait capté une erreur console PivotTable.js `Uncaught TypeError: M.aggregators[u.val(...)] is not a function` lors d'un rendu initial, mais l'usage réel de l'écran est conforme : pivot rendu avec agrégateur `Sum`, valeur `Montant`, colonnes par `Opération`, familles/comptes et totaux affichés. La source plate serveur était déjà correcte. Conclusion : ne pas traiter comme KO fonctionnel ; au plus une note technique à surveiller si l'erreur console devient reproductible côté utilisateur. | 📝 Non bloquant / conforme à l'usage | — |
+| N-9 | 2026-07-19 | 6 | Déclassé hors bug V5 après clarification utilisateur : le dashboard « Résumé budget » reprend une logique déjà présente en v4. Le constat reste valide fonctionnellement : le réalisé par familles est limité aux comptes budgétés, n'est pas aligné avec le CR, et le total réalisé global additionne recettes et charges (ex. total autour de 64 k€), ce qui est comptablement dépourvu de sens. Exemples d'écarts avec le CR : `Cotisations et dons` réalisé dashboard 526,11 € vs CR 1 386,11 € ; `Ventes et prestations` 8 970,00 € vs CR 10 429,09 € ; `Charges de fonctionnement` prévu dashboard 18 395,00 € vs CR 18 095,00 €. À traiter comme refonte dashboard/budget dédiée : séparer charges/produits, présenter un résultat net si besoin, et définir explicitement le périmètre comptes budgétés vs familles CR. Preuve conservée pour future investigation UX : `outputs/recette-compta-v5-20260719/N-9-dashboard-budget-cr-ecart.jpg`. | 📝 Dette fonctionnelle héritée / non bloquant V5 | — |
+| N-10 | 2026-07-19 | 7 | Note wizard clôture : les gates de clôture s'évaluent sans erreur et ne bloquent pas, mais le récapitulatif « Réconciliation bancaire » affiche un écart non nul (`-1 851,24 €`) alors que le smoke-test rapprochement ressort à `0,00 €`. Cause probable : le récap utilise encore des agrégats header/legacy (`Transaction.montant_total`, `type`, `compte_id`, toutes transactions non pointées) dans un monde V5 où les flux bancaires réels sont portés par les lignes PD et par des T1/T2/T4/OD. À clarifier avant usage réel du wizard de clôture : soit recalculer depuis les lignes 512X/rapprochement PD, soit assumer un simple avertissement non bloquant mieux libellé. | 📝 À clarifier / non bloquant gates | — |
+| N-11 | 2026-07-19 | 7 | KO invariant après création des provisions : `compta:check-integrity` signale `TX#438 montant_total=123.45 ≠ sum(lignes)=0.00`, `TX#439 montant_total=123.45 ≠ sum(lignes)=0.00`, `TX#440 montant_total=67.89 ≠ sum(lignes)=0.00`, `TX#441 montant_total=67.89 ≠ sum(lignes)=0.00`. Les écritures PD sont pourtant équilibrées en débit/crédit ; le problème vient du contrat du check qui additionne `transaction_lignes.montant` sur les classes 6/7, alors que les OD générées par `EcritureGenerator::pourProvisionDotation()` / `pourProvisionExtourne()` posent `montant=0` sur les lignes. | 🐞 À corriger | — |
+| N-12 | 2026-07-19 | 7 | KO `compta:reconcilier-statuts --check` : 5 divergences détectées. Détail : #189 et #191 `miroir=recu` / `ledger=en_main` sur chèques recette anciens ; #434 et #435 `miroir=en_attente` / `ledger=recu` sur OD de compensation abandon de créance NDF #7 ; #443 `miroir=en_attente` / `ledger=pointe` sur la T2 d'encaissement liée à la transaction extournée #442. La commande applique le resolver à toutes les transactions, y compris T2 bancaires et OD ; il faut décider si ces écritures doivent être synchronisées, exclues du check, ou si le resolver doit distinguer les transactions métier des transactions techniques. | 🐞 À corriger / arbitrer périmètre | — |

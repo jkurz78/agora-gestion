@@ -654,12 +654,9 @@
                                 <button type="button"
                                         wire:click="marquerRecu({{ $tx->id }}, '{{ e($tx->source_type) }}', {{ $tx->poste_tiers_ligne_id ?? 'null' }})"
                                         class="btn btn-sm btn-outline-success"
-                                        style="padding:.15rem .3rem;font-size:.7rem"
+                                        style="padding:.15rem .3rem;font-size:.7rem;white-space:nowrap"
                                         title="{{ $sensTreso === 'depense' ? 'Marquer comme payé' : ($tx->mode_paiement === null ? 'Enregistrer l\'encaissement (choisir le mode)' : 'Marquer comme reçu') }}">
                                     <i class="bi bi-check-lg"></i>
-                                    @if($sensTreso === 'recette' && $tx->mode_paiement === null)
-                                        <i class="bi bi-credit-card ms-1" style="font-size:.65rem" title="Créance — mode à saisir"></i>
-                                    @endif
                                 </button>
                             @endif
                             @if (! $isReportAN && ! $exerciceCloture)

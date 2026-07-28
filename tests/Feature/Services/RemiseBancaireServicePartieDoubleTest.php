@@ -353,6 +353,33 @@ it('[D] supprimer remise → T4 supprimée, lignes 5112 sources délettrées', f
 // Scénario E — Modifier remise (ajout tx) → T4 recréée avec 3 lignes 5112
 // ---------------------------------------------------------------------------
 
+it('[D2] enregistrer brouillon (retrait tx) → la source retirée reste en main', function () {
+    $remise = t25creerRemise($this, ModePaiement::Cheque);
+
+    $ligne1 = t25creerLigne5112($this, 50.00);
+    $ligne2 = t25creerLigne5112($this, 30.00);
+
+    $tx1 = Transaction::findOrFail($ligne1->transaction_id);
+    $tx2 = Transaction::findOrFail($ligne2->transaction_id);
+
+    $this->service->enregistrerBrouillon($remise, [$tx1->id, $tx2->id]);
+
+    $tx2->refresh();
+    expect($tx2->remise_id)->toBe($remise->id);
+    expect($tx2->statut_reglement)->toBe(StatutReglement::EnMain);
+
+    // Modifier le brouillon : retirer tx2 de cette remise, sans annuler le paiement reçu.
+    $this->service->enregistrerBrouillon($remise->fresh(), [$tx1->id]);
+
+    $tx2->refresh();
+    $ligne2->refresh();
+
+    expect($tx2->remise_id)->toBeNull();
+    expect($tx2->reference)->toBeNull();
+    expect($tx2->statut_reglement)->toBe(StatutReglement::EnMain);
+    expect($ligne2->lettrage_code)->toBeNull('Le chèque retiré du brouillon reste reçu mais non remis');
+});
+
 it('[E] modifier remise (ajout tx) → T4 recréée avec le nouveau périmètre', function () {
     $remise = t25creerRemise($this, ModePaiement::Cheque);
 

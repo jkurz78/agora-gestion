@@ -482,6 +482,20 @@ $activeGroup = match(true) {
                             </li>
 
                             <li class="nav-item">
+                                <a href="{{ route('rapports.balance') }}"
+                                   class="nav-link {{ request()->routeIs('rapports.balance') ? 'active' : '' }}">
+                                    <i class="bi bi-list-columns-reverse me-1"></i> Balance comptable
+                                </a>
+                            </li>
+
+                            <li class="nav-item">
+                                <a href="{{ route('rapports.grand-livre') }}"
+                                   class="nav-link {{ request()->routeIs('rapports.grand-livre') ? 'active' : '' }}">
+                                    <i class="bi bi-book me-1"></i> Grand livre
+                                </a>
+                            </li>
+
+                            <li class="nav-item">
                                 <a href="{{ route('rapports.operations') }}"
                                    class="nav-link {{ request()->routeIs('rapports.operations') ? 'active' : '' }}">
                                     <i class="bi bi-diagram-3 me-1"></i> CR par opérations

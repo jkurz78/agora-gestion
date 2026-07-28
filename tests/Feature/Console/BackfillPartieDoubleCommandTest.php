@@ -31,6 +31,7 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Models\VirementInterne;
 use App\Services\Compta\BackfillAuditor;
 use App\Services\Compta\Migrations\BancairesSeeder;
 use App\Services\Compta\Migrations\SystemeSeeder;
@@ -440,6 +441,57 @@ test('[H] invariant pas-tiers-sur-512X — toute ligne classe 5 a tiers_id IS NU
         ->count();
 
     expect($lignesAvecTiers)->toBe(0, 'Des lignes classe 5 avec tiers_id ont été trouvées.');
+})->group('backfill');
+
+test('[H2] backfill reprend les virements internes legacy en écritures 512 source/destination', function () {
+    setupBackfillFixtureStep32($this);
+
+    $compteDestination = CompteBancaire::factory()->create([
+        'association_id' => $this->association->id,
+        'nom' => 'Compte destination',
+        'iban' => 'FR7612345000012345678909999',
+        'actif_recettes_depenses' => true,
+    ]);
+    BancairesSeeder::seed();
+
+    $compte512Source = Compte::where('association_id', $this->association->id)
+        ->where('compte_bancaire_id', $this->compteBancaire->id)
+        ->firstOrFail();
+    $compte512Destination = Compte::where('association_id', $this->association->id)
+        ->where('compte_bancaire_id', $compteDestination->id)
+        ->firstOrFail();
+
+    $virement = VirementInterne::factory()->create([
+        'association_id' => $this->association->id,
+        'date' => '2025-11-20',
+        'montant' => '123.45',
+        'compte_source_id' => $this->compteBancaire->id,
+        'compte_destination_id' => $compteDestination->id,
+        'reference' => 'VIR-LEGACY-001',
+        'numero_piece' => '2025-2026:00999',
+    ]);
+
+    expect(Transaction::where('virement_interne_id', $virement->id)->exists())->toBeFalse();
+
+    $this->artisan('compta:backfill-partie-double', [
+        '--exercice' => '2025',
+        '--asso' => $this->association->id,
+    ])->assertSuccessful();
+
+    $transaction = Transaction::where('virement_interne_id', $virement->id)->first();
+
+    expect($transaction)->not->toBeNull()
+        ->and($transaction->type)->toBe(TypeTransaction::Virement)
+        ->and($transaction->journal)->toBe(JournalComptable::Banque)
+        ->and((bool) $transaction->equilibree)->toBeTrue();
+
+    $lignes = TransactionLigne::where('transaction_id', $transaction->id)
+        ->whereNull('deleted_at')
+        ->get();
+
+    expect($lignes)->toHaveCount(2)
+        ->and((float) $lignes->firstWhere('compte_id', $compte512Destination->id)->debit)->toBe(123.45)
+        ->and((float) $lignes->firstWhere('compte_id', $compte512Source->id)->credit)->toBe(123.45);
 })->group('backfill');
 
 // ---------------------------------------------------------------------------

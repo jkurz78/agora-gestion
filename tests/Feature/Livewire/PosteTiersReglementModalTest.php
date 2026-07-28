@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\DTOs\Compta\PosteTiersReglementData;
 use App\Enums\ModePaiement;
 use App\Enums\StatutReglement;
+use App\Enums\TypeTransaction;
 use App\Livewire\Compta\AnnulationReglementTiersModal;
 use App\Livewire\Compta\PosteTiersReglementModal;
 use App\Models\Association;
@@ -57,6 +58,31 @@ function creerPosteOuvertPourModaleReglement(object $contexte, int $montantCenti
     return [$transaction->fresh(), $ligne];
 }
 
+/**
+ * @return array{Transaction, TransactionLigne}
+ */
+function creerDetteOuvertePourModaleReglement(object $contexte, int $montantCentimes = 10000): array
+{
+    $tiers = Tiers::factory()->create(['association_id' => $contexte->association->id]);
+    $transaction = $contexte->ecritures->pourDepenseACredit(
+        tiers: $tiers,
+        ventilations: [[
+            'compte' => $contexte->compte606,
+            'montant' => MontantDecimal::depuisCentimes($montantCentimes),
+        ]],
+        dateConstatation: new DateTimeImmutable('2025-10-01'),
+        libelle: 'Facture fournisseur à payer',
+    );
+    $transaction->update(['statut_reglement' => StatutReglement::EnAttente]);
+
+    /** @var TransactionLigne $ligne */
+    $ligne = $transaction->lignes()
+        ->whereHas('compte', fn ($query) => $query->where('numero_pcg', '401'))
+        ->firstOrFail();
+
+    return [$transaction->fresh(), $ligne];
+}
+
 test('ouvrir préremplit le solde et la date du jour dans les bornes de l exercice', function (): void {
     CarbonImmutable::setTestNow('2026-07-23 10:00:00');
     [, $ligne] = creerPosteOuvertPourModaleReglement($this);
@@ -71,6 +97,16 @@ test('ouvrir préremplit le solde et la date du jour dans les bornes de l exerci
             $posteOrigine,
             'Cotisation annuelle à encaisser',
         ));
+});
+
+test('le compte bancaire est masqué tant que le mode ne nécessite pas de banque', function (): void {
+    [, $ligne] = creerPosteOuvertPourModaleReglement($this);
+
+    Livewire::test(PosteTiersReglementModal::class, ['exercice' => 2025])
+        ->dispatch('poste-tiers-reglement:ouvrir', ligneId: (int) $ligne->id, exercice: 2025)
+        ->assertDontSee('Compte bancaire')
+        ->set('mode', ModePaiement::Especes->value)
+        ->assertDontSee('Compte bancaire');
 });
 
 test('ouvrir borne la date par le début et la fin de l exercice', function (string $maintenant, string $dateAttendue): void {
@@ -104,6 +140,87 @@ test('enregistrer crée le règlement et notifie les consommateurs', function ()
         ->whereDate('date', '2026-07-23')
         ->where('montant_total', '30.00')
         ->exists())->toBeTrue();
+});
+
+test('le compte bancaire apparaît et se préremplit avec le compte par défaut quand il est requis', function (): void {
+    [, $ligne] = creerPosteOuvertPourModaleReglement($this);
+    $compteParDefaut = CompteBancaire::factory()->create([
+        'association_id' => (int) $this->association->id,
+        'nom' => 'Banque par défaut',
+    ]);
+    $this->association->update(['facture_compte_bancaire_id' => (int) $compteParDefaut->id]);
+
+    Livewire::test(PosteTiersReglementModal::class, ['exercice' => 2025])
+        ->dispatch('poste-tiers-reglement:ouvrir', ligneId: (int) $ligne->id, exercice: 2025)
+        ->assertDontSee('Compte bancaire')
+        ->set('mode', ModePaiement::Virement->value)
+        ->assertSee('Compte bancaire')
+        ->assertSet('compteBancaireId', (int) $compteParDefaut->id);
+});
+
+test('la dernière banque utilisée prime sur le compte par défaut', function (): void {
+    [, $ligne] = creerPosteOuvertPourModaleReglement($this);
+    $compteParDefaut = CompteBancaire::factory()->create([
+        'association_id' => (int) $this->association->id,
+        'nom' => 'Banque par défaut',
+    ]);
+    $derniereBanque = CompteBancaire::factory()->create([
+        'association_id' => (int) $this->association->id,
+        'nom' => 'Dernière banque utilisée',
+    ]);
+    $this->association->update(['facture_compte_bancaire_id' => (int) $compteParDefaut->id]);
+
+    Transaction::factory()->create([
+        'association_id' => (int) $this->association->id,
+        'type' => TypeTransaction::Recette,
+        'date' => '2026-07-22',
+        'journal' => 'banque',
+        'mode_paiement' => ModePaiement::Virement,
+        'compte_id' => (int) $derniereBanque->id,
+    ]);
+
+    Livewire::test(PosteTiersReglementModal::class, ['exercice' => 2025])
+        ->dispatch('poste-tiers-reglement:ouvrir', ligneId: (int) $ligne->id, exercice: 2025)
+        ->set('mode', ModePaiement::Virement->value)
+        ->assertSet('compteBancaireId', (int) $derniereBanque->id);
+});
+
+test('enregistrer exige un compte bancaire pour un virement', function (): void {
+    [, $ligne] = creerPosteOuvertPourModaleReglement($this);
+
+    Livewire::test(PosteTiersReglementModal::class, ['exercice' => 2025])
+        ->dispatch('poste-tiers-reglement:ouvrir', ligneId: (int) $ligne->id, exercice: 2025)
+        ->set('mode', ModePaiement::Virement->value)
+        ->set('compteBancaireId', null)
+        ->call('enregistrer')
+        ->assertHasErrors(['compteBancaireId' => 'required'])
+        ->assertSee('Ce mode de règlement nécessite un compte bancaire.')
+        ->assertNotDispatched('poste-tiers-reglement:enregistre');
+});
+
+test('enregistrer exige un compte bancaire pour un chèque fournisseur', function (): void {
+    [, $ligne] = creerDetteOuvertePourModaleReglement($this);
+
+    Livewire::test(PosteTiersReglementModal::class, ['exercice' => 2025])
+        ->dispatch('poste-tiers-reglement:ouvrir', ligneId: (int) $ligne->id, exercice: 2025)
+        ->set('mode', ModePaiement::Cheque->value)
+        ->set('compteBancaireId', null)
+        ->call('enregistrer')
+        ->assertHasErrors(['compteBancaireId' => 'required'])
+        ->assertSee('Ce mode de règlement nécessite un compte bancaire.')
+        ->assertNotDispatched('poste-tiers-reglement:enregistre');
+});
+
+test('enregistrer autorise un chèque reçu sans compte bancaire explicite', function (): void {
+    [, $ligne] = creerPosteOuvertPourModaleReglement($this);
+
+    Livewire::test(PosteTiersReglementModal::class, ['exercice' => 2025])
+        ->dispatch('poste-tiers-reglement:ouvrir', ligneId: (int) $ligne->id, exercice: 2025)
+        ->set('mode', ModePaiement::Cheque->value)
+        ->set('compteBancaireId', null)
+        ->call('enregistrer')
+        ->assertHasNoErrors()
+        ->assertDispatched('poste-tiers-reglement:enregistre');
 });
 
 test('enregistrer rejette un compte bancaire d une autre association dès la validation', function (): void {
@@ -207,6 +324,7 @@ test('les vues utilisent les modales Bootstrap sans confirmation native', functi
     expect($reglement)->toContain('class="modal fade"')
         ->and($reglement)->toContain('wire:ignore.self')
         ->and($reglement)->toContain('poste-tiers-reglement-modal-open.window')
+        ->and($reglement)->toContain('wire:model.live="mode"')
         ->and($annulation)->toContain('class="modal fade"')
         ->and($annulation)->toContain('Annuler le règlement')
         ->and($reglement.$annulation)->not->toContain('window.confirm');

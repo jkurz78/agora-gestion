@@ -53,14 +53,30 @@ final class RemiseBancaireService
     public function enregistrerBrouillon(RemiseBancaire $remise, array $transactionIds): void
     {
         DB::transaction(function () use ($remise, $transactionIds): void {
-            // Retirer les transactions déselectionnées → repasser en attente
-            Transaction::where('remise_id', $remise->id)
+            // Retirer les transactions désélectionnées de cette remise.
+            // Legacy : EnAttente. PD : le syncer dérive EnMain si le règlement
+            // est toujours reçu physiquement (5112/530 non lettré).
+            $idsRetires = Transaction::where('remise_id', $remise->id)
                 ->whereNotIn('id', $transactionIds)
-                ->update([
-                    'remise_id' => null,
-                    'statut_reglement' => StatutReglement::EnAttente->value,
-                    'reference' => null,
-                ]);
+                ->pluck('id')
+                ->map(fn ($id): int => (int) $id)
+                ->all();
+
+            if (! empty($idsRetires)) {
+                Transaction::whereIn('id', $idsRetires)
+                    ->update([
+                        'remise_id' => null,
+                        'statut_reglement' => StatutReglement::EnAttente->value,
+                        'reference' => null,
+                    ]);
+
+                foreach ($idsRetires as $txId) {
+                    $tx = Transaction::find($txId);
+                    if ($tx !== null) {
+                        $this->etatReglementResolver->syncer($tx->fresh());
+                    }
+                }
+            }
 
             // Ajouter les transactions sélectionnées → reçues (prêtes pour dépôt)
             // Legacy : Recu. PD : le syncer dérive EnMain (5112 non lettré = chèque en main).

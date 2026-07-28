@@ -13,6 +13,7 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\TypeOperation;
+use App\Services\Compta\EcritureGenerator;
 use App\Services\ReglementOperationService;
 use Carbon\Carbon;
 use Livewire\Livewire;
@@ -84,6 +85,24 @@ it('[AC9] TransactionUniverselle::marquerRecu ouvre la modale datée sans géné
 
     expect(Transaction::count())->toBe(1)
         ->and($ligne411T1->fresh()->lettrage_code)->toBeNull();
+});
+
+it('affiche un bouton de règlement compact sans icône carte bancaire parasite', function (): void {
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
+    app(EcritureGenerator::class)->pourRecetteACredit(
+        tiers: $tiers,
+        ventilations: [[
+            'compte' => $this->compte706,
+            'montant' => '80.00',
+        ]],
+        dateConstatation: new DateTimeImmutable('2025-12-01'),
+        libelle: 'Créance sans mode',
+    );
+
+    $html = Livewire::test(TransactionUniverselle::class, ['exercice' => 2025])->html();
+
+    expect($html)->toContain('bi bi-check-lg')
+        ->and($html)->not->toContain('bi bi-credit-card');
 });
 
 // ---------------------------------------------------------------------------

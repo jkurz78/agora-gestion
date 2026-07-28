@@ -8,7 +8,10 @@ use App\Models\Association;
 use App\Models\RemiseBancaire;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Models\VirementInterne;
 use App\Services\Compta\BackfillAuditor;
+use App\Services\Compta\EcritureGenerator;
+use App\Services\Compta\PartieDoubleGuard;
 use App\Services\Compta\TransactionConverter;
 use App\Services\ExerciceService;
 use App\Services\RemiseBancaireService;
@@ -54,6 +57,7 @@ final class BackfillPartieDoubleCommand extends Command
         private readonly BackfillAuditor $auditor,
         private readonly TransactionConverter $converter,
         private readonly RemiseBancaireService $remiseBancaireService,
+        private readonly EcritureGenerator $ecritureGenerator,
     ) {
         parent::__construct();
     }
@@ -409,6 +413,66 @@ final class BackfillPartieDoubleCommand extends Command
 
         if ($remisesErreurs > 0) {
             $this->warn('Des erreurs sont survenues lors de la reconstruction des remises. Consulter les logs.');
+        }
+
+        // --- Phase 3 : reprise des virements internes legacy (512 destination D / 512 source C) ---
+        $this->reconstruireVirementsInternes($annee, $isForce);
+    }
+
+    private function reconstruireVirementsInternes(int $annee, bool $isForce): void
+    {
+        $dateDebut = "{$annee}-09-01";
+        $dateFin = ($annee + 1).'-08-31';
+
+        $query = VirementInterne::whereBetween('date', [$dateDebut, $dateFin]);
+
+        if (! $isForce) {
+            $query->whereDoesntHave('transaction');
+        }
+
+        $virements = $query->get();
+        $total = $virements->count();
+
+        if ($total === 0) {
+            $this->info('Phase 3 : virements internes déjà à jour, 0 repris.');
+
+            return;
+        }
+
+        $repris = 0;
+        $erreurs = 0;
+
+        foreach ($virements as $virement) {
+            try {
+                DB::transaction(function () use ($virement, $isForce, &$repris): void {
+                    if ($isForce) {
+                        Transaction::withTrashed()
+                            ->where('virement_interne_id', (int) $virement->id)
+                            ->get()
+                            ->each(function (Transaction $transaction): void {
+                                $transaction->lignes()->withTrashed()->forceDelete();
+                                $transaction->forceDelete();
+                            });
+                    }
+
+                    $transaction = $this->ecritureGenerator->pourVirementInterne($virement->fresh());
+                    PartieDoubleGuard::assertComplete($transaction);
+                    $repris++;
+                });
+            } catch (\Throwable $e) {
+                $erreurs++;
+                Log::error('[Backfill] Erreur reprise virement interne', [
+                    'virement_interne_id' => (int) $virement->id,
+                    'error' => $e->getMessage(),
+                ]);
+                $this->warn("  Erreur virement interne #{$virement->id} : {$e->getMessage()}");
+            }
+        }
+
+        $this->info("Phase 3 : {$repris} virement(s) interne(s) repris, {$erreurs} erreur(s).");
+
+        if ($erreurs > 0) {
+            $this->warn('Des erreurs sont survenues lors de la reprise des virements internes. Consulter les logs.');
         }
     }
 }
