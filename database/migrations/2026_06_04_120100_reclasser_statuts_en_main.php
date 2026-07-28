@@ -16,8 +16,17 @@ use Illuminate\Database\Migrations\Migration;
  * Le resolver est idempotent : les autres tx restent inchangées.
  *
  * Itère par association (TenantContext requis pour le scope global).
- * No-op sous tenant sans schéma PD, et no-op si compta.use_partie_double=false
- * (le syncer gate là-dessus) → à exécuter après activation du flag (cutover).
+ *
+ * ⚠️ Cette migration ne suffit pas au cutover. Elle s'exécute au `migrate`,
+ * donc avant `compta:backfill-partie-double` : les transactions legacy n'ont pas
+ * encore de ligne partie double, le resolver retombe sur la colonne stockée
+ * (EtatReglementResolver::resolve) et la reclassification est un no-op sur cette
+ * population. La reclassification réelle se fait avec
+ * `php artisan compta:reconcilier-statuts` APRÈS le backfill — voir la séquence
+ * de bascule dans docs/compta-partie-double.md §8.
+ *
+ * (Le syncer ne se gate plus sur compta.use_partie_double depuis le passage en
+ * partie double inconditionnelle : le flag ne pilote que l'affichage.)
  */
 return new class extends Migration
 {

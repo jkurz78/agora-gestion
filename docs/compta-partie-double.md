@@ -462,11 +462,26 @@ function compteSysteme(string $numero): Compte
    ```bash
    php artisan config:cache
    ```
-5. Valider visuellement le Compte de résultat et le rapprochement bancaire.
+5. **Réconcilier les statuts de règlement** — obligatoire, et dans cet ordre :
+   ```bash
+   php artisan compta:reconcilier-statuts --check   # inventaire
+   php artisan compta:reconcilier-statuts           # resynchronisation
+   ```
+   La migration `2026_06_04_120100_reclasser_statuts_en_main` ne suffit pas : elle
+   s'exécute au `migrate`, donc **avant** que le backfill n'ait créé les lignes
+   partie double. À ce moment-là le resolver retombe sur la colonne stockée et
+   la reclassification est un no-op sur toute la population legacy. Sans cette
+   étape, les recettes chèque/espèces jamais remises restent étiquetées « Reçu »
+   au lieu de « À remettre » — visible dans les listes, les filtres et l'écran
+   des créances.
+6. Contrôler les invariants : `compta:check-integrity`, `compta:assert-pd-complete --check`, `compta:smoke-test-v5 --detail`.
+7. Valider visuellement le Compte de résultat et le rapprochement bancaire.
 
 ### Rollback
 
-Le feature flag `COMPTA_USE_PARTIE_DOUBLE=false` (default) remet les rapports et le rappro en mode legacy immédiatement. Les données PD restent en base mais ne sont pas lues.
+> ⚠️ **Cette section est périmée depuis la dissolution `sous_categories` → `comptes` (DC-10b) et doit être réécrite après la première répétition de bascule.** Les tables `sous_categories` et `categories` ont été supprimées et les rapports lisent `comptes` dans les deux branches : repasser le flag à `false` ne restitue plus le comportement v4. Le rollback réel est la **restauration de la sauvegarde de base**, dont la procédure et la durée restent à établir.
+
+Le feature flag `COMPTA_USE_PARTIE_DOUBLE=false` (default) ne pilote plus que quelques bifurcations de lecture (neutralisation des provisions au CR, filtre du rapprochement, gates de clôture). La génération des écritures, elle, est inconditionnelle.
 
 Les colonnes legacy (`transactions.type`, `transaction_lignes.sous_categorie_id`, `transaction_lignes.montant`) sont **conservées** jusqu'à une PR dédiée post-stabilité prod (Step 40 différé).
 
