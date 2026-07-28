@@ -4,16 +4,15 @@ declare(strict_types=1);
 
 namespace App\Services\Rapports;
 
-use App\Enums\JournalComptable;
 use App\Models\Compte;
 use App\Models\TransactionLigne;
-use App\Support\MontantDecimal;
+use App\Services\Rapports\Concerns\AnalysePeriodeComptable;
 use Carbon\CarbonImmutable;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Collection;
 
 final class BalanceComptableBuilder
 {
+    use AnalysePeriodeComptable;
+
     /**
      * @param  array<int, string>  $prefixesComptes
      * @return array{date_debut: string, date_fin: string, prefixes_comptes: array<int, string>, lignes: list<array<string, mixed>>, totaux: array<string, int>}
@@ -23,8 +22,9 @@ final class BalanceComptableBuilder
         $debut = CarbonImmutable::parse($dateDebut)->startOfDay();
         $fin = CarbonImmutable::parse($dateFin)->startOfDay();
         $prefixes = $this->normaliserPrefixes($prefixesComptes);
+        $coupure = $this->dateCoupureANouveau($debut);
 
-        $lignes = $this->lignesJusqua($fin, $prefixes);
+        $lignes = $this->requeteLignes($fin, $coupure, $prefixes)->get();
         $groupes = [];
 
         foreach ($lignes as $ligne) {
@@ -34,8 +34,8 @@ final class BalanceComptableBuilder
                 continue;
             }
 
-            $estOuverture = $this->estOuverture($ligne, $debut);
-            $estMouvement = $this->estMouvement($ligne, $debut, $fin);
+            $estOuverture = $this->estOuverture($ligne, $debut, $coupure);
+            $estMouvement = $this->estMouvement($ligne, $debut, $fin, $coupure);
 
             if (! $estOuverture && ! $estMouvement) {
                 continue;
@@ -69,72 +69,6 @@ final class BalanceComptableBuilder
             'lignes' => $lignesBalance,
             'totaux' => $this->totaux($lignesBalance),
         ];
-    }
-
-    /**
-     * @param  array<int, string>  $prefixes
-     * @return Collection<int, TransactionLigne>
-     */
-    private function lignesJusqua(CarbonImmutable $fin, array $prefixes): Collection
-    {
-        return TransactionLigne::query()
-            ->with(['compte', 'tiers', 'transaction'])
-            ->whereHas('transaction', fn (Builder $query): Builder => $query
-                ->whereDate('date', '<=', $fin->toDateString()))
-            ->whereHas('compte', fn (Builder $query): Builder => $this->filtrerComptes($query, $prefixes))
-            ->get();
-    }
-
-    /**
-     * @param  array<int, string>  $prefixes
-     */
-    private function filtrerComptes(Builder $query, array $prefixes): Builder
-    {
-        if ($prefixes === []) {
-            return $query;
-        }
-
-        return $query->where(function (Builder $comptes) use ($prefixes): void {
-            foreach ($prefixes as $prefixe) {
-                $comptes->orWhere('numero_pcg', 'like', $prefixe.'%');
-            }
-        });
-    }
-
-    private function estOuverture(TransactionLigne $ligne, CarbonImmutable $debut): bool
-    {
-        $transaction = $ligne->transaction;
-        if ($transaction === null) {
-            return false;
-        }
-
-        if ($this->estCompteResultat($ligne)) {
-            return false;
-        }
-
-        $date = CarbonImmutable::parse($transaction->date->toDateString());
-        $journal = $transaction->journal instanceof JournalComptable
-            ? $transaction->journal->value
-            : (string) $transaction->journal;
-
-        return $date->lt($debut)
-            || ($date->equalTo($debut) && $journal === JournalComptable::AN->value);
-    }
-
-    private function estMouvement(TransactionLigne $ligne, CarbonImmutable $debut, CarbonImmutable $fin): bool
-    {
-        $transaction = $ligne->transaction;
-        if ($transaction === null) {
-            return false;
-        }
-
-        $date = CarbonImmutable::parse($transaction->date->toDateString());
-        $journal = $transaction->journal instanceof JournalComptable
-            ? $transaction->journal->value
-            : (string) $transaction->journal;
-
-        return $date->betweenIncluded($debut, $fin)
-            && ! ($date->equalTo($debut) && $journal === JournalComptable::AN->value);
     }
 
     private function cleRegroupement(TransactionLigne $ligne): string
@@ -223,16 +157,6 @@ final class BalanceComptableBuilder
         ];
     }
 
-    private function centimes(mixed $montant): int
-    {
-        return MontantDecimal::versCentimes((string) $montant);
-    }
-
-    private function estCompteResultat(TransactionLigne $ligne): bool
-    {
-        return in_array((int) ($ligne->compte?->classe ?? 0), [6, 7], true);
-    }
-
     /**
      * Trie les numéros de comptes comme des codes comptables, et non comme
      * des nombres : 5112 doit précéder 530.
@@ -244,19 +168,5 @@ final class BalanceComptableBuilder
     {
         return strcmp((string) $a['numero_compte'], (string) $b['numero_compte'])
             ?: strcmp((string) ($a['tiers'] ?? ''), (string) ($b['tiers'] ?? ''));
-    }
-
-    /**
-     * @param  array<int, string>  $prefixes
-     * @return array<int, string>
-     */
-    private function normaliserPrefixes(array $prefixes): array
-    {
-        return collect($prefixes)
-            ->map(fn (string $prefixe): string => trim($prefixe))
-            ->filter(fn (string $prefixe): bool => $prefixe !== '')
-            ->unique()
-            ->values()
-            ->all();
     }
 }

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\DTOs\Compta\PosteTiersReglementData;
+use App\Enums\JournalComptable;
 use App\Enums\ModePaiement;
 use App\Enums\TypeTransaction;
 use App\Models\Compte;
@@ -293,4 +294,110 @@ it('produit un grand livre avec solde ouverture et solde progressif', function (
         ->and($compte411['lignes'][2]['date'])->toBe('2025-10-10')
         ->and($compte411['lignes'][2]['credit_centimes'])->toBe(3000)
         ->and($compte411['lignes'][2]['solde_progressif_centimes'])->toBe(15000);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Coupure des à-nouveaux : la pièce AN résume l'historique antérieur, elle ne
+// s'y ajoute pas. Sans coupure, l'ouverture d'un exercice suivant une clôture
+// comptait deux fois le solde de clôture (constat recette 5122, 2026-07-24).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Crée un mouvement bancaire simple (débit 512X) à la date donnée. */
+function creerMouvementBanque(object $contexte, string $date, string $montant, string $libelle): void
+{
+    $transaction = Transaction::query()->create([
+        'association_id' => (int) $contexte->association->id,
+        'type' => TypeTransaction::Recette,
+        'date' => $date,
+        'libelle' => $libelle,
+        'montant_total' => $montant,
+        'saisi_par' => (int) $contexte->user->id,
+    ]);
+
+    TransactionLigne::query()->create([
+        'transaction_id' => (int) $transaction->id,
+        'compte_id' => (int) $contexte->compte512X->id,
+        'debit' => $montant,
+        'credit' => '0.00',
+        'montant' => '0.00',
+        'libelle' => $libelle,
+    ]);
+}
+
+/** Crée une pièce AN (journal des à-nouveaux) portant un débit 512X. */
+function creerPieceANouveau(object $contexte, string $date, string $montant): void
+{
+    $transaction = Transaction::query()->create([
+        'association_id' => (int) $contexte->association->id,
+        'type' => TypeTransaction::AN,
+        'date' => $date,
+        'libelle' => 'À-nouveaux',
+        'montant_total' => $montant,
+        'saisi_par' => (int) $contexte->user->id,
+        'journal' => JournalComptable::AN,
+    ]);
+
+    TransactionLigne::query()->create([
+        'transaction_id' => (int) $transaction->id,
+        'compte_id' => (int) $contexte->compte512X->id,
+        'debit' => $montant,
+        'credit' => '0.00',
+        'montant' => '0.00',
+        'libelle' => 'AN banque',
+    ]);
+}
+
+it('n additionne pas l historique et la pièce AN dans l ouverture', function (): void {
+    creerMouvementBanque($this, '2025-10-01', '500.00', 'Encaissement exercice N');
+    creerPieceANouveau($this, '2026-09-01', '500.00');
+
+    $balance = app(BalanceComptableBuilder::class)
+        ->balance('2026-09-01', '2027-08-31', ['512']);
+    $ligne = collect($balance['lignes'])
+        ->firstWhere('compte_id', (int) $this->compte512X->id);
+
+    expect($ligne['ouverture_debit_centimes'])->toBe(50000)
+        ->and($ligne['mouvement_debit_centimes'])->toBe(0)
+        ->and($ligne['solde_fin_debit_centimes'])->toBe(50000);
+
+    $grandLivre = app(GrandLivreBuilder::class)
+        ->grandLivre('2026-09-01', '2027-08-31', ['512']);
+    $compte = collect($grandLivre['comptes'])
+        ->firstWhere('compte_id', (int) $this->compte512X->id);
+
+    expect($compte['solde_ouverture_centimes'])->toBe(50000)
+        ->and($compte['solde_fin_centimes'])->toBe(50000);
+});
+
+it('ignore les exercices antérieurs à la dernière pièce AN', function (): void {
+    // Deux clôtures successives : seule la plus récente doit porter l'ouverture.
+    creerMouvementBanque($this, '2024-10-01', '300.00', 'Exercice N-2');
+    creerPieceANouveau($this, '2025-09-01', '300.00');
+    creerMouvementBanque($this, '2025-10-01', '200.00', 'Exercice N-1');
+    creerPieceANouveau($this, '2026-09-01', '500.00');
+
+    $balance = app(BalanceComptableBuilder::class)
+        ->balance('2026-09-01', '2027-08-31', ['512']);
+    $ligne = collect($balance['lignes'])
+        ->firstWhere('compte_id', (int) $this->compte512X->id);
+
+    expect($ligne['ouverture_debit_centimes'])->toBe(50000)
+        ->and($ligne['solde_fin_debit_centimes'])->toBe(50000);
+});
+
+it('compte les mouvements postérieurs à l AN quand la période démarre en cours d exercice', function (): void {
+    creerMouvementBanque($this, '2025-10-01', '500.00', 'Exercice N');
+    creerPieceANouveau($this, '2026-09-01', '500.00');
+    creerMouvementBanque($this, '2026-09-20', '100.00', 'Début exercice N+1');
+    creerMouvementBanque($this, '2026-11-05', '40.00', 'Dans la période');
+
+    // Période démarrant après l'AN : l'ouverture = AN + mouvements intercalaires.
+    $balance = app(BalanceComptableBuilder::class)
+        ->balance('2026-10-15', '2027-08-31', ['512']);
+    $ligne = collect($balance['lignes'])
+        ->firstWhere('compte_id', (int) $this->compte512X->id);
+
+    expect($ligne['ouverture_debit_centimes'])->toBe(60000)
+        ->and($ligne['mouvement_debit_centimes'])->toBe(4000)
+        ->and($ligne['solde_fin_debit_centimes'])->toBe(64000);
 });
