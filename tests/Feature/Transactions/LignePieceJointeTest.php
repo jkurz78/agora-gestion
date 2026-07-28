@@ -9,7 +9,6 @@ use App\Models\CompteBancaire;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
-use App\Services\Compta\Migrations\BancairesSeeder;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Tenant\TenantContext;
 use Illuminate\Http\UploadedFile;
@@ -29,7 +28,17 @@ beforeEach(function () {
     $this->compteBancaire = CompteBancaire::factory()->create([
         'association_id' => $this->association->id,
     ]);
-    BancairesSeeder::seed();
+    Compte::create([
+        'association_id' => $this->association->id,
+        'numero_pcg' => '512_TEST_PJ_'.$this->compteBancaire->id,
+        'intitule' => 'Banque PJ lignes',
+        'classe' => 5,
+        'actif' => true,
+        'est_systeme' => true,
+        'pour_inscriptions' => false,
+        'lettrable' => false,
+        'compte_bancaire_id' => $this->compteBancaire->id,
+    ]);
 
     $this->tiers = Tiers::factory()->create([
         'association_id' => $this->association->id,
