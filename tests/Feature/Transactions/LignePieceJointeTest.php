@@ -45,10 +45,10 @@ beforeEach(function () {
         'association_id' => $this->association->id,
     ]);
 
-    // Mode de paiement figé : la factory en tire un au hasard, et « espèces »
-    // exige le compte 530 que SystemeSeeder ne crée que si une transaction en
-    // espèces existe déjà — ici le seeder tourne avant. Le sujet de ce fichier
-    // étant les pièces jointes, on fixe le virement (compte 512 créé ci-dessus).
+    // Mode de paiement figé : la factory en tire un au hasard, ce qui ferait
+    // varier le compte de trésorerie porté par l'écriture d'un run à l'autre.
+    // Le sujet de ce fichier étant les pièces jointes, on fixe le virement
+    // (compte 512 créé ci-dessus).
     $this->tx = Transaction::factory()->asDepense()->create([
         'association_id' => $this->association->id,
         'date' => '2025-10-01',

@@ -10,17 +10,17 @@ use Illuminate\Support\Facades\DB;
  * Seed helper for Step 5 of plans/fondations-partie-double-slice1.md.
  *
  * Inserts the four system accounts (411, 401, 5112, 530) into `comptes` for
- * every tenant. 530 (Caisse — espèces) is conditional: it is only inserted when
- * the tenant has at least one non-deleted transaction with mode_paiement='especes'.
+ * every tenant.
  *
  * Design decisions baked into this class:
  *
- *  - Unconditional accounts (411, 401, 5112): one cross-tenant INSERT … SELECT FROM
- *    associations is issued per account.
+ *  - One cross-tenant INSERT … SELECT FROM associations is issued per account.
  *
- *  - Conditional account (530): the EXISTS sub-query reads from `transactions`
- *    filtered by association_id, mode_paiement='especes', AND deleted_at IS NULL —
- *    exactly as specified in the plan (§ "Critère 530 — décision actée").
+ *  - 530 (Caisse — espèces) used to be conditional on the tenant already having a
+ *    live transaction with mode_paiement='especes' (plan § "Critère 530"). That
+ *    made the account's existence depend on ordering: a transaction switched to
+ *    espèces after the seed had run found no 530 and CompteTresorerieResolver
+ *    threw. The account is now seeded like the others.
  *
  *  - Idempotence: MySQL uses INSERT IGNORE; SQLite uses INSERT OR IGNORE.
  *    Both skip rows that would violate the UNIQUE (association_id, numero_pcg)
@@ -97,68 +97,6 @@ final class SystemeSeeder
     }
 
     /**
-     * Returns the INSERT … SELECT SQL for the conditional 530 (Caisse — espèces).
-     *
-     * Only inserts for associations that satisfy:
-     *   EXISTS (SELECT 1 FROM transactions t
-     *           WHERE t.association_id = associations.id
-     *             AND t.mode_paiement = 'especes'
-     *             AND t.deleted_at IS NULL)
-     *
-     * This is the exact contract from the plan's "Critère 530 — décision actée".
-     */
-    public static function conditionalCaisseSql(): string
-    {
-        $isSqlite = DB::getDriverName() === 'sqlite';
-        $insertClause = $isSqlite ? 'INSERT OR IGNORE' : 'INSERT IGNORE';
-
-        return <<<SQL
-            {$insertClause} INTO comptes (
-                association_id,
-                numero_pcg,
-                intitule,
-                classe,
-                parent_compte_id,
-                actif,
-                est_systeme,
-                pour_inscriptions,
-                lettrable,
-                iban,
-                bic,
-                domiciliation,
-                solde_initial,
-                date_solde_initial,
-                created_at,
-                updated_at
-            )
-            SELECT
-                a.id,
-                '530',
-                'Caisse (espèces)',
-                5,
-                NULL,
-                1,
-                1,
-                0,
-                1,
-                NULL,
-                NULL,
-                NULL,
-                NULL,
-                NULL,
-                CURRENT_TIMESTAMP,
-                CURRENT_TIMESTAMP
-            FROM association a
-            WHERE EXISTS (
-                SELECT 1 FROM transactions t
-                WHERE t.association_id = a.id
-                  AND t.mode_paiement = 'especes'
-                  AND t.deleted_at IS NULL
-            )
-            SQL;
-    }
-
-    /**
      * Executes all seed statements.
      *
      * Called by the migration's up() and by the test suite's replaySystemeSeed()
@@ -187,8 +125,8 @@ final class SystemeSeeder
         // Unconditional: 5112 Chèques à encaisser (classe 5)
         DB::statement(self::unconditionalSql('5112', 'Chèques à encaisser', 5));
 
-        // Conditional: 530 Caisse (espèces) — only for tenants with live espèces transactions
-        DB::statement(self::conditionalCaisseSql());
+        // Unconditional: 530 Caisse (espèces) (classe 5)
+        DB::statement(self::unconditionalSql('530', 'Caisse (espèces)', 5));
 
         // Unconditional: 486 Charges constatées d'avance (classe 4, provisions — non lettrable)
         DB::statement(self::unconditionalSql('486', 'Charges constatées d\'avance', 4, false));

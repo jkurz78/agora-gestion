@@ -20,11 +20,12 @@ use Illuminate\Support\Facades\DB;
  *  | 411        | Clients              | 4      | Always                |
  *  | 401        | Fournisseurs         | 4      | Always                |
  *  | 5112       | Chèques à encaisser  | 5      | Always                |
- *  | 530        | Caisse (espèces)     | 5      | Tenant uses espèces   |
+ *  | 530        | Caisse (espèces)     | 5      | Always                |
  *
- * The 530 condition (decision actée in the plan):
- *   EXISTS (SELECT 1 FROM transactions t WHERE t.association_id = associations.id
- *           AND t.mode_paiement = 'especes' AND t.deleted_at IS NULL)
+ * 530 was originally conditional on the tenant already having a live espèces
+ * transaction; it is now seeded unconditionally like the others (voir
+ * 2026_07_28_000001_add_compte_530_system pour le rattrapage des tenants
+ * migrés sous l'ancien contrat).
  *
  * All rows are seeded with:
  *   est_systeme = TRUE, lettrable = TRUE, categorie_id = NULL,

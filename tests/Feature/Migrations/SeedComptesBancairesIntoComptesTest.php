@@ -512,13 +512,13 @@ it('down() removes all bank sous-comptes including 5-digit numero_pcg (10+ banks
         ->where('numero_pcg', 'LIKE', '512_%')
         ->delete();
 
-    // 5. All 11 bank sous-comptes are gone; the 5112 system compte remains
+    // 5. All 11 bank sous-comptes are gone; the 5112 / 530 system comptes remain
     $remaining = DB::table('comptes')
         ->where('association_id', $association->id)
         ->where('classe', 5)
         ->pluck('numero_pcg')
         ->all();
 
-    expect($remaining)->toHaveCount(1);
-    expect($remaining[0])->toBe('5112');
+    expect($remaining)->toHaveCount(2);
+    expect($remaining)->toContain('5112')->toContain('530');
 });

@@ -17,7 +17,7 @@ use App\Services\Compta\Migrations\SystemeSeeder;
  *  - `DatabaseSeeder` l'appelle après avoir créé association / comptes bancaires
  *    et plan comptable.
  *  - Le wizard d'onboarding l'appelle à la finalisation → tout nouveau tenant
- *    obtient ses comptes système (411/401/5112) et bancaires (512X).
+ *    obtient ses comptes système (411/401/5112/530) et bancaires (512X).
  *
  * Chaque seed est idempotent (INSERT IGNORE / NOT EXISTS) : un rejeu est un
  * no-op pour les comptes déjà présents.
@@ -29,7 +29,7 @@ final class ComptesProvisioningService
         // Comptes bancaires physiques (512X) depuis comptes_bancaires.
         BancairesSeeder::seed();
 
-        // Comptes système (411/401/5112 + 530 conditionnel).
+        // Comptes système (411/401/5112/530).
         SystemeSeeder::seed();
     }
 }

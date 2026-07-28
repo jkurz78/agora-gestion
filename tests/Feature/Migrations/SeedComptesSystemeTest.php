@@ -10,8 +10,12 @@ use Illuminate\Support\Facades\DB;
  * Step 5 of plans/fondations-partie-double-slice1.md (sous-slice 1a).
  *
  * Verifies that the SystemeSeeder inserts the system accounts 411, 401, 5112
- * (unconditionally per tenant) and 530 (conditionally — only when the tenant
- * has at least one non-deleted transaction with mode_paiement='especes').
+ * and 530 unconditionally, for every tenant.
+ *
+ * 530 (Caisse — espèces) used to be conditional on the tenant already having a
+ * non-deleted transaction with mode_paiement='especes'. That made the account's
+ * existence depend on seeding order: a transaction created in espèces *after*
+ * the seed had run found no 530, and CompteTresorerieResolver threw.
  *
  * The seeder logic is extracted from the migration so it can be exercised here
  * without re-running the migration. Same pattern as AuditGuard / BancairesSeeder.
@@ -23,14 +27,14 @@ function replaySystemeSeed(): void
     SystemeSeeder::seed();
 }
 
-it('creates 411, 401, 5112 for every tenant (2 tenants)', function () {
+it('creates 411, 401, 5112, 530 for every tenant (2 tenants)', function () {
     $assoA = Association::firstOrFail();
     $assoB = Association::factory()->create();
 
     replaySystemeSeed();
 
     foreach ([$assoA, $assoB] as $asso) {
-        foreach (['411', '401', '5112'] as $numero) {
+        foreach (['411', '401', '5112', '530'] as $numero) {
             $compte = DB::table('comptes')
                 ->where('association_id', $asso->id)
                 ->where('numero_pcg', $numero)
@@ -43,7 +47,7 @@ it('creates 411, 401, 5112 for every tenant (2 tenants)', function () {
     }
 });
 
-it('does not create 530 when tenant has no espèces transactions', function () {
+it('creates 530 even when tenant has no espèces transaction yet', function () {
     $association = Association::firstOrFail();
 
     // Insert a virement transaction only — no espèces
@@ -65,7 +69,9 @@ it('does not create 530 when tenant has no espèces transactions', function () {
         ->where('numero_pcg', '530')
         ->first();
 
-    expect($compte)->toBeNull('Compte 530 should NOT be created when no espèces transactions exist');
+    expect($compte)->not->toBeNull(
+        'Compte 530 must exist up front: an espèces transaction can be created after the seed has run'
+    );
 });
 
 it('creates 530 when tenant has at least one non-deleted espèces transaction', function () {
@@ -92,19 +98,10 @@ it('creates 530 when tenant has at least one non-deleted espèces transaction', 
     expect($compte)->not->toBeNull('Compte 530 should be created when tenant has a non-deleted espèces transaction');
 });
 
-it('does not create 530 when only soft-deleted espèces transactions exist', function () {
-    $association = Association::firstOrFail();
+it('creates 530 for a tenant that has no transaction at all', function () {
+    $association = Association::factory()->create();
 
-    DB::table('transactions')->insert([
-        'association_id' => $association->id,
-        'type' => 'recette',
-        'date' => '2025-10-01',
-        'montant_total' => '50.00',
-        'mode_paiement' => 'especes',
-        'deleted_at' => now(), // soft-deleted
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    expect(DB::table('transactions')->where('association_id', $association->id)->count())->toBe(0);
 
     replaySystemeSeed();
 
@@ -113,67 +110,11 @@ it('does not create 530 when only soft-deleted espèces transactions exist', fun
         ->where('numero_pcg', '530')
         ->first();
 
-    expect($compte)->toBeNull('Compte 530 should NOT be created when only soft-deleted espèces transactions exist');
-});
-
-it('530 conditional is per-tenant (A has espèces → 530 ; B no espèces → no 530)', function () {
-    $assoA = Association::firstOrFail();
-    $assoB = Association::factory()->create();
-
-    // Tenant A: has a live espèces transaction
-    DB::table('transactions')->insert([
-        'association_id' => $assoA->id,
-        'type' => 'recette',
-        'date' => '2025-10-01',
-        'montant_total' => '50.00',
-        'mode_paiement' => 'especes',
-        'deleted_at' => null,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
-
-    // Tenant B: only a virement
-    DB::table('transactions')->insert([
-        'association_id' => $assoB->id,
-        'type' => 'recette',
-        'date' => '2025-10-01',
-        'montant_total' => '100.00',
-        'mode_paiement' => 'virement',
-        'deleted_at' => null,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
-
-    replaySystemeSeed();
-
-    $compte530A = DB::table('comptes')
-        ->where('association_id', $assoA->id)
-        ->where('numero_pcg', '530')
-        ->first();
-
-    $compte530B = DB::table('comptes')
-        ->where('association_id', $assoB->id)
-        ->where('numero_pcg', '530')
-        ->first();
-
-    expect($compte530A)->not->toBeNull('Tenant A with espèces should have compte 530');
-    expect($compte530B)->toBeNull('Tenant B without espèces should NOT have compte 530');
+    expect($compte)->not->toBeNull('Compte 530 must exist for a brand-new tenant');
 });
 
 it('system comptes have correct attributes (est_systeme, lettrable, actif, pour_inscriptions)', function () {
     $association = Association::firstOrFail();
-
-    // Add espèces transaction so 530 is created
-    DB::table('transactions')->insert([
-        'association_id' => $association->id,
-        'type' => 'recette',
-        'date' => '2025-10-01',
-        'montant_total' => '50.00',
-        'mode_paiement' => 'especes',
-        'deleted_at' => null,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
 
     replaySystemeSeed();
 
@@ -207,18 +148,6 @@ it('system comptes have correct attributes (est_systeme, lettrable, actif, pour_
 
 it('intituleds match spec (Clients / Fournisseurs / Chèques à encaisser / Caisse (espèces))', function () {
     $association = Association::firstOrFail();
-
-    // Add espèces transaction so 530 is created
-    DB::table('transactions')->insert([
-        'association_id' => $association->id,
-        'type' => 'recette',
-        'date' => '2025-10-01',
-        'montant_total' => '50.00',
-        'mode_paiement' => 'especes',
-        'deleted_at' => null,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
 
     replaySystemeSeed();
 

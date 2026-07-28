@@ -12,7 +12,6 @@ use App\Services\Compta\Migrations\BancairesSeeder;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Trait Pest pour établir le contexte partie double dans les tests Feature PD.
@@ -38,7 +37,7 @@ trait CreatesPartieDoubleContext
      *
      * - Crée une association + un user admin
      * - Boote TenantContext + session
-     * - Seed comptes système (411, 401, 5112) + force 530
+     * - Seed comptes système (411, 401, 5112, 530)
      * - Crée un CompteBancaire avec IBAN connu + Compte 512X via BancairesSeeder
      * - Crée les comptes de ventilation 706 et 606
      * - Active config('compta.use_partie_double') = true
@@ -56,20 +55,8 @@ trait CreatesPartieDoubleContext
         // Activer le mode partie double
         Config::set('compta.use_partie_double', true);
 
-        // Comptes système : 411, 401, 5112
+        // Comptes système : 411, 401, 5112, 530
         SystemeSeeder::seed();
-
-        // Forcer 530 (Caisse — espèces) : conditionnel dans SystemeSeeder
-        // (requis sans transaction espèces préexistante)
-        $tenantId = (int) TenantContext::currentId();
-        $isSqlite = DB::getDriverName() === 'sqlite';
-        $insertClause = $isSqlite ? 'INSERT OR IGNORE' : 'INSERT IGNORE';
-        DB::statement(<<<SQL
-            {$insertClause} INTO comptes
-                (association_id, numero_pcg, intitule, classe, actif, est_systeme, pour_inscriptions, lettrable, created_at, updated_at)
-            VALUES
-                ({$tenantId}, '530', 'Caisse (espèces)', 5, 1, 1, 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        SQL);
 
         // CompteBancaire + Compte 512X correspondant (BancairesSeeder copie l'IBAN)
         $this->iban = 'FR7612345000012345678901234';

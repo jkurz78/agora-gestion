@@ -48,12 +48,6 @@ function setupDumpTransactionContext(object $ctx): void
     Config::set('compta.use_partie_double', true);
 
     SystemeSeeder::seed();
-    Compte::factory()->numero('530')->create([
-        'association_id' => (int) $ctx->association->id,
-        'intitule' => 'Caisse (espèces)',
-        'est_systeme' => true,
-        'lettrable' => true,
-    ]);
 
     $ctx->iban = 'FR7612345000012345678901234';
     $ctx->compteBancaire = CompteBancaire::factory()->create([
