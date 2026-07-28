@@ -366,15 +366,25 @@ final class LettrageService
             throw new \RuntimeException("Impossible de réserver le code de lettrage du compte #{$compteId}.");
         }
 
-        $plusGrandIndexExistant = TransactionLigne::where('compte_id', $compteId)
-            ->whereNotNull('lettrage_code')
-            ->pluck('lettrage_code')
-            ->reduce(function (int $maximum, mixed $code): int {
-                $index = self::indexDepuisCode((string) $code);
+        $indexReserve = (int) $sequence->next_value;
 
-                return $index === null ? $maximum : max($maximum, $index);
-            }, -1);
-        $indexReserve = max((int) $sequence->next_value, $plusGrandIndexExistant + 1);
+        // Amorçage : tant que la séquence n'a jamais servi (next_value = 0), des
+        // codes peuvent déjà exister sur le compte (reprise de données, backfill).
+        // On les scanne une seule fois pour repartir au-dessus du plus haut ; une
+        // fois la séquence amorcée, elle fait autorité — sinon chaque lettrage
+        // relirait toutes les lignes lettrées du compte (coût linéaire croissant).
+        if ($indexReserve === 0) {
+            $plusGrandIndexExistant = TransactionLigne::where('compte_id', $compteId)
+                ->whereNotNull('lettrage_code')
+                ->pluck('lettrage_code')
+                ->reduce(function (int $maximum, mixed $code): int {
+                    $index = self::indexDepuisCode((string) $code);
+
+                    return $index === null ? $maximum : max($maximum, $index);
+                }, -1);
+
+            $indexReserve = $plusGrandIndexExistant + 1;
+        }
 
         if ($indexReserve >= 26 ** 4) {
             throw new \RuntimeException('La séquence de lettrage alphabétique est épuisée.');

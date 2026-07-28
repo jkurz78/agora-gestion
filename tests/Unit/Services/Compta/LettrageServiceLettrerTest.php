@@ -158,6 +158,112 @@ test('réserve séquentiellement les codes générés dans une séquence tenant 
             ->value('next_value'))->toBe(2);
 });
 
+test('amorce la séquence sur les codes déjà présents quand la ligne de séquence n’existe pas encore', function () {
+    // Cas reprise de données (clone prod, backfill) : des codes existent déjà sur
+    // le compte mais aucune ligne de séquence n'a jamais été écrite.
+    $compte = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '411-REPRISE',
+        'intitule' => 'Clients reprise',
+        'classe' => 4,
+        'lettrable' => true,
+        'actif' => true,
+        'est_systeme' => false,
+        'pour_inscriptions' => false,
+    ]);
+
+    $txExistante = Transaction::factory()->create(['association_id' => TenantContext::currentId()]);
+    foreach (['AAAA', 'AAAB'] as $codeExistant) {
+        TransactionLigne::create([
+            'transaction_id' => $txExistante->id,
+            'compte_id' => $compte->id,
+            'debit' => '10.00',
+            'credit' => '0.00',
+            'lettrage_code' => $codeExistant,
+            'montant' => 0,
+        ]);
+    }
+
+    expect(DB::table('lettrage_sequences')
+        ->where('compte_id', (int) $compte->id)
+        ->count())->toBe(0);
+
+    $tx = Transaction::factory()->create(['association_id' => TenantContext::currentId()]);
+    $debit = TransactionLigne::create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $compte->id,
+        'debit' => '40.00',
+        'credit' => '0.00',
+        'montant' => 0,
+    ]);
+    $credit = TransactionLigne::create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $compte->id,
+        'debit' => '0.00',
+        'credit' => '40.00',
+        'montant' => 0,
+    ]);
+
+    expect(app(LettrageService::class)->lettrer(collect([$debit, $credit])))->toBe('AAAC');
+});
+
+test('ne rescanne pas les codes du compte une fois la séquence amorcée', function () {
+    $compte = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '411-NORESCAN',
+        'intitule' => 'Clients sans rescan',
+        'classe' => 4,
+        'lettrable' => true,
+        'actif' => true,
+        'est_systeme' => false,
+        'pour_inscriptions' => false,
+    ]);
+
+    $service = app(LettrageService::class);
+
+    $lettrerUnePaire = function (string $montant) use ($compte, $service): string {
+        $tx = Transaction::factory()->create(['association_id' => TenantContext::currentId()]);
+        $debit = TransactionLigne::create([
+            'transaction_id' => $tx->id,
+            'compte_id' => $compte->id,
+            'debit' => $montant,
+            'credit' => '0.00',
+            'montant' => 0,
+        ]);
+        $credit = TransactionLigne::create([
+            'transaction_id' => $tx->id,
+            'compte_id' => $compte->id,
+            'debit' => '0.00',
+            'credit' => $montant,
+            'montant' => 0,
+        ]);
+
+        return $service->lettrer(collect([$debit, $credit]));
+    };
+
+    // 1er lettrage : la séquence est amorcée (next_value = 1).
+    expect($lettrerUnePaire('10.00'))->toBe('AAAA');
+
+    // Un code bien plus haut apparaît sur le compte sans passer par la séquence
+    // (import, lettrage manuel historique). La séquence, elle, reste à 1.
+    $txHorsSequence = Transaction::factory()->create(['association_id' => TenantContext::currentId()]);
+    TransactionLigne::create([
+        'transaction_id' => $txHorsSequence->id,
+        'compte_id' => $compte->id,
+        'debit' => '99.00',
+        'credit' => '0.00',
+        'lettrage_code' => 'AAZZ',
+        'montant' => 0,
+    ]);
+
+    // La séquence fait autorité : pas de re-scan du compte à chaque lettrage.
+    expect($lettrerUnePaire('20.00'))->toBe('AAAB')
+        ->and(DB::table('lettrage_sequences')
+            ->where('association_id', TenantContext::currentId())
+            ->where('compte_id', (int) $compte->id)
+            ->value('next_value'))->toBe(2);
+});
+
 // ---------------------------------------------------------------------------
 // Test 3 : compte non lettrable → CompteNonLettrableException, aucune écriture
 // ---------------------------------------------------------------------------
