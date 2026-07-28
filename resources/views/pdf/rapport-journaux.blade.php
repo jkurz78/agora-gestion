@@ -27,6 +27,9 @@
     .jx-zero { color: #adb5bd; }
     .text-end { text-align: right; }
     .text-center { text-align: center; }
+    /* Même raison qu'au grand livre : le n° de pièce (15 caractères) se repliait
+       sur deux lignes et doublait la hauteur de chaque en-tête de pièce. */
+    .jx-nowrap { white-space: nowrap; }
 @endsection
 
 @section('content')
@@ -51,8 +54,8 @@
         <table class="jx-table">
             <thead>
                 <tr>
-                    <th style="width:60px;">Date</th>
-                    <th style="width:85px;">Pièce</th>
+                    <th style="width:70px;" class="jx-nowrap">Date</th>
+                    <th style="width:105px;" class="jx-nowrap">Pièce</th>
                     <th>Compte / Libellé</th>
                     @if($afficherModeReglement)
                         <th style="width:70px;">Règlement</th>
@@ -65,8 +68,8 @@
             <tbody>
                 @foreach($bloc['pieces'] as $piece)
                     <tr class="jx-piece {{ $piece['equilibree'] ? '' : 'jx-desequilibre' }}">
-                        <td>{{ \Carbon\Carbon::parse($piece['date'])->format('d/m/Y') }}</td>
-                        <td>{{ $piece['numero_piece'] ?? $piece['reference'] ?? '—' }}</td>
+                        <td class="jx-nowrap">{{ \Carbon\Carbon::parse($piece['date'])->format('d/m/Y') }}</td>
+                        <td class="jx-nowrap">{{ $piece['numero_piece'] ?? $piece['reference'] ?? '—' }}</td>
                         <td>
                             {{ $piece['libelle'] }}
                             @unless($piece['equilibree'])

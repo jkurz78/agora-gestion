@@ -26,6 +26,10 @@
     .gl-zero { color: #adb5bd; }
     .text-end { text-align: right; }
     .text-center { text-align: center; }
+    /* Date, journal et n° de pièce tiennent sur une ligne : un repli sur deux
+       lignes doublait la hauteur de chaque écriture. Le n° fait 15 caractères
+       (2025-2026:00001), la référence de repli jusqu'à 23. */
+    .gl-nowrap { white-space: nowrap; }
 @endsection
 
 @section('content')
@@ -57,9 +61,9 @@
         <table class="gl-table">
             <thead>
                 <tr>
-                    <th style="width:60px;">Date</th>
-                    <th style="width:55px;">Journal</th>
-                    <th style="width:80px;">Pièce</th>
+                    <th style="width:70px;" class="gl-nowrap">Date</th>
+                    <th style="width:58px;" class="gl-nowrap">Journal</th>
+                    <th style="width:105px;" class="gl-nowrap">Pièce</th>
                     @if($afficherModeReglement)
                         <th style="width:70px;">Règlement</th>
                     @endif
@@ -79,9 +83,9 @@
 
                 @foreach($compte['lignes'] as $ligne)
                     <tr>
-                        <td>{{ \Carbon\Carbon::parse($ligne['date'])->format('d/m/Y') }}</td>
-                        <td>{{ $ligne['journal'] }}</td>
-                        <td>{{ $ligne['numero_piece'] ?? $ligne['reference'] ?? '—' }}</td>
+                        <td class="gl-nowrap">{{ \Carbon\Carbon::parse($ligne['date'])->format('d/m/Y') }}</td>
+                        <td class="gl-nowrap">{{ $ligne['journal'] }}</td>
+                        <td class="gl-nowrap">{{ $ligne['numero_piece'] ?? $ligne['reference'] ?? '—' }}</td>
                         @if($afficherModeReglement)
                             <td>{{ $ligne['mode_paiement'] ?? '—' }}</td>
                         @endif
