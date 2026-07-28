@@ -11,6 +11,7 @@
         .gl-opening td { background: #dce6f0; color: #1e3a5f; font-weight: 600; }
         .gl-tier { color: #6c757d; font-size: 12px; margin-top: 2px; }
         .gl-zero { color: #adb5bd; }
+        .gl-lettrage { font-family: monospace; font-size: 12px; background: #e7eef7; color: #1e3a5f; padding: 1px 5px; border-radius: 3px; }
     </style>
 
     <div class="card border-0 shadow-sm mb-3">
@@ -48,16 +49,30 @@
                 </div>
 
                 <div class="col-md-2 d-flex align-items-end">
-                    <div class="form-check mb-1">
-                        <input
-                            type="checkbox"
-                            class="form-check-input"
-                            id="grandLivreNonSoldes"
-                            wire:model.live="uniquementNonSoldes"
-                        >
-                        <label class="form-check-label gl-filter-label" for="grandLivreNonSoldes">
-                            Comptes non soldés
-                        </label>
+                    <div class="mb-1">
+                        <div class="form-check">
+                            <input
+                                type="checkbox"
+                                class="form-check-input"
+                                id="grandLivreNonSoldes"
+                                wire:model.live="uniquementNonSoldes"
+                            >
+                            <label class="form-check-label gl-filter-label" for="grandLivreNonSoldes">
+                                Comptes non soldés
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input
+                                type="checkbox"
+                                class="form-check-input"
+                                id="grandLivreNonLettrees"
+                                wire:model.live="uniquementNonLettrees"
+                            >
+                            <label class="form-check-label gl-filter-label" for="grandLivreNonLettrees"
+                                   title="N'affiche que les écritures non lettrées : le solde obtenu est la position restant ouverte">
+                                Écritures non lettrées
+                            </label>
+                        </div>
                     </div>
                 </div>
 
@@ -92,6 +107,7 @@
                                 <th style="width:120px;">Pièce</th>
                                 <th>Libellé</th>
                                 <th style="width:160px;">Tiers</th>
+                                <th class="text-center" style="width:80px;" title="Code de lettrage : relie une créance à son encaissement (ou une dette à son règlement)">Lettrage</th>
                                 <th class="text-end" style="width:115px;">Débit</th>
                                 <th class="text-end" style="width:115px;">Crédit</th>
                                 <th class="text-end" style="width:125px;">Solde</th>
@@ -99,7 +115,7 @@
                         </thead>
                         <tbody>
                             <tr class="gl-opening">
-                                <td colspan="7">Solde ouverture</td>
+                                <td colspan="8">Solde ouverture</td>
                                 <td class="text-end">{{ $this->formatCentimes((int) $compte['solde_ouverture_centimes']) }}</td>
                             </tr>
 
@@ -112,6 +128,13 @@
                                     <td>
                                         @if($ligne['tiers'] !== null)
                                             <div class="gl-tier">{{ $ligne['tiers'] }}</div>
+                                        @else
+                                            <span class="gl-zero">—</span>
+                                        @endif
+                                    </td>
+                                    <td class="text-center">
+                                        @if($ligne['lettrage_code'] !== null)
+                                            <span class="gl-lettrage">{{ $ligne['lettrage_code'] }}</span>
                                         @else
                                             <span class="gl-zero">—</span>
                                         @endif
@@ -132,7 +155,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8" class="text-center text-muted py-4">
+                                    <td colspan="9" class="text-center text-muted py-4">
                                         Aucun mouvement sur la période.
                                     </td>
                                 </tr>
@@ -140,7 +163,7 @@
                         </tbody>
                         <tfoot>
                             <tr class="gl-total">
-                                <td colspan="5">TOTAL MOUVEMENTS</td>
+                                <td colspan="6">TOTAL MOUVEMENTS</td>
                                 <td class="text-end">{{ $this->formatCentimes((int) $compte['mouvement_debit_centimes']) }}</td>
                                 <td class="text-end">{{ $this->formatCentimes((int) $compte['mouvement_credit_centimes']) }}</td>
                                 <td class="text-end">{{ $this->formatCentimes((int) $compte['solde_fin_centimes']) }}</td>

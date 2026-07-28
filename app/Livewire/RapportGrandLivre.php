@@ -24,6 +24,10 @@ final class RapportGrandLivre extends Component
     #[Url(as: 'non_soldes')]
     public bool $uniquementNonSoldes = false;
 
+    /** N'affiche que les écritures non lettrées : la position ouverte du compte. */
+    #[Url(as: 'non_lettrees')]
+    public bool $uniquementNonLettrees = false;
+
     public function mount(ExerciceService $exerciceService): void
     {
         $range = $exerciceService->dateRange($exerciceService->current());
@@ -69,6 +73,7 @@ final class RapportGrandLivre extends Component
                 $this->dateFin,
                 $this->prefixesComptes(),
                 $this->uniquementNonSoldes,
+                $this->uniquementNonLettrees,
             ),
         ]);
     }

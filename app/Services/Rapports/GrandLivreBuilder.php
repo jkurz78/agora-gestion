@@ -20,13 +20,19 @@ final class GrandLivreBuilder
      * @param  bool  $uniquementNonSoldes  N'affiche que les comptes (et tiers
      *                                     auxiliaires) dont le solde de fin
      *                                     n'est pas nul.
-     * @return array{date_debut: string, date_fin: string, prefixes_comptes: array<int, string>, uniquement_non_soldes: bool, comptes: list<array<string, mixed>>}
+     * @param  bool  $uniquementNonLettrees  Écarte les écritures lettrées, à
+     *                                       l'ouverture comme en mouvement : ce
+     *                                       qui reste est la position ouverte
+     *                                       du compte (créances non encaissées,
+     *                                       dettes non réglées).
+     * @return array{date_debut: string, date_fin: string, prefixes_comptes: array<int, string>, uniquement_non_soldes: bool, uniquement_non_lettrees: bool, comptes: list<array<string, mixed>>}
      */
     public function grandLivre(
         string $dateDebut,
         string $dateFin,
         array $prefixesComptes = [],
         bool $uniquementNonSoldes = false,
+        bool $uniquementNonLettrees = false,
     ): array {
         $debut = CarbonImmutable::parse($dateDebut)->startOfDay();
         $fin = CarbonImmutable::parse($dateFin)->startOfDay();
@@ -40,6 +46,13 @@ final class GrandLivreBuilder
             $transaction = $ligne->transaction;
             $compte = $ligne->compte;
             if ($transaction === null || $compte === null) {
+                continue;
+            }
+
+            // Écarté dès la source : la ligne lettrée ne pèse alors ni sur
+            // l'ouverture ni sur les mouvements, et le solde affiché vaut la
+            // position ouverte du compte.
+            if ($uniquementNonLettrees && $ligne->lettrage_code !== null) {
                 continue;
             }
 
@@ -76,6 +89,7 @@ final class GrandLivreBuilder
             'date_fin' => $fin->toDateString(),
             'prefixes_comptes' => $prefixes,
             'uniquement_non_soldes' => $uniquementNonSoldes,
+            'uniquement_non_lettrees' => $uniquementNonLettrees,
             'comptes' => $comptesFinalises,
         ];
     }

@@ -593,3 +593,61 @@ it('détaille toujours le grand livre par tiers, quel que soit le mode de la bal
 
     expect($grandLivre['comptes'])->toHaveCount(2);
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Filtre « écritures non lettrées » : la position restant ouverte sur le compte.
+// Le lettrage est écarté à l'ouverture comme en mouvement, de sorte que le solde
+// affiché vaille exactement ce qui reste dû.
+// ─────────────────────────────────────────────────────────────────────────────
+
+it('n affiche que les écritures non lettrées et en déduit la position ouverte', function (): void {
+    $tiers = Tiers::factory()->create([
+        'association_id' => (int) $this->association->id,
+        'nom' => 'Client Lettrage',
+    ]);
+
+    // Créance réglée → les deux lignes 411 seront lettrées entre elles.
+    $t1Reglee = $this->ecritures->pourRecetteACredit(
+        tiers: $tiers,
+        ventilations: [['compte' => $this->compte706, 'montant' => MontantDecimal::depuisCentimes(5000)]],
+        dateConstatation: new DateTimeImmutable('2025-10-01'),
+        libelle: 'Créance réglée',
+    );
+
+    // Créance laissée ouverte.
+    $this->ecritures->pourRecetteACredit(
+        tiers: $tiers,
+        ventilations: [['compte' => $this->compte706, 'montant' => MontantDecimal::depuisCentimes(7000)]],
+        dateConstatation: new DateTimeImmutable('2025-10-02'),
+        libelle: 'Créance ouverte',
+    );
+
+    $poste = app(PostesTiersOuvertsService::class)->pourTransaction($t1Reglee, 2025);
+    $this->reglements->regler(new PosteTiersReglementData(
+        ligneId: (int) $poste?->ligneActionId,
+        montantCentimes: 5000,
+        date: CarbonImmutable::parse('2025-10-05'),
+        mode: ModePaiement::Virement,
+        compteBancaireId: (int) $this->compteBancaire->id,
+        exercice: 2025,
+    ));
+
+    $builder = app(GrandLivreBuilder::class);
+
+    // Sans filtre : la créance réglée et son encaissement figurent au grand livre.
+    $complet = $builder->grandLivre('2025-09-01', '2026-08-31', ['411']);
+    $compteComplet = $complet['comptes'][0];
+    expect($complet['uniquement_non_lettrees'])->toBeFalse()
+        ->and($compteComplet['solde_fin_centimes'])->toBe(7000)
+        ->and(collect($compteComplet['lignes'])->whereNotNull('lettrage_code'))->not->toBeEmpty();
+
+    // Avec filtre : seule la créance ouverte subsiste, et le solde vaut ce qui reste dû.
+    $ouvert = $builder->grandLivre('2025-09-01', '2026-08-31', ['411'], false, true);
+    $compteOuvert = $ouvert['comptes'][0];
+
+    expect($ouvert['uniquement_non_lettrees'])->toBeTrue()
+        ->and($compteOuvert['lignes'])->toHaveCount(1)
+        ->and($compteOuvert['lignes'][0]['libelle'])->toContain('ouverte')
+        ->and($compteOuvert['lignes'][0]['lettrage_code'])->toBeNull()
+        ->and($compteOuvert['solde_fin_centimes'])->toBe(7000);
+});
