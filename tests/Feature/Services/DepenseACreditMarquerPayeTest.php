@@ -214,7 +214,7 @@ it('[3b-2] marquerPaye crée T2 (401 D / 512X C, journal=Banque), lettre 401 T1�
 // [3b-3] Réversion (update mode null) → T2 supprimée, 401 T1 délettré
 // ---------------------------------------------------------------------------
 
-it('[3b-3] réversion paye→non-paye (mode null via update) supprime T2 et délettre le 401 de T1', function () {
+it('[3b-3] refuse la réversion directe d’une dépense réglée', function () {
     // Arrange : dépense + marquerPaye → T1+T2 avec 401 lettré
     ['data' => $data, 'lignes' => $lignes] = depenseNonPayeeData($this);
     $data['mode_paiement'] = ModePaiement::Virement->value; // d'abord payée (comptant)
@@ -254,51 +254,27 @@ it('[3b-3] réversion paye→non-paye (mode null via update) supprime T2 et dél
         'notes' => null,
     ]];
 
-    $this->service->update($t1, $updateData, $updateLignes);
+    expect(fn () => $this->service->update($t1, $updateData, $updateLignes))
+        ->toThrow(RuntimeException::class, 'mode de paiement');
 
-    // Assert : T2 supprimée → 1 seule transaction
-    expect(Transaction::count())->toBe(1, 'T2 doit être supprimée après réversion');
-
-    // Assert : 401 de T1 délettré
-    $t1->refresh();
-    $ligne401C_T1_apres = TransactionLigne::where('transaction_id', $t1->id)
-        ->where('compte_id', $compte401->id)
-        ->first();
-    expect($ligne401C_T1_apres)->not()->toBeNull('La ligne 401 de T1 doit encore exister');
-    expect($ligne401C_T1_apres->lettrage_code)->toBeNull('Le 401 de T1 doit être délettré après réversion');
-
-    // Note : statut_reglement reste Recu (staleness connue — chantier 4)
-    // On constate sans bloquer.
+    expect(Transaction::count())->toBe(2);
+    expect($ligne401C_T1->fresh()->lettrage_code)->not->toBeNull();
 });
 
 // ---------------------------------------------------------------------------
 // [3b-4] Livewire : bouton "Marquer payé" visible + appel marquerPaye
 // ---------------------------------------------------------------------------
 
-it('[3b-4] TransactionUniverselle affiche bouton Marquer payé pour dépense en attente et appelle marquerPaye', function () {
+it('[3b-4] TransactionUniverselle ouvre le règlement de poste tiers pour une dépense en attente', function () {
     // Arrange : T1 dette ouverte avec ligne 401 non lettrée
     ['data' => $data, 'lignes' => $lignes] = depenseNonPayeeData($this);
     $t1 = $this->service->create($data, $lignes);
 
-    // Act : appel via Livewire (le bouton appelle marquerRecu qui dispatche une modale pour les dépenses)
-    // Pour une dépense en attente avec mode null : doit ouvrir la modale marquer-paye
+    // La liste délègue désormais au composant de règlement daté.
     $component = Livewire::test(TransactionUniverselle::class)
         ->call('marquerRecu', $t1->id);
 
-    // Assert : la modale doit s'ouvrir (payeTxId renseigné + event dispatché)
-    $component->assertDispatched('marquer-paye-modal-open');
-
-    // Act : confirmer depuis la modale
-    Livewire::test(TransactionUniverselle::class)
-        ->set('payeTxId', (int) $t1->id)
-        ->set('payeMode', ModePaiement::Virement->value)
-        ->set('payeCompteId', (int) $this->compteBancaire->id)
-        ->call('confirmerPaye');
-
-    // Assert : statut=Recu
-    $t1->refresh();
-    expect($t1->statut_reglement)->toBe(StatutReglement::Recu, 'statut_reglement doit être Recu après confirmerPaye');
-
-    // Assert : T2 générée
-    expect(Transaction::count())->toBe(2, 'T2 doit exister après confirmerPaye');
+    $component->assertDispatched('poste-tiers-reglement:ouvrir');
+    expect($t1->fresh()->statut_reglement)->toBe(StatutReglement::EnAttente)
+        ->and(Transaction::count())->toBe(1);
 });

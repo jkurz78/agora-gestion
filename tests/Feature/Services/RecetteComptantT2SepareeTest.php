@@ -133,7 +133,7 @@ it('[2a-1] recette comptant live produit T1 (Vente, 411D/7xxC) + T2 séparée (B
 // Scénario 2a-2 — Réversion : recette comptant passée en non reçue → T2 supprimée, 411 délettré
 // ---------------------------------------------------------------------------
 
-it('[2a-2] réversion (mode null) → T2 supprimée, 411 T1 délettré, T1 reste créance pure', function () {
+it('[2a-2] refuse la réversion directe d’une recette réglée', function () {
     $this->tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
 
     ['data' => $data, 'lignes' => $lignes] = recetteChequeLiveData($this);
@@ -171,7 +171,7 @@ it('[2a-2] réversion (mode null) → T2 supprimée, 411 T1 délettré, T1 reste
             'notes' => $l->notes,
         ])->values()->toArray();
 
-    $this->service->update($t1, [
+    expect(fn () => $this->service->update($t1, [
         'type' => TypeTransaction::Recette->value,
         'date' => '2025-10-15',
         'libelle' => 'Adhésion Jean Dupont',
@@ -179,18 +179,19 @@ it('[2a-2] réversion (mode null) → T2 supprimée, 411 T1 délettré, T1 reste
         'mode_paiement' => null,  // ← réversion vers créance
         'tiers_id' => $this->tiers->id,
         'compte_id' => null,
-    ], $lignesData);
+    ], $lignesData))
+        ->toThrow(RuntimeException::class, 'compte bancaire');
 
-    // T2 doit avoir disparu
+    // La T2 et le lettrage restent intacts jusqu'à une annulation explicite.
     $t2Apres = Transaction::find($t2Id);
-    expect($t2Apres)->toBeNull('T2 doit être supprimée après réversion');
+    expect($t2Apres)->not->toBeNull();
 
     // La ligne 411 de T1 doit être délettrée
     $ligne411T1Apres = TransactionLigne::where('transaction_id', $t1->id)
         ->where('compte_id', $compte411->id)
         ->first();
     expect($ligne411T1Apres)->not()->toBeNull('La ligne 411 de T1 doit toujours exister');
-    expect($ligne411T1Apres->lettrage_code)->toBeNull('La ligne 411 de T1 doit être délettrée après réversion');
+    expect($ligne411T1Apres->lettrage_code)->not->toBeNull();
 });
 
 // ---------------------------------------------------------------------------

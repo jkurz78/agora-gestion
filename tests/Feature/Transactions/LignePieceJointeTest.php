@@ -5,9 +5,12 @@ declare(strict_types=1);
 use App\Livewire\TransactionForm;
 use App\Models\Association;
 use App\Models\Compte;
+use App\Models\CompteBancaire;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\Compta\Migrations\BancairesSeeder;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Tenant\TenantContext;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -22,6 +25,11 @@ beforeEach(function () {
     TenantContext::boot($this->association);
     session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
+    SystemeSeeder::seed();
+    $this->compteBancaire = CompteBancaire::factory()->create([
+        'association_id' => $this->association->id,
+    ]);
+    BancairesSeeder::seed();
 
     $this->tiers = Tiers::factory()->create([
         'association_id' => $this->association->id,
@@ -31,6 +39,7 @@ beforeEach(function () {
         'association_id' => $this->association->id,
         'date' => '2025-10-01',
         'tiers_id' => $this->tiers->id,
+        'compte_id' => $this->compteBancaire->id,
     ]);
     // Prendre la première ligne créée par la factory
     $this->ligne = $this->tx->lignes()->first();
@@ -163,6 +172,7 @@ it('persiste la PJ de ligne lors du create', function () {
         ->set('date', '2025-10-01')
         ->set('libelle', 'Test create PJ ligne')
         ->set('mode_paiement', 'virement')
+        ->set('compte_id', $this->compteBancaire->id)
         ->set('tiers_id', $this->tiers->id)
         ->set('lignes.0.compte_id', (string) $compteVentilation->id)
         ->set('lignes.0.montant', '50')
@@ -193,6 +203,7 @@ it('remplace la PJ de ligne existante lors du update', function () {
 
     Livewire::test(TransactionForm::class)
         ->call('edit', $this->tx->id)
+        ->set('compte_id', $this->compteBancaire->id)
         ->set('lignes.0.piece_jointe_upload', $nouveauFichier)
         ->call('save')
         ->assertHasNoErrors();
@@ -215,6 +226,7 @@ it('supprime la PJ de ligne quand piece_jointe_remove est true', function () {
 
     Livewire::test(TransactionForm::class)
         ->call('edit', $this->tx->id)
+        ->set('compte_id', $this->compteBancaire->id)
         ->set('lignes.0.piece_jointe_remove', true)
         ->call('save')
         ->assertHasNoErrors();

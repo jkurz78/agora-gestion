@@ -243,7 +243,7 @@ it('marquerRecu sans mode sur une créance reste rétro-compatible (skip T2 sile
 // Réversion — éditer une recette reçue en « non reçu » supprime la T2
 // ============================================================
 
-it('éditer une recette reçue en « non reçu » supprime la T2 (pas de chèque fantôme en 5112)', function () {
+it('éditer une recette réglée conserve la T2 : son annulation passe par le flux dédié', function () {
     // 1. Créance
     Livewire::test(TransactionForm::class)
         ->call('showNewForm', 'recette')
@@ -282,21 +282,23 @@ it('éditer une recette reçue en « non reçu » supprime la T2 (pas de chèque
         ->call('save')
         ->assertHasNoErrors();
 
-    // 4. La T2 est supprimée (pas d'orphelin)
-    expect(Transaction::find($t2Id))->toBeNull();
+    // 4. Une T1 réglée est verrouillée : la T2 reste la source de vérité.
+    expect(Transaction::find($t2Id))->not->toBeNull();
 
-    // Aucune ligne 5112 ne subsiste pour ce tiers (chèque fantôme évité)
+    // Le portage reste sur la T2 (sans tiers en en-tête, conformément au FEC).
     $orphan5112 = TransactionLigne::whereHas('compte', fn ($q) => $q->where('numero_pcg', '5112'))
         ->whereHas('transaction', fn ($q) => $q->where('tiers_id', $this->tiers->id))
         ->exists();
     expect($orphan5112)->toBeFalse();
+    expect($t2->fresh()->lignes()->whereHas('compte', fn ($q) => $q->where('numero_pcg', '5112'))->exists())
+        ->toBeTrue();
 
-    // La transaction redevient une créance propre : mode null, 411 non lettré
+    // Le flux historique conserve son mode sur T1, mais son 411 demeure lettré vers la T2.
     $tx->refresh();
-    expect($tx->mode_paiement)->toBeNull();
+    expect($tx->mode_paiement)->toBe(ModePaiement::Cheque);
     $ligne411 = TransactionLigne::where('transaction_id', $tx->id)
         ->whereHas('compte', fn ($q) => $q->where('numero_pcg', '411'))
         ->first();
     expect($ligne411)->not->toBeNull();
-    expect($ligne411->lettrage_code)->toBeNull();
+    expect($ligne411->lettrage_code)->not->toBeNull();
 });

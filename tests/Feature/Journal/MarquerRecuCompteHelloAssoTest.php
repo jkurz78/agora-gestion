@@ -24,7 +24,7 @@ beforeEach(function () {
 // (tout en conservant la liste complète pour le filtre de colonnes via `comptes`).
 // ---------------------------------------------------------------------------
 
-it('[BugA] la modale marquer-recu n\'expose pas le compte HelloAsso (saisie_automatisee=true)', function () {
+it('[BugA] la liste ne rend plus la modale legacy marquer-recu', function () {
     // Compte normal : saisie manuelle autorisée (valeurs factory par défaut)
     $compteNormal = CompteBancaire::factory()->create([
         'association_id' => $this->association->id,
@@ -43,14 +43,9 @@ it('[BugA] la modale marquer-recu n\'expose pas le compte HelloAsso (saisie_auto
 
     $component = Livewire::test(TransactionUniverselle::class);
 
-    $comptesBancaires = $component->viewData('comptesBancaires');
-
-    $ids = $comptesBancaires->pluck('id')->map(fn ($id) => (int) $id)->toArray();
-
-    // Le compte normal doit être présent
-    expect($ids)->toContain((int) $compteNormal->id);
-
-    // RED avant fix : comptesBancaires contient le compte HelloAsso
-    // GREEN après fix : comptesBancaires ne contient PAS le compte HelloAsso
-    expect($ids)->not->toContain((int) $compteHelloAsso->id);
+    // Le choix du compte appartient désormais à PosteTiersReglementModal ; la
+    // liste ne maintient plus de liste parallèle de comptes pour l'ancienne modale.
+    expect($component->html())
+        ->not->toContain('marquer-recu-modal')
+        ->and((int) $compteNormal->id)->not->toBe((int) $compteHelloAsso->id);
 });

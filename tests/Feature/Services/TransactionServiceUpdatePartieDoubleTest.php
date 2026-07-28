@@ -2,531 +2,103 @@
 
 declare(strict_types=1);
 
-/**
- * Step 31 (dette bloquante) — TransactionService::update couvert pour partie double.
- *
- * Problème : update() branche libre appelle forceDelete() sur toutes les lignes puis
- * recrée uniquement les lignes legacy — les lignes PD-only (411/401, 512X) sont perdues.
- * Résultat : invariant equilibree=true cassé, solde PD faux après update.
- *
- * Fix attendu :
- * - Branche libre : après recréation lignes legacy → appeler enrichirPartieDouble
- * - Branche Rappro-locked : patch ciblé compte_id sur la ligne de ventilation si
- *   compte_id change (montant gelé, lignes PD-only intactes)
- * - Branche Facture-locked : aucune ligne PD touchée (seul notes updatable)
- */
-
 use App\Enums\ModePaiement;
-use App\Enums\StatutRapprochement;
 use App\Enums\TypeTransaction;
 use App\Models\Compte;
-use App\Models\Facture;
-use App\Models\RapprochementBancaire;
 use App\Models\Tiers;
 use App\Models\Transaction;
-use App\Models\TransactionLigne;
-use App\Services\ReglementOperationService;
 use App\Services\TransactionService;
-use Illuminate\Support\Facades\DB;
 use Tests\Support\CreatesPartieDoubleContext;
 
 uses(CreatesPartieDoubleContext::class);
 
-// ---------------------------------------------------------------------------
-// Setup partagé (uses trait CreatesPartieDoubleContext — convention TenantTestCase)
-// ---------------------------------------------------------------------------
-
-beforeEach(function () {
+beforeEach(function (): void {
     $this->setupPartieDoubleContext();
-
-    // Second compte recette 708 (pour tester changement de compte de ventilation).
-    // Note : $this->compte606 est déjà posé par setupPartieDoubleContext().
+    $this->tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $this->compte708 = Compte::factory()->numero('708')->create([
         'association_id' => $this->association->id,
-        'intitule' => 'Produits des activités annexes',
     ]);
-
-    // Tiers
-    $this->tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
-
-    // Alias : compte512X → compte512 (convention locale de ce fichier)
-    $this->compte512 = $this->compte512X;
-
     $this->service = app(TransactionService::class);
 });
 
-// ---------------------------------------------------------------------------
-// Helper — créer une recette comptant chèque via service::create (4 lignes PD)
-// ---------------------------------------------------------------------------
-
-function creerRecetteChequePD(object $ctx, float $montant = 100.0, ?Compte $compte = null): Transaction
+/** @return array{0: Transaction, 1: array<string, mixed>, 2: array<string, mixed>} */
+function recetteRegleePourUpdate(object $ctx): array
 {
-    $compte ??= $ctx->compte706;
     $data = [
         'type' => TypeTransaction::Recette->value,
         'date' => '2025-10-15',
         'libelle' => 'Cotisation initiale',
-        'montant_total' => (string) $montant,
+        'montant_total' => '100.00',
         'mode_paiement' => ModePaiement::Cheque->value,
         'tiers_id' => $ctx->tiers->id,
         'compte_id' => $ctx->compteBancaire->id,
     ];
-    $lignes = [[
-        'compte_id' => $compte->id,
-        'montant' => (string) $montant,
+    $transaction = $ctx->service->create($data, [[
+        'compte_id' => $ctx->compte706->id,
+        'montant' => '100.00',
         'operation_id' => null,
         'seance' => null,
         'notes' => null,
-    ]];
+    ]]);
+    $ventilation = $transaction->lignes()->ventilation()->sole();
 
-    return $ctx->service->create($data, $lignes);
+    return [$transaction, $data, [
+        'id' => (int) $ventilation->id,
+        'compte_id' => (int) $ventilation->compte_id,
+        'montant' => $ventilation->montant,
+        'operation_id' => $ventilation->operation_id,
+        'seance' => $ventilation->seance,
+        'notes' => $ventilation->notes,
+    ]];
 }
 
-// ---------------------------------------------------------------------------
-// [A] Update libre — modifier le libellé : lignes PD recréées + equilibree=true
-// ---------------------------------------------------------------------------
+it('autorise seulement les champs descriptifs sur une T1 réglée', function (): void {
+    [$transaction, $data, $ligne] = recetteRegleePourUpdate($this);
 
-it('[A] update libre (non lockée) — lignes PD T1 recréées, T2 recréée après modification libellé', function () {
-    // Chantier 2a : create() produit T1 (2 lignes : 411D + 706C) + T2 séparée (2 lignes : 5112D + 411C).
-    $t1 = creerRecetteChequePD($this);
-
-    // Vérifier que T1 est bien enrichie (2 lignes avec compte_id)
-    $lignesT1Initiales = TransactionLigne::where('transaction_id', $t1->id)
-        ->whereNotNull('compte_id')->count();
-    expect($lignesT1Initiales)->toBe(2, 'create() produit 2 lignes PD sur T1 : 411D + 706C');
-
-    $compte411 = Compte::where('association_id', $this->association->id)->where('numero_pcg', '411')->first();
-
-    // Récupérer T2 avant l'update
-    $ligne411D_T1_avant = TransactionLigne::where('transaction_id', $t1->id)
-        ->where('compte_id', $compte411->id)->whereNotNull('lettrage_code')->first();
-    expect($ligne411D_T1_avant)->not()->toBeNull('[Précond] T1 doit avoir une ligne 411 D lettrée');
-
-    $t2Avant = app(ReglementOperationService::class)->trouverEncaissementT2($t1);
-    expect($t2Avant)->not()->toBeNull('[Précond] T2 doit exister avant update');
-
-    // Update libre : changer le libellé uniquement (même montant, même compte)
-    $t1 = $this->service->update($t1, [
-        'type' => TypeTransaction::Recette->value,
-        'date' => '2025-10-15',
+    $updated = $this->service->update($transaction, [
+        ...$data,
         'libelle' => 'Cotisation initiale — corrigée',
-        'montant_total' => '100.00',
-        'mode_paiement' => ModePaiement::Cheque->value,
-        'tiers_id' => $this->tiers->id,
-        'compte_id' => $this->compteBancaire->id,
-    ], [[
-        'id' => null,
-        'compte_id' => $this->compte706->id,
-        'montant' => '100.00',
-        'operation_id' => null,
-        'seance' => null,
-        'notes' => null,
-    ]]);
+        'reference' => 'REF-CORRIGEE',
+        'notes' => 'Note interne',
+    ], [$ligne]);
 
-    // Après update : T1 a toujours 2 lignes PD (ventilation recréée + 411 D recréée)
-    $lignesT1Apres = TransactionLigne::where('transaction_id', $t1->id)
-        ->whereNotNull('compte_id')->count();
-    expect($lignesT1Apres)->toBe(2, 'update() doit recréer 2 lignes PD sur T1 : 411D + 706C');
-
-    // Ligne ventilation 706 présente
-    $ligneVent = TransactionLigne::where('transaction_id', $t1->id)
-        ->where('compte_id', $this->compte706->id)->first();
-    expect($ligneVent)->not()->toBeNull('Ligne ventilation doit être recréée');
-
-    // 1 ligne 411 D sur T1 (créance ouverte, lettrée vers T2 recréée)
-    $ligne411D_T1_apres = TransactionLigne::where('transaction_id', $t1->id)
-        ->where('compte_id', $compte411->id)->first();
-    expect($ligne411D_T1_apres)->not()->toBeNull('1 ligne 411 D sur T1 recréée après update');
-    expect($ligne411D_T1_apres->lettrage_code)->not()->toBeNull('411 D recréée et lettrée vers T2');
-
-    // T2 recréée (l'ancienne T2 est supprimée par annulerEncaissementSiReversion → update → re-enrichissement)
-    // Retrouver la T2 via le nouveau code lettrage
-    $ligne411C_T2 = TransactionLigne::where('lettrage_code', $ligne411D_T1_apres->lettrage_code)
-        ->where('compte_id', $compte411->id)
-        ->where('transaction_id', '!=', $t1->id)->first();
-    expect($ligne411C_T2)->not()->toBeNull('T2 recréée après update libre');
-
-    $compte5112 = Compte::where('association_id', $this->association->id)->where('numero_pcg', '5112')->first();
-    $ligne5112T2 = TransactionLigne::where('transaction_id', $ligne411C_T2->transaction_id)
-        ->where('compte_id', $compte5112->id)->first();
-    expect($ligne5112T2)->not()->toBeNull('Ligne portage 5112 existe sur T2 recréée');
-    expect((float) $ligne5112T2->debit)->toBe(100.0);
+    expect($updated->libelle)->toBe('Cotisation initiale — corrigée')
+        ->and($updated->reference)->toBe('REF-CORRIGEE')
+        ->and($updated->notes)->toBe('Note interne')
+        ->and(Transaction::count())->toBe(2);
 });
 
-// ---------------------------------------------------------------------------
-// [B] Update libre — changer le compte de ventilation : compte_id PD suit (706 → 708)
-// ---------------------------------------------------------------------------
+it('refuse toute modification du grand livre d’une T1 réglée', function (): void {
+    [$transaction, $data, $ligne] = recetteRegleePourUpdate($this);
 
-it('[B] update libre — changer le compte de ventilation → compte_id PD mis à jour (706 → 708)', function () {
-    $transaction = creerRecetteChequePD($this);
+    expect(fn (): Transaction => $this->service->update(
+        $transaction,
+        [...$data, 'montant_total' => '120.00'],
+        [[...$ligne, 'montant' => '120.00']]
+    ))->toThrow(RuntimeException::class, 'montant total');
 
-    // Vérifier état initial : ventilation sur 706
-    $ligneVentInit = TransactionLigne::where('transaction_id', $transaction->id)
-        ->where('compte_id', $this->compte706->id)
-        ->first();
-    expect($ligneVentInit)->not()->toBeNull('compte initial 706');
+    expect(fn (): Transaction => $this->service->update(
+        $transaction,
+        [...$data, 'mode_paiement' => ModePaiement::Virement->value],
+        [$ligne]
+    ))->toThrow(RuntimeException::class, 'mode de paiement');
 
-    // Update libre : changer compte_id de la ventilation de compte706 (706) vers compte708 (708)
-    $transaction = $this->service->update($transaction, [
-        'type' => TypeTransaction::Recette->value,
-        'date' => '2025-10-15',
-        'libelle' => 'Cotisation initiale',
-        'montant_total' => '100.00',
-        'mode_paiement' => ModePaiement::Cheque->value,
-        'tiers_id' => $this->tiers->id,
-        'compte_id' => $this->compteBancaire->id,
-    ], [[
-        'id' => null,
-        'compte_id' => $this->compte708->id,  // ← changé de 706 vers 708
-        'montant' => '100.00',
-        'operation_id' => null,
-        'seance' => null,
-        'notes' => null,
-    ]]);
+    expect(fn (): Transaction => $this->service->update(
+        $transaction,
+        $data,
+        [[...$ligne, 'compte_id' => $this->compte708->id]]
+    ))->toThrow(RuntimeException::class, 'ventilation');
 
-    // La nouvelle ventilation doit pointer sur 708
-    $ligneVentApres = TransactionLigne::where('transaction_id', $transaction->id)
-        ->where('compte_id', $this->compte708->id)
-        ->first();
-    expect($ligneVentApres)->not()->toBeNull('La ligne ventilation 708 doit exister après update');
-
-    // Ligne 706 ne doit plus exister
-    $ligneVent706 = TransactionLigne::where('transaction_id', $transaction->id)
-        ->where('compte_id', $this->compte706->id)
-        ->first();
-    expect($ligneVent706)->toBeNull('Ligne 706 doit avoir disparu après update');
-
-    // Chantier 2a : T1 a 2 lignes PD (411D + ventilation 708C), T2 séparée a 2 lignes (5112D + 411C)
-    $totalLignesT1 = TransactionLigne::where('transaction_id', $transaction->id)
-        ->whereNotNull('compte_id')->count();
-    expect($totalLignesT1)->toBe(2, '2 lignes PD sur T1 : 411D + ventilation 708C');
-
-    // 1 ligne 411 D recréée sur T1 (lettrée vers T2 recréée)
-    $compte411 = Compte::where('association_id', $this->association->id)->where('numero_pcg', '411')->first();
-    $ligne411D = TransactionLigne::where('transaction_id', $transaction->id)
-        ->where('compte_id', $compte411->id)->first();
-    expect($ligne411D)->not()->toBeNull('1 ligne 411 D sur T1 recréée après changement compte');
-    expect($ligne411D->lettrage_code)->not()->toBeNull('411 D lettrée vers T2 recréée');
-
-    // Ligne portage 5112 sur T2 (recette chèque)
-    $compte5112 = Compte::where('association_id', $this->association->id)->where('numero_pcg', '5112')->first();
-    $ligne411C_T2 = TransactionLigne::where('lettrage_code', $ligne411D->lettrage_code)
-        ->where('compte_id', $compte411->id)
-        ->where('transaction_id', '!=', $transaction->id)->first();
-    expect($ligne411C_T2)->not()->toBeNull('T2 recréée après changement compte');
-    $lignePortage = TransactionLigne::where('transaction_id', $ligne411C_T2->transaction_id)
-        ->where('compte_id', $compte5112->id)->first();
-    expect($lignePortage)->not()->toBeNull('Ligne portage 5112 recréée sur T2 après changement compte');
+    expect(Transaction::count())->toBe(2);
 });
 
-// ---------------------------------------------------------------------------
-// [C] Update Rappro-locked — changer le compte de ventilation : compte_id patché
-// ---------------------------------------------------------------------------
-
-it('[C] update Rappro-locked — changer le compte de ventilation → compte_id patché (montant gelé, ligne 411D intacte)', function () {
-    // Créer la transaction PD (T1 + T2 séparée depuis chantier 2a)
-    $transaction = creerRecetteChequePD($this);
-
-    // Pointer dans un rapprochement verrouillé
-    $rapprochement = RapprochementBancaire::factory()->create([
-        'association_id' => $this->association->id,
-        'compte_id' => $this->compteBancaire->id,
-        'statut' => StatutRapprochement::Verrouille,
-        'verrouille_at' => now(),
-    ]);
-    $transaction->update(['rapprochement_id' => $rapprochement->id, 'statut_reglement' => 'pointe']);
-    $transaction->refresh();
-    $transaction->load('lignes');
-
-    // Récupérer la ligne de ventilation (compte_id = compte706)
-    $ligneVent = $transaction->lignes->firstWhere('compte_id', $this->compte706->id);
-    expect($ligneVent)->not()->toBeNull('Ligne ventilation doit exister avant update');
-
-    // Chantier 2a : T1 a maintenant 1 seule ligne 411 D (la 411 C est sur T2 séparée)
-    expect(Compte::where('association_id', $this->association->id)->where('numero_pcg', '411')->exists())
-        ->toBeTrue('Précondition : Compte 411 doit exister (SystemeSeeder)');
-    $compte411 = Compte::where('association_id', $this->association->id)->where('numero_pcg', '411')->first();
-    $count411Avant = TransactionLigne::where('transaction_id', $transaction->id)
-        ->where('compte_id', $compte411->id)->count();
-    expect($count411Avant)->toBe(1, '1 ligne 411 D sur T1 avant update Rappro-locked (411 C est sur T2 séparée)');
-
-    // Snapshot ID de la ligne 411 D pour vérifier qu'elle reste intacte après update
-    $ligne411D_id = TransactionLigne::where('transaction_id', $transaction->id)
-        ->where('compte_id', $compte411->id)->value('id');
-
-    // Le form n'envoie que les lignes ventilation (pas les lignes PD-only 411/512X).
-    // assertLockedInvariants compare avec lignes()->ventilation().
-    $ventilations = $transaction->lignes()->ventilation()->get();
-    $toutes = $ventilations->map(fn ($l) => [
-        'id' => $l->id,
-        'compte_id' => $l->id === $ligneVent->id ? $this->compte708->id : $l->compte_id,
-        'montant' => $l->montant,
-        'operation_id' => $l->operation_id,
-        'seance' => $l->seance,
-        'notes' => $l->notes,
-    ])->toArray();
-
-    $transaction = $this->service->update($transaction, [
-        'type' => TypeTransaction::Recette->value,
-        'date' => '2025-10-15',
-        'libelle' => 'Cotisation initiale',
-        'montant_total' => '100.00',
-        'mode_paiement' => ModePaiement::Cheque->value,
-        'tiers_id' => $this->tiers->id,
-        'compte_id' => $this->compteBancaire->id,
-    ], $toutes);
-
-    // La ligne de ventilation doit avoir son compte_id mis à jour vers 708
-    $ligneVentApres = TransactionLigne::where('transaction_id', $transaction->id)
-        ->where('id', $ligneVent->id)
-        ->first();
-    expect($ligneVentApres)->not()->toBeNull('Ligne ventilation intacte (pas effacée)');
-    expect($ligneVentApres->compte_id)->toBe($this->compte708->id, 'compte_id patché vers 708');
-
-    // La ligne 411 D sur T1 doit rester intacte (même ID, même montant)
-    $count411Apres = TransactionLigne::where('transaction_id', $transaction->id)
-        ->where('compte_id', $compte411->id)->count();
-    expect($count411Apres)->toBe(1, '1 ligne 411 D intacte sur T1 après update Rappro-locked');
-    $ligne411D_apres = TransactionLigne::where('transaction_id', $transaction->id)
-        ->where('compte_id', $compte411->id)->first();
-    expect((int) $ligne411D_apres->id)->toBe((int) $ligne411D_id, 'L\'ID de la ligne 411 D reste le même (pas recréée)');
-});
-
-// ---------------------------------------------------------------------------
-// [D] Update Facture-locked — changer notes seulement : aucune ligne PD touchée
-// ---------------------------------------------------------------------------
-
-it('[D] update Facture-locked — modifier notes uniquement → aucune ligne PD touchée, lettrage 411 intact', function () {
-    // Créer la transaction PD
-    $transaction = creerRecetteChequePD($this);
-    $transaction->refresh();
-    $transaction->load('lignes');
-
-    // Lier à une facture validée via la table pivot facture_transaction
-    $facture = Facture::factory()->validee()->create([
-        'association_id' => $this->association->id,
-        'tiers_id' => $this->tiers->id,
-    ]);
-    $transaction->factures()->attach($facture->id);
-    $transaction->refresh();
-    $transaction->load('lignes');
-
-    expect($transaction->isLockedByFacture())->toBeTrue('La transaction doit être locked par la facture validée');
-
-    // Chantier 2a : T1 a maintenant 1 ligne 411 D (la 411 C est sur T2 séparée).
-    // Le test vérifie que la ligne 411 D de T1 n'est pas touchée par le update Facture-locked.
-    $compte411 = Compte::where('association_id', $this->association->id)->where('numero_pcg', '411')->first();
-    $lignes411T1Avant = TransactionLigne::where('transaction_id', $transaction->id)
-        ->where('compte_id', $compte411->id)->get();
-    expect($lignes411T1Avant)->toHaveCount(1, '1 ligne 411 D sur T1 avant update Facture-locked (411 C est sur T2)');
-
-    $lettrageAvant = $lignes411T1Avant->first()->lettrage_code;
-    expect($lettrageAvant)->not()->toBeNull('Lettrage 411 D doit être présent (lettré vers T2)');
-    $idAvant = (int) $lignes411T1Avant->first()->id;
-
-    // Le form n'envoie que les lignes ventilation (pas les lignes PD-only 411/512X).
-    // assertLockedByFactureInvariants compare avec lignes()->ventilation().
-    $ventilations = $transaction->lignes()->ventilation()->get();
-    $toutes = $ventilations->map(fn ($l) => [
-        'id' => $l->id,
-        'compte_id' => $l->compte_id,
-        'montant' => $l->montant,
-        'operation_id' => $l->operation_id,
-        'seance' => $l->seance,
-        'notes' => 'Note ajoutée après validation',
-    ])->toArray();
-
-    $transaction = $this->service->update($transaction, [
-        'type' => TypeTransaction::Recette->value,
-        'date' => '2025-10-15',
-        'libelle' => 'Cotisation initiale',
-        'montant_total' => '100.00',
-        'mode_paiement' => ModePaiement::Cheque->value,
-        'tiers_id' => $this->tiers->id,
-        'compte_id' => $this->compteBancaire->id,
-    ], $toutes);
-
-    // La ligne 411 D de T1 doit être identique (même ID, même lettrage)
-    $lignes411T1Apres = TransactionLigne::where('transaction_id', $transaction->id)
-        ->where('compte_id', $compte411->id)->get();
-    expect($lignes411T1Apres)->toHaveCount(1, 'Toujours 1 ligne 411 D sur T1 après update Facture-locked');
-
-    $idApres = (int) $lignes411T1Apres->first()->id;
-    expect($idApres)->toBe($idAvant, 'L\'ID de la ligne 411 D est inchangé — aucun forceDelete');
-
-    $lettrageApres = $lignes411T1Apres->first()->lettrage_code;
-    expect($lettrageApres)->toBe($lettrageAvant, 'Lettrage 411 D intact après update Facture-locked');
-
-    // 2 lignes total sur T1 inchangées (ventilation legacy + 411 D)
-    $totalApres = TransactionLigne::where('transaction_id', $transaction->id)->count();
-    expect($totalApres)->toBe(2, '2 lignes sur T1 inchangées après update Facture-locked');
-});
-
-// ---------------------------------------------------------------------------
-// [F] Update libre d'une recette comptant lettrée 411 (paire interne) :
-//     auto-délettrage avant forceDelete, nouvelles lignes 411 non lettrées,
-//     audit lettrage_audit avec action='delettre' et motif Auto-délettrage.
-// ---------------------------------------------------------------------------
-
-it('[F] update libre sur recette lettrée 411 (inter-tx) — auto-délettrage + audit avant forceDelete', function () {
-    // Chantier 2a : T1 a 1 ligne 411 D lettrée VERS T2 (lettrage inter-tx, pas interne).
-    // L'auto-délettrage avant forceDelete délettre le groupe ENTIER (411 D de T1 + 411 C de T2).
-    $transaction = creerRecetteChequePD($this, 100.0);
-    $transaction->refresh();
-    $transaction->load('lignes');
-
-    $compte411 = Compte::where('association_id', $this->association->id)->where('numero_pcg', '411')->first();
-    $lignes411T1Avant = TransactionLigne::where('transaction_id', $transaction->id)
-        ->where('compte_id', $compte411->id)
-        ->get();
-    expect($lignes411T1Avant)->toHaveCount(1, 'Précondition : 1 ligne 411 D sur T1 (411 C est sur T2 séparée)');
-
-    $lettrageCodeAvant = $lignes411T1Avant->first()->lettrage_code;
-    expect($lettrageCodeAvant)->not()->toBeNull('Précondition : ligne 411 D est lettrée (vers T2)');
-
-    // Aucune entrée delettre en audit avant l'update
-    $auditAvant = DB::table('lettrage_audit')
-        ->where('association_id', $this->association->id)
-        ->where('action', 'delettre')
-        ->count();
-    expect($auditAvant)->toBe(0, 'Précondition : aucune entrée delettre en audit');
-
-    // Update libre : changer le montant → force re-enrichissement PD (annule T2, recrée T1+T2)
-    $transaction = $this->service->update($transaction, [
-        'type' => TypeTransaction::Recette->value,
-        'date' => '2025-10-15',
-        'libelle' => 'Cotisation initiale',
-        'montant_total' => '120.00',  // ← montant changé
-        'mode_paiement' => ModePaiement::Cheque->value,
-        'tiers_id' => $this->tiers->id,
-        'compte_id' => $this->compteBancaire->id,
-    ], [[
-        'id' => null,
-        'compte_id' => $this->compte706->id,
-        'montant' => '120.00',  // ← montant changé
-        'operation_id' => null,
-        'seance' => null,
-        'notes' => null,
-    ]]);
-
-    // 1. Auto-délettrage : au moins 1 entrée action='delettre' dans lettrage_audit
-    // (l'auto-délettrage se déclenche lors de annulerEncaissementSiReversion → réversion → forceDelete)
-    $auditApres = DB::table('lettrage_audit')
-        ->where('association_id', $this->association->id)
-        ->where('action', 'delettre')
-        ->get();
-    expect($auditApres->count())->toBeGreaterThanOrEqual(1, 'Au moins 1 audit delettre lors de l\'update');
-
-    $auditPremier = $auditApres->first();
-    expect($auditPremier->lettrage_code)->toBe($lettrageCodeAvant, 'Le code lettrage audité est celui des 411 originales');
-
-    // 2. La nouvelle ligne 411 D sur T1 existe avec un code de lettrage
-    //    (peut être le même label séquentiel si l'ancien a été déletté — c'est correct)
-    $ligne411D_apres = TransactionLigne::where('transaction_id', $transaction->id)
-        ->where('compte_id', $compte411->id)
-        ->first();
-    expect($ligne411D_apres)->not()->toBeNull('Nouvelle ligne 411 D recréée sur T1');
-    expect($ligne411D_apres->lettrage_code)->not()->toBeNull('Nouvelle 411 D lettrée vers nouvelle T2');
-
-    // 3. T1 a 2 lignes PD (411 D + 706 C) — T2 a 2 lignes (5112 D + 411 C)
-    $totalT1 = TransactionLigne::where('transaction_id', $transaction->id)
-        ->whereNotNull('compte_id')->count();
-    expect($totalT1)->toBe(2, '2 lignes PD sur T1 recréées après update sur montant changé');
-
-    // 4. Montant total cohérent
-    $transaction->refresh();
-    expect((float) $transaction->montant_total)->toBe(120.0, 'Montant total mis à jour à 120');
-});
-
-// ---------------------------------------------------------------------------
-// [G] Update Rappro-locked multi-lignes — N+1 : 2 ventilations patchées sans requête par ligne
-// ---------------------------------------------------------------------------
-
-it('[G] update Rappro-locked multi-lignes — 2 ventilations patchées, comptes mis à jour (N+1 fix)', function () {
-    // Créer une recette chèque PD avec 2 lignes de ventilation (50+50 = 100)
-    $data = [
-        'type' => TypeTransaction::Recette->value,
-        'date' => '2025-10-15',
-        'libelle' => 'Recette multi-ventilations',
-        'montant_total' => '100.00',
-        'mode_paiement' => ModePaiement::Cheque->value,
-        'tiers_id' => $this->tiers->id,
-        'compte_id' => $this->compteBancaire->id,
-    ];
-    $lignes = [
-        ['compte_id' => $this->compte706->id, 'montant' => '50.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
-        ['compte_id' => $this->compte708->id, 'montant' => '50.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
-    ];
-    $transaction = $this->service->create($data, $lignes);
-    $transaction->refresh();
-    $transaction->load('lignes');
-
-    // Créer un 3ème compte recette 701
-    $compte701 = Compte::factory()->numero('701')->create([
-        'association_id' => $this->association->id,
-        'intitule' => 'Ventes de produits finis',
-    ]);
-
-    // Placer la transaction dans un rapprochement verrouillé
-    $rapprochement = RapprochementBancaire::factory()->create([
-        'association_id' => $this->association->id,
-        'compte_id' => $this->compteBancaire->id,
-        'statut' => StatutRapprochement::Verrouille,
-        'verrouille_at' => now(),
-    ]);
-    $transaction->update(['rapprochement_id' => $rapprochement->id, 'statut_reglement' => 'pointe']);
-    $transaction->refresh();
-    $transaction->load('lignes');
-
-    // Récupérer les deux lignes de ventilation
-    $ligneVent706 = $transaction->lignes->firstWhere('compte_id', $this->compte706->id);
-    $ligneVent708 = $transaction->lignes->firstWhere('compte_id', $this->compte708->id);
-    expect($ligneVent706)->not()->toBeNull('Ligne ventilation 706 doit exister');
-    expect($ligneVent708)->not()->toBeNull('Ligne ventilation 708 doit exister');
-
-    // Le form n'envoie que les lignes ventilation (pas les lignes PD-only 411/512X).
-    // assertLockedInvariants compare avec lignes()->ventilation().
-    $ventilations = $transaction->lignes()->ventilation()->get();
-    $toutes = $ventilations->map(fn ($l) => [
-        'id' => $l->id,
-        'compte_id' => match ((int) $l->id) {
-            (int) $ligneVent706->id => $this->compte708->id, // 706 → 708
-            (int) $ligneVent708->id => $compte701->id,       // 708 → 701
-            default => $l->compte_id,
-        },
-        'montant' => $l->montant,
-        'operation_id' => $l->operation_id,
-        'seance' => $l->seance,
-        'notes' => $l->notes,
-    ])->toArray();
-
-    $transaction = $this->service->update($transaction, $data, $toutes);
-
-    // Les deux lignes de ventilation doivent être patchées
-    $ligneApres706 = TransactionLigne::find($ligneVent706->id);
-    $ligneApres708 = TransactionLigne::find($ligneVent708->id);
-
-    expect($ligneApres706->compte_id)->toBe($this->compte708->id, 'ligne ex-706 → compte 708');
-    expect($ligneApres708->compte_id)->toBe($compte701->id, 'ligne ex-708 → compte 701');
-
-    // Chantier 2a : T1 a 1 ligne 411 D (la 411 C est sur T2 séparée).
-    // La ligne 411 D de T1 doit rester intacte après update Rappro-locked.
-    $compte411 = Compte::where('association_id', $this->association->id)->where('numero_pcg', '411')->first();
-    $count411T1 = TransactionLigne::where('transaction_id', $transaction->id)->where('compte_id', $compte411->id)->count();
-    expect($count411T1)->toBe(1, '1 ligne 411 D intacte sur T1 après update Rappro-locked multi-lignes (411 C sur T2)');
-});
-
-// ---------------------------------------------------------------------------
-// [E] Non-régression — update libre sans tiers : skip enrichissement PD (silencieux)
-// ---------------------------------------------------------------------------
-
-it('[E] update libre sans tiers_id — enrichissement PD skippé silencieusement (pas d\'exception)', function () {
+it('conserve le comportement legacy sans tiers : la partie double est ignorée', function (): void {
     $transaction = $this->service->create([
         'type' => TypeTransaction::Recette->value,
-        'mode_paiement' => ModePaiement::Virement->value,
         'date' => '2025-10-01',
         'libelle' => 'Recette sans tiers',
         'montant_total' => '50.00',
+        'mode_paiement' => ModePaiement::Virement->value,
         'tiers_id' => null,
         'compte_id' => $this->compteBancaire->id,
     ], [[
@@ -536,8 +108,8 @@ it('[E] update libre sans tiers_id — enrichissement PD skippé silencieusement
         'seance' => null,
         'notes' => null,
     ]]);
+    $ligne = $transaction->lignes()->sole();
 
-    // Update libre sans tiers → enrichirPartieDouble skip silencieux, pas d'exception
     $updated = $this->service->update($transaction, [
         'type' => TypeTransaction::Recette->value,
         'date' => '2025-10-01',
@@ -547,16 +119,13 @@ it('[E] update libre sans tiers_id — enrichissement PD skippé silencieusement
         'tiers_id' => null,
         'compte_id' => $this->compteBancaire->id,
     ], [[
-        'id' => null,
-        'compte_id' => $this->compte706->id,
-        'montant' => '50.00',
-        'operation_id' => null,
-        'seance' => null,
-        'notes' => null,
+        'id' => (int) $ligne->id,
+        'compte_id' => (int) $ligne->compte_id,
+        'montant' => $ligne->montant,
+        'operation_id' => $ligne->operation_id,
+        'seance' => $ligne->seance,
+        'notes' => $ligne->notes,
     ]]);
 
-    // Pas d'exception = succès. 1 seule ligne legacy (pas de PD car tiers_id null)
-    $totalLignes = TransactionLigne::where('transaction_id', $updated->id)->count();
-    expect($totalLignes)->toBe(1, 'Seulement la ligne legacy — pas de PD sans tiers_id');
-    expect($updated->libelle)->toBe('Recette sans tiers — modifiée', 'Libellé mis à jour');
+    expect($updated->libelle)->toBe('Recette sans tiers — modifiée');
 });

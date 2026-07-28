@@ -15,6 +15,8 @@ use App\Models\FacturePartenaireDeposee;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\Compta\Migrations\BancairesSeeder;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
@@ -33,6 +35,7 @@ beforeEach(function () {
     $this->user = User::factory()->create(['dernier_espace' => Espace::Compta]);
     $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
     $this->actingAs($this->user);
+    SystemeSeeder::seed();
 
     $this->tiers = Tiers::factory()->pourDepenses()->create(['association_id' => $this->association->id]);
 
@@ -40,6 +43,7 @@ beforeEach(function () {
     $this->compteVentilation = Compte::factory()->numero('606')->create(['association_id' => $this->association->id]);
 
     $this->compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
+    BancairesSeeder::seed();
 });
 
 afterEach(function () {
@@ -273,8 +277,8 @@ it('flash erreur système si le déplacement du PDF échoue pendant la comptabil
     expect((string) session()->get('error'))
         ->toContain('Erreur système');
 
-    // Transaction créée (orpheline) — TransactionService::create() s'est exécuté avant l'échec
-    expect(Transaction::count())->toBe(1);
+    // T1 ouverte et T2 de règlement sont créées avant l'échec de déplacement.
+    expect(Transaction::count())->toBe(2);
 
     // Dépôt inchangé (comptabiliser() a échoué dans son DB::transaction interne)
     $depot->refresh();

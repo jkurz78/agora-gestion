@@ -9,13 +9,12 @@ use App\Models\CompteBancaire;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\Compta\Migrations\BancairesSeeder;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Tenant\TenantContext;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
-
-uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->association = Association::factory()->create();
@@ -26,6 +25,8 @@ beforeEach(function () {
     $this->actingAs($this->user);
 
     $this->compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
+    SystemeSeeder::seed();
+    BancairesSeeder::seed();
     $this->compteRecette = Compte::factory()->numero('706')->create();
     $this->tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
 });

@@ -11,6 +11,8 @@ use App\Models\IncomingDocument;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\Compta\Migrations\BancairesSeeder;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -25,6 +27,7 @@ beforeEach(function () {
     $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
     $this->actingAs($this->user);
     session(['exercice_actif' => 2025]);
+    SystemeSeeder::seed();
 
     // DC-10a : les payloads OCR portent directement des ids comptes.id (classe 6).
     $this->compteCharge = Compte::create([
@@ -174,6 +177,7 @@ it('save transfère le fichier inbox vers transactions/{tid} et supprime l\'Inco
     ]);
 
     $compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
+    BancairesSeeder::seed();
     $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $doc = createInboxDocument('FAKE PDF BYTES');
     $incomingFullPath = $doc->incomingFullPath();
@@ -273,6 +277,7 @@ it('save flash un warning et crée la dépense sans justificatif si le fichier i
     ]);
 
     $compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
+    BancairesSeeder::seed();
     $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $doc = createInboxDocument();
 

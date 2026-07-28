@@ -82,9 +82,9 @@ it('[I1] encaisserSiNonEncaisse — premier appel génère exactement 1 T2', fun
     // 1 T2 créée
     expect(Transaction::count())->toBe(2);
 
-    // statut_reglement de T1 INCHANGÉ (helper ne touche pas au statut)
+    // Le statut est désormais dérivé du grand livre : un chèque est EnMain.
     $t1->refresh();
-    expect($t1->statut_reglement)->toBe(StatutReglement::EnAttente);
+    expect($t1->statut_reglement)->toBe(StatutReglement::EnMain);
 });
 
 // ---------------------------------------------------------------------------
