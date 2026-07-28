@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\DB;
  *
  *  1. Rapprochements verrouillés → écart = 0
  *  2. Remises bancaires → montant_total T4 = sum des sources
- *  3. Transactions → montant_total = sum(lignes.montant)
+ *  3. Transactions → montant_total = net débit/crédit des ventilations 6/7
  *  4. Adhésions → montant_facial = sum(lignes de la TX liée)
  *
  * Stocke les résultats en cache pour affichage d'une alerte admin dans l'UI.
@@ -156,18 +156,28 @@ final class ComptaCheckIntegrityCommand extends Command
     }
 
     /**
-     * CHECK 3 — Chaque transaction : montant_total = sum(lignes.montant).
+     * CHECK 3 — Chaque transaction : montant_total = net débit/crédit des ventilations.
      */
     private function checkTransactionTotals(): void
     {
         $shouldFix = (bool) $this->option('fix');
 
-        // Requête agrégée : toutes les TX où montant_total ≠ sum(lignes ventilation)
+        // Requête agrégée : toutes les TX où montant_total ≠ net débit/crédit des
+        // ventilations. On mesure sur debit/credit — la vérité en partie double —
+        // et non sur `transaction_lignes.montant` : les OD (dotations et extournes
+        // de provisions, compensations) posent montant = 0 sur leurs lignes, ce qui
+        // faisait sonner ce contrôle sur des écritures parfaitement équilibrées.
+        // Sens : une charge (classe 6) est au débit, un produit (classe 7) au
+        // crédit ; les miroirs d'extourne inversent les deux et portent un
+        // montant_total négatif, que cette convention retrouve telle quelle.
         $divergences = DB::select('
             SELECT t.id, t.montant_total, COALESCE(s.sum_lignes, 0) as sum_lignes
             FROM transactions t
             JOIN (
-                SELECT tl.transaction_id, SUM(tl.montant) as sum_lignes
+                SELECT tl.transaction_id,
+                       SUM(CASE WHEN c.classe = 6
+                                THEN tl.debit - tl.credit
+                                ELSE tl.credit - tl.debit END) as sum_lignes
                 FROM transaction_lignes tl
                 JOIN comptes c ON c.id = tl.compte_id
                 WHERE c.association_id = ?
@@ -197,7 +207,9 @@ final class ComptaCheckIntegrityCommand extends Command
     }
 
     /**
-     * CHECK 4 — Chaque adhésion liée à une TX : montant_facial = sum(lignes TX).
+     * CHECK 4 — Chaque adhésion liée à une TX : montant_facial = net débit/crédit de la TX.
+     *
+     * Même convention de mesure que CHECK 3 (débit/crédit, pas `lignes.montant`).
      */
     private function checkAdhesionMontants(): void
     {
@@ -207,7 +219,10 @@ final class ComptaCheckIntegrityCommand extends Command
             FROM adhesions a
             JOIN transactions t ON t.id = a.transaction_id
             LEFT JOIN (
-                SELECT tl.transaction_id, SUM(tl.montant) as sum_lignes
+                SELECT tl.transaction_id,
+                       SUM(CASE WHEN c.classe = 6
+                                THEN tl.debit - tl.credit
+                                ELSE tl.credit - tl.debit END) as sum_lignes
                 FROM transaction_lignes tl
                 JOIN comptes c ON c.id = tl.compte_id
                 WHERE c.association_id = ?

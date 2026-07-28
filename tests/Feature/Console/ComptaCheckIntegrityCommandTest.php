@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\Adhesion;
 use App\Models\Association;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
@@ -56,6 +57,105 @@ it('calcule les totaux depuis les seules ventilations de classes 6 et 7', functi
         'montant' => 0.00,
         'credit' => 0.00,
         'debit' => 100.00,
+    ]);
+
+    $this->artisan('compta:check-integrity', ['--quiet-ok' => true])
+        ->assertExitCode(0);
+});
+
+it('mesure les OD sur débit/crédit et non sur la colonne montant', function (): void {
+    // Écriture de dotation aux provisions : 681 D / 486 C. Le générateur pose
+    // montant = 0 sur ces lignes — la vérité est portée par débit/crédit.
+    $compteDotation = Compte::factory()->numero('681')->create([
+        'association_id' => (int) $this->association->id,
+        'est_systeme' => true,
+    ]);
+    $compteCharges = Compte::factory()->numero('486')->create([
+        'association_id' => (int) $this->association->id,
+        'est_systeme' => true,
+    ]);
+
+    $transaction = Transaction::forceCreate([
+        'association_id' => (int) $this->association->id,
+        'type' => 'depense',
+        'date' => '2026-01-15',
+        'libelle' => 'Dotation provision FNP',
+        'montant_total' => 123.45,
+        'type_ecriture' => 'normale',
+    ]);
+
+    TransactionLigne::forceCreate([
+        'transaction_id' => (int) $transaction->id,
+        'compte_id' => (int) $compteDotation->id,
+        'montant' => 0.00,
+        'debit' => 123.45,
+        'credit' => 0.00,
+    ]);
+    TransactionLigne::forceCreate([
+        'transaction_id' => (int) $transaction->id,
+        'compte_id' => (int) $compteCharges->id,
+        'montant' => 0.00,
+        'debit' => 0.00,
+        'credit' => 123.45,
+    ]);
+
+    $this->artisan('compta:check-integrity', ['--quiet-ok' => true])
+        ->assertExitCode(0);
+});
+
+it('mesure un miroir d’extourne au négatif sans le signaler', function (): void {
+    // Miroir d'extourne d'une recette : 707 D / 411 C, montant_total négatif.
+    $transaction = Transaction::forceCreate([
+        'association_id' => (int) $this->association->id,
+        'type' => 'recette',
+        'date' => '2026-01-15',
+        'libelle' => 'Miroir extourne',
+        'montant_total' => -150.00,
+        'type_ecriture' => 'extourne',
+    ]);
+
+    TransactionLigne::forceCreate([
+        'transaction_id' => (int) $transaction->id,
+        'compte_id' => (int) $this->compteProduit->id,
+        'montant' => 0.00,
+        'debit' => 150.00,
+        'credit' => 0.00,
+    ]);
+    TransactionLigne::forceCreate([
+        'transaction_id' => (int) $transaction->id,
+        'compte_id' => (int) $this->compteClient->id,
+        'montant' => 0.00,
+        'debit' => 0.00,
+        'credit' => 150.00,
+    ]);
+
+    $this->artisan('compta:check-integrity', ['--quiet-ok' => true])
+        ->assertExitCode(0);
+});
+
+it('mesure l’adhésion liée sur débit/crédit et non sur la colonne montant', function (): void {
+    $transaction = Transaction::forceCreate([
+        'association_id' => (int) $this->association->id,
+        'type' => 'recette',
+        'date' => '2026-01-15',
+        'libelle' => 'Cotisation',
+        'montant_total' => 25.00,
+        'mode_paiement' => 'virement',
+        'type_ecriture' => 'normale',
+    ]);
+
+    TransactionLigne::forceCreate([
+        'transaction_id' => (int) $transaction->id,
+        'compte_id' => (int) $this->compteProduit->id,
+        'montant' => 0.00,
+        'debit' => 0.00,
+        'credit' => 25.00,
+    ]);
+
+    Adhesion::factory()->create([
+        'association_id' => (int) $this->association->id,
+        'transaction_id' => (int) $transaction->id,
+        'montant_facial' => 25.00,
     ]);
 
     $this->artisan('compta:check-integrity', ['--quiet-ok' => true])
