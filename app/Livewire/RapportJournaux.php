@@ -65,6 +65,19 @@ final class RapportJournaux extends Component
         $this->journaux = [];
     }
 
+    public function exportUrl(string $format): string
+    {
+        return route('rapports.export', [
+            'rapport' => 'journaux',
+            'format' => $format,
+            'exercice' => app(ExerciceService::class)->current(),
+            'du' => $this->dateDebut,
+            'au' => $this->dateFin,
+            'journaux' => $this->journaux,
+            'mode_reglement' => $this->afficherModeReglement ? 1 : 0,
+        ]);
+    }
+
     public function formatCentimes(int $centimes): string
     {
         if ($centimes === 0) {

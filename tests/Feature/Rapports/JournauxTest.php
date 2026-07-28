@@ -20,6 +20,7 @@ use App\Services\Rapports\JournauxBuilder;
 use App\Support\MontantDecimal;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use Tests\Support\CreatesPartieDoubleContext;
 
 uses(CreatesPartieDoubleContext::class);
@@ -165,4 +166,94 @@ it('rend la page hôte Journaux', function (): void {
         ->assertOk()
         ->assertSeeLivewire(RapportJournaux::class)
         ->assertSee('Journaux');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Exports. L'Excel des journaux est volontairement « à plat » : chaque ligne
+// porte tout son contexte, pour rester exploitable après un tri ou un filtre.
+// ─────────────────────────────────────────────────────────────────────────────
+
+it('exporte les journaux en Excel avec une ligne complète par écriture', function (): void {
+    creerCreanceJournal($this);
+
+    $response = $this->get(route('rapports.export', [
+        'rapport' => 'journaux',
+        'format' => 'xlsx',
+        'du' => '2025-09-01',
+        'au' => '2026-08-31',
+        'exercice' => 2025,
+    ]));
+
+    $response->assertOk();
+
+    $tmp = tempnam(sys_get_temp_dir(), 'journaux').'.xlsx';
+    file_put_contents($tmp, $response->streamedContent());
+    $sheet = IOFactory::load($tmp)->getActiveSheet();
+
+    $lignes = [];
+    for ($row = 1; $row <= $sheet->getHighestRow(); $row++) {
+        $valeurs = [];
+        foreach ($sheet->getRowIterator($row, $row) as $ligneFeuille) {
+            foreach ($ligneFeuille->getCellIterator() as $cellule) {
+                $valeurs[] = $cellule->getValue();
+            }
+        }
+        $lignes[] = $valeurs;
+    }
+    @unlink($tmp);
+
+    $plat = collect($lignes);
+
+    // En-têtes dénormalisés attendus.
+    $entetes = $plat->first(fn (array $l): bool => in_array('Journal', $l, true));
+    expect($entetes)->toContain('Journal', 'Date', 'Pièce', 'Libellé', 'Compte', 'Règlement', 'Lettrage', 'Débit', 'Crédit');
+
+    // Chaque ligne d'écriture porte à la fois le journal, la pièce et le compte.
+    $ligne411 = $plat->first(fn (array $l): bool => in_array('411', $l, true));
+    expect($ligne411)->not->toBeNull()
+        ->and($ligne411)->toContain('Journal des ventes')
+        ->and($ligne411)->toContain('Créance journal');
+
+    // Le total est posé par journal, pas par pièce.
+    $totalJournal = $plat->first(fn (array $l): bool => in_array('TOTAL Journal des ventes', $l, true));
+    expect($totalJournal)->not->toBeNull()
+        ->and($plat->first(fn (array $l): bool => in_array('TOTAL GÉNÉRAL', $l, true)))->not->toBeNull();
+});
+
+it('exporte les journaux en PDF', function (): void {
+    creerCreanceJournal($this);
+
+    $this->get(route('rapports.export', [
+        'rapport' => 'journaux',
+        'format' => 'pdf',
+        'du' => '2025-09-01',
+        'au' => '2026-08-31',
+        'exercice' => 2025,
+    ]))
+        ->assertOk()
+        ->assertHeader('Content-Type', 'application/pdf');
+});
+
+it('exporte le grand livre en Excel et en PDF', function (): void {
+    creerCreanceJournal($this);
+
+    $this->get(route('rapports.export', [
+        'rapport' => 'grand-livre',
+        'format' => 'xlsx',
+        'du' => '2025-09-01',
+        'au' => '2026-08-31',
+        'comptes' => '411',
+        'exercice' => 2025,
+    ]))->assertOk();
+
+    $this->get(route('rapports.export', [
+        'rapport' => 'grand-livre',
+        'format' => 'pdf',
+        'du' => '2025-09-01',
+        'au' => '2026-08-31',
+        'comptes' => '411',
+        'exercice' => 2025,
+    ]))
+        ->assertOk()
+        ->assertHeader('Content-Type', 'application/pdf');
 });

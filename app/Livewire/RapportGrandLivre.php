@@ -70,6 +70,21 @@ final class RapportGrandLivre extends Component
             ->all();
     }
 
+    public function exportUrl(string $format): string
+    {
+        return route('rapports.export', [
+            'rapport' => 'grand-livre',
+            'format' => $format,
+            'exercice' => app(ExerciceService::class)->current(),
+            'du' => $this->dateDebut,
+            'au' => $this->dateFin,
+            'comptes' => $this->comptes,
+            'non_soldes' => $this->uniquementNonSoldes ? 1 : 0,
+            'non_lettrees' => $this->uniquementNonLettrees ? 1 : 0,
+            'mode_reglement' => $this->afficherModeReglement ? 1 : 0,
+        ]);
+    }
+
     public function formatCentimes(int $centimes): string
     {
         if ($centimes === 0) {

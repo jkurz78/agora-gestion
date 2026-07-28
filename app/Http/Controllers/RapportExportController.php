@@ -9,6 +9,8 @@ use App\Livewire\AnalysePivot;
 use App\Models\Association;
 use App\Services\ExerciceService;
 use App\Services\Rapports\BalanceComptableBuilder;
+use App\Services\Rapports\GrandLivreBuilder;
+use App\Services\Rapports\JournauxBuilder;
 use App\Services\Rapports\ProjectionMatrix;
 use App\Services\Rapports\VentilationFinanciereService;
 use App\Services\RapportService;
@@ -23,6 +25,7 @@ use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -36,6 +39,8 @@ final class RapportExportController extends Controller
     private const RAPPORTS = [
         'compte-resultat' => ['xlsx', 'pdf'],
         'balance' => ['xlsx', 'pdf'],
+        'grand-livre' => ['xlsx', 'pdf'],
+        'journaux' => ['xlsx', 'pdf'],
         'operations' => ['xlsx', 'pdf'],
         'flux-tresorerie' => ['xlsx', 'pdf'],
         'analyse-financier' => ['xlsx'],
@@ -46,6 +51,8 @@ final class RapportExportController extends Controller
     private const PDF_ORIENTATION = [
         'compte-resultat' => 'portrait',
         'balance' => 'landscape',
+        'grand-livre' => 'landscape',
+        'journaux' => 'landscape',
         'operations' => 'landscape',
         'flux-tresorerie' => 'portrait',
     ];
@@ -54,6 +61,8 @@ final class RapportExportController extends Controller
     private const TITLES = [
         'compte-resultat' => 'Compte de resultat',
         'balance' => 'Balance comptable',
+        'grand-livre' => 'Grand livre',
+        'journaux' => 'Journaux',
         'operations' => 'CR par operations',
         'flux-tresorerie' => 'Flux de tresorerie',
         'analyse-financier' => 'Analyse financiere',
@@ -112,6 +121,8 @@ final class RapportExportController extends Controller
                 $request->boolean('budget', true),
             ),
             'balance' => $this->xlsxBalance($request, $exercice, $exerciceService),
+            'grand-livre' => $this->xlsxGrandLivre($request, $exercice, $exerciceService),
+            'journaux' => $this->xlsxJournaux($request, $exercice, $exerciceService),
             'operations' => $this->xlsxOperations($rapportService, $exercice, $request),
             'flux-tresorerie' => $this->xlsxFluxTresorerie($rapportService, $exercice),
             'analyse-financier' => $this->xlsxAnalyse('financier', $exercice, $exerciceService),
@@ -390,6 +401,197 @@ final class RapportExportController extends Controller
         }
 
         return $spreadsheet;
+    }
+
+    private function xlsxGrandLivre(Request $request, int $exercice, ExerciceService $exerciceService): Spreadsheet
+    {
+        $params = $this->grandLivreParams($request, $exercice, $exerciceService);
+        $grandLivre = app(GrandLivreBuilder::class)->grandLivre(
+            $params['date_debut'],
+            $params['date_fin'],
+            $params['prefixes'],
+            $params['uniquement_non_soldes'],
+            $params['uniquement_non_lettrees'],
+        );
+
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Grand livre');
+
+        $headers = ['Compte', 'Intitulé', 'Tiers', 'Date', 'Journal', 'Pièce', 'Libellé', 'Règlement', 'Lettrage', 'Débit', 'Crédit', 'Solde'];
+        $lastCol = Coordinate::stringFromColumnIndex(count($headers));
+
+        $sheet->setCellValue('A1', 'Grand livre');
+        $sheet->mergeCells('A1:'.$lastCol.'1');
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+
+        $sheet->fromArray([['Période', $this->periodeLabel($params['date_debut'], $params['date_fin'])]], null, 'A2');
+        $sheet->fromArray([['Comptes', $params['comptes']]], null, 'A3');
+        $sheet->getStyle('A2:A3')->getFont()->setBold(true);
+
+        $headerRow = 5;
+        $sheet->fromArray([$headers], null, 'A'.$headerRow);
+        $this->styleEnteteXlsx($sheet, 'A'.$headerRow.':'.$lastCol.$headerRow);
+
+        $row = $headerRow + 1;
+
+        foreach ($grandLivre['comptes'] as $compte) {
+            // Solde d'ouverture, puis chaque écriture — chaque ligne porte le
+            // compte et le tiers pour rester exploitable après un tri Excel.
+            $sheet->fromArray([[
+                $compte['numero_compte'],
+                $compte['intitule_compte'],
+                $compte['tiers'],
+                null, null, null, 'Solde ouverture', null, null, null, null,
+                $this->euros((int) $compte['solde_ouverture_centimes']),
+            ]], null, 'A'.$row);
+            $sheet->setCellValueExplicit('A'.$row, (string) $compte['numero_compte'], DataType::TYPE_STRING);
+            $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFont()->setBold(true);
+            $row++;
+
+            foreach ($compte['lignes'] as $ligne) {
+                $sheet->fromArray([[
+                    $compte['numero_compte'],
+                    $compte['intitule_compte'],
+                    $compte['tiers'],
+                    $ligne['date'],
+                    $ligne['journal'],
+                    $ligne['numero_piece'] ?? $ligne['reference'],
+                    $ligne['libelle'],
+                    $ligne['mode_paiement'],
+                    $ligne['lettrage_code'],
+                    $this->euros((int) $ligne['debit_centimes']),
+                    $this->euros((int) $ligne['credit_centimes']),
+                    $this->euros((int) $ligne['solde_progressif_centimes']),
+                ]], null, 'A'.$row);
+                $sheet->setCellValueExplicit('A'.$row, (string) $compte['numero_compte'], DataType::TYPE_STRING);
+                $row++;
+            }
+
+            $sheet->fromArray([[
+                $compte['numero_compte'],
+                $compte['intitule_compte'],
+                $compte['tiers'],
+                null, null, null, 'TOTAL', null, null,
+                $this->euros((int) $compte['mouvement_debit_centimes']),
+                $this->euros((int) $compte['mouvement_credit_centimes']),
+                $this->euros((int) $compte['solde_fin_centimes']),
+            ]], null, 'A'.$row);
+            $sheet->setCellValueExplicit('A'.$row, (string) $compte['numero_compte'], DataType::TYPE_STRING);
+            $this->styleTotalXlsx($sheet, 'A'.$row.':'.$lastCol.$row);
+            $row++;
+        }
+
+        if ($row > $headerRow + 1) {
+            $sheet->getStyle('J'.($headerRow + 1).':'.$lastCol.($row - 1))
+                ->getNumberFormat()
+                ->setFormatCode('#,##0.00');
+        }
+
+        return $spreadsheet;
+    }
+
+    /**
+     * Journaux — export à plat : chaque ligne porte l'intégralité du contexte
+     * (date, pièce, libellé, compte, règlement, lettrage), de sorte que le
+     * fichier reste exploitable après un tri ou un filtre Excel. Les totaux
+     * sont posés par journal, pas par pièce.
+     */
+    private function xlsxJournaux(Request $request, int $exercice, ExerciceService $exerciceService): Spreadsheet
+    {
+        $params = $this->journauxParams($request, $exercice, $exerciceService);
+        $resultat = app(JournauxBuilder::class)->journaux(
+            $params['date_debut'],
+            $params['date_fin'],
+            $params['journaux'],
+        );
+
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Journaux');
+
+        $headers = ['Journal', 'Date', 'Pièce', 'Libellé', 'Compte', 'Intitulé', 'Tiers', 'Règlement', 'Lettrage', 'Débit', 'Crédit'];
+        $lastCol = Coordinate::stringFromColumnIndex(count($headers));
+
+        $sheet->setCellValue('A1', 'Journaux');
+        $sheet->mergeCells('A1:'.$lastCol.'1');
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+
+        $sheet->fromArray([['Période', $this->periodeLabel($params['date_debut'], $params['date_fin'])]], null, 'A2');
+        $sheet->fromArray([['Journaux', $params['journaux'] === [] ? 'Tous' : implode(', ', $params['journaux'])]], null, 'A3');
+        $sheet->getStyle('A2:A3')->getFont()->setBold(true);
+
+        $headerRow = 5;
+        $sheet->fromArray([$headers], null, 'A'.$headerRow);
+        $this->styleEnteteXlsx($sheet, 'A'.$headerRow.':'.$lastCol.$headerRow);
+
+        $row = $headerRow + 1;
+
+        foreach ($resultat['journaux'] as $bloc) {
+            foreach ($bloc['pieces'] as $piece) {
+                foreach ($piece['lignes'] as $ligne) {
+                    $sheet->fromArray([[
+                        $bloc['libelle'],
+                        $piece['date'],
+                        $piece['numero_piece'] ?? $piece['reference'],
+                        $piece['libelle'],
+                        $ligne['numero_compte'],
+                        $ligne['intitule_compte'],
+                        $ligne['tiers'],
+                        $piece['mode_paiement'],
+                        $ligne['lettrage_code'],
+                        $this->euros((int) $ligne['debit_centimes']),
+                        $this->euros((int) $ligne['credit_centimes']),
+                    ]], null, 'A'.$row);
+                    $sheet->setCellValueExplicit('E'.$row, (string) $ligne['numero_compte'], DataType::TYPE_STRING);
+                    $row++;
+                }
+            }
+
+            $sheet->fromArray([[
+                'TOTAL '.$bloc['libelle'],
+                null, null, null, null, null, null, null, null,
+                $this->euros((int) $bloc['debit_centimes']),
+                $this->euros((int) $bloc['credit_centimes']),
+            ]], null, 'A'.$row);
+            $this->styleTotalXlsx($sheet, 'A'.$row.':'.$lastCol.$row);
+            $row++;
+        }
+
+        if ($resultat['journaux'] !== []) {
+            $sheet->fromArray([[
+                'TOTAL GÉNÉRAL',
+                null, null, null, null, null, null, null, null,
+                $this->euros((int) $resultat['totaux']['debit_centimes']),
+                $this->euros((int) $resultat['totaux']['credit_centimes']),
+            ]], null, 'A'.$row);
+            $this->styleTotalXlsx($sheet, 'A'.$row.':'.$lastCol.$row);
+            $row++;
+        }
+
+        if ($row > $headerRow + 1) {
+            $sheet->getStyle('J'.($headerRow + 1).':'.$lastCol.($row - 1))
+                ->getNumberFormat()
+                ->setFormatCode('#,##0.00');
+        }
+
+        return $spreadsheet;
+    }
+
+    private function styleEnteteXlsx(Worksheet $sheet, string $plage): void
+    {
+        $sheet->getStyle($plage)->applyFromArray([
+            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '3D5473']],
+        ]);
+    }
+
+    private function styleTotalXlsx(Worksheet $sheet, string $plage): void
+    {
+        $sheet->getStyle($plage)->applyFromArray([
+            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '5A7FA8']],
+        ]);
     }
 
     private function xlsxOperations(RapportService $rapportService, int $exercice, Request $request): Spreadsheet
@@ -1198,6 +1400,8 @@ final class RapportExportController extends Controller
         $viewData = match ($rapport) {
             'compte-resultat' => $this->pdfCompteResultatData($rapportService, $exercice, $label, $request),
             'balance' => $this->pdfBalanceData($request, $exercice, $exerciceService),
+            'grand-livre' => $this->pdfGrandLivreData($request, $exercice, $exerciceService),
+            'journaux' => $this->pdfJournauxData($request, $exercice, $exerciceService),
             'operations' => $this->pdfOperationsData($rapportService, $exercice, $request),
             'flux-tresorerie' => $this->pdfFluxTresorerieData($rapportService, $exercice),
         };
@@ -1360,7 +1564,81 @@ final class RapportExportController extends Controller
         ];
     }
 
+    private function pdfGrandLivreData(Request $request, int $exercice, ExerciceService $exerciceService): array
+    {
+        $params = $this->grandLivreParams($request, $exercice, $exerciceService);
+
+        return [
+            'subtitle' => $this->periodeLabel($params['date_debut'], $params['date_fin']),
+            'grandLivre' => app(GrandLivreBuilder::class)->grandLivre(
+                $params['date_debut'],
+                $params['date_fin'],
+                $params['prefixes'],
+                $params['uniquement_non_soldes'],
+                $params['uniquement_non_lettrees'],
+            ),
+            'comptes' => $params['comptes'],
+            'afficherModeReglement' => $params['mode_reglement'],
+        ];
+    }
+
+    private function pdfJournauxData(Request $request, int $exercice, ExerciceService $exerciceService): array
+    {
+        $params = $this->journauxParams($request, $exercice, $exerciceService);
+
+        return [
+            'subtitle' => $this->periodeLabel($params['date_debut'], $params['date_fin']),
+            'journal' => app(JournauxBuilder::class)->journaux(
+                $params['date_debut'],
+                $params['date_fin'],
+                $params['journaux'],
+            ),
+            'afficherModeReglement' => $params['mode_reglement'],
+        ];
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────────
+
+    /**
+     * @return array{date_debut: string, date_fin: string, comptes: string, prefixes: array<int, string>, uniquement_non_soldes: bool, uniquement_non_lettrees: bool, mode_reglement: bool}
+     */
+    private function grandLivreParams(Request $request, int $exercice, ExerciceService $exerciceService): array
+    {
+        $range = $exerciceService->dateRange($exercice);
+        $comptes = trim((string) $request->query('comptes', '1,2,3,4,5,6,7'));
+
+        if ($comptes === '') {
+            $comptes = '1,2,3,4,5,6,7';
+        }
+
+        return [
+            'date_debut' => (string) $request->query('du', $range['start']->toDateString()),
+            'date_fin' => (string) $request->query('au', $range['end']->toDateString()),
+            'comptes' => $comptes,
+            'prefixes' => $this->balancePrefixes($comptes),
+            'uniquement_non_soldes' => $request->boolean('non_soldes'),
+            'uniquement_non_lettrees' => $request->boolean('non_lettrees'),
+            'mode_reglement' => $request->boolean('mode_reglement'),
+        ];
+    }
+
+    /**
+     * @return array{date_debut: string, date_fin: string, journaux: array<int, string>, mode_reglement: bool}
+     */
+    private function journauxParams(Request $request, int $exercice, ExerciceService $exerciceService): array
+    {
+        $range = $exerciceService->dateRange($exercice);
+
+        return [
+            'date_debut' => (string) $request->query('du', $range['start']->toDateString()),
+            'date_fin' => (string) $request->query('au', $range['end']->toDateString()),
+            'journaux' => array_values(array_filter(
+                array_map('strval', (array) $request->query('journaux', [])),
+                static fn (string $code): bool => $code !== '',
+            )),
+            'mode_reglement' => $request->boolean('mode_reglement'),
+        ];
+    }
 
     /**
      * @return array{date_debut: string, date_fin: string, comptes: string, prefixes: array<int, string>, colonnes: int}
