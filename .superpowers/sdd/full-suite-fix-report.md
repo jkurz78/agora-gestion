@@ -39,3 +39,10 @@
 ## Commit
 
 `fix(compta): stabiliser la suite complète des règlements tiers`.
+
+## Retouche post-vérification
+
+- `tests/Feature/Transactions/LignePieceJointeTest.php` dépendait encore de `BancairesSeeder::seed()` pour créer le compte 512 lié au compte bancaire du test. Dans le groupe de régression complet, cela restait fragile.
+- Le test crée maintenant explicitement son compte 512 relié par `compte_bancaire_id`.
+- Vérification : groupe de régression demandé vert, 49 tests / 234 assertions.
+- Commit : `test(compta): stabiliser les PJ de lignes avec compte bancaire`.
