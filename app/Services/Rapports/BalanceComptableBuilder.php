@@ -15,10 +15,17 @@ final class BalanceComptableBuilder
 
     /**
      * @param  array<int, string>  $prefixesComptes
-     * @return array{date_debut: string, date_fin: string, prefixes_comptes: array<int, string>, lignes: list<array<string, mixed>>, totaux: array<string, int>}
+     * @param  bool  $uniquementNonSoldes  N'affiche que les comptes (et tiers
+     *                                     auxiliaires) dont le solde de fin
+     *                                     n'est pas nul.
+     * @return array{date_debut: string, date_fin: string, prefixes_comptes: array<int, string>, uniquement_non_soldes: bool, lignes: list<array<string, mixed>>, totaux: array<string, int>}
      */
-    public function balance(string $dateDebut, string $dateFin, array $prefixesComptes = []): array
-    {
+    public function balance(
+        string $dateDebut,
+        string $dateFin,
+        array $prefixesComptes = [],
+        bool $uniquementNonSoldes = false,
+    ): array {
         $debut = CarbonImmutable::parse($dateDebut)->startOfDay();
         $fin = CarbonImmutable::parse($dateFin)->startOfDay();
         $prefixes = $this->normaliserPrefixes($prefixesComptes);
@@ -58,6 +65,8 @@ final class BalanceComptableBuilder
         $lignesBalance = collect($groupes)
             ->map(fn (array $ligne): array => $this->finaliserLigne($ligne))
             ->filter(fn (array $ligne): bool => $this->ligneNonNulle($ligne))
+            ->filter(fn (array $ligne): bool => ! $uniquementNonSoldes
+                || (int) $ligne['solde_fin_centimes'] !== 0)
             ->sort(fn (array $a, array $b): int => $this->comparerLignes($a, $b))
             ->values()
             ->all();
@@ -66,19 +75,12 @@ final class BalanceComptableBuilder
             'date_debut' => $debut->toDateString(),
             'date_fin' => $fin->toDateString(),
             'prefixes_comptes' => $prefixes,
+            'uniquement_non_soldes' => $uniquementNonSoldes,
             'lignes' => $lignesBalance,
+            // Les totaux portent sur la sélection affichée, comme pour le
+            // filtre par préfixe de comptes.
             'totaux' => $this->totaux($lignesBalance),
         ];
-    }
-
-    private function cleRegroupement(TransactionLigne $ligne): string
-    {
-        $numero = $ligne->compte?->numero_pcg ?? '';
-        $tiersId = in_array($numero, ['401', '411'], true) && $ligne->tiers_id !== null
-            ? (int) $ligne->tiers_id
-            : 0;
-
-        return ((int) $ligne->compte_id).'|'.$tiersId;
     }
 
     /**

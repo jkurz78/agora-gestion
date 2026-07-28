@@ -327,6 +327,7 @@ final class RapportExportController extends Controller
             $params['date_debut'],
             $params['date_fin'],
             $params['prefixes'],
+            $params['uniquement_non_soldes'],
         );
 
         $spreadsheet = new Spreadsheet;
@@ -1344,6 +1345,7 @@ final class RapportExportController extends Controller
             $params['date_debut'],
             $params['date_fin'],
             $params['prefixes'],
+            $params['uniquement_non_soldes'],
         );
 
         return [
@@ -1376,6 +1378,7 @@ final class RapportExportController extends Controller
             'comptes' => $comptes,
             'prefixes' => $this->balancePrefixes($comptes),
             'colonnes' => $this->balanceColonnes($request->integer('colonnes', 6)),
+            'uniquement_non_soldes' => $request->boolean('non_soldes'),
         ];
     }
 

@@ -401,3 +401,129 @@ it('compte les mouvements postérieurs à l AN quand la période démarre en cou
         ->and($ligne['mouvement_debit_centimes'])->toBe(4000)
         ->and($ligne['solde_fin_debit_centimes'])->toBe(64000);
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Grand livre auxiliaire : 401/411 sont des comptes collectifs, le tiers y tient
+// lieu de compte auxiliaire. Un bloc par tiers, comme dans la balance.
+// ─────────────────────────────────────────────────────────────────────────────
+
+it('sépare le grand livre du 411 par tiers', function (): void {
+    foreach (['Client Alpha', 'Client Beta'] as $index => $nom) {
+        $tiers = Tiers::factory()->create([
+            'association_id' => (int) $this->association->id,
+            'nom' => $nom,
+        ]);
+
+        $this->ecritures->pourRecetteACredit(
+            tiers: $tiers,
+            ventilations: [[
+                'compte' => $this->compte706,
+                'montant' => MontantDecimal::depuisCentimes(10000 * ($index + 1)),
+            ]],
+            dateConstatation: new DateTimeImmutable('2025-10-05'),
+            libelle: 'Créance '.$nom,
+        );
+    }
+
+    $grandLivre = app(GrandLivreBuilder::class)
+        ->grandLivre('2025-09-01', '2026-08-31', ['411']);
+
+    // Un bloc par tiers, et non un bloc 411 fourre-tout.
+    expect($grandLivre['comptes'])->toHaveCount(2);
+
+    $alpha = collect($grandLivre['comptes'])
+        ->first(fn (array $c): bool => str_contains((string) $c['tiers'], 'ALPHA'));
+    $beta = collect($grandLivre['comptes'])
+        ->first(fn (array $c): bool => str_contains((string) $c['tiers'], 'BETA'));
+
+    expect($alpha)->not->toBeNull()
+        ->and($beta)->not->toBeNull()
+        ->and($alpha['numero_compte'])->toBe('411')
+        ->and($alpha['mouvement_debit_centimes'])->toBe(10000)
+        ->and($alpha['solde_fin_centimes'])->toBe(10000)
+        ->and($alpha['lignes'])->toHaveCount(1)
+        ->and($beta['mouvement_debit_centimes'])->toBe(20000)
+        ->and($beta['solde_fin_centimes'])->toBe(20000)
+        ->and($beta['lignes'])->toHaveCount(1);
+});
+
+it('ne scinde pas les comptes non collectifs par tiers', function (): void {
+    creerMouvementBanque($this, '2025-10-01', '500.00', 'Encaissement A');
+    creerMouvementBanque($this, '2025-10-02', '300.00', 'Encaissement B');
+
+    $grandLivre = app(GrandLivreBuilder::class)
+        ->grandLivre('2025-09-01', '2026-08-31', ['512']);
+
+    $compte = collect($grandLivre['comptes'])
+        ->firstWhere('compte_id', (int) $this->compte512X->id);
+
+    expect(collect($grandLivre['comptes'])->where('numero_compte', $this->compte512X->numero_pcg))
+        ->toHaveCount(1)
+        ->and($compte['tiers'])->toBeNull()
+        ->and($compte['mouvement_debit_centimes'])->toBe(80000);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Filtre « comptes non soldés » : masque les comptes et tiers auxiliaires dont
+// le solde de fin est nul (créances réglées, dettes payées).
+// ─────────────────────────────────────────────────────────────────────────────
+
+it('masque les comptes soldés quand le filtre est actif', function (): void {
+    // Un tiers réglé intégralement (solde nul) et un tiers encore débiteur.
+    $regle = Tiers::factory()->create([
+        'association_id' => (int) $this->association->id,
+        'nom' => 'Client Solde',
+    ]);
+    $ouvert = Tiers::factory()->create([
+        'association_id' => (int) $this->association->id,
+        'nom' => 'Client Ouvert',
+    ]);
+
+    $t1Regle = $this->ecritures->pourRecetteACredit(
+        tiers: $regle,
+        ventilations: [['compte' => $this->compte706, 'montant' => MontantDecimal::depuisCentimes(5000)]],
+        dateConstatation: new DateTimeImmutable('2025-10-01'),
+        libelle: 'Créance réglée',
+    );
+
+    $this->ecritures->pourRecetteACredit(
+        tiers: $ouvert,
+        ventilations: [['compte' => $this->compte706, 'montant' => MontantDecimal::depuisCentimes(7000)]],
+        dateConstatation: new DateTimeImmutable('2025-10-02'),
+        libelle: 'Créance ouverte',
+    );
+
+    $poste = app(PostesTiersOuvertsService::class)->pourTransaction($t1Regle, 2025);
+    $this->reglements->regler(new PosteTiersReglementData(
+        ligneId: (int) $poste?->ligneActionId,
+        montantCentimes: 5000,
+        date: CarbonImmutable::parse('2025-10-05'),
+        mode: ModePaiement::Virement,
+        compteBancaireId: (int) $this->compteBancaire->id,
+        exercice: 2025,
+    ));
+
+    // Sans filtre : les deux tiers sont présents.
+    $balanceComplete = app(BalanceComptableBuilder::class)
+        ->balance('2025-09-01', '2026-08-31', ['411']);
+    expect($balanceComplete['lignes'])->toHaveCount(2)
+        ->and($balanceComplete['uniquement_non_soldes'])->toBeFalse();
+
+    // Avec filtre : seul le tiers encore débiteur subsiste.
+    $balanceFiltree = app(BalanceComptableBuilder::class)
+        ->balance('2025-09-01', '2026-08-31', ['411'], true);
+
+    expect($balanceFiltree['lignes'])->toHaveCount(1)
+        ->and($balanceFiltree['uniquement_non_soldes'])->toBeTrue()
+        ->and($balanceFiltree['lignes'][0]['tiers'])->toContain('OUVERT')
+        ->and($balanceFiltree['lignes'][0]['solde_fin_debit_centimes'])->toBe(7000)
+        // Les totaux portent sur la sélection affichée.
+        ->and($balanceFiltree['totaux']['solde_fin_debit_centimes'])->toBe(7000);
+
+    $grandLivreFiltre = app(GrandLivreBuilder::class)
+        ->grandLivre('2025-09-01', '2026-08-31', ['411'], true);
+
+    expect($grandLivreFiltre['comptes'])->toHaveCount(1)
+        ->and($grandLivreFiltre['comptes'][0]['tiers'])->toContain('OUVERT')
+        ->and($grandLivreFiltre['comptes'][0]['solde_fin_centimes'])->toBe(7000);
+});

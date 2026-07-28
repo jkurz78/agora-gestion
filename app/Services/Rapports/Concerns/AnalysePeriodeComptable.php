@@ -128,6 +128,29 @@ trait AnalysePeriodeComptable
     }
 
     /**
+     * Clé de regroupement d'une ligne dans un état comptable.
+     *
+     * Les comptes 401 et 411 sont des comptes *collectifs* : le tiers y tient
+     * lieu de compte auxiliaire. Balance comme grand livre présentent donc une
+     * entrée par tiers, et non un bloc unique où tous les tiers se mélangent.
+     * Les lignes sans tiers (données historiques) sont regroupées à part.
+     */
+    private function cleRegroupement(TransactionLigne $ligne): string
+    {
+        return ((int) $ligne->compte_id).'|'.$this->tiersAuxiliaire($ligne);
+    }
+
+    /**
+     * Identifiant du tiers auxiliaire, ou 0 si le compte n'est pas collectif.
+     */
+    private function tiersAuxiliaire(TransactionLigne $ligne): int
+    {
+        $estCollectif = in_array($ligne->compte?->numero_pcg ?? '', ['401', '411'], true);
+
+        return $estCollectif && $ligne->tiers_id !== null ? (int) $ligne->tiers_id : 0;
+    }
+
+    /**
      * Borne la lecture du grand livre : rien avant la coupure n'est exploité,
      * inutile de le charger.
      *

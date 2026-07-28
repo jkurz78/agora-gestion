@@ -21,6 +21,9 @@ final class RapportGrandLivre extends Component
     #[Url(as: 'comptes')]
     public string $comptes = '1,2,3,4,5,6,7';
 
+    #[Url(as: 'non_soldes')]
+    public bool $uniquementNonSoldes = false;
+
     public function mount(ExerciceService $exerciceService): void
     {
         $range = $exerciceService->dateRange($exerciceService->current());
@@ -65,6 +68,7 @@ final class RapportGrandLivre extends Component
                 $this->dateDebut,
                 $this->dateFin,
                 $this->prefixesComptes(),
+                $this->uniquementNonSoldes,
             ),
         ]);
     }

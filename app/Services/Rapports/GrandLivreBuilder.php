@@ -17,10 +17,17 @@ final class GrandLivreBuilder
 
     /**
      * @param  array<int, string>  $prefixesComptes
-     * @return array{date_debut: string, date_fin: string, prefixes_comptes: array<int, string>, comptes: list<array<string, mixed>>}
+     * @param  bool  $uniquementNonSoldes  N'affiche que les comptes (et tiers
+     *                                     auxiliaires) dont le solde de fin
+     *                                     n'est pas nul.
+     * @return array{date_debut: string, date_fin: string, prefixes_comptes: array<int, string>, uniquement_non_soldes: bool, comptes: list<array<string, mixed>>}
      */
-    public function grandLivre(string $dateDebut, string $dateFin, array $prefixesComptes = []): array
-    {
+    public function grandLivre(
+        string $dateDebut,
+        string $dateFin,
+        array $prefixesComptes = [],
+        bool $uniquementNonSoldes = false,
+    ): array {
         $debut = CarbonImmutable::parse($dateDebut)->startOfDay();
         $fin = CarbonImmutable::parse($dateFin)->startOfDay();
         $prefixes = $this->normaliserPrefixes($prefixesComptes);
@@ -36,11 +43,12 @@ final class GrandLivreBuilder
                 continue;
             }
 
-            $compteId = (int) $compte->id;
-            $comptes[$compteId] ??= $this->compteVide($compte);
+            // 401/411 : une entrée par tiers (compte auxiliaire), comme la balance.
+            $cle = $this->cleRegroupement($ligne);
+            $comptes[$cle] ??= $this->compteVide($ligne);
 
             if ($this->estOuverture($ligne, $debut, $coupure)) {
-                $comptes[$compteId]['solde_ouverture_centimes'] += $this->montantSigneCentimes($ligne);
+                $comptes[$cle]['solde_ouverture_centimes'] += $this->montantSigneCentimes($ligne);
 
                 continue;
             }
@@ -49,14 +57,16 @@ final class GrandLivreBuilder
                 continue;
             }
 
-            $comptes[$compteId]['mouvement_debit_centimes'] += $this->centimes($ligne->debit);
-            $comptes[$compteId]['mouvement_credit_centimes'] += $this->centimes($ligne->credit);
-            $comptes[$compteId]['lignes'][] = $this->ligneGrandLivre($ligne);
+            $comptes[$cle]['mouvement_debit_centimes'] += $this->centimes($ligne->debit);
+            $comptes[$cle]['mouvement_credit_centimes'] += $this->centimes($ligne->credit);
+            $comptes[$cle]['lignes'][] = $this->ligneGrandLivre($ligne);
         }
 
         $comptesFinalises = collect($comptes)
             ->map(fn (array $compte): array => $this->finaliserCompte($compte))
             ->filter(fn (array $compte): bool => $this->compteNonNul($compte))
+            ->filter(fn (array $compte): bool => ! $uniquementNonSoldes
+                || (int) $compte['solde_fin_centimes'] !== 0)
             ->sort(fn (array $a, array $b): int => $this->comparerComptes($a, $b))
             ->values()
             ->all();
@@ -65,6 +75,7 @@ final class GrandLivreBuilder
             'date_debut' => $debut->toDateString(),
             'date_fin' => $fin->toDateString(),
             'prefixes_comptes' => $prefixes,
+            'uniquement_non_soldes' => $uniquementNonSoldes,
             'comptes' => $comptesFinalises,
         ];
     }
@@ -87,12 +98,18 @@ final class GrandLivreBuilder
     /**
      * @return array<string, mixed>
      */
-    private function compteVide(Compte $compte): array
+    private function compteVide(TransactionLigne $ligne): array
     {
+        /** @var Compte $compte */
+        $compte = $ligne->compte;
+        $tiersId = $this->tiersAuxiliaire($ligne);
+
         return [
             'compte_id' => (int) $compte->id,
             'numero_compte' => (string) $compte->numero_pcg,
             'intitule_compte' => (string) $compte->intitule,
+            'tiers_id' => $tiersId !== 0 ? $tiersId : null,
+            'tiers' => $tiersId !== 0 ? $ligne->tiers?->displayName() : null,
             'solde_ouverture_centimes' => 0,
             'mouvement_debit_centimes' => 0,
             'mouvement_credit_centimes' => 0,
@@ -180,7 +197,8 @@ final class GrandLivreBuilder
      */
     private function comparerComptes(array $a, array $b): int
     {
-        return strcmp((string) $a['numero_compte'], (string) $b['numero_compte']);
+        return strcmp((string) $a['numero_compte'], (string) $b['numero_compte'])
+            ?: strcmp((string) ($a['tiers'] ?? ''), (string) ($b['tiers'] ?? ''));
     }
 
     private function comparerLignes(TransactionLigne $a, TransactionLigne $b): int

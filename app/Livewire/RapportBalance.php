@@ -24,6 +24,9 @@ final class RapportBalance extends Component
     #[Url(as: 'colonnes')]
     public int $colonnes = 6;
 
+    #[Url(as: 'non_soldes')]
+    public bool $uniquementNonSoldes = false;
+
     public function mount(ExerciceService $exerciceService): void
     {
         $range = $exerciceService->dateRange($exerciceService->current());
@@ -69,6 +72,7 @@ final class RapportBalance extends Component
             'au' => $this->dateFin,
             'comptes' => $this->comptes,
             'colonnes' => $this->colonnes,
+            'non_soldes' => $this->uniquementNonSoldes ? 1 : 0,
         ]);
     }
 
@@ -90,6 +94,7 @@ final class RapportBalance extends Component
                 $this->dateDebut,
                 $this->dateFin,
                 $this->prefixesComptes(),
+                $this->uniquementNonSoldes,
             ),
         ]);
     }

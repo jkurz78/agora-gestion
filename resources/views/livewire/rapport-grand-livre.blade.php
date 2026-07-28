@@ -3,6 +3,7 @@
         .gl-filter-label { font-size: 12px; font-weight: 700; color: #3d5473; text-transform: uppercase; letter-spacing: .02em; }
         .gl-account-header { background: #3d5473; color: #fff; padding: 9px 12px; font-weight: 700; }
         .gl-account-subtitle { color: rgba(255,255,255,.8); font-size: 12px; font-weight: 400; }
+        .gl-account-tier { color: #cfe0f5; font-weight: 600; }
         .gl-table { font-size: 13px; border-collapse: collapse; width: 100%; }
         .gl-table th,
         .gl-table td { padding: 7px 9px; vertical-align: middle; }
@@ -35,7 +36,7 @@
                     >
                 </div>
 
-                <div class="col-md-7">
+                <div class="col-md-5">
                     <label for="grandLivreComptes" class="form-label gl-filter-label">Comptes</label>
                     <input
                         type="text"
@@ -44,6 +45,20 @@
                         wire:model.live.debounce.400ms="comptes"
                         placeholder="Ex. 4, 5, 6, 7 ou 40, 41"
                     >
+                </div>
+
+                <div class="col-md-2 d-flex align-items-end">
+                    <div class="form-check mb-1">
+                        <input
+                            type="checkbox"
+                            class="form-check-input"
+                            id="grandLivreNonSoldes"
+                            wire:model.live="uniquementNonSoldes"
+                        >
+                        <label class="form-check-label gl-filter-label" for="grandLivreNonSoldes">
+                            Comptes non soldés
+                        </label>
+                    </div>
                 </div>
 
                 <div class="col-md-1 d-grid">
@@ -59,6 +74,9 @@
         <div class="card border-0 shadow-sm mb-3">
             <div class="gl-account-header">
                 {{ $compte['numero_compte'] }} — {{ $compte['intitule_compte'] }}
+                @if(($compte['tiers'] ?? null) !== null)
+                    <span class="gl-account-tier">· {{ $compte['tiers'] }}</span>
+                @endif
                 <span class="gl-account-subtitle ms-2">
                     Solde final : {{ $this->formatCentimes((int) $compte['solde_fin_centimes']) }}
                 </span>
