@@ -399,6 +399,7 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
         Route::view('/compte-resultat', 'rapports.compte-resultat')->name('compte-resultat');
         Route::view('/balance', 'rapports.balance')->name('balance');
         Route::view('/grand-livre', 'rapports.grand-livre')->name('grand-livre');
+        Route::view('/journaux', 'rapports.journaux')->name('journaux');
         Route::view('/operations', 'rapports.operations')->name('operations');
         Route::view('/flux-tresorerie', 'rapports.flux-tresorerie')->name('flux-tresorerie');
         Route::view('/analyse', 'rapports.analyse')->name('analyse');

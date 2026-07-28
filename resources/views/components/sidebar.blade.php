@@ -496,6 +496,13 @@ $activeGroup = match(true) {
                             </li>
 
                             <li class="nav-item">
+                                <a href="{{ route('rapports.journaux') }}"
+                                   class="nav-link {{ request()->routeIs('rapports.journaux') ? 'active' : '' }}">
+                                    <i class="bi bi-journals me-1"></i> Journaux
+                                </a>
+                            </li>
+
+                            <li class="nav-item">
                                 <a href="{{ route('rapports.operations') }}"
                                    class="nav-link {{ request()->routeIs('rapports.operations') ? 'active' : '' }}">
                                     <i class="bi bi-diagram-3 me-1"></i> CR par opérations
