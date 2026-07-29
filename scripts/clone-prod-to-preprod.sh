@@ -121,6 +121,40 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 run "mysql -h '${PREPROD_DB_HOST}' -u '${PREPROD_DB_USER}' -p'${PREPROD_DB_PASS}' '${PREPROD_DB_NAME}' < '${SCRIPT_DIR}/anonymize-tiers.sql'"
 
 # ---------------------------------------------------------------------------
+# Step 3b : Champs chiffrés — les valeurs viennent de la prod, chiffrées avec la
+#           clé APP de PRODUCTION. La préprod a sa propre APP_KEY : toute lecture
+#           lève `DecryptException: The MAC is invalid.` et l'écran part en 500.
+#
+#           Constaté le 2026-07-29 sur la préprod NAS : l'écran Recettes/dépenses
+#           appelait InvoiceOcrService::isConfigured(), qui lit le champ chiffré
+#           association.anthropic_api_key → 500, sans rapport avec la compta.
+#
+#           Politique : les SECRETS applicatifs n'ont rien à faire sur une
+#           préprod — on les efface systématiquement. Les DONNÉES chiffrées
+#           (présences, données médicales) ne sont récupérables qu'avec la clé de
+#           prod ; on ne les re-chiffre que si PROD_APP_KEY est fournie.
+# ---------------------------------------------------------------------------
+
+echo "[$(date)] Step 3b : neutralisation des secrets applicatifs chiffrés"
+run "mysql -h '${PREPROD_DB_HOST}' -u '${PREPROD_DB_USER}' -p'${PREPROD_DB_PASS}' '${PREPROD_DB_NAME}' -e \"
+    UPDATE association SET anthropic_api_key = NULL;
+    UPDATE helloasso_parametres SET client_secret = NULL, callback_token = NULL;
+    UPDATE incoming_mail_parametres SET imap_password = NULL;
+    UPDATE smtp_parametres SET smtp_password = NULL;
+    UPDATE users SET two_factor_secret = NULL, two_factor_recovery_codes = NULL;\""
+
+if [[ -n "${PROD_APP_KEY:-}" ]]; then
+    echo "[$(date)] Step 3b : PROD_APP_KEY fournie → re-chiffrement des données"
+    run "php artisan staging:rekey-encrypted"
+else
+    echo "[$(date)] Step 3b : PROD_APP_KEY absente — présences et données médicales"
+    echo "           restent chiffrées avec la clé de prod. Les écrans qui les"
+    echo "           lisent (présences, émargement, fiches médicales) tomberont en"
+    echo "           500. Sans effet sur la recette comptable. Pour les récupérer :"
+    echo "           PROD_APP_KEY=… php artisan staging:rekey-encrypted"
+fi
+
+# ---------------------------------------------------------------------------
 # Step 4 : Migrations Laravel
 # ---------------------------------------------------------------------------
 
