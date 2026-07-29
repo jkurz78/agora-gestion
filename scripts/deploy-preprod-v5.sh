@@ -95,11 +95,35 @@ echo "[$(date)] Step 5 : activation du feature flag COMPTA_USE_PARTIE_DOUBLE=tru
 run "sed -i 's/COMPTA_USE_PARTIE_DOUBLE=false/COMPTA_USE_PARTIE_DOUBLE=true/' .env"
 
 # ---------------------------------------------------------------------------
-# Step 6 : Smoke-test final
+# Step 5b : Réconciliation des statuts de règlement — OBLIGATOIRE après le backfill.
+#
+#           La migration 2026_06_04_120100_reclasser_statuts_en_main s'exécute au
+#           `migrate`, donc AVANT le backfill : les lignes partie double n'existent
+#           pas encore, EtatReglementResolver retombe sur la colonne stockée et la
+#           reclassification est un no-op sur toute la population legacy. Sans cette
+#           étape, les recettes chèque/espèces jamais remises restent étiquetées
+#           « Reçu » au lieu de « À remettre » — visible dans les listes, les filtres
+#           et l'écran des créances. Reproduit sur clone prod le 2026-07-29.
+#           Voir docs/compta-partie-double.md §8.
+# ---------------------------------------------------------------------------
+
+echo "[$(date)] Step 5b : compta:reconcilier-statuts --check (inventaire)"
+run "php artisan compta:reconcilier-statuts --check || true"
+
+echo "[$(date)] Step 5b : compta:reconcilier-statuts (resynchronisation)"
+run "php artisan compta:reconcilier-statuts"
+
+# ---------------------------------------------------------------------------
+# Step 6 : Smoke-test + invariants
 # ---------------------------------------------------------------------------
 
 echo "[$(date)] Step 6 : config:clear + compta:smoke-test-v5"
 run "php artisan config:clear"
 run "php artisan compta:smoke-test-v5"
+
+echo "[$(date)] Step 6 : invariants"
+run "php artisan compta:check-integrity"
+run "php artisan compta:assert-pd-complete --check"
+run "php artisan compta:reconcilier-statuts --check"
 
 echo "[$(date)] deploy-preprod-v5 terminé avec succès."

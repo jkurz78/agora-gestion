@@ -52,11 +52,23 @@ else
   php artisan compta:backfill-partie-double --exercice=current
 fi
 
+# Réconciliation des statuts — OBLIGATOIRE, et seulement après le backfill.
+# La migration 2026_06_04_120100_reclasser_statuts_en_main tourne au `migrate`,
+# avant que les lignes partie double n'existent : le resolver retombe alors sur
+# la colonne stockée et la reclassification est un no-op. Sans cette étape, les
+# recettes chèque/espèces jamais remises restent étiquetées « Reçu » au lieu de
+# « À remettre ». Voir docs/compta-partie-double.md §8.
+echo "[$(date)] Step 6b: reconcile règlement statuses (after backfill)"
+php artisan compta:reconcilier-statuts
+
 echo "[$(date)] Step 7: optimize:clear + up"
 php artisan optimize:clear
 php artisan up
 
-echo "[$(date)] Step 8: smoke test"
+echo "[$(date)] Step 8: smoke test + invariants"
 php artisan compta:smoke-test-v5
+php artisan compta:check-integrity
+php artisan compta:assert-pd-complete --check
+php artisan compta:reconcilier-statuts --check
 
 echo "[$(date)] Done. Preprod ${BRANCH} is live."
