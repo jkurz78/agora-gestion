@@ -53,8 +53,17 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Step 2 : Migrations Laravel
+# Step 2 : Migrations Laravel — SOUS MAINTENANCE.
+#
+#          Mesuré sur la préprod NAS (MariaDB 11.8, données prod) le 2026-07-29 :
+#          ~10 minutes pour les 28 migrations, dont 2 min 19 s pour le seul
+#          drop_sous_categories_and_categories. En local (MySQL 8.4 sur SSD) la
+#          même séquence prend 3,8 s — ne jamais dimensionner la fenêtre de
+#          bascule sur la mesure locale.
 # ---------------------------------------------------------------------------
+
+echo "[$(date)] Step 2 : php artisan down (fenêtre de maintenance)"
+run "php artisan down --message='Migration comptable en cours, retour dans quelques minutes' --retry=60 || true"
 
 echo "[$(date)] Step 2 : php artisan migrate --force"
 run "php artisan migrate --force"
@@ -91,8 +100,26 @@ run "php artisan compta:corriger-cheques-reportes"
 # Step 5 : Activer le feature flag COMPTA_USE_PARTIE_DOUBLE
 # ---------------------------------------------------------------------------
 
+# Le sed seul ne suffit pas : si la ligne est absente du .env (cas constaté sur
+# la préprod NAS le 2026-07-29), il ne fait rien et le flag reste à false — sans
+# que le script ne le signale. On ajoute la ligne quand elle manque.
 echo "[$(date)] Step 5 : activation du feature flag COMPTA_USE_PARTIE_DOUBLE=true"
-run "sed -i 's/COMPTA_USE_PARTIE_DOUBLE=false/COMPTA_USE_PARTIE_DOUBLE=true/' .env"
+run "grep -q '^COMPTA_USE_PARTIE_DOUBLE=' .env \
+     && sed -i 's/^COMPTA_USE_PARTIE_DOUBLE=.*/COMPTA_USE_PARTIE_DOUBLE=true/' .env \
+     || echo 'COMPTA_USE_PARTIE_DOUBLE=true' >> .env"
+run "grep '^COMPTA_USE_PARTIE_DOUBLE=' .env"
+
+# ⚠️ Déploiement conteneurisé (préprod NAS) : le compose injecte le .env via
+#    `env_file`, donc les variables sont gelées à la CRÉATION du conteneur.
+#    Éditer le .env puis `config:clear` ne suffit pas — l'app continue de lire
+#    l'ancienne valeur. Constaté le 2026-07-29 : flag à true dans le fichier,
+#    `config:show compta` toujours à false. Il faut recréer le conteneur :
+#        docker compose -f docker-compose.staging.yml up -d app
+#    Toujours contrôler la valeur effective, pas seulement le fichier :
+#        php artisan config:show compta | grep use_partie_double
+echo "[$(date)] Step 5 : contrôle de la valeur EFFECTIVE vue par l'application"
+run "php artisan config:clear"
+run "php artisan config:show compta | grep use_partie_double"
 
 # ---------------------------------------------------------------------------
 # Step 5b : Réconciliation des statuts de règlement — OBLIGATOIRE après le backfill.
@@ -125,5 +152,12 @@ echo "[$(date)] Step 6 : invariants"
 run "php artisan compta:check-integrity"
 run "php artisan compta:assert-pd-complete --check"
 run "php artisan compta:reconcilier-statuts --check"
+
+# ---------------------------------------------------------------------------
+# Step 7 : Sortie de maintenance — seulement une fois les invariants verts.
+# ---------------------------------------------------------------------------
+
+echo "[$(date)] Step 7 : php artisan up (fin de la fenêtre de maintenance)"
+run "php artisan up"
 
 echo "[$(date)] deploy-preprod-v5 terminé avec succès."
