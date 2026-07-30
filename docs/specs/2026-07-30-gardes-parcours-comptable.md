@@ -193,13 +193,19 @@ Reproduire les situations réelles du 2026-07-29, pas des cas d'école.
 
 ## 8. Hors périmètre
 
-Explicitement exclus de cette tranche :
+**Périmètre réduit le 2026-07-30, en cours de réalisation.** Après quatre tasks, le volume de construction est apparu disproportionné au risque : l'association compte **un seul tenant en production**, et l'argument « chaque nouvelle association » qui justifiait une fonction permanente était spéculatif. Ce qui empêche réellement la répétition du 2026-07-29 tient en deux choses — la séquence d'exploitation corrigée dans les scripts de déploiement, et **une garde bloquante à la clôture**. Le reste relevait du « tant qu'on y est ».
 
-- l'écran IHM de reprise initiale (tranche 2) ;
-- le retrait du drapeau `COMPTA_USE_PARTIE_DOUBLE` ;
-- toute modification de `checkOuverturePrecedente` ;
-- toute table nouvelle ;
-- toute correction des données de la préprod, qui relève d'un geste d'exploitation.
+Livré : l'énumération, l'objet-valeur, le résolveur avec ses deux règles dont le contrôle de couverture, la garde de l'assistant de clôture, et le refus dans `ExerciceService::cloturer()` — sans lequel la garde resterait consultative.
+
+Abandonnés, avec leur raison :
+
+| Abandonné | Pourquoi |
+|---|---|
+| Règle de réconciliation des statuts | Sur-stricte : des statuts périmés ne corrompent pas la clôture, l'à-nouveau se construit sur le grand livre et non sur le miroir. Elle bloquerait la préprod aujourd'hui sans motif comptable. |
+| Commande `compta:etat` | Les trois gates existantes donnent déjà la réponse, et le piège du drapeau qu'elle devait révéler est corrigé dans le script de déploiement. |
+| Garde sur `compta:bootstrap-an` | La séquence est désormais scriptée : backfill puis réconciliation, dans cet ordre. |
+
+Restent exclus comme prévu : l'écran IHM de reprise initiale (tranche 2), le retrait du drapeau `COMPTA_USE_PARTIE_DOUBLE`, toute modification de `checkOuverturePrecedente`, toute table nouvelle, et toute correction des données de la préprod, qui relève d'un geste d'exploitation.
 
 ## 9. Références
 

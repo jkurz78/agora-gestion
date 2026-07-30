@@ -10,7 +10,16 @@
 
 **Spec:** [docs/specs/2026-07-30-gardes-parcours-comptable.md](../docs/specs/2026-07-30-gardes-parcours-comptable.md)
 
-**Écart assumé vis-à-vis de la spec :** la garde de clôture s'appelle « Préalables comptables » et non « Soldes historiques repris ». Elle couvre les trois préalables (backfill, reprise, réconciliation) ; le nom de la spec ne décrivait que le deuxième.
+**Écart assumé vis-à-vis de la spec :** la garde de clôture s'appelle « Préalables comptables » et non « Soldes historiques repris ».
+
+> ## ⚠️ Plan clos par anticipation le 2026-07-30
+>
+> Livrées : tasks 1 à 4 (dont le contrôle de couverture, plus large que prévu), 7 et 8.
+> **Abandonnées : tasks 5, 6 (repliée dans la 8), 9, 10 et 11.**
+>
+> Motif : le volume de construction était disproportionné au risque. L'association compte un seul tenant en production, et l'argument « chaque nouvelle association » qui justifiait une fonction permanente était spéculatif. Ce qui empêche la répétition du 2026-07-29, c'est la séquence d'exploitation corrigée dans les scripts de déploiement — déjà committée — et une garde bloquante à la clôture. Le reste relevait du « tant qu'on y est ».
+>
+> Voir le § 8 de la spec pour le détail de chaque abandon. Les tasks qui suivent sont conservées comme trace de ce qui avait été prévu ; **ne pas les exécuter sans rouvrir la décision**.
 
 ---
 
