@@ -268,6 +268,11 @@ git commit -m "feat(compta): objet-valeur de l'état comptable d'une association
 
 Le critère est celui du backfill lui-même (`compta:backfill-partie-double` convertit les transactions `equilibree = false`) et l'exclusion HelloAsso est celle d'`compta:assert-pd-complete` (`whereNull('helloasso_order_id')`). Aucun troisième critère n'est écrit.
 
+> **Livré et corrigé en revue — le code fait foi, voir `c9a41357` puis `a4bcc2c7`.** Trois écarts par rapport au bloc ci-dessous :
+> le résolveur **échoue fermé** (il exige un `TenantContext` booté, sinon il ne verrait aucune donnée et se dirait opérationnel) ;
+> la cause parle d'« opération(s) sans écriture comptable complète » et non de conversion, vocabulaire que l'énumération s'interdit ;
+> le helper de test s'appelle `etatComptaIsolerSoldes()`, sans argument, et se place **après** la création des fixtures — `TransactionFactory` frappe un second compte bancaire au solde aléatoire qu'une remise à zéro anticipée manquait.
+
 **Files:**
 - Create: `app/Services/Compta/EtatComptaResolver.php`
 - Test: `tests/Feature/Compta/EtatComptaResolverTest.php` (ajout)
@@ -296,20 +301,22 @@ Puis ajouter les tests :
  * un tirage aléatoire, donc intermittent, exactement la mine que la recette du
  * 2026-07-24 avait mis une journée à identifier sur mode_paiement.
  */
-function isolerRegleTestee(object $contexte): void
+function etatComptaIsolerSoldes(): void
 {
-    $contexte->compteBancaire->update(['solde_initial' => 0]);
+    CompteBancaire::query()->update(['solde_initial' => 0]);
 }
 
 it('exige le backfill quand des transactions ne sont pas en partie double', function (): void {
     $this->setupPartieDoubleContext();
-    isolerRegleTestee($this);
 
     Transaction::factory()->create([
         'association_id' => $this->association->id,
+        'compte_id' => $this->compteBancaire->id,
         'equilibree' => false,
         'helloasso_order_id' => null,
     ]);
+
+    etatComptaIsolerSoldes();
 
     $etat = app(EtatComptaResolver::class)->pourTenantCourant();
 
@@ -319,13 +326,15 @@ it('exige le backfill quand des transactions ne sont pas en partie double', func
 
 it('n’exige pas le backfill pour une transaction HelloAsso restée legacy', function (): void {
     $this->setupPartieDoubleContext();
-    isolerRegleTestee($this);
 
     Transaction::factory()->create([
         'association_id' => $this->association->id,
+        'compte_id' => $this->compteBancaire->id,
         'equilibree' => false,
         'helloasso_order_id' => 'HA-12345',
     ]);
+
+    etatComptaIsolerSoldes();
 
     $etat = app(EtatComptaResolver::class)->pourTenantCourant();
 
@@ -621,8 +630,8 @@ function transactionMiroirDivergent(string $journal): Transaction
 
 it('exige la réconciliation quand le miroir diverge sur une écriture métier', function (): void {
     $this->setupPartieDoubleContext();
-    isolerRegleTestee($this);
     transactionMiroirDivergent(JournalComptable::Vente->value);
+    etatComptaIsolerSoldes();
 
     $etat = app(EtatComptaResolver::class)->pourTenantCourant();
 
@@ -633,8 +642,8 @@ it('exige la réconciliation quand le miroir diverge sur une écriture métier',
 
 it('ignore une divergence portée par une écriture technique', function (): void {
     $this->setupPartieDoubleContext();
-    isolerRegleTestee($this);
     transactionMiroirDivergent(JournalComptable::Banque->value);
+    etatComptaIsolerSoldes();
 
     $etat = app(EtatComptaResolver::class)->pourTenantCourant();
 

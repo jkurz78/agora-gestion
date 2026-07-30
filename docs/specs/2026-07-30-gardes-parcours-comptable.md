@@ -82,7 +82,11 @@ Les quatre règles sont évaluées dans l'ordre ci-dessous ; la première condit
 
 Il reste des transactions non converties en partie double.
 
-**Critère** : celui de `compta:assert-pd-complete`, réutilisé tel quel — y compris son exclusion des transactions HelloAsso restées legacy par construction. Sur la préprod, ce sont le « ℹ 1 transaction HelloAsso non enrichie » que la commande sort en information et non en erreur : le résolveur hérite de ce jugement, il n'en formule pas un second.
+**Critère** : le drapeau `equilibree = false`, qui est la sélection du backfill lui-même, avec l'exclusion HelloAsso d'`compta:assert-pd-complete` (`helloasso_order_id` non nul) — ces transactions restent legacy par construction, leur enrichissement est best-effort au sync.
+
+**Le critère est volontairement plus étroit que celui d'`assert-pd-complete`**, qui vérifie en outre la présence de lignes et l'équilibre débit/crédit de chacune. Un contrôle exécuté à chaque requête ne peut pas payer ce coût ; le critère complet reste appliqué au déploiement, où `assert-pd-complete --check` figure déjà dans la séquence. Les deux ne peuvent pas beaucoup diverger : tout chemin d'écriture supporté pose `equilibree = true` dans la même transaction que `PartieDoubleGuard::assertComplete()`.
+
+⚠️ **Risque résiduel accepté.** `TransactionConverter` renonce silencieusement dans cinq cas (montant nul, tiers absent, pas de ventilation, classe de compte inattendue, compte de trésorerie irrésoluble) et laisse `equilibree = false` définitivement. Une association qui en porterait une ne pourrait plus clôturer, et le backfill prescrit ne la débloquerait pas — il rapporterait « 0 convertie, N skippée ». **Mesuré sur le clone prod le 2026-07-30 : zéro transaction dans ce cas** (la seule non convertie est HelloAsso, donc exclue). Le risque n'est donc pas matérialisé. S'il le devient, la sortie est d'offrir au backfill un moyen d'enregistrer son renoncement — une colonne ou une valeur de `type_ecriture` que le résolveur exclut nommément, sur le modèle exact de l'exclusion HelloAsso. Sur la préprod, ce sont le « ℹ 1 transaction HelloAsso non enrichie » que la commande sort en information et non en erreur : le résolveur hérite de ce jugement, il n'en formule pas un second.
 
 **Geste prescrit** : `compta:backfill-partie-double --all`.
 
