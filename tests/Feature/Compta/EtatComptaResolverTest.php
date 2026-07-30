@@ -6,7 +6,6 @@ use App\Enums\EtapeCompta;
 use App\Enums\OrigineANouveau;
 use App\Enums\StatutANouveau;
 use App\Models\ANouveauGeneration;
-use App\Models\CompteBancaire;
 use App\Models\Transaction;
 use App\Services\Compta\EtatCompta;
 use App\Services\Compta\EtatComptaResolver;
@@ -91,21 +90,6 @@ it('refuse Operationnel comme clé de blocage', function (): void {
         ->toThrow(InvalidArgumentException::class);
 });
 
-/**
- * Met à zéro tous les soldes bancaires du tenant.
- *
- * À appeler APRÈS la création des fixtures : TransactionFactory pose
- * `compte_id => CompteBancaire::factory()`, donc chaque transaction créée sans
- * compte explicite frappe un second compte bancaire dont le solde est tiré au
- * hasard entre 0 et 10 000. Une règle du résolveur compte les comptes portant un
- * solde non nul : sans cette remise à zéro, les tests des autres règles
- * échoueraient sur un tirage aléatoire, donc par intermittence.
- */
-function etatComptaIsolerSoldes(): void
-{
-    CompteBancaire::query()->update(['solde_initial' => 0]);
-}
-
 it('exige le backfill quand des transactions ne sont pas en partie double', function (): void {
     $this->setupPartieDoubleContext();
 
@@ -115,8 +99,6 @@ it('exige le backfill quand des transactions ne sont pas en partie double', func
         'equilibree' => false,
         'helloasso_order_id' => null,
     ]);
-
-    etatComptaIsolerSoldes();
 
     $etat = app(EtatComptaResolver::class)->pourTenantCourant();
 
@@ -133,8 +115,6 @@ it('compte les opérations concernées dans sa cause, sans jargon de migration',
         'equilibree' => false,
         'helloasso_order_id' => null,
     ]);
-
-    etatComptaIsolerSoldes();
 
     $etat = app(EtatComptaResolver::class)->pourTenantCourant();
 
@@ -154,8 +134,6 @@ it('n’exige pas le backfill pour une transaction HelloAsso restée legacy', fu
         'equilibree' => false,
         'helloasso_order_id' => 'HA-12345',
     ]);
-
-    etatComptaIsolerSoldes();
 
     $etat = app(EtatComptaResolver::class)->pourTenantCourant();
 
@@ -190,7 +168,6 @@ it('exige la reprise quand un solde bancaire historique n’est pas repris', fun
 
 it('n’exige pas de reprise quand tous les soldes bancaires sont à zéro', function (): void {
     $this->setupPartieDoubleContext();
-    etatComptaIsolerSoldes();
 
     $etat = app(EtatComptaResolver::class)->pourTenantCourant();
 
