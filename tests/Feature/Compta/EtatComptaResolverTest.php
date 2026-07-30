@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 use App\Enums\EtapeCompta;
+use App\Enums\OrigineANouveau;
+use App\Enums\StatutANouveau;
+use App\Models\ANouveauGeneration;
 use App\Models\CompteBancaire;
 use App\Models\Transaction;
 use App\Services\Compta\EtatCompta;
@@ -167,4 +170,51 @@ it('refuse de répondre sans TenantContext booté plutôt que de se dire opérat
 
     expect(fn () => app(EtatComptaResolver::class)->pourTenantCourant())
         ->toThrow(RuntimeException::class, 'TenantContext');
+});
+
+it('exige la reprise quand un solde bancaire historique n’est pas repris', function (): void {
+    $this->setupPartieDoubleContext();
+
+    // Les soldes réels de la préprod au moment du défaut du 2026-07-29.
+    $this->compteBancaire->update([
+        'solde_initial' => 2388.82,
+        'date_solde_initial' => '2024-08-31',
+    ]);
+
+    $etat = app(EtatComptaResolver::class)->pourTenantCourant();
+
+    expect($etat->exige(EtapeCompta::RepriseInitialeRequise))->toBeTrue()
+        ->and($etat->etape())->toBe(EtapeCompta::RepriseInitialeRequise)
+        ->and($etat->causes())->toContain('solde historique');
+});
+
+it('n’exige pas de reprise quand tous les soldes bancaires sont à zéro', function (): void {
+    $this->setupPartieDoubleContext();
+    etatComptaIsolerSoldes();
+
+    $etat = app(EtatComptaResolver::class)->pourTenantCourant();
+
+    // Une association qui démarre à zéro n'a rien à reprendre : elle traverse
+    // cette étape sans rien faire. C'est le cas nominal, pas une exception.
+    expect($etat->exige(EtapeCompta::RepriseInitialeRequise))->toBeFalse();
+});
+
+it('considère la reprise faite quand une génération reprise_initiale est active', function (): void {
+    $this->setupPartieDoubleContext();
+
+    $this->compteBancaire->update(['solde_initial' => 2388.82]);
+
+    ANouveauGeneration::create([
+        'association_id' => $this->association->id,
+        'exercice_source' => 2023,
+        'exercice_cible' => 2024,
+        'transaction_id' => null,
+        'origine' => OrigineANouveau::RepriseInitiale,
+        'statut' => StatutANouveau::Active,
+        'cree_par_id' => $this->user->id,
+    ]);
+
+    $etat = app(EtatComptaResolver::class)->pourTenantCourant();
+
+    expect($etat->exige(EtapeCompta::RepriseInitialeRequise))->toBeFalse();
 });
