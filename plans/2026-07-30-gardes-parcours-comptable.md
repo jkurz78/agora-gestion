@@ -32,7 +32,7 @@
 | Fichier | Responsabilité |
 |---|---|
 | `app/Enums/EtapeCompta.php` | Les quatre étapes et leur libellé français (aucune commande) |
-| `app/Services/Compta/EtatCompta.php` | Objet-valeur immuable : étape + blocages |
+| `app/Services/Compta/EtatCompta.php` | Objet-valeur immuable : les blocages, dont l'étape se déduit |
 | `app/Services/Compta/EtatComptaResolver.php` | La déduction, en lecture seule |
 | `app/Exceptions/Compta/EtapeComptaRequiseException.php` | Refus porteur de l'état |
 | `app/Console/Commands/EtatComptaCommand.php` | `compta:etat`, diagnostic |
@@ -226,56 +226,24 @@ Expected: FAIL — `Class "App\Services\Compta\EtatCompta" not found`
 
 Créer `app/Services/Compta/EtatCompta.php` :
 
+> Forme révisée après la revue : un seul champ, l'étape déduite, les clés validées.
+> Le code livré fait foi — voir le commit `de3da6ed`.
+
 ```php
-<?php
-
-declare(strict_types=1);
-
-namespace App\Services\Compta;
-
-use App\Enums\EtapeCompta;
-
-/**
- * État comptable d'une association à un instant donné — dérivé, jamais stocké.
- */
 final readonly class EtatCompta
 {
-    /**
-     * @param  array<string, string>  $blocages  Conditions bloquantes détectées,
-     *                                           indexées par EtapeCompta::value,
-     *                                           décrites en français et SANS commande.
-     */
-    public function __construct(
-        public EtapeCompta $etape,
-        public array $blocages,
-    ) {}
-
-    public function estOperationnel(): bool
+    /** @param  array<string, string>  $blocages  Indexés par EtapeCompta::value, sans commande. */
+    public function __construct(public array $blocages)
     {
-        return $this->etape === EtapeCompta::Operationnel;
+        // Rejette toute clé inconnue et Operationnel : sans ce contrôle, une clé
+        // mal orthographiée est affichée par le diagnostic mais invisible
+        // d'exige(), et une garde laisse passer l'opération sans rien signaler.
     }
 
-    /**
-     * Cette condition précise fait-elle partie des blocages ?
-     *
-     * Une garde exprime ainsi son intention (« le backfill est-il requis ? »)
-     * sans comparer l'identité de $etape, qui ne révèle que le premier blocage.
-     */
-    public function exige(EtapeCompta $etape): bool
-    {
-        return isset($this->blocages[$etape->value]);
-    }
-
-    /**
-     * Les causes, concaténées, prêtes à afficher sur n'importe quel support.
-     *
-     * Ne contient jamais de commande : le remède dépend du support et du tenant,
-     * c'est à l'appelant de le composer.
-     */
+    public function etape(): EtapeCompta      // premier blocage dans l'ordre déclaré
+    public function estOperationnel(): bool   // $this->blocages === []
+    public function exige(EtapeCompta $condition): bool
     public function causes(): string
-    {
-        return implode(' ', $this->blocages);
-    }
 }
 ```
 
@@ -330,7 +298,7 @@ it('exige le backfill quand des transactions ne sont pas en partie double', func
 
     $etat = app(EtatComptaResolver::class)->pourTenantCourant();
 
-    expect($etat->etape)->toBe(EtapeCompta::BackfillRequis)
+    expect($etat->etape())->toBe(EtapeCompta::BackfillRequis)
         ->and($etat->blocages)->toHaveCount(1);
 });
 
@@ -345,7 +313,7 @@ it('n’exige pas le backfill pour une transaction HelloAsso restée legacy', fu
 
     $etat = app(EtatComptaResolver::class)->pourTenantCourant();
 
-    expect($etat->etape)->not->toBe(EtapeCompta::BackfillRequis);
+    expect($etat->etape())->not->toBe(EtapeCompta::BackfillRequis);
 });
 ```
 
@@ -384,18 +352,16 @@ final class EtatComptaResolver
     public function pourTenantCourant(): EtatCompta
     {
         $blocages = [];
-        $etape = null;
 
         $legacy = $this->transactionsHorsPartieDouble();
         if ($legacy > 0) {
-            $etape ??= EtapeCompta::BackfillRequis;
             $blocages[EtapeCompta::BackfillRequis->value] = sprintf(
                 '%d transaction(s) ne sont pas converties en partie double.',
                 $legacy,
             );
         }
 
-        return new EtatCompta($etape ?? EtapeCompta::Operationnel, $blocages);
+        return new EtatCompta($blocages);
     }
 
     /**
@@ -461,7 +427,7 @@ it('exige la reprise initiale quand un solde bancaire historique n’est pas rep
 
     $etat = app(EtatComptaResolver::class)->pourTenantCourant();
 
-    expect($etat->etape)->toBe(EtapeCompta::RepriseInitialeRequise)
+    expect($etat->etape())->toBe(EtapeCompta::RepriseInitialeRequise)
         ->and($etat->causes())->toContain('solde historique');
 });
 
@@ -472,7 +438,7 @@ it('n’exige pas de reprise quand tous les soldes bancaires sont à zéro', fun
 
     $etat = app(EtatComptaResolver::class)->pourTenantCourant();
 
-    expect($etat->etape)->not->toBe(EtapeCompta::RepriseInitialeRequise);
+    expect($etat->etape())->not->toBe(EtapeCompta::RepriseInitialeRequise);
 });
 
 it('considère la reprise faite quand une génération reprise_initiale est active', function (): void {
@@ -492,7 +458,7 @@ it('considère la reprise faite quand une génération reprise_initiale est acti
 
     $etat = app(EtatComptaResolver::class)->pourTenantCourant();
 
-    expect($etat->etape)->not->toBe(EtapeCompta::RepriseInitialeRequise);
+    expect($etat->etape())->not->toBe(EtapeCompta::RepriseInitialeRequise);
 });
 ```
 
@@ -520,7 +486,6 @@ Puis, dans `pourTenantCourant()`, après le bloc du backfill et avant le `return
 ```php
         $comptesNonRepris = $this->comptesBancairesNonRepris();
         if ($comptesNonRepris > 0) {
-            $etape ??= EtapeCompta::RepriseInitialeRequise;
             $blocages[EtapeCompta::RepriseInitialeRequise->value] = sprintf(
                 '%d compte(s) bancaire(s) portent un solde historique jamais entré dans le grand livre.',
                 $comptesNonRepris,
@@ -641,7 +606,7 @@ it('exige la réconciliation quand le miroir diverge sur une écriture métier',
 
     $etat = app(EtatComptaResolver::class)->pourTenantCourant();
 
-    expect($etat->etape)->toBe(EtapeCompta::ReconciliationRequise)
+    expect($etat->etape())->toBe(EtapeCompta::ReconciliationRequise)
         ->and($etat->causes())->toContain('désaccord avec le grand livre');
 });
 
@@ -651,7 +616,7 @@ it('ignore une divergence portée par une écriture technique', function (): voi
 
     $etat = app(EtatComptaResolver::class)->pourTenantCourant();
 
-    expect($etat->etape)->toBe(EtapeCompta::Operationnel);
+    expect($etat->etape())->toBe(EtapeCompta::Operationnel);
 });
 ```
 
@@ -678,7 +643,6 @@ Dans `pourTenantCourant()`, après le bloc de la reprise :
 ```php
         $divergences = $this->divergencesMiroir();
         if ($divergences > 0) {
-            $etape ??= EtapeCompta::ReconciliationRequise;
             $blocages[EtapeCompta::ReconciliationRequise->value] = sprintf(
                 '%d transaction(s) portent un statut de règlement en désaccord avec le grand livre.',
                 $divergences,
@@ -795,7 +759,7 @@ final class EtapeComptaRequiseException extends RuntimeException
 
     public static function pour(EtatCompta $etat): self
     {
-        return new self($etat->etape->label().' — '.$etat->causes(), $etat);
+        return new self($etat->etape()->label().' — '.$etat->causes(), $etat);
     }
 }
 ```
@@ -1222,16 +1186,22 @@ final class EtatComptaCommand extends Command
                     'Association #%d (%s) — %s',
                     (int) $association->id,
                     $association->nom,
-                    $etat->etape->label(),
+                    $etat->etape()->label(),
                 ));
 
-                foreach ($etat->blocages as $blocage) {
+                // Un remède par blocage, et non un seul pour l'étape courante :
+                // quand deux préalables manquent, l'opérateur doit voir les deux
+                // gestes. La clé du tableau porte l'étape concernée.
+                foreach ($etat->blocages as $cle => $blocage) {
                     $this->line('  ⚠️  '.$blocage);
+
+                    $remede = $this->remede(EtapeCompta::from((string) $cle), (int) $association->id);
+                    if ($remede !== null) {
+                        $this->line('     → '.$remede);
+                    }
                 }
 
-                $remede = $this->remede($etat->etape, (int) $association->id);
-                if ($remede !== null) {
-                    $this->line('  → '.$remede);
+                if (! $etat->estOperationnel()) {
                     $tousOperationnels = false;
                 }
             }
@@ -1348,7 +1318,7 @@ Puis, dans `handle()`, **après** le boot de `TenantContext` sur l'association c
         // un grand livre incomplet produirait des montants faux.
         $etat = app(EtatComptaResolver::class)->pourTenantCourant();
         if ($etat->exige(EtapeCompta::BackfillRequis)) {
-            $this->error($etat->etape->label().' — '.$etat->causes());
+            $this->error($etat->etape()->label().' — '.$etat->causes());
             $this->line('  → php artisan compta:backfill-partie-double --all --asso='.(int) $associationOption);
 
             return self::FAILURE;

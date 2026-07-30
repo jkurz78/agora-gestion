@@ -54,15 +54,17 @@ Les libellés évitent deux pièges. « Conversion » et « backfill » décrive
 
 ### `App\Services\Compta\EtatCompta`
 
-Objet-valeur immuable, `final readonly` :
+Objet-valeur immuable, `final readonly`, **avec un seul champ** :
 
-- `etape` — l'étape courante, c'est-à-dire le premier blocage détecté ;
-- `blocages` — les conditions bloquantes détectées, **indexées par la valeur de l'étape** qu'elles concernent, chacune décrite en français sans commande ;
-- `estOperationnel(): bool` ;
-- `exige(EtapeCompta $etape): bool` — cette condition précise fait-elle partie des blocages ? Permet à une garde d'exprimer son intention (« le backfill est-il requis ? ») sans comparer l'identité de `etape`, qui ne révèle que le premier blocage ;
+- `blocages` — les conditions bloquantes détectées, **indexées par la valeur de l'étape** qu'elles concernent, chacune décrite en français sans commande. Le constructeur rejette toute clé qui n'est pas une valeur d'`EtapeCompta`, ainsi que `Operationnel` ;
+- `etape(): EtapeCompta` — **déduite** : le premier blocage dans l'ordre de déclaration de l'énumération, ou `Operationnel` ;
+- `estOperationnel(): bool` — vrai exactement quand il n'y a aucun blocage ;
+- `exige(EtapeCompta $condition): bool` — cette condition précise fait-elle partie des blocages ? Permet à une garde d'exprimer son intention (« le backfill est-il requis ? ») sans dépendre de l'étape courante, qui ne révèle que le premier blocage ;
 - `causes(): string` — les causes concaténées, prêtes à afficher sur n'importe quel support.
 
-L'indexation par étape rend vraie la promesse d'ordre de l'énumération : insérer une étape plus tôt ne casse silencieusement aucune garde, puisqu'aucune garde ne repose sur « l'étape courante vaut exactement X ».
+**Révisé le 2026-07-30 après la revue de la task 2.** La première version stockait `etape` à côté de `blocages`. Or l'étape s'en déduit entièrement : la stocker rendait représentable un état qui se contredit — `estOperationnel()` vrai et `exige()` vrai simultanément — soit précisément le défaut de seconde source de vérité que ce chantier corrige. Un objet dont la première ligne annonce « dérivé, jamais stocké » ne peut pas stocker un dérivé.
+
+Deux bénéfices en découlent. La promesse d'ordre de l'énumération devient vraie : elle repose désormais sur l'ordre de déclaration, et non sur l'ordre d'évaluation des règles du résolveur, que rien n'imposait. Et la validation des clés ferme un contournement muet : sans elle, une clé mal orthographiée était affichée par le diagnostic mais invisible d'`exige()`, si bien qu'une garde laissait passer l'opération sans rien signaler.
 
 ### `App\Services\Compta\EtatComptaResolver`
 
