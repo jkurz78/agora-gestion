@@ -7,12 +7,14 @@ namespace App\Services;
 use App\Enums\OrigineANouveau;
 use App\Enums\StatutExercice;
 use App\Enums\TypeActionExercice;
+use App\Exceptions\Compta\EtapeComptaRequiseException;
 use App\Exceptions\ExerciceCloturedException;
 use App\Models\Exercice;
 use App\Models\ExerciceAction;
 use App\Models\User;
 use App\Services\Compta\ANouveau\ANouveauPreviewBuilder;
 use App\Services\Compta\ANouveau\ANouveauService;
+use App\Services\Compta\EtatComptaResolver;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
@@ -160,6 +162,15 @@ final class ExerciceService
                 ->whereKey((int) $exercice->id)
                 ->lockForUpdate()
                 ->firstOrFail();
+
+            // Défense en profondeur : les gardes de l'assistant sont
+            // consultatives, ce service peut être appelé directement. Refuser ici
+            // rend la garde réelle. Un utilisateur normal ne voit jamais cette
+            // exception : l'assistant l'a arrêté avant.
+            $etatCompta = app(EtatComptaResolver::class)->pourTenantCourant();
+            if (! $etatCompta->estOperationnel()) {
+                throw EtapeComptaRequiseException::pour($etatCompta);
+            }
 
             if (config('compta.use_partie_double')) {
                 $exerciceCible = Exercice::query()
