@@ -16,6 +16,7 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\VirementInterne;
 use App\Services\Compta\ANouveau\ANouveauPreviewBuilder;
+use App\Services\Compta\EtatComptaResolver;
 use Throwable;
 
 final class ClotureCheckService
@@ -23,6 +24,7 @@ final class ClotureCheckService
     public function __construct(
         private readonly ExerciceService $exerciceService,
         private readonly SoldeService $soldeService,
+        private readonly EtatComptaResolver $etatCompta,
     ) {}
 
     public function executer(int $annee): ClotureCheckResult
@@ -33,6 +35,7 @@ final class ClotureCheckService
 
         return new ClotureCheckResult(
             bloquants: [
+                $this->checkPrealablesComptables(),
                 $this->checkOuverturePrecedente($annee),
                 $this->checkRapprochementsEnCours($start, $end),
                 $this->checkLignesSansCompte($annee),
@@ -46,6 +49,32 @@ final class ClotureCheckService
                 $this->checkMouvementsExerciceCible($annee),
             ],
             soldesComptes: $this->calculerSoldesComptes($annee),
+        );
+    }
+
+    /**
+     * Les préalables comptables sont-ils réunis ?
+     *
+     * Garde ajoutée après la recette du 2026-07-29 : une clôture avait été
+     * acceptée sans reprise initiale, produisant une ouverture amputée de
+     * 26 000 €. checkOuverturePrecedente ne pouvait pas le voir — elle sort au
+     * vert dès que l'exercice précédent n'existe pas, ce qui est le cas de toute
+     * première clôture — et checkANouveau ne teste que l'équilibre débit/crédit
+     * d'un aperçu par ailleurs incomplet.
+     *
+     * Le message ne prescrit aucune commande : ces préalables se traitent en
+     * administration, et le trésorier qui lit cette checklist n'a pas de console.
+     */
+    private function checkPrealablesComptables(): CheckItem
+    {
+        $etat = $this->etatCompta->pourTenantCourant();
+
+        return new CheckItem(
+            nom: 'Préalables comptables',
+            ok: $etat->estOperationnel(),
+            message: $etat->estOperationnel()
+                ? 'Les soldes historiques et les écritures sont à jour'
+                : $etat->causes().' Ces préalables doivent être traités avant la clôture.',
         );
     }
 

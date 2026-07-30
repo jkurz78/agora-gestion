@@ -1,7 +1,12 @@
 <?php
 
+use App\Enums\OrigineANouveau;
+use App\Enums\StatutANouveau;
+use App\Models\ANouveauGeneration;
 use App\Models\Association;
 use App\Models\Compte;
+use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -99,6 +104,52 @@ function compteSysteme(string $numero): Compte
     return Compte::where('numero_pcg', $numero)
         ->where('association_id', TenantContext::currentId())
         ->firstOrFail();
+}
+
+/**
+ * Une reprise initiale réaliste : la génération et sa pièce d'à-nouveau, portant
+ * une ligne sur chacun des comptes 512X passés en argument.
+ *
+ * Partagé (au lieu de vivre dans un seul fichier de test) car un test lancé
+ * seul par son chemin de fichier ne charge que ce fichier — les fonctions
+ * globales déclarées dans un autre fichier de test ne sont alors pas
+ * disponibles, contrairement à une exécution de suite complète ou filtrée qui
+ * charge tous les fichiers avant d'appliquer le filtre.
+ *
+ * @param  list<Compte>  $comptesCouverts
+ */
+function etatComptaCreerReprise(
+    object $contexte,
+    array $comptesCouverts,
+    int $exerciceCible = 2024,
+    StatutANouveau $statut = StatutANouveau::Active,
+    OrigineANouveau $origine = OrigineANouveau::RepriseInitiale,
+): ANouveauGeneration {
+    $piece = Transaction::factory()->create([
+        'association_id' => $contexte->association->id,
+        'compte_id' => $contexte->compteBancaire->id,
+        'equilibree' => true,
+    ]);
+
+    foreach ($comptesCouverts as $compte) {
+        TransactionLigne::forceCreate([
+            'transaction_id' => (int) $piece->id,
+            'compte_id' => (int) $compte->id,
+            'montant' => 0,
+            'debit' => '2388.82',
+            'credit' => 0,
+        ]);
+    }
+
+    return ANouveauGeneration::create([
+        'association_id' => $contexte->association->id,
+        'exercice_source' => $exerciceCible - 1,
+        'exercice_cible' => $exerciceCible,
+        'transaction_id' => (int) $piece->id,
+        'origine' => $origine,
+        'statut' => $statut,
+        'cree_par_id' => $contexte->user->id,
+    ]);
 }
 
 /**

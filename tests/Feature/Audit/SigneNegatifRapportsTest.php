@@ -163,7 +163,12 @@ it('super_admin_dashboard_renders_with_negative_transactions_in_db', function ()
 it('cloture_wizard_calcule_solde_ouverture_avec_negatifs', function () {
     // Tx recette -100 € : réduit totalRecettes, ce qui augmente soldeOuverture calculé
     // (formule : soldeReel - recettes + depenses - vIn + vOut)
-    $this->makeAuditTransaction('recette', -100.0, $this->sc, $this->compte, 2025);
+    // equilibree: true — makeAuditTransaction ne crée que la ligne de
+    // ventilation (pas de lignes PD 411/401/512) ; ce test exerce
+    // computeFinancialSummary(), pas la complétude comptable, et sans ce
+    // drapeau la nouvelle garde « Préalables comptables » de
+    // ClotureCheckService bloquerait le passage à l'étape 2.
+    $this->makeAuditTransaction('recette', -100.0, $this->sc, $this->compte, 2025, overrides: ['equilibree' => true]);
 
     $component = Livewire::test(ClotureWizard::class)
         ->call('suite')   // step 1 → step 2
@@ -182,11 +187,12 @@ it('cloture_wizard_calcule_solde_ouverture_avec_negatifs', function () {
 
 it('cloture_wizard_resultat_avec_dataset_mixte', function () {
     // +200 recette, -50 recette, +80 dépense
-    $this->makeAuditTransaction('recette', 200.0, $this->sc, $this->compte, 2025);
-    $this->makeAuditTransaction('recette', -50.0, $this->sc, $this->compte, 2025);
+    // equilibree: true sur les trois — voir le commentaire du test précédent.
+    $this->makeAuditTransaction('recette', 200.0, $this->sc, $this->compte, 2025, overrides: ['equilibree' => true]);
+    $this->makeAuditTransaction('recette', -50.0, $this->sc, $this->compte, 2025, overrides: ['equilibree' => true]);
 
     $compteDepense = Compte::factory()->depense()->numero('606')->create();
-    $this->makeAuditTransaction('depense', 80.0, $compteDepense, $this->compte, 2025);
+    $this->makeAuditTransaction('depense', 80.0, $compteDepense, $this->compte, 2025, overrides: ['equilibree' => true]);
 
     $component = Livewire::test(ClotureWizard::class)
         ->call('suite')

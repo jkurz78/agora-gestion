@@ -5,12 +5,10 @@ declare(strict_types=1);
 use App\Enums\EtapeCompta;
 use App\Enums\OrigineANouveau;
 use App\Enums\StatutANouveau;
-use App\Models\ANouveauGeneration;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Exercice;
 use App\Models\Transaction;
-use App\Models\TransactionLigne;
 use App\Services\Compta\EtatCompta;
 use App\Services\Compta\EtatComptaResolver;
 use App\Tenant\TenantContext;
@@ -154,45 +152,10 @@ it('refuse de répondre sans TenantContext booté plutôt que de se dire opérat
         ->toThrow(RuntimeException::class, 'TenantContext');
 });
 
-/**
- * Une reprise initiale réaliste : la génération et sa pièce d'à-nouveau, portant
- * une ligne sur chacun des comptes 512X passés en argument.
- *
- * @param  list<Compte>  $comptesCouverts
- */
-function etatComptaCreerReprise(
-    object $contexte,
-    array $comptesCouverts,
-    int $exerciceCible = 2024,
-    StatutANouveau $statut = StatutANouveau::Active,
-    OrigineANouveau $origine = OrigineANouveau::RepriseInitiale,
-): ANouveauGeneration {
-    $piece = Transaction::factory()->create([
-        'association_id' => $contexte->association->id,
-        'compte_id' => $contexte->compteBancaire->id,
-        'equilibree' => true,
-    ]);
-
-    foreach ($comptesCouverts as $compte) {
-        TransactionLigne::forceCreate([
-            'transaction_id' => (int) $piece->id,
-            'compte_id' => (int) $compte->id,
-            'montant' => 0,
-            'debit' => '2388.82',
-            'credit' => 0,
-        ]);
-    }
-
-    return ANouveauGeneration::create([
-        'association_id' => $contexte->association->id,
-        'exercice_source' => $exerciceCible - 1,
-        'exercice_cible' => $exerciceCible,
-        'transaction_id' => (int) $piece->id,
-        'origine' => $origine,
-        'statut' => $statut,
-        'cree_par_id' => $contexte->user->id,
-    ]);
-}
+// etatComptaCreerReprise() a été déplacée dans tests/Pest.php : lancée seule
+// via son chemin de fichier, cette suite ne charge pas les autres fichiers de
+// test, donc une fonction globale déclarée ici ne serait pas disponible pour
+// eux ; à l'inverse d'une exécution de suite complète ou filtrée par nom.
 
 it('exige la reprise quand aucun solde historique n’est dans le grand livre', function (): void {
     $this->setupPartieDoubleContext();
