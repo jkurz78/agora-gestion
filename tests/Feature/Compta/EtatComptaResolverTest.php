@@ -3,9 +3,11 @@
 declare(strict_types=1);
 
 use App\Enums\EtapeCompta;
+use App\Models\CompteBancaire;
 use App\Models\Transaction;
 use App\Services\Compta\EtatCompta;
 use App\Services\Compta\EtatComptaResolver;
+use App\Tenant\TenantContext;
 use Tests\Support\CreatesPartieDoubleContext;
 
 uses(CreatesPartieDoubleContext::class);
@@ -87,28 +89,31 @@ it('refuse Operationnel comme clé de blocage', function (): void {
 });
 
 /**
- * Neutralise les règles dont le test courant n'est pas le sujet.
+ * Met à zéro tous les soldes bancaires du tenant.
  *
- * CompteBancaireFactory tire solde_initial au hasard entre 0 et 10 000 : sans
- * remise à zéro, la règle de reprise (task 4) se déclencherait sur toutes les
- * fixtures et ferait échouer les tests des autres règles — un échec piloté par
- * un tirage aléatoire, donc intermittent, exactement la mine que la recette du
- * 2026-07-24 avait mis une journée à identifier sur mode_paiement.
+ * À appeler APRÈS la création des fixtures : TransactionFactory pose
+ * `compte_id => CompteBancaire::factory()`, donc chaque transaction créée sans
+ * compte explicite frappe un second compte bancaire dont le solde est tiré au
+ * hasard entre 0 et 10 000. Une règle du résolveur compte les comptes portant un
+ * solde non nul : sans cette remise à zéro, les tests des autres règles
+ * échoueraient sur un tirage aléatoire, donc par intermittence.
  */
-function isolerRegleTestee(object $contexte): void
+function etatComptaIsolerSoldes(): void
 {
-    $contexte->compteBancaire->update(['solde_initial' => 0]);
+    CompteBancaire::query()->update(['solde_initial' => 0]);
 }
 
 it('exige le backfill quand des transactions ne sont pas en partie double', function (): void {
     $this->setupPartieDoubleContext();
-    isolerRegleTestee($this);
 
     Transaction::factory()->create([
         'association_id' => $this->association->id,
+        'compte_id' => $this->compteBancaire->id,
         'equilibree' => false,
         'helloasso_order_id' => null,
     ]);
+
+    etatComptaIsolerSoldes();
 
     $etat = app(EtatComptaResolver::class)->pourTenantCourant();
 
@@ -116,19 +121,50 @@ it('exige le backfill quand des transactions ne sont pas en partie double', func
         ->and($etat->etape())->toBe(EtapeCompta::BackfillRequis);
 });
 
+it('compte les opérations concernées dans sa cause, sans jargon de migration', function (): void {
+    $this->setupPartieDoubleContext();
+
+    Transaction::factory()->count(3)->create([
+        'association_id' => $this->association->id,
+        'compte_id' => $this->compteBancaire->id,
+        'equilibree' => false,
+        'helloasso_order_id' => null,
+    ]);
+
+    etatComptaIsolerSoldes();
+
+    $etat = app(EtatComptaResolver::class)->pourTenantCourant();
+
+    expect($etat->causes())
+        ->toContain('3 opération(s)')
+        ->not->toContain('converti')
+        ->not->toContain('backfill')
+        ->not->toContain('artisan');
+});
+
 it('n’exige pas le backfill pour une transaction HelloAsso restée legacy', function (): void {
     $this->setupPartieDoubleContext();
-    isolerRegleTestee($this);
 
     Transaction::factory()->create([
         'association_id' => $this->association->id,
+        'compte_id' => $this->compteBancaire->id,
         'equilibree' => false,
         'helloasso_order_id' => 'HA-12345',
     ]);
+
+    etatComptaIsolerSoldes();
 
     $etat = app(EtatComptaResolver::class)->pourTenantCourant();
 
     // exige() plutôt que etape() : l'assertion reste juste et pour la bonne
     // raison quand d'autres règles s'ajouteront au résolveur.
     expect($etat->exige(EtapeCompta::BackfillRequis))->toBeFalse();
+});
+
+it('refuse de répondre sans TenantContext booté plutôt que de se dire opérationnel', function (): void {
+    $this->setupPartieDoubleContext();
+    TenantContext::clear();
+
+    expect(fn () => app(EtatComptaResolver::class)->pourTenantCourant())
+        ->toThrow(RuntimeException::class, 'TenantContext');
 });
