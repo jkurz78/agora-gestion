@@ -41,23 +41,28 @@ Trois objets, chacun testable isolément.
 
 Énumération ordonnée des étapes du parcours comptable d'une association :
 
-| Cas | Valeur |
-|---|---|
-| `BackfillRequis` | `backfill_requis` |
-| `RepriseInitialeRequise` | `reprise_initiale_requise` |
-| `ReconciliationRequise` | `reconciliation_requise` |
-| `Operationnel` | `operationnel` |
+| Cas | Valeur | Libellé |
+|---|---|---|
+| `BackfillRequis` | `backfill_requis` | Écritures comptables incomplètes |
+| `RepriseInitialeRequise` | `reprise_initiale_requise` | Soldes d'ouverture non repris |
+| `ReconciliationRequise` | `reconciliation_requise` | Statuts de règlement à mettre à jour |
+| `Operationnel` | `operationnel` | Opérationnel |
 
-Chaque cas porte son libellé français et le geste prescrit (commande ou écran).
+Chaque cas porte **son libellé français, et rien d'autre**. Pas de commande : le remède appartient à la couche qui connaît le support et le tenant (voir § 6).
+
+Les libellés évitent deux pièges. « Conversion » et « backfill » décrivent une opération de migration que le trésorier n'a pas déclenchée et ne peut pas se représenter. Et « réconciliation » désigne en français comptable la même chose que « rapprochement » — or la checklist de clôture contient déjà « Rapprochements en cours », qui parle de banque et non de statuts.
 
 ### `App\Services\Compta\EtatCompta`
 
 Objet-valeur immuable, `final readonly` :
 
-- `etape` — l'étape courante ;
-- `blocages` — liste des conditions bloquantes, chacune avec son libellé français et son geste prescrit ;
-- `prochaineEtape` — description de l'étape légitime suivante, ou `null` si opérationnel ;
-- `estOperationnel(): bool`.
+- `etape` — l'étape courante, c'est-à-dire le premier blocage détecté ;
+- `blocages` — les conditions bloquantes détectées, **indexées par la valeur de l'étape** qu'elles concernent, chacune décrite en français sans commande ;
+- `estOperationnel(): bool` ;
+- `exige(EtapeCompta $etape): bool` — cette condition précise fait-elle partie des blocages ? Permet à une garde d'exprimer son intention (« le backfill est-il requis ? ») sans comparer l'identité de `etape`, qui ne révèle que le premier blocage ;
+- `causes(): string` — les causes concaténées, prêtes à afficher sur n'importe quel support.
+
+L'indexation par étape rend vraie la promesse d'ordre de l'énumération : insérer une étape plus tôt ne casse silencieusement aucune garde, puisqu'aucune garde ne repose sur « l'étape courante vaut exactement X ».
 
 ### `App\Services\Compta\EtatComptaResolver`
 
@@ -139,14 +144,22 @@ Le résolveur l'ignore : sur v5 la génération partie double est inconditionnel
 
 Son retrait complet reste un chantier distinct — il gate encore des lectures dans `RapportService`, `RapprochementBancaireService`, `ExerciceService`, `ClotureCheckService`, `RapprochementDetail` et `ClotureWizard`.
 
-## 6. Refus
+## 6. Refus — la cause est partagée, le remède ne l'est pas
 
-`App\Exceptions\Compta\EtapeComptaRequiseException`, dans la lignée des exceptions compta existantes. Elle porte l'`EtatCompta` et produit un message français nommant **deux** choses : ce qui bloque, et le geste qui débloque.
+**Révisé le 2026-07-30 après la revue de la task 1.** La première version de cette section demandait que la console et l'écran rendent « le même texte, pris à la même source ». Bonne intention, mauvais objet : appliquée au remède, elle faisait remonter `php artisan compta:backfill-partie-double --all` dans l'assistant de clôture — une commande que le trésorier ne peut pas exécuter, qu'il ne *doit* pas exécuter puisqu'elle traiterait tous les tenants, et qui contrevient à la règle « pas de jargon technique dans l'IHM ».
 
-- **CLI** : la commande attrape l'exception, affiche un bloc lisible, sort en code non nul. Jamais de trace d'exception pour un refus légitime.
-- **IHM** : la garde de clôture rend le **même texte**, pris à la même source. La console et l'écran ne peuvent pas raconter deux histoires différentes.
+La règle corrigée : **la cause est partagée, le remède est propre à chaque support.**
 
-Aucun refus n'est muet : chacun nomme la cause et la sortie.
+**La cause** est indépendante du support et du tenant : « 2 compte(s) bancaire(s) portent un solde historique jamais entré dans le grand livre. » Elle vit dans `EtatCompta::causes()` et ne contient jamais de commande.
+
+**Le remède** dépend du support *et* du tenant. Il est composé par la couche qui connaît les deux :
+
+- **CLI** : `compta:etat` et les commandes qui refusent composent la commande complète, avec le bon `--asso=` ou `--association=`. Deux des trois gestes sont en effet scopables par association — `compta:backfill-partie-double` via `--asso`, `compta:bootstrap-an` via `--association` (obligatoire) — tandis que `compta:reconcilier-statuts` est nécessairement global, faute d'option.
+- **IHM** : la garde de clôture affiche la cause et le fait que ces préalables doivent être traités avant la clôture. Aucune commande. La tranche 2 y ajoutera le lien vers l'écran de reprise.
+
+`App\Exceptions\Compta\EtapeComptaRequiseException` porte l'`EtatCompta` et un message composé du libellé d'étape et des causes — sans commande. L'appelant CLI y ajoute son remède.
+
+Aucun refus n'est muet : chacun nomme sa cause. Aucun refus ne prescrit un geste que son destinataire ne peut pas accomplir.
 
 ## 7. Tests
 

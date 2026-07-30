@@ -31,7 +31,7 @@
 
 | Fichier | Responsabilité |
 |---|---|
-| `app/Enums/EtapeCompta.php` | Les quatre étapes, leur libellé français et le geste prescrit |
+| `app/Enums/EtapeCompta.php` | Les quatre étapes et leur libellé français (aucune commande) |
 | `app/Services/Compta/EtatCompta.php` | Objet-valeur immuable : étape + blocages |
 | `app/Services/Compta/EtatComptaResolver.php` | La déduction, en lecture seule |
 | `app/Exceptions/Compta/EtapeComptaRequiseException.php` | Refus porteur de l'état |
@@ -69,17 +69,23 @@ declare(strict_types=1);
 
 use App\Enums\EtapeCompta;
 
-it('donne un libellé français et un geste prescrit pour chaque étape', function (): void {
-    foreach (EtapeCompta::cases() as $etape) {
-        expect($etape->label())->not->toBe('');
-    }
+it('nomme chaque étape en français, sans jargon de migration', function (): void {
+    expect(EtapeCompta::BackfillRequis->label())
+        ->toBe('Écritures comptables incomplètes')
+        ->and(EtapeCompta::RepriseInitialeRequise->label())
+        ->toBe('Soldes d’ouverture non repris')
+        ->and(EtapeCompta::ReconciliationRequise->label())
+        ->toBe('Statuts de règlement à mettre à jour')
+        ->and(EtapeCompta::Operationnel->label())
+        ->toBe('Opérationnel');
+});
 
-    expect(EtapeCompta::BackfillRequis->geste())
-        ->toBe('php artisan compta:backfill-partie-double --all')
-        ->and(EtapeCompta::ReconciliationRequise->geste())
-        ->toBe('php artisan compta:reconcilier-statuts')
-        ->and(EtapeCompta::Operationnel->geste())
-        ->toBeNull();
+it('ne porte aucune commande : le remède appartient à l’appelant', function (): void {
+    expect(method_exists(EtapeCompta::class, 'geste'))->toBeFalse();
+
+    foreach (EtapeCompta::cases() as $etape) {
+        expect($etape->label())->not->toContain('artisan');
+    }
 });
 ```
 
@@ -106,6 +112,18 @@ namespace App\Enums;
  * L'étape n'est jamais stockée : elle est dérivée des données par
  * App\Services\Compta\EtatComptaResolver. Une seconde source de vérité
  * finirait par diverger — c'est la leçon de la recette du 2026-07-29.
+ *
+ * Chaque cas porte son libellé, et rien d'autre. Le remède — quelle commande
+ * lancer, avec quel tenant, ou quel écran ouvrir — appartient à la couche qui
+ * connaît le support et l'association. Faire porter une commande artisan par
+ * l'énumération la faisait remonter jusque dans l'assistant de clôture, où le
+ * trésorier lisait une ligne de console qu'il ne pouvait pas exécuter.
+ *
+ * Les libellés évitent « conversion » et « backfill » (vocabulaire de migration,
+ * opération que le trésorier n'a pas déclenchée) et « réconciliation », qui en
+ * français comptable désigne la même chose que « rapprochement » — mot déjà pris
+ * par la garde « Rapprochements en cours » de la même checklist, qui parle de
+ * banque et non de statuts.
  */
 enum EtapeCompta: string
 {
@@ -117,21 +135,10 @@ enum EtapeCompta: string
     public function label(): string
     {
         return match ($this) {
-            self::BackfillRequis => 'Conversion en partie double requise',
-            self::RepriseInitialeRequise => 'Reprise initiale des soldes requise',
-            self::ReconciliationRequise => 'Réconciliation des statuts requise',
+            self::BackfillRequis => 'Écritures comptables incomplètes',
+            self::RepriseInitialeRequise => 'Soldes d’ouverture non repris',
+            self::ReconciliationRequise => 'Statuts de règlement à mettre à jour',
             self::Operationnel => 'Opérationnel',
-        };
-    }
-
-    /** Geste qui débloque l'étape, ou null si rien n'est requis. */
-    public function geste(): ?string
-    {
-        return match ($this) {
-            self::BackfillRequis => 'php artisan compta:backfill-partie-double --all',
-            self::RepriseInitialeRequise => 'php artisan compta:bootstrap-an --dry-run puis --confirmer',
-            self::ReconciliationRequise => 'php artisan compta:reconcilier-statuts',
-            self::Operationnel => null,
         };
     }
 }
@@ -168,7 +175,7 @@ Ajouter à `tests/Feature/Compta/EtatComptaResolverTest.php` :
 it('expose l’étape, ses blocages et la nature opérationnelle', function (): void {
     $bloque = new App\Services\Compta\EtatCompta(
         EtapeCompta::RepriseInitialeRequise,
-        ['2 compte(s) bancaire(s) portent un solde historique non repris.'],
+        [EtapeCompta::RepriseInitialeRequise->value => '2 compte(s) bancaire(s) portent un solde historique jamais entré dans le grand livre.'],
     );
 
     expect($bloque->estOperationnel())->toBeFalse()
@@ -178,6 +185,34 @@ it('expose l’étape, ses blocages et la nature opérationnelle', function (): 
 
     expect($ok->estOperationnel())->toBeTrue()
         ->and($ok->blocages)->toBe([]);
+});
+
+it('répond sur une condition précise, pas seulement sur la première', function (): void {
+    // Deux blocages : l'étape courante est le premier, mais le second doit rester
+    // interrogeable — sinon une garde qui vise le backfill deviendrait aveugle
+    // dès qu'un blocage antérieur apparaît.
+    $etat = new App\Services\Compta\EtatCompta(
+        EtapeCompta::BackfillRequis,
+        [
+            EtapeCompta::BackfillRequis->value => '3 transaction(s) ne sont pas converties en partie double.',
+            EtapeCompta::ReconciliationRequise->value => '2 transaction(s) portent un statut en désaccord avec le grand livre.',
+        ],
+    );
+
+    expect($etat->exige(EtapeCompta::BackfillRequis))->toBeTrue()
+        ->and($etat->exige(EtapeCompta::ReconciliationRequise))->toBeTrue()
+        ->and($etat->exige(EtapeCompta::RepriseInitialeRequise))->toBeFalse();
+});
+
+it('énonce ses causes sans jamais prescrire de commande', function (): void {
+    $etat = new App\Services\Compta\EtatCompta(
+        EtapeCompta::BackfillRequis,
+        [EtapeCompta::BackfillRequis->value => '3 transaction(s) ne sont pas converties en partie double.'],
+    );
+
+    expect($etat->causes())
+        ->toContain('3 transaction(s)')
+        ->not->toContain('artisan');
 });
 ```
 
@@ -206,8 +241,9 @@ use App\Enums\EtapeCompta;
 final readonly class EtatCompta
 {
     /**
-     * @param  list<string>  $blocages  Conditions bloquantes détectées, en français,
-     *                                  dans l'ordre d'évaluation des règles.
+     * @param  array<string, string>  $blocages  Conditions bloquantes détectées,
+     *                                           indexées par EtapeCompta::value,
+     *                                           décrites en français et SANS commande.
      */
     public function __construct(
         public EtapeCompta $etape,
@@ -219,15 +255,26 @@ final readonly class EtatCompta
         return $this->etape === EtapeCompta::Operationnel;
     }
 
-    /** Message de refus prêt à afficher : ce qui bloque, puis le geste qui débloque. */
-    public function messageRefus(): string
+    /**
+     * Cette condition précise fait-elle partie des blocages ?
+     *
+     * Une garde exprime ainsi son intention (« le backfill est-il requis ? »)
+     * sans comparer l'identité de $etape, qui ne révèle que le premier blocage.
+     */
+    public function exige(EtapeCompta $etape): bool
     {
-        $geste = $this->etape->geste();
+        return isset($this->blocages[$etape->value]);
+    }
 
-        return trim(
-            $this->etape->label().' — '.implode(' ', $this->blocages)
-            .($geste === null ? '' : ' → '.$geste)
-        );
+    /**
+     * Les causes, concaténées, prêtes à afficher sur n'importe quel support.
+     *
+     * Ne contient jamais de commande : le remède dépend du support et du tenant,
+     * c'est à l'appelant de le composer.
+     */
+    public function causes(): string
+    {
+        return implode(' ', $this->blocages);
     }
 }
 ```
@@ -342,7 +389,7 @@ final class EtatComptaResolver
         $legacy = $this->transactionsHorsPartieDouble();
         if ($legacy > 0) {
             $etape ??= EtapeCompta::BackfillRequis;
-            $blocages[] = sprintf(
+            $blocages[EtapeCompta::BackfillRequis->value] = sprintf(
                 '%d transaction(s) ne sont pas converties en partie double.',
                 $legacy,
             );
@@ -415,7 +462,7 @@ it('exige la reprise initiale quand un solde bancaire historique n’est pas rep
     $etat = app(EtatComptaResolver::class)->pourTenantCourant();
 
     expect($etat->etape)->toBe(EtapeCompta::RepriseInitialeRequise)
-        ->and($etat->messageRefus())->toContain('compta:bootstrap-an');
+        ->and($etat->causes())->toContain('solde historique');
 });
 
 it('n’exige pas de reprise quand tous les soldes bancaires sont à zéro', function (): void {
@@ -474,7 +521,7 @@ Puis, dans `pourTenantCourant()`, après le bloc du backfill et avant le `return
         $comptesNonRepris = $this->comptesBancairesNonRepris();
         if ($comptesNonRepris > 0) {
             $etape ??= EtapeCompta::RepriseInitialeRequise;
-            $blocages[] = sprintf(
+            $blocages[EtapeCompta::RepriseInitialeRequise->value] = sprintf(
                 '%d compte(s) bancaire(s) portent un solde historique jamais entré dans le grand livre.',
                 $comptesNonRepris,
             );
@@ -595,7 +642,7 @@ it('exige la réconciliation quand le miroir diverge sur une écriture métier',
     $etat = app(EtatComptaResolver::class)->pourTenantCourant();
 
     expect($etat->etape)->toBe(EtapeCompta::ReconciliationRequise)
-        ->and($etat->messageRefus())->toContain('compta:reconcilier-statuts');
+        ->and($etat->causes())->toContain('désaccord avec le grand livre');
 });
 
 it('ignore une divergence portée par une écriture technique', function (): void {
@@ -632,7 +679,7 @@ Dans `pourTenantCourant()`, après le bloc de la reprise :
         $divergences = $this->divergencesMiroir();
         if ($divergences > 0) {
             $etape ??= EtapeCompta::ReconciliationRequise;
-            $blocages[] = sprintf(
+            $blocages[EtapeCompta::ReconciliationRequise->value] = sprintf(
                 '%d transaction(s) portent un statut de règlement en désaccord avec le grand livre.',
                 $divergences,
             );
@@ -695,17 +742,18 @@ git commit -m "feat(compta): détecte les statuts de règlement en désaccord av
 Ajouter à `tests/Feature/Compta/EtatComptaResolverTest.php` :
 
 ```php
-it('produit un refus qui nomme le blocage et le geste', function (): void {
+it('produit un refus qui nomme le blocage sans prescrire de commande', function (): void {
     $etat = new App\Services\Compta\EtatCompta(
         EtapeCompta::RepriseInitialeRequise,
-        ['2 compte(s) bancaire(s) portent un solde historique jamais entré dans le grand livre.'],
+        [EtapeCompta::RepriseInitialeRequise->value => '2 compte(s) bancaire(s) portent un solde historique jamais entré dans le grand livre.'],
     );
 
     $exception = App\Exceptions\Compta\EtapeComptaRequiseException::pour($etat);
 
     expect($exception->getMessage())
+        ->toContain('Soldes d’ouverture non repris')
         ->toContain('solde historique')
-        ->toContain('compta:bootstrap-an')
+        ->not->toContain('artisan')
         ->and($exception->etat->etape)->toBe(EtapeCompta::RepriseInitialeRequise);
 });
 ```
@@ -733,8 +781,10 @@ use RuntimeException;
 /**
  * Refus d'une opération dont les préalables comptables ne sont pas réunis.
  *
- * Le message nomme toujours deux choses : ce qui bloque, et le geste qui
- * débloque. Un refus muet est un refus raté.
+ * Le message nomme la cause — l'étape manquante et ce qui la bloque — et jamais
+ * le remède : celui-ci dépend du support et du tenant, c'est à l'appelant de le
+ * composer. Un refus muet est un refus raté, mais un refus qui prescrit un geste
+ * que son destinataire ne peut pas accomplir est pire.
  */
 final class EtapeComptaRequiseException extends RuntimeException
 {
@@ -745,7 +795,7 @@ final class EtapeComptaRequiseException extends RuntimeException
 
     public static function pour(EtatCompta $etat): self
     {
-        return new self($etat->messageRefus(), $etat);
+        return new self($etat->etape->label().' — '.$etat->causes(), $etat);
     }
 }
 ```
@@ -824,7 +874,8 @@ it('refuse la clôture quand les soldes historiques ne sont pas repris', functio
 
     expect($garde)->not->toBeNull()
         ->and($garde->ok)->toBeFalse()
-        ->and($garde->message)->toContain('compta:bootstrap-an');
+        ->and($garde->message)->toContain('solde historique')
+        ->and($garde->message)->not->toContain('artisan');
 });
 
 it('autorise la clôture une fois la reprise initiale créée', function (): void {
@@ -909,7 +960,7 @@ Et la méthode :
             ok: $etat->estOperationnel(),
             message: $etat->estOperationnel()
                 ? 'Conversion, reprise des soldes et statuts de règlement sont à jour'
-                : $etat->messageRefus(),
+                : $etat->causes().' Ces préalables doivent être traités avant la clôture.',
         );
     }
 ```
@@ -1113,6 +1164,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Enums\EtapeCompta;
 use App\Models\Association;
 use App\Services\Compta\EtatComptaResolver;
 use App\Tenant\TenantContext;
@@ -1177,9 +1229,9 @@ final class EtatComptaCommand extends Command
                     $this->line('  ⚠️  '.$blocage);
                 }
 
-                $geste = $etat->etape->geste();
-                if ($geste !== null) {
-                    $this->line('  → '.$geste);
+                $remede = $this->remede($etat->etape, (int) $association->id);
+                if ($remede !== null) {
+                    $this->line('  → '.$remede);
                     $tousOperationnels = false;
                 }
             }
@@ -1193,6 +1245,35 @@ final class EtatComptaCommand extends Command
         return $tousOperationnels || ! $this->option('check')
             ? self::SUCCESS
             : self::FAILURE;
+    }
+
+    /**
+     * Le remède, composé ici — la console est la seule couche qui connaisse à la
+     * fois le support et le tenant. L'énumération ne porte que la cause : une
+     * commande artisan placée là remontait jusque dans l'assistant de clôture,
+     * sous les yeux d'un trésorier qui ne peut pas l'exécuter.
+     *
+     * Deux des trois gestes se restreignent à une association — le backfill via
+     * `--asso`, la reprise via `--association` (obligatoire). La réconciliation
+     * n'a pas d'option et reste nécessairement globale : on le dit plutôt que de
+     * laisser croire le contraire.
+     */
+    private function remede(EtapeCompta $etape, int $associationId): ?string
+    {
+        return match ($etape) {
+            EtapeCompta::BackfillRequis => sprintf(
+                'php artisan compta:backfill-partie-double --all --asso=%d',
+                $associationId,
+            ),
+            EtapeCompta::RepriseInitialeRequise => sprintf(
+                'php artisan compta:bootstrap-an --association=%d --exercice=<année> --dry-run,'
+                .' puis --confirmer — voir docs/runbooks/2026-07-22-reprise-initiale-a-nouveaux.md',
+                $associationId,
+            ),
+            EtapeCompta::ReconciliationRequise => 'php artisan compta:reconcilier-statuts'
+                .' (global : cette commande n’a pas d’option par association)',
+            EtapeCompta::Operationnel => null,
+        };
     }
 }
 ```
@@ -1266,8 +1347,9 @@ Puis, dans `handle()`, **après** le boot de `TenantContext` sur l'association c
         // Ordre imposé : convertir avant de reprendre. Reprendre des soldes sur
         // un grand livre incomplet produirait des montants faux.
         $etat = app(EtatComptaResolver::class)->pourTenantCourant();
-        if ($etat->etape === EtapeCompta::BackfillRequis) {
-            $this->error($etat->messageRefus());
+        if ($etat->exige(EtapeCompta::BackfillRequis)) {
+            $this->error($etat->etape->label().' — '.$etat->causes());
+            $this->line('  → php artisan compta:backfill-partie-double --all --asso='.(int) $associationOption);
 
             return self::FAILURE;
         }
