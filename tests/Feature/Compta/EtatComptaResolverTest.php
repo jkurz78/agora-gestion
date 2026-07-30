@@ -3,7 +3,12 @@
 declare(strict_types=1);
 
 use App\Enums\EtapeCompta;
+use App\Models\Transaction;
 use App\Services\Compta\EtatCompta;
+use App\Services\Compta\EtatComptaResolver;
+use Tests\Support\CreatesPartieDoubleContext;
+
+uses(CreatesPartieDoubleContext::class);
 
 it('nomme chaque étape en français, sans jargon de migration', function (): void {
     expect(EtapeCompta::BackfillRequis->label())
@@ -79,4 +84,51 @@ it('refuse une clé de blocage inconnue', function (): void {
 it('refuse Operationnel comme clé de blocage', function (): void {
     expect(fn () => new EtatCompta([EtapeCompta::Operationnel->value => 'Contradiction.']))
         ->toThrow(InvalidArgumentException::class);
+});
+
+/**
+ * Neutralise les règles dont le test courant n'est pas le sujet.
+ *
+ * CompteBancaireFactory tire solde_initial au hasard entre 0 et 10 000 : sans
+ * remise à zéro, la règle de reprise (task 4) se déclencherait sur toutes les
+ * fixtures et ferait échouer les tests des autres règles — un échec piloté par
+ * un tirage aléatoire, donc intermittent, exactement la mine que la recette du
+ * 2026-07-24 avait mis une journée à identifier sur mode_paiement.
+ */
+function isolerRegleTestee(object $contexte): void
+{
+    $contexte->compteBancaire->update(['solde_initial' => 0]);
+}
+
+it('exige le backfill quand des transactions ne sont pas en partie double', function (): void {
+    $this->setupPartieDoubleContext();
+    isolerRegleTestee($this);
+
+    Transaction::factory()->create([
+        'association_id' => $this->association->id,
+        'equilibree' => false,
+        'helloasso_order_id' => null,
+    ]);
+
+    $etat = app(EtatComptaResolver::class)->pourTenantCourant();
+
+    expect($etat->exige(EtapeCompta::BackfillRequis))->toBeTrue()
+        ->and($etat->etape())->toBe(EtapeCompta::BackfillRequis);
+});
+
+it('n’exige pas le backfill pour une transaction HelloAsso restée legacy', function (): void {
+    $this->setupPartieDoubleContext();
+    isolerRegleTestee($this);
+
+    Transaction::factory()->create([
+        'association_id' => $this->association->id,
+        'equilibree' => false,
+        'helloasso_order_id' => 'HA-12345',
+    ]);
+
+    $etat = app(EtatComptaResolver::class)->pourTenantCourant();
+
+    // exige() plutôt que etape() : l'assertion reste juste et pour la bonne
+    // raison quand d'autres règles s'ajouteront au résolveur.
+    expect($etat->exige(EtapeCompta::BackfillRequis))->toBeFalse();
 });
