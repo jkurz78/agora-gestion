@@ -8,9 +8,13 @@ use App\Enums\EtapeCompta;
 use App\Enums\OrigineANouveau;
 use App\Enums\StatutANouveau;
 use App\Models\ANouveauGeneration;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
+use App\Models\Exercice;
 use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Tenant\TenantContext;
+use Carbon\CarbonImmutable;
 use RuntimeException;
 
 /**
@@ -78,37 +82,92 @@ final class EtatComptaResolver
     }
 
     /**
-     * Soldes historiques non repris : des comptes bancaires portent un solde
-     * initial non nul et aucune reprise initiale n'a jamais été créée.
+     * Comptes bancaires dont le solde historique n'est pas démontrablement dans
+     * le grand livre.
      *
-     * C'est la règle qui ferme le défaut du 2026-07-29 : une clôture avait été
-     * acceptée sans reprise, produisant une ouverture amputée de 26 000 € sans
-     * qu'aucune garde ne le signale.
+     * La première version vérifiait seulement qu'une reprise avait été lancée :
+     * elle répondait « une reprise existe-t-elle ? » quand la question qui a
+     * coûté 26 000 € le 2026-07-29 est « les soldes sont-ils dans le grand
+     * livre ? ». Un compte n'est couvert que si la pièce de reprise en vigueur
+     * porte une ligne sur son compte 512X.
      *
-     * Lecture sur `comptes_bancaires`, la source de vérité — comme
-     * BootstrapANouveauService. La copie dans `comptes.solde_initial` n'est
-     * rafraîchie par rien et peut être périmée : c'est précisément l'écart qui a
-     * été constaté ce jour-là.
-     *
-     * Une association qui démarre à zéro ne porte aucun solde non nul et
-     * traverse cette étape sans rien faire : cas nominal, pas exception.
+     * Un compte bancaire sans compte 512X ne peut par construction pas être
+     * couvert : la reprise parcourt le plan comptable et ne le voit pas.
      */
     private function comptesBancairesNonRepris(): int
     {
-        $avecSolde = CompteBancaire::query()
-            ->whereNotNull('solde_initial')
+        $porteurs = CompteBancaire::query()
             ->where('solde_initial', '<>', 0)
-            ->count();
+            ->get();
 
-        if ($avecSolde === 0) {
+        if ($porteurs->isEmpty()) {
             return 0;
         }
 
-        $repriseFaite = ANouveauGeneration::query()
+        $reprise = $this->repriseEnVigueur();
+
+        if ($reprise === null) {
+            return $porteurs->count();
+        }
+
+        $comptesCouverts = TransactionLigne::query()
+            ->where('transaction_id', (int) $reprise->transaction_id)
+            ->pluck('compte_id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
+
+        $comptes512 = Compte::query()
+            ->whereNotNull('compte_bancaire_id')
+            ->get()
+            ->keyBy(fn (Compte $compte): int => (int) $compte->compte_bancaire_id);
+
+        return $porteurs
+            ->filter(function (CompteBancaire $banque) use ($comptesCouverts, $comptes512): bool {
+                $compte = $comptes512->get((int) $banque->id);
+
+                return $compte === null
+                    || ! in_array((int) $compte->id, $comptesCouverts, true);
+            })
+            ->count();
+    }
+
+    /**
+     * La reprise initiale en vigueur, ou null s'il n'y en a pas d'exploitable.
+     *
+     * Trois conditions, chacune correspondant à un scénario qui finissait comme
+     * le 2026-07-29 avec une garde verte par-dessus.
+     */
+    private function repriseEnVigueur(): ?ANouveauGeneration
+    {
+        $reprise = ANouveauGeneration::query()
             ->where('origine', OrigineANouveau::RepriseInitiale)
             ->where('statut', StatutANouveau::Active)
-            ->exists();
+            ->latest('id')
+            ->first();
 
-        return $repriseFaite ? 0 : $avecSolde;
+        if ($reprise === null || $reprise->transaction_id === null) {
+            return null;
+        }
+
+        // Elle doit ouvrir le PREMIER exercice de l'association : viser une année
+        // postérieure laisse les exercices antérieurs sans leurs soldes — et
+        // c'est l'année par défaut de compta:bootstrap-an, donc le piège le plus
+        // probable en exploitation.
+        $premierExercice = Exercice::query()->min('annee');
+        if ($premierExercice !== null && (int) $reprise->exercice_cible !== (int) $premierExercice) {
+            return null;
+        }
+
+        // Un solde corrigé APRÈS la reprise n'y figure pas : séquence exacte du
+        // 2026-07-29, date de solde rectifiée à 13:34, clôture à 13:35.
+        $dernierEdit = CompteBancaire::query()
+            ->where('solde_initial', '<>', 0)
+            ->max('updated_at');
+
+        if ($dernierEdit !== null && CarbonImmutable::parse($dernierEdit)->gt($reprise->created_at)) {
+            return null;
+        }
+
+        return $reprise;
     }
 }

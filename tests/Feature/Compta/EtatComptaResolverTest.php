@@ -6,7 +6,11 @@ use App\Enums\EtapeCompta;
 use App\Enums\OrigineANouveau;
 use App\Enums\StatutANouveau;
 use App\Models\ANouveauGeneration;
+use App\Models\Compte;
+use App\Models\CompteBancaire;
+use App\Models\Exercice;
 use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Services\Compta\EtatCompta;
 use App\Services\Compta\EtatComptaResolver;
 use App\Tenant\TenantContext;
@@ -150,8 +154,50 @@ it('refuse de répondre sans TenantContext booté plutôt que de se dire opérat
         ->toThrow(RuntimeException::class, 'TenantContext');
 });
 
-it('exige la reprise quand un solde bancaire historique n’est pas repris', function (): void {
+/**
+ * Une reprise initiale réaliste : la génération et sa pièce d'à-nouveau, portant
+ * une ligne sur chacun des comptes 512X passés en argument.
+ *
+ * @param  list<Compte>  $comptesCouverts
+ */
+function etatComptaCreerReprise(
+    object $contexte,
+    array $comptesCouverts,
+    int $exerciceCible = 2024,
+    StatutANouveau $statut = StatutANouveau::Active,
+    OrigineANouveau $origine = OrigineANouveau::RepriseInitiale,
+): ANouveauGeneration {
+    $piece = Transaction::factory()->create([
+        'association_id' => $contexte->association->id,
+        'compte_id' => $contexte->compteBancaire->id,
+        'equilibree' => true,
+    ]);
+
+    foreach ($comptesCouverts as $compte) {
+        TransactionLigne::forceCreate([
+            'transaction_id' => (int) $piece->id,
+            'compte_id' => (int) $compte->id,
+            'montant' => 0,
+            'debit' => '2388.82',
+            'credit' => 0,
+        ]);
+    }
+
+    return ANouveauGeneration::create([
+        'association_id' => $contexte->association->id,
+        'exercice_source' => $exerciceCible - 1,
+        'exercice_cible' => $exerciceCible,
+        'transaction_id' => (int) $piece->id,
+        'origine' => $origine,
+        'statut' => $statut,
+        'cree_par_id' => $contexte->user->id,
+    ]);
+}
+
+it('exige la reprise quand aucun solde historique n’est dans le grand livre', function (): void {
     $this->setupPartieDoubleContext();
+
+    Exercice::create(['annee' => 2024, 'statut' => 'ouvert']);
 
     // Les soldes réels de la préprod au moment du défaut du 2026-07-29.
     $this->compteBancaire->update([
@@ -166,7 +212,7 @@ it('exige la reprise quand un solde bancaire historique n’est pas repris', fun
         ->and($etat->causes())->toContain('solde historique');
 });
 
-it('n’exige pas de reprise quand tous les soldes bancaires sont à zéro', function (): void {
+it('n’exige rien d’une association qui démarre à zéro', function (): void {
     $this->setupPartieDoubleContext();
 
     $etat = app(EtatComptaResolver::class)->pourTenantCourant();
@@ -176,22 +222,125 @@ it('n’exige pas de reprise quand tous les soldes bancaires sont à zéro', fun
     expect($etat->exige(EtapeCompta::RepriseInitialeRequise))->toBeFalse();
 });
 
-it('considère la reprise faite quand une génération reprise_initiale est active', function (): void {
+it('lève le blocage quand la reprise couvre le compte porteur', function (): void {
     $this->setupPartieDoubleContext();
+
+    Exercice::create(['annee' => 2024, 'statut' => 'ouvert']);
 
     $this->compteBancaire->update(['solde_initial' => 2388.82]);
 
-    ANouveauGeneration::create([
-        'association_id' => $this->association->id,
-        'exercice_source' => 2023,
-        'exercice_cible' => 2024,
-        'transaction_id' => null,
-        'origine' => OrigineANouveau::RepriseInitiale,
-        'statut' => StatutANouveau::Active,
-        'cree_par_id' => $this->user->id,
-    ]);
+    etatComptaCreerReprise($this, [$this->compte512X]);
 
     $etat = app(EtatComptaResolver::class)->pourTenantCourant();
 
     expect($etat->exige(EtapeCompta::RepriseInitialeRequise))->toBeFalse();
+});
+
+it('bloque quand la reprise ne couvre qu’une partie des comptes porteurs', function (): void {
+    $this->setupPartieDoubleContext();
+
+    Exercice::create(['annee' => 2024, 'statut' => 'ouvert']);
+
+    // Séquence du 2026-07-29 : le compte courant est repris, le livret A ne
+    // l'est pas — 24 010 € disparaissent à la clôture sans qu'aucune garde ne
+    // le signale.
+    $this->compteBancaire->update(['solde_initial' => 2388.82]);
+
+    $livretA = CompteBancaire::factory()->avecSoldeHistorique(24010.00)->create([
+        'association_id' => $this->association->id,
+    ]);
+    Compte::factory()->numero('5122')->create([
+        'association_id' => $this->association->id,
+        'compte_bancaire_id' => $livretA->id,
+    ]);
+
+    etatComptaCreerReprise($this, [$this->compte512X]);
+
+    $etat = app(EtatComptaResolver::class)->pourTenantCourant();
+
+    expect($etat->exige(EtapeCompta::RepriseInitialeRequise))->toBeTrue()
+        ->and($etat->causes())->toContain('1 compte');
+});
+
+it('bloque quand la reprise vise une année postérieure au premier exercice', function (): void {
+    $this->setupPartieDoubleContext();
+
+    Exercice::create(['annee' => 2024, 'statut' => 'ouvert']);
+    Exercice::create(['annee' => 2025, 'statut' => 'ouvert']);
+
+    $this->compteBancaire->update(['solde_initial' => 2388.82]);
+
+    // L'année par défaut de compta:bootstrap-an est l'exercice courant : viser
+    // 2025 alors que le premier exercice est 2024 est le piège le plus probable
+    // en exploitation.
+    etatComptaCreerReprise($this, [$this->compte512X], exerciceCible: 2025);
+
+    $etat = app(EtatComptaResolver::class)->pourTenantCourant();
+
+    expect($etat->exige(EtapeCompta::RepriseInitialeRequise))->toBeTrue();
+});
+
+it('bloque quand un solde a été corrigé après la reprise', function (): void {
+    $this->setupPartieDoubleContext();
+
+    Exercice::create(['annee' => 2024, 'statut' => 'ouvert']);
+
+    $this->compteBancaire->update(['solde_initial' => 2388.82]);
+
+    etatComptaCreerReprise($this, [$this->compte512X]);
+
+    // Séquence exacte du 2026-07-29 : date de solde rectifiée à 13:34, clôture
+    // à 13:35 — le solde corrigé n'a jamais transité par la reprise.
+    $this->travel(1)->minute();
+    $this->compteBancaire->update(['solde_initial' => 2518.82]);
+
+    $etat = app(EtatComptaResolver::class)->pourTenantCourant();
+
+    expect($etat->exige(EtapeCompta::RepriseInitialeRequise))->toBeTrue();
+});
+
+it('bloque quand la reprise a été invalidée par une réouverture', function (): void {
+    $this->setupPartieDoubleContext();
+
+    Exercice::create(['annee' => 2024, 'statut' => 'ouvert']);
+
+    $this->compteBancaire->update(['solde_initial' => 2388.82]);
+
+    etatComptaCreerReprise($this, [$this->compte512X], statut: StatutANouveau::Invalidee);
+
+    $etat = app(EtatComptaResolver::class)->pourTenantCourant();
+
+    expect($etat->exige(EtapeCompta::RepriseInitialeRequise))->toBeTrue();
+});
+
+it('ne prend pas un à-nouveau de clôture pour une reprise', function (): void {
+    $this->setupPartieDoubleContext();
+
+    Exercice::create(['annee' => 2024, 'statut' => 'ouvert']);
+
+    $this->compteBancaire->update(['solde_initial' => 2388.82]);
+
+    etatComptaCreerReprise($this, [$this->compte512X], origine: OrigineANouveau::Cloture);
+
+    $etat = app(EtatComptaResolver::class)->pourTenantCourant();
+
+    expect($etat->exige(EtapeCompta::RepriseInitialeRequise))->toBeTrue();
+});
+
+it('bloque un compte porteur dépourvu de compte 512X', function (): void {
+    $this->setupPartieDoubleContext();
+
+    Exercice::create(['annee' => 2024, 'statut' => 'ouvert']);
+
+    // Livret sans compte 512X : la reprise parcourt le plan comptable et ne
+    // peut par construction pas le voir.
+    CompteBancaire::factory()->avecSoldeHistorique(500.00)->create([
+        'association_id' => $this->association->id,
+    ]);
+
+    etatComptaCreerReprise($this, [$this->compte512X]);
+
+    $etat = app(EtatComptaResolver::class)->pourTenantCourant();
+
+    expect($etat->exige(EtapeCompta::RepriseInitialeRequise))->toBeTrue();
 });
