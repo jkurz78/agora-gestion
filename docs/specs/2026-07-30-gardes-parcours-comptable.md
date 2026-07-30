@@ -113,6 +113,12 @@ Aucune des trois conditions ci-dessus. Clôtures et saisie normales.
 
 `checkOuverturePrecedente` n'est **pas** modifiée. Son court-circuit sur l'absence d'exercice précédent n'était nocif que parce que rien ne couvrait les soldes historiques ; une fois la garde nouvelle en place, il redevient inoffensif. Le laisser tranquille évite de perturber son comportement et ses tests existants.
 
+### `ExerciceService::cloturer` — défense en profondeur
+
+`ExerciceService::cloturer()` ne consulte pas `ClotureCheckService` : les gardes de l'assistant sont **consultatives**. Un appel direct au service — un test, un futur bouton, une requête forgée — clôture sans elles.
+
+Le service refuse donc lui-même, en levant `EtapeComptaRequiseException` quand l'association n'est pas opérationnelle. Le contrôle est posé après le verrou sur l'exercice, au même endroit que le refus existant sur l'exercice cible déjà clôturé. Un utilisateur normal ne verra jamais cette exception : l'assistant l'aura arrêté avant.
+
 ### `compta:bootstrap-an`
 
 Refuse tant que le backfill n'est pas terminé. Aujourd'hui la commande ne refuse qu'une génération en doublon.
