@@ -4,15 +4,21 @@ declare(strict_types=1);
 
 use App\Enums\EtapeCompta;
 
-it('donne un libellé français et un geste prescrit pour chaque étape', function (): void {
-    foreach (EtapeCompta::cases() as $etape) {
-        expect($etape->label())->not->toBe('');
-    }
+it('nomme chaque étape en français, sans jargon de migration', function (): void {
+    expect(EtapeCompta::BackfillRequis->label())
+        ->toBe('Écritures comptables incomplètes')
+        ->and(EtapeCompta::RepriseInitialeRequise->label())
+        ->toBe('Soldes d’ouverture non repris')
+        ->and(EtapeCompta::ReconciliationRequise->label())
+        ->toBe('Statuts de règlement à mettre à jour')
+        ->and(EtapeCompta::Operationnel->label())
+        ->toBe('Opérationnel');
+});
 
-    expect(EtapeCompta::BackfillRequis->geste())
-        ->toBe('php artisan compta:backfill-partie-double --all')
-        ->and(EtapeCompta::ReconciliationRequise->geste())
-        ->toBe('php artisan compta:reconcilier-statuts')
-        ->and(EtapeCompta::Operationnel->geste())
-        ->toBeNull();
+it('ne porte aucune commande : le remède appartient à l’appelant', function (): void {
+    expect(method_exists(EtapeCompta::class, 'geste'))->toBeFalse();
+
+    foreach (EtapeCompta::cases() as $etape) {
+        expect($etape->label())->not->toContain('artisan');
+    }
 });

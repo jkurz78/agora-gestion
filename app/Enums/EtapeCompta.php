@@ -10,6 +10,18 @@ namespace App\Enums;
  * L'étape n'est jamais stockée : elle est dérivée des données par
  * App\Services\Compta\EtatComptaResolver. Une seconde source de vérité
  * finirait par diverger — c'est la leçon de la recette du 2026-07-29.
+ *
+ * Chaque cas porte son libellé, et rien d'autre. Le remède — quelle commande
+ * lancer, avec quel tenant, ou quel écran ouvrir — appartient à la couche qui
+ * connaît le support et l'association. Faire porter une commande artisan par
+ * l'énumération la faisait remonter jusque dans l'assistant de clôture, où le
+ * trésorier lisait une ligne de console qu'il ne pouvait pas exécuter.
+ *
+ * Les libellés évitent « conversion » et « backfill » (vocabulaire de migration,
+ * opération que le trésorier n'a pas déclenchée) et « réconciliation », qui en
+ * français comptable désigne la même chose que « rapprochement » — mot déjà pris
+ * par la garde « Rapprochements en cours » de la même checklist, qui parle de
+ * banque et non de statuts.
  */
 enum EtapeCompta: string
 {
@@ -21,21 +33,10 @@ enum EtapeCompta: string
     public function label(): string
     {
         return match ($this) {
-            self::BackfillRequis => 'Conversion en partie double requise',
-            self::RepriseInitialeRequise => 'Reprise initiale des soldes requise',
-            self::ReconciliationRequise => 'Réconciliation des statuts requise',
+            self::BackfillRequis => 'Écritures comptables incomplètes',
+            self::RepriseInitialeRequise => 'Soldes d’ouverture non repris',
+            self::ReconciliationRequise => 'Statuts de règlement à mettre à jour',
             self::Operationnel => 'Opérationnel',
-        };
-    }
-
-    /** Geste qui débloque l'étape, ou null si rien n'est requis. */
-    public function geste(): ?string
-    {
-        return match ($this) {
-            self::BackfillRequis => 'php artisan compta:backfill-partie-double --all',
-            self::RepriseInitialeRequise => 'php artisan compta:bootstrap-an --dry-run puis --confirmer',
-            self::ReconciliationRequise => 'php artisan compta:reconcilier-statuts',
-            self::Operationnel => null,
         };
     }
 }
