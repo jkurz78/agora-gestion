@@ -287,8 +287,23 @@ uses(CreatesPartieDoubleContext::class);
 Puis ajouter les tests :
 
 ```php
+/**
+ * Neutralise les règles dont le test courant n'est pas le sujet.
+ *
+ * CompteBancaireFactory tire solde_initial au hasard entre 0 et 10 000 : sans
+ * remise à zéro, la règle de reprise (task 4) se déclencherait sur toutes les
+ * fixtures et ferait échouer les tests des autres règles — un échec piloté par
+ * un tirage aléatoire, donc intermittent, exactement la mine que la recette du
+ * 2026-07-24 avait mis une journée à identifier sur mode_paiement.
+ */
+function isolerRegleTestee(object $contexte): void
+{
+    $contexte->compteBancaire->update(['solde_initial' => 0]);
+}
+
 it('exige le backfill quand des transactions ne sont pas en partie double', function (): void {
     $this->setupPartieDoubleContext();
+    isolerRegleTestee($this);
 
     Transaction::factory()->create([
         'association_id' => $this->association->id,
@@ -298,12 +313,13 @@ it('exige le backfill quand des transactions ne sont pas en partie double', func
 
     $etat = app(EtatComptaResolver::class)->pourTenantCourant();
 
-    expect($etat->etape())->toBe(EtapeCompta::BackfillRequis)
-        ->and($etat->blocages)->toHaveCount(1);
+    expect($etat->exige(EtapeCompta::BackfillRequis))->toBeTrue()
+        ->and($etat->etape())->toBe(EtapeCompta::BackfillRequis);
 });
 
 it('n’exige pas le backfill pour une transaction HelloAsso restée legacy', function (): void {
     $this->setupPartieDoubleContext();
+    isolerRegleTestee($this);
 
     Transaction::factory()->create([
         'association_id' => $this->association->id,
@@ -313,7 +329,9 @@ it('n’exige pas le backfill pour une transaction HelloAsso restée legacy', fu
 
     $etat = app(EtatComptaResolver::class)->pourTenantCourant();
 
-    expect($etat->etape())->not->toBe(EtapeCompta::BackfillRequis);
+    // exige() plutôt que etape() : l'assertion reste juste et pour la bonne
+    // raison quand d'autres règles s'ajouteront au résolveur.
+    expect($etat->exige(EtapeCompta::BackfillRequis))->toBeFalse();
 });
 ```
 
@@ -427,7 +445,8 @@ it('exige la reprise initiale quand un solde bancaire historique n’est pas rep
 
     $etat = app(EtatComptaResolver::class)->pourTenantCourant();
 
-    expect($etat->etape())->toBe(EtapeCompta::RepriseInitialeRequise)
+    expect($etat->exige(EtapeCompta::RepriseInitialeRequise))->toBeTrue()
+        ->and($etat->etape())->toBe(EtapeCompta::RepriseInitialeRequise)
         ->and($etat->causes())->toContain('solde historique');
 });
 
@@ -438,7 +457,7 @@ it('n’exige pas de reprise quand tous les soldes bancaires sont à zéro', fun
 
     $etat = app(EtatComptaResolver::class)->pourTenantCourant();
 
-    expect($etat->etape())->not->toBe(EtapeCompta::RepriseInitialeRequise);
+    expect($etat->exige(EtapeCompta::RepriseInitialeRequise))->toBeFalse();
 });
 
 it('considère la reprise faite quand une génération reprise_initiale est active', function (): void {
@@ -458,7 +477,7 @@ it('considère la reprise faite quand une génération reprise_initiale est acti
 
     $etat = app(EtatComptaResolver::class)->pourTenantCourant();
 
-    expect($etat->etape())->not->toBe(EtapeCompta::RepriseInitialeRequise);
+    expect($etat->exige(EtapeCompta::RepriseInitialeRequise))->toBeFalse();
 });
 ```
 
@@ -602,21 +621,27 @@ function transactionMiroirDivergent(string $journal): Transaction
 
 it('exige la réconciliation quand le miroir diverge sur une écriture métier', function (): void {
     $this->setupPartieDoubleContext();
+    isolerRegleTestee($this);
     transactionMiroirDivergent(JournalComptable::Vente->value);
 
     $etat = app(EtatComptaResolver::class)->pourTenantCourant();
 
-    expect($etat->etape())->toBe(EtapeCompta::ReconciliationRequise)
+    expect($etat->exige(EtapeCompta::ReconciliationRequise))->toBeTrue()
+        ->and($etat->etape())->toBe(EtapeCompta::ReconciliationRequise)
         ->and($etat->causes())->toContain('désaccord avec le grand livre');
 });
 
 it('ignore une divergence portée par une écriture technique', function (): void {
     $this->setupPartieDoubleContext();
+    isolerRegleTestee($this);
     transactionMiroirDivergent(JournalComptable::Banque->value);
 
     $etat = app(EtatComptaResolver::class)->pourTenantCourant();
 
-    expect($etat->etape())->toBe(EtapeCompta::Operationnel);
+    // Aucun blocage du tout : c'est le seul test qui vérifie l'état Opérationnel
+    // de bout en bout sur des données réelles.
+    expect($etat->estOperationnel())->toBeTrue()
+        ->and($etat->etape())->toBe(EtapeCompta::Operationnel);
 });
 ```
 
