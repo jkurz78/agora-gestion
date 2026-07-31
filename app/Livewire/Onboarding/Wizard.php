@@ -11,11 +11,13 @@ use App\Models\Famille;
 use App\Models\HelloAssoParametres;
 use App\Models\IncomingMailParametres;
 use App\Models\SmtpParametres;
+use App\Services\Compta\ANouveau\RepriseAutomatiqueService;
 use App\Services\Compta\ComptesProvisioningService;
 use App\Services\Onboarding\DefaultChartOfAccountsService;
 use App\Services\SmtpService;
 use App\Tenant\TenantContext;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Validate;
@@ -540,6 +542,12 @@ final class Wizard extends Component
         // Provisionne les comptes (partie double) du nouveau tenant maintenant
         // que le plan comptable et les comptes bancaires sont saisis. Idempotent.
         app(ComptesProvisioningService::class)->provisionAll();
+
+        // Les soldes d'ouverture saisis à l'étape bancaire entrent en comptabilité
+        // maintenant que le plan comptable existe. Sans ça, l'association verrait
+        // sa trésorerie à l'écran au-dessus d'une comptabilité qui l'ignore, et sa
+        // première clôture serait refusée sans issue dans l'application.
+        app(RepriseAutomatiqueService::class)->tenter(Auth::user());
 
         $this->currentAssociation()->update([
             'wizard_completed_at' => now(),

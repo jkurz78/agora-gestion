@@ -8,7 +8,9 @@ use App\Http\Requests\StoreCompteBancaireRequest;
 use App\Http\Requests\UpdateCompteBancaireRequest;
 use App\Models\CompteBancaire;
 use App\Models\VirementInterne;
+use App\Services\Compta\ANouveau\RepriseAutomatiqueService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 final class CompteBancaireController extends Controller
@@ -29,6 +31,10 @@ final class CompteBancaireController extends Controller
     {
         CompteBancaire::create($request->validated());
 
+        // Un solde d'ouverture saisi hors du parcours d'onboarding entre lui aussi
+        // en comptabilité. Le service s'abstient si une reprise existe déjà.
+        app(RepriseAutomatiqueService::class)->tenter(Auth::user());
+
         return redirect()->route('banques.comptes.index')
             ->with('success', 'Compte bancaire créé avec succès.');
     }
@@ -41,6 +47,10 @@ final class CompteBancaireController extends Controller
     public function update(UpdateCompteBancaireRequest $request, CompteBancaire $comptesBancaire): RedirectResponse
     {
         $comptesBancaire->update($request->validated());
+
+        // Un solde d'ouverture saisi hors du parcours d'onboarding entre lui aussi
+        // en comptabilité. Le service s'abstient si une reprise existe déjà.
+        app(RepriseAutomatiqueService::class)->tenter(Auth::user());
 
         return redirect()->route('banques.comptes.index')
             ->with('success', 'Compte bancaire mis à jour avec succès.');
