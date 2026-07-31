@@ -31,7 +31,6 @@ use App\Services\ReglementOperationService;
 use App\Services\TransactionService;
 use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
@@ -45,7 +44,6 @@ function setupDumpTransactionContext(object $ctx): void
     TenantContext::boot($ctx->association);
     session(['current_association_id' => $ctx->association->id]);
     $ctx->actingAs($ctx->user);
-    Config::set('compta.use_partie_double', true);
 
     SystemeSeeder::seed();
 

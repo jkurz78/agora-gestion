@@ -36,7 +36,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
-    config(['compta.use_partie_double' => true]);
 
     $this->asso = Association::factory()->create();
     $this->user = User::factory()->create();

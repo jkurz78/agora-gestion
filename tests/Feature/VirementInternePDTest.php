@@ -47,8 +47,7 @@ beforeEach(function () {
 // CREATE
 // ---------------------------------------------------------------------------
 
-it('create() generates a PD transaction when use_partie_double is true', function () {
-    config(['compta.use_partie_double' => true]);
+it('create() generates the PD transaction backing a virement', function () {
     [$cb1, $cb2] = creerCompteBancairesPD();
 
     $service = app(VirementInterneService::class);
@@ -69,7 +68,7 @@ it('create() generates a PD transaction when use_partie_double is true', functio
     expect($transaction->lignes)->toHaveCount(2);
 });
 
-it('create() generates PD even without explicit use_partie_double flag', function () {
+it('create() generates a balanced PD transaction when no reference is given', function () {
     [$cb1, $cb2] = creerCompteBancairesPD();
 
     $service = app(VirementInterneService::class);
@@ -90,7 +89,6 @@ it('create() generates PD even without explicit use_partie_double flag', functio
 // ---------------------------------------------------------------------------
 
 it('update() recreates the PD transaction with new values', function () {
-    config(['compta.use_partie_double' => true]);
     [$cb1, $cb2] = creerCompteBancairesPD();
 
     $service = app(VirementInterneService::class);
@@ -149,7 +147,6 @@ it('update() always recreates PD transaction', function () {
 // ---------------------------------------------------------------------------
 
 it('delete() removes the PD transaction along with the virement', function () {
-    config(['compta.use_partie_double' => true]);
     [$cb1, $cb2] = creerCompteBancairesPD();
 
     $service = app(VirementInterneService::class);

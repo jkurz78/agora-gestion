@@ -30,7 +30,6 @@ use App\Services\ReglementOperationService;
 use App\Services\TransactionService;
 use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Config;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -47,8 +46,6 @@ beforeEach(function () {
     TenantContext::boot($this->association);
     session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
-
-    Config::set('compta.use_partie_double', true);
 
     // Comptes système : 401, 411, 5112
     SystemeSeeder::seed();

@@ -40,7 +40,6 @@ use App\Services\RapprochementBancaireService;
 use App\Services\TransactionService;
 use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
@@ -1231,7 +1230,6 @@ test('[AC6] chèque recu sans remise ni rapprochement → portage 5112, 411 lett
  * Construit la fixture minimale pour les tests de reconstruction des remises (Wave 3).
  *
  * - Contexte partie double complet (comptes système, 512X, 5112, 530, 706)
- * - config use_partie_double = true
  * - 1 RemiseBancaire chèque avec 2 sources converties (lignes 5112 posées par la phase 1)
  *
  * Paramètres retournés sur $ctx :
@@ -1243,7 +1241,6 @@ test('[AC6] chèque recu sans remise ni rapprochement → portage 5112, 411 lett
 function setupFixtureRemiseBackfill(object $ctx, bool $avecRapprochement = false, bool $sourcesSansReference = false): void
 {
     setupFixtureBugA($ctx);
-    Config::set('compta.use_partie_double', true);
 
     // Créer la RemiseBancaire
     $ctx->remise = RemiseBancaire::create([

@@ -9,8 +9,7 @@
 #   2. Migrations Laravel
 #   3. Backfill partie double --dry-run (audit pré-backfill)
 #   4. Backfill partie double réel (idempotent)
-#   5. Active le feature flag COMPTA_USE_PARTIE_DOUBLE=true dans .env
-#   6. Smoke-test final (compta:smoke-test-v5)
+#   5. Smoke-test final (compta:smoke-test-v5)
 #
 # Usage :
 #   ./scripts/deploy-preprod-v5.sh
@@ -97,32 +96,7 @@ echo "[$(date)] Step 4b : compta:corriger-cheques-reportes (correctif réel)"
 run "php artisan compta:corriger-cheques-reportes"
 
 # ---------------------------------------------------------------------------
-# Step 5 : Activer le feature flag COMPTA_USE_PARTIE_DOUBLE
-# ---------------------------------------------------------------------------
-
-# Le sed seul ne suffit pas : si la ligne est absente du .env (cas constaté sur
-# la préprod NAS le 2026-07-29), il ne fait rien et le flag reste à false — sans
-# que le script ne le signale. On ajoute la ligne quand elle manque.
-echo "[$(date)] Step 5 : activation du feature flag COMPTA_USE_PARTIE_DOUBLE=true"
-run "grep -q '^COMPTA_USE_PARTIE_DOUBLE=' .env \
-     && sed -i 's/^COMPTA_USE_PARTIE_DOUBLE=.*/COMPTA_USE_PARTIE_DOUBLE=true/' .env \
-     || echo 'COMPTA_USE_PARTIE_DOUBLE=true' >> .env"
-run "grep '^COMPTA_USE_PARTIE_DOUBLE=' .env"
-
-# ⚠️ Déploiement conteneurisé (préprod NAS) : le compose injecte le .env via
-#    `env_file`, donc les variables sont gelées à la CRÉATION du conteneur.
-#    Éditer le .env puis `config:clear` ne suffit pas — l'app continue de lire
-#    l'ancienne valeur. Constaté le 2026-07-29 : flag à true dans le fichier,
-#    `config:show compta` toujours à false. Il faut recréer le conteneur :
-#        docker compose -f docker-compose.staging.yml up -d app
-#    Toujours contrôler la valeur effective, pas seulement le fichier :
-#        php artisan config:show compta | grep use_partie_double
-echo "[$(date)] Step 5 : contrôle de la valeur EFFECTIVE vue par l'application"
-run "php artisan config:clear"
-run "php artisan config:show compta | grep use_partie_double"
-
-# ---------------------------------------------------------------------------
-# Step 5b : Réconciliation des statuts de règlement — OBLIGATOIRE après le backfill.
+# Step 5 : Réconciliation des statuts de règlement — OBLIGATOIRE après le backfill.
 #
 #           La migration 2026_06_04_120100_reclasser_statuts_en_main s'exécute au
 #           `migrate`, donc AVANT le backfill : les lignes partie double n'existent
@@ -134,10 +108,10 @@ run "php artisan config:show compta | grep use_partie_double"
 #           Voir docs/compta-partie-double.md §8.
 # ---------------------------------------------------------------------------
 
-echo "[$(date)] Step 5b : compta:reconcilier-statuts --check (inventaire)"
+echo "[$(date)] Step 5 : compta:reconcilier-statuts --check (inventaire)"
 run "php artisan compta:reconcilier-statuts --check || true"
 
-echo "[$(date)] Step 5b : compta:reconcilier-statuts (resynchronisation)"
+echo "[$(date)] Step 5 : compta:reconcilier-statuts (resynchronisation)"
 run "php artisan compta:reconcilier-statuts"
 
 # ---------------------------------------------------------------------------

@@ -11,7 +11,6 @@ use App\Models\User;
 use App\Services\Compta\Migrations\BancairesSeeder;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Tenant\TenantContext;
-use Illuminate\Support\Facades\Config;
 
 /**
  * Trait Pest pour établir le contexte partie double dans les tests Feature PD.
@@ -40,7 +39,6 @@ trait CreatesPartieDoubleContext
      * - Seed comptes système (411, 401, 5112, 530)
      * - Crée un CompteBancaire avec IBAN connu + Compte 512X via BancairesSeeder
      * - Crée les comptes de ventilation 706 et 606
-     * - Active config('compta.use_partie_double') = true
      */
     public function setupPartieDoubleContext(): void
     {
@@ -51,9 +49,6 @@ trait CreatesPartieDoubleContext
         TenantContext::boot($this->association);
         session(['current_association_id' => $this->association->id]);
         $this->actingAs($this->user);
-
-        // Activer le mode partie double
-        Config::set('compta.use_partie_double', true);
 
         // Comptes système : 411, 401, 5112, 530
         SystemeSeeder::seed();

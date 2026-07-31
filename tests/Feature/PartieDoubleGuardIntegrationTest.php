@@ -10,7 +10,6 @@ use App\Services\Compta\Migrations\BancairesSeeder;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\VirementInterneService;
 use App\Tenant\TenantContext;
-use Illuminate\Support\Facades\Config;
 
 // ---------------------------------------------------------------------------
 // Setup
@@ -36,8 +35,6 @@ afterEach(function () {
 // ---------------------------------------------------------------------------
 
 it('VirementInterneService::create() avec PD active → guard passe (virement est équilibré)', function () {
-    Config::set('compta.use_partie_double', true);
-
     $cb1 = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
     $cb2 = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
     BancairesSeeder::seed();

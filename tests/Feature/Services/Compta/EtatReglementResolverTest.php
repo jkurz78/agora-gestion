@@ -183,8 +183,7 @@ it('syncer est idempotent (deux appels = même résultat, pas de drift)', functi
     expect($second)->toBe($premier);
 });
 
-it('syncer est un no-op en mode legacy (use_partie_double=false)', function () {
-    config()->set('compta.use_partie_double', false);
+it('syncer laisse intacte une transaction dépourvue d’écritures partie double', function () {
 
     $t1 = Transaction::factory()->create([
         'association_id' => $this->association->id,

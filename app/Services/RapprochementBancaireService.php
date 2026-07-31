@@ -16,7 +16,6 @@ use App\Models\VirementInterne;
 use App\Services\Compta\EtatReglementResolver;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -148,76 +147,41 @@ final class RapprochementBancaireService
      * Calcule le solde pointé courant :
      * solde_ouverture + entrées pointées − sorties pointées.
      *
-     * Mode legacy : Transaction.rapprochement_id → SUM(CASE type THEN ±montant_total).
-     * Mode PD     : transaction_lignes.compte_id IN (512X du compte) jointure sur
-     *               transactions.rapprochement_id → SUM(debit) - SUM(credit).
+     * transaction_lignes.compte_id IN (512X du compte) jointure sur
+     * transactions.rapprochement_id → SUM(debit) - SUM(credit).
      *
-     * Dans les deux modes, les virements internes restent calculés via
+     * Les virements internes restent calculés via
      * VirementInterne.rapprochement_source_id / rapprochement_destination_id
      * (ils n'ont pas de transaction_lignes PD dans slice 1).
      *
-     * Comportement mixte (mode PD, transactions non enrichies) : les transactions
-     * sans ligne 512X enrichie sont invisibles au calcul PD. C'est documenté et
+     * Comportement mixte (transactions non enrichies) : les transactions
+     * sans ligne 512X enrichie sont invisibles au calcul. C'est documenté et
      * attendu — le backfill (slice 1d) les rendra visibles.
      */
     public function calculerSoldePointage(RapprochementBancaire $rapprochement): float
     {
         $solde = (float) $rapprochement->solde_ouverture;
 
-        if (config('compta.use_partie_double')) {
-            // Mode PD : lire les lignes 512X du compte bancaire de ce rapprochement,
-            // liées aux transactions pointées (rapprochement_id = ce rapprochement).
-            $compte512X = $this->resoudreCompte512X($rapprochement->compte);
+        // Lire les lignes 512X du compte bancaire de ce rapprochement,
+        // liées aux transactions pointées (rapprochement_id = ce rapprochement).
+        $compte512X = $this->resoudreCompte512X($rapprochement->compte);
 
-            if ($compte512X !== null) {
-                $mouvement = (float) TransactionLigne::where('transaction_lignes.compte_id', $compte512X->id)
-                    ->join('transactions', 'transactions.id', '=', 'transaction_lignes.transaction_id')
-                    ->where('transactions.rapprochement_id', $rapprochement->id)
-                    ->where('transactions.journal', '!=', JournalComptable::AN->value)
-                    ->selectRaw('SUM(transaction_lignes.debit) - SUM(transaction_lignes.credit) as net')
-                    ->value('net');
+        if ($compte512X !== null) {
+            $mouvement = (float) TransactionLigne::where('transaction_lignes.compte_id', $compte512X->id)
+                ->join('transactions', 'transactions.id', '=', 'transaction_lignes.transaction_id')
+                ->where('transactions.rapprochement_id', $rapprochement->id)
+                ->where('transactions.journal', '!=', JournalComptable::AN->value)
+                ->selectRaw('SUM(transaction_lignes.debit) - SUM(transaction_lignes.credit) as net')
+                ->value('net');
 
-                $solde += $mouvement;
-            } else {
-                Log::warning('[PartieDouble][RapprochementBancaireService] — skip solde : compte 512X introuvable pour CompteBancaire', [
-                    'compte_bancaire_id' => (int) $rapprochement->compte_id,
-                    'rapprochement_id' => (int) $rapprochement->id,
-                ]);
-            }
-            // Si compte 512X introuvable (tenant sans schéma PD), solde = ouverture seul.
+            $solde += $mouvement;
         } else {
-            // Mode legacy : type + montant_total à l'entête Transaction.
-            //
-            // Step 31 — exclure les T1 sources de remise du SUM.
-            // Depuis Step 25 PD, toggleRemise() pointe à la fois les T1 sources ET la T4 consolidée.
-            // Les T1 sources sont des chèques individuels ; la T4 est le dépôt bancaire qui les
-            // représente tous. En compter les deux = double-comptage. Décision : compter la T4 seule
-            // (identique au comportement PD via la ligne 512X de la T4).
-            //
-            // Critère structurel : un T1 source de remise ne porte PAS de ligne 512X (son portage
-            // est sur 5112/530) ; seule la T4 porte une ligne 512X. On exclut donc les transactions
-            // de remise sans ligne 512X. Volontairement indépendant de `reference` : des chèques
-            // remisés réels (prod) ont reference = NULL, ce qui faisait rater l'exclusion par l'ancien
-            // critère `reference IS NOT NULL` → double-comptage T1 + T4 (Finding 2, cutover 2026-05-31).
-            $solde += (float) Transaction::where('rapprochement_id', $rapprochement->id)
-                ->where('journal', '!=', JournalComptable::AN->value)
-                ->whereNot(function (Builder $q): void {
-                    $q->whereNotNull('remise_id')
-                        ->whereDoesntHave('lignes', fn (Builder $l): Builder => $l
-                            ->whereHas('compte', fn (Builder $c): Builder => $c->bancaires()));
-                })
-                // Chantier 2a — exclure les T2 d'encaissement séparées (journal=Banque, remise_id null).
-                // Depuis le chantier 2a, TransactionService produit une T2 (journal=Banque) distincte
-                // pour les recettes comptant. Ces T2 ont rapprochement_id propagé depuis toggleTransaction,
-                // mais leur montant_total ne doit PAS être compté en mode legacy (doublon avec T1).
-                // Les T4 de remise (journal=Banque ET remise_id NOT NULL) sont conservées dans le SUM.
-                ->whereNot(function (Builder $q): void {
-                    $q->where('journal', JournalComptable::Banque->value)
-                        ->whereNull('remise_id');
-                })
-                ->selectRaw("SUM(CASE WHEN type = 'depense' THEN -montant_total ELSE montant_total END) as total")
-                ->value('total');
+            Log::warning('[PartieDouble][RapprochementBancaireService] — skip solde : compte 512X introuvable pour CompteBancaire', [
+                'compte_bancaire_id' => (int) $rapprochement->compte_id,
+                'rapprochement_id' => (int) $rapprochement->id,
+            ]);
         }
+        // Si compte 512X introuvable (tenant sans schéma PD), solde = ouverture seul.
 
         $solde += (float) VirementInterne::where('rapprochement_destination_id', $rapprochement->id)->sum('montant');
         $solde -= (float) VirementInterne::where('rapprochement_source_id', $rapprochement->id)->sum('montant');
@@ -269,7 +233,7 @@ final class RapprochementBancaireService
             }
             $appartientAuCompte = (int) $model->compte_id === (int) $rapprochement->compte_id;
 
-            if (! $appartientAuCompte && config('compta.use_partie_double')) {
+            if (! $appartientAuCompte) {
                 $compte512X = $this->resoudreCompte512X($rapprochement->compte);
                 $appartientAuCompte = $compte512X !== null
                     && $model->lignes()->where('compte_id', $compte512X->id)->exists();
@@ -331,7 +295,7 @@ final class RapprochementBancaireService
                 // Propager rapprochement_id sur T2 séparée si elle existe.
                 // Chantier 2a : recettes comptant → T2 via lettrage 411.
                 // Chantier 3a-i : dépenses comptant → T2 via lettrage 401.
-                // Sans garde use_partie_double — les T2 sont créées systématiquement depuis
+                // Appelé sans condition : les T2 sont créées systématiquement depuis
                 // les chantiers 2a/3a-i. Les méthodes retournent null pour les transactions
                 // legacy (lumpées) ou sans T2 → no-op.
                 $t2 = $this->reglementService->trouverT2($model);

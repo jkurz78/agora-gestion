@@ -15,7 +15,6 @@ use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\ReglementOperationService;
 use App\Services\TransactionService;
 use App\Tenant\TenantContext;
-use Illuminate\Support\Facades\Config;
 
 beforeEach(function () {
     $this->association = Association::factory()->create();
@@ -29,7 +28,6 @@ beforeEach(function () {
     session(['exercice_actif' => 2025]);
 
     SystemeSeeder::seed();
-    Config::set('compta.use_partie_double', true);
 });
 
 afterEach(function () {

@@ -15,7 +15,6 @@ use App\Livewire\TransactionForm;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Config;
 use Tests\Support\CreatesPartieDoubleContext;
 
 uses(RefreshDatabase::class);
@@ -23,7 +22,6 @@ uses(CreatesPartieDoubleContext::class);
 
 beforeEach(function () {
     $this->setupPartieDoubleContext();
-    Config::set('compta.use_partie_double', true);
     $this->tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
 });
 

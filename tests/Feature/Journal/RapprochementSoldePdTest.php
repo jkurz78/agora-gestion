@@ -16,7 +16,6 @@ require_once __DIR__.'/EcritureGeneratorJournalTest.php';
 
 beforeEach(function () {
     SystemeSeeder::seed();
-    config(['compta.use_partie_double' => true]);
 });
 
 it('pointer une remise comptabilisée meut le solde pointé du montant du dépôt (PD)', function () {

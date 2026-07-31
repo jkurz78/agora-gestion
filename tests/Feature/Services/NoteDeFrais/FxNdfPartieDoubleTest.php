@@ -37,7 +37,6 @@ use Illuminate\Support\Facades\Storage;
 uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
-    config(['compta.use_partie_double' => true]);
     Storage::fake('local');
 
     $this->asso = Association::factory()->create();

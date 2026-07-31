@@ -52,7 +52,6 @@ use App\Services\TransactionExtourneService;
 use App\Services\TransactionService;
 use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -137,7 +136,6 @@ beforeEach(function () {
 });
 
 afterEach(function () {
-    Config::set('compta.use_partie_double', false);
     TenantContext::clear();
 });
 
@@ -556,9 +554,7 @@ test('[L] backfill end-to-end exercice complet — toutes Tx equilibree=TRUE, CR
     $txIds = creerFixtureE2E($this);
 
     // Étape 2 : Capturer CR en mode PD (référence "après backfill")
-    Config::set('compta.use_partie_double', true);
     $crAvantLegacy = crSnapshot($this->crBuilder, $this->exercice);
-    Config::set('compta.use_partie_double', false);
 
     // Étape 3 : Simuler l'état legacy
     simulerEtatLegacyE2E($txIds);
@@ -764,9 +760,7 @@ test('[L] backfill end-to-end exercice complet — toutes Tx equilibree=TRUE, CR
     }
 
     // Étape 7 : Comparer CR pré/post backfill (tolérance 0,00€)
-    Config::set('compta.use_partie_double', true);
     $crApres = crSnapshot($this->crBuilder, $this->exercice);
-    Config::set('compta.use_partie_double', false);
 
     // Comparaison solde global
     expect($crApres['solde'])->toEqual(

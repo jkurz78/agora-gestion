@@ -19,7 +19,6 @@ require_once __DIR__.'/EcritureGeneratorJournalTest.php';
 
 beforeEach(function () {
     SystemeSeeder::seed();
-    config(['compta.use_partie_double' => true]);
 });
 
 // ---------------------------------------------------------------------------

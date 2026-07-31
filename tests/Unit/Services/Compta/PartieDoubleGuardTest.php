@@ -46,8 +46,6 @@ function makeLignePDG(Transaction $tx, Compte $compte, float $debit, float $cred
 // ---------------------------------------------------------------------------
 
 test('[2] HelloAsso — assertComplete ne lève pas d\'exception même si equilibree=false', function () {
-    config()->set('compta.use_partie_double', true);
-
     $tx = Transaction::factory()->create([
         'association_id' => TenantContext::currentId(),
         'helloasso_order_id' => 12345,
@@ -62,8 +60,6 @@ test('[2] HelloAsso — assertComplete ne lève pas d\'exception même si equili
 // ---------------------------------------------------------------------------
 
 test('[3] equilibree=false — assertComplete lève PartieDoubleIncompleteException::nonEquilibree', function () {
-    config()->set('compta.use_partie_double', true);
-
     $tx = Transaction::factory()->create([
         'association_id' => TenantContext::currentId(),
         'equilibree' => false,
@@ -79,8 +75,6 @@ test('[3] equilibree=false — assertComplete lève PartieDoubleIncompleteExcept
 // ---------------------------------------------------------------------------
 
 test('[4] equilibree=true sans lignes comptables — assertComplete lève PartieDoubleIncompleteException::sansLignes', function () {
-    config()->set('compta.use_partie_double', true);
-
     $tx = Transaction::factory()->create([
         'association_id' => TenantContext::currentId(),
         'equilibree' => true,
@@ -98,8 +92,6 @@ test('[4] equilibree=true sans lignes comptables — assertComplete lève Partie
 // ---------------------------------------------------------------------------
 
 test('[5] lignes PD déséquilibrées — assertComplete lève PartieDoubleIncompleteException::desequilibree', function () {
-    config()->set('compta.use_partie_double', true);
-
     $tx = Transaction::factory()->create([
         'association_id' => TenantContext::currentId(),
         'equilibree' => true,
@@ -121,8 +113,6 @@ test('[5] lignes PD déséquilibrées — assertComplete lève PartieDoubleIncom
 // ---------------------------------------------------------------------------
 
 test('[6] lignes PD équilibrées — assertComplete ne lève pas d\'exception', function () {
-    config()->set('compta.use_partie_double', true);
-
     $tx = Transaction::factory()->create([
         'association_id' => TenantContext::currentId(),
         'equilibree' => true,

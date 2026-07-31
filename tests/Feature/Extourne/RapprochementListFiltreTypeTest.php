@@ -10,6 +10,7 @@ use App\Enums\StatutReglement;
 use App\Enums\TypeRapprochement;
 use App\Enums\TypeTransaction;
 use App\Livewire\RapprochementList;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
@@ -142,6 +143,13 @@ test('BDD scénario 3 — extourne recette encaissée pointable dans rapprocheme
     rapprochementActAsComptable();
     $compte = CompteBancaire::factory()->create();
 
+    // Compte de trésorerie du compte bancaire : calculerSoldePointage() somme les
+    // lignes qu'il porte. Le scope bancaires() exige numero_pcg LIKE '512_%'.
+    $compte512X = Compte::factory()->numero('5121')->create([
+        'classe' => 5,
+        'compte_bancaire_id' => $compte->id,
+    ]);
+
     // R1 verrouillé bancaire
     $r1 = RapprochementBancaire::factory()->create([
         'compte_id' => $compte->id,
@@ -164,11 +172,22 @@ test('BDD scénario 3 — extourne recette encaissée pointable dans rapprocheme
     // Origine était Pointe → miroir EnAttente (dette de remboursement à pointer en banque)
     expect($extourne->extourne->statut_reglement)->toBe(StatutReglement::EnAttente);
 
-    // R2 EnCours bancaire, pointer l'extourne et verrouiller
+    // R2 EnCours bancaire, pointer l'extourne et verrouiller.
+    // Ouverture = solde_fin de R1 (500) ; le miroir sort 80 € de trésorerie,
+    // d'où le solde de clôture attendu à 420. La ligne 512X au crédit reproduit
+    // ce que EcritureGenerator produit en fonctionnement réel — le fixture
+    // d'origine ne créait qu'une ligne sans compte, invisible au calcul.
     $r2 = app(RapprochementBancaireService::class)->create($compte, now()->toDateString(), 420);
     $extourne->extourne->update([
         'rapprochement_id' => $r2->id,
         'statut_reglement' => StatutReglement::Pointe,
+    ]);
+    TransactionLigne::create([
+        'transaction_id' => $extourne->extourne->id,
+        'compte_id' => $compte512X->id,
+        'debit' => 0.0,
+        'credit' => 80.0,
+        'montant' => 80.0,
     ]);
     app(RapprochementBancaireService::class)->verrouiller($r2);
 

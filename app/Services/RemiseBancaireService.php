@@ -258,7 +258,7 @@ final class RemiseBancaireService
 
             // --- PD : syncer toutes les tx touchées (retirées + gardées) après recreerT4 ---
             // Les retirées obtiennent EnMain (5112 délettré), les gardées obtiennent Recu
-            // (5112 lettrée via nouvelle T4). Legacy : no-op (use_partie_double=false).
+            // (5112 lettrée via nouvelle T4).
             $tousIds = array_unique(array_merge($retiresIds, array_map('intval', $transactionIds)));
             foreach ($tousIds as $id) {
                 $s = Transaction::find($id);

@@ -177,21 +177,19 @@ final class RapprochementDetail extends Component
         $transactions = collect();
         $verrouille = $this->rapprochement->isVerrouille();
 
-        // En mode partie double, résoudre le compte 512X strict du compte bancaire.
+        // Résoudre le compte 512X strict du compte bancaire.
         // Utilisé pour filtrer la liste pointable : seules les écritures portant une
         // ligne sur CE compte 512X (ou appartenant à une remise) sont affichées.
         // Si le compte 512X est introuvable (tenant sans schéma PD), pas de filtre
-        // (dégradation gracieuse identique au comportement legacy).
-        $compte512X = config('compta.use_partie_double')
-            ? $service->resoudreCompte512X($compte)
-            : null;
+        // (dégradation gracieuse).
+        $compte512X = $service->resoudreCompte512X($compte);
 
         // Transactions (dépenses + recettes) — grouper les remises en une seule ligne
         //
-        // Mode PD : le filtre par lignes 512X REMPLACE le filtre legacy header compte_id.
+        // Le filtre par lignes 512X REMPLACE le filtre header compte_id.
         // La T2 de règlement (créée par pourReglement) n'a pas de compte_id header
         // mais porte une ligne 512X — sans ce fallback elle serait invisible.
-        $usePdFilter = config('compta.use_partie_double') && $compte512X !== null;
+        $usePdFilter = $compte512X !== null;
 
         $txRows = Transaction::query()
             ->where('journal', '!=', JournalComptable::AN->value)

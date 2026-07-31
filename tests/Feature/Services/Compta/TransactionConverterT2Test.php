@@ -26,7 +26,6 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\Compta\TransactionConverter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\CreatesPartieDoubleContext;
 
@@ -39,8 +38,6 @@ uses(CreatesPartieDoubleContext::class);
 
 beforeEach(function () {
     $this->setupPartieDoubleContext();
-
-    Config::set('compta.use_partie_double', true);
 
     // Tiers utilisé par tous les tests
     $this->tiers = Tiers::factory()->create([

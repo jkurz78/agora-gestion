@@ -8,7 +8,6 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Services\Compta\PartieDoubleGuard;
 use App\Services\TransactionService;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\CreatesPartieDoubleContext;
 
@@ -20,7 +19,6 @@ uses(CreatesPartieDoubleContext::class);
 
 beforeEach(function () {
     $this->setupPartieDoubleContext();
-    Config::set('compta.use_partie_double', true);
 });
 
 it('create() avec PD active et compte valide → guard passe, equilibree=true', function () {

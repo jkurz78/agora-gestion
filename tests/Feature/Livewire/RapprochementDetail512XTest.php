@@ -33,7 +33,6 @@ use App\Services\Compta\Migrations\BancairesSeeder;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\RemiseBancaireService;
 use App\Tenant\TenantContext;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
@@ -51,7 +50,6 @@ beforeEach(function () {
     $this->actingAs($this->user);
 
     // Activer le mode partie double
-    Config::set('compta.use_partie_double', true);
 
     // Comptes système : 411, 401, 5112
     SystemeSeeder::seed();
@@ -125,7 +123,6 @@ beforeEach(function () {
 });
 
 afterEach(function () {
-    Config::set('compta.use_partie_double', false);
     TenantContext::clear();
 });
 

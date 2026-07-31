@@ -169,10 +169,9 @@ final class ReglementOperationService
      *
      * Ne touche PAS à statut_reglement — c'est la responsabilité du caller.
      *
-     * Volontairement INDÉPENDANT du flag config('compta.use_partie_double') : les callers
-     * (marquerRecu, remise) l'appellent sans condition. C'est sûr car une transaction legacy
-     * pré-cutover n'a pas de ligne 411 → la garde « 411 absent » ci-dessous en fait un no-op.
-     * La garde 411 EST le gate de fait, le flag n'est pas requis ici.
+     * Les callers (marquerRecu, remise) l'appellent sans condition. C'est sûr car une
+     * transaction dépourvue de ligne 411 déclenche la garde « 411 absent » ci-dessous,
+     * qui en fait un no-op. Cette garde EST le gate de fait.
      *
      * Skip silencieux (sans exception) dans les cas suivants :
      * — mode_paiement null sur T1

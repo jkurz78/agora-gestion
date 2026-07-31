@@ -283,13 +283,26 @@ it('rapprochement_service_solde_avec_negatif', function () {
         'saisi_par' => $this->user->id,
     ]);
 
-    // Tx recette -50 € pointée au rapprochement
-    // La formule calculerSoldePointage :
-    //   solde_ouverture
-    //   + SUM(CASE WHEN type='depense' THEN -montant_total ELSE montant_total END)
-    // Pour une recette à -50 : contribution = -50
+    // Tx recette -50 € pointée au rapprochement.
+    //
+    // calculerSoldePointage() somme les lignes portées par le compte 512X du
+    // compte bancaire : solde_ouverture + SUM(debit) - SUM(credit).
+    // Une recette de -50 € porte donc une ligne 512X au crédit de 50 €.
     // Résultat attendu : 500 + (-50) = 450
-    $this->makeAuditTransaction('recette', -50.0, $this->sc, $this->compte, 2025, $rapprochement);
+    //
+    // Le scope bancaires() exige numero_pcg LIKE '512_%' — « 512 » seul ne matche pas.
+    $compte512X = Compte::create([
+        'numero_pcg' => '5121',
+        'intitule' => 'Banque',
+        'classe' => 5,
+        'compte_bancaire_id' => $this->compte->id,
+        'actif' => true,
+        'est_systeme' => false,
+        'pour_inscriptions' => false,
+        'lettrable' => false,
+    ]);
+    $tx = $this->makeAuditTransaction('recette', -50.0, $this->sc, $this->compte, 2025, $rapprochement);
+    completerContrepartieBancaire($tx, $compte512X, 'recette', -50.0);
 
     $service = app(RapprochementBancaireService::class);
     $solde = $service->calculerSoldePointage($rapprochement->fresh());

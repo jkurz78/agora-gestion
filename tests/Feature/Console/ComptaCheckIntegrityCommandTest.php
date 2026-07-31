@@ -187,7 +187,6 @@ it('signale une divergence sur une ventilation compte-first', function (): void 
 });
 
 it('ne compte pas deux fois une écriture opérationnelle et son règlement bancaire', function (): void {
-    config()->set('compta.use_partie_double', true);
 
     $user = User::factory()->create();
     $compteBancaire = CompteBancaire::factory()->create([
