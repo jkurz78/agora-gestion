@@ -11,7 +11,6 @@ Ce guide accompagne la branche `feat/compta-v5`. Il décrit 4 scénarios de vali
 ### Prérequis
 
 - **Sail démarré** : `./vendor/bin/sail up -d`
-- **Mode PD activé** : `COMPTA_USE_PARTIE_DOUBLE=true` dans `.env`
 - **Migrations fraîches** : `./vendor/bin/sail artisan migrate:fresh --seed`
 - **Backfill exécuté** si données legacy présentes (voir section 2)
 
@@ -342,14 +341,6 @@ docker compose exec laravel.test php artisan compta:backfill-partie-double --dry
 
 ### Variables d'environnement preprod
 
-Assurez-vous que `.env` sur le NAS contient :
-
-```env
-COMPTA_USE_PARTIE_DOUBLE=true
-```
-
-Vérifiable via :
-
-```bash
-docker compose exec laravel.test php artisan tinker --execute "echo config('compta.use_partie_double') ? 'PD: ON' : 'PD: OFF';"
-```
+Aucune variable spécifique à la partie double n'est requise : elle est le comportement
+unique du produit depuis le 2026-07-31, sans interrupteur
+(voir [ADR-004](adr/004-partie-double-inconditionnelle.md)).

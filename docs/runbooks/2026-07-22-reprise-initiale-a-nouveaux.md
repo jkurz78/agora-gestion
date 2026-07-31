@@ -26,7 +26,6 @@ Pour un exercice décalé, `--exercice=2025` désigne la période du 1er septemb
 ## 2. Pré-requis
 
 - [ ] Le code Compta V5 et ses migrations sont déployés.
-- [ ] `compta.use_partie_double` est activé.
 - [ ] L’identifiant de l’association est confirmé.
 - [ ] L’exercice cible est confirmé.
 - [ ] L’utilisateur passé dans `--acteur` appartient à l’association et est habilité à valider la reprise.
