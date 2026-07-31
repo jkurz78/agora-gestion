@@ -115,6 +115,17 @@ it('déduit l’exercice 2025 quand le solde le plus récent est daté du 31 ao�
     expect(app(BootstrapANouveauService::class)->exerciceSuggere())->toBe(2025);
 });
 
+it('déduit l’exercice en cours quand l’association adopte l’outil en cours d’année', function (): void {
+    // Cas révélé par le rejeu du site de démonstration : soldes datés du
+    // 19 septembre pour un exercice ouvert le 1er. C'est le cas d'adoption le
+    // plus fréquent, et non une exception — l'exercice à ouvrir est celui qui
+    // contient la date, pas un hypothétique exercice commençant après elle.
+    Exercice::create(['annee' => 2025, 'statut' => StatutExercice::Ouvert]);
+    banqueGardeReprise('512-G7', '5000.00', '2025-09-19');
+
+    expect(app(BootstrapANouveauService::class)->exerciceSuggere())->toBe(2025);
+});
+
 it('ne peut pas déduire d’exercice quand aucun solde bancaire n’est non nul', function (): void {
     Exercice::create(['annee' => 2025, 'statut' => StatutExercice::Ouvert]);
     banqueGardeReprise('512-G6', '0.00', '2025-08-31');

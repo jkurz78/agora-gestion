@@ -158,26 +158,32 @@ final class BootstrapANouveauService
             return null;
         }
 
-        $dateReference = CarbonImmutable::parse((string) $dateReferenceMax);
+        // L'exercice à ouvrir est celui qui contient le LENDEMAIN de la date de
+        // référence : un solde arrête une position, et l'exercice à reprendre est
+        // celui qui court immédiatement après elle.
+        //
+        // Cette formulation couvre les deux cas sans traiter le second comme une
+        // exception : un solde daté de la veille d'un exercice (reprise nette,
+        // 31/08 → exercice suivant) et un solde daté en cours d'exercice — une
+        // association qui adopte l'outil en cours d'année, ce qui est le cas le
+        // plus fréquent à l'onboarding. Chercher un exercice qui *commence après*
+        // la date refusait ce second cas, pourtant légitime : c'est le défaut
+        // qu'a révélé le rejeu du site de démonstration, dont les soldes sont
+        // datés du 19 septembre pour un exercice ouvert le 1er.
+        $lendemain = CarbonImmutable::parse((string) $dateReferenceMax)->addDay();
 
-        $exerciceRetenu = null;
-        $debutRetenu = null;
-        foreach (Exercice::query()->get() as $exercice) {
-            $debut = CarbonImmutable::instance(
-                $this->exerciceService->dateRange((int) $exercice->annee)['start']
-            );
+        foreach (Exercice::query()->orderBy('annee')->get() as $exercice) {
+            $range = $this->exerciceService->dateRange((int) $exercice->annee);
 
-            if (! $debut->greaterThan($dateReference)) {
-                continue;
-            }
+            $debut = CarbonImmutable::instance($range['start']);
+            $fin = CarbonImmutable::instance($range['end']);
 
-            if ($debutRetenu === null || $debut->lessThan($debutRetenu)) {
-                $debutRetenu = $debut;
-                $exerciceRetenu = (int) $exercice->annee;
+            if ($lendemain->betweenIncluded($debut, $fin)) {
+                return (int) $exercice->annee;
             }
         }
 
-        return $exerciceRetenu;
+        return null;
     }
 
     /**
