@@ -25,8 +25,8 @@ use Illuminate\Database\Migrations\Migration;
  * `php artisan compta:reconcilier-statuts` APRÈS le backfill — voir la séquence
  * de bascule dans docs/compta-partie-double.md §8.
  *
- * (Le syncer ne se gate plus sur compta.use_partie_double depuis le passage en
- * partie double inconditionnelle : le flag ne pilote que l'affichage.)
+ * (Le syncer ne dépend d'aucune option : la partie double est inconditionnelle.
+ * Voir docs/adr/004-partie-double-inconditionnelle.md.)
  */
 return new class extends Migration
 {
