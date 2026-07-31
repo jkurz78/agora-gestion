@@ -1,5 +1,9 @@
 # ADR-003 : Révision stratégie comptable — Cash basis enrichie → Partie double uniforme
 
+> **Amendé le 2026-07-31** — le volet *feature flag* de cet ADR est supersédé par
+> [ADR-004 — La partie double devient inconditionnelle](004-partie-double-inconditionnelle.md).
+> Le reste du document conserve sa valeur d'enregistrement historique.
+
 **Statut :** Adopté 2026-05-27
 **Date :** 2026-05-27
 **Auteurs :** Jurgen Kurz, Claude

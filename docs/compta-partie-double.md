@@ -2,7 +2,7 @@
 
 **Version documentée** : Slice 1 (`feat/compta-v5`)
 **Date** : 2026-05-27
-**Statut** : En production sur branche `feat/compta-v5`, cutover prod planifié post-backfill.
+**Statut** : Partie double inconditionnelle sur branche `feat/compta-v5` — comportement unique du produit, plus de cutover. Voir [ADR-004](adr/004-partie-double-inconditionnelle.md).
 
 Mémoires de référence :
 - `project_compta_partie_double.md` — cadrage initial (2026-05-02)
@@ -262,17 +262,6 @@ Pour une **recette** par chèque : ligne 5112D (chèque reçu en portefeuille �
 
 Pour une **dépense** par chèque : ligne 512X D directement (chèque émis → débit immédiat). Le compte 5112 n'est **pas** utilisé pour les dépenses. Cette asymétrie est documentée dans la spec §4.3 et dans `CompteTresorerieResolver` (voir §6).
 
-### Feature flag
-
-```php
-// config/compta.php
-'use_partie_double' => env('COMPTA_USE_PARTIE_DOUBLE', false)
-```
-
-Utilisé par `CompteResultatBuilder` (Step 27) et `RapprochementBancaireService` (Step 29) pour basculer entre le path legacy et le path partie double. La double écriture (enrichissement des lignes) est **toujours active** depuis le branchement Step 21 — le flag contrôle uniquement la **lecture** dans les rapports et le rappro.
-
-**Activation post-backfill** : une fois le backfill d'un exercice terminé avec succès, passer `COMPTA_USE_PARTIE_DOUBLE=true` active les rapports PD pour cet exercice.
-
 ### Mapping SousCategorie → Compte
 
 ```
@@ -454,15 +443,11 @@ function compteSysteme(string $numero): Compte
    php artisan compta:backfill-partie-double --exercice=2025
    ```
 2. Vérifier le rapport : `converti=N / déjà PD=0 / skippé=K / erreur=0`.
-3. Activer le feature flag dans `.env` :
-   ```
-   COMPTA_USE_PARTIE_DOUBLE=true
-   ```
-4. Vider le cache de configuration :
+3. Vider le cache de configuration :
    ```bash
    php artisan config:cache
    ```
-5. **Réconcilier les statuts de règlement** — obligatoire, et dans cet ordre :
+4. **Réconcilier les statuts de règlement** — obligatoire, et dans cet ordre :
    ```bash
    php artisan compta:reconcilier-statuts --check   # inventaire
    php artisan compta:reconcilier-statuts           # resynchronisation
@@ -474,14 +459,12 @@ function compteSysteme(string $numero): Compte
    étape, les recettes chèque/espèces jamais remises restent étiquetées « Reçu »
    au lieu de « À remettre » — visible dans les listes, les filtres et l'écran
    des créances.
-6. Contrôler les invariants : `compta:check-integrity`, `compta:assert-pd-complete --check`, `compta:smoke-test-v5 --detail`.
-7. Valider visuellement le Compte de résultat et le rapprochement bancaire.
+5. Contrôler les invariants : `compta:check-integrity`, `compta:assert-pd-complete --check`, `compta:smoke-test-v5 --detail`.
+6. Valider visuellement le Compte de résultat et le rapprochement bancaire.
 
 ### Rollback
 
-> ⚠️ **Cette section est périmée depuis la dissolution `sous_categories` → `comptes` (DC-10b) et doit être réécrite après la première répétition de bascule.** Les tables `sous_categories` et `categories` ont été supprimées et les rapports lisent `comptes` dans les deux branches : repasser le flag à `false` ne restitue plus le comportement v4. Le rollback réel est la **restauration de la sauvegarde de base**, dont la procédure et la durée restent à établir.
-
-Le feature flag `COMPTA_USE_PARTIE_DOUBLE=false` (default) ne pilote plus que quelques bifurcations de lecture (neutralisation des provisions au CR, filtre du rapprochement, gates de clôture). La génération des écritures, elle, est inconditionnelle.
+Il n'existe plus de bascule de configuration : la partie double est le comportement unique du produit (voir [ADR-004](adr/004-partie-double-inconditionnelle.md)). Le seul recours réel en cas de problème après une mise en production est la **restauration d'une sauvegarde de base**, dont la procédure et la durée restent à établir.
 
 Les colonnes legacy (`transactions.type`, `transaction_lignes.sous_categorie_id`, `transaction_lignes.montant`) sont **conservées** jusqu'à une PR dédiée post-stabilité prod (Step 40 différé).
 
@@ -490,7 +473,7 @@ Les colonnes legacy (`transactions.type`, `transaction_lignes.sous_categorie_id`
 | Artéfact | Raison du maintien | Prochaine étape |
 |---|---|---|
 | `transaction_lignes.sous_categorie_id` | FK utilisée par les services legacy encore actifs | Drop Step 40, PR séparée |
-| `transaction_lignes.montant` | Lu par les rapports en mode `use_partie_double=false` | Drop Step 40, PR séparée |
+| `transaction_lignes.montant` | Code mort depuis la suppression du flag (ADR-004) — plus aucun lecteur | Drop Step 40, PR séparée |
 | `transactions.type` | Discriminant legacy (recette/dépense) | Drop Step 40, PR séparée |
 | `transactions.compte_id` | FK vers `comptes_bancaires` (pas vers `comptes`) | Drop Step 40, PR séparée |
 | `App\Models\SousCategorie` | FK `sous_categorie_id` dans 6 tables | Programme dédié post-cutover |
@@ -507,15 +490,13 @@ Les colonnes legacy (`transactions.type`, `transaction_lignes.sous_categorie_id`
 
 Ce test crée une fixture exercice complet (3 recettes comptant, 1 créance + encaissement, 2 dépenses, 1 facture 2 lignes + encaissement, 1 remise bancaire 2 chèques, 1 séance via `ReglementOperationService`) et vérifie que les totaux du Compte de résultat en mode PD sont identiques aux totaux en mode legacy, à l'euro près.
 
-8 scénarios (E1 à E7 + I2) couvrent : totaux par catégorie, totaux par sous-catégorie, filtrage opération, ventilation par séance, non-régression flag OFF, sanity montants > 0, absence lignes techniques (411/5112/512X) dans les produits/charges.
+8 scénarios (E1 à E7 + I2) couvrent : totaux par catégorie, totaux par sous-catégorie, filtrage opération, ventilation par séance, sanity montants > 0, absence lignes techniques (411/5112/512X) dans les produits/charges.
 
 **Résultat** : 0 divergence détectée sur l'ensemble de la fixture exercice 2025.
 
-### Rapprochement bancaire — tolérance 0€
+### Rapprochement bancaire
 
-**Fichier** : `tests/Feature/Rappro/PartieDoubleEquivalenceTest.php` (Step 30)
-
-Vérifie que le solde calculé par `RapprochementBancaireService::calculerSoldePointage` en mode PD est identique au solde en mode legacy, sur la même fixture de transactions enrichies.
+Le test d'équivalence legacy vs PD (`tests/Feature/Rappro/PartieDoubleEquivalenceTest.php`, Step 30) est supprimé avec le flag (voir [ADR-004](adr/004-partie-double-inconditionnelle.md)) : il n'a plus de second terme à comparer. Le contrôle d'équilibre `∑ debit = ∑ credit` par transaction reste vérifié par `compta:smoke-test-v5`.
 
 ### Backfill end-to-end exercice complet
 
