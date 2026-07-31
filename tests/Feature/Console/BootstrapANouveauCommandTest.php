@@ -16,7 +16,6 @@ use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Tenant\TenantContext;
 
 beforeEach(function (): void {
-    config(['compta.use_partie_double' => true]);
     SystemeSeeder::seed();
     $this->associationBootstrap = TenantContext::current();
 

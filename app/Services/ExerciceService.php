@@ -172,23 +172,21 @@ final class ExerciceService
                 throw EtapeComptaRequiseException::pour($etatCompta);
             }
 
-            if (config('compta.use_partie_double')) {
-                $exerciceCible = Exercice::query()
-                    ->where('annee', (int) $exerciceVerrouille->annee + 1)
-                    ->lockForUpdate()
-                    ->first();
+            $exerciceCible = Exercice::query()
+                ->where('annee', (int) $exerciceVerrouille->annee + 1)
+                ->lockForUpdate()
+                ->first();
 
-                if ($exerciceCible?->isCloture()) {
-                    throw new \RuntimeException('Impossible de générer les à-nouveaux : l’exercice cible est clôturé.');
-                }
-
-                $preview = app(ANouveauPreviewBuilder::class)->build((int) $exerciceVerrouille->annee);
-                app(ANouveauService::class)->persister(
-                    $preview,
-                    OrigineANouveau::Cloture,
-                    $user,
-                );
+            if ($exerciceCible?->isCloture()) {
+                throw new \RuntimeException('Impossible de générer les à-nouveaux : l’exercice cible est clôturé.');
             }
+
+            $preview = app(ANouveauPreviewBuilder::class)->build((int) $exerciceVerrouille->annee);
+            app(ANouveauService::class)->persister(
+                $preview,
+                OrigineANouveau::Cloture,
+                $user,
+            );
 
             $exerciceVerrouille->update([
                 'statut' => StatutExercice::Cloture,
@@ -217,9 +215,7 @@ final class ExerciceService
     public function reouvrir(Exercice $exercice, User $user, string $commentaire): void
     {
         DB::transaction(function () use ($exercice, $user, $commentaire): void {
-            if (config('compta.use_partie_double')) {
-                app(ANouveauService::class)->invalider($exercice, $user, $commentaire);
-            }
+            app(ANouveauService::class)->invalider($exercice, $user, $commentaire);
 
             $exercice->update([
                 'statut' => StatutExercice::Ouvert,

@@ -80,14 +80,6 @@ final class ClotureCheckService
 
     public function checkOuverturePrecedente(int $annee): CheckItem
     {
-        if (! config('compta.use_partie_double')) {
-            return new CheckItem(
-                'Soldes d’ouverture',
-                true,
-                'Contrôle des soldes d’ouverture non requis en mode comptable historique',
-            );
-        }
-
         $precedent = Exercice::query()->where('annee', $annee - 1)->first();
         if ($precedent === null) {
             return new CheckItem(
@@ -199,10 +191,6 @@ final class ClotureCheckService
 
     private function checkExerciceCible(int $annee): CheckItem
     {
-        if (! config('compta.use_partie_double')) {
-            return new CheckItem('Exercice cible', true, 'À-nouveaux non activés en mode comptable historique');
-        }
-
         $cible = Exercice::query()->where('annee', $annee + 1)->first();
         $ok = $cible === null || ! $cible->isCloture();
 
@@ -217,10 +205,6 @@ final class ClotureCheckService
 
     private function checkANouveau(int $annee): CheckItem
     {
-        if (! config('compta.use_partie_double')) {
-            return new CheckItem('Aperçu AN', true, 'Aperçu AN non requis en mode comptable historique');
-        }
-
         try {
             $preview = app(ANouveauPreviewBuilder::class)->build($annee);
             $ok = $preview->equilibree();
@@ -243,10 +227,6 @@ final class ClotureCheckService
 
     private function checkMouvementsExerciceCible(int $annee): CheckItem
     {
-        if (! config('compta.use_partie_double')) {
-            return new CheckItem('Mouvements exercice suivant', true, 'Contrôle non requis');
-        }
-
         $transactions = Transaction::query()
             ->forExercice($annee + 1)
             ->where('journal', '!=', JournalComptable::AN->value)

@@ -238,7 +238,7 @@ final class ClotureWizard extends Component
             $viewData['summary'] = $this->computeFinancialSummary();
         }
 
-        if ($this->step === 3 && config('compta.use_partie_double')) {
+        if ($this->step === 3) {
             $preview = app(ANouveauPreviewBuilder::class)->build($this->annee);
             $tiersIds = collect($preview->lignes)->pluck('tiers_id')->filter()->unique()->all();
 

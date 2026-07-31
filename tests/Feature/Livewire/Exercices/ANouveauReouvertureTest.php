@@ -19,7 +19,6 @@ use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
 it('reouvre l exercice et invalide immediatement sa piece AN', function (): void {
-    config(['compta.use_partie_double' => true]);
     SystemeSeeder::seed();
 
     $user = User::factory()->create();

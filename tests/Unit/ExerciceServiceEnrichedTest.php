@@ -20,6 +20,7 @@ beforeEach(function () {
     TenantContext::boot($association);
     $this->service = app(ExerciceService::class);
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($association->id, ['role' => 'admin', 'joined_at' => now()]);
 });
 
 afterEach(function () {

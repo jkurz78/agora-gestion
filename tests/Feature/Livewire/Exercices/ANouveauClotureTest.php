@@ -22,7 +22,6 @@ use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
 beforeEach(function (): void {
-    config(['compta.use_partie_double' => true]);
     SystemeSeeder::seed();
 
     $this->userClotureAN = User::factory()->create();

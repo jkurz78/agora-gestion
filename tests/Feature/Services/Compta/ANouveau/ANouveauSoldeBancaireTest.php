@@ -26,7 +26,6 @@ use Carbon\CarbonImmutable;
 use Livewire\Livewire;
 
 beforeEach(function (): void {
-    config(['compta.use_partie_double' => true]);
     SystemeSeeder::seed();
     Exercice::create(['annee' => 2025, 'statut' => StatutExercice::Ouvert]);
     Exercice::create(['annee' => 2026, 'statut' => StatutExercice::Ouvert]);
@@ -122,6 +121,11 @@ it('calcule le solde depuis l AN et les seuls mouvements de l exercice cible', f
 });
 
 it('laisse l ancienne operation non pointee candidate mais exclut la piece AN', function (): void {
+    // TODO(lot 3) : RapprochementDetail::resoudreCompte512X() reste gardé par
+    // config('compta.use_partie_double') (app/Livewire/RapprochementDetail.php:185,194).
+    // Ce test exerce ce composant ; à retirer quand le filtre 512X deviendra permanent.
+    config(['compta.use_partie_double' => true]);
+
     $ancienne = mouvementBanqueAN(
         $this->compte512AN,
         $this->produitBanqueAN,

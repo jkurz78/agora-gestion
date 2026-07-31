@@ -26,7 +26,10 @@ use App\Models\CompteBancaire;
 use App\Models\Exercice;
 use App\Models\Provision;
 use App\Models\RapprochementBancaire;
+use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\Rapports\CompteResultatBuilder;
 use App\Services\Rapports\FluxTresorerieBuilder;
 use App\Services\RapprochementBancaireService;
@@ -40,6 +43,10 @@ uses(MakesAuditTransactions::class);
 
 beforeEach(function () {
     $this->association = Association::factory()->create();
+    // Comptes système (dont 120/129) requis par ANouveauPreviewBuilder : la
+    // garde « Aperçu AN » de ClotureCheckService, désormais inconditionnelle,
+    // les recherche dès que le résultat de l'exercice est non nul.
+    SystemeSeeder::seed();
     $this->user = User::factory()->create();
     $this->user->associations()->attach($this->association->id, [
         'role' => 'admin',
@@ -69,6 +76,32 @@ beforeEach(function () {
 afterEach(function () {
     TenantContext::clear();
 });
+
+/**
+ * Complète l'écriture à une seule ligne produite par makeAuditTransaction()
+ * par une contrepartie sur le compte bancaire.
+ *
+ * makeAuditTransaction() ne crée que la ligne de ventilation (706/606), ce
+ * qui suffisait tant que la garde « Aperçu AN » de ClotureCheckService restait
+ * de complaisance derrière le flag. Devenue réelle, elle bâtit un aperçu des
+ * à-nouveaux sur l'ensemble de l'exercice et le rejette si le grand livre ne
+ * s'équilibre pas — une écriture à une seule ligne ne s'équilibre jamais.
+ * Seuls les tests qui passent par ClotureWizard (5 et 6) ont besoin de cette
+ * contrepartie ; les huit autres testent des sommations de rapports qui ne
+ * déclenchent pas cette garde.
+ */
+function completerContrepartieBancaire(Transaction $transaction, Compte $compte512, string $type, float $montant): void
+{
+    $contribution = $type === 'depense' ? -$montant : $montant;
+
+    TransactionLigne::create([
+        'transaction_id' => $transaction->id,
+        'compte_id' => $compte512->id,
+        'debit' => $contribution > 0 ? $contribution : 0.0,
+        'credit' => $contribution < 0 ? -$contribution : 0.0,
+        'montant' => abs($montant),
+    ]);
+}
 
 // ── Test 1 ────────────────────────────────────────────────────────────────────
 
@@ -168,7 +201,18 @@ it('cloture_wizard_calcule_solde_ouverture_avec_negatifs', function () {
     // computeFinancialSummary(), pas la complétude comptable, et sans ce
     // drapeau la nouvelle garde « Préalables comptables » de
     // ClotureCheckService bloquerait le passage à l'étape 2.
-    $this->makeAuditTransaction('recette', -100.0, $this->sc, $this->compte, 2025, overrides: ['equilibree' => true]);
+    $compte512 = Compte::create([
+        'numero_pcg' => '512',
+        'intitule' => 'Banque',
+        'classe' => 5,
+        'compte_bancaire_id' => $this->compte->id,
+        'actif' => true,
+        'est_systeme' => false,
+        'pour_inscriptions' => false,
+        'lettrable' => false,
+    ]);
+    $tx = $this->makeAuditTransaction('recette', -100.0, $this->sc, $this->compte, 2025, overrides: ['equilibree' => true]);
+    completerContrepartieBancaire($tx, $compte512, 'recette', -100.0);
 
     $component = Livewire::test(ClotureWizard::class)
         ->call('suite')   // step 1 → step 2
@@ -188,11 +232,26 @@ it('cloture_wizard_calcule_solde_ouverture_avec_negatifs', function () {
 it('cloture_wizard_resultat_avec_dataset_mixte', function () {
     // +200 recette, -50 recette, +80 dépense
     // equilibree: true sur les trois — voir le commentaire du test précédent.
-    $this->makeAuditTransaction('recette', 200.0, $this->sc, $this->compte, 2025, overrides: ['equilibree' => true]);
-    $this->makeAuditTransaction('recette', -50.0, $this->sc, $this->compte, 2025, overrides: ['equilibree' => true]);
+    $compte512 = Compte::create([
+        'numero_pcg' => '512',
+        'intitule' => 'Banque',
+        'classe' => 5,
+        'compte_bancaire_id' => $this->compte->id,
+        'actif' => true,
+        'est_systeme' => false,
+        'pour_inscriptions' => false,
+        'lettrable' => false,
+    ]);
+
+    $tx1 = $this->makeAuditTransaction('recette', 200.0, $this->sc, $this->compte, 2025, overrides: ['equilibree' => true]);
+    completerContrepartieBancaire($tx1, $compte512, 'recette', 200.0);
+
+    $tx2 = $this->makeAuditTransaction('recette', -50.0, $this->sc, $this->compte, 2025, overrides: ['equilibree' => true]);
+    completerContrepartieBancaire($tx2, $compte512, 'recette', -50.0);
 
     $compteDepense = Compte::factory()->depense()->numero('606')->create();
-    $this->makeAuditTransaction('depense', 80.0, $compteDepense, $this->compte, 2025, overrides: ['equilibree' => true]);
+    $tx3 = $this->makeAuditTransaction('depense', 80.0, $compteDepense, $this->compte, 2025, overrides: ['equilibree' => true]);
+    completerContrepartieBancaire($tx3, $compte512, 'depense', 80.0);
 
     $component = Livewire::test(ClotureWizard::class)
         ->call('suite')
