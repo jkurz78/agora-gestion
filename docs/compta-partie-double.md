@@ -488,9 +488,11 @@ Les colonnes legacy (`transactions.type`, `transaction_lignes.sous_categorie_id`
 
 **Fichier** : `tests/Feature/CR/PartieDoubleEquivalenceTest.php` (Step 28)
 
-Ce test crée une fixture exercice complet (3 recettes comptant, 1 créance + encaissement, 2 dépenses, 1 facture 2 lignes + encaissement, 1 remise bancaire 2 chèques, 1 séance via `ReglementOperationService`) et vérifie que les totaux du Compte de résultat en mode PD sont identiques aux totaux en mode legacy, à l'euro près.
+Ce test crée une fixture exercice complet (3 recettes comptant, 1 créance + encaissement, 2 dépenses, 1 facture 2 lignes + encaissement, 1 remise bancaire 2 chèques, 1 séance via `ReglementOperationService`) et vérifie les totaux du Compte de résultat à l'euro près.
 
-8 scénarios (E1 à E7 + I2) couvrent : totaux par catégorie, totaux par sous-catégorie, filtrage opération, ventilation par séance, sanity montants > 0, absence lignes techniques (411/5112/512X) dans les produits/charges.
+> Le nom du fichier est historique : il comparait autrefois les totaux partie double aux totaux du modèle historique. Ce second terme n'existe plus, le test vérifie désormais les totaux dans l'absolu.
+
+6 scénarios couvrent : familles et comptes attendus avec leurs montants, filtrage par opération, ventilation par séance et par compte, exclusion des lignes techniques de classes 4 et 5 des produits et charges, équilibre d'une recette comptant saisie par le service, et identité de statut entre une écriture directe et une écriture convertie.
 
 **Résultat** : 0 divergence détectée sur l'ensemble de la fixture exercice 2025.
 
