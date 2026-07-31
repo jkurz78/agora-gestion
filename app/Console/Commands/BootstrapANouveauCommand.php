@@ -73,7 +73,18 @@ final class BootstrapANouveauCommand extends Command
 
             $exercice = $this->option('exercice') !== null
                 ? (int) $this->option('exercice')
-                : $this->exerciceService->current();
+                : $this->bootstrapService->exerciceSuggere();
+
+            if ($exercice === null) {
+                $this->error(
+                    'Impossible de déduire l’exercice à ouvrir depuis les dates de solde. '
+                    .'Précisez --exercice, ou datez les soldes de la veille de l’exercice concerné.'
+                );
+
+                return self::FAILURE;
+            }
+
+            $this->line(sprintf('Exercice cible : %d', $exercice));
 
             if (ANouveauGeneration::activePourCible($exercice) !== null) {
                 $this->error("Une génération active existe déjà pour l’exercice {$exercice}.");

@@ -8,6 +8,8 @@ use App\Exceptions\Compta\ANouveauInvalideException;
 use App\Models\ANouveauGeneration;
 use App\Models\ANouveauLigneOrigine;
 use App\Models\Compte;
+use App\Models\CompteBancaire;
+use App\Models\Exercice;
 use App\Models\TransactionLigne;
 use App\Services\ExerciceService;
 use Carbon\CarbonImmutable;
@@ -138,6 +140,47 @@ final class BootstrapANouveauService
     }
 
     /**
+     * L'exercice que les soldes historiques ouvrent réellement : celui dont
+     * l'ouverture suit immédiatement la date de référence la plus récente.
+     *
+     * Déduire cet exercice plutôt que le faire saisir supprime le piège de
+     * l'année par défaut de la commande, qui vaut l'exercice courant et non
+     * celui que les soldes ouvrent.
+     */
+    public function exerciceSuggere(): ?int
+    {
+        $dateReferenceMax = CompteBancaire::query()
+            ->whereNotNull('date_solde_initial')
+            ->where('solde_initial', '<>', 0)
+            ->max('date_solde_initial');
+
+        if ($dateReferenceMax === null) {
+            return null;
+        }
+
+        $dateReference = CarbonImmutable::parse((string) $dateReferenceMax);
+
+        $exerciceRetenu = null;
+        $debutRetenu = null;
+        foreach (Exercice::query()->get() as $exercice) {
+            $debut = CarbonImmutable::instance(
+                $this->exerciceService->dateRange((int) $exercice->annee)['start']
+            );
+
+            if (! $debut->greaterThan($dateReference)) {
+                continue;
+            }
+
+            if ($debutRetenu === null || $debut->lessThan($debutRetenu)) {
+                $debutRetenu = $debut;
+                $exerciceRetenu = (int) $exercice->annee;
+            }
+        }
+
+        return $exerciceRetenu;
+    }
+
+    /**
      * @param  array<int, array{compte: Compte, solde: string}>  $soldes
      */
     private function appliquerSoldesBancaires(
@@ -163,6 +206,30 @@ final class BootstrapANouveauService
                         "Le compte {$compte->numero_pcg} a des mouvements le {$dateReference}. "
                         .'Relancez avec --meme-jour=inclus|exclus.'
                     );
+                }
+            }
+
+            if ($dateReference !== null
+                && bccomp((string) $banque->solde_initial, '0.00', 2) !== 0
+                && $dateReference > $dateOuverture->toDateString()
+            ) {
+                $dateReferenceCarbon = CarbonImmutable::parse($dateReference);
+                $mouvementIntermediaire = $this->mouvementCompte(
+                    $compte,
+                    $dateOuverture->toDateString(),
+                    $dateReferenceCarbon->subDay()->toDateString(),
+                );
+
+                if (bccomp($mouvementIntermediaire, '0.00', 2) !== 0) {
+                    throw new ANouveauInvalideException(sprintf(
+                        'Le compte %s porte un solde daté du %s, postérieur à l’ouverture de '
+                        .'l’exercice (%s), et des mouvements existent entre les deux. Ce solde les '
+                        .'contient déjà : les reprendre les compterait deux fois. Datez le solde de '
+                        .'la veille de l’exercice à ouvrir, ou visez l’exercice que ce solde ouvre réellement.',
+                        $compte->numero_pcg,
+                        $dateReferenceCarbon->format('d/m/Y'),
+                        $dateOuverture->format('d/m/Y'),
+                    ));
                 }
             }
 
