@@ -46,9 +46,7 @@ final class RapportCompteResultat extends Component
         $resultatCourant = $totalProduitsN - $totalChargesN;
         $resultatCourantN1 = $totalProduitsN1 - $totalChargesN1;
 
-        $provisionsBlock = $rapportService->compteDeResultatProvisions($exercice, $resultatCourant, $resultatCourantN1);
-
-        return view('livewire.rapport-compte-resultat', array_merge([
+        return view('livewire.rapport-compte-resultat', [
             'charges' => $data['charges'],
             'produits' => $data['produits'],
             'labelN' => $labelN,
@@ -58,6 +56,7 @@ final class RapportCompteResultat extends Component
             'totalChargesN' => $totalChargesN,
             'totalProduitsN' => $totalProduitsN,
             'resultatCourant' => $resultatCourant,
-        ], $provisionsBlock));
+            'resultatCourantN1' => $resultatCourantN1,
+        ]);
     }
 }

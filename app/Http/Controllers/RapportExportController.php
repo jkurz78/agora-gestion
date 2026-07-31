@@ -157,21 +157,6 @@ final class RapportExportController extends Controller
         $resultatCourant = (float) $totalProduitsN - (float) $totalChargesN;
         $resultatCourantN1 = (float) $totalProduitsN1 - (float) $totalChargesN1;
 
-        [
-            'provisions' => $provisions,
-            'provisionsN1' => $provisionsN1,
-            'extournes' => $extournes,
-            'extournesN1' => $extournesN1,
-            'totalProvisions' => $totalProvisions,
-            'totalProvisionsN1' => $totalProvisionsN1,
-            'totalExtournes' => $totalExtournes,
-            'totalExtournesN1' => $totalExtournesN1,
-            'resultatBrut' => $resultatBrut,
-            'resultatBrutN1' => $resultatBrutN1,
-            'resultatNet' => $resultatNet,
-            'resultatNetN1' => $resultatNetN1,
-        ] = $rapportService->compteDeResultatProvisions($exercice, $resultatCourant, $resultatCourantN1);
-
         $labelN1 = ($exercice - 1).'-'.$exercice;
         $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
@@ -217,107 +202,20 @@ final class RapportExportController extends Controller
         // Blank separator row
         $row++;
 
-        // Extournes section
-        if ($extournes->isNotEmpty() || $extournesN1->isNotEmpty()) {
-            $extournesN1Keyed = $extournesN1->keyBy(fn (array $e) => $e['libelle'].'|'.$e['compte_id']);
-            $extournesNKeyed = $extournes->keyBy(fn (array $e) => $e['libelle'].'|'.$e['compte_id']);
-            $allExtourneKeys = $extournesN1Keyed->keys()->merge($extournesNKeyed->keys())->unique();
-
-            foreach ($allExtourneKeys as $key) {
-                $eN = $extournesNKeyed->get($key);
-                $eN1 = $extournesN1Keyed->get($key);
-                $familleNom = $eN['famille_nom'] ?? $eN1['famille_nom'];
-                $compteNom = $eN['compte_nom'] ?? $eN1['compte_nom'];
-                $sheet->fromArray([[
-                    'Extourne',
-                    $familleNom,
-                    $compteNom,
-                    $eN1 !== null ? $eN1['montant_signe'] : null,
-                    $eN !== null ? $eN['montant_signe'] : null,
-                    null,
-                    null,
-                ]], null, 'A'.$row);
-                $row++;
-            }
-
-            // Extournes total row
-            $sheet->fromArray([[
-                'Extourne',
-                '',
-                'TOTAL EXTOURNES',
-                $totalExtournesN1 !== 0.0 ? $totalExtournesN1 : null,
-                $totalExtournes !== 0.0 ? $totalExtournes : null,
-                null,
-                null,
-            ]], null, 'A'.$row);
-            $sheet->getStyle('A'.$row.':G'.$row)->getFont()->setBold(true);
-            $row++;
-        }
-
-        // Résultat brut row
+        // Résultat row
         $sheet->fromArray([[
             '',
             '',
-            'RÉSULTAT BRUT',
-            $resultatBrutN1,
-            $resultatBrut,
+            'RÉSULTAT',
+            $resultatCourantN1,
+            $resultatCourant,
             null,
             null,
         ]], null, 'A'.$row);
         $sheet->getStyle('A'.$row.':G'.$row)->getFont()->setBold(true);
         $row++;
 
-        // Provisions section
-        if ($provisions->isNotEmpty() || $provisionsN1->isNotEmpty()) {
-            $provisionsN1Keyed = $provisionsN1->keyBy(fn (array $p) => $p['libelle'].'|'.$p['compte_id']);
-            $provisionsNKeyed = $provisions->keyBy(fn (array $p) => $p['libelle'].'|'.$p['compte_id']);
-            $allProvisionKeys = $provisionsN1Keyed->keys()->merge($provisionsNKeyed->keys())->unique();
-
-            foreach ($allProvisionKeys as $key) {
-                $pN = $provisionsNKeyed->get($key);
-                $pN1 = $provisionsN1Keyed->get($key);
-                $familleNom = $pN['famille_nom'] ?? $pN1['famille_nom'];
-                $compteNom = $pN['compte_nom'] ?? $pN1['compte_nom'];
-                $sheet->fromArray([[
-                    'Provision',
-                    $familleNom,
-                    $compteNom,
-                    $pN1 !== null ? $pN1['montant_signe'] : null,
-                    $pN !== null ? $pN['montant_signe'] : null,
-                    null,
-                    null,
-                ]], null, 'A'.$row);
-                $row++;
-            }
-
-            // Provisions total row
-            $sheet->fromArray([[
-                'Provision',
-                '',
-                'TOTAL PROVISIONS',
-                $totalProvisionsN1 !== 0.0 ? $totalProvisionsN1 : null,
-                $totalProvisions !== 0.0 ? $totalProvisions : null,
-                null,
-                null,
-            ]], null, 'A'.$row);
-            $sheet->getStyle('A'.$row.':G'.$row)->getFont()->setBold(true);
-            $row++;
-        }
-
-        // Résultat net ajusté row
-        $sheet->fromArray([[
-            '',
-            '',
-            'RÉSULTAT AJUSTÉ',
-            $resultatNetN1,
-            $resultatNet,
-            null,
-            null,
-        ]], null, 'A'.$row);
-        $sheet->getStyle('A'.$row.':G'.$row)->getFont()->setBold(true);
-        $row++;
-
-        // Format number columns (covers all rows including provisions/extournes)
+        // Format number columns
         $sheet->getStyle('D2:G'.$row)->getNumberFormat()->setFormatCode('#,##0.00');
 
         // Colonnes : A Type | B Famille | C Compte | D N-1 | E N | F Budget | G Écart
@@ -1444,21 +1342,6 @@ final class RapportExportController extends Controller
         $resultatCourant = $totalProduitsN - $totalChargesN;
         $resultatCourantN1 = $totalProduitsN1 - $totalChargesN1;
 
-        [
-            'provisions' => $provisions,
-            'provisionsN1' => $provisionsN1,
-            'extournes' => $extournes,
-            'extournesN1' => $extournesN1,
-            'totalProvisions' => $totalProvisions,
-            'totalProvisionsN1' => $totalProvisionsN1,
-            'totalExtournes' => $totalExtournes,
-            'totalExtournesN1' => $totalExtournesN1,
-            'resultatBrut' => $resultatBrut,
-            'resultatBrutN1' => $resultatBrutN1,
-            'resultatNet' => $resultatNet,
-            'resultatNetN1' => $resultatNetN1,
-        ] = $rapportService->compteDeResultatProvisions($exercice, (float) $resultatCourant, (float) $resultatCourantN1);
-
         return [
             'charges' => $data['charges'],
             'produits' => $data['produits'],
@@ -1468,18 +1351,8 @@ final class RapportExportController extends Controller
             'totalProduitsN' => $totalProduitsN,
             'totalChargesN1' => $totalChargesN1,
             'totalProduitsN1' => $totalProduitsN1,
-            'provisions' => $provisions,
-            'provisionsN1' => $provisionsN1,
-            'extournes' => $extournes,
-            'extournesN1' => $extournesN1,
-            'totalProvisions' => $totalProvisions,
-            'totalProvisionsN1' => $totalProvisionsN1,
-            'totalExtournes' => $totalExtournes,
-            'totalExtournesN1' => $totalExtournesN1,
-            'resultatBrut' => $resultatBrut,
-            'resultatBrutN1' => $resultatBrutN1,
-            'resultatNet' => $resultatNet,
-            'resultatNetN1' => $resultatNetN1,
+            'resultatCourant' => $resultatCourant,
+            'resultatCourantN1' => $resultatCourantN1,
             'compareN1' => $request->boolean('n1', true),
             'compareBudget' => $request->boolean('budget', true),
         ];

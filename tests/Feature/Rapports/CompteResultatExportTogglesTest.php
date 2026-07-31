@@ -2,12 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Enums\TypeTransaction;
 use App\Models\Association;
-use App\Models\Compte;
-use App\Models\Provision;
 use App\Models\User;
-use App\Services\ProvisionService;
 use App\Tenant\TenantContext;
 use Illuminate\Testing\TestResponse;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -41,55 +37,6 @@ it('XLSX : sans params, toutes les colonnes sont présentes', function () {
     expect(headerCellsXlsx($response))->toContain('Budget')->toContain('Écart');
 });
 
-it('XLSX : les provisions et extournes respectent Nature, Famille, Compte', function () {
-    $compte = Compte::factory()->numero('706')->create(['intitule' => 'Compte ajustements']);
-    Provision::factory()->create([
-        'exercice' => 2025,
-        'type' => TypeTransaction::Recette,
-        'compte_id' => $compte->id,
-        'libelle' => 'Provision courante',
-        'date' => '2026-08-31',
-        'saisi_par' => $this->user->id,
-    ]);
-    Provision::factory()->create([
-        'exercice' => 2024,
-        'type' => TypeTransaction::Recette,
-        'compte_id' => $compte->id,
-        'libelle' => 'Provision antérieure',
-        'date' => '2025-08-31',
-        'saisi_par' => $this->user->id,
-    ]);
-
-    $familleNom = app(ProvisionService::class)->provisionsExercice(2025)->first()['famille_nom'];
-    $response = $this->get(route('rapports.export', [
-        'rapport' => 'compte-resultat',
-        'format' => 'xlsx',
-        'exercice' => 2025,
-    ]));
-    $response->assertOk();
-
-    $tmp = tempnam(sys_get_temp_dir(), 'cr-ajustements').'.xlsx';
-    file_put_contents($tmp, $response->streamedContent());
-    $sheet = IOFactory::load($tmp)->getActiveSheet();
-    $rows = [];
-    for ($row = 2; $row <= $sheet->getHighestRow(); $row++) {
-        $rows[] = [
-            (string) $sheet->getCell('A'.$row)->getValue(),
-            (string) $sheet->getCell('B'.$row)->getValue(),
-            (string) $sheet->getCell('C'.$row)->getValue(),
-        ];
-    }
-    @unlink($tmp);
-
-    expect([
-        $sheet->getCell('A1')->getValue(),
-        $sheet->getCell('B1')->getValue(),
-        $sheet->getCell('C1')->getValue(),
-    ])->toBe(['Nature', 'Famille', 'Compte'])
-        ->and($rows)->toContain(['Provision', $familleNom, 'Compte ajustements'])
-        ->and($rows)->toContain(['Extourne', $familleNom, 'Compte ajustements']);
-});
-
 it('XLSX : budget=0 retire Budget et Écart', function () {
     $response = $this->get(route('rapports.export', ['rapport' => 'compte-resultat', 'format' => 'xlsx', 'exercice' => 2025, 'budget' => '0']));
     $response->assertOk();
@@ -115,10 +62,7 @@ it('PDF : la vue omet N-1 et budget quand les flags sont false', function () {
         'charges' => [], 'produits' => [],
         'labelN' => '2025-2026', 'labelN1' => '2024-2025',
         'totalChargesN' => 0.0, 'totalProduitsN' => 0.0, 'totalChargesN1' => 0.0, 'totalProduitsN1' => 0.0,
-        'provisions' => collect(), 'provisionsN1' => collect(), 'extournes' => collect(), 'extournesN1' => collect(),
-        'totalProvisions' => 0.0, 'totalProvisionsN1' => 0.0, 'totalExtournes' => 0.0, 'totalExtournesN1' => 0.0,
-        'resultatBrut' => 0.0, 'resultatBrutN1' => 0.0,
-        'resultatNet' => 0.0, 'resultatNetN1' => 0.0,
+        'resultatCourant' => 0.0, 'resultatCourantN1' => 0.0,
         'title' => 'Compte de résultat', 'subtitle' => 'Exercice 2025-2026',
         'association' => null, 'headerLogoBase64' => null, 'headerLogoMime' => null,
         'appLogoBase64' => null, 'footerLogoBase64' => null, 'footerLogoMime' => null,

@@ -331,8 +331,11 @@ it('compte_resultat_avec_transactions_negatives_ET_provisions_PCA', function () 
     // (a) Tx recette -50 € (future extourne Slice 1)
     $this->makeAuditTransaction('recette', -50.0, $this->sc, $this->compte, 2025);
 
-    // (b) Provision de type recette à montant négatif (PCA — déjà supporté)
-    // montantSigne() : type=recette → retourne montant tel quel = -30
+    // (b) Enregistrement `provisions` legacy à montant négatif (PCA), créé
+    // directement sans passer par ProvisionPDService : aucune écriture 681/781
+    // n'existe pour cette provision. En partie double, seules les écritures
+    // du grand livre alimentent le compte de résultat — ce record n'a donc
+    // aucun effet sur le résultat, et ne provoque plus de double comptage.
     Provision::factory()->create([
         'association_id' => $this->association->id,
         'exercice' => 2025,
@@ -359,19 +362,9 @@ it('compte_resultat_avec_transactions_negatives_ET_provisions_PCA', function () 
     $component = Livewire::test(RapportCompteResultat::class)
         ->assertOk();
 
-    // La provision PCA est gérée via totalProvisions (montantSigne = -30)
-    // elle n'est PAS incluse dans les produits du builder (sources séparées)
-    // Vérifier que les deux sources coexistent correctement
     $component->assertViewHas('totalProduitsN', -50.0);
 
-    // totalProvisions = sum(montantSigne) = -30 pour une PCA recette
-    $component->assertViewHas('totalProvisions', -30.0);
-
-    // resultatCourant = produits - charges = -50 - 0 = -50
+    // resultatCourant = produits - charges = -50 - 0 = -50 : la provision
+    // legacy sans écriture PD n'est pas comptée en sus.
     $component->assertViewHas('resultatCourant', -50.0);
-
-    // resultatNet = resultatBrut + totalProvisions
-    // = resultatCourant + totalExtournes + totalProvisions
-    // = (-50) + 0 + (-30) = -80
-    $component->assertViewHas('resultatNet', -80.0);
 });

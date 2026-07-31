@@ -13,7 +13,6 @@ use App\Models\User;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\Rapports\CompteResultatBuilder;
 use App\Tenant\TenantContext;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 
 // ---------------------------------------------------------------------------
@@ -65,13 +64,6 @@ beforeEach(function () {
     ]);
 
     $this->builder = app(CompteResultatBuilder::class);
-
-    // Feature flag PD activé pour tous ces tests
-    Config::set('compta.use_partie_double', true);
-});
-
-afterEach(function () {
-    Config::set('compta.use_partie_double', false);
 });
 
 // ---------------------------------------------------------------------------

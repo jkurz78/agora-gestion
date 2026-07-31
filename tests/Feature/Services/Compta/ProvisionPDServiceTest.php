@@ -16,9 +16,7 @@ use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\Compta\ProvisionPDService;
 use App\Services\ExerciceService;
-use App\Services\Rapports\FluxTresorerieBuilder;
 use App\Tenant\TenantContext;
-use Illuminate\Support\Facades\Config;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -297,26 +295,4 @@ test('ProvisionIndex::delete removes PD transactions', function () {
 
     expect(Transaction::where('provision_id', $provision->id)->count())->toBe(0);
     expect(Provision::find($provision->id))->toBeNull();
-});
-
-test('FluxTresorerieBuilder does not double-count provisions in PD mode', function () {
-    Config::set('compta.use_partie_double', true);
-
-    $provision = Provision::factory()->create([
-        'association_id' => $this->association->id,
-        'exercice' => 2025,
-        'type' => 'depense',
-        'montant' => 1000.00,
-        'libelle' => 'FNP test flux',
-        'date' => '2026-08-31',
-        'saisi_par' => $this->user->id,
-    ]);
-
-    app(ProvisionPDService::class)->generer($provision);
-
-    $builder = app(FluxTresorerieBuilder::class);
-    $result = $builder->fluxTresorerie(2025);
-
-    expect((float) $result['synthese']['total_provisions'])->toBe(0.0);
-    expect((float) $result['synthese']['total_extournes'])->toBe(0.0);
 });
