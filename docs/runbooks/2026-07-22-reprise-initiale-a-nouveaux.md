@@ -10,6 +10,10 @@
 
 Ce runbook ne concerne que la première activation des à-nouveaux. Les exercices suivants sont pris en charge automatiquement par l’assistant de clôture.
 
+> **Chemin nominal : l’application le fait seule.** Depuis la reprise automatique, saisir les soldes d’ouverture depuis **Paramètres → Comptes bancaires** suffit : `RepriseAutomatiqueService` crée la pièce dès que le calcul est net. Il s’abstient — sans erreur, et en le journalisant — dans cinq cas : aucun solde à reprendre, reprise déjà faite, exercice indéterminable, **comptes ne désignant pas le même exercice** (saisie en cours : terminer la saisie de tous les comptes), et mouvements datés du jour même du solde de référence.
+>
+> Ce dernier cas est le seul qui exige encore la commande, pour son arbitrage `--meme-jour`. Recourir à `compta:bootstrap-an` alors que l’IHM suffisait n’est pas neutre : la commande retient la date de solde la plus tardive, donc une saisie inachevée y produit le même à-nouveau faux — voir la recette du 2026-08-01.
+
 ## 1. Résultat attendu
 
 La commande crée une génération d’origine `reprise_initiale` et une pièce équilibrée dans le journal `AN`, datée du premier jour de l’exercice cible.
