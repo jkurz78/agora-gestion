@@ -10,6 +10,7 @@ use App\Enums\ModePaiement;
 use App\Enums\RoleAssociation;
 use App\Enums\StatutRapprochement;
 use App\Enums\StatutReglement;
+use App\Enums\TypeTransaction;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
@@ -193,6 +194,13 @@ final class RapprochementDetail extends Component
 
         $txRows = Transaction::query()
             ->where('journal', '!=', JournalComptable::AN->value)
+            // Les écritures de virement interne sont exclues : le virement est déjà
+            // listé plus bas par sa propre ligne, qui se pointe séparément côté source
+            // et côté destination — la bonne granularité, un virement figurant sur deux
+            // relevés. Sans cette exclusion l'écriture ressort avec type='virement',
+            // chaîne que toggleTransaction() route vers VirementInterne::findOrFail()
+            // en lui passant un id de Transaction : la ligne devient impointable.
+            ->where('type', '!=', TypeTransaction::Virement->value)
             ->when(
                 $usePdFilter,
                 fn ($q) => $q->where(function ($w) use ($compte512X, $compte) {

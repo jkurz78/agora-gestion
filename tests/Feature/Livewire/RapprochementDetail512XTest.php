@@ -16,6 +16,7 @@ declare(strict_types=1);
  *   5. Cross-compte : écriture avec 512X-B sur compte A → NON listée
  */
 
+use App\Enums\JournalComptable;
 use App\Enums\ModePaiement;
 use App\Enums\StatutRapprochement;
 use App\Enums\StatutReglement;
@@ -29,6 +30,7 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Models\VirementInterne;
 use App\Services\Compta\Migrations\BancairesSeeder;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\RemiseBancaireService;
@@ -48,8 +50,6 @@ beforeEach(function () {
     TenantContext::boot($this->association);
     session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
-
-    // Activer le mode partie double
 
     // Comptes système : 411, 401, 5112
     SystemeSeeder::seed();
@@ -595,4 +595,88 @@ it('[512X-9] dépense virement en_attente sans 512X est listée via compte_id (m
 
     $found = $rows->contains(fn ($r) => (int) $r['id'] === (int) $txDepEnAttente->id);
     expect($found)->toBeTrue('Une dépense virement en attente (sans 512X) doit apparaître dans le rappro via compte_id');
+});
+
+// ---------------------------------------------------------------------------
+// Cas 6 — Écriture d'un virement interne : NE doit PAS apparaître comme ligne
+//         de transaction. Le virement est déjà listé par sa propre ligne, qui
+//         se pointe séparément côté source et côté destination.
+//
+//         Régression constatée en recette le 2026-08-01 : ces écritures
+//         sortaient avec type='virement', chaîne que toggleTransaction() route
+//         vers VirementInterne::findOrFail() — appelé avec l'id de la
+//         transaction. D'où « No query results for model VirementInterne 417 »
+//         et un montant jamais pris en compte.
+// ---------------------------------------------------------------------------
+
+it('[512X-6] l’écriture d’un virement interne n’est pas listée comme transaction pointable', function () {
+    $compteDest = CompteBancaire::factory()->create([
+        'association_id' => $this->association->id,
+        'iban' => 'FR7698765000098765432109876',
+        'solde_initial' => 0.0,
+        'date_solde_initial' => '2025-09-01',
+    ]);
+    BancairesSeeder::seed();
+    $compte512XDest = Compte::where('compte_bancaire_id', $compteDest->id)->bancaires()->firstOrFail();
+
+    $virement = VirementInterne::create([
+        'association_id' => $this->association->id,
+        'date' => '2026-07-15',
+        'montant' => 500.00,
+        'compte_source_id' => $this->compteBancaire->id,
+        'compte_destination_id' => $compteDest->id,
+        'saisi_par' => $this->user->id,
+    ]);
+
+    // L'écriture partie double du virement : 512X destination au débit,
+    // 512X source au crédit. Elle porte donc bien une ligne sur le compte du
+    // rapprochement — c'est ce qui la faisait entrer dans la liste.
+    $txVirement = Transaction::factory()->create([
+        'association_id' => TenantContext::currentId(),
+        'type' => TypeTransaction::Virement,
+        'journal' => JournalComptable::Banque,
+        'compte_id' => null,
+        'virement_interne_id' => $virement->id,
+        'montant_total' => 500.00,
+        'date' => '2026-07-15',
+        'libelle' => 'Virement interne',
+        'equilibree' => true,
+        'saisi_par' => $this->user->id,
+    ]);
+    TransactionLigne::create([
+        'transaction_id' => $txVirement->id,
+        'compte_id' => $compte512XDest->id,
+        'debit' => 500.00,
+        'credit' => 0,
+        'libelle' => 'Virement interne',
+        'montant' => 0,
+        'tiers_id' => null,
+    ]);
+    TransactionLigne::create([
+        'transaction_id' => $txVirement->id,
+        'compte_id' => $this->compte512X->id,
+        'debit' => 0,
+        'credit' => 500.00,
+        'libelle' => 'Virement interne',
+        'montant' => 0,
+        'tiers_id' => null,
+    ]);
+
+    $component = Livewire::test(RapprochementDetail::class, ['rapprochement' => $this->rapprochement]);
+    $rows = collect($component->viewData('transactions'));
+
+    $ecritureListee = $rows->contains(fn ($r) => (int) $r['id'] === (int) $txVirement->id
+        && $r['type'] === TypeTransaction::Virement->value);
+
+    expect($ecritureListee)->toBeFalse(
+        'L’écriture partie double d’un virement interne ne doit pas être listée : '
+        .'son id est celui d’une Transaction, alors que le pointage des lignes de type '
+        .'« virement » attend un id de VirementInterne.'
+    );
+
+    // Le virement reste représenté — par sa propre ligne, côté source.
+    $virementListe = $rows->contains(fn ($r) => str_starts_with((string) $r['type'], 'virement')
+        && (int) $r['id'] === (int) $virement->id);
+
+    expect($virementListe)->toBeTrue('Le virement interne doit rester listé via sa propre ligne source.');
 });
