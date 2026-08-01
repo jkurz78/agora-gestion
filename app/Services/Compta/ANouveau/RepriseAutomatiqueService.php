@@ -23,7 +23,7 @@ use Illuminate\Support\Facades\Log;
  * dangereuses — double comptage et mauvaise année — sont refusées en amont par
  * BootstrapANouveauService.
  *
- * Ce service s'abstient donc, sans erreur, dans les quatre cas où l'opération est
+ * Ce service s'abstient donc, sans erreur, dans les cinq cas où l'opération est
  * inutile ou demande une décision humaine. Il n'écrit que lorsque le calcul est
  * net. La commande compta:bootstrap-an reste disponible pour les reprises
  * délicates et pour l'audit.
@@ -63,6 +63,29 @@ final class RepriseAutomatiqueService
             ->exists();
 
         if ($dejaRepris) {
+            return null;
+        }
+
+        // Saisie en cours. Reprendre l'existant est un geste multi-comptes, et
+        // l'IHM enregistre un compte à la fois : entre deux enregistrements,
+        // l'instantané mélange les dates nouvelles et les anciennes. Comme
+        // exerciceSuggere() retient la date la plus tardive, la reprise partirait
+        // sur l'exercice que désigne le compte pas encore corrigé, et reporterait
+        // les autres d'une année entière.
+        //
+        // Constaté en recette le 2026-08-01 : deux comptes à redater au 31/08/2024,
+        // huit secondes entre les deux enregistrements, reprise créée sur
+        // l'exercice 2025 au premier — puis abstention au second, la porte étant
+        // refermée par le contrôle ci-dessus. Comparer les exercices désignés et
+        // non les dates laisse passer le cas légitime de dates différentes au sein
+        // d'un même exercice, celui du site de démonstration.
+        $exercicesVises = $this->bootstrap->exercicesVises();
+
+        if (count($exercicesVises) > 1) {
+            Log::info('[Reprise] Reprise automatique différée, les comptes ne désignent pas le même exercice.', [
+                'exercices_vises' => $exercicesVises,
+            ]);
+
             return null;
         }
 

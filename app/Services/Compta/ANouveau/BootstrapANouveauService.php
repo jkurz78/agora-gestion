@@ -158,6 +158,42 @@ final class BootstrapANouveauService
             return null;
         }
 
+        return $this->exercicePourDate(CarbonImmutable::parse((string) $dateReferenceMax));
+    }
+
+    /**
+     * Les exercices distincts que désignent les soldes historiques, un par compte
+     * porteur — `null` pour un compte dont la date ne tombe dans aucun exercice.
+     *
+     * Plus d'une valeur signifie que les comptes ne s'accordent pas sur l'exercice
+     * à ouvrir. `exerciceSuggere()` tranche alors sur la date la plus tardive, ce
+     * qui est le bon arbitrage pour une reprise que l'opérateur a fini de saisir,
+     * et le mauvais pour un instantané pris au milieu de sa saisie.
+     *
+     * @return list<?int>
+     */
+    public function exercicesVises(): array
+    {
+        $exercices = [];
+
+        $dates = CompteBancaire::query()
+            ->whereNotNull('date_solde_initial')
+            ->where('solde_initial', '<>', 0)
+            ->pluck('date_solde_initial');
+
+        foreach ($dates as $date) {
+            $exercice = $this->exercicePourDate(CarbonImmutable::parse((string) $date));
+
+            if (! in_array($exercice, $exercices, true)) {
+                $exercices[] = $exercice;
+            }
+        }
+
+        return $exercices;
+    }
+
+    private function exercicePourDate(CarbonImmutable $dateReference): ?int
+    {
         // L'exercice à ouvrir est celui qui contient le LENDEMAIN de la date de
         // référence : un solde arrête une position, et l'exercice à reprendre est
         // celui qui court immédiatement après elle.
@@ -170,7 +206,7 @@ final class BootstrapANouveauService
         // la date refusait ce second cas, pourtant légitime : c'est le défaut
         // qu'a révélé le rejeu du site de démonstration, dont les soldes sont
         // datés du 19 septembre pour un exercice ouvert le 1er.
-        $lendemain = CarbonImmutable::parse((string) $dateReferenceMax)->addDay();
+        $lendemain = $dateReference->addDay();
 
         foreach (Exercice::query()->orderBy('annee')->get() as $exercice) {
             $range = $this->exerciceService->dateRange((int) $exercice->annee);

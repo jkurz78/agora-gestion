@@ -6,11 +6,14 @@ use App\Enums\OrigineANouveau;
 use App\Enums\StatutANouveau;
 use App\Enums\StatutExercice;
 use App\Models\ANouveauGeneration;
+use App\Models\Compte;
+use App\Models\CompteBancaire;
 use App\Models\Exercice;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\ClotureCheckService;
 use App\Services\Compta\ANouveau\RepriseAutomatiqueService;
+use App\Services\Compta\Migrations\BancairesSeeder;
 use Tests\Support\CreatesPartieDoubleContext;
 
 uses(CreatesPartieDoubleContext::class);
@@ -103,6 +106,64 @@ it('ne fait rien et ne lève pas quand un arbitrage humain est requis', function
 
     expect(app(RepriseAutomatiqueService::class)->tenter($this->user))->toBeNull()
         ->and(ANouveauGeneration::count())->toBe(0);
+});
+
+it('ne fait rien tant que les comptes ne désignent pas le même exercice', function (): void {
+    // Recette du 2026-08-01 : deux comptes à redater, enregistrés l'un après
+    // l'autre. Au premier enregistrement, le second porte encore sa date
+    // d'origine — l'instantané est à moitié modifié.
+    Exercice::create(['annee' => 2025, 'statut' => StatutExercice::Ouvert]);
+
+    $this->compteBancaire->update([
+        'solde_initial' => 2388.82,
+        'date_solde_initial' => '2024-08-31',
+    ]);
+
+    CompteBancaire::factory()
+        ->avecSoldeHistorique(24010.00, '2025-08-31')
+        ->create([
+            'association_id' => $this->association->id,
+            'iban' => 'FR7630003000011234567890143',
+        ]);
+    BancairesSeeder::seed();
+
+    expect(app(RepriseAutomatiqueService::class)->tenter($this->user))->toBeNull()
+        ->and(ANouveauGeneration::count())->toBe(0);
+});
+
+it('reprend dès que tous les comptes désignent le même exercice', function (): void {
+    Exercice::create(['annee' => 2025, 'statut' => StatutExercice::Ouvert]);
+
+    $this->compteBancaire->update([
+        'solde_initial' => 2388.82,
+        'date_solde_initial' => '2024-08-31',
+    ]);
+
+    $livret = CompteBancaire::factory()
+        ->avecSoldeHistorique(24010.00, '2025-08-31')
+        ->create([
+            'association_id' => $this->association->id,
+            'iban' => 'FR7630003000011234567890143',
+        ]);
+    BancairesSeeder::seed();
+
+    app(RepriseAutomatiqueService::class)->tenter($this->user);
+
+    // Second enregistrement : l'instantané devient cohérent, la reprise part
+    // seule et vise l'exercice que les soldes ouvrent réellement.
+    $livret->update(['date_solde_initial' => '2024-08-31']);
+
+    $generation = app(RepriseAutomatiqueService::class)->tenter($this->user);
+
+    expect($generation)->not->toBeNull()
+        ->and((int) $generation->exercice_cible)->toBe(2024);
+
+    $compteLivret = Compte::where('compte_bancaire_id', (int) $livret->id)->sole();
+    $ligne = TransactionLigne::where('transaction_id', (int) $generation->transaction_id)
+        ->where('compte_id', (int) $compteLivret->id)
+        ->sole();
+
+    expect((float) $ligne->debit)->toBe(24010.00);
 });
 
 it('ne fait rien sans acteur', function (): void {
