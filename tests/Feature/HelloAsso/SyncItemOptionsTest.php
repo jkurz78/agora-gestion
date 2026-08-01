@@ -104,13 +104,13 @@ it('split HA-55698 : 1 item + 1 option → 2 lignes séparées (cotisation 0€ 
     $tx = Transaction::first();
     expect($tx)->not->toBeNull();
     expect((float) $tx->montant_total)->toBe(12.00); // somme des 2 lignes
-    expect($tx->lignes()->count())->toBe(2);
+    expect($tx->lignes()->whereNotNull('helloasso_item_id')->count())->toBe(2);
 
-    $parent = $tx->lignes()->whereNull('helloasso_option_id')->first();
+    $parent = $tx->lignes()->whereNotNull('helloasso_item_id')->whereNull('helloasso_option_id')->first();
     expect((float) $parent->montant)->toBe(0.00); // item.amount = 0 (discount total)
     expect((int) $parent->helloasso_item_id)->toBe(87070);
 
-    $option = $tx->lignes()->whereNotNull('helloasso_option_id')->first();
+    $option = $tx->lignes()->whereNotNull('helloasso_item_id')->whereNotNull('helloasso_option_id')->first();
     expect((float) $option->montant)->toBe(12.00); // option.amount = 1200c
     expect((int) $option->helloasso_option_id)->toBe(18596);
 });
@@ -140,6 +140,6 @@ it('sync sans options garde item.amount tel quel (non-régression)', function ()
     $service = new HelloAssoSyncService($this->parametres);
     $service->synchroniser([$order], 2025);
 
-    $ligne = Transaction::first()->lignes()->first();
+    $ligne = Transaction::first()->lignes()->whereNotNull('helloasso_item_id')->first();
     expect((float) $ligne->montant)->toBe(35.00);
 });

@@ -587,6 +587,10 @@ test('pourRemiseBancaire leve CompteIncorrectException si compte cible nest pas 
         'saisie_automatisee' => false,
     ]);
 
+    // CompteBancaireObserver a doté la fiche fake de son 512X : il faut le retirer,
+    // sinon la résolution le trouve et l'erreur ne se produit plus.
+    Compte::where('compte_bancaire_id', (int) $compteBancaireFake->id)->delete();
+
     // Le compte 530 (caisse) n'est pas un 512X bancaire physique : on le rattache
     // au CompteBancaire fake pour que la résolution le retourne et échoue.
     $compte530 = compteSystemeRem('530');

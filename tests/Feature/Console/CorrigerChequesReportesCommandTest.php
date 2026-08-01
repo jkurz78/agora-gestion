@@ -50,17 +50,8 @@ beforeEach(function (): void {
         'association_id' => $this->asso->id,
     ]);
 
-    $this->compte512X = Compte::create([
-        'association_id' => $this->asso->id,
-        'numero_pcg' => '5121',
-        'intitule' => 'Compte Courant',
-        'classe' => 5,
-        'lettrable' => false,
-        'actif' => true,
-        'est_systeme' => false,
-        'pour_inscriptions' => false,
-        'compte_bancaire_id' => $this->compteBancaire->id,
-    ]);
+    // Le compte 512X est créé par CompteBancaireObserver avec la fiche bancaire.
+    $this->compte512X = Compte::where('compte_bancaire_id', (int) $this->compteBancaire->id)->sole();
 });
 
 // ---------------------------------------------------------------------------

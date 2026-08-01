@@ -11,10 +11,15 @@ use App\Models\FormuleAdhesion;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
 beforeEach(function (): void {
+    // Comptes système (411) : le compte bancaire porte désormais son 512X, la
+    // partie double est donc réellement générée — comme en production.
+    SystemeSeeder::seed();
+
     $this->user = User::factory()->create();
     $this->user->associations()->attach(TenantContext::currentId(), ['role' => 'admin', 'joined_at' => now()]);
     $this->sc = Compte::factory()->pourCotisations()->create();
@@ -87,8 +92,11 @@ it('crée une adhésion payée avec transaction', function (): void {
         ->assertDispatched('adhesion-creee');
 
     expect(Adhesion::count())->toBe(1);
-    expect(Transaction::count())->toBe(1);
-    expect((float) Transaction::first()->montant_total)->toBe(30.00);
+
+    // Une seule écriture métier — l'adhésion. Le règlement comptant lui ajoute
+    // sa T2 d'encaissement au journal de banque, qui n'est pas une seconde vente.
+    expect(Transaction::operationnel()->count())->toBe(1);
+    expect((float) Transaction::operationnel()->first()->montant_total)->toBe(30.00);
 });
 
 it('mode durée affiche date_debut + date_fin readonly', function (): void {

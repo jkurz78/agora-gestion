@@ -41,16 +41,9 @@ beforeEach(function (): void {
         'solde_initial' => '999.00',
         'date_solde_initial' => '2025-01-01',
     ]);
-    $this->compte512AN = Compte::create([
-        'numero_pcg' => '512-AN',
-        'intitule' => 'Banque AN',
-        'classe' => 5,
-        'compte_bancaire_id' => $this->compteBancaireAN->id,
-        'actif' => true,
-        'est_systeme' => false,
-        'pour_inscriptions' => false,
-        'lettrable' => false,
-    ]);
+    // Le compte 512X est créé par CompteBancaireObserver avec la fiche bancaire :
+    // en fabriquer un second ferait diverger la résolution, qui prend le premier.
+    $this->compte512AN = Compte::where('compte_bancaire_id', (int) $this->compteBancaireAN->id)->sole();
     $this->produitBanqueAN = Compte::create([
         'numero_pcg' => '706-AN',
         'intitule' => 'Produit AN',

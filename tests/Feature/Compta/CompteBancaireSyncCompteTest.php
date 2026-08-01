@@ -63,6 +63,59 @@ it('propage les coordonnées bancaires corrigées', function (): void {
         ->and($compte->domiciliation)->toBe('Crédit Mutuel');
 });
 
+it('crée le compte du plan comptable dès la création de la fiche bancaire', function (): void {
+    // Sans ce hook, un compte bancaire créé depuis Paramètres n'avait aucun 512X :
+    // ses écritures partaient sans contrepartie de trésorerie, en silence.
+    $livret = CompteBancaire::factory()->create([
+        'association_id' => (int) TenantContext::currentId(),
+        'nom' => 'Livret Épargne',
+        'iban' => 'FR7630003000011234567890143',
+        'solde_initial' => 24010.00,
+        'date_solde_initial' => '2024-08-31',
+    ]);
+
+    $compte = Compte::where('compte_bancaire_id', (int) $livret->id)->sole();
+
+    expect($compte->numero_pcg)->toBe('5122')
+        ->and($compte->classe)->toBe(5)
+        ->and($compte->intitule)->toBe('Livret Épargne')
+        ->and($compte->iban)->toBe('FR7630003000011234567890143')
+        ->and((float) $compte->solde_initial)->toBe(24010.00)
+        ->and($compte->date_solde_initial->toDateString())->toBe('2024-08-31');
+});
+
+it('ne réutilise jamais le numéro d’un compte bancaire supprimé', function (): void {
+    // La suppression d'une fiche bancaire annule compte_bancaire_id (nullOnDelete)
+    // mais laisse le compte — et ses écritures — dans le plan comptable. Son
+    // numéro reste pris à vie ; le rang recalculé de BancairesSeeder l'ignorait.
+    $deuxieme = CompteBancaire::factory()->create([
+        'association_id' => (int) TenantContext::currentId(),
+        'iban' => 'FR7630003000011234567890143',
+    ]);
+
+    expect(Compte::where('compte_bancaire_id', (int) $deuxieme->id)->sole()->numero_pcg)->toBe('5122');
+
+    $deuxieme->delete();
+
+    $troisieme = CompteBancaire::factory()->create([
+        'association_id' => (int) TenantContext::currentId(),
+        'iban' => 'FR7610011000201234567890188',
+    ]);
+
+    expect(Compte::where('compte_bancaire_id', (int) $troisieme->id)->sole()->numero_pcg)->toBe('5123');
+});
+
+it('ne crée pas de second compte quand le seed rejoue sur un numéro renuméroté', function (): void {
+    // Le numéro d'un compte sans écriture est modifiable (décision D3). Le seed,
+    // idempotent sur le seul numéro calculé, ne reconnaissait plus le compte
+    // renuméroté et lui en fabriquait un doublon à chaque rejeu.
+    $this->compte512->update(['numero_pcg' => '5129']);
+
+    BancairesSeeder::seed();
+
+    expect(Compte::where('compte_bancaire_id', (int) $this->compteBancaire->id)->count())->toBe(1);
+});
+
 it('ne touche pas au compte quand aucun attribut bancaire ne change', function (): void {
     $avant = $this->compte512->fresh()->updated_at;
 

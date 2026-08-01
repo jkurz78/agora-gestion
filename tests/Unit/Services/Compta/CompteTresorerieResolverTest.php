@@ -28,19 +28,10 @@ beforeEach(function () {
         'iban' => $this->iban,
     ]);
 
-    $this->compte512X = Compte::create([
-        'association_id' => TenantContext::currentId(),
-        'numero_pcg' => '5121',
-        'intitule' => 'Banque principale',
-        'classe' => 5,
-        'lettrable' => false,
-        'actif' => true,
-        'est_systeme' => false,
-        'pour_inscriptions' => false,
-        'iban' => $this->iban,
-        // Clé stable utilisée par le resolver (l'IBAN est nullable et non unique).
-        'compte_bancaire_id' => $this->compteBancaire->id,
-    ]);
+    // Le compte 512X est créé par CompteBancaireObserver à la création de la
+    // fiche bancaire. Il porte compte_bancaire_id — la clé stable qu'utilise le
+    // resolver, l'IBAN étant nullable et non unique.
+    $this->compte512X = Compte::where('compte_bancaire_id', (int) $this->compteBancaire->id)->sole();
 });
 
 // ---------------------------------------------------------------------------
@@ -130,14 +121,30 @@ it('[R5] compteBancaireId non-null + IBAN match + mode Virement → Compte 512X 
 // Branche : compteBancaireId non-null + IBAN no-match
 // ---------------------------------------------------------------------------
 
+/**
+ * Une fiche bancaire privée de son compte 512X.
+ *
+ * CompteBancaireObserver en dote désormais toute fiche nouvelle ; il faut donc
+ * défaire son travail pour atteindre cette branche. Elle reste vivante en
+ * production : les fiches créées avant l'observer, et celles dont le compte a
+ * été archivé, y passent encore.
+ */
+function compteBancaireSans512X(string $iban): CompteBancaire
+{
+    $compteBancaire = CompteBancaire::factory()->create([
+        'association_id' => TenantContext::currentId(),
+        'iban' => $iban,
+    ]);
+
+    Compte::where('compte_bancaire_id', (int) $compteBancaire->id)->delete();
+
+    return $compteBancaire;
+}
+
 it('[R6] compteBancaireId non-null + IBAN no-match + mode Virement → null + Log::warning', function () {
     Log::spy();
 
-    // CompteBancaire sans Compte 512X correspondant (IBAN différent)
-    $compteBancaireSans512X = CompteBancaire::factory()->create([
-        'association_id' => TenantContext::currentId(),
-        'iban' => 'FR7699999999999999999999999',
-    ]);
+    $compteBancaireSans512X = compteBancaireSans512X('FR7699999999999999999999999');
 
     $result = CompteTresorerieResolver::resoudre(
         compteBancaireId: (int) $compteBancaireSans512X->id,
@@ -156,10 +163,7 @@ it('[R6] compteBancaireId non-null + IBAN no-match + mode Virement → null + Lo
 });
 
 it('[R7] compteBancaireId non-null + IBAN no-match + mode Especes → placeholder 5112', function () {
-    $compteBancaireSans512X = CompteBancaire::factory()->create([
-        'association_id' => TenantContext::currentId(),
-        'iban' => 'FR7699999999999999999999998',
-    ]);
+    $compteBancaireSans512X = compteBancaireSans512X('FR7699999999999999999999998');
 
     $result = CompteTresorerieResolver::resoudre(
         compteBancaireId: (int) $compteBancaireSans512X->id,
@@ -175,10 +179,7 @@ it('[R7] compteBancaireId non-null + IBAN no-match + mode Especes → placeholde
 it('[R8] compteBancaireId non-null + IBAN no-match + mode Cheque + Sens::Depense → null + Log::warning', function () {
     Log::spy();
 
-    $compteBancaireSans512X = CompteBancaire::factory()->create([
-        'association_id' => TenantContext::currentId(),
-        'iban' => 'FR7699999999999999999999997',
-    ]);
+    $compteBancaireSans512X = compteBancaireSans512X('FR7699999999999999999999997');
 
     $result = CompteTresorerieResolver::resoudre(
         compteBancaireId: (int) $compteBancaireSans512X->id,

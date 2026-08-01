@@ -102,12 +102,12 @@ it('un don additionnel dans un order Membership tombe dans le compte fallback Do
     $service->synchroniser([$order], 2025);
 
     $tx = Transaction::first();
-    expect($tx->lignes()->count())->toBe(2);
+    expect($tx->lignes()->whereNotNull('helloasso_item_id')->count())->toBe(2);
 
-    $ligneCotisation = $tx->lignes()->where('helloasso_item_id', 1234)->first();
+    $ligneCotisation = $tx->lignes()->whereNotNull('helloasso_item_id')->where('helloasso_item_id', 1234)->first();
     expect((int) $ligneCotisation->compte_id)->toBe((int) $this->scCotisation->id);
 
-    $ligneDon = $tx->lignes()->where('helloasso_item_id', 1235)->first();
+    $ligneDon = $tx->lignes()->whereNotNull('helloasso_item_id')->where('helloasso_item_id', 1235)->first();
     expect((int) $ligneDon->compte_id)->toBe((int) $this->scDon->id);
 });
 
@@ -153,13 +153,13 @@ it('un don additionnel dans un order Event tombe dans le compte fallback Don (pa
     $service->synchroniser([$order], 2025);
 
     $tx = Transaction::first();
-    expect($tx->lignes()->count())->toBe(2);
+    expect($tx->lignes()->whereNotNull('helloasso_item_id')->count())->toBe(2);
 
-    $ligneInscription = $tx->lignes()->where('helloasso_item_id', 2001)->first();
+    $ligneInscription = $tx->lignes()->whereNotNull('helloasso_item_id')->where('helloasso_item_id', 2001)->first();
     expect((int) $ligneInscription->compte_id)->toBe((int) $scFormation->id)
         ->and((int) $ligneInscription->operation_id)->toBe((int) $operation->id);
 
-    $ligneDon = $tx->lignes()->where('helloasso_item_id', 2002)->first();
+    $ligneDon = $tx->lignes()->whereNotNull('helloasso_item_id')->where('helloasso_item_id', 2002)->first();
     expect((int) $ligneDon->compte_id)->toBe((int) $this->scDon->id) // fallback Don
         ->and((int) $ligneDon->operation_id)->toBe((int) $operation->id); // traçabilité conservée
 });

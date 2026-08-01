@@ -7,6 +7,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 final class CompteBancaire extends TenantModel
 {
@@ -39,6 +40,15 @@ final class CompteBancaire extends TenantModel
     public function transactions(): HasMany
     {
         return $this->hasMany(Transaction::class, 'compte_id');
+    }
+
+    /**
+     * Le compte 512X du plan comptable, créé par CompteBancaireObserver à la
+     * création de la fiche. Inverse de Compte::compteBancaire().
+     */
+    public function comptePlanComptable(): HasOne
+    {
+        return $this->hasOne(Compte::class, 'compte_bancaire_id');
     }
 
     public function depenses(): HasMany

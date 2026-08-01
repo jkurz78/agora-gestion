@@ -13,10 +13,16 @@ use App\Models\Transaction;
 use App\Models\User;
 use App\Services\Adhesion\NouvelleAdhesionDTO;
 use App\Services\AdhesionService;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Carbon;
 
 beforeEach(function (): void {
+    // Comptes système (411 notamment) : la contrepartie de toute recette à
+    // crédit. Le compte bancaire ci-dessous porte désormais son 512X, donc la
+    // partie double est réellement générée — comme en production.
+    SystemeSeeder::seed();
+
     // DC-10a : compte classe 7 flaggé Cotisation (compte-first).
     $this->sc = Compte::create([
         'association_id' => TenantContext::currentId(),

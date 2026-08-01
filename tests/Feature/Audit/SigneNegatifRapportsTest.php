@@ -290,17 +290,8 @@ it('rapprochement_service_solde_avec_negatif', function () {
     // Une recette de -50 € porte donc une ligne 512X au crédit de 50 €.
     // Résultat attendu : 500 + (-50) = 450
     //
-    // Le scope bancaires() exige numero_pcg LIKE '512_%' — « 512 » seul ne matche pas.
-    $compte512X = Compte::create([
-        'numero_pcg' => '5121',
-        'intitule' => 'Banque',
-        'classe' => 5,
-        'compte_bancaire_id' => $this->compte->id,
-        'actif' => true,
-        'est_systeme' => false,
-        'pour_inscriptions' => false,
-        'lettrable' => false,
-    ]);
+    // Le compte 512X est créé par CompteBancaireObserver avec la fiche bancaire.
+    $compte512X = Compte::where('compte_bancaire_id', (int) $this->compte->id)->sole();
     $tx = $this->makeAuditTransaction('recette', -50.0, $this->sc, $this->compte, 2025, $rapprochement);
     completerContrepartieBancaire($tx, $compte512X, 'recette', -50.0);
 

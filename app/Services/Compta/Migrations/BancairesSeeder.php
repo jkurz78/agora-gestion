@@ -25,6 +25,14 @@ use Illuminate\Support\Facades\DB;
  *    Both skip duplicate rows rejected by the UNIQUE (association_id, numero_pcg)
  *    constraint introduced in Step 3.
  *
+ *  - Idempotence réelle par `compte_bancaire_id` (NOT EXISTS), et non par le seul
+ *    numéro calculé : le numéro d'un compte sans écriture est modifiable
+ *    (décision D3 de la dissolution sous_categories → comptes), et un compte
+ *    renuméroté n'était plus reconnu — le rejeu lui fabriquait un second compte
+ *    512X, que les résolveurs départagent alors sur un `first()` arbitraire.
+ *    C'est aussi ce qui rend le seed compatible avec `CompteBancaireObserver`,
+ *    qui dote désormais toute fiche nouvelle de son compte à la création.
+ *
  *  - All comptes_bancaires rows are included without a deleted_at filter because
  *    the comptes_bancaires table carries no deleted_at column (the model does not
  *    use SoftDeletes). If a bank account becomes inactive, the corresponding
@@ -113,6 +121,9 @@ final class BancairesSeeder
                 CURRENT_TIMESTAMP,
                 CURRENT_TIMESTAMP
             FROM ranked r
+            WHERE NOT EXISTS (
+                SELECT 1 FROM comptes c WHERE c.compte_bancaire_id = r.id
+            )
             SQL;
     }
 

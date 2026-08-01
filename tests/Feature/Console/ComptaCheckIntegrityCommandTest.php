@@ -193,10 +193,8 @@ it('ne compte pas deux fois une écriture opérationnelle et son règlement banc
         'association_id' => (int) $this->association->id,
         'solde_initial' => 0,
     ]);
-    $compteBanque = Compte::factory()->numero('5121')->create([
-        'association_id' => (int) $this->association->id,
-        'compte_bancaire_id' => (int) $compteBancaire->id,
-    ]);
+    // Le compte 512X vient de CompteBancaireObserver.
+    $compteBanque = Compte::where('compte_bancaire_id', (int) $compteBancaire->id)->sole();
 
     $rapprochement = RapprochementBancaire::create([
         'association_id' => (int) $this->association->id,
@@ -296,10 +294,7 @@ it('signale un montant T4 différent de la somme des sources de remise', functio
     $compteBancaire = CompteBancaire::factory()->create([
         'association_id' => (int) $this->association->id,
     ]);
-    $compte512 = Compte::factory()->numero('5121')->create([
-        'association_id' => (int) $this->association->id,
-        'compte_bancaire_id' => (int) $compteBancaire->id,
-    ]);
+    $compte512 = Compte::where('compte_bancaire_id', (int) $compteBancaire->id)->sole();
     $remise = RemiseBancaire::create([
         'association_id' => (int) $this->association->id,
         'numero' => 1,

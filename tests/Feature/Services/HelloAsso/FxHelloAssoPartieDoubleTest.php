@@ -49,17 +49,8 @@ beforeEach(function (): void {
         'association_id' => (int) $this->asso->id,
         'nom' => 'HelloAsso',
     ]);
-    Compte::forceCreate([
-        'association_id' => (int) $this->asso->id,
-        'numero_pcg' => '512_HA',
-        'intitule' => 'Banque HelloAsso',
-        'classe' => 5,
-        'actif' => true,
-        'est_systeme' => false,
-        'lettrable' => false,
-        'pour_inscriptions' => false,
-        'compte_bancaire_id' => (int) $this->compteBancaireHA->id,
-    ]);
+    // Le compte 512X est créé par CompteBancaireObserver avec la fiche bancaire.
+    $this->compte512HA = Compte::where('compte_bancaire_id', (int) $this->compteBancaireHA->id)->sole();
 
     // Compte 7xx pour dons
     $this->compteDon = Compte::forceCreate([
@@ -215,8 +206,7 @@ test('[A] don CB : T1 (411D/754C) + T2 (512X D/411C), equilibree=true', function
     expect($t2)->not->toBeNull('T2 doit exister avec même lettrage 411');
 
     // La T2 porte une ligne 512X au débit
-    $compte512 = Compte::where('association_id', (int) $this->asso->id)
-        ->where('numero_pcg', '512_HA')->first();
+    $compte512 = $this->compte512HA;
     $ligne512D = TransactionLigne::where('transaction_id', (int) $t2->transaction_id)
         ->where('compte_id', (int) $compte512->id)
         ->where('debit', '>', 0)->first();

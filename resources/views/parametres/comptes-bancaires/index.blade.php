@@ -67,6 +67,7 @@
         <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
             <tr>
                 <th>Nom</th>
+                <th>N° comptable</th>
                 <th>IBAN</th>
                 <th>BIC</th>
                 <th>Domiciliation</th>
@@ -81,6 +82,16 @@
                 <tr>
                     <td>
                         {{ $compte->nom }}
+                    </td>
+                    <td>
+                        @if ($compte->comptePlanComptable !== null)
+                            <span class="font-monospace">{{ $compte->comptePlanComptable->numero_pcg }}</span>
+                        @else
+                            <span class="badge text-bg-warning" data-bs-toggle="tooltip"
+                                  title="Ce compte n’a pas de compte au plan comptable : ses écritures ne peuvent pas être enregistrées.">
+                                absent
+                            </span>
+                        @endif
                     </td>
                     <td>{{ $compte->iban ?? '—' }}</td>
                     <td>{{ $compte->bic ?? '—' }}</td>

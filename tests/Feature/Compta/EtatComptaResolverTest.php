@@ -209,12 +209,9 @@ it('bloque quand la reprise ne couvre qu’une partie des comptes porteurs', fun
     // le signale.
     $this->compteBancaire->update(['solde_initial' => 2388.82]);
 
-    $livretA = CompteBancaire::factory()->avecSoldeHistorique(24010.00)->create([
+    // Le compte 5122 du plan comptable est créé par CompteBancaireObserver.
+    CompteBancaire::factory()->avecSoldeHistorique(24010.00)->create([
         'association_id' => $this->association->id,
-    ]);
-    Compte::factory()->numero('5122')->create([
-        'association_id' => $this->association->id,
-        'compte_bancaire_id' => $livretA->id,
     ]);
 
     etatComptaCreerReprise($this, [$this->compte512X]);
