@@ -44,7 +44,10 @@ La saisie manuelle experte — saisie d'OD, retouche de la pièce d'à-nouveaux,
 
 ## Liens
 
-- **Spec** : `docs/superpowers/specs/2026-07-31-suppression-flag-partie-double-design.md`
-- **Plan** : `docs/superpowers/plans/2026-07-31-suppression-flag-partie-double.md`
 - **Documentation moteur** : `docs/compta-partie-double.md`
+- **Spec et plan d'implémentation** : `docs/superpowers/specs/2026-07-31-suppression-flag-partie-double-design.md`
+  et `docs/superpowers/plans/2026-07-31-suppression-flag-partie-double.md`. ⚠️ `/docs/superpowers/`
+  est exclu du dépôt (`.gitignore`) : ces deux documents n'existent que sur le poste de travail
+  d'origine. Le présent ADR est le seul enregistrement versionné de la décision — il doit donc se
+  suffire à lui-même.
 - **ADR connexe** : `003-passage-partie-double.md` — le volet feature flag de cet ADR est supersédé par le présent document ; le reste conserve sa valeur d'enregistrement historique.
