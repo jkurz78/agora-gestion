@@ -84,6 +84,29 @@ run() {
 }
 
 # ---------------------------------------------------------------------------
+# Le SQL passe par le conteneur, jamais par l'hôte.
+#
+# L'hôte NAS a `ssh` mais aucun client MySQL ; le conteneur `db` a le client
+# mais pas `ssh`. Ce script appelait les deux nus dans le même shell, ce qu'aucune
+# des deux machines ne peut honorer — constaté le 2026-08-02, aucun
+# storage/logs/clone-prod-*.log n'ayant jamais été écrit sur la préprod.
+#
+# Même patron que clone-prod-to-localhost.sh, qui tourne depuis des mois : le
+# dump arrive par `ssh` côté hôte et entre dans la base par un tuyau vers le
+# client du conteneur. MariaDB 11 ne fournit plus l'alias `mysql` : on appelle
+# `mariadb` et `mariadb-admin` par leur nom.
+# ---------------------------------------------------------------------------
+
+COMPOSE_FILE="${COMPOSE_FILE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/docker-compose.staging.yml}"
+DOCKER_BIN="${DOCKER_BIN:-/usr/local/bin/docker}"
+DC="${DOCKER_BIN} compose -f ${COMPOSE_FILE}"
+
+# Client SQL de la préprod, exécuté dans le conteneur db.
+preprod_sql() {
+    echo "${DC} exec -T db mariadb -h '${PREPROD_DB_HOST}' -u '${PREPROD_DB_USER}' -p'${PREPROD_DB_PASS}'"
+}
+
+# ---------------------------------------------------------------------------
 # Logging (mode réel uniquement)
 # ---------------------------------------------------------------------------
 
@@ -109,8 +132,8 @@ run "ssh ${PREPROD_SSH_HOST} \"mysqldump --single-transaction --skip-lock-tables
 # ---------------------------------------------------------------------------
 
 echo "[$(date)] Step 2 : Restauration dans preprod ${PREPROD_DB_NAME}"
-run "mysql -h '${PREPROD_DB_HOST}' -u '${PREPROD_DB_USER}' -p'${PREPROD_DB_PASS}' -e \"DROP DATABASE IF EXISTS ${PREPROD_DB_NAME}; CREATE DATABASE ${PREPROD_DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;\""
-run "gunzip < /tmp/prod-dump.sql.gz | mysql -h '${PREPROD_DB_HOST}' -u '${PREPROD_DB_USER}' -p'${PREPROD_DB_PASS}' '${PREPROD_DB_NAME}'"
+run "$(preprod_sql) -e \"DROP DATABASE IF EXISTS ${PREPROD_DB_NAME}; CREATE DATABASE ${PREPROD_DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;\""
+run "gunzip < /tmp/prod-dump.sql.gz | $(preprod_sql) '${PREPROD_DB_NAME}'"
 
 # ---------------------------------------------------------------------------
 # Step 3 : Anonymisation des données tiers
@@ -118,7 +141,7 @@ run "gunzip < /tmp/prod-dump.sql.gz | mysql -h '${PREPROD_DB_HOST}' -u '${PREPRO
 
 echo "[$(date)] Step 3 : Anonymisation tiers (scripts/anonymize-tiers.sql)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-run "mysql -h '${PREPROD_DB_HOST}' -u '${PREPROD_DB_USER}' -p'${PREPROD_DB_PASS}' '${PREPROD_DB_NAME}' < '${SCRIPT_DIR}/anonymize-tiers.sql'"
+run "$(preprod_sql) '${PREPROD_DB_NAME}' < '${SCRIPT_DIR}/anonymize-tiers.sql'"
 
 # ---------------------------------------------------------------------------
 # Step 3b : Champs chiffrés — les valeurs viennent de la prod, chiffrées avec la
@@ -136,7 +159,7 @@ run "mysql -h '${PREPROD_DB_HOST}' -u '${PREPROD_DB_USER}' -p'${PREPROD_DB_PASS}
 # ---------------------------------------------------------------------------
 
 echo "[$(date)] Step 3b : neutralisation des secrets applicatifs chiffrés"
-run "mysql -h '${PREPROD_DB_HOST}' -u '${PREPROD_DB_USER}' -p'${PREPROD_DB_PASS}' '${PREPROD_DB_NAME}' -e \"
+run "$(preprod_sql) '${PREPROD_DB_NAME}' -e \"
     UPDATE association SET anthropic_api_key = NULL;
     UPDATE helloasso_parametres SET client_secret = NULL, callback_token = NULL;
     UPDATE incoming_mail_parametres SET imap_password = NULL;
@@ -145,7 +168,7 @@ run "mysql -h '${PREPROD_DB_HOST}' -u '${PREPROD_DB_USER}' -p'${PREPROD_DB_PASS}
 
 if [[ -n "${PROD_APP_KEY:-}" ]]; then
     echo "[$(date)] Step 3b : PROD_APP_KEY fournie → re-chiffrement des données"
-    run "php artisan staging:rekey-encrypted"
+    run "${DC} exec -T app php artisan staging:rekey-encrypted"
 else
     echo "[$(date)] Step 3b : PROD_APP_KEY absente — présences et données médicales"
     echo "           restent chiffrées avec la clé de prod. Les écrans qui les"
@@ -159,14 +182,14 @@ fi
 # ---------------------------------------------------------------------------
 
 echo "[$(date)] Step 4 : php artisan migrate --force"
-run "php artisan migrate --force"
+run "${DC} exec -T app php artisan migrate --force"
 
 # ---------------------------------------------------------------------------
 # Step 5 : Smoke-check DB
 # ---------------------------------------------------------------------------
 
 echo "[$(date)] Step 5 : vérification de connectivité preprod"
-run "mysql -h '${PREPROD_DB_HOST}' -u '${PREPROD_DB_USER}' -p'${PREPROD_DB_PASS}' '${PREPROD_DB_NAME}' -e \"SELECT COUNT(*) FROM associations;\""
+run "$(preprod_sql) '${PREPROD_DB_NAME}' -e \"SELECT COUNT(*) FROM association;\""
 
 # ---------------------------------------------------------------------------
 # Nettoyage
