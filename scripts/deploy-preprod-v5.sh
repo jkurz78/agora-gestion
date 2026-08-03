@@ -5,7 +5,7 @@
 # Reference: docs/specs/2026-05-19-fondations-partie-double-slice1.md §16.5
 #
 # Séquence :
-#   1. Clone la DB prod → preprod (via clone-prod-to-preprod.sh)
+#   1. Clone la DB prod → preprod (via clone-prod-to-preprod.sh) — sauf --sans-clone
 #   2. Migrations Laravel
 #   3. Backfill partie double --dry-run (audit pré-backfill)
 #   4. Backfill partie double réel (idempotent)
@@ -13,7 +13,13 @@
 #
 # Usage :
 #   ./scripts/deploy-preprod-v5.sh
-#   ./scripts/deploy-preprod-v5.sh --dry-run   # affiche sans exécuter
+#   ./scripts/deploy-preprod-v5.sh --dry-run     # affiche sans exécuter
+#   ./scripts/deploy-preprod-v5.sh --sans-clone  # part des données déjà en place
+#
+# --sans-clone est le mode qui répète la mise en production. Sur O2Switch il n'y
+# aura aucun clone : la base est déjà là. Tant que l'étape 1 était obligatoire,
+# ce script rejouait une bascule sur des données qu'il venait lui-même
+# d'installer — utile pour préparer une préprod, sans valeur comme répétition.
 
 set -euo pipefail
 
@@ -24,10 +30,24 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 DRY_RUN=0
-if [[ "${1:-}" == "--dry-run" ]]; then
-    DRY_RUN=1
-    echo "[dry-run] Mode dry-run activé — aucune commande réelle exécutée."
-fi
+AVEC_CLONE=1
+
+for arg in "$@"; do
+    case "${arg}" in
+        --dry-run)
+            DRY_RUN=1
+            echo "[dry-run] Mode dry-run activé — aucune commande réelle exécutée."
+            ;;
+        --sans-clone)
+            AVEC_CLONE=0
+            ;;
+        *)
+            echo "ERREUR : option inconnue : ${arg}" >&2
+            echo "Options : --dry-run, --sans-clone" >&2
+            exit 1
+            ;;
+    esac
+done
 
 run() {
     local cmd="$*"
@@ -62,12 +82,15 @@ artisan() {
 # Step 1 : Clone DB prod → preprod
 # ---------------------------------------------------------------------------
 
-echo "[$(date)] Step 1 : clone-prod-to-preprod.sh ${1:-}"
-if [[ "${DRY_RUN}" -eq 1 ]]; then
+if [[ "${AVEC_CLONE}" -eq 0 ]]; then
+    echo "[$(date)] Step 1 : clone ignoré (--sans-clone) — bascule sur les données en place."
+elif [[ "${DRY_RUN}" -eq 1 ]]; then
+    echo "[$(date)] Step 1 : clone-prod-to-preprod.sh --dry-run"
     echo "would run: ${SCRIPT_DIR}/clone-prod-to-preprod.sh --dry-run"
     # Simuler la sortie du sous-script en mode dry-run
     bash "${SCRIPT_DIR}/clone-prod-to-preprod.sh" --dry-run
 else
+    echo "[$(date)] Step 1 : clone-prod-to-preprod.sh"
     bash "${SCRIPT_DIR}/clone-prod-to-preprod.sh"
 fi
 
