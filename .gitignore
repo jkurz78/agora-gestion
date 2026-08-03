@@ -69,3 +69,6 @@ public/proto-*.html
 /agora-gestion-pitch-*.pdf
 /agora-gestion-pitch-*.pptx
 /scripts/clone-prod-to-localhost.sh
+
+# Sorties de recette (captures, journaux d’exécution) — jamais versionnées
+/outputs/
