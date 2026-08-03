@@ -695,7 +695,18 @@ final class TransactionForm extends Component
             // Les nouvelles T1 et les créances/dettes modernes (mode nul) restent
             // ouvertes : leur règlement est porté par une T2 distincte. Les flux
             // historiques gardent en revanche leur mode sur la transaction source.
-            'mode_paiement' => $transactionExistante?->mode_paiement?->value,
+            //
+            // « Non » le retire : sans cela une dette portant un mode résiduel se
+            // déclarait payée à la première mise à jour — enrichirPartieDouble()
+            // déduit « comptant » de ce seul champ. Une facture non payée sortait
+            // ainsi son montant du solde bancaire sur un simple enregistrement.
+            // « Non » ne retire ce mode que là où le bascule est réellement en
+            // jeu. Sur une transaction déjà réglée, TransactionService refuse le
+            // changement — et le formulaire n'a pas à lui soumettre ce qu'il sait
+            // refusé : le retrait y passe par « Annuler le règlement ».
+            'mode_paiement' => ($this->paiementModifiable && ! $this->paiementRecu)
+                ? null
+                : $transactionExistante?->mode_paiement?->value,
             'tiers_id' => $this->tiers_id,
             'reference' => $this->reference,
             'compte_id' => $this->compte_id,
@@ -1210,8 +1221,6 @@ final class TransactionForm extends Component
         // règlement : sans cela le formulaire affichait « En attente de
         // règlement » et « Paiement effectué : oui » en même temps.
         $this->paiementRecu = $transaction->statut_reglement !== StatutReglement::EnAttente;
-        $this->paiementModifiable = $transaction->statut_reglement === StatutReglement::EnAttente
-            && $transaction->mode_paiement === null;
 
         $service = app(PostesTiersOuvertsService::class);
         $exercice = app(ExerciceService::class)->current();
@@ -1230,6 +1239,15 @@ final class TransactionForm extends Component
             ])
             ->all();
         $this->isLockedByReglement = $reglements->isNotEmpty();
+
+        // Le bascule n'agit que tant qu'aucun règlement n'existe. Au-delà,
+        // TransactionService refuse tout changement de mode sur une transaction
+        // réglée — « Le mode de paiement ne peut pas être modifié sur une
+        // transaction réglée » — et le retrait passe par « Annuler le règlement ».
+        // Une dette portant un mode résiduel, elle, reste modifiable : c'est la
+        // forme héritée du backfill, et lui refuser le bascule laissait la
+        // contradiction en place.
+        $this->paiementModifiable = $reglements->isEmpty();
         $this->etatPaiement = $reglements->isEmpty()
             ? 'ouvert'
             : ($poste === null ? 'solde' : 'partiel');

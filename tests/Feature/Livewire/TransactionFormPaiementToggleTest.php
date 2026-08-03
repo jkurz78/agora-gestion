@@ -128,6 +128,69 @@ it('ne ressuscite pas le règlement annulé quand on enregistre la fiche', funct
         ->and($depense->fresh()->statut_reglement)->toBe(StatutReglement::EnAttente);
 });
 
+/**
+ * Forme héritée du clone de production : dette non réglée qui porte pourtant un
+ * mode de paiement — la facture Kaligrafik FA000696. Les deux critères se
+ * contredisent, et c'est le statut qui dit vrai : la facture n'est pas payée.
+ */
+function detteAvecModeResiduel(object $ctx): Transaction
+{
+    $range = app(ExerciceService::class)->dateRange(app(ExerciceService::class)->current());
+
+    Livewire::test(TransactionForm::class)
+        ->set('type', 'depense')
+        ->set('date', $range['start']->addDays(10)->toDateString())
+        ->set('libelle', 'Fournisseur — facture non payée')
+        ->set('paiementRecu', false)
+        ->set('compte_id', $ctx->compteBancaire->id)
+        ->set('tiers_id', $ctx->tiers->id)
+        ->set('lignes', [[
+            'compte_id' => (string) $ctx->compteDepense->id,
+            'operation_id' => '',
+            'seance' => '',
+            'montant' => '180',
+            'notes' => '',
+        ]])
+        ->call('save');
+
+    $dette = Transaction::where('libelle', 'Fournisseur — facture non payée')->sole();
+    $dette->forceFill(['mode_paiement' => ModePaiement::Virement->value])->save();
+
+    return $dette;
+}
+
+it('n’invente pas un règlement en enregistrant une dette non payée', function (): void {
+    // Le danger : ouvrir la facture et cliquer « Mettre à jour » sans rien
+    // changer la déclarait payée, et sortait 180 € du solde bancaire.
+    $dette = detteAvecModeResiduel($this);
+
+    Livewire::test(TransactionForm::class)
+        ->dispatch('edit-transaction', id: (int) $dette->id)
+        ->assertSet('paiementRecu', false)
+        ->assertSet('paiementModifiable', true)
+        ->call('save');
+
+    expect($dette->fresh()->statut_reglement)->toBe(StatutReglement::EnAttente)
+        ->and(app(PostesTiersOuvertsService::class)->reglements($dette->fresh())->count())->toBe(0)
+        ->and($dette->fresh()->mode_paiement)->toBeNull();
+});
+
+it('crée le règlement quand le bascule passe à oui', function (): void {
+    $dette = detteAvecModeResiduel($this);
+    $range = app(ExerciceService::class)->dateRange(app(ExerciceService::class)->current());
+
+    Livewire::test(TransactionForm::class)
+        ->dispatch('edit-transaction', id: (int) $dette->id)
+        ->set('paiementRecu', true)
+        ->set('mode_paiement', 'cheque')
+        ->set('compte_id', $this->compteBancaire->id)
+        ->set('dateReglement', $range['start']->addDays(20)->toDateString())
+        ->call('save');
+
+    expect($dette->fresh()->statut_reglement)->not->toBe(StatutReglement::EnAttente)
+        ->and(app(PostesTiersOuvertsService::class)->reglements($dette->fresh())->count())->toBe(1);
+});
+
 it('ne propose pas le bascule quand la mise à jour ne l’honorerait pas', function (): void {
     $depense = depenseRegleeToggle($this);
 

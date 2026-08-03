@@ -9,6 +9,7 @@ use App\Models\CompteBancaire;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
@@ -19,6 +20,12 @@ beforeEach(function () {
     TenantContext::boot($this->association);
     session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
+
+    // Comptes système : toute association réelle les possède, et l'édition d'une
+    // dette non payée emprunte désormais le chemin « créance », qui a besoin du
+    // 401/411. Sans eux, la génération partie double échouait au lieu d'être
+    // simplement sautée.
+    SystemeSeeder::seed();
 
     $this->compteHelloasso = CompteBancaire::factory()->create([
         'association_id' => $this->association->id,
