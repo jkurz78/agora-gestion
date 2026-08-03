@@ -18,7 +18,11 @@ La comptabilité passe en partie double inconditionnelle. Trois séparations app
 - ce qui est **en main** (5112 chèques reçus, 530 espèces) cesse d'être confondu avec ce qui est en banque ;
 - ce qui est **en banque** (512X) ne bouge qu'au mouvement bancaire réel.
 
-**Conséquence visible dès la première minute** : le solde du compte courant affiché au tableau de bord passe de **1 411,88 € à 1 431,88 €**. Ce n'est pas une anomalie. Décomposition vérifiée sur la préprod :
+**Conséquence visible — mais pas immédiatement** : le solde du compte courant affiché au tableau de bord passe de **1 411,88 € à 1 431,88 €**. Ce n'est pas une anomalie.
+
+⚠️ **Ce basculement n'a lieu qu'après la reprise du § 6, pas à la fin du déploiement.** `SoldeService` ne calcule par le grand livre que si un à-nouveau existe pour l'exercice (`ANouveauGeneration::activePourCible()`) ; tant qu'il n'y en a pas, il retombe sur `solde_initial + recettes − dépenses`, c'est-à-dire le calcul v4. Lire 1 411,88 € juste après le déploiement est donc **le comportement attendu**, pas un échec de la bascule. Constaté en production le 2026-08-03.
+
+Décomposition, vérifiée sur la préprod puis **confirmée au centime sur le grand livre de production** (5112 = 160,00 € ; 401 = −180,00 €) :
 
 | Poste | Effet |
 |---|---|
