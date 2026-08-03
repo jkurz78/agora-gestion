@@ -71,7 +71,12 @@ COMPOSE_FILE="${COMPOSE_FILE:-$(cd "${SCRIPT_DIR}/.." && pwd)/docker-compose.sta
 DOCKER_BIN="${DOCKER_BIN:-/usr/local/bin/docker}"
 export COMPOSE_FILE DOCKER_BIN
 
-ARTISAN="${DOCKER_BIN} compose -f ${COMPOSE_FILE} exec -T app php artisan"
+# `-u www-data` : `docker compose exec` ouvre un shell root. Un artisan lancé en
+# root crée storage/logs/laravel.log à son nom, et php-fpm — qui tourne en
+# www-data — ne peut plus y écrire ensuite : toute page se solde alors par
+# « could not be opened in append mode ». Constaté après la bascule du
+# 2026-08-03, où la première écriture de journal du backfill a suffi.
+ARTISAN="${DOCKER_BIN} compose -f ${COMPOSE_FILE} exec -T -u www-data app php artisan"
 
 # Artisan dans le conteneur applicatif.
 artisan() {

@@ -207,7 +207,7 @@ run "$(preprod_sql) '${PREPROD_DB_NAME}' -e \"
 
 if [[ -n "${PROD_APP_KEY:-}" ]]; then
     echo "[$(date)] Step 3b : PROD_APP_KEY fournie → re-chiffrement des données"
-    run "${DC} exec -T app php artisan staging:rekey-encrypted"
+    run "${DC} exec -T -u www-data app php artisan staging:rekey-encrypted"
 else
     echo "[$(date)] Step 3b : PROD_APP_KEY absente — présences et données médicales"
     echo "           restent chiffrées avec la clé de prod. Les écrans qui les"
@@ -221,7 +221,7 @@ fi
 # ---------------------------------------------------------------------------
 
 echo "[$(date)] Step 4 : php artisan migrate --force"
-run "${DC} exec -T app php artisan migrate --force"
+run "${DC} exec -T -u www-data app php artisan migrate --force"
 
 # ---------------------------------------------------------------------------
 # Step 5 : Smoke-check DB
