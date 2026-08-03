@@ -172,7 +172,26 @@
                             @endif
                             @error('tiers_id') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                         </div>
-                        @if (($type === 'recette' || $type === 'depense') && ! $isLockedByReglement)
+                        @if (($type === 'recette' || $type === 'depense') && ! $paiementModifiable)
+                        {{-- Le règlement ne se retire pas ici : la mise à jour n'y toucherait pas.
+                             L'état est rappelé en lecture seule, et le geste renvoyé là où il agit. --}}
+                        <div class="col-md-2">
+                            <label class="form-label">
+                                @if ($sensTresorerie === 'depense')
+                                    Paiement effectué ?
+                                @else
+                                    Paiement déjà reçu ?
+                                @endif
+                            </label>
+                            <div class="mt-1">
+                                <span class="badge {{ $paiementRecu ? 'text-bg-success' : 'text-bg-secondary' }}">{{ $paiementRecu ? 'Oui' : 'Non' }}</span>
+                                @if ($paiementRecu)
+                                    <div class="form-text">Pour le retirer, utilisez « Annuler le règlement ».</div>
+                                @endif
+                            </div>
+                        </div>
+                        @endif
+                        @if (($type === 'recette' || $type === 'depense') && $paiementModifiable)
                         <div class="col-md-2">
                             <label class="form-label">
                                 @if ($sensTresorerie === 'depense')

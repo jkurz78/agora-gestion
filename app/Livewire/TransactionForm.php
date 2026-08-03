@@ -80,6 +80,19 @@ final class TransactionForm extends Component
      */
     public bool $paiementRecu = true;
 
+    /**
+     * Le bascule « Paiement effectué ? » peut-il encore agir ?
+     *
+     * `save()` n'écrit `statut_reglement` qu'à la création, et ne crée un
+     * règlement que si la transaction n'a pas déjà son mode de paiement. Sur
+     * tout le reste, basculer l'option ne produit rien : l'offrir quand même
+     * fait croire à un échec de l'application. Constaté le 2026-08-03, où
+     * l'utilisateur a conclu qu'une annulation de règlement pourtant réussie
+     * n'avait pas fonctionné. Le retrait d'un règlement passe par la modale
+     * « Annuler le règlement », qui demande confirmation.
+     */
+    public bool $paiementModifiable = true;
+
     public ?int $tiers_id = null;
 
     public ?string $reference = null;
@@ -174,7 +187,7 @@ final class TransactionForm extends Component
 
     public function showNewForm(string $type): void
     {
-        $this->reset(['transactionId', 'type', 'date', 'libelle', 'mode_paiement', 'dateReglement', 'paiementRecu',
+        $this->reset(['transactionId', 'type', 'date', 'libelle', 'mode_paiement', 'dateReglement', 'paiementRecu', 'paiementModifiable',
             'tiers_id', 'reference', 'compte_id', 'notes', 'lignes',
             'etatPaiement', 'soldeRestantCentimes', 'isLockedByReglement', 'reglementsEnregistres', 'posteTiersLigneId',
             'ventilationLigneId', 'ventilationLigneCompteLabel', 'ventilationLigneMontant', 'affectations',
@@ -474,7 +487,6 @@ final class TransactionForm extends Component
         $this->date = $transaction->date->format('Y-m-d');
         $this->libelle = $transaction->libelle;
         $this->mode_paiement = $transaction->mode_paiement?->value ?? '';
-        $this->paiementRecu = $transaction->statut_reglement !== StatutReglement::EnAttente;
         $this->dateReglement = app(ExerciceService::class)->defaultDate();
         $this->tiers_id = $transaction->tiers_id;
         $this->reference = $transaction->reference;
@@ -524,7 +536,7 @@ final class TransactionForm extends Component
     public function resetForm(): void
     {
         $this->reset([
-            'transactionId', 'type', 'date', 'libelle', 'mode_paiement', 'dateReglement', 'paiementRecu',
+            'transactionId', 'type', 'date', 'libelle', 'mode_paiement', 'dateReglement', 'paiementRecu', 'paiementModifiable',
             'tiers_id', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked', 'isLockedByFacture', 'isLockedByHelloAsso', 'isLockedByReglement', 'isExtourneMiroir', 'sensTresorerie',
             'etatPaiement', 'soldeRestantCentimes', 'reglementsEnregistres', 'posteTiersLigneId',
             'ventilationLigneId', 'ventilationLigneCompteLabel', 'ventilationLigneMontant', 'affectations',
@@ -1194,6 +1206,13 @@ final class TransactionForm extends Component
 
     private function chargerEtatReglement(Transaction $transaction): void
     {
+        // Le bascule suit l'état réel, y compris après l'annulation d'un
+        // règlement : sans cela le formulaire affichait « En attente de
+        // règlement » et « Paiement effectué : oui » en même temps.
+        $this->paiementRecu = $transaction->statut_reglement !== StatutReglement::EnAttente;
+        $this->paiementModifiable = $transaction->statut_reglement === StatutReglement::EnAttente
+            && $transaction->mode_paiement === null;
+
         $service = app(PostesTiersOuvertsService::class);
         $exercice = app(ExerciceService::class)->current();
         $poste = $service->pourTransaction($transaction, $exercice);
