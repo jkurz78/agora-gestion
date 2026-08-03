@@ -156,6 +156,14 @@ run "$(preprod_sql) '${PREPROD_DB_NAME}' < '${SCRIPT_DIR}/anonymize-tiers.sql'"
 #           préprod — on les efface systématiquement. Les DONNÉES chiffrées
 #           (présences, données médicales) ne sont récupérables qu'avec la clé de
 #           prod ; on ne les re-chiffre que si PROD_APP_KEY est fournie.
+#
+#           `smtp_parametres` est en outre DÉSACTIVÉE, et pas seulement vidée.
+#           BootTenantConfig écrase la configuration mail dès qu'une ligne existe
+#           et qu'elle est active : une ligne active au mot de passe nul ne rend
+#           pas la préprod muette, elle la fait échouer à l'authentification SMTP
+#           — donc plus de code 2FA, donc plus de connexion possible. Désactivée,
+#           la préprod retombe sur le mailer de son propre .env, qui lui
+#           fonctionne. Aucune préprod ne doit dépendre du SMTP de la prod.
 # ---------------------------------------------------------------------------
 
 echo "[$(date)] Step 3b : neutralisation des secrets applicatifs chiffrés"
@@ -163,7 +171,7 @@ run "$(preprod_sql) '${PREPROD_DB_NAME}' -e \"
     UPDATE association SET anthropic_api_key = NULL;
     UPDATE helloasso_parametres SET client_secret = NULL, callback_token = NULL;
     UPDATE incoming_mail_parametres SET imap_password = NULL;
-    UPDATE smtp_parametres SET smtp_password = NULL;
+    UPDATE smtp_parametres SET smtp_password = NULL, enabled = 0;
     UPDATE users SET two_factor_secret = NULL, two_factor_recovery_codes = NULL;\""
 
 if [[ -n "${PROD_APP_KEY:-}" ]]; then
