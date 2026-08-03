@@ -15,10 +15,9 @@ use App\Enums\StatutExercice;
 use App\Livewire\Concerns\MontantValidation;
 use App\Livewire\TransactionForm;
 use App\Models\Association;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Exercice;
-use App\Models\SousCategorie;
 use App\Models\User;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
@@ -34,14 +33,7 @@ beforeEach(function (): void {
     session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
 
-    $this->categorie = Categorie::factory()->create([
-        'association_id' => $this->association->id,
-        'type' => 'recette',
-    ]);
-    $this->sc = SousCategorie::factory()->create([
-        'categorie_id' => $this->categorie->id,
-        'association_id' => $this->association->id,
-    ]);
+    $this->compteVentilation = Compte::factory()->numero('706')->create();
     $this->compte = CompteBancaire::factory()->create([
         'association_id' => $this->association->id,
         'solde_initial' => 0.0,
@@ -69,7 +61,7 @@ it('transaction_form_refuse_montant_negatif_sur_ligne', function (): void {
     $component->set('date', '2025-10-15')
         ->set('mode_paiement', 'virement')
         ->set('compte_id', $this->compte->id)
-        ->set('lignes.0.sous_categorie_id', (string) $this->sc->id)
+        ->set('lignes.0.compte_id', (string) $this->compteVentilation->id)
         ->set('lignes.0.montant', '-50')
         ->call('save');
 
@@ -89,7 +81,7 @@ it('transaction_form_accepte_montant_positif_sur_ligne', function (): void {
     $component->set('date', '2025-10-15')
         ->set('mode_paiement', 'virement')
         ->set('compte_id', $this->compte->id)
-        ->set('lignes.0.sous_categorie_id', (string) $this->sc->id)
+        ->set('lignes.0.compte_id', (string) $this->compteVentilation->id)
         ->set('lignes.0.montant', '50')
         ->call('save');
 
@@ -105,7 +97,7 @@ it('save_ventilation_refuse_montant_negatif_avec_message_standard', function ():
 
     // Simuler une ligne existante avec ID 999 (ne doit pas exister en DB pour ce test)
     $component->set('lignes', [
-        ['id' => 999, 'sous_categorie_id' => '', 'operation_id' => '', 'seance' => '', 'montant' => '50', 'notes' => ''],
+        ['id' => 999, 'compte_id' => '', 'operation_id' => '', 'seance' => '', 'montant' => '50', 'notes' => ''],
     ]);
     $component->set('ventilationLigneId', 999);
     $component->set('affectations', [

@@ -7,7 +7,6 @@ use App\DTOs\InvoiceOcrResult;
 use App\Exceptions\OcrAnalysisException;
 use App\Exceptions\OcrNotConfiguredException;
 use App\Models\Association;
-use App\Models\SousCategorie;
 use App\Models\User;
 use App\Services\InvoiceOcrService;
 use App\Tenant\TenantContext;
@@ -46,7 +45,6 @@ it('analyze lance OcrNotConfiguredException sans clé', function () {
 
 it('analyze parse correctement la réponse API', function () {
     $this->association->update(['anthropic_api_key' => 'sk-test-key']);
-    SousCategorie::factory()->create();
 
     Http::fake([
         'api.anthropic.com/*' => Http::response([
@@ -59,8 +57,8 @@ it('analyze parse correctement la réponse API', function () {
                     'tiers_nom' => 'Anne KURZ',
                     'montant_total' => 390.00,
                     'lignes' => [
-                        ['description' => 'Séance 4', 'sous_categorie_id' => 1, 'operation_id' => null, 'seance' => 4, 'montant' => 250.00],
-                        ['description' => 'Suivi', 'sous_categorie_id' => 1, 'operation_id' => null, 'seance' => null, 'montant' => 140.00],
+                        ['description' => 'Séance 4', 'compte_id' => 1, 'operation_id' => null, 'seance' => 4, 'montant' => 250.00],
+                        ['description' => 'Suivi', 'compte_id' => 1, 'operation_id' => null, 'seance' => null, 'montant' => 140.00],
                     ],
                     'warnings' => [],
                 ]),
@@ -84,7 +82,6 @@ it('analyze parse correctement la réponse API', function () {
 
 it('utilise le modèle configuré (pilotable par config, pas en dur)', function () {
     $this->association->update(['anthropic_api_key' => 'sk-test-key']);
-    SousCategorie::factory()->create();
     config()->set('services.anthropic.invoice_ocr_model', 'claude-sonnet-4-6');
 
     Http::fake([
@@ -107,7 +104,6 @@ it('utilise le modèle configuré (pilotable par config, pas en dur)', function 
 
 it('utilise le modèle choisi par l\'association en priorité', function () {
     $this->association->update(['anthropic_api_key' => 'sk-test-key', 'invoice_ocr_model' => 'claude-opus-4-8']);
-    SousCategorie::factory()->create();
 
     Http::fake([
         'api.anthropic.com/*' => Http::response([
@@ -150,7 +146,6 @@ it('fetchAvailableModels lève une exception si l\'API échoue', function () {
 
 it('analyze gère les warnings de cohérence', function () {
     $this->association->update(['anthropic_api_key' => 'sk-test-key']);
-    SousCategorie::factory()->create();
 
     Http::fake([
         'api.anthropic.com/*' => Http::response([
@@ -180,7 +175,6 @@ it('analyze gère les warnings de cohérence', function () {
 
 it('analyze lance OcrAnalysisException si API échoue', function () {
     $this->association->update(['anthropic_api_key' => 'sk-test-key']);
-    SousCategorie::factory()->create();
 
     Http::fake([
         'api.anthropic.com/*' => Http::response('Internal Server Error', 500),
@@ -192,7 +186,6 @@ it('analyze lance OcrAnalysisException si API échoue', function () {
 
 it('analyze lance OcrAnalysisException si JSON invalide', function () {
     $this->association->update(['anthropic_api_key' => 'sk-test-key']);
-    SousCategorie::factory()->create();
 
     Http::fake([
         'api.anthropic.com/*' => Http::response([
@@ -206,7 +199,6 @@ it('analyze lance OcrAnalysisException si JSON invalide', function () {
 
 it('analyzeFromPath parse correctement la réponse API depuis un fichier sur disque', function () {
     $this->association->update(['anthropic_api_key' => 'sk-test-key']);
-    SousCategorie::factory()->create();
 
     Http::fake([
         'api.anthropic.com/*' => Http::response([
@@ -219,7 +211,7 @@ it('analyzeFromPath parse correctement la réponse API depuis un fichier sur dis
                     'tiers_nom' => 'EDF',
                     'montant_total' => 123.45,
                     'lignes' => [
-                        ['description' => 'Électricité', 'sous_categorie_id' => 1, 'operation_id' => null, 'seance' => null, 'montant' => 123.45],
+                        ['description' => 'Électricité', 'compte_id' => 1, 'operation_id' => null, 'seance' => null, 'montant' => 123.45],
                     ],
                     'warnings' => [],
                 ]),

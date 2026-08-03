@@ -77,7 +77,7 @@
                             <tbody style="color:#555">
                                 @forelse ($operations as $op)
                                     @php
-                                        $scNom = $op->typeOperation?->sousCategorie?->nom ?? '—';
+                                        $scNom = $op->typeOperation?->compte?->intitule ?? '—';
                                         $typeNom = $op->typeOperation?->nom ?? '—';
 
                                         $debut = $op->date_debut?->format('d/m/Y') ?? '?';
@@ -142,9 +142,9 @@
                                         if ($statut === null) {
                                             $statutBadge = null;
                                         } elseif ($statut->isEncaisse()) {
-                                            $statutBadge = ['Payé', 'bg-success'];
+                                            $statutBadge = ['Réglé', 'bg-success'];
                                         } else {
-                                            $statutBadge = ['À payer', 'bg-warning text-dark'];
+                                            $statutBadge = ['Dû', 'bg-warning text-dark'];
                                         }
                                     @endphp
                                     <tr>
@@ -193,9 +193,9 @@
                                         if ($statut === null) {
                                             $statutBadge = null;
                                         } elseif ($statut->isEncaisse()) {
-                                            $statutBadge = ['Reçu', 'bg-success'];
+                                            $statutBadge = ['Remis', 'bg-success'];
                                         } else {
-                                            $statutBadge = ['En attente', 'bg-warning text-dark'];
+                                            $statutBadge = ['Dû', 'bg-warning text-dark'];
                                         }
                                     @endphp
                                     <tr>
@@ -245,7 +245,7 @@
                                     <tr>
                                         <td class="small text-nowrap">{{ $ligne->transaction->date->format('d/m/Y') }}</td>
                                         <td class="small">{{ $ligne->transaction->tiers ? $ligne->transaction->tiers->displayName() : 'Anonyme' }}</td>
-                                        <td class="small text-muted">{{ $ligne->sousCategorie?->nom ?? '—' }}</td>
+                                        <td class="small text-muted">{{ $ligne->compte?->intitule ?? '—' }}</td>
                                         <td class="text-end small fw-semibold text-nowrap">{{ number_format((float) $ligne->montant, 2, ',', ' ') }} &euro;</td>
                                     </tr>
                                 @empty
@@ -313,7 +313,7 @@
                     <h6 class="mb-0"><a href="{{ route('comptabilite.budget') }}" class="text-decoration-none text-dark">Résumé budget</a></h6>
                 </div>
                 <div class="card-body py-2">
-                    @if(empty($budgetParCategorie))
+                    @if(empty($budgetParFamille))
                         <div class="text-center text-muted small py-3">
                             <i class="bi bi-info-circle me-1"></i>
                             Aucun budget défini pour cet exercice.
@@ -341,42 +341,42 @@
                         </div>
                     </div>
 
-                    @if(! empty($budgetParCategorie))
+                    @if(! empty($budgetParFamille))
                         <table class="table table-sm mb-0" style="font-size:.8rem">
                             <thead>
                                 <tr class="text-muted">
-                                    <th style="font-weight:500">Catégorie</th>
+                                    <th style="font-weight:500">Famille</th>
                                     <th class="text-end" style="font-weight:500">Prévu</th>
                                     <th class="text-end" style="font-weight:500">Réalisé</th>
                                     <th class="text-end" style="font-weight:500">Écart</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach($budgetParCategorie as $catNom => $data)
+                                @foreach($budgetParFamille as $familleNom => $data)
                                     @php
-                                        $catEcart = $data['prevu'] - $data['realise'];
+                                        $familleEcart = $data['prevu'] - $data['realise'];
                                         // Côté recette : écart négatif (réalisé < prévu) = mauvais (rouge)
                                         // Côté dépense : écart positif (prévu > réalisé, donc on a moins dépensé) = bon (vert)
                                         $ecartColor = $data['type'] === 'recette'
-                                            ? ($catEcart > 0 ? 'text-danger' : 'text-success')
-                                            : ($catEcart >= 0 ? 'text-success' : 'text-danger');
+                                            ? ($familleEcart > 0 ? 'text-danger' : 'text-success')
+                                            : ($familleEcart >= 0 ? 'text-success' : 'text-danger');
                                     @endphp
                                     <tr>
                                         <td>
                                             <span class="badge {{ $data['type'] === 'recette' ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger' }} me-1" style="font-size:.65rem">
                                                 {{ $data['type'] === 'recette' ? 'R' : 'D' }}
                                             </span>
-                                            {{ $catNom }}
+                                            {{ $familleNom }}
                                         </td>
                                         <td class="text-end">{{ number_format($data['prevu'], 2, ',', ' ') }} &euro;</td>
                                         <td class="text-end">{{ number_format($data['realise'], 2, ',', ' ') }} &euro;</td>
-                                        <td class="text-end {{ $ecartColor }}">{{ number_format($catEcart, 2, ',', ' ') }} &euro;</td>
+                                        <td class="text-end {{ $ecartColor }}">{{ number_format($familleEcart, 2, ',', ' ') }} &euro;</td>
                                     </tr>
                                 @endforeach
                             </tbody>
                         </table>
                     @endif
-                    @endif {{-- /budgetParCategorie empty --}}
+                    @endif {{-- /budgetParFamille empty --}}
                 </div>
             </div>
         </div>

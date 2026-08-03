@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Models\Compte;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
-use App\Models\SousCategorie;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -20,7 +20,7 @@ final class NoteDeFraisLigneFactory extends Factory
     {
         return [
             'note_de_frais_id' => NoteDeFrais::factory(),
-            'sous_categorie_id' => SousCategorie::factory(),
+            'compte_id' => Compte::factory()->depense(),
             'operation_id' => null,
             'seance' => null,
             'libelle' => fake()->optional(0.7)->sentence(3),

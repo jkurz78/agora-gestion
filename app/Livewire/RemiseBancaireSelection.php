@@ -125,7 +125,7 @@ final class RemiseBancaireSelection extends Component
 
         $totalSelected = (float) $allTransactions
             ->whereIn('id', $this->selectedTransactionIds)
-            ->sum('montant_total');
+            ->sum(fn ($tx) => abs((float) $tx->montant_total));
 
         $countSelected = count($this->selectedTransactionIds);
 
@@ -142,15 +142,29 @@ final class RemiseBancaireSelection extends Component
      */
     private function buildBaseQuery(): Builder
     {
-        return Transaction::where('type', TypeTransaction::Recette->value)
+        return Transaction::query()
+            ->operationnel()
             ->where('mode_paiement', $this->remise->mode_paiement->value)
+            ->whereNull('extournee_at')
             ->whereIn('statut_reglement', [
-                StatutReglement::EnAttente->value,
+                StatutReglement::EnMain->value,
                 StatutReglement::Recu->value,
             ])
             ->where(function ($q): void {
                 $q->whereNull('remise_id')
                     ->orWhere('remise_id', $this->remise->id);
+            })
+            // Sens trésorerie = recette (argent entre) via la même logique que sensTresorerie() PHP :
+            // - Transaction normale avec type = recette
+            // - Miroir d'extourne de dépense (type=depense, type_ecriture=extourne → sens inversé)
+            ->where(function ($q): void {
+                $q->where(function ($q): void {
+                    $q->where('type_ecriture', '!=', 'extourne')
+                        ->where('type', TypeTransaction::Recette->value);
+                })->orWhere(function ($q): void {
+                    $q->where('type_ecriture', 'extourne')
+                        ->where('type', TypeTransaction::Depense->value);
+                });
             });
     }
 }

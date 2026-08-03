@@ -71,7 +71,9 @@ final class RemiseBancaireList extends Component
 
     public function render(): View
     {
-        $remises = RemiseBancaire::with(['compteCible', 'transactions'])
+        // Affiche toutes les remises, triées par date puis numéro décroissants.
+        $remises = RemiseBancaire::query()
+            ->with(['compteCible', 'transactions' => fn ($q) => $q->operationnel()])
             ->orderByDesc('date')
             ->orderByDesc('numero')
             ->paginate(20);

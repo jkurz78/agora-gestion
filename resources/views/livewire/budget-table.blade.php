@@ -114,7 +114,7 @@
                 <table class="table table-striped table-hover mb-0">
                     <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                         <tr>
-                            <th>Sous-catégorie</th>
+                            <th>Compte</th>
                             <th class="text-end">Prévu</th>
                             <th class="text-end">Réalisé</th>
                             <th class="text-end">Écart</th>
@@ -122,21 +122,21 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach ($depenseCategories as $categorie)
+                        @foreach ($depenseGroupes as $codeFamille => $groupe)
                             <tr class="table-secondary">
-                                <td colspan="5" class="fw-bold">{{ $categorie->nom }}</td>
+                                <td colspan="5" class="fw-bold">{{ $groupe['famille']?->libelle() ?? $codeFamille }}</td>
                             </tr>
-                            @foreach ($categorie->sousCategories as $sc)
+                            @foreach ($groupe['comptes'] as $compte)
                                 @php
-                                    $line = $budgetLines->get($sc->id);
+                                    $line = $budgetLines->get($compte->id);
                                     $prevu = $line ? (float) $line->montant_prevu : 0;
-                                    $realise = $realiseData[$sc->id] ?? 0;
+                                    $realise = $realiseData[$compte->id] ?? 0;
                                     $ecart = $prevu - $realise;
                                     $totalChargesPrevu += $prevu;
                                     $totalChargesRealise += $realise;
                                 @endphp
                                 <tr>
-                                    <td class="ps-4">{{ $sc->nom }}</td>
+                                    <td class="ps-4"><span class="font-monospace">{{ $compte->numero_pcg }}</span> — {{ $compte->intitule }}</td>
                                     <td class="text-end">
                                         @if (! $exerciceCloture && $this->canEdit && $line && $editingLineId === $line->id)
                                             <div class="d-flex justify-content-end gap-1">
@@ -173,7 +173,7 @@
                                     <td>
                                         @if (! $exerciceCloture && $this->canEdit)
                                         @if (! $line)
-                                            <button wire:click="addLine({{ $sc->id }})"
+                                            <button wire:click="addLine({{ $compte->id }})"
                                                     class="btn btn-sm btn-outline-primary">
                                                 <i class="bi bi-plus-lg"></i>
                                             </button>
@@ -214,7 +214,7 @@
                 <table class="table table-striped table-hover mb-0">
                     <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                         <tr>
-                            <th>Sous-catégorie</th>
+                            <th>Compte</th>
                             <th class="text-end">Prévu</th>
                             <th class="text-end">Réalisé</th>
                             <th class="text-end">Écart</th>
@@ -222,21 +222,21 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach ($recetteCategories as $categorie)
+                        @foreach ($recetteGroupes as $codeFamille => $groupe)
                             <tr class="table-secondary">
-                                <td colspan="5" class="fw-bold">{{ $categorie->nom }}</td>
+                                <td colspan="5" class="fw-bold">{{ $groupe['famille']?->libelle() ?? $codeFamille }}</td>
                             </tr>
-                            @foreach ($categorie->sousCategories as $sc)
+                            @foreach ($groupe['comptes'] as $compte)
                                 @php
-                                    $line = $budgetLines->get($sc->id);
+                                    $line = $budgetLines->get($compte->id);
                                     $prevu = $line ? (float) $line->montant_prevu : 0;
-                                    $realise = $realiseData[$sc->id] ?? 0;
+                                    $realise = $realiseData[$compte->id] ?? 0;
                                     $ecart = $prevu - $realise;
                                     $totalProduitsPrevu += $prevu;
                                     $totalProduitsRealise += $realise;
                                 @endphp
                                 <tr>
-                                    <td class="ps-4">{{ $sc->nom }}</td>
+                                    <td class="ps-4"><span class="font-monospace">{{ $compte->numero_pcg }}</span> — {{ $compte->intitule }}</td>
                                     <td class="text-end">
                                         @if (! $exerciceCloture && $this->canEdit && $line && $editingLineId === $line->id)
                                             <div class="d-flex justify-content-end gap-1">
@@ -273,7 +273,7 @@
                                     <td>
                                         @if (! $exerciceCloture && $this->canEdit)
                                         @if (! $line)
-                                            <button wire:click="addLine({{ $sc->id }})"
+                                            <button wire:click="addLine({{ $compte->id }})"
                                                     class="btn btn-sm btn-outline-primary">
                                                 <i class="bi bi-plus-lg"></i>
                                             </button>

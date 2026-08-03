@@ -6,6 +6,7 @@ use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Tenant\TenantContext;
 
 beforeEach(function () {
@@ -36,6 +37,22 @@ it('can store a compte bancaire', function () {
         'iban' => 'FR7630006000011234567890189',
         'association_id' => $this->association->id,
     ]);
+});
+
+it('affiche le numéro de compte du plan comptable dans la liste', function () {
+    // Toute association sortie de l'onboarding a son plan comptable : c'est la
+    // condition dans laquelle un compte bancaire est créé depuis Paramètres.
+    SystemeSeeder::seed();
+
+    $this->post(route('banques.comptes.store'), [
+        'nom' => 'Compte Courant',
+        'solde_initial' => 0,
+        'date_solde_initial' => '2024-01-01',
+    ]);
+
+    $this->get(route('banques.comptes.index'))
+        ->assertOk()
+        ->assertSee('5121');
 });
 
 it('validates required fields when storing a compte bancaire', function () {

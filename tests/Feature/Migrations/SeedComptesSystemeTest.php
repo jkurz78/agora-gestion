@@ -1,0 +1,191 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Models\Association;
+use App\Services\Compta\Migrations\SystemeSeeder;
+use Illuminate\Support\Facades\DB;
+
+/*
+ * Step 5 of plans/fondations-partie-double-slice1.md (sous-slice 1a).
+ *
+ * Verifies that the SystemeSeeder inserts the system accounts 411, 401, 5112
+ * and 530 unconditionally, for every tenant.
+ *
+ * 530 (Caisse — espèces) used to be conditional on the tenant already having a
+ * non-deleted transaction with mode_paiement='especes'. That made the account's
+ * existence depend on seeding order: a transaction created in espèces *after*
+ * the seed had run found no 530, and CompteTresorerieResolver threw.
+ *
+ * The seeder logic is extracted from the migration so it can be exercised here
+ * without re-running the migration. Same pattern as AuditGuard / BancairesSeeder.
+ */
+
+/** Replays the système seed step (same SQL as the migration uses). */
+function replaySystemeSeed(): void
+{
+    SystemeSeeder::seed();
+}
+
+it('creates 411, 401, 5112, 530 for every tenant (2 tenants)', function () {
+    $assoA = Association::firstOrFail();
+    $assoB = Association::factory()->create();
+
+    replaySystemeSeed();
+
+    foreach ([$assoA, $assoB] as $asso) {
+        foreach (['411', '401', '5112', '530'] as $numero) {
+            $compte = DB::table('comptes')
+                ->where('association_id', $asso->id)
+                ->where('numero_pcg', $numero)
+                ->first();
+
+            expect($compte)->not->toBeNull(
+                "Compte {$numero} should exist for association {$asso->id}"
+            );
+        }
+    }
+});
+
+it('creates 530 even when tenant has no espèces transaction yet', function () {
+    $association = Association::firstOrFail();
+
+    // Insert a virement transaction only — no espèces
+    DB::table('transactions')->insert([
+        'association_id' => $association->id,
+        'type' => 'recette',
+        'date' => '2025-10-01',
+        'montant_total' => '100.00',
+        'mode_paiement' => 'virement',
+        'deleted_at' => null,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    replaySystemeSeed();
+
+    $compte = DB::table('comptes')
+        ->where('association_id', $association->id)
+        ->where('numero_pcg', '530')
+        ->first();
+
+    expect($compte)->not->toBeNull(
+        'Compte 530 must exist up front: an espèces transaction can be created after the seed has run'
+    );
+});
+
+it('creates 530 when tenant has at least one non-deleted espèces transaction', function () {
+    $association = Association::firstOrFail();
+
+    DB::table('transactions')->insert([
+        'association_id' => $association->id,
+        'type' => 'recette',
+        'date' => '2025-10-01',
+        'montant_total' => '50.00',
+        'mode_paiement' => 'especes',
+        'deleted_at' => null,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    replaySystemeSeed();
+
+    $compte = DB::table('comptes')
+        ->where('association_id', $association->id)
+        ->where('numero_pcg', '530')
+        ->first();
+
+    expect($compte)->not->toBeNull('Compte 530 should be created when tenant has a non-deleted espèces transaction');
+});
+
+it('creates 530 for a tenant that has no transaction at all', function () {
+    $association = Association::factory()->create();
+
+    expect(DB::table('transactions')->where('association_id', $association->id)->count())->toBe(0);
+
+    replaySystemeSeed();
+
+    $compte = DB::table('comptes')
+        ->where('association_id', $association->id)
+        ->where('numero_pcg', '530')
+        ->first();
+
+    expect($compte)->not->toBeNull('Compte 530 must exist for a brand-new tenant');
+});
+
+it('system comptes have correct attributes (est_systeme, lettrable, actif, pour_inscriptions)', function () {
+    $association = Association::firstOrFail();
+
+    replaySystemeSeed();
+
+    $comptes = DB::table('comptes')
+        ->where('association_id', $association->id)
+        ->whereIn('numero_pcg', ['411', '401', '5112', '530'])
+        ->get()
+        ->keyBy('numero_pcg');
+
+    foreach (['411', '401', '5112', '530'] as $numero) {
+        $compte = $comptes->get($numero);
+        expect($compte)->not->toBeNull("Compte {$numero} should exist");
+        expect((bool) $compte->est_systeme)->toBeTrue("{$numero}: est_systeme should be true");
+        expect((bool) $compte->lettrable)->toBeTrue("{$numero}: lettrable should be true");
+        expect((bool) $compte->actif)->toBeTrue("{$numero}: actif should be true");
+        expect((bool) $compte->pour_inscriptions)->toBeFalse("{$numero}: pour_inscriptions should be false");
+        expect($compte->parent_compte_id)->toBeNull("{$numero}: parent_compte_id should be null");
+        expect($compte->iban)->toBeNull("{$numero}: iban should be null");
+        expect($compte->bic)->toBeNull("{$numero}: bic should be null");
+        expect($compte->domiciliation)->toBeNull("{$numero}: domiciliation should be null");
+        expect($compte->solde_initial)->toBeNull("{$numero}: solde_initial should be null");
+        expect($compte->date_solde_initial)->toBeNull("{$numero}: date_solde_initial should be null");
+    }
+
+    // Classe checks
+    expect((int) $comptes->get('411')->classe)->toBe(4, '411 should be classe 4');
+    expect((int) $comptes->get('401')->classe)->toBe(4, '401 should be classe 4');
+    expect((int) $comptes->get('5112')->classe)->toBe(5, '5112 should be classe 5');
+    expect((int) $comptes->get('530')->classe)->toBe(5, '530 should be classe 5');
+});
+
+it('intituleds match spec (Clients / Fournisseurs / Chèques à encaisser / Caisse (espèces))', function () {
+    $association = Association::firstOrFail();
+
+    replaySystemeSeed();
+
+    $comptes = DB::table('comptes')
+        ->where('association_id', $association->id)
+        ->whereIn('numero_pcg', ['411', '401', '5112', '530'])
+        ->get()
+        ->keyBy('numero_pcg');
+
+    expect($comptes->get('411')->intitule)->toBe('Clients');
+    expect($comptes->get('401')->intitule)->toBe('Fournisseurs');
+    expect($comptes->get('5112')->intitule)->toBe('Chèques à encaisser');
+    expect($comptes->get('530')->intitule)->toBe('Caisse (espèces)');
+});
+
+it('is idempotent — running the seed twice produces no duplicates', function () {
+    $association = Association::firstOrFail();
+
+    DB::table('transactions')->insert([
+        'association_id' => $association->id,
+        'type' => 'recette',
+        'date' => '2025-10-01',
+        'montant_total' => '50.00',
+        'mode_paiement' => 'especes',
+        'deleted_at' => null,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    replaySystemeSeed();
+    replaySystemeSeed(); // second call must be a no-op
+
+    foreach (['411', '401', '5112', '530'] as $numero) {
+        $count = DB::table('comptes')
+            ->where('association_id', $association->id)
+            ->where('numero_pcg', $numero)
+            ->count();
+
+        expect($count)->toBe(1, "Compte {$numero} should appear exactly once after idempotent re-seed");
+    }
+});

@@ -9,6 +9,7 @@ use App\Enums\StatutReglement;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 
 final class RemiseBancaire extends TenantModel
 {
@@ -24,6 +25,7 @@ final class RemiseBancaire extends TenantModel
         'compte_cible_id',
         'libelle',
         'saisi_par',
+        'comptabilisee_at',
     ];
 
     protected function casts(): array
@@ -34,6 +36,7 @@ final class RemiseBancaire extends TenantModel
             'numero' => 'integer',
             'compte_cible_id' => 'integer',
             'saisi_par' => 'integer',
+            'comptabilisee_at' => 'datetime',
         ];
     }
 
@@ -71,6 +74,6 @@ final class RemiseBancaire extends TenantModel
 
     public function montantTotal(): float
     {
-        return (float) $this->transactions()->sum('montant_total');
+        return (float) $this->transactions()->operationnel()->sum(DB::raw('ABS(montant_total)'));
     }
 }

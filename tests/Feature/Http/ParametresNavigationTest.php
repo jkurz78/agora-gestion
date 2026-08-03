@@ -19,14 +19,21 @@ afterEach(function () {
     TenantContext::clear();
 });
 
-test('GET /parametres/categories retourne 200', function () {
+test('GET /parametres/categories redirige 301 vers /parametres/plan-comptable', function () {
     $response = $this->get('/parametres/categories');
+    $response->assertStatus(301);
+    $response->assertRedirect('/parametres/plan-comptable');
+});
+
+test('GET /parametres/plan-comptable retourne 200', function () {
+    $response = $this->get('/parametres/plan-comptable');
     $response->assertStatus(200);
 });
 
-test('GET /parametres/sous-categories retourne 200', function () {
-    $response = $this->get('/parametres/sous-categories');
-    $response->assertStatus(200);
+test('GET /parametres/comptes redirige 301 vers /parametres/plan-comptable', function () {
+    $response = $this->get('/parametres/comptes');
+    $response->assertStatus(301);
+    $response->assertRedirect('/parametres/plan-comptable');
 });
 
 test('GET /banques/comptes retourne 200', function () {
@@ -39,12 +46,12 @@ test('GET /parametres/utilisateurs retourne 200', function () {
     $response->assertStatus(200);
 });
 
-test('POST /parametres/categories redirige vers /parametres/categories', function () {
+test('POST /parametres/categories redirige 301', function () {
     $response = $this->post('/parametres/categories', [
         'nom' => 'Test Categorie',
         'type' => 'depense',
     ]);
-    $response->assertRedirect('/parametres/categories');
+    $response->assertStatus(301);
 });
 
 test('POST /banques/comptes redirige vers /banques/comptes', function () {

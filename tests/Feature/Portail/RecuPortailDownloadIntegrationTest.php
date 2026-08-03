@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
-use App\Enums\UsageComptable;
 use App\Models\Adhesion;
 use App\Models\Association;
-use App\Models\SousCategorie;
+use App\Models\Compte;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -55,8 +54,7 @@ function makeTiersAvecAdresse(Association $asso): Tiers
 
 function makeDonLigneReelle(Association $asso, Tiers $tiers, float $montant = 50.0): TransactionLigne
 {
-    $sousCat = SousCategorie::factory()->create(['association_id' => $asso->id]);
-    $sousCat->usages()->create(['usage' => UsageComptable::Don->value]);
+    $compte = Compte::factory()->pourDons()->create(['association_id' => $asso->id]);
 
     $tx = Transaction::factory()->create([
         'association_id' => $asso->id,
@@ -69,7 +67,8 @@ function makeDonLigneReelle(Association $asso, Tiers $tiers, float $montant = 50
 
     return TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compte->id,
+        'credit' => $montant,
         'montant' => $montant,
     ]);
 }
@@ -117,8 +116,7 @@ it('GET recus.cotisation génère un vrai PDF : Content-Type, inline, bytes comm
     Auth::guard('tiers-portail')->login($tiers);
     session(['portail.last_activity_at' => now()->timestamp]);
 
-    $sousCat = SousCategorie::factory()->create(['association_id' => $asso->id]);
-    $sousCat->usages()->create(['usage' => UsageComptable::Cotisation->value]);
+    $compte = Compte::factory()->pourCotisations()->create(['association_id' => $asso->id]);
 
     $tx = Transaction::factory()->create([
         'association_id' => $asso->id,
@@ -132,7 +130,8 @@ it('GET recus.cotisation génère un vrai PDF : Content-Type, inline, bytes comm
     $tx->lignes()->delete();
     $ligneCotisation = TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compte->id,
+        'credit' => 60.0,
         'montant' => 60.0,
     ]);
 

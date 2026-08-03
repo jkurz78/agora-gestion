@@ -11,6 +11,8 @@ use App\Enums\StatutNoteDeFrais;
 use App\Models\Adhesion;
 use App\Models\Association;
 use App\Models\AssociationUser;
+use App\Models\Compte;
+use App\Models\CompteBancaire;
 use App\Models\Extourne;
 use App\Models\FacturePartenaireDeposee;
 use App\Models\IncomingDocument;
@@ -24,16 +26,20 @@ use App\Observers\AdhesionObserver;
 use App\Observers\AdhesionRecuFiscalObserver;
 use App\Observers\AdhesionTransactionLigneObserver;
 use App\Observers\AssociationObserver;
+use App\Observers\CompteBancaireObserver;
+use App\Observers\CompteObserver;
 use App\Observers\ImmutableSlugObserver;
+use App\Observers\TransactionLigneObserver;
 use App\Observers\TransactionLigneRecuFiscalObserver;
 use App\Observers\TransactionObserver;
 use App\Observers\TransactionRecuFiscalObserver;
 use App\Observers\UserRoleObserver;
+use App\Policies\ComptePolicy;
 use App\Policies\ExtournePolicy;
 use App\Policies\FacturePartenaireDeposeePolicy;
 use App\Policies\NoteDeFraisPolicy;
 use App\Policies\RecuFiscalPolicy;
-use App\Services\Adhesion\SousCategorieFormuleResolver;
+use App\Services\Adhesion\CompteFormuleResolver;
 use App\Services\NoteDeFrais\LigneTypes\LigneTypeRegistry;
 use App\Tenant\TenantContext;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -49,11 +55,12 @@ final class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(LigneTypeRegistry::class);
-        $this->app->singleton(SousCategorieFormuleResolver::class);
+        $this->app->singleton(CompteFormuleResolver::class);
     }
 
     public function boot(): void
     {
+        Gate::policy(Compte::class, ComptePolicy::class);
         Gate::policy(FacturePartenaireDeposee::class, FacturePartenaireDeposeePolicy::class);
         Gate::policy(NoteDeFrais::class, NoteDeFraisPolicy::class);
         Gate::policy(Extourne::class, ExtournePolicy::class);
@@ -64,10 +71,13 @@ final class AppServiceProvider extends ServiceProvider
         Transaction::observe(TransactionObserver::class);
         Transaction::observe(TransactionRecuFiscalObserver::class);
         Transaction::observe(AdhesionObserver::class);
+        TransactionLigne::observe(TransactionLigneObserver::class);
         TransactionLigne::observe(TransactionLigneRecuFiscalObserver::class);
         TransactionLigne::observe(AdhesionTransactionLigneObserver::class);
         Adhesion::observe(AdhesionRecuFiscalObserver::class);
         User::observe(UserRoleObserver::class);
+        Compte::observe(CompteObserver::class);
+        CompteBancaire::observe(CompteBancaireObserver::class);
 
         // Rate limiter pour l'API newsletter publique : 5 requêtes / IP / heure.
         // Réponse 429 normalisée {"error": "rate_limit"} pour le contrat API.

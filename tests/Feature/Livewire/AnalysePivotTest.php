@@ -5,12 +5,12 @@ declare(strict_types=1);
 use App\Enums\Espace;
 use App\Livewire\AnalysePivot;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Reglement;
 use App\Models\Seance;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -98,7 +98,7 @@ it('returns participants data with correct fields', function () {
 it('returns financier data with correct fields including temporal dimensions', function () {
     $compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
     $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Fournisseur', 'pour_depenses' => true]);
-    $sousCategorie = SousCategorie::factory()->create(['association_id' => $this->association->id]);
+    $compteVentilation = Compte::factory()->depense()->numero('606')->create();
     $transaction = Transaction::create([
         'association_id' => $this->association->id,
         'tiers_id' => $tiers->id,
@@ -112,8 +112,10 @@ it('returns financier data with correct fields including temporal dimensions', f
     ]);
     TransactionLigne::create([
         'transaction_id' => $transaction->id,
-        'sous_categorie_id' => $sousCategorie->id,
         'montant' => 100.00,
+        'compte_id' => $compteVentilation->id,
+        'debit' => 100.00,
+        'credit' => 0.0,
     ]);
 
     $component = Livewire::test(AnalysePivot::class, ['mode' => 'financier']);
@@ -121,7 +123,7 @@ it('returns financier data with correct fields including temporal dimensions', f
 
     expect($data)->toBeArray()->not->toBeEmpty();
     expect($data[0])->toHaveKeys([
-        'Tiers', 'Date', 'Montant', 'Sous-catégorie', 'Catégorie', 'Type', 'Compte',
+        'Tiers', 'Date', 'Montant', 'Compte comptable', 'Famille', 'Type', 'Compte bancaire',
         'Mois', 'Trimestre', 'Semestre',
     ]);
     expect($data[0]['Montant'])->toBe(-100.0); // dépense → signe négatif (spine)

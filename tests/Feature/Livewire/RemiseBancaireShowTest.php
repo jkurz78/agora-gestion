@@ -85,3 +85,64 @@ it('isBrouillon returns true when no recu or pointe transactions', function () {
     // No comptabiliser called — no recu transactions
     expect($remiseBrouillon->transactions()->whereIn('statut_reglement', ['recu', 'pointe'])->exists())->toBeFalse();
 });
+
+// ── Tests pour l'action comptabiliser ──
+
+it('comptabiliser finalise une remise brouillon (reference + comptabilisee_at + statut recu)', function () {
+    $service = app(RemiseBancaireService::class);
+    $remiseBrouillon = $service->creer([
+        'date' => '2025-12-01',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'compte_cible_id' => $this->compteCible->id,
+    ]);
+
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
+    $tx = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
+        'compte_id' => $this->compteCible->id,
+        'mode_paiement' => ModePaiement::Cheque,
+        'montant_total' => 50.00,
+        'statut_reglement' => StatutReglement::EnAttente,
+        'tiers_id' => $tiers->id,
+        'remise_id' => $remiseBrouillon->id,
+        'reference' => null,
+    ]);
+
+    Livewire::test(RemiseBancaireShow::class, ['remise' => $remiseBrouillon])
+        ->call('comptabiliser');
+
+    $tx->refresh();
+    expect($tx->reference)->not->toBeNull()
+        ->and($tx->statut_reglement)->toBe(StatutReglement::Recu)
+        ->and($remiseBrouillon->fresh()->comptabilisee_at)->not->toBeNull();
+});
+
+it('le bouton Comptabiliser est visible pour une remise brouillon', function () {
+    $service = app(RemiseBancaireService::class);
+    $remiseBrouillon = $service->creer([
+        'date' => '2025-12-02',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'compte_cible_id' => $this->compteCible->id,
+    ]);
+
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
+    Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
+        'compte_id' => $this->compteCible->id,
+        'mode_paiement' => ModePaiement::Cheque,
+        'montant_total' => 20.00,
+        'statut_reglement' => StatutReglement::EnAttente,
+        'tiers_id' => $tiers->id,
+        'remise_id' => $remiseBrouillon->id,
+        'reference' => null,
+    ]);
+
+    Livewire::test(RemiseBancaireShow::class, ['remise' => $remiseBrouillon])
+        ->assertSee('Comptabiliser');
+});
+
+it('le bouton Comptabiliser est absent pour une remise deja comptabilisee', function () {
+    // $this->remise est déjà comptabilisée dans le beforeEach
+    Livewire::test(RemiseBancaireShow::class, ['remise' => $this->remise])
+        ->assertDontSee('Comptabiliser');
+});

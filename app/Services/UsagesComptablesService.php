@@ -4,99 +4,127 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\TypeCategorie;
 use App\Enums\UsageComptable;
-use App\Models\SousCategorie;
-use App\Models\UsageSousCategorie;
+use App\Models\Compte;
+use App\Models\UsageCompte;
 use App\Tenant\TenantContext;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
 final class UsagesComptablesService
 {
-    public function setFraisKilometriques(?int $sousCategorieId): void
+    public function setFraisKilometriques(?int $compteId): void
     {
-        $this->setMono(UsageComptable::FraisKilometriques, $sousCategorieId);
+        $this->setMono(UsageComptable::FraisKilometriques, $compteId);
     }
 
-    public function setAbandonCreance(?int $sousCategorieId): void
+    public function setAbandonCreance(?int $compteId): void
     {
-        if ($sousCategorieId !== null) {
-            $sc = SousCategorie::findOrFail($sousCategorieId);
-            if (! $sc->hasUsage(UsageComptable::Don)) {
-                throw new DomainException('La sous-catégorie doit être un Don pour être désignée comme abandon de créance.');
+        if ($compteId !== null) {
+            $compte = Compte::findOrFail($compteId);
+            if (! $compte->hasUsage(UsageComptable::Don)) {
+                throw new DomainException('Le compte doit être un Don pour être désigné comme abandon de créance.');
             }
         }
-        $this->setMono(UsageComptable::AbandonCreance, $sousCategorieId);
+        $this->setMono(UsageComptable::AbandonCreance, $compteId);
     }
 
-    public function toggleDon(int $sousCategorieId, bool $active): void
+    public function toggleDon(int $compteId, bool $active): void
     {
-        $this->toggle(UsageComptable::Don, $sousCategorieId, $active);
+        $this->toggle(UsageComptable::Don, $compteId, $active);
         if (! $active) {
             // cascade : retirer AbandonCreance si elle était posée
-            $this->toggle(UsageComptable::AbandonCreance, $sousCategorieId, false);
+            $this->toggle(UsageComptable::AbandonCreance, $compteId, false);
         }
     }
 
-    public function toggleCotisation(int $sousCategorieId, bool $active): void
+    public function toggleCotisation(int $compteId, bool $active): void
     {
-        $this->toggle(UsageComptable::Cotisation, $sousCategorieId, $active);
+        $this->toggle(UsageComptable::Cotisation, $compteId, $active);
     }
 
-    public function toggleInscription(int $sousCategorieId, bool $active): void
+    public function toggleInscription(int $compteId, bool $active): void
     {
-        $this->toggle(UsageComptable::Inscription, $sousCategorieId, $active);
+        $this->toggle(UsageComptable::Inscription, $compteId, $active);
     }
 
     /**
-     * @param  array<string, mixed>  $attrs
+     * Création d'un compte de résultat directement flaggé d'un usage.
+     *
+     * @param  array{intitule: string, numero_pcg: string}  $attrs
      */
-    public function createAndFlag(array $attrs, UsageComptable $usage): SousCategorie
+    public function createAndFlag(array $attrs, UsageComptable $usage): Compte
     {
-        return DB::transaction(function () use ($attrs, $usage): SousCategorie {
-            $sc = SousCategorie::create(array_merge(
-                ['association_id' => TenantContext::currentId()],
-                $attrs,
-            ));
-            $this->ensureLink($usage, $sc->id);
+        $numero = trim((string) $attrs['numero_pcg']);
+        $classeAttendue = $usage->polarite() === TypeCategorie::Depense ? 6 : 7;
+
+        if ($numero === '' || (int) substr($numero, 0, 1) !== $classeAttendue) {
+            throw new DomainException("Le numéro de compte doit être de classe {$classeAttendue} pour cet usage.");
+        }
+
+        return DB::transaction(function () use ($attrs, $usage, $numero, $classeAttendue): Compte {
+            $associationId = TenantContext::currentId();
+
+            // Réutilise un compte existant plutôt que de heurter l'unicité
+            // (association_id, numero_pcg) — plus accueillant qu'une violation SQL.
+            $compte = Compte::withoutGlobalScopes()
+                ->where('association_id', $associationId)
+                ->where('numero_pcg', $numero)
+                ->first();
+
+            if ($compte === null) {
+                $compte = Compte::create([
+                    'association_id' => $associationId,
+                    'numero_pcg' => $numero,
+                    'intitule' => $attrs['intitule'],
+                    'classe' => $classeAttendue,
+                    'actif' => true,
+                    'est_systeme' => false,
+                    'pour_inscriptions' => $usage === UsageComptable::Inscription,
+                    'lettrable' => false,
+                ]);
+            }
+
+            $this->ensureLink($usage, (int) $compte->id);
             if ($usage === UsageComptable::AbandonCreance) {
-                $this->ensureLink(UsageComptable::Don, $sc->id);
+                $this->ensureLink(UsageComptable::Don, (int) $compte->id);
             }
 
-            return $sc;
+            return $compte;
         });
     }
 
-    private function setMono(UsageComptable $usage, ?int $sousCategorieId): void
+    private function setMono(UsageComptable $usage, ?int $compteId): void
     {
-        DB::transaction(function () use ($usage, $sousCategorieId): void {
-            UsageSousCategorie::where('usage', $usage->value)->delete();
-            if ($sousCategorieId !== null) {
-                SousCategorie::findOrFail($sousCategorieId);
-                $this->ensureLink($usage, $sousCategorieId);
+        DB::transaction(function () use ($usage, $compteId): void {
+            UsageCompte::where('usage', $usage->value)->delete();
+            if ($compteId !== null) {
+                Compte::findOrFail($compteId);
+                $this->ensureLink($usage, $compteId);
             }
         });
     }
 
-    private function toggle(UsageComptable $usage, int $sousCategorieId, bool $active): void
+    private function toggle(UsageComptable $usage, int $compteId, bool $active): void
     {
-        DB::transaction(function () use ($usage, $sousCategorieId, $active): void {
-            $sc = SousCategorie::findOrFail($sousCategorieId);
+        DB::transaction(function () use ($usage, $compteId, $active): void {
+            $compte = Compte::findOrFail($compteId);
             if ($active) {
-                $this->ensureLink($usage, $sc->id);
+                $this->ensureLink($usage, $compte->id);
             } else {
-                UsageSousCategorie::where('sous_categorie_id', $sc->id)
+                UsageCompte::where('compte_id', $compte->id)
                     ->where('usage', $usage->value)
                     ->delete();
             }
         });
     }
 
-    private function ensureLink(UsageComptable $usage, int $sousCategorieId): void
+    private function ensureLink(UsageComptable $usage, int $compteId): void
     {
-        UsageSousCategorie::firstOrCreate([
+        UsageCompte::firstOrCreate([
             'association_id' => TenantContext::currentId(),
-            'sous_categorie_id' => $sousCategorieId,
+            'compte_id' => $compteId,
             'usage' => $usage->value,
         ]);
     }

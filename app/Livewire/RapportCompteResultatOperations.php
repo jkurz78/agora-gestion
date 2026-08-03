@@ -113,11 +113,17 @@ final class RapportCompteResultatOperations extends Component
         ]);
     }
 
-    /** @return list<array{id: int, nom: string, types: list<array>}> */
+    /**
+     * Arbre de regroupement pour le sélecteur d'opérations (groupe par compte).
+     * L'id n'est qu'une clé de groupement locale à ce widget JS — jamais
+     * renvoyée au serveur (seuls les op.id le sont via selectedOperationIds).
+     *
+     * @return list<array{id: int, nom: string, types: list<array>}>
+     */
     private function buildOperationTree(int $exercice): array
     {
         $typeOperations = TypeOperation::actif()
-            ->with(['sousCategorie', 'operations' => fn ($q) => $q->forExercice($exercice)->orderBy('nom')])
+            ->with(['compte', 'operations' => fn ($q) => $q->forExercice($exercice)->orderBy('nom')])
             ->orderBy('nom')
             ->get();
 
@@ -126,15 +132,15 @@ final class RapportCompteResultatOperations extends Component
             if ($type->operations->isEmpty()) {
                 continue;
             }
-            $scId = $type->sous_categorie_id;
-            if (! isset($tree[$scId])) {
-                $tree[$scId] = [
-                    'id' => $scId,
-                    'nom' => $type->sousCategorie->nom,
+            $cId = (int) $type->compte_id;
+            if (! isset($tree[$cId])) {
+                $tree[$cId] = [
+                    'id' => $cId,
+                    'nom' => $type->compte?->intitule ?? '—',
                     'types' => [],
                 ];
             }
-            $tree[$scId]['types'][] = [
+            $tree[$cId]['types'][] = [
                 'id' => $type->id,
                 'nom' => $type->nom,
                 'operations' => $type->operations

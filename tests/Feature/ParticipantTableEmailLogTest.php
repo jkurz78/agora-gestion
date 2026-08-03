@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 use App\Livewire\ParticipantTable;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\EmailLog;
 use App\Models\EmailTemplate;
 use App\Models\Operation;
 use App\Models\Participant;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Models\User;
@@ -29,9 +29,9 @@ beforeEach(function (): void {
     $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
     $this->actingAs($this->user);
 
-    $sousCategorie = SousCategorie::factory()->create();
+    $compte = Compte::factory()->create(['association_id' => $this->association->id]);
     $this->typeOp = TypeOperation::factory()->create([
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compte->id,
         'email_from' => 'asso@example.com',
         'email_from_name' => 'Association Test',
         'association_id' => $this->association->id,

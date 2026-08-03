@@ -2,11 +2,21 @@
 
 declare(strict_types=1);
 
+use App\Enums\OrigineANouveau;
+use App\Enums\StatutExercice;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
+use App\Models\Exercice;
 use App\Models\Tiers;
 use App\Models\Transaction;
+use App\Models\User;
 use App\Models\VirementInterne;
+use App\Services\Compta\ANouveau\ANouveauPreviewBuilder;
+use App\Services\Compta\ANouveau\ANouveauService;
+use App\Services\Compta\EcritureGenerator;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\TransactionUniverselleService;
+use App\Tenant\TenantContext;
 
 beforeEach(function () {
     $this->svc = app(TransactionUniverselleService::class);
@@ -161,4 +171,181 @@ it('filtre par modePaiement', function () {
 
     $result = $this->svc->paginate(null, null, ['depense'], null, null, null, null, null, null, 'cheque', null);
     expect($result['paginator']->total())->toBe(1);
+});
+
+it('expose une seule ligne report AN avec les informations de la transaction d origine', function (): void {
+    SystemeSeeder::seed();
+    Exercice::create(['annee' => 2025, 'statut' => StatutExercice::Ouvert]);
+    $acteur = User::factory()->create();
+    $acteur->associations()->attach((int) TenantContext::currentId(), ['role' => 'admin', 'joined_at' => now()]);
+
+    $tiers = Tiers::factory()->create(['nom' => 'Client report']);
+    $produit = Compte::create([
+        'numero_pcg' => '706-REPORT',
+        'intitule' => 'Produit reporté',
+        'classe' => 7,
+        'actif' => true,
+        'est_systeme' => false,
+        'pour_inscriptions' => false,
+        'lettrable' => false,
+    ]);
+
+    $t1 = app(EcritureGenerator::class)->pourRecetteACredit(
+        tiers: $tiers,
+        ventilations: [['compte' => $produit, 'montant' => 42.00]],
+        dateConstatation: new DateTimeImmutable('2026-08-20'),
+        libelle: 'Créance à reporter',
+    );
+    $t1->update(['reference' => 'REF-CLIENT-42']);
+    $ligneAN = app(ANouveauService::class)->persister(
+        app(ANouveauPreviewBuilder::class)->build(2025),
+        OrigineANouveau::Cloture,
+        $acteur,
+    )->origines()->with('ligneAN.compte')->firstOrFail()->ligneAN;
+
+    session(['exercice_actif' => 2026]);
+    $result = $this->svc->paginate(
+        null,
+        null,
+        ['recette'],
+        '2026-09-01',
+        '2027-08-31',
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+    );
+
+    $row = collect($result['paginator']->items())->firstWhere('source_type', 'report_an');
+
+    expect($row)->not->toBeNull()
+        ->and($row->date)->toBe('2026-09-01')
+        ->and($row->numero_piece)->toBe($t1->numero_piece)
+        ->and($row->reference)->toBe('REF-CLIENT-42')
+        ->and((int) $row->poste_tiers_ligne_id)->toBe((int) $ligneAN->id)
+        ->and($row->sens_tresorerie)->toBe('recette');
+
+    $resultN = $this->svc->paginate(
+        null,
+        null,
+        ['recette'],
+        '2025-09-01',
+        '2026-08-31',
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+    );
+
+    expect(collect($resultN['paginator']->items())->where('source_type', 'report_an'))->toBeEmpty();
+});
+
+it('utilise l exercice demandé pour les reports AN plutôt que celui de la session', function (): void {
+    SystemeSeeder::seed();
+    Exercice::create(['annee' => 2024, 'statut' => StatutExercice::Ouvert]);
+    $acteur = User::factory()->create();
+    $acteur->associations()->attach((int) TenantContext::currentId(), ['role' => 'admin', 'joined_at' => now()]);
+    $tiers = Tiers::factory()->create(['nom' => 'Client exercice affiché']);
+    $produit = Compte::create([
+        'numero_pcg' => '706-REPORT-EXERCICE',
+        'intitule' => 'Produit report exercice',
+        'classe' => 7,
+        'actif' => true,
+        'est_systeme' => false,
+        'pour_inscriptions' => false,
+        'lettrable' => false,
+    ]);
+    $transaction = app(EcritureGenerator::class)->pourRecetteACredit(
+        tiers: $tiers,
+        ventilations: [['compte' => $produit, 'montant' => 25.00]],
+        dateConstatation: new DateTimeImmutable('2025-08-20'),
+        libelle: 'Créance exercice affiché',
+    );
+    $ligneAN = app(ANouveauService::class)->persister(
+        app(ANouveauPreviewBuilder::class)->build(2024),
+        OrigineANouveau::Cloture,
+        $acteur,
+    )->origines()->with('ligneAN')->firstOrFail()->ligneAN;
+
+    session(['exercice_actif' => 2026]);
+    $result = $this->svc->paginate(
+        null, null, ['recette'], '2025-09-01', '2026-08-31', null, null, null, null, null, null,
+        null, false, 'date', 'desc', 25, 1, false, 2025,
+    );
+
+    $report = collect($result['paginator']->items())->firstWhere('source_type', 'report_an');
+
+    expect($report)->not->toBeNull()
+        ->and($report->numero_piece)->toBe($transaction->numero_piece)
+        ->and((int) $report->poste_tiers_ligne_id)->toBe((int) $ligneAN->id);
+});
+
+it('filtre les reports AN par bornes, tiers, référence, pièce et sens', function (): void {
+    SystemeSeeder::seed();
+    Exercice::create(['annee' => 2025, 'statut' => StatutExercice::Ouvert]);
+    $acteur = User::factory()->create();
+    $acteur->associations()->attach((int) TenantContext::currentId(), ['role' => 'admin', 'joined_at' => now()]);
+    $client = Tiers::factory()->create(['nom' => 'Client AN']);
+    $fournisseur = Tiers::factory()->create(['nom' => 'Fournisseur AN']);
+    $produit = Compte::create([
+        'numero_pcg' => '706-REPORT-FILTRE',
+        'intitule' => 'Produit report filtre',
+        'classe' => 7,
+        'actif' => true,
+        'est_systeme' => false,
+        'pour_inscriptions' => false,
+        'lettrable' => false,
+    ]);
+    $charge = Compte::create([
+        'numero_pcg' => '606-REPORT-FILTRE',
+        'intitule' => 'Charge report filtre',
+        'classe' => 6,
+        'actif' => true,
+        'est_systeme' => false,
+        'pour_inscriptions' => false,
+        'lettrable' => false,
+    ]);
+    app(EcritureGenerator::class)->pourRecetteACredit(
+        tiers: $client,
+        ventilations: [['compte' => $produit, 'montant' => 20.00]],
+        dateConstatation: new DateTimeImmutable('2026-08-20'),
+        libelle: 'Créance filtrée',
+    );
+    $dette = app(EcritureGenerator::class)->pourDepenseACredit(
+        tiers: $fournisseur,
+        ventilations: [['compte' => $charge, 'montant' => 30.00]],
+        dateConstatation: new DateTimeImmutable('2026-08-21'),
+        libelle: 'Dette filtrée',
+    );
+    $dette->update(['reference' => 'REF-FOURN-30']);
+    app(ANouveauService::class)->persister(
+        app(ANouveauPreviewBuilder::class)->build(2025),
+        OrigineANouveau::Cloture,
+        $acteur,
+    );
+    session(['exercice_actif' => 2026]);
+
+    $result = $this->svc->paginate(
+        null,
+        (int) $fournisseur->id,
+        ['depense'],
+        '2026-09-01',
+        '2026-09-01',
+        null,
+        null,
+        'REF-FOURN-30',
+        (string) $dette->numero_piece,
+        null,
+        null,
+    );
+
+    $rows = collect($result['paginator']->items());
+    expect($rows)->toHaveCount(1)
+        ->and($rows->sole()->source_type)->toBe('report_an')
+        ->and($rows->sole()->sens_tresorerie)->toBe('depense')
+        ->and((float) $rows->sole()->montant)->toBe(-30.0);
 });

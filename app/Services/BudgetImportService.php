@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\BudgetLine;
-use App\Models\SousCategorie;
+use App\Models\Compte;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -13,7 +13,7 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 
 final class BudgetImportService
 {
-    private const EXPECTED_HEADERS = ['exercice', 'categorie', 'sous_categorie', 'montant_prevu'];
+    private const EXPECTED_HEADERS = ['exercice', 'famille', 'compte', 'montant_prevu'];
 
     public function import(UploadedFile $file, int $exercice): BudgetImportResult
     {
@@ -39,13 +39,13 @@ final class BudgetImportService
             return new BudgetImportResult(false, errors: [['line' => 0, 'message' => 'Le fichier ne contient aucune ligne de données.']]);
         }
 
-        // Charger toutes les sous-catégories indexées par nom (lowercase)
-        // Détecte les homonymes : clé => [SousCategorie, ...]
-        /** @var array<string, list<SousCategorie>> */
-        $scByName = [];
-        foreach (SousCategorie::all() as $sc) {
-            $key = Str::lower(trim($sc->nom));
-            $scByName[$key][] = $sc;
+        // Charger tous les comptes indexés par intitulé (lowercase)
+        // Détecte les homonymes : clé => [Compte, ...]
+        /** @var array<string, list<Compte>> */
+        $compteByName = [];
+        foreach (Compte::all() as $compte) {
+            $key = Str::lower(trim($compte->intitule));
+            $compteByName[$key][] = $compte;
         }
 
         $errors = [];
@@ -54,8 +54,8 @@ final class BudgetImportService
         foreach ($dataRows as $idx => $row) {
             $lineNum = $idx + 2;
             $exerciceCell = trim((string) ($row[0] ?? ''));
-            // col 1 = categorie — ignorée à l'import (lecture seule)
-            $scNom = trim((string) ($row[2] ?? ''));
+            // col 1 = famille — ignorée à l'import (lecture seule)
+            $compteNom = trim((string) ($row[2] ?? ''));
             $montantCell = trim((string) ($row[3] ?? ''));
 
             // Exercice : accepte "2025" ou "2025-2026"
@@ -67,13 +67,13 @@ final class BudgetImportService
                 $wrongExercices[] = $exerciceCell;
             }
 
-            // Sous-catégorie
-            if ($scNom === '') {
-                $errors[] = ['line' => $lineNum, 'message' => "Ligne {$lineNum} : sous-catégorie vide (champ obligatoire)."];
-            } elseif (! isset($scByName[Str::lower($scNom)])) {
-                $errors[] = ['line' => $lineNum, 'message' => "Ligne {$lineNum} : sous-catégorie '{$scNom}' introuvable."];
-            } elseif (count($scByName[Str::lower($scNom)]) > 1) {
-                $errors[] = ['line' => $lineNum, 'message' => "Ligne {$lineNum} : nom '{$scNom}' ambigu (plusieurs sous-catégories portent ce nom)."];
+            // Compte
+            if ($compteNom === '') {
+                $errors[] = ['line' => $lineNum, 'message' => "Ligne {$lineNum} : compte vide (champ obligatoire)."];
+            } elseif (! isset($compteByName[Str::lower($compteNom)])) {
+                $errors[] = ['line' => $lineNum, 'message' => "Ligne {$lineNum} : compte '{$compteNom}' introuvable."];
+            } elseif (count($compteByName[Str::lower($compteNom)]) > 1) {
+                $errors[] = ['line' => $lineNum, 'message' => "Ligne {$lineNum} : nom '{$compteNom}' ambigu (plusieurs comptes portent ce nom)."];
             }
 
             // Montant : vide ou zéro sont acceptés (la ligne sera ignorée à l'import)
@@ -103,11 +103,11 @@ final class BudgetImportService
         // Insertion dans une transaction DB
         $inserted = 0;
 
-        DB::transaction(function () use ($dataRows, $exercice, $scByName, &$inserted) {
+        DB::transaction(function () use ($dataRows, $exercice, $compteByName, &$inserted) {
             BudgetLine::where('exercice', $exercice)->delete();
 
             foreach ($dataRows as $row) {
-                $scNom = trim((string) ($row[2] ?? ''));
+                $compteNom = trim((string) ($row[2] ?? ''));
                 $montantCell = trim((string) ($row[3] ?? ''));
 
                 // Ignorer montant vide ou zéro
@@ -119,10 +119,10 @@ final class BudgetImportService
                     continue;
                 }
 
-                $sc = $scByName[Str::lower($scNom)][0];
+                $compte = $compteByName[Str::lower($compteNom)][0];
 
                 BudgetLine::create([
-                    'sous_categorie_id' => $sc->id,
+                    'compte_id' => $compte->id,
                     'exercice' => $exercice,
                     'montant_prevu' => (float) $montantCell,
                 ]);

@@ -56,7 +56,7 @@
                     <tr>
                         <th>#</th>
                         <th>Libellé</th>
-                        <th>Sous-catégorie</th>
+                        <th>Nature</th>
                         <th class="text-end">Montant</th>
                         <th>Justificatif</th>
                         <th></th>
@@ -71,9 +71,9 @@
                             </td>
                             <td>
                                 @php
-                                    $scNom = $sousCategories->find($ligne['sous_categorie_id'])?->nom ?? '—';
+                                    $compteNom = $comptes->find($ligne['compte_id'])?->intitule ?? '—';
                                 @endphp
-                                {{ $scNom }}
+                                {{ $compteNom }}
                             </td>
                             <td class="text-end" data-sort="{{ $ligne['montant'] }}">
                                 {{ $ligne['montant'] ? number_format((float) str_replace(',', '.', (string) $ligne['montant']), 2, ',', ' ') . ' €' : '—' }}
@@ -266,16 +266,16 @@
                             {{-- Étape 3 : Catégorisation --}}
                             <div class="mb-3">
                                 <label class="form-label fw-semibold">
-                                    Sous-catégorie <span class="text-danger">*</span>
+                                    Nature de la dépense <span class="text-danger">*</span>
                                 </label>
-                                <select wire:model.live="draftLigne.sous_categorie_id"
-                                        class="form-select @error('draftLigne.sous_categorie_id') is-invalid @enderror">
+                                <select wire:model.live="draftLigne.compte_id"
+                                        class="form-select @error('draftLigne.compte_id') is-invalid @enderror">
                                     <option value="">— choisir —</option>
-                                    @foreach ($sousCategories as $sc)
-                                        <option value="{{ $sc->id }}">{{ $sc->nom }}</option>
+                                    @foreach ($comptes as $compte)
+                                        <option value="{{ $compte->id }}">{{ $compte->intitule }}</option>
                                     @endforeach
                                 </select>
-                                @error('draftLigne.sous_categorie_id')
+                                @error('draftLigne.compte_id')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
                             </div>

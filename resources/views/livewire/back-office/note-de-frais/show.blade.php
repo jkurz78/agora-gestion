@@ -35,14 +35,14 @@
                     Le tiers propose un don par abandon de créance de
                     <strong>{{ number_format((float) $ndf->lignes->sum('montant'), 2, ',', ' ') }} €</strong>.
                 </p>
-                @if ($sousCatAbandon)
+                @if ($compteAbandon)
                     <small class="text-muted">
-                        Sous-catégorie désignée : {{ $sousCatAbandon->nom }}
+                        Compte désigné : {{ $compteAbandon->numero_pcg }} — {{ $compteAbandon->intitule }}
                     </small>
                 @else
                     <small class="text-warning">
                         <i class="bi bi-exclamation-triangle"></i>
-                        Aucune sous-catégorie n'est désignée pour l'usage Abandon de créance.
+                        Aucun compte n'est désigné pour l'usage Abandon de créance.
                         <a href="{{ route('parametres.comptabilite.usages') }}">Configurer l'usage</a>.
                     </small>
                 @endif
@@ -150,7 +150,7 @@
                             <tr>
                                 <th>#</th>
                                 <th>Libellé</th>
-                                <th>Sous-catégorie</th>
+                                <th>Compte</th>
                                 <th>Opération</th>
                                 <th>Séance</th>
                                 <th class="text-end">Montant</th>
@@ -172,7 +172,7 @@
                                             ]
                                         ])
                                     </td>
-                                    <td>{{ $ligne->sousCategorie?->nom ?? '—' }}</td>
+                                    <td>{{ $ligne->compte?->intitule ?? 'Compte supprimé' }}</td>
                                     <td>{{ $ligne->operation?->nom ?? '—' }}</td>
                                     <td>{{ $ligne->seance ?? '—' }}</td>
                                     <td class="text-end" data-sort="{{ number_format((float) $ligne->montant, 2, '.', '') }}">
@@ -236,12 +236,12 @@
                             <div class="form-check">
                                 <input class="form-check-input" type="radio" id="choix-abandon"
                                        name="choixValidation" wire:model.live="choixValidation" value="abandon"
-                                       @if (! $sousCatAbandon) disabled @endif>
+                                       @if (! $compteAbandon) disabled @endif>
                                 <label class="form-check-label" for="choix-abandon">
                                     Accepter l'abandon de créance (don)
-                                    @if (! $sousCatAbandon)
+                                    @if (! $compteAbandon)
                                         <small class="text-muted d-block">
-                                            Désignation d'une sous-catégorie requise dans
+                                            Désignation d'un compte requise dans
                                             <a href="{{ route('parametres.comptabilite.usages') }}">Paramètres → Comptabilité → Usages</a>.
                                         </small>
                                     @endif
@@ -266,7 +266,8 @@
                     @endif
 
                     <div class="row g-3">
-                        {{-- Compte bancaire --}}
+                        @if ($choixValidation !== 'abandon')
+                        {{-- Compte bancaire (masqué en abandon — pas de mouvement bancaire) --}}
                         <div class="col-md-4">
                             <label for="compteId" class="form-label">Compte bancaire <span class="text-danger">*</span></label>
                             <select id="compteId"
@@ -282,7 +283,7 @@
                             @enderror
                         </div>
 
-                        {{-- Mode de règlement --}}
+                        {{-- Mode de règlement (masqué en abandon — pas de paiement réel) --}}
                         <div class="col-md-4">
                             <label for="modePaiement" class="form-label">Mode de règlement <span class="text-danger">*</span></label>
                             <select id="modePaiement"
@@ -296,6 +297,7 @@
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
+                        @endif
 
                         {{-- Date de comptabilisation --}}
                         <div class="col-md-4">

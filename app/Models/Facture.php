@@ -89,6 +89,7 @@ final class Facture extends TenantModel
     {
         return (float) $this->transactions()
             ->whereIn('statut_reglement', [
+                StatutReglement::EnMain->value,
                 StatutReglement::Recu->value,
                 StatutReglement::Pointe->value,
             ])

@@ -3,7 +3,7 @@
 **Created**: 2026-05-20
 **Spec**: `docs/specs/2026-05-19-fondations-partie-double-slice1.md` (3 commits, 938 lignes)
 **Branch**: `feat/compta-v5` (à créer en Step 1)
-**Status**: approved (2026-05-20)
+**Status**: ✅ PRÊT CUTOVER — 1a TERMINÉE (11/11 — 2026-05-21) + 1b TERMINÉE 2026-05-22 + 1c TERMINÉE 2026-05-24 + **1d TERMINÉE 2026-05-27 : Steps 32-44 livrés** (suite 12 171 / 0 failed). Step 39+40 DIFFÉRÉS (programme dédié post-cutover).
 **Découpage build** : 4 sous-slices avec `/clear` intermédiaires (voir « Découpage en sous-slices »)
 
 ## Goal
@@ -23,7 +23,7 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 - [ ] **Saisie recette / dépense** : écrans actuels fonctionnent sans changement perceptible
 - [ ] **Saisie facture Factur-X** : `FactureService::valider()` génère désormais via `EcritureGenerator::pourRecetteACredit()`
 - [ ] **Encaissement créance** : auto-lettrage de la paire 411
-- [ ] **Remise bancaire** : T4 splittée par tiers (Variante 2a) + lettrage auto
+- [ ] **Remise bancaire** : T4 = 1 ligne 512 D total + N lignes 5112 C par chèque source (sans tiers, amendée 2026-05-22) + lettrage par paire
 - [ ] **Extourne d'une transaction lettrée** : auto-délettrage des lignes d'origine
 - [ ] **Provisions v2.10.0** : continue de fonctionner inchangé
 - [ ] **Fiche tiers 360** : solde ouvert visible, timeline inchangée
@@ -42,7 +42,7 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 - [ ] **Invariant lettrage** : `∑ (debit - credit) = 0` pour chaque `lettrage_code` — *idem, vérifiable dès 1b.*
 - [ ] **Invariant tenant** : aucune ligne ne pointe vers un compte d'un autre tenant — *posé structurellement en 1a, exerçable dès 1b.*
 - [ ] **Invariant tiers obligatoire 411/401** : toute ligne sur 411 ou 401 porte un `tiers_id` — *exerçable dès Step 14 (EcritureGenerator invariants).*
-- [ ] **Invariant pas de tiers sur 512X** : aucune ligne 512 ne porte de tiers — *idem.*
+- [ ] **Invariant pas de tiers sur classe 5** (amendé 2026-05-22) : aucune ligne 512X / 5112 / 530 ne porte de tiers (conformément FEC) — *exerçable dès Phase D révisée.*
 
 ### Audit
 
@@ -62,12 +62,48 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 
 | Sous-slice | Steps | Phases | Critère de complétude | Durée estimée |
 |---|---|---|---|---|
-| **1a — Data layer** | 1-11 | A + B + C | Toutes migrations passées, modèles `Compte` / `TransactionLigne` enrichi en place, suite Pest verte | ~3-4 jours |
-| **1b — Services partie double** | 12-20 | D | `LettrageService` + `EcritureGenerator` complets, matrice École C testée unitairement, suite Pest verte | ~5-7 jours |
+| **1a — Data layer** ✅ | 1-11 | A + B + C | Toutes migrations passées, modèles `Compte` / `TransactionLigne` enrichi en place, suite Pest verte | ~3-4 jours |
+| **1b — Services partie double** ✅ (révisée 2026-05-22) | 12-20 | D | `LettrageService` + `EcritureGenerator` complets école 411 systématique (FEC-conforme). Matrice École 411 testée. Suite Pest 11 446 / 0 failed. | ~6-9 jours réels (1ʳᵉ version + révision même jour) |
 | **1c — Branchements + rapports** | 21-31 | E + F + G | Tous écrans de saisie + rapports rebranchés sur le nouveau moteur, tests non-régression CR + rappro verts, suite Pest verte | ~5-7 jours |
 | **1d — Backfill + renommage + ops** | 32-44 | H + I + (J) + K | Backfill idempotent fonctionnel, codebase renommé, scripts ops finalisés, recette préprod jouée — **prêt cutover prod** | ~5-7 jours |
 
-**Total estimé build** : 18-25 jours soit ~4 semaines, conformément à la spec §16.9.
+**Total estimé build** : 18-25 jours soit ~4 semaines, conformément à la spec §16.9. **Révision Phase D ajoute ~1-2 jours** suite amendement spec 2026-05-22.
+
+---
+
+## Amendement 2026-05-22 — Révision Phase D (école 411 systématique)
+
+**Contexte** : trou de cadrage identifié au démarrage 1c. La spec §4.3 d'origine court-circuitait le 411 (recette comptant chèque = `5112 D X tiers / 706 C X`), incompatible FEC. Bascule sur l'école « 411 systématique » : toute écriture de produit/charge passe par 411/401, les classes 5 ne portent jamais de tiers. Voir spec §amendement et §§4.1-4.4, §11 amendés.
+
+**Conséquence** : les 6 méthodes `EcritureGenerator::pour*` livrées en première version 1b (commits `27613be5` à `9359a5c5`) sont à **réviser**. `LettrageService` (Steps 12-13) est inchangé. Step 14 (squelette + invariants) est inchangé sauf l'invariant 5 reformulé.
+
+### Périmètre de révision méthode par méthode
+
+| Step | Méthode | Commit d'origine | Révision requise |
+|---|---|---|---|
+| 12 | `LettrageService::lettrer` | `70b46ae8` | **Inchangé** |
+| 13 | `LettrageService::delettrer*` | `87bd2786` | **Inchangé** |
+| 14 | `EcritureGenerator` squelette + invariants | `f5ef4452` | Invariant 5 reformulé : « tiers obligatoire 411/401, **interdit sur classe 5** (512X, 5112, 530), optionnel sur 6x/7x ». Les méthodes d'invariants existent déjà — il faut juste **étendre `assertPasDeTiersSur512` → `assertPasDeTiersSurClasse5`** (s'applique à 5112 et 530 aussi). |
+| 15 | `pourRecetteComptant` | `27613be5` | **Refonte majeure** : signature multi-ventilation (`iterable $ventilations`). Schéma passe de 2 lignes à (N+3) lignes : `411 D total tiers / [7x C × N] / 5xx D total / 411 C total tiers` + auto-lettrage interne 411. |
+| 16 | `pourRecetteACredit` | `4da5e084` | **Extension multi-vent** : signature `iterable $ventilations`. Schéma `411 D total tiers / [7x C × N]`. |
+| 17 | `pourEncaissementCreance` | `a1f35238` | **Mineur** : la ligne 411 source agrégée reste unique (multi-vent ne touche que les lignes 7x). Vérifier que la résolution `$tCreance->lignes()->where('compte_id', $compte411->id)->first()` reste valide (oui, une seule ligne 411 D par créance dans la nouvelle école). |
+| 18 | `pourDepenseComptant` | `9116b731` | **Refonte majeure symétrique S15** : signature multi-vent. Schéma `[6x D × N] / 401 C total tiers / 401 D total tiers / 5xx C total` + auto-lettrage interne 401. |
+| 19 | `pourDepenseACredit` + `pourReglementFournisseur` | `1604623b` | **`pourDepenseACredit`** : extension multi-vent symétrique S16. **`pourReglementFournisseur`** : mineur (symétrique S17). |
+| 20 | `pourRemiseBancaire` | `9359a5c5` | **Modéré** : retirer le groupement par tiers (les lignes 5112 sources n'ont plus de tiers). Schéma : `512 D total / [5112 C × N — une par chèque source, sans tiers]` + lettrage par paire ligne source ↔ ligne remise. Helper privé `regrouperParTiers` à supprimer. |
+
+### Stratégie d'exécution
+
+1. **Pas de rollback git** des commits 1b — historique préservé comme « version école directe ».
+2. **Commits de révision par-dessus**, datés 2026-05-22, méthode par méthode en TDD.
+3. **Ordre** : Step 14 (invariants) → Step 15 → Step 18 (refontes majeures symétriques) → Step 16 → Step 19a `pourDepenseACredit` (multi-vent) → Step 17 + Step 19b `pourReglementFournisseur` (vérifs mineures) → Step 20 (allégement).
+4. **Tests Pest** : squelettes/factories/helpers conservés. Réécriture des assertions sur les lignes attendues (4 lignes au lieu de 2 sur comptant, sans tiers sur 5xx, etc.). Ajout : 1 test multi-ventilation par méthode + 1 test FEC-conformité globale (aucune ligne classe 5 ne porte tiers).
+5. **Cible** : suite Pest verte avec révision finie avant Step 21.
+
+### Steps Phase D — statut révisé
+
+Les blocs RED/GREEN/REFACTOR ci-dessous reflètent la **première version (école directe)** livrée le 2026-05-22. La révision 2026-05-22 (école 411 systématique) suivra la table ci-dessus, sans réécriture du plan step par step — la spec amendée tient lieu de référence pour la version cible.
+
+---
 
 ### Workflow `/clear` recommandé
 
@@ -92,9 +128,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 
 ### Phase A — Préparation (steps 1-2) — Sous-slice 1a
 
-#### Step 1 : Création de la branche `feat/compta-v5` et scripts ops squelette
+#### Step 1 : Création de la branche `feat/compta-v5` et scripts ops squelette ✅
 
 **Complexity**: trivial
+**Status**: ✅ done — commit `037bc22f` (2026-05-20)
 **RED**: N/A — pas de test pour la création de branche
 **GREEN**:
 - `git checkout main && git pull && git checkout -b feat/compta-v5`
@@ -105,9 +142,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: `scripts/*.sh`, `.env.preprod.example`
 **Commit**: `chore(v5): bootstrap feat/compta-v5 branch + ops scripts skeleton`
 
-#### Step 2 : Audit pré-backfill — commande artisan `audit:compta-v5-preparation`
+#### Step 2 : Audit pré-backfill — commande artisan `audit:compta-v5-preparation` ✅
 
 **Complexity**: standard
+**Status**: ✅ done — commit `3281d432` (2026-05-20). 6 tests Pest verts (33 assertions), Pint vert. 5 sections d'audit, JSON output dans `storage/audits/`.
 **RED**: Tests Pest :
 - Sous-catégorie sans `code_cerfa` → apparaît dans le rapport
 - Sous-catégorie avec `code_cerfa` valide → ne pose pas problème
@@ -126,9 +164,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 
 ### Phase B — Schéma (steps 3-8) — Sous-slice 1a
 
-#### Step 3 : Migration `comptes` — création table + seed depuis `sous_categories`
+#### Step 3 : Migration `comptes` — création table + seed depuis `sous_categories` ✅
 
 **Complexity**: complex
+**Status**: ✅ done — commit `b9c1d28b` (2026-05-20). 8 tests Pest verts (42 assertions), Pint vert, suite complète 3453 tests verts. Décision notable : garde-fou extrait en service `App\Services\Compta\Migrations\AuditGuard` (testable hors cycle migrate). `pour_inscriptions` dérivé du pivot `usages_sous_categories` (colonne booléenne droppée v4.1.2).
 **RED**: Tests Pest migration :
 - Table `comptes` existe avec toutes les colonnes attendues
 - Chaque `sous_categorie` existante a un `compte` correspondant avec `numero_pcg = code_cerfa`, `intitule = nom`, `classe` dérivée, `categorie_id` copié
@@ -145,9 +184,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: `database/migrations/2026_05_20_000001_create_comptes_table.php`, `tests/Feature/Migrations/CreateComptesTableTest.php`
 **Commit**: `feat(v5): create comptes table + seed depuis sous_categories`
 
-#### Step 4 : Seed `comptes` depuis `comptes_bancaires` (sous-comptes 5121, 5122…)
+#### Step 4 : Seed `comptes` depuis `comptes_bancaires` (sous-comptes 5121, 5122…) ✅
 
 **Complexity**: standard
+**Status**: ✅ done — commits `a3627a3a` + `eb581e1a` + `3352c710` (2026-05-21). 11 tests Pest verts (38 assertions), Pint vert, suite complète 10746 assertions / 0 failed. Décisions notables : seed extrait en service `App\Services\Compta\Migrations\BancairesSeeder` (mirror du pattern `AuditGuard`), numérotation par `ROW_NUMBER() OVER (PARTITION BY association_id ORDER BY id)` avec branching MySQL/SQLite (`CONCAT` vs `||`), `down()` filtre `LIKE '512_%'` (un char min après 512) pour exclure le futur 5112 système et supporter les assos avec 10+ banques (`51210`+), idempotence via `INSERT IGNORE` / `INSERT OR IGNORE` sur l'unique `(association_id, numero_pcg)`. `comptes_bancaires` n'a pas de `deleted_at` (model sans SoftDeletes) — comportement documenté inline.
 **RED**: Tests Pest :
 - Chaque `compte_bancaire` actif crée un compte `5121`, `5122`… par incrément
 - Attributs bancaires copiés (IBAN, BIC, domiciliation, solde_initial, date_solde_initial)
@@ -160,9 +200,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: `database/migrations/2026_05_20_000002_seed_comptes_bancaires_into_comptes.php`, tests Feature dédiés
 **Commit**: `feat(v5): seed comptes bancaires comme sous-comptes 5121, 5122…`
 
-#### Step 5 : Seed comptes système (411, 401, 5112, 530 conditionnel)
+#### Step 5 : Seed comptes système (411, 401, 5112, 530 conditionnel) ✅
 
 **Complexity**: standard
+**Status**: ✅ done — commits `409c61f4` + `2f0e177c` (2026-05-21). 19 tests Pest verts (82 assertions ; 8 migration + 11 policy), Pint vert, suite complète **10 829 assertions / 0 failed**. Décisions notables : seed extrait en service `App\Services\Compta\Migrations\SystemeSeeder` (mirror du pattern `AuditGuard` / `BancairesSeeder`), split `unconditionalSql()` (411/401/5112) + `conditionalCaisseSql()` (530) avec SQL EXISTS verbatim plan. Modèle minimal `App\Models\Compte` (TenantModel + SoftDeletes + fillable + casts, enrichi en Step 9 — `// TODO step 9` marker). `ComptePolicy` (update + delete refusent `est_systeme=true`, sinon délègue à `RoleAssociation::canWrite(Espace::Compta)`), enregistrée dans `AppServiceProvider`. **Bug pré-existant Step 3 surfacé et corrigé** : FK `comptes.association_id` sans cascade (default RESTRICT) cassait 141 tests dès que chaque association recevait un seed système — fix `->cascadeOnDelete()` aligné sur la convention projet (10+ tables tenant-scopées). Tests Step 4 refinés (`classe = 5` → `numero_pcg LIKE '512_%'`) pour ne pas compter le nouveau 5112 système.
 **RED**: Tests Pest :
 - Compte 411, 401, 5112 créés pour chaque tenant (toujours)
 - **Critère 530 — décision actée** : `EXISTS (SELECT 1 FROM transactions WHERE association_id = :id AND mode_paiement = 'especes' AND deleted_at IS NULL)`. Tenant avec transactions espèces non-supprimées → compte 530 créé. Tenant sans → compte 530 absent. Tenant avec uniquement des transactions espèces soft-deleted → compte 530 absent.
@@ -176,12 +217,13 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: Migration + `app/Policies/ComptePolicy.php` + tests
 **Commit**: `feat(v5): seed comptes système 411/401/5112 + 530 conditionnel + policy garde-fou`
 
-#### Step 6 : Migration `transaction_lignes` — colonnes débit/crédit + lettrage + tiers
+#### Step 6 : Migration `transaction_lignes` — colonnes débit/crédit + lettrage + tiers ✅
 
 **Complexity**: complex
+**Status**: ✅ done — commit `789241bf` (2026-05-21). 12 tests Pest verts (49 assertions), Pint vert, suite complète **10 876 assertions / 0 failed**. 6 colonnes ajoutées avec types/defaults exact spec §2.2 (`compte_id` / `tiers_id` BIGINT nullable FK `nullOnDelete()`, `debit` / `credit` DECIMAL(12,2) DEFAULT 0, `lettrage_code` VARCHAR(20), `libelle` VARCHAR(255)), **3 indexes** posés `(compte_id, tiers_id, lettrage_code)` + `(lettrage_code)` + `(compte_id, tiers_id)`, `sous_categorie_id` et `montant` conservés intacts, `down()` testé (drop indexes → FKs → columns).
 **RED**: Tests Pest :
 - Colonnes `compte_id`, `debit`, `credit`, `tiers_id`, `lettrage_code`, `libelle` existent avec types attendus
-- Index `(compte_id, tiers_id, lettrage_code)` et `(lettrage_code)` posés
+- Index `(compte_id, tiers_id, lettrage_code)`, `(lettrage_code)` et `(compte_id, tiers_id)` posés (3 indexes per spec §2.2)
 - `sous_categorie_id` et `montant` conservés (nullables)
 - Aucune ligne existante n'est cassée par la migration
 **GREEN**:
@@ -191,9 +233,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: Migration + tests Feature
 **Commit**: `feat(v5): add debit/credit/tiers_id/lettrage_code columns to transaction_lignes`
 
-#### Step 7 : Migration `transactions` — flags `equilibree` + `type_ecriture`
+#### Step 7 : Migration `transactions` — flags `equilibree` + `type_ecriture` ✅
 
 **Complexity**: standard
+**Status**: ✅ done — commit `36f3a10f` (2026-05-21). 13 tests Pest verts (25 assertions), Pint vert, suite complète **10 900 assertions / 0 failed**. `equilibree` BOOLEAN default FALSE + `type_ecriture` ENUM('normale','an','od','extourne') default 'normale' ajoutés en `AFTER montant_total` / `AFTER equilibree`. Legacy `type`, `compte_id`, `tiers_id`, `remise_id` conservés intacts. `down()` testé.
 **RED**: Tests Pest :
 - Colonnes `equilibree` (default FALSE) + `type_ecriture` (enum) existent
 - Anciennes colonnes `type`, `compte_id` conservées
@@ -203,9 +246,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: Migration + tests
 **Commit**: `feat(v5): add equilibree flag + type_ecriture enum to transactions`
 
-#### Step 8 : Migration `lettrage_audit`
+#### Step 8 : Migration `lettrage_audit` ✅
 
 **Complexity**: standard
+**Status**: ✅ done — commit `ece08013` (2026-05-21). 14 tests Pest verts (24 assertions), Pint vert, suite complète **10 925 assertions / 0 failed**. Table append-only conforme spec §2.5 : 9 colonnes + 2 indexes composites, pas d'`updated_at` ni `deleted_at`, `action` ENUM('lettre','delettre'), `transaction_ligne_ids` JSON, FK cascade asso + compte, FK nullOnDelete user (RGPD-ready), tenant scope vérifié au SQL.
 **RED**: Tests Pest :
 - Table existe avec colonnes attendues
 - Indexes posés
@@ -220,29 +264,31 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 
 ### Phase C — Modèle Eloquent (steps 9-11) — Sous-slice 1a *(fin → `/clear`)*
 
-#### Step 9 : Modèle `App\Models\Compte` + relations + scopes
+#### Step 9 : Modèle `App\Models\Compte` + relations + scopes ✅
 
 **Complexity**: standard
+**Status**: ✅ done — commits `ee77bd1c` + `7b3dd671` (2026-05-21). 15 tests Pest verts (32 assertions), Pint vert, suite complète **10 959 assertions / 0 failed**. Modèle Step 5 enrichi : 2 statics (`ofNumero` retourne `?self`, `ofNumeroSysteme` throws `ModelNotFoundException`), 3 scopes (`lettrables`, `classe(int)`, `bancaires`), 1 relation `lignes(): HasMany`. **Décision actée** : `bancaires()` utilise `LIKE '512_%'` (harmonisé avec Step 4 `down()`) — supporte 10+ banques, exclut toujours 5112 et 530. 4 fixes post-review : commentaire helper, test négatif `ofNumeroSysteme`, `count == 3` exact, cast `(int)` FK.
 **RED**: Tests Pest :
 - `Compte::ofNumero('706')` retourne le compte 706 du tenant courant
 - `Compte::ofNumeroSysteme('411')` retourne le 411 système
 - Scope `lettrables()` filtre `lettrable = TRUE`
 - Scope `classe(int $classe)` filtre par classe
-- **Scope `bancaires()`** : retourne les comptes 5121, 5122… (banques physiques uniquement). Assertions positives ET négatives : 5121 inclus, **5112 et 530 EXCLUS**. Filtre exact : `classe = 5 AND numero_pcg LIKE '512_'` (regex underscore = un seul caractère après 512, donc 5121-5129 mais pas 5112).
+- **Scope `bancaires()`** : retourne les comptes 5121, 5122… (banques physiques uniquement). Assertions positives ET négatives : 5121 inclus, **5112 et 530 EXCLUS**. Filtre exact : `classe = 5 AND numero_pcg LIKE '512_%'` (un char + reste optionnel après 512, supporte 10+ banques tout en excluant 5112).
 - Relation `Compte::lignes()` retourne les `TransactionLigne` du compte
 - Étend `TenantModel`, scope global respecté
 **GREEN**:
 - `App\Models\Compte` extends `TenantModel`
 - Méthodes statiques + scopes + relation
-- Scope `bancaires()` utilise `LIKE '512_'` (underscore SQL = exactement un caractère)
+- Scope `bancaires()` utilise `LIKE '512_%'` (consistant avec Step 4 down() + 10+ banques)
 - Casts (`classe`, `actif`, `est_systeme`, `lettrable`)
 **REFACTOR**: None needed
 **Files**: `app/Models/Compte.php`, `tests/Feature/Models/CompteTest.php`
 **Commit**: `feat(v5): App\Models\Compte avec scopes ofNumero / lettrables / classe / bancaires`
 
-#### Step 10 : Modèle `TransactionLigne` enrichi (debit, credit, lettrage)
+#### Step 10 : Modèle `TransactionLigne` enrichi (debit, credit, lettrage) ✅
 
 **Complexity**: standard
+**Status**: ✅ done — commit `cca10ca6` (2026-05-21). 14 tests Pest verts (22 assertions), Pint vert, suite complète **10 980 assertions / 0 failed** (vérifiée directement par l'orchestrateur). Modèle enrichi : 6 fillable + 4 casts (compte_id/tiers_id int, debit/credit decimal:2), `isLettree()`, accessor `montantSigne` (Attribute style), relations `compte()` + `tiers()` BelongsTo. Observer `TransactionLigneObserver::saving` avec **discriminator `compte_id === null` skip** (clé du design — laisse passer les lignes legacy slice-0 inchangées pendant que Steps 21-26 rebranchent les services). Cas couverts : XOR violation (deux > 0), ni-ni (deux = 0), legacy row (compte_id null) succès, raw `DB::table` bypass de l'observer. Spec compliance et code quality APPROVED 0 issues.
 **RED**: Tests Pest :
 - `TransactionLigne::isLettree()` retourne true ssi `lettrage_code IS NOT NULL`
 - Accesseur `montantSigne` retourne `debit - credit`
@@ -260,9 +306,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: `app/Models/TransactionLigne.php`, `app/Observers/TransactionLigneObserver.php`, tests
 **Commit**: `feat(v5): TransactionLigne enrichi (debit/credit + observer XOR + isLettree)`
 
-#### Step 11 : Cohabitation `SousCategorie` ↔ `Compte` (pas d'alias en 1a, déféré 1d)
+#### Step 11 : Cohabitation `SousCategorie` ↔ `Compte` (pas d'alias en 1a, déféré 1d) ✅
 
 **Complexity**: trivial
+**Status**: ✅ done — commit `315658d9` (2026-05-21). 4 tests Pest verts (15 assertions), Pint vert, suite complète **10 995 assertions / 0 failed**. Aucune modif code prod — uniquement le test file `tests/Feature/Models/SousCategorieCompteCohabitationTest.php`. Verifie : tables distinctes (`comptes` vs `sous_categories`), coexistence Eloquent sans collision, `FormuleAdhesion::sousCategorie` retourne toujours `SousCategorie` (smoke test régression).
 **Décision révisée post-AC review** : transformer `SousCategorie` en alias deprecated dans 1a casserait silencieusement les ~10 relations existantes (`Adhesion::sousCategorie`, `FormuleAdhesion::sousCategorie`, `BudgetLine::sousCategorie`, `UsageSousCategorie::sousCategorie`, etc.). On garde `SousCategorie` **inchangé** en 1a (pointe toujours sur `sous_categories`). Le renommage transverse `SousCategorie → Compte` est fait en bloc en 1d (Steps 36-39) avec une migration de relations propre.
 
 **RED**: Tests Pest :
@@ -279,11 +326,15 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 
 ---
 
-### Phase D — Services (steps 12-20) — Sous-slice 1b *(fin → `/clear`)*
+### Phase D — Services (steps 12-20) — Sous-slice 1b ✅ TERMINÉE 2026-05-22 *(fin → `/clear`)*
 
-#### Step 12 : `LettrageService::lettrer` — invariants + audit
+Sous-slice 1b livrée sur `feat/compta-v5` — 9 commits (Steps 12-20), 76 nouveaux tests Pest unit, +374 assertions. Suite globale 11 371 assertions / 0 failed. `LettrageService` et `EcritureGenerator` complets, matrice École C entièrement testée unitairement. **Pas encore branché sur l'UI** (c'est 1c).
+
+
+#### Step 12 : `LettrageService::lettrer` — invariants + audit ✅
 
 **Complexity**: complex
+**Status**: ✅ done — commit `70b46ae8` (2026-05-22). 9/9 tests, 29 assertions. Décision : tenant-check exécuté en premier (security-first vs ordre plan), bcmath pour comparaison équilibre (évite drift float), `Illuminate\Support\Collection` en signature (supertype).
 **RED**: Tests Pest exhaustifs sur invariants :
 - Lettrage de 2 lignes équilibrées sur compte lettrable → OK + lettrage_code généré + audit créé
 - Compte non lettrable → throw `CompteNonLettrableException`
@@ -302,9 +353,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: `app/Services/Compta/LettrageService.php`, `app/Exceptions/Compta/*.php`, tests
 **Commit**: `feat(v5): LettrageService::lettrer + 5 invariants + audit`
 
-#### Step 13 : `LettrageService::delettrer` + `delettrerParLigne`
+#### Step 13 : `LettrageService::delettrer` + `delettrerParLigne` ✅
 
 **Complexity**: standard
+**Status**: ✅ done — commit `87bd2786` (2026-05-22). 7/7 tests, 32 assertions. Refactor `writeAudit()` mutualisé entre lettrer/delettrer. Filtrage tenant via `whereHas('compte')` (TenantScope global s'applique automatiquement).
 **RED**: Tests Pest :
 - `delettrer($code)` passe `lettrage_code = NULL` sur toutes les lignes du code
 - Audit ligne action='delettre' créée
@@ -318,9 +370,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: `app/Services/Compta/LettrageService.php` (étendu), tests
 **Commit**: `feat(v5): LettrageService::delettrer + delettrerParLigne + audit`
 
-#### Step 14 : `EcritureGenerator` squelette + invariants
+#### Step 14 : `EcritureGenerator` squelette + invariants ✅
 
 **Complexity**: complex
+**Status**: ✅ done — commit `f5ef4452` (2026-05-22). 14/14 tests, 18 assertions. Invariants exposés en **public** pour testabilité directe (visibilité à réévaluer après Step 20 — peut être réduit à private si les `pour*` les exercent déjà). 4 nouvelles exceptions (EcritureNonEquilibree, CompteIncorrect, TiersRequis, TiersInterdit) + enrichissement `TenantBoundaryException::crossTenantTiers`. ⚠ **RÉVISION 2026-05-22** : invariant 5 reformulé, `assertPasDeTiersSur512` à étendre en `assertPasDeTiersSurClasse5` (cf. spec §4.2 amendé).
 **RED**: Tests Pest sur le squelette :
 - `EcritureGenerator` est résoluble via container
 - Méthode `assertEquilibre` valide une collection de lignes
@@ -336,9 +389,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: `app/Services/Compta/EcritureGenerator.php`, exceptions, tests
 **Commit**: `feat(v5): EcritureGenerator skeleton + invariants partagés`
 
-#### Step 15 : `EcritureGenerator::pourRecetteComptant` (tous modes)
+#### Step 15 : `EcritureGenerator::pourRecetteComptant` (tous modes) ⚠ EN RÉVISION
 
 **Complexity**: complex
+**Status**: 1ʳᵉ version (école directe) — commit `27613be5` (2026-05-22). 13/13 tests, 49 assertions. ⚠ **EN RÉVISION 2026-05-22** : refonte majeure pour école 411 systématique (signature multi-ventilation, schéma N+3 lignes, auto-lettrage interne 411). Voir « Amendement 2026-05-22 — Révision Phase D » plus haut. Décisions historiques (école directe) : Prelevement = Virement (portage 512X) ; `assertPasDeTiersSur512` NON appelé sur T1 directes ; legacy `montant=0`, `sous_categorie_id=null` ; `Transaction.fillable` enrichi avec `equilibree` + `type_ecriture`.
 **RED**: Tests Pest matrice §4.3 lignes 1-4 :
 - Recette comptant chèque → T1 `5112 D X (tiers) / 706 C X`
 - Recette comptant espèces → T1 `530 D X (tiers) / 706 C X`
@@ -355,9 +409,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: `app/Services/Compta/EcritureGenerator.php` (étendu), tests
 **Commit**: `feat(v5): EcritureGenerator::pourRecetteComptant (chèque/espèces/virement/CB)`
 
-#### Step 16 : `EcritureGenerator::pourRecetteACredit`
+#### Step 16 : `EcritureGenerator::pourRecetteACredit` ⚠ EN RÉVISION
 
 **Complexity**: standard
+**Status**: 1ʳᵉ version — commit `4da5e084` (2026-05-22). 9/9 tests, 27 assertions. ⚠ **EN RÉVISION 2026-05-22** : extension signature multi-ventilation (`iterable $ventilations`). Schéma 411 D total tiers / [7x C × N]. Helper `createTransactionHeader(...)` conservé. `mode_paiement = null` pour créance constatée conservé.
 **RED**: Tests Pest :
 - Recette à crédit → T1 `411 D X (tiers) / 706 C X`
 - Pas de portage (pas de transaction T2 ici)
@@ -369,9 +424,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: `app/Services/Compta/EcritureGenerator.php`, tests
 **Commit**: `feat(v5): EcritureGenerator::pourRecetteACredit (411/706)`
 
-#### Step 17 : `EcritureGenerator::pourEncaissementCreance` + auto-lettrage 411
+#### Step 17 : `EcritureGenerator::pourEncaissementCreance` + auto-lettrage 411 ⚠ RÉVISION MINEURE
 
 **Complexity**: complex
+**Status**: 1ʳᵉ version — commit `a1f35238` (2026-05-22). 10/10 tests, 47 assertions. ⚠ **RÉVISION MINEURE 2026-05-22** : la ligne 411 source agrégée reste unique (multi-vent ne touche que les lignes 7x amont), schéma T2 inchangé `5xx D / 411 C tiers`. Vérifier que la ligne 5xx D (sans tiers) respecte le nouvel invariant 5 amendé. Décisions historiques : `LettrageDejaPresentException` réutilisée ; `LigneDejaLettreeException` créée mais non utilisée (à nettoyer en revue) ; résolution ligne 411 source via query DB fraîche (stale relation).
 **RED**: Tests Pest :
 - Encaissement d'une créance 411 existante → T2 `5112 ou 530 ou 512 D X (tiers) / 411 C X (tiers)`
 - Auto-lettrage : la ligne 411 de T1 et de T2 partagent un nouveau `lettrage_code`
@@ -387,9 +443,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: `app/Services/Compta/EcritureGenerator.php`, tests
 **Commit**: `feat(v5): EcritureGenerator::pourEncaissementCreance + auto-lettrage 411`
 
-#### Step 18 : `EcritureGenerator::pourDepense*` (3 cas)
+#### Step 18 : `EcritureGenerator::pourDepense*` (3 cas) ⚠ EN RÉVISION
 
 **Complexity**: standard
+**Status**: 1ʳᵉ version (école directe) — commit `9116b731` (2026-05-22). 11/11 tests, 44 assertions. ⚠ **EN RÉVISION 2026-05-22** : refonte majeure symétrique S15 pour école 411 systématique (signature multi-ventilation, schéma N+3 lignes `[6x D × N] / 401 C total tiers / 401 D total tiers / 5xx C total`, auto-lettrage interne 401). Helper `resoudreComptePortageDepense` conservé (asymétrie 5112 conservée : chèque émis débite 512 directement).
 **RED**: Tests Pest matrice §4.3 :
 - Dépense comptant chèque émis → `607 D X / 512 C X (tiers)` (pas de 5112 miroir, décision actée)
 - Dépense comptant CB → `607 D X / 512 C X (tiers)`
@@ -401,9 +458,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: tests
 **Commit**: `feat(v5): EcritureGenerator::pourDepenseComptant (3 modes)`
 
-#### Step 19 : `EcritureGenerator::pourDepenseACredit` + `pourReglementFournisseur` + auto-lettrage 401
+#### Step 19 : `EcritureGenerator::pourDepenseACredit` + `pourReglementFournisseur` + auto-lettrage 401 ⚠ EN RÉVISION
 
 **Complexity**: standard
+**Status**: 1ʳᵉ version — commit `1604623b` (2026-05-22). 14/14 tests (6 dépense crédit + 8 règlement), 64 assertions. ⚠ **EN RÉVISION 2026-05-22** : `pourDepenseACredit` extension multi-ventilation symétrique S16 (`[6x D × N] / 401 C total tiers`) ; `pourReglementFournisseur` révision mineure (T2 inchangé `401 D tiers / 5xx C`, vérifier nouvel invariant 5 sur 5xx sans tiers). Décision conservée : pas de factorisation S17/S19 (5 axes diffèrent, lisibilité métier).
 **RED**: Tests Pest :
 - Dépense à crédit → `607 D X / 401 C X (tiers)`
 - Règlement fournisseur → `401 D X (tiers) / 512 C X` + auto-lettrage paire 401
@@ -414,9 +472,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: tests
 **Commit**: `feat(v5): EcritureGenerator::pourDepenseACredit + pourReglementFournisseur + auto-lettrage 401`
 
-#### Step 20 : `EcritureGenerator::pourRemiseBancaire` (Variante 2a splittée par tiers)
+#### Step 20 : `EcritureGenerator::pourRemiseBancaire` ⚠ RÉVISION MODÉRÉE
 
 **Complexity**: complex
+**Status**: 1ʳᵉ version (splittée par tiers) — commit `9359a5c5` (2026-05-22). 13/13 tests, 67 assertions. ⚠ **RÉVISION MODÉRÉE 2026-05-22** : retrait du groupement par tiers (les lignes 5112 sources n'ont plus de tiers, cf. invariant 5 amendé). Nouveau schéma : `512 D total / [5112 C × N — une par chèque source, sans tiers]` + lettrage par paire ligne source ↔ ligne remise. Helper privé `regrouperParTiers` à supprimer. Résolution `CompteBancaire → Compte 512X` par IBAN conservée. Pattern de rechargements DB explicites conservé.
 **RED**: Tests Pest cas remise §11 scénario 2 :
 - Remise de 3 chèques (Pierre 50, Paul 30, Jeanne 20) sur 512BNP
 - Transaction T4 créée avec **4 lignes** :
@@ -439,78 +498,128 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 
 ### Phase E — Branchements UI (steps 21-26) — Sous-slice 1c
 
-#### Step 21 : Livewire Recette branché sur `EcritureGenerator`
+#### Step 21 : `TransactionService` branché sur `EcritureGenerator` (recette + dépense unifié) ✅
 
-**Complexity**: complex
-**RED**: Tests Pest Livewire :
-- Saisie recette chèque via composant → écritures partie double créées
-- Saisie recette à crédit → ligne 411 créée + créance visible fiche tiers
-- Suite tests existants `RecetteForm*` reste verte
-**GREEN**:
-- `App\Livewire\Recettes\RecetteForm` (ou équivalent) appelle `EcritureGenerator::pourRecetteComptant` ou `pourRecetteACredit` selon le mode
-- Conservation totale de l'UI existante
-**REFACTOR**: Extraire la logique de submit en `RecetteFormHandler` testable unitairement
-**Files**: composants Livewire concernés, tests
-**Commit**: `feat(v5): branche saisie recette Livewire sur EcritureGenerator`
+**Status**: ✅ TERMINÉ 2026-05-23 — commits `5ad4645d` (feat) + `b725c6e2` (fix gardes mode comptant) + `0a7dad79` (refactor qualité). Suite Pest 11 537 / 0 failed. **Steps 21 + 22 fusionnés** : `app/Livewire/TransactionForm.php` gère unifié recettes + dépenses, donc branchement dans `TransactionService::create()` (1 commit feat + 2 commits suite reviews spec + qualité).
 
-#### Step 22 : Livewire Dépense branché
+**Décisions actées** (cf. brainstorming avec PO le 2026-05-23) :
+- **Point d'injection** : `TransactionService::create()` (PAS `TransactionForm`). UI inchangée. EcritureGenerator étendu d'un paramètre `?Transaction $existingTransaction = null` sur ses 4 méthodes `pourXXX` (option A — préserve l'API publique pour les 113 tests unit).
+- **Modèle DB** : 1 seule Transaction. Les N lignes ventilation legacy sont enrichies en place via `$ligne->fill([compte_id, debit, credit])->save()` (chemin Eloquent → observer XOR actif). Les 3 lignes techniques PD-only (411/401 D tiers, 5xx D/C portage, 411/401 C tiers) sont ajoutées sur la MÊME Transaction par EcritureGenerator (qui skippe la création de ses propres lignes de ventilation si `$existingTransaction` fourni).
+- **Double écriture systématique** : pas de feature flag. Les lignes legacy (sous_categorie_id + montant) sont conservées intactes pour les rapports.
+- **Asymétrie chèque** : pour dépense `Cheque`, `EcritureGenerator::resoudreComptePortageDepense` retourne `$compteTresorerieExplicite` (512X direct, pas 5112 miroir). TransactionService doit donc skip si IBAN→512X échoue pour dépense chèque (sinon écriture incorrecte sur 5112).
+- **Gardes skip avec log** : tiers_id null, sous_categorie sans code_cerfa, compte introuvable, classe inattendue, compte_id null + mode nécessitant 512X → skip + Log::warning (préserve la création legacy).
 
-**Complexity**: standard
-**RED**: Symétrique au step 21 pour les dépenses
-**GREEN**: Appel `pourDepenseComptant` ou `pourDepenseACredit`
-**REFACTOR**: Cohérence avec Step 21
-**Files**: composants Livewire Dépenses
-**Commit**: `feat(v5): branche saisie dépense Livewire sur EcritureGenerator`
+**Tests ajoutés** : `tests/Feature/Services/TransactionServicePartieDoubleTest.php` — 12 scenarios (89 assertions) : 4 cas canoniques, multi-ventilation, conservation legacy, 4 cas de skip, dépense chèque (révèle bug placeholder 5112), compte_id null sur mode comptant, garde-fou XOR observer, propagation notes ventilation.
 
-#### Step 23 : `FactureService::valider` branché sur `pourRecetteACredit`
+**Refactor inclus** : helper privé `EcritureGenerator::reattacherComptesAuxLignes(Collection, Compte, ?Compte, Collection)` extrait — élimine ~80 lignes dupliquées sur les 4 méthodes `pourXXX`.
 
-**Complexity**: standard
-**RED**: Tests Pest :
-- `FactureService::valider($facture)` génère une transaction `411/706` (ou multiple lignes 706 si plusieurs produits)
-- Solde ouvert 411 = montant TTC facture
-- Test existant `FactureServiceTest` reste vert
-**GREEN**:
-- `FactureService::valider` délègue à `EcritureGenerator::pourRecetteACredit` (potentiellement boucle sur lignes facture pour multi-produits)
-**REFACTOR**: None needed
-**Files**: `app/Services/FactureService.php`, tests
-**Commit**: `feat(v5): FactureService::valider délègue à EcritureGenerator::pourRecetteACredit`
+**Dette technique notée pour Steps 22+** :
+- **N+1 latent** dans `TransactionService::enrichirPartieDouble` : N × `SousCategorie::find` + N × `Compte::ofNumero` dans la boucle. Préfetch à faire si HelloAsso (N≤10) pose problème en pratique. Non bloquant N≤3.
+- **SRP enrichirPartieDouble (~215 lignes)** : 4 responsabilités identifiables (résolution tiers, ventilations+enrichissement legacy, trésorerie 512X, dispatch 4 chemins). Extraction en 3 méthodes privées recommandée au Step 22 ou Step 23 quand la méthode regrossit (sinon re-divergence assurée).
+- **`TransactionService::update`** : NON couvert au Step 21. La logique `forceDelete` + recréation des lignes détruirait les lignes PD-only sans les recréer. Step dédié à prévoir (ex. Step 26b ou au cutover 1d).
+- **Helpers test globaux `compte411()` / `compte401()` / `compte5112()`** : à factoriser dans un trait `WithCompteResolvers` ou `tests/Pest.php` quand Step 23 en aura besoin.
+- **Setup test dupliqué (~65 lignes beforeEach)** : à factoriser en trait `CreatesPartieDoublContext` au Step 23.
 
-#### Step 24 : `FactureService::encaisser` branché sur `pourEncaissementCreance`
+**Files**: `app/Services/TransactionService.php`, `app/Services/Compta/EcritureGenerator.php`, `tests/Feature/Services/TransactionServicePartieDoubleTest.php`
+**Commits**: `5ad4645d` + `b725c6e2` + `0a7dad79`
 
-**Complexity**: standard
-**RED**: Tests Pest :
-- Encaissement facture → auto-lettrage 411
-- Solde ouvert 411 = 0
-**GREEN**:
-- `FactureService::encaisser` délègue à `EcritureGenerator::pourEncaissementCreance`
-**REFACTOR**: None needed
-**Files**: tests
-**Commit**: `feat(v5): FactureService::encaisser délègue à EcritureGenerator + auto-lettrage`
+#### Step 22 : Livewire Dépense branché — **FUSIONNÉ dans Step 21** ✅
 
-#### Step 25 : `RemiseBancaireService::comptabiliser` branché sur `pourRemiseBancaire`
+#### Step 23 : `FactureService::valider` branché sur `pourRecetteACredit` ✅
 
-**Complexity**: complex
-**RED**: Tests Pest :
-- Création remise avec 3 chèques → T4 splittée par tiers conforme scénario §11
-- Test existant `RemiseBancaireServiceTest` reste vert
-**GREEN**:
-- `RemiseBancaireService::comptabiliser` délègue à `EcritureGenerator::pourRemiseBancaire`
-- Conservation totale UI préparation remise
-**REFACTOR**: Vérifier que `RemiseBancaireService::supprimer` délette correctement (Step 31 traitera l'extourne mais la suppression de remise est un cas particulier — à confirmer en build)
-**Files**: `app/Services/RemiseBancaireService.php`, tests
-**Commit**: `feat(v5): RemiseBancaireService::comptabiliser délègue à EcritureGenerator + variante 2a`
+**Status**: ✅ TERMINÉ 2026-05-23 — commits `84615294` (feat) + `67674dd8` (quality fixes I2 + note dette). Suite Pest 11 592 / 0 failed (+14 vs Step 21).
+**Option choisie**: A (inline) — résolution SC→Compte inline dans `resoudreCompteVentilationRecette` (helper privé) + appel direct `EcritureGenerator::pourRecetteACredit(existingTransaction:)`. Pas d'extraction de helper partagé avec Step 21 (rule of three — attendre Step 25).
+**Décisions implémentation** :
+- Toujours `pourRecetteACredit` (facture validée = créance, même si `mode_paiement_prevu` renseigné). Pas de branche comptant.
+- Lignes legacy enrichies via `$ligne->fill([...])->save()` (observer XOR actif, pattern Step 21).
+- Boucle skip **sans break** (asymétrie vs Step 21 documentée inline) : la boucle sert AUSSI à créer les TransactionLignes legacy pour TOUTES les FactureLignes (chaque FactureLigne doit avoir sa `transaction_ligne_id`). Le `break` Step 21 ne s'applique pas ici. Sémantique à réconcilier au Step 25+ lors de l'extraction du helper partagé.
+- 4 gardes skip avec `Log::warning` : sous_cat null (mort en pratique grâce à `assertGuardsLignesManuelles`), code_cerfa null, Compte introuvable, classe ≠ 7.
+- `Tiers::findOrFail` (FK NOT NULL en base).
+- Lignes Montant (ref TX existante), Texte, et factures sans MontantManuel inchangées.
 
-#### Step 26 : `ReglementService` (comptabilisation onglet règlements) branché
+**Tests** : 8 scénarios dans `tests/Feature/Services/FactureServicePartieDoubleTest.php` (~55 assertions) : happy path 1+2 ventilations, solde ouvert 411 = montant_total, conservation legacy, facture sans MontantManuel, FEC-conformité, pas de lettrage auto, SC sans code_cerfa (skip gracieux + Log::warning + facture toujours Validee).
 
-**Complexity**: standard
-**RED**: Tests Pest :
-- Marquer un règlement comme reçu depuis l'onglet règlements d'une opération → écritures partie double générées
-- Test existant `ReglementServiceTest` reste vert
-**GREEN**:
-- `ReglementService` (ou équivalent) délègue à `EcritureGenerator`
-**REFACTOR**: None needed
-**Files**: services règlements, tests
-**Commit**: `feat(v5): ReglementService délègue à EcritureGenerator pour comptabilisation`
+**Dette technique notée pour Steps 24+** :
+- **DRY M1** : `resoudreCompteVentilationRecette` (~55 lignes) quasi-identique au bloc résolution Step 21. Extraction `App\Services\Compta\PartieDoubleEnricher` ou similaire à faire **au Step 25** (3ᵉ caller fera émerger le pattern net).
+- **SRP** : `genererTransactionDepuisLignesManuelles` est passée de ~30 à ~92 lignes (4 responsabilités initiales + 3 nouvelles). À surveiller — extraction à faire en même temps que M1.
+- **M2** : `Tiers::findOrFail((int) $facture->tiers_id)` génère 1 requête DB en plus. Pourrait être `$facture->tiers` (relation chargée). À fixer post-cutover.
+- **M5 helpers test** : `compte411PD()` dupliqué de `compte411()` (Step 21) à cause de collision globale Pest. Factoriser dans `tests/Pest.php` au Step 24.
+- **M6 messages log** : `'[PartieDouble] Step 23 — …'` — remplacer par `'[PartieDouble][FactureService] …'` post-cutover.
+
+**Files**: `app/Services/FactureService.php` (+116 lignes), `tests/Feature/Services/FactureServicePartieDoubleTest.php` (créé, 436 lignes)
+**Commits**: `84615294` + `67674dd8`
+
+#### Step 24 : `FactureService::marquerReglementRecu` branché sur `pourEncaissementCreance` ✅
+
+**Status**: ✅ TERMINÉ 2026-05-23 — commits `4153b9b9` (feat) + `2ceb599a` (quality fixes I-1 à I-4 + M-4). Suite Pest 11 649 / 0 failed (+57 vs Step 23).
+**Méthode cible** : `marquerReglementRecu(Facture, array $transactionIds)` (et non `encaisser` comme nommé dans le plan d'origine).
+**Différence vs Steps 21+23** : T2 = **nouvelle Transaction physique** créée par `pourEncaissementCreance` (pas d'enrichissement de la T1). La paire 411 (T1-ligne + T2-ligne) est auto-lettrée. T2 attachée au pivot `facture_transaction`.
+**Décisions implémentation** :
+- Mode + compteTresorerie résolus depuis T1 (`$t1->mode_paiement` copié de `mode_paiement_prevu` au Step 23, `$t1->compte_id` CompteBancaire).
+- 5 gardes skip avec `Log::warning` : transaction sans tiers/411 introuvable (legacy), compte 411 absent (tenant sans schéma PD), mode_paiement null, IBAN no-match pour modes nécessitant 512X, ligne 411 déjà lettrée → throw `LettrageDejaPresentException` rollback complet.
+- Pas de paramètre `$existingTransaction` car `pourEncaissementCreance` crée toujours une T2 nouvelle (matrice spec §4.3 à 2 transactions distinctes).
+- Préservation flag legacy : si skip PD, `statut_reglement = Recu` quand même (le PD est best-effort).
+
+**Refactor inclus — Option B (extraction helper `CompteTresorerieResolver`)** :
+- Nouveau `App\Services\Compta\CompteTresorerieResolver::resoudre(?int $compteBancaireId, ModePaiement $mode, string $contextLog, bool $isDepense): ?Compte`
+- Factorise la résolution `CompteBancaire IBAN → Compte 512X` + fallback placeholder utilisée par TransactionService (Step 21) ET FactureService (Step 24).
+- 3ᵉ caller à venir : RemiseBancaireService Step 25.
+- 8 cas couverts en test unit dédié (`tests/Unit/Services/Compta/CompteTresorerieResolverTest.php`, 201 assertions).
+
+**Refactor inclus — helper test global** :
+- `compteSysteme(string $numero): Compte` extrait dans `tests/Pest.php` — remplace les 6 helpers locaux dupliqués (`compte411()` / `compte5112()` / `compte411PD()` / `compte411Enc()` / etc.) dans 4 fichiers test. -125 lignes au total.
+
+**Tests** : 6 scénarios dans `tests/Feature/Services/FactureServicePartieDoubleEncaissementTest.php` (~42 assertions) + 8 cas dans test unit resolver. Couvre : Cheque (5112), Virement (512X IBAN), solde ouvert 411 = 0 après encaissement, double encaissement (LettrageDejaPresentException + rollback complet via 2-T1 cohérentes), mode + compte_id null (skip + Log::warning), T1 legacy sans 411 (skip gracieux).
+
+**Dette technique notée pour Steps 25+** :
+- **N+1 latent** dans `marquerReglementRecu` : pour chaque tx ~5-6 SELECT/insert. `Compte::ofNumero('411')` hoistable hors boucle. Acceptable car N ≤ 3-5 en pratique.
+- **Param `$isDepense: bool`** dans CompteTresorerieResolver : enum `Sens { Recette, Depense }` plus parlant. Post-cutover.
+- **`TransactionService::update`** : toujours pas couvert (idem note Step 21).
+- **Convention messages log `[PartieDouble] Step XX`** : préfixe historique fragile (cf. M-6 Step 23). À refactorer en `[PartieDouble][ServiceName]` post-cutover.
+
+**Files**: `app/Services/Compta/CompteTresorerieResolver.php` (créé, 97 lignes), `app/Services/FactureService.php` (+89 lignes), `app/Services/TransactionService.php` (-40 lignes inline → appel resolver), `tests/Feature/Services/FactureServicePartieDoubleEncaissementTest.php` (créé, 6 scénarios), `tests/Unit/Services/Compta/CompteTresorerieResolverTest.php` (créé, 8 cas), `tests/Pest.php` (+13 lignes helper), `tests/Feature/Services/TransactionServicePartieDoubleTest.php` + `FactureServicePartieDoubleTest.php` + `EcritureGeneratorPourRecetteComptantTest.php` (refacto helpers)
+**Commits**: `4153b9b9` + `2ceb599a`
+
+#### Step 25 : `RemiseBancaireService::comptabiliser` branché sur `pourRemiseBancaire` ✅
+
+**Status**: ✅ TERMINÉ 2026-05-23 — commits `3291033e` (feat) + `53f1becf` (quality fixes Important-1 à Minor-3). Suite Pest 11 741 / 0 failed (+92 vs Step 24).
+**Méthode cible** : `comptabiliser(RemiseBancaire, array $transactionIds)`. Couvre aussi `modifier()` et `supprimer()` (cycle complet T4).
+**Décisions implémentation** :
+- T4 = nouvelle Transaction créée par `pourRemiseBancaire` (pas d'enrichissement). Lien remise→T4 via `transactions.remise_id = $remise->id` posé après création (option a, cohérent §2.4 legacy).
+- Modes supportés : Cheque (portage 5112) + Especes (portage 530). Autres → InvalidArgumentException (déjà couvert par EcritureGenerator).
+- **Auto-lettrage 5112↔5112 par paire 1↔1** (spec §4.4 amendée 2026-05-22, helper `regrouperParTiers` SUPPRIMÉ). Vérifié dans test A : 3 paires distinctes, codes lettrage uniques par paire.
+- Critère discriminant T4 : `(remise_id, reference IS NULL, equilibree = true)` formalisé en méthode privée `queryT4(int $remiseId): Builder<Transaction>` avec docblock documentant l'invariant (T1 sources ont TOUJOURS reference != null après comptabiliser/modifier).
+- `comptabiliser()` idempotente : garde explicite `if (queryT4()->exists()) throw "déjà comptabilisée"`. L'UI Livewire (`RemiseBancaireValidation`) route déjà vers `modifier()` si reference existe → aucune régression UI.
+- `modifier()` : delete+recreate T4 via `supprimerT4SiExiste() + recreerT4()` dans la même DB::transaction. Bug index numérotation corrigé (T4 ne doit pas être comptée).
+- `supprimer()` : `supprimerT4SiExiste()` (délettre paires 5112↔5112, forceDelete lignes + T4) puis `$remise->delete()`.
+- Gardes skip avec Log::warning : tx legacy sans ligne portage 5112/530 (skip cette tx mais continue traitement legacy), mode non supporté, compte portage introuvable. Si aucune source résolue → pas de T4, log warning.
+- **CompteTresorerieResolver NON utilisé ici** : `pourRemiseBancaire` résout 512X par IBAN inline (force-resolve sans fallback). Asymétrie acceptée — pas 3ᵉ caller resolver.
+
+**Tests** : 11 scénarios dans `tests/Feature/Services/RemiseBancaireServicePartieDoubleTest.php` (~91 assertions). Couvre : A (chèque 3 sources), B (espèces 2 sources), C (solde 5112=0), D (supprimer + délettrer + delete T4), E (modifier ajout + index correct), F (modifier retrait + délettrage source), G (legacy skip), G2 (mix PD+legacy), H (verrouillée throw), I (invariant queryT4 unique), J (idempotence comptabiliser throw).
+
+**Dette technique notée pour Steps 26+** :
+- **N+1 latent dans `recreerT4()`** : boucle sur transactionsRemise → 1 SELECT ligne portage par tx. Hoistable via `whereIn`. Acceptable car N petit.
+- **Helpers privés `supprimerT4SiExiste()` + `recreerT4()` + `queryT4()`** : RemiseBancaireService grossit à ~360 lignes. Extraction `App\Services\Compta\RemiseT4Manager` envisageable si T4 acquiert plus d'autonomie (extournes Step 31 par ex).
+- **Step 26 ReglementService** : appliquera le même pattern (critère discriminant T3 = `equilibree = true AND reference IS NULL` probablement). Le pattern `queryT4()` formalisé en Step 25 sera réplicable.
+- **Step 29 RapprochementBancaireService** : la T4 a `remise_id` et une ligne 512X. Le rappro lira `transaction_lignes` classe 5 → ligne 512X T4 sera pointable comme unique ligne de la remise (spec §7).
+- **Step 31 TransactionExtourneService** : pattern `supprimerT4SiExiste()` peut servir de référence pour extourner une T4 (délettrer paires 5112↔5112 avant extourne).
+
+**Files**: `app/Services/RemiseBancaireService.php` (+218 lignes), `tests/Feature/Services/RemiseBancaireServicePartieDoubleTest.php` (créé, 11 scénarios)
+**Commits**: `3291033e` + `53f1becf`
+
+#### Step 26 : `ReglementOperationService` (onglet règlements opération) branché ✅
+
+**Status**: ✅ TERMINÉ 2026-05-23 — commits `946156c0` (feat) + `848ad31b` (fix tenant scope Reglement). Suite Pest 11 806 / 0 failed (+65 vs Step 25).
+**Service nouveau** : `App\Services\ReglementOperationService` (créé, ~280 lignes) — option B retenue (nouveau service dédié, cohérent pattern FactureService).
+**2 méthodes publiques** :
+- `comptabiliserSeance(Seance, array $data)` : crée N Transactions de règlement créance (statut_reglement=EnAttente) + enrichit lignes legacy + appelle `pourRecetteACredit(existingTransaction)` pour chaque. **TOUJOURS pourRecetteACredit** même si mode_paiement renseigné (statut EnAttente = créance, mode est prospective).
+- `marquerRecu(Transaction)` : toggle statut_reglement=Recu + appelle `pourEncaissementCreance` pour T2 + auto-lettrage 411 (pattern Step 24). **Pas d'attache pivot** (pas de facture).
+**Refactor Livewire** : `ReglementTable` devient thin wrapper, -32 lignes inline.
+**Guard multi-tenant ajouté** (fix `848ad31b`) : `Reglement::where('seance_id')` enrichi de `whereHas('participant', fn → where('association_id', currentId))`. Reglement n'a pas de colonne association_id directe — la chaîne tenant passe par participant.association_id.
+**Tests** : 8 scénarios (~60 assertions) dans `tests/Feature/Services/ReglementOperationServicePartieDoubleTest.php`. Couvre : créance créée, marquerRecu (T2 + lettrage), solde 411 = 0, multi-seances, Virement+IBAN, garde locks, mode_paiement prospective, tenant cross-isolation [H].
+**Dette technique** : **3ème occurrence `resoudreCompteVentilationRecette`** (TransactionService + FactureService + ReglementOperationService). À extraire en `App\Services\Compta\CompteVentilationResolver` **au début du Step 27** (avant le code CompteResultatBuilder) pour éviter divergence sur correction future.
+**Files**: `app/Services/ReglementOperationService.php` (créé), `app/Livewire/ReglementTable.php` (-32 lignes), `tests/Feature/Services/ReglementOperationServicePartieDoubleTest.php` (créé, 8 scénarios)
+**Commits**: `946156c0` + `848ad31b`
 
 ---
 
@@ -594,6 +703,9 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **REFACTOR**: None needed
 **Files**: `app/Services/TransactionExtourneService.php`, tests
 **Commit**: `feat(v5): TransactionExtourneService auto-délettre les lignes lettrées`
+**Status**: ✅ TERMINÉ 2026-05-24 — commit `341b9b2e`. Suite **11 995 / 0 failed** (+38 vs Step 30).
+API : `LettrageService::delettrerParLigne($ligne, $motif)`. Helper privé `autoDelettrerLignes(Transaction)`.
+5 scénarios : [A] recette comptant auto-lettrée, [B] créance encaissée T1-T2, [C] legacy pure, [D] créance ouverte, [E] audit trace. Non-régression : 141 tests extourne/annulation verts.
 
 ---
 
@@ -674,43 +786,39 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: migration + tests
 **Commit**: `feat(v5): backfill transaction_lignes.compte_id depuis sous_categorie_id`
 
-#### Step 37 : Renommage code base (search/replace assisté)
+#### Step 37 : Renommage code base (search/replace assisté) ✅ DOCUMENTÉ (no-op code)
 
-**Complexity**: complex
-**RED**: Suite tests entière reste verte après le renommage
-**GREEN**:
-- Search/replace : `sous_categorie` → `compte` dans tout `app/`, `resources/views/`, `tests/`, `database/seeders/`, `routes/`
-- Attention au cas où `sous_categorie` apparaît dans des données métier (chaînes utilisateur) → ne PAS renommer
-- Cas particulier : `$ligne->sous_categorie_id` → `$ligne->compte_id` (avec backfill auto via Step 36)
-**REFACTOR**: None needed (refacto en bloc)
-**Files**: ~50 fichiers attendus
-**Commit**: `refactor(v5): rename sous_categorie → compte across codebase`
+> **Décision de scope (2026-05-27)** : rename complet `SousCategorie → Compte` PARQUÉ post-cutover v5.0.
+> 6 tables (`budget_lines`, `formules_adhesion`, `facture_lignes`, `note_de_frais_lignes`,
+> `devis_lignes`, `usages_sous_categorie`) ont une FK `sous_categorie_id` → `sous_categories.id`.
+> Migrer ces FK nécessite 6 migrations supplémentaires hors scope slice 1d.
+> Le modèle `SousCategorie` coexiste avec `App\Models\Compte` — docblock ajouté.
+> Voir `memory/project_compta_v5_sous_slice_1d.md` section « Phase I — partielle ».
 
-#### Step 38 : Renommage UI + routes + redirects 301
+**Complexity**: no-op (décision documentée)
+**Commit**: `docs(v5): Step 37 — décision de scope, rename SousCategorie reporté post-cutover`
+
+#### Step 38 : Renommage UI + routes + redirects 301 ✅ TERMINÉ
 
 **Complexity**: standard
-**RED**: Tests Pest UI :
-- Écran « Paramètres > Sous-catégories » devient « Paramètres > Comptes »
-- Route `/parametres/comptes` répond 200, `/parametres/sous-categories` redirige 301
-- Tests Livewire passent
 **GREEN**:
-- Refonte des vues Blade (labels, titres)
-- Mise à jour routes + redirects
-- Sidebar mise à jour
-**REFACTOR**: None needed
-**Files**: vues + routes
-**Commit**: `feat(v5): UI rename sous-catégorie → compte + redirects 301`
+- Route `/parametres/comptes` créée (nouveau contrôleur `CompteParametreController`)
+- Vue `parametres/comptes/index.blade.php` avec labels « Comptes »
+- Redirect 301 `/parametres/sous-categories` → `/parametres/comptes`
+- Sidebar label « Sous-catégories » → « Comptes » (route `parametres.comptes.index`)
+- Tests [D] route 200 + [E] redirect 301
+**Files**: contrôleur + vues + routes + sidebar + tests
+**Commit**: `feat(v5): Step 38 — UI rename Parametres > Comptes + redirect 301`
 
-#### Step 39 : Suppression alias deprecated `SousCategorie`
+#### Step 39 : Suppression alias deprecated `SousCategorie` 🅿️ PARQUÉ post-cutover
 
-**Complexity**: trivial
-**RED**: Suite tests verte sans `SousCategorie`
-**GREEN**:
-- Drop `app/Models/SousCategorie.php`
-- Grep final pour s'assurer aucun usage résiduel
-**REFACTOR**: None needed
-**Files**: model deleted + tests
-**Commit**: `chore(v5): remove deprecated SousCategorie alias`
+> **PARQUÉ** : reporté à un programme dédié post-prod v5.0.
+> Dépend de la migration des 6 FK `sous_categorie_id` (budget_lines, formules_adhesion,
+> facture_lignes, note_de_frais_lignes, devis_lignes, usages_sous_categorie) vers `compte_id`.
+> Estimé 6 migrations + refactoring callers → programme autonome.
+
+**Statut**: 🅿️ PARQUÉ
+**Commit**: N/A (reporté)
 
 ---
 
@@ -733,7 +841,7 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 
 ---
 
-### Phase K — Documentation + Ops finalisés (steps 41-44) — Sous-slice 1d *(fin → recette préprod + cutover prod)*
+### Phase K — Documentation + Ops finalisés (steps 41-44) — Sous-slice 1d ✅ TERMINÉE — **PRÊT CUTOVER** (Step 39+40 différés)
 
 #### Step 41 : Documentation interne `docs/compta-partie-double.md`
 
@@ -759,33 +867,24 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: ADR
 **Commit**: `docs(v5): ADR-002 révision cash basis → partie double uniforme`
 
-#### Step 43 : Scripts ops finalisés
+#### Step 43 : Scripts ops finalisés ✅
 
+**SHA**: `ccd3a8cb`
 **Complexity**: standard
-**RED**: Tests scripts :
-- `scripts/clone-prod-to-preprod.sh` testable en dry-run (audit des étapes sans exécution réelle)
-- `scripts/deploy-preprod-v5.sh` testable similairement
-- Commande artisan `compta:smoke-test-v5` qui exécute CR + rappro + assertion équilibre sur exercice courant
-**GREEN**:
-- Implémentation complète des 3 scripts (vu §16.4 et §16.5 de la spec)
-- Commande smoke
-**REFACTOR**: None needed
-**Files**: scripts, command
-**Commit**: `feat(v5): ops scripts finalisés (clone-prod, deploy-preprod, smoke-test)`
+**Livrables** :
+- `scripts/clone-prod-to-preprod.sh` — clone DB prod→preprod, anonymisation, migrate, smoke ; --dry-run safe
+- `scripts/deploy-preprod-v5.sh` — séquence 6 étapes, --dry-run propagé
+- `app/Console/Commands/SmokeTestV5Command.php` — `compta:smoke-test-v5` (CR delta + rappro delta + invariant équilibre)
+- `tests/Feature/Console/SmokeTestV5CommandTest.php` — [A][B][C]
+- `tests/Feature/Scripts/OpsScriptsDryRunTest.php` — [D][E]
 
-#### Step 44 : Commande `v5:sync-from-main` helper
+#### Step 44 : Commande `v5:sync-from-main` helper ✅
 
+**SHA**: `541a253f`
 **Complexity**: standard
-**RED**: Test Pest :
-- Lance fetch + dry-run merge + dry-run backfill
-- Échec dry-run backfill = exit code non-zéro + message clair
-**GREEN**:
-- `App\Console\Commands\V5SyncFromMainCommand`
-- Wraps `git fetch + git merge main + php artisan test --filter=Backfill + php artisan compta:backfill-partie-double --dry-run`
-- Rapport synthétique
-**REFACTOR**: None needed
-**Files**: command, test
-**Commit**: `feat(v5): v5:sync-from-main helper pour sync hebdo + validation`
+**Livrables** :
+- `app/Console/Commands/V5SyncFromMainCommand.php` — git fetch → git merge → test Backfill → backfill dry-run ; rapport tableau
+- `tests/Feature/Console/V5SyncFromMainCommandTest.php` — [A][B][C] via Process::fake
 
 ---
 

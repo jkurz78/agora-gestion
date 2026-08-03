@@ -1,0 +1,736 @@
+<?php
+
+declare(strict_types=1);
+
+use App\DTOs\Compta\PosteTiersReglementData;
+use App\Enums\ModePaiement;
+use App\Enums\TypeTransaction;
+use App\Models\Compte;
+use App\Models\Tiers;
+use App\Models\Transaction;
+use App\Models\TransactionLigne;
+use App\Services\Compta\EcritureGenerator;
+use App\Services\Compta\PosteTiersReglementService;
+use App\Services\TransactionService;
+use Carbon\CarbonImmutable;
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Events\Dispatcher;
+use Illuminate\Support\Facades\DB;
+use Tests\Support\CreatesPartieDoubleContext;
+
+uses(CreatesPartieDoubleContext::class);
+
+// ---------------------------------------------------------------------------
+// Setup partagé
+// ---------------------------------------------------------------------------
+
+beforeEach(function () {
+    $this->setupPartieDoubleContext();
+
+    // Tiers
+    $this->tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
+
+    // Alias : compte512X → compte512 (convention locale de ce fichier)
+    $this->compte512 = $this->compte512X;
+
+    $this->service = app(TransactionService::class);
+});
+
+// ---------------------------------------------------------------------------
+// Helpers locaux
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Scénario 1 : Recette comptant chèque
+// ---------------------------------------------------------------------------
+
+it('recette comptant chèque — T1 (Vente, 411D/7xxC) + T2 séparée (Banque, 5112D/411C), 411 inter-tx lettré', function () {
+    // Chantier 2a : la saisie live d'une recette comptant produit désormais 2 transactions
+    // séparées (T1 créance Vente + T2 encaissement Banque) au lieu d'un seul lumpé.
+    $data = [
+        'type' => TypeTransaction::Recette->value,
+        'date' => '2025-10-15',
+        'libelle' => 'Adhésion Jean Martin',
+        'montant_total' => '100.00',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'tiers_id' => $this->tiers->id,
+        'compte_id' => $this->compteBancaire->id,
+    ];
+    $lignes = [[
+        'compte_id' => $this->compte706->id,
+        'montant' => '100.00',
+        'operation_id' => null,
+        'seance' => null,
+        'notes' => null,
+    ]];
+
+    $t1 = $this->service->create($data, $lignes);
+
+    $compte411 = compteSysteme('411');
+    $compte5112 = compteSysteme('5112');
+
+    // ---- T1 : 2 lignes avec compte_id (411 D + ventilation 706 C) ----
+    // La ligne de ventilation porte compte_id dès la création (contrat compte-first).
+    $lignesT1 = TransactionLigne::where('transaction_id', $t1->id)
+        ->whereNotNull('compte_id')
+        ->get();
+    expect($lignesT1->count())->toBe(2, 'T1 doit avoir 2 lignes PD : 411 D + 706 C');
+
+    // 1 ligne 411 D sur T1 (créance ouverte)
+    $ligne411D_T1 = $lignesT1->first(fn ($l) => (int) $l->compte_id === (int) $compte411->id && (float) $l->debit > 0);
+    expect($ligne411D_T1)->not()->toBeNull('T1 doit avoir une ligne 411 D');
+    expect((float) $ligne411D_T1->debit)->toBe(100.0);
+    expect((int) $ligne411D_T1->tiers_id)->toBe((int) $this->tiers->id);
+
+    // Pas de ligne 5112 sur T1
+    $ligne5112T1 = $lignesT1->firstWhere('compte_id', $compte5112->id);
+    expect($ligne5112T1)->toBeNull('T1 ne doit PAS avoir de ligne 5112 (portage sur T2)');
+
+    // La ligne de ventilation porte compte_id 706
+    $ligneVentilation = TransactionLigne::where('transaction_id', $t1->id)
+        ->where('compte_id', $this->compte706->id)
+        ->first();
+    expect($ligneVentilation)->not()->toBeNull('La ligne de ventilation doit exister');
+    expect((float) $ligneVentilation->credit)->toBe(100.0, 'La ligne 706 est créditée (produit)');
+    expect((float) $ligneVentilation->montant)->toBe(100.0, 'montant conservé');
+
+    // ---- T2 : 2 lignes (5112 D + 411 C), lettrage 411 T1↔T2 ----
+    $ligne411D_T1->refresh();
+    expect($ligne411D_T1->lettrage_code)->not()->toBeNull('La ligne 411 D de T1 doit être lettrée');
+
+    $ligne411C_T2 = TransactionLigne::where('lettrage_code', $ligne411D_T1->lettrage_code)
+        ->where('compte_id', $compte411->id)
+        ->where('transaction_id', '!=', $t1->id)
+        ->first();
+    expect($ligne411C_T2)->not()->toBeNull('La ligne 411 C de T2 doit exister et partager le code lettrage de T1');
+
+    $t2 = Transaction::findOrFail($ligne411C_T2->transaction_id);
+
+    $lignesT2 = TransactionLigne::where('transaction_id', $t2->id)->get();
+    expect($lignesT2->count())->toBe(2, 'T2 doit avoir 2 lignes : 5112 D + 411 C');
+
+    $ligne5112T2 = $lignesT2->firstWhere('compte_id', $compte5112->id);
+    expect($ligne5112T2)->not()->toBeNull('T2 doit avoir une ligne 5112 D');
+    expect((float) $ligne5112T2->debit)->toBe(100.0);
+    expect($ligne5112T2->tiers_id)->toBeNull('Invariant FEC : classe 5 sans tiers');
+
+    expect((float) $ligne411C_T2->credit)->toBe(100.0);
+    expect((int) $ligne411C_T2->tiers_id)->toBe((int) $this->tiers->id);
+});
+
+// ---------------------------------------------------------------------------
+// Scénario 2 : Recette à crédit (mode_paiement null)
+// ---------------------------------------------------------------------------
+
+it('recette à crédit — crée 2 lignes (1 ventilation enrichie + 411 D), pas de lettrage', function () {
+    $data = [
+        'type' => TypeTransaction::Recette->value,
+        'date' => '2025-11-01',
+        'libelle' => 'Facture cotisation à recouvrer',
+        'montant_total' => '75.00',
+        'mode_paiement' => null,   // ← créance
+        'tiers_id' => $this->tiers->id,
+        'compte_id' => null,   // pas de compte bancaire pour une créance
+    ];
+    $lignes = [[
+        'compte_id' => $this->compte706->id,
+        'montant' => '75.00',
+        'operation_id' => null,
+        'seance' => null,
+        'notes' => null,
+    ]];
+
+    $transaction = $this->service->create($data, $lignes);
+
+    $totalLignes = TransactionLigne::where('transaction_id', $transaction->id)->count();
+    expect($totalLignes)->toBe(2);
+
+    $compte411 = compteSysteme('411');
+
+    // 1 ligne 411 D (créance ouverte)
+    $ligne411 = TransactionLigne::where('transaction_id', $transaction->id)
+        ->where('compte_id', $compte411->id)
+        ->first();
+    expect($ligne411)->not()->toBeNull();
+    expect((float) $ligne411->debit)->toBe(75.0);
+    expect((int) $ligne411->tiers_id)->toBe((int) $this->tiers->id);
+    expect($ligne411->lettrage_code)->toBeNull('Créance ouverte — pas encore lettrée');
+
+    // 1 ligne ventilation 706 C
+    $ligneVent = TransactionLigne::where('transaction_id', $transaction->id)
+        ->where('compte_id', $this->compte706->id)
+        ->first();
+    expect($ligneVent)->not()->toBeNull();
+    expect((float) $ligneVent->credit)->toBe(75.0);
+});
+
+// ---------------------------------------------------------------------------
+// Scénario 3 : Dépense comptant virement
+// Chantier 3a-i : produit désormais T1 (Achat, 60xD/401C) + T2 séparée (Banque, 401D/512XC),
+// 401 inter-tx lettré — symétrique du chantier 2a pour les recettes.
+// ---------------------------------------------------------------------------
+
+it('dépense comptant virement — T1 (Achat, 60xD/401C) + T2 séparée (Banque, 401D/512XC), 401 inter-tx lettré', function () {
+    $data = [
+        'type' => TypeTransaction::Depense->value,
+        'date' => '2025-10-20',
+        'libelle' => 'Achat fournitures',
+        'montant_total' => '200.00',
+        'mode_paiement' => ModePaiement::Virement->value,
+        'tiers_id' => $this->tiers->id,
+        'compte_id' => $this->compteBancaire->id,
+    ];
+    $lignes = [[
+        'compte_id' => $this->compte606->id,
+        'montant' => '200.00',
+        'operation_id' => null,
+        'seance' => null,
+        'notes' => null,
+    ]];
+
+    $t1 = $this->service->create($data, $lignes);
+
+    $compte401 = compteSysteme('401');
+
+    // T1 : 2 lignes PD (606 D + 401 C), pas de ligne 512X sur T1
+    $lignesT1 = TransactionLigne::where('transaction_id', $t1->id)
+        ->whereNotNull('compte_id')
+        ->get();
+    expect($lignesT1->count())->toBe(2, 'T1 doit avoir 2 lignes PD : 606 D + 401 C');
+
+    $ligne512T1 = $lignesT1->firstWhere('compte_id', $this->compte512->id);
+    expect($ligne512T1)->toBeNull('T1 ne doit PAS avoir de ligne 512X (portage sur T2)');
+
+    // 1 ligne 401 C sur T1 (dette fournisseur, avec tiers)
+    $ligne401C_T1 = $lignesT1->first(fn ($l) => (int) $l->compte_id === (int) $compte401->id && (float) $l->credit > 0);
+    expect($ligne401C_T1)->not()->toBeNull('T1 doit avoir une ligne 401 C');
+    expect((float) $ligne401C_T1->credit)->toBe(200.0);
+    expect((int) $ligne401C_T1->tiers_id)->toBe((int) $this->tiers->id);
+
+    // La ligne de ventilation porte compte_id 606
+    $ligneVent = TransactionLigne::where('transaction_id', $t1->id)
+        ->where('compte_id', $this->compte606->id)
+        ->first();
+    expect($ligneVent)->not()->toBeNull('La ligne de ventilation doit exister');
+    expect((float) $ligneVent->debit)->toBe(200.0, 'La ligne 606 est débitée (charge)');
+
+    // T2 : 2 lignes (401 D + 512X C), 401 lettré inter-tx
+    $ligne401C_T1->refresh();
+    expect($ligne401C_T1->lettrage_code)->not()->toBeNull('La ligne 401 C de T1 doit être lettrée');
+
+    $ligne401D_T2 = TransactionLigne::where('lettrage_code', $ligne401C_T1->lettrage_code)
+        ->where('compte_id', $compte401->id)
+        ->where('transaction_id', '!=', $t1->id)
+        ->first();
+    expect($ligne401D_T2)->not()->toBeNull('La ligne 401 D de T2 doit exister et partager le code lettrage de T1');
+
+    $t2 = Transaction::findOrFail($ligne401D_T2->transaction_id);
+
+    $lignesT2 = TransactionLigne::where('transaction_id', $t2->id)->get();
+    expect($lignesT2->count())->toBe(2, 'T2 doit avoir 2 lignes : 401 D + 512X C');
+
+    $ligne512T2 = $lignesT2->firstWhere('compte_id', $this->compte512->id);
+    expect($ligne512T2)->not()->toBeNull('T2 doit avoir une ligne 512X C');
+    expect((float) $ligne512T2->credit)->toBe(200.0);
+    expect($ligne512T2->tiers_id)->toBeNull('Invariant FEC : classe 5 sans tiers');
+
+    expect((float) $ligne401D_T2->debit)->toBe(200.0);
+    expect((int) $ligne401D_T2->tiers_id)->toBe((int) $this->tiers->id);
+});
+
+// ---------------------------------------------------------------------------
+// Scénario 4 : Dépense à crédit (mode_paiement null)
+// ---------------------------------------------------------------------------
+
+it('dépense à crédit — crée 2 lignes symétriques, pas de lettrage', function () {
+    $data = [
+        'type' => TypeTransaction::Depense->value,
+        'date' => '2025-11-10',
+        'libelle' => 'Facture fournisseur à payer',
+        'montant_total' => '300.00',
+        'mode_paiement' => null,  // ← dette
+        'tiers_id' => $this->tiers->id,
+        'compte_id' => null,
+    ];
+    $lignes = [[
+        'compte_id' => $this->compte606->id,
+        'montant' => '300.00',
+        'operation_id' => null,
+        'seance' => null,
+        'notes' => null,
+    ]];
+
+    $transaction = $this->service->create($data, $lignes);
+
+    $totalLignes = TransactionLigne::where('transaction_id', $transaction->id)->count();
+    expect($totalLignes)->toBe(2);
+
+    $compte401 = compteSysteme('401');
+
+    // 1 ligne 401 C (dette ouverte)
+    $ligne401 = TransactionLigne::where('transaction_id', $transaction->id)
+        ->where('compte_id', $compte401->id)
+        ->first();
+    expect($ligne401)->not()->toBeNull();
+    expect((float) $ligne401->credit)->toBe(300.0);
+    expect((int) $ligne401->tiers_id)->toBe((int) $this->tiers->id);
+    expect($ligne401->lettrage_code)->toBeNull('Dette ouverte — pas encore lettrée');
+
+    // 1 ligne ventilation 606 D
+    $ligneVent = TransactionLigne::where('transaction_id', $transaction->id)
+        ->where('compte_id', $this->compte606->id)
+        ->first();
+    expect($ligneVent)->not()->toBeNull();
+    expect((float) $ligneVent->debit)->toBe(300.0);
+});
+
+// ---------------------------------------------------------------------------
+// Scénario 5 : Multi-ventilation (2 comptes de recette)
+// ---------------------------------------------------------------------------
+
+it('multi-ventilation recette comptant chèque — T1 (411D/2×7xxC) + T2 séparée (5112D/411C agrégé)', function () {
+    // Chantier 2a : multi-ventilation produit toujours T1+T2 séparées.
+    // T1 : 1 ligne 411 D (total agrégé) + 2 ventilations légacy enrichies 7xx C
+    // T2 : 1 ligne 5112 D (total agrégé) + 1 ligne 411 C (total agrégé)
+    $compte706B = Compte::firstOrCreate(
+        ['association_id' => $this->association->id, 'numero_pcg' => '706B'],
+        [
+            'intitule' => 'Formations',
+            'classe' => 7,
+            'lettrable' => false,
+            'actif' => true,
+            'est_systeme' => false,
+            'pour_inscriptions' => false,
+        ]
+    );
+
+    $data = [
+        'type' => TypeTransaction::Recette->value,
+        'date' => '2025-10-25',
+        'libelle' => 'Adhésion + Formation Jean Martin',
+        'montant_total' => '150.00',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'tiers_id' => $this->tiers->id,
+        'compte_id' => $this->compteBancaire->id,
+    ];
+    $lignes = [
+        [
+            'compte_id' => $this->compte706->id,
+            'montant' => '100.00',
+            'operation_id' => null,
+            'seance' => null,
+            'notes' => null,
+        ],
+        [
+            'compte_id' => $compte706B->id,
+            'montant' => '50.00',
+            'operation_id' => null,
+            'seance' => null,
+            'notes' => null,
+        ],
+    ];
+
+    $t1 = $this->service->create($data, $lignes);
+
+    $compte411 = compteSysteme('411');
+    $compte5112 = compteSysteme('5112');
+
+    // T1 : 3 lignes avec compte_id (411 D agrégé + 2 ventilations 7xx C)
+    $lignesT1 = TransactionLigne::where('transaction_id', $t1->id)
+        ->whereNotNull('compte_id')
+        ->get();
+    expect($lignesT1->count())->toBe(3, 'T1 doit avoir 3 lignes : 411 D + 2 ventilations 7xx C');
+
+    // La ligne 411 D porte le montant total agrégé (150)
+    $ligne411D = $lignesT1->first(fn ($l) => (int) $l->compte_id === (int) $compte411->id && (float) $l->debit > 0);
+    expect($ligne411D)->not()->toBeNull('T1 doit avoir une ligne 411 D');
+    expect((float) $ligne411D->debit)->toBe(150.0);
+
+    // Pas de ligne 5112 sur T1
+    $ligne5112T1 = $lignesT1->firstWhere('compte_id', $compte5112->id);
+    expect($ligne5112T1)->toBeNull('T1 ne doit PAS avoir de ligne 5112 (sur T2 uniquement)');
+
+    // Les 2 lignes de ventilation portent chacune leur compte_id respectif
+    $ligneVent1 = TransactionLigne::where('transaction_id', $t1->id)
+        ->where('compte_id', $this->compte706->id)
+        ->first();
+    $ligneVent2 = TransactionLigne::where('transaction_id', $t1->id)
+        ->where('compte_id', $compte706B->id)
+        ->first();
+
+    expect($ligneVent1)->not()->toBeNull();
+    expect((float) $ligneVent1->credit)->toBe(100.0);
+    expect($ligneVent2)->not()->toBeNull();
+    expect((float) $ligneVent2->credit)->toBe(50.0);
+
+    // T2 : 2 lignes (5112 D + 411 C), 411 lettré inter-tx
+    $ligne411D->refresh();
+    expect($ligne411D->lettrage_code)->not()->toBeNull('411 D de T1 doit être lettré vers T2');
+
+    $ligne411C_T2 = TransactionLigne::where('lettrage_code', $ligne411D->lettrage_code)
+        ->where('compte_id', $compte411->id)
+        ->where('transaction_id', '!=', $t1->id)
+        ->first();
+    expect($ligne411C_T2)->not()->toBeNull('T2 doit avoir une ligne 411 C lettrée');
+    expect((float) $ligne411C_T2->credit)->toBe(150.0, 'T2 411 C doit avoir le total agrégé 150');
+
+    $t2Id = $ligne411C_T2->transaction_id;
+    $lignesT2 = TransactionLigne::where('transaction_id', $t2Id)->get();
+    expect($lignesT2->count())->toBe(2, 'T2 doit avoir 2 lignes : 5112 D + 411 C');
+
+    $ligne5112T2 = $lignesT2->firstWhere('compte_id', $compte5112->id);
+    expect($ligne5112T2)->not()->toBeNull('T2 doit avoir une ligne 5112 D');
+    expect((float) $ligne5112T2->debit)->toBe(150.0);
+    expect($ligne5112T2->tiers_id)->toBeNull('Invariant FEC : classe 5 sans tiers');
+});
+
+// ---------------------------------------------------------------------------
+// Scénario 6 : Les champs de la ligne de ventilation (compte_id + montant) sont conservés
+// ---------------------------------------------------------------------------
+
+it('les champs (compte_id et montant) sont conservés intacts après double écriture', function () {
+    $data = [
+        'type' => TypeTransaction::Recette->value,
+        'date' => '2025-10-15',
+        'libelle' => 'Test conservation champs ventilation',
+        'montant_total' => '100.00',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'tiers_id' => $this->tiers->id,
+        'compte_id' => $this->compteBancaire->id,
+    ];
+    $lignes = [[
+        'compte_id' => $this->compte706->id,
+        'montant' => '100.00',
+        'operation_id' => null,
+        'seance' => null,
+        'notes' => 'Note test',
+    ]];
+
+    $transaction = $this->service->create($data, $lignes);
+
+    // La ligne de ventilation doit avoir ses champs originaux intacts
+    $ligneVent = TransactionLigne::where('transaction_id', $transaction->id)
+        ->where('compte_id', $this->compte706->id)
+        ->first();
+
+    expect($ligneVent)->not()->toBeNull();
+    expect((int) $ligneVent->compte_id)->toBe((int) $this->compte706->id);
+    expect((float) $ligneVent->montant)->toBe(100.0, 'montant conservé');
+    expect($ligneVent->notes)->toBe('Note test', 'notes conservées');
+});
+
+// ---------------------------------------------------------------------------
+// Scénario 7 : Skip silencieux si tiers_id est NULL
+// ---------------------------------------------------------------------------
+
+it('si tiers_id est null, la double écriture est ignorée (lignes legacy seules)', function () {
+    $data = [
+        'type' => TypeTransaction::Recette->value,
+        'date' => '2025-10-15',
+        'libelle' => 'Recette sans tiers',
+        'montant_total' => '50.00',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'tiers_id' => null,  // ← pas de tiers
+        'compte_id' => $this->compteBancaire->id,
+    ];
+    $lignes = [[
+        'compte_id' => $this->compte706->id,
+        'montant' => '50.00',
+        'operation_id' => null,
+        'seance' => null,
+        'notes' => null,
+    ]];
+
+    // Ne doit pas lever d'exception
+    $transaction = $this->service->create($data, $lignes);
+
+    // Seulement 1 ligne de ventilation (pas de PD-only sans tiers)
+    $totalLignes = TransactionLigne::where('transaction_id', $transaction->id)->count();
+    expect($totalLignes)->toBe(1);
+});
+
+// ---------------------------------------------------------------------------
+// Scénario 9 : Dépense comptant chèque — portage T2 sur 512X (pas 5112)
+// Chantier 3a-i : T2 séparée (journal=Banque) porte la ligne 512X.
+// La ligne portage doit être sur 512X IBAN-matched, PAS sur 5112 (chèques reçus).
+// ---------------------------------------------------------------------------
+
+it('dépense comptant chèque — T2 séparée avec ligne portage sur 512X IBAN-matched (pas 5112)', function () {
+    // Le compteBancaire et le compte512 (IBAN-matched 5121) sont créés dans beforeEach.
+    $data = [
+        'type' => TypeTransaction::Depense->value,
+        'date' => '2025-10-28',
+        'libelle' => 'Achat fournitures par chèque',
+        'montant_total' => '80.00',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'tiers_id' => $this->tiers->id,
+        'compte_id' => $this->compteBancaire->id,  // IBAN → compte5121
+    ];
+    $lignes = [[
+        'compte_id' => $this->compte606->id,
+        'montant' => '80.00',
+        'operation_id' => null,
+        'seance' => null,
+        'notes' => null,
+    ]];
+
+    $t1 = $this->service->create($data, $lignes);
+
+    $compte401 = compteSysteme('401');
+    $compte5112 = compteSysteme('5112');
+
+    // T1 : 2 lignes PD (606 D + 401 C) — pas de ligne 512X sur T1
+    $totalLignesT1 = TransactionLigne::where('transaction_id', $t1->id)->count();
+    expect($totalLignesT1)->toBe(2, 'T1 doit avoir 2 lignes : 606 D + 401 C');
+
+    $ligne512T1 = TransactionLigne::where('transaction_id', $t1->id)
+        ->where('compte_id', $this->compte512->id)
+        ->first();
+    expect($ligne512T1)->toBeNull('T1 ne doit PAS avoir de ligne 512X (portage sur T2 uniquement)');
+
+    // T2 retrouvée via lettrage 401
+    $ligne401C_T1 = TransactionLigne::where('transaction_id', $t1->id)
+        ->where('compte_id', $compte401->id)
+        ->whereNotNull('lettrage_code')
+        ->first();
+    expect($ligne401C_T1)->not()->toBeNull('T1 doit avoir une ligne 401 C lettrée');
+
+    $ligne401D_T2 = TransactionLigne::where('lettrage_code', $ligne401C_T1->lettrage_code)
+        ->where('compte_id', $compte401->id)
+        ->where('transaction_id', '!=', $t1->id)
+        ->first();
+    expect($ligne401D_T2)->not()->toBeNull('T2 doit avoir une ligne 401 D lettrée');
+
+    $t2Id = $ligne401D_T2->transaction_id;
+
+    // T2 : ligne portage DOIT être sur 512X IBAN-matched, PAS sur 5112
+    $ligne512T2 = TransactionLigne::where('transaction_id', $t2Id)
+        ->where('compte_id', $this->compte512->id)
+        ->first();
+    expect($ligne512T2)->not()->toBeNull('T2 doit avoir la ligne portage sur le compte 512X IBAN-matched');
+    expect((float) $ligne512T2->credit)->toBe(80.0);
+    expect($ligne512T2->tiers_id)->toBeNull('Invariant FEC : classe 5 sans tiers');
+
+    // Aucune ligne sur 5112 sur T2 (serait sémantiquement faux pour un chèque émis)
+    $lignes5112_T2 = TransactionLigne::where('transaction_id', $t2Id)
+        ->where('compte_id', $compte5112->id)
+        ->count();
+    expect($lignes5112_T2)->toBe(0, 'Chèque émis → 512X direct sur T2, jamais 5112 (chèques reçus)');
+
+    // Ligne ventilation 606 D sur T1
+    $ligneVent = TransactionLigne::where('transaction_id', $t1->id)
+        ->where('compte_id', $this->compte606->id)
+        ->first();
+    expect($ligneVent)->not()->toBeNull();
+    expect((float) $ligneVent->debit)->toBe(80.0);
+});
+
+// ---------------------------------------------------------------------------
+// Scénario 10 (bonus issue #2) : mode comptant + compte_id null → skip gracieux
+// ---------------------------------------------------------------------------
+
+it('dépense comptant virement avec compte_id null — skip gracieux sans TypeError', function () {
+    $data = [
+        'type' => TypeTransaction::Depense->value,
+        'date' => '2025-11-15',
+        'libelle' => 'Virement sans compte renseigné',
+        'montant_total' => '50.00',
+        'mode_paiement' => ModePaiement::Virement->value,
+        'tiers_id' => $this->tiers->id,
+        'compte_id' => null,  // ← compte_id null avec mode comptant
+    ];
+    $lignes = [[
+        'compte_id' => $this->compte606->id,
+        'montant' => '50.00',
+        'operation_id' => null,
+        'seance' => null,
+        'notes' => null,
+    ]];
+
+    // Ne doit pas lever de TypeError ni d'exception — skip gracieux
+    $transaction = $this->service->create($data, $lignes);
+
+    // Seulement 1 ligne de ventilation (pas de PD-only car 512X introuvable)
+    $totalLignes = TransactionLigne::where('transaction_id', $transaction->id)->count();
+    expect($totalLignes)->toBe(1, 'Skip gracieux : seulement la ligne de ventilation sans double écriture');
+});
+
+// ---------------------------------------------------------------------------
+// Scénario 12 — Fix #4-B : notes propagées sur les lignes de ventilation PD-only
+// Vérifie que notes saisies sur la ligne legacy (path TransactionService)
+// est bien copiée sur la ligne de ventilation lors d'une recette via EcritureGenerator.
+// ---------------------------------------------------------------------------
+
+it('Fix #4-B — notes propagées sur la ligne de ventilation dans une recette à crédit via EcritureGenerator', function () {
+    // On appelle directement EcritureGenerator (chemin PD-only sans existingTransaction)
+    // pour vérifier que notes est transmis depuis la ventilation vers la ligne créée.
+
+    $generator = app(EcritureGenerator::class);
+
+    $ventilations = [[
+        'compte' => $this->compte706,
+        'montant' => 80.0,
+        'operation_id' => null,
+        'seance' => null,
+        'notes' => 'Remboursement frais déplacement participant',
+    ]];
+
+    $transaction = $generator->pourRecetteACredit(
+        tiers: $this->tiers,
+        ventilations: $ventilations,
+        dateConstatation: new DateTimeImmutable('2025-11-01'),
+        libelle: 'Recette test notes',
+    );
+
+    // La ligne de ventilation (706 C) doit avoir notes renseignée
+    $ligneVent = TransactionLigne::where('transaction_id', $transaction->id)
+        ->where('compte_id', $this->compte706->id)
+        ->first();
+
+    expect($ligneVent)->not()->toBeNull('La ligne de ventilation 706 doit exister');
+    expect($ligneVent->notes)->toBe(
+        'Remboursement frais déplacement participant',
+        'Fix #4-B : notes propagées sur la ligne de ventilation PD-only'
+    );
+
+    // Les lignes techniques (411) ne doivent PAS avoir de notes
+    $compte411 = compteSysteme('411');
+    $ligne411 = TransactionLigne::where('transaction_id', $transaction->id)
+        ->where('compte_id', $compte411->id)
+        ->first();
+    expect($ligne411)->not()->toBeNull();
+    expect($ligne411->notes)->toBeNull('Les lignes techniques 411 ne portent pas de notes métier');
+});
+
+it('modifie le libellé d une transaction partiellement réglée sans recréer son ledger', function (): void {
+    $data = [
+        'type' => TypeTransaction::Recette->value,
+        'date' => '2025-10-15',
+        'libelle' => 'Créance à protéger',
+        'montant_total' => '100.00',
+        'mode_paiement' => null,
+        'tiers_id' => $this->tiers->id,
+        'compte_id' => null,
+        'reference' => 'REF-INITIALE',
+        'notes' => 'Note initiale',
+    ];
+    $t1 = $this->service->create($data, [[
+        'compte_id' => $this->compte706->id,
+        'montant' => '100.00',
+        'operation_id' => null,
+        'seance' => null,
+        'notes' => 'Note ventilation initiale',
+    ]]);
+    $parent = $t1->lignes()->whereHas('compte', fn ($query) => $query->where('numero_pcg', '411'))->firstOrFail();
+    $t2 = app(PosteTiersReglementService::class)->regler(new PosteTiersReglementData(
+        ligneId: (int) $parent->id,
+        montantCentimes: 3000,
+        date: CarbonImmutable::parse('2026-07-23'),
+        mode: ModePaiement::Virement,
+        compteBancaireId: (int) $this->compteBancaire->id,
+        exercice: 2025,
+    ));
+    $fraction = $parent->fractionsPosteTiers()->sole();
+    $ventilation = $t1->lignes()->where('compte_id', $this->compte706->id)->firstOrFail();
+    $codeLettrage = $fraction->lettrage_code;
+
+    expect($t1->fresh()->aUnReglementTiers())->toBeTrue();
+
+    $updated = $this->service->update($t1->fresh(), [
+        ...$data,
+        'libelle' => 'Créance renommée',
+        'reference' => 'REF-MODIFIEE',
+        'notes' => 'Note transaction modifiée',
+    ], [[
+        'id' => $ventilation->id,
+        'compte_id' => $ventilation->compte_id,
+        'montant' => '100.00',
+        'operation_id' => null,
+        'seance' => null,
+        'notes' => 'Note ventilation modifiée',
+    ]]);
+
+    expect($updated->libelle)->toBe('Créance renommée')
+        ->and($updated->reference)->toBe('REF-MODIFIEE')
+        ->and($updated->notes)->toBe('Note transaction modifiée')
+        ->and($parent->fresh()->id)->toBe($parent->id)
+        ->and($fraction->fresh()->id)->toBe($fraction->id)
+        ->and($fraction->fresh()->lettrage_code)->toBe($codeLettrage)
+        ->and(Transaction::find($t2->id)?->id)->toBe($t2->id)
+        ->and($ventilation->fresh()->notes)->toBe('Note ventilation modifiée');
+});
+
+it('relit le poste tiers verrouillé avant de réécrire une transaction devenue réglée', function (): void {
+    $data = [
+        'type' => TypeTransaction::Recette->value,
+        'date' => '2025-10-15',
+        'libelle' => 'Créance exposée à une course',
+        'montant_total' => '100.00',
+        'mode_paiement' => null,
+        'tiers_id' => $this->tiers->id,
+        'compte_id' => null,
+        'reference' => null,
+        'notes' => null,
+    ];
+    $t1 = $this->service->create($data, [[
+        'compte_id' => $this->compte706->id,
+        'montant' => '100.00',
+        'operation_id' => null,
+        'seance' => null,
+        'notes' => 'Ventilation initiale',
+    ]]);
+    $parent = $t1->lignes()->whereHas('compte', fn ($query) => $query->where('numero_pcg', '411'))->firstOrFail();
+    $ventilation = $t1->lignes()->where('compte_id', $this->compte706->id)->firstOrFail();
+    $injectionDeclenchee = false;
+    $t2Creee = null;
+
+    $connection = DB::connection();
+    $dispatcherPrecedent = $connection->getEventDispatcher();
+    $connection->setEventDispatcher(new Dispatcher($this->app));
+    $connection->listen(function (QueryExecuted $query) use (&$injectionDeclenchee, &$t2Creee, $parent): void {
+        $sql = strtolower($query->sql);
+        if ($injectionDeclenchee
+            || ! str_contains($sql, 'transaction_lignes')
+            || ! str_contains($sql, 'poste_tiers_parent_id')
+            || ! str_contains($sql, 'order by')) {
+            return;
+        }
+
+        $injectionDeclenchee = true;
+        $t2Creee = app(PosteTiersReglementService::class)->regler(new PosteTiersReglementData(
+            ligneId: (int) $parent->id,
+            montantCentimes: 3000,
+            date: CarbonImmutable::parse('2026-07-23'),
+            mode: ModePaiement::Virement,
+            compteBancaireId: (int) $this->compteBancaire->id,
+            exercice: 2025,
+        ));
+    });
+
+    try {
+        $updated = $this->service->update($t1->fresh(), [
+            ...$data,
+            'libelle' => 'Créance réglée pendant l édition',
+        ], [[
+            'id' => $ventilation->id,
+            'compte_id' => $ventilation->compte_id,
+            'montant' => '100.00',
+            'operation_id' => null,
+            'seance' => null,
+            'notes' => 'Ventilation modifiée sans réécriture',
+        ]]);
+    } finally {
+        $connection->setEventDispatcher($dispatcherPrecedent);
+    }
+
+    expect($injectionDeclenchee)->toBeTrue();
+
+    $fraction = $parent->fractionsPosteTiers()->sole();
+
+    expect($updated->libelle)->toBe('Créance réglée pendant l édition')
+        ->and($t2Creee)->not->toBeNull()
+        ->and(Transaction::find((int) $t2Creee->id)?->id)->toBe((int) $t2Creee->id)
+        ->and($parent->fresh()->id)->toBe((int) $parent->id)
+        ->and($fraction->fresh()->lettrage_code)->not->toBeNull()
+        ->and($ventilation->fresh()->notes)->toBe('Ventilation modifiée sans réécriture');
+});

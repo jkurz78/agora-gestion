@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\JournalComptable;
 use App\Enums\ModePaiement;
+use App\Enums\Sens;
 use App\Enums\StatutFacture;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
@@ -18,6 +20,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
+use LogicException;
 
 final class Transaction extends TenantModel
 {
@@ -48,6 +52,15 @@ final class Transaction extends TenantModel
         'helloasso_form_slug',
         'statut_reglement',
         'extournee_at',
+        // Partie double — ajoutés Step 15
+        'equilibree',
+        'type_ecriture',
+        // Journal de banque — ajouté Task 3
+        'journal',
+        // Virement interne — ajouté Task 2
+        'virement_interne_id',
+        // Provision — ajouté Task 1
+        'provision_id',
     ];
 
     protected function casts(): array
@@ -68,7 +81,72 @@ final class Transaction extends TenantModel
             'helloasso_cashout_id' => 'integer',
             'helloasso_payment_id' => 'integer',
             'extournee_at' => 'datetime',
+            // Partie double — ajoutés Step 15
+            'equilibree' => 'boolean',
+            // Journal de banque — ajouté Task 3
+            'journal' => JournalComptable::class,
+            // Virement interne — ajouté Task 2
+            'virement_interne_id' => 'integer',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        parent::booted();
+
+        self::creating(function (Transaction $transaction): void {
+            if ($transaction->journal !== null) {
+                return;
+            }
+            $transaction->journal = match ($transaction->type) {
+                TypeTransaction::Recette => JournalComptable::Vente,
+                TypeTransaction::Depense => JournalComptable::Achat,
+                TypeTransaction::Virement => JournalComptable::Banque,
+                TypeTransaction::AN => JournalComptable::AN,
+            };
+        });
+    }
+
+    /**
+     * Restreint aux écritures opérationnelles (ventes/achats), excluant le
+     * journal de banque (T2/T4) et OD. Utilisé par les listes et agrégats
+     * recettes/dépenses.
+     *
+     * @param  Builder<Transaction>  $query
+     */
+    public function scopeOperationnel(Builder $query): Builder
+    {
+        return $query->whereIn('journal', [
+            JournalComptable::Vente->value,
+            JournalComptable::Achat->value,
+        ]);
+    }
+
+    /**
+     * Ajoute une colonne virtuelle `sens_tresorerie_sql` dérivée des lignes D/C
+     * sur les comptes de trésorerie (classe 5, numero_pcg LIKE '512_*').
+     * Si D > C → recette ; si C > D → depense. Fallback sur `transactions.type`
+     * pour les écritures sans lignes partie double.
+     *
+     * @param  Builder<Transaction>  $query
+     */
+    public function scopeSensTresorerieSql(Builder $query): Builder
+    {
+        return $query->addSelect(DB::raw("
+            COALESCE(
+                (SELECT CASE
+                    WHEN SUM(tl_st.debit) > SUM(tl_st.credit) THEN 'recette'
+                    WHEN SUM(tl_st.credit) > SUM(tl_st.debit) THEN 'depense'
+                    ELSE NULL
+                END
+                FROM transaction_lignes tl_st
+                INNER JOIN comptes c_st ON c_st.id = tl_st.compte_id
+                WHERE tl_st.transaction_id = transactions.id
+                  AND c_st.classe = 5
+                  AND c_st.numero_pcg LIKE '512!_%' ESCAPE '!'),
+                transactions.type
+            ) AS sens_tresorerie_sql
+        "));
     }
 
     public function tiers(): BelongsTo
@@ -106,9 +184,33 @@ final class Transaction extends TenantModel
         return $this->belongsTo(Reglement::class, 'reglement_id');
     }
 
+    public function virementInterne(): BelongsTo
+    {
+        return $this->belongsTo(VirementInterne::class);
+    }
+
+    public function provision(): BelongsTo
+    {
+        return $this->belongsTo(Provision::class);
+    }
+
     public function lignes(): HasMany
     {
         return $this->hasMany(TransactionLigne::class);
+    }
+
+    public function aUnReglementTiers(): bool
+    {
+        return $this->lignes()
+            ->whereHas('compte', fn (Builder $query) => $query->whereIn('numero_pcg', ['401', '411']))
+            ->where(function (Builder $query): void {
+                $query->whereNotNull('lettrage_code')
+                    ->orWhereHas(
+                        'fractionsPosteTiers',
+                        fn (Builder $fraction) => $fraction->whereNotNull('lettrage_code')
+                    );
+            })
+            ->exists();
     }
 
     public function adhesions(): HasMany
@@ -126,6 +228,29 @@ final class Transaction extends TenantModel
         $montant = (float) $this->montant_total;
 
         return $this->type === TypeTransaction::Depense ? -$montant : $montant;
+    }
+
+    /**
+     * Retourne le sens de trésorerie réel de la transaction.
+     *
+     * Pour les transactions normales, le sens suit le type :
+     *   Recette → Sens::Recette, Dépense → Sens::Depense.
+     *
+     * Pour les miroirs d'extourne (type_ecriture = 'extourne'), le sens est inversé :
+     *   une recette extournée est un remboursement (argent sort) → Sens::Depense
+     *   une dépense extournée est un remboursement (argent entre) → Sens::Recette
+     */
+    public function sensTresorerie(): Sens
+    {
+        $sensNaturel = match ($this->type) {
+            TypeTransaction::Recette, TypeTransaction::Virement => Sens::Recette,
+            TypeTransaction::Depense => Sens::Depense,
+            TypeTransaction::AN => throw new LogicException('Une écriture AN n’a pas de sens de trésorerie opérationnel.'),
+        };
+
+        return $this->type_ecriture === 'extourne'
+            ? ($sensNaturel === Sens::Recette ? Sens::Depense : Sens::Recette)
+            : $sensNaturel;
     }
 
     public function isLockedByRapprochement(): bool

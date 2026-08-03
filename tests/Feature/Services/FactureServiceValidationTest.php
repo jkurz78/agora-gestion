@@ -8,10 +8,10 @@ use App\Enums\StatutFacture;
 use App\Enums\TypeTransaction;
 use App\Exceptions\ExerciceCloturedException;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Exercice;
 use App\Models\Facture;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -30,7 +30,7 @@ beforeEach(function () {
     $this->actingAs($this->user);
     $this->tiers = Tiers::factory()->create();
     $this->compteBancaire = CompteBancaire::factory()->create();
-    $this->sousCategorie = SousCategorie::factory()->create(['nom' => 'Inscription']);
+    $this->compte = Compte::factory()->create(['intitule' => 'Inscription']);
     $this->service = app(FactureService::class);
 });
 
@@ -69,7 +69,9 @@ function createBrouillonWithLignes(
 
     TransactionLigne::create([
         'transaction_id' => $transaction->id,
-        'sous_categorie_id' => $context->sousCategorie->id,
+        'compte_id' => $context->compte->id,
+        'debit' => 0,
+        'credit' => $montant,
         'montant' => $montant,
     ]);
 
@@ -111,13 +113,17 @@ describe('valider()', function () {
 
         TransactionLigne::create([
             'transaction_id' => $transaction1->id,
-            'sous_categorie_id' => $this->sousCategorie->id,
+            'compte_id' => $this->compte->id,
+            'debit' => 0,
+            'credit' => 75.50,
             'montant' => 75.50,
         ]);
 
         TransactionLigne::create([
             'transaction_id' => $transaction1->id,
-            'sous_categorie_id' => $this->sousCategorie->id,
+            'compte_id' => $this->compte->id,
+            'debit' => 0,
+            'credit' => 49.50,
             'montant' => 49.50,
         ]);
 

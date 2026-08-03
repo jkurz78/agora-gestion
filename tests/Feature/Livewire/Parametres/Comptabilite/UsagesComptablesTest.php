@@ -3,13 +3,11 @@
 declare(strict_types=1);
 
 use App\Enums\RoleAssociation;
-use App\Enums\TypeCategorie;
 use App\Enums\UsageComptable;
 use App\Livewire\Parametres\Comptabilite\UsagesComptables;
 use App\Models\Association;
 use App\Models\AssociationUser;
-use App\Models\Categorie;
-use App\Models\SousCategorie;
+use App\Models\Compte;
 use App\Models\User;
 use App\Services\UsagesComptablesService;
 use App\Tenant\TenantContext;
@@ -25,8 +23,6 @@ beforeEach(function () {
         'role' => RoleAssociation::Admin->value,
         'joined_at' => now(),
     ]);
-    $this->catR = Categorie::factory()->for($this->asso, 'association')->create(['type' => TypeCategorie::Recette]);
-    $this->catD = Categorie::factory()->for($this->asso, 'association')->create(['type' => TypeCategorie::Depense]);
     $this->actingAs($this->admin);
 });
 
@@ -38,66 +34,76 @@ it('renders 4 usage cards', function () {
         ->assertSee('Comptabilisation des Dons');
 });
 
+// DC-10a : l'écran liste des comptes — les fixtures créent le Compte directement,
+// et les appels passent l'id du compte.
+
 it('toggleDon persists through service', function () {
-    $sc = SousCategorie::factory()->for($this->asso, 'association')->for($this->catR)->create();
+    $compte = Compte::factory()->numero('754')->create();
     Livewire::test(UsagesComptables::class)
-        ->call('toggleDon', $sc->id, true);
-    expect($sc->fresh()->hasUsage(UsageComptable::Don))->toBeTrue();
+        ->call('toggleDon', $compte->id, true);
+    expect($compte->fresh()->hasUsage(UsageComptable::Don))->toBeTrue();
 });
 
 it('setFraisKilometriques switches mono link', function () {
-    $sc1 = SousCategorie::factory()->for($this->asso, 'association')->for($this->catD)->create();
-    $sc2 = SousCategorie::factory()->for($this->asso, 'association')->for($this->catD)->create();
+    $compte1 = Compte::factory()->depense()->numero('625')->create();
+    $compte2 = Compte::factory()->depense()->numero('6250')->create();
     Livewire::test(UsagesComptables::class)
-        ->set('fraisKmSelectedId', $sc1->id)
+        ->set('fraisKmSelectedId', $compte1->id)
         ->call('saveFraisKilometriques');
-    expect($sc1->fresh()->hasUsage(UsageComptable::FraisKilometriques))->toBeTrue();
+    expect($compte1->fresh()->hasUsage(UsageComptable::FraisKilometriques))->toBeTrue();
     Livewire::test(UsagesComptables::class)
-        ->set('fraisKmSelectedId', $sc2->id)
+        ->set('fraisKmSelectedId', $compte2->id)
         ->call('saveFraisKilometriques');
-    expect($sc1->fresh()->hasUsage(UsageComptable::FraisKilometriques))->toBeFalse();
-    expect($sc2->fresh()->hasUsage(UsageComptable::FraisKilometriques))->toBeTrue();
+    expect($compte1->fresh()->hasUsage(UsageComptable::FraisKilometriques))->toBeFalse();
+    expect($compte2->fresh()->hasUsage(UsageComptable::FraisKilometriques))->toBeTrue();
 });
 
 it('abandonCreanceCandidates lists only Dons', function () {
-    $scDon = SousCategorie::factory()->for($this->asso, 'association')->for($this->catR)->create(['nom' => 'Don A']);
-    $scAutre = SousCategorie::factory()->for($this->asso, 'association')->for($this->catR)->create(['nom' => 'Autre']);
-    app(UsagesComptablesService::class)->toggleDon($scDon->id, true);
+    $compteDon = Compte::factory()->numero('754')->create(['intitule' => 'Don A']);
+    $compteAutre = Compte::factory()->numero('706')->create(['intitule' => 'Autre']);
+    app(UsagesComptablesService::class)->toggleDon($compteDon->id, true);
 
     $comp = Livewire::test(UsagesComptables::class);
     $candidates = collect($comp->instance()->abandonCreanceCandidates);
-    expect($candidates->pluck('id'))->toContain($scDon->id);
-    expect($candidates->pluck('id'))->not->toContain($scAutre->id);
+    expect($candidates->pluck('id'))->toContain($compteDon->id);
+    expect($candidates->pluck('id'))->not->toContain($compteAutre->id);
 });
 
 it('toggleDon false cascades AbandonCreance', function () {
-    $sc = SousCategorie::factory()->for($this->asso, 'association')->for($this->catR)->create();
+    $compte = Compte::factory()->numero('754')->create();
     $svc = app(UsagesComptablesService::class);
-    $svc->toggleDon($sc->id, true);
-    $svc->setAbandonCreance($sc->id);
+    $svc->toggleDon($compte->id, true);
+    $svc->setAbandonCreance($compte->id);
 
-    Livewire::test(UsagesComptables::class)->call('toggleDon', $sc->id, false);
-    expect($sc->fresh()->hasUsage(UsageComptable::AbandonCreance))->toBeFalse();
+    Livewire::test(UsagesComptables::class)->call('toggleDon', $compte->id, false);
+    expect($compte->fresh()->hasUsage(UsageComptable::AbandonCreance))->toBeFalse();
 });
 
-it('submitInline creates sous-cat and flags it', function () {
+it('submitInline creates compte and flags it', function () {
     Livewire::test(UsagesComptables::class)
         ->set('inlineUsage', UsageComptable::Cotisation->value)
-        ->set('inlineCategorieId', $this->catR->id)
         ->set('inlineNom', 'Nouvelle cotisation')
-        ->set('inlineCodeCerfa', '751B')
+        ->set('inlineNumeroPcg', '751B')
         ->call('submitInline');
-    $sc = SousCategorie::where('nom', 'Nouvelle cotisation')->first();
-    expect($sc)->not->toBeNull();
-    expect($sc->hasUsage(UsageComptable::Cotisation))->toBeTrue();
+    $compte = Compte::where('numero_pcg', '751B')->first();
+    expect($compte)->not->toBeNull();
+    expect($compte->hasUsage(UsageComptable::Cotisation))->toBeTrue();
 });
 
-it('inlineCategoriesEligibles filtered to Depense for FraisKilometriques', function () {
-    $comp = Livewire::test(UsagesComptables::class)
-        ->set('inlineUsage', UsageComptable::FraisKilometriques->value);
-    $cats = collect($comp->instance()->inlineCategoriesEligibles);
-    $types = $cats->pluck('type')->unique()->values();
-    expect($types->all())->toBe([TypeCategorie::Depense]);
+it('openInline affiche uniquement les champs compte-first', function () {
+    Livewire::test(UsagesComptables::class)
+        ->call('openInline', UsageComptable::Cotisation->value)
+        ->assertSee('Numéro de compte')
+        ->assertDontSee('Catégorie');
+});
+
+it('submitInline surfaces a classe mismatch as a validation error', function () {
+    Livewire::test(UsagesComptables::class)
+        ->set('inlineUsage', UsageComptable::Cotisation->value)
+        ->set('inlineNom', 'Compte invalide')
+        ->set('inlineNumeroPcg', '606')
+        ->call('submitInline')
+        ->assertHasErrors(['inlineNumeroPcg']);
 });
 
 it('denies non-admin users', function () {

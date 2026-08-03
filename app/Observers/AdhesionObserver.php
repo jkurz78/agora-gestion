@@ -22,6 +22,10 @@ final class AdhesionObserver
      */
     public function updated(Transaction $tx): void
     {
+        if (AdhesionTransactionLigneObserver::$suppress) {
+            return;
+        }
+
         $this->service->creerDepuisTransaction($tx);
     }
 

@@ -20,14 +20,15 @@ use App\Enums\StatutFacture;
 use App\Enums\TypeLigneDevis;
 use App\Enums\TypeLigneFacture;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\Devis;
 use App\Models\DevisLigne;
 use App\Models\Facture;
 use App\Models\FactureLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\DevisService;
 use App\Services\FactureService;
 use App\Tenant\TenantContext;
@@ -45,10 +46,11 @@ beforeEach(function (): void {
         'joined_at' => now(),
     ]);
     TenantContext::boot($this->association);
+    SystemeSeeder::seed();
     $this->actingAs($this->user);
 
     $this->tiers = Tiers::factory()->create();
-    $this->sousCategorie = SousCategorie::factory()->create();
+    $this->compteVentilation = Compte::factory()->numero('706')->create();
     $this->factureService = app(FactureService::class);
     $this->devisService = app(DevisService::class);
 });
@@ -62,7 +64,7 @@ afterEach(function (): void {
 /**
  * Crée un devis Accepté avec 1 ligne Montant.
  */
-function creerDevisAcceptePourRace(Tiers $tiers, SousCategorie $sousCategorie): Devis
+function creerDevisAcceptePourRace(Tiers $tiers, Compte $compteVentilation): Devis
 {
     $devis = new Devis([
         'tiers_id' => $tiers->id,
@@ -84,7 +86,7 @@ function creerDevisAcceptePourRace(Tiers $tiers, SousCategorie $sousCategorie): 
         'prix_unitaire' => 1000.00,
         'quantite' => 1.0,
         'montant' => 1000.00,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
     ]);
 
     return $devis;
@@ -93,7 +95,7 @@ function creerDevisAcceptePourRace(Tiers $tiers, SousCategorie $sousCategorie): 
 /**
  * Crée une facture brouillon libre avec 1 ligne MontantManuel prête à valider.
  */
-function creerFactureLibrePourRace(FactureService $service, Tiers $tiers, SousCategorie $sousCategorie): Facture
+function creerFactureLibrePourRace(FactureService $service, Tiers $tiers, Compte $compteVentilation): Facture
 {
     $facture = $service->creerManuelleVierge($tiers->id);
     $facture->update(['mode_paiement_prevu' => ModePaiement::Virement->value]);
@@ -106,7 +108,7 @@ function creerFactureLibrePourRace(FactureService $service, Tiers $tiers, SousCa
         'quantite' => 1.0,
         'montant' => 800.0,
         'transaction_ligne_id' => null,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
         'operation_id' => null,
         'seance' => null,
         'ordre' => 1,
@@ -129,7 +131,7 @@ describe('Race transformation devis : 2 transformations séquentielles → 1 seu
      * Assertion finale : Facture::where('devis_id', ..)->count() === 1.
      */
     it('la seconde transformation lève une exception et n\'insère pas de doublon', function (): void {
-        $devis = creerDevisAcceptePourRace($this->tiers, $this->sousCategorie);
+        $devis = creerDevisAcceptePourRace($this->tiers, $this->compteVentilation);
 
         // Worker 1 : réussit
         $this->devisService->transformerEnFacture($devis);
@@ -145,7 +147,7 @@ describe('Race transformation devis : 2 transformations séquentielles → 1 seu
     });
 
     it('l\'unique facture créée est correctement liée au devis', function (): void {
-        $devis = creerDevisAcceptePourRace($this->tiers, $this->sousCategorie);
+        $devis = creerDevisAcceptePourRace($this->tiers, $this->compteVentilation);
 
         $factureCreee = $this->devisService->transformerEnFacture($devis);
 
@@ -175,7 +177,7 @@ describe('Race validation facture : 2 validations séquentielles → 1 seule Tra
      * Assertion finale : Transaction::where('libelle', 'Facture {numero}')->count() === 1.
      */
     it('le second appel à valider lève une exception et ne crée pas de doublon de Transaction', function (): void {
-        $facture = creerFactureLibrePourRace($this->factureService, $this->tiers, $this->sousCategorie);
+        $facture = creerFactureLibrePourRace($this->factureService, $this->tiers, $this->compteVentilation);
 
         $countAvant = Transaction::count();
 
@@ -193,7 +195,7 @@ describe('Race validation facture : 2 validations séquentielles → 1 seule Tra
     });
 
     it('l\'assertion count sur le libellé de la transaction confirme l\'unicité', function (): void {
-        $facture = creerFactureLibrePourRace($this->factureService, $this->tiers, $this->sousCategorie);
+        $facture = creerFactureLibrePourRace($this->factureService, $this->tiers, $this->compteVentilation);
 
         // Worker 1
         $this->factureService->valider($facture);
@@ -212,7 +214,7 @@ describe('Race validation facture : 2 validations séquentielles → 1 seule Tra
     });
 
     it('après la race, la facture reste au statut Validee (pas de corruption)', function (): void {
-        $facture = creerFactureLibrePourRace($this->factureService, $this->tiers, $this->sousCategorie);
+        $facture = creerFactureLibrePourRace($this->factureService, $this->tiers, $this->compteVentilation);
 
         $this->factureService->valider($facture);
 

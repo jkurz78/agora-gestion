@@ -38,7 +38,7 @@ final class StandardLigneType implements LigneTypeInterface
         return '';
     }
 
-    public function resolveSousCategorieId(?int $requestedId): ?int
+    public function resolveCompteId(?int $requestedId): ?int
     {
         return $requestedId;
     }

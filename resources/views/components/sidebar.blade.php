@@ -110,7 +110,7 @@
 
 @php
 $activeGroup = match(true) {
-    request()->routeIs('comptabilite.transactions*', 'comptabilite.budget*', 'comptabilite.ndf.*', 'comptabilite.dons', 'comptabilite.cotisations') => 'comptabilite',
+    request()->routeIs('comptabilite.transactions*', 'comptabilite.postes-tiers-ouverts', 'comptabilite.budget*', 'comptabilite.ndf.*', 'comptabilite.dons', 'comptabilite.cotisations') => 'comptabilite',
     request()->routeIs('banques.rapprochement.*', 'banques.virements.*', 'banques.helloasso-sync',
         'banques.comptes.*', 'banques.remises*') => 'banques',
     request()->routeIs('tiers.*') => 'tiers',
@@ -173,6 +173,13 @@ $activeGroup = match(true) {
                                 <a href="{{ route('comptabilite.transactions') }}"
                                    class="nav-link {{ request()->routeIs('comptabilite.transactions') ? 'active' : '' }}">
                                     <i class="bi bi-list-ul me-1"></i> Recettes &amp; dépenses
+                                </a>
+                            </li>
+
+                            <li class="nav-item">
+                                <a href="{{ route('comptabilite.postes-tiers-ouverts') }}"
+                                   class="nav-link {{ request()->routeIs('comptabilite.postes-tiers-ouverts') ? 'active' : '' }}">
+                                    <i class="bi bi-hourglass-split me-1"></i> Postes tiers ouverts
                                 </a>
                             </li>
 
@@ -475,6 +482,27 @@ $activeGroup = match(true) {
                             </li>
 
                             <li class="nav-item">
+                                <a href="{{ route('rapports.balance') }}"
+                                   class="nav-link {{ request()->routeIs('rapports.balance') ? 'active' : '' }}">
+                                    <i class="bi bi-list-columns-reverse me-1"></i> Balance comptable
+                                </a>
+                            </li>
+
+                            <li class="nav-item">
+                                <a href="{{ route('rapports.grand-livre') }}"
+                                   class="nav-link {{ request()->routeIs('rapports.grand-livre') ? 'active' : '' }}">
+                                    <i class="bi bi-book me-1"></i> Grand livre
+                                </a>
+                            </li>
+
+                            <li class="nav-item">
+                                <a href="{{ route('rapports.journaux') }}"
+                                   class="nav-link {{ request()->routeIs('rapports.journaux') ? 'active' : '' }}">
+                                    <i class="bi bi-journals me-1"></i> Journaux
+                                </a>
+                            </li>
+
+                            <li class="nav-item">
                                 <a href="{{ route('rapports.operations') }}"
                                    class="nav-link {{ request()->routeIs('rapports.operations') ? 'active' : '' }}">
                                     <i class="bi bi-diagram-3 me-1"></i> CR par opérations
@@ -619,20 +647,11 @@ $activeGroup = match(true) {
                             </li>
                             @endif
 
-                            @if (Route::has('parametres.categories.index'))
+                            @if (Route::has('parametres.plan-comptable'))
                             <li class="nav-item">
-                                <a href="{{ route('parametres.categories.index') }}"
-                                   class="nav-link {{ request()->routeIs('parametres.categories.*') ? 'active' : '' }}">
-                                    <i class="bi bi-tags me-1"></i> Catégories
-                                </a>
-                            </li>
-                            @endif
-
-                            @if (Route::has('parametres.sous-categories.index'))
-                            <li class="nav-item">
-                                <a href="{{ route('parametres.sous-categories.index') }}"
-                                   class="nav-link {{ request()->routeIs('parametres.sous-categories.*') ? 'active' : '' }}">
-                                    <i class="bi bi-tag me-1"></i> Sous-catégories
+                                <a href="{{ route('parametres.plan-comptable') }}"
+                                   class="nav-link {{ request()->routeIs('parametres.plan-comptable') ? 'active' : '' }}">
+                                    <i class="bi bi-tag me-1"></i> Plan comptable
                                 </a>
                             </li>
                             @endif

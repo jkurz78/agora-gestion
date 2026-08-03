@@ -4,19 +4,27 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\JournalComptable;
+use App\Enums\OrigineANouveau;
 use App\Enums\StatutRapprochement;
+use App\Models\ANouveauGeneration;
 use App\Models\BudgetLine;
 use App\Models\CompteBancaire;
+use App\Models\Exercice;
 use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\VirementInterne;
+use App\Services\Compta\ANouveau\ANouveauPreviewBuilder;
+use App\Services\Compta\EtatComptaResolver;
+use Throwable;
 
 final class ClotureCheckService
 {
     public function __construct(
         private readonly ExerciceService $exerciceService,
         private readonly SoldeService $soldeService,
+        private readonly EtatComptaResolver $etatCompta,
     ) {}
 
     public function executer(int $annee): ClotureCheckResult
@@ -27,15 +35,71 @@ final class ClotureCheckService
 
         return new ClotureCheckResult(
             bloquants: [
+                $this->checkPrealablesComptables(),
+                $this->checkOuverturePrecedente($annee),
                 $this->checkRapprochementsEnCours($start, $end),
-                $this->checkLignesSansSousCategorie($annee),
+                $this->checkLignesSansCompte($annee),
                 $this->checkVirementsDesequilibres($start, $end),
+                $this->checkExerciceCible($annee),
+                $this->checkANouveau($annee),
             ],
             avertissements: [
                 $this->checkTransactionsNonPointees($start, $end),
                 $this->checkBudgetAbsent($annee),
+                $this->checkMouvementsExerciceCible($annee),
             ],
-            soldesComptes: $this->calculerSoldesComptes(),
+            soldesComptes: $this->calculerSoldesComptes($annee),
+        );
+    }
+
+    /**
+     * Les préalables comptables sont-ils réunis ?
+     *
+     * Garde ajoutée après la recette du 2026-07-29 : une clôture avait été
+     * acceptée sans reprise initiale, produisant une ouverture amputée de
+     * 26 000 €. checkOuverturePrecedente ne pouvait pas le voir — elle sort au
+     * vert dès que l'exercice précédent n'existe pas, ce qui est le cas de toute
+     * première clôture — et checkANouveau ne teste que l'équilibre débit/crédit
+     * d'un aperçu par ailleurs incomplet.
+     *
+     * Le message ne prescrit aucune commande : ces préalables se traitent en
+     * administration, et le trésorier qui lit cette checklist n'a pas de console.
+     */
+    private function checkPrealablesComptables(): CheckItem
+    {
+        $etat = $this->etatCompta->pourTenantCourant();
+
+        return new CheckItem(
+            nom: 'Préalables comptables',
+            ok: $etat->estOperationnel(),
+            message: $etat->estOperationnel()
+                ? 'Les soldes historiques et les écritures sont à jour'
+                : $etat->causes().' Ces préalables doivent être traités avant la clôture.',
+        );
+    }
+
+    public function checkOuverturePrecedente(int $annee): CheckItem
+    {
+        $precedent = Exercice::query()->where('annee', $annee - 1)->first();
+        if ($precedent === null) {
+            return new CheckItem(
+                'Soldes d’ouverture',
+                true,
+                'Aucun exercice précédent enregistré',
+            );
+        }
+
+        $generationActive = ANouveauGeneration::activePourCible($annee);
+        $disponibles = $generationActive !== null
+            && ($precedent->isCloture() || $generationActive->origine === OrigineANouveau::RepriseInitiale);
+
+        return new CheckItem(
+            nom: 'Soldes d’ouverture',
+            ok: $disponibles,
+            message: $disponibles
+                ? 'Les soldes d’ouverture sont disponibles'
+                : 'Soldes d’ouverture indisponibles : reclôturez l’exercice '
+                    .$this->exerciceService->label($annee - 1).' pour régénérer ses à-nouveaux',
         );
     }
 
@@ -54,18 +118,23 @@ final class ClotureCheckService
         );
     }
 
-    private function checkLignesSansSousCategorie(int $annee): CheckItem
+    /**
+     * Lignes de ventilation sans compte (compte_id NULL). Les lignes PD-only
+     * générées par EcritureGenerator (411/401/5XXX) portent toujours un
+     * compte_id — ce critère ne cible donc que les lignes métier non ventilées.
+     */
+    private function checkLignesSansCompte(int $annee): CheckItem
     {
         $count = TransactionLigne::whereHas('transaction', fn ($q) => $q->forExercice($annee))
-            ->whereNull('sous_categorie_id')
+            ->whereNull('compte_id')
             ->count();
 
         return new CheckItem(
-            nom: 'Lignes sans sous-catégorie',
+            nom: 'Lignes sans compte',
             ok: $count === 0,
             message: $count === 0
-                ? 'Toutes les lignes ont une sous-catégorie'
-                : "{$count} ligne(s) sans sous-catégorie",
+                ? 'Toutes les lignes ont un compte'
+                : "{$count} ligne(s) sans compte",
         );
     }
 
@@ -89,8 +158,13 @@ final class ClotureCheckService
 
     private function checkTransactionsNonPointees(string $start, string $end): CheckItem
     {
-        $count = Transaction::whereNull('rapprochement_id')
-            ->whereBetween('date', [$start, $end])
+        $count = Transaction::query()
+            ->operationnel()
+            ->whereDate('date', '>=', $start)
+            ->whereDate('date', '<=', $end)
+            ->whereDoesntHave('rapprochement', fn ($query) => $query
+                ->where('statut', StatutRapprochement::Verrouille)
+                ->whereDate('date_fin', '<=', $end))
             ->count();
 
         return new CheckItem(
@@ -115,14 +189,69 @@ final class ClotureCheckService
         );
     }
 
+    private function checkExerciceCible(int $annee): CheckItem
+    {
+        $cible = Exercice::query()->where('annee', $annee + 1)->first();
+        $ok = $cible === null || ! $cible->isCloture();
+
+        return new CheckItem(
+            nom: 'Exercice cible',
+            ok: $ok,
+            message: $ok
+                ? 'L’exercice cible est disponible pour les à-nouveaux'
+                : 'L’exercice cible '.$this->exerciceService->label($annee + 1).' est déjà clôturé',
+        );
+    }
+
+    private function checkANouveau(int $annee): CheckItem
+    {
+        try {
+            $preview = app(ANouveauPreviewBuilder::class)->build($annee);
+            $ok = $preview->equilibree();
+
+            return new CheckItem(
+                nom: 'Aperçu des à-nouveaux',
+                ok: $ok,
+                message: $ok
+                    ? 'L’aperçu des à-nouveaux est équilibré'
+                    : 'L’aperçu des à-nouveaux est déséquilibré',
+            );
+        } catch (Throwable $exception) {
+            return new CheckItem(
+                nom: 'Aperçu des à-nouveaux',
+                ok: false,
+                message: 'Impossible de préparer les à-nouveaux : '.$exception->getMessage(),
+            );
+        }
+    }
+
+    private function checkMouvementsExerciceCible(int $annee): CheckItem
+    {
+        $transactions = Transaction::query()
+            ->forExercice($annee + 1)
+            ->where('journal', '!=', JournalComptable::AN->value)
+            ->count();
+        $virements = VirementInterne::query()->forExercice($annee + 1)->count();
+        $count = $transactions + $virements;
+
+        return new CheckItem(
+            nom: 'Mouvements exercice suivant',
+            ok: $count === 0,
+            message: $count === 0
+                ? 'Aucun mouvement dans l’exercice suivant'
+                : "{$count} mouvement(s) déjà présent(s) dans l’exercice suivant ; ils seront conservés",
+        );
+    }
+
     /**
      * @return array<string, float>
      */
-    private function calculerSoldesComptes(): array
+    private function calculerSoldesComptes(int $annee): array
     {
         $soldes = [];
+        $dateFin = $this->exerciceService->dateRange($annee)['end'];
         foreach (CompteBancaire::orderBy('nom')->get() as $compte) {
-            $soldes[$compte->nom] = $this->soldeService->solde($compte);
+            $soldes[$compte->nom] = $this->soldeService->solde($compte, $annee, $dateFin);
         }
 
         return $soldes;

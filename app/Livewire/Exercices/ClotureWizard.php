@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Livewire\Exercices;
 
+use App\Enums\StatutRapprochement;
 use App\Models\CompteBancaire;
+use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\VirementInterne;
 use App\Services\ClotureCheckService;
+use App\Services\Compta\ANouveau\ANouveauPreviewBuilder;
 use App\Services\ExerciceService;
 use App\Services\ProvisionService;
 use App\Services\RapprochementBancaireService;
@@ -57,6 +60,12 @@ final class ClotureWizard extends Component
         }
 
         if ($this->step === 2) {
+            $this->runChecks();
+            if (! $this->peutCloturer) {
+                $this->step = 1;
+
+                return;
+            }
             $this->step = 3;
         }
     }
@@ -77,6 +86,13 @@ final class ClotureWizard extends Component
         $exercice = $exerciceService->exerciceAffiche();
 
         if ($exercice === null || $exercice->isCloture()) {
+            return;
+        }
+
+        $this->runChecks();
+        if (! $this->peutCloturer) {
+            $this->step = 1;
+
             return;
         }
 
@@ -108,7 +124,7 @@ final class ClotureWizard extends Component
         $totalSoldeRapprochement = 0.0;
 
         foreach ($comptes as $compte) {
-            $soldeReel = $soldeService->solde($compte);
+            $soldeReel = $soldeService->solde($compte, $this->annee, $range['end']);
 
             // Recettes and dépenses in the exercice for this account
             $recettesCompte = (float) $compte->recettes()->forExercice($this->annee)->sum('montant_total');
@@ -126,8 +142,11 @@ final class ClotureWizard extends Component
             $soldeOuverture = round($soldeReel - $recettesCompte + $depensesCompte - $virementsIn + $virementsOut, 2);
             $mouvements = round($recettesCompte - $depensesCompte + $virementsIn - $virementsOut, 2);
 
-            // Solde dernier rapprochement verrouillé
-            $soldeRapprochement = $rapprochementService->calculerSoldeOuverture($compte);
+            // Solde du dernier rapprochement verrouillé connu à la clôture.
+            $soldeRapprochement = $rapprochementService->calculerSoldeRapprochementAu(
+                $compte,
+                $range['end'],
+            );
 
             $comptesData[] = [
                 'nom' => $compte->nom,
@@ -149,13 +168,18 @@ final class ClotureWizard extends Component
         $totalSoldeRapprochement = round($totalSoldeRapprochement, 2);
 
         // Total recettes / dépenses of the exercice (across all accounts)
-        $totalRecettes = (float) Transaction::where('type', 'recette')->forExercice($this->annee)->sum('montant_total');
-        $totalDepenses = (float) Transaction::where('type', 'depense')->forExercice($this->annee)->sum('montant_total');
+        $totalRecettes = (float) Transaction::where('type', 'recette')->operationnel()->forExercice($this->annee)->sum('montant_total');
+        $totalDepenses = (float) Transaction::where('type', 'depense')->operationnel()->forExercice($this->annee)->sum('montant_total');
         $resultat = round($totalRecettes - $totalDepenses, 2);
 
         // Écritures non pointées (transactions)
-        $nonPointeesTx = Transaction::whereNull('rapprochement_id')
-            ->whereBetween('date', [$start, $end])
+        $nonPointeesTx = Transaction::query()
+            ->operationnel()
+            ->whereDate('date', '>=', $start)
+            ->whereDate('date', '<=', $end)
+            ->whereDoesntHave('rapprochement', fn ($query) => $query
+                ->where('statut', StatutRapprochement::Verrouille)
+                ->whereDate('date_fin', '<=', $end))
             ->selectRaw("
                 COUNT(*) as nombre,
                 SUM(CASE WHEN type = 'recette' THEN montant_total ELSE 0 END) as total_recettes,
@@ -212,6 +236,18 @@ final class ClotureWizard extends Component
 
         if ($this->step === 2) {
             $viewData['summary'] = $this->computeFinancialSummary();
+        }
+
+        if ($this->step === 3) {
+            $preview = app(ANouveauPreviewBuilder::class)->build($this->annee);
+            $tiersIds = collect($preview->lignes)->pluck('tiers_id')->filter()->unique()->all();
+
+            $viewData['aNouveauPreview'] = $preview;
+            $viewData['aNouveauTiers'] = Tiers::query()
+                ->whereIn('id', $tiersIds)
+                ->get()
+                ->mapWithKeys(fn (Tiers $tiers): array => [(int) $tiers->id => $tiers->displayName()])
+                ->all();
         }
 
         return view('livewire.exercices.cloture-wizard', $viewData);

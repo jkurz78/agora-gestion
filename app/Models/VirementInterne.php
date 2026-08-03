@@ -8,6 +8,7 @@ use App\Services\ExerciceService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 final class VirementInterne extends TenantModel
@@ -68,6 +69,11 @@ final class VirementInterne extends TenantModel
     public function rapprochementDestination(): BelongsTo
     {
         return $this->belongsTo(RapprochementBancaire::class, 'rapprochement_destination_id');
+    }
+
+    public function transaction(): HasOne
+    {
+        return $this->hasOne(Transaction::class, 'virement_interne_id');
     }
 
     public function isLockedByRapprochement(): bool

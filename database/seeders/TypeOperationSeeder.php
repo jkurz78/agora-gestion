@@ -5,18 +5,18 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Models\Association;
-use App\Models\SousCategorie;
+use App\Models\Compte;
 use App\Models\TypeOperation;
 use Illuminate\Database\Seeder;
 
-class TypeOperationSeeder extends Seeder
+final class TypeOperationSeeder extends Seeder
 {
     public function run(): void
     {
         $associationId = Association::first()?->id ?? 1;
 
-        $sousParcours = SousCategorie::where('nom', 'Parcours thérapeutiques')->firstOrFail();
-        $sousFormation = SousCategorie::where('nom', 'Formations')->firstOrFail();
+        $compteParcours = Compte::where('intitule', 'Parcours thérapeutiques')->firstOrFail();
+        $compteFormation = Compte::where('intitule', 'Formations')->firstOrFail();
 
         // ── PSA — Parcours de soins A ───────────────────────────────────
         $psa = TypeOperation::firstOrCreate(
@@ -26,7 +26,7 @@ class TypeOperationSeeder extends Seeder
                 'nom' => 'Parcours de soins A',
                 'libelle_article' => 'le parcours de soins thérapeutique',
                 'description' => 'Parcours thérapeutique de 30 séances avec médiation animale.',
-                'sous_categorie_id' => $sousParcours->id,
+                'compte_id' => $compteParcours->id,
                 'nombre_seances' => 30,
                 'formulaire_actif' => true,
                 'formulaire_prescripteur' => true,
@@ -52,7 +52,7 @@ class TypeOperationSeeder extends Seeder
                 'nom' => 'Formation',
                 'libelle_article' => 'la formation',
                 'description' => 'Formation ouverte à tous, 12 séances.',
-                'sous_categorie_id' => $sousFormation->id,
+                'compte_id' => $compteFormation->id,
                 'nombre_seances' => 12,
                 'formulaire_actif' => false,
                 'formulaire_parcours_therapeutique' => false,

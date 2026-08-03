@@ -2,10 +2,9 @@
 
 declare(strict_types=1);
 
-use App\Enums\UsageComptable;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\RecuFiscalEmis;
-use App\Models\SousCategorie;
 use App\Services\RecuFiscalService;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Storage;
@@ -77,15 +76,13 @@ it('dérive article 238 bis pour un donateur entreprise', function () {
     expect($recu->article_cgi)->toBe('art_238_bis');
 });
 
-it('dérive forme abandon_revenus pour sous-cat avec usage AbandonCreance', function () {
+it('dérive forme abandon_revenus pour compte avec usage AbandonCreance', function () {
     setupAssoEligible();
 
-    // Créer une sous-cat avec les deux usages Don + AbandonCreance
-    $sousCatAbandon = SousCategorie::factory()->create();
-    $sousCatAbandon->usages()->create(['usage' => UsageComptable::Don->value]);
-    $sousCatAbandon->usages()->create(['usage' => UsageComptable::AbandonCreance->value]);
+    // Créer un compte avec les deux usages Don + AbandonCreance
+    $compteAbandon = Compte::factory()->numero('7588')->pourDons()->pourAbandonCreance()->create();
 
-    $ligne = $this->ligneDonValide(ligneOverrides: ['sous_categorie_id' => $sousCatAbandon->id]);
+    $ligne = $this->ligneDonValide(ligneOverrides: ['compte_id' => $compteAbandon->id]);
 
     $service = app(RecuFiscalService::class);
     $recu = $service->obtenirOuGenerer($ligne);

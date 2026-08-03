@@ -9,18 +9,15 @@ use App\Enums\StatutDevis;
 use App\Enums\StatutFacture;
 use App\Enums\StatutReglement;
 use App\Enums\TypeLigneFacture;
-use App\Enums\TypeTransaction;
+use App\Models\Compte;
 use App\Models\Devis;
 use App\Models\DevisLigne;
 use App\Models\Facture;
 use App\Models\FactureLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
-use App\Models\Transaction;
-use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Services\Compta\EcritureGenerator;
 use App\Services\ExerciceService;
-use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -55,10 +52,10 @@ final class FactureManuelSeeder extends Seeder
             return;
         }
 
-        $sousCategorie = SousCategorie::where('nom', 'Formations')->first()
-            ?? SousCategorie::orderBy('id')->first();
+        $compteProduit = Compte::where('intitule', 'Formations')->first()
+            ?? Compte::where('classe', 7)->orderBy('id')->first();
 
-        if ($sousCategorie === null) {
+        if ($compteProduit === null) {
             return;
         }
 
@@ -68,6 +65,8 @@ final class FactureManuelSeeder extends Seeder
         if ($saisiParUser === null) {
             return;
         }
+
+        $ecritureGenerator = app(EcritureGenerator::class);
 
         // ── Cas 1 : Devis accepté → Facture brouillon (transformation) ───────────
         // Crée un devis accepté dédié au cas de démonstration de transformation.
@@ -125,7 +124,7 @@ final class FactureManuelSeeder extends Seeder
             'prix_unitaire' => '1200.00',
             'quantite' => '1.000',
             'montant' => '1200.00',
-            'sous_categorie_id' => $sousCategorie->id,
+            'compte_id' => $compteProduit->id,
             'ordre' => 1,
         ]);
 
@@ -136,7 +135,7 @@ final class FactureManuelSeeder extends Seeder
             'prix_unitaire' => '800.00',
             'quantite' => '1.000',
             'montant' => '800.00',
-            'sous_categorie_id' => $sousCategorie->id,
+            'compte_id' => $compteProduit->id,
             'ordre' => 2,
         ]);
 
@@ -155,31 +154,27 @@ final class FactureManuelSeeder extends Seeder
             'saisi_par' => $saisiParUser->id,
         ]);
 
-        // Transaction recette "à recevoir" générée à la validation
-        $transaction = Transaction::create([
-            'association_id' => (int) TenantContext::currentId(),
-            'type' => TypeTransaction::Recette,
+        $transaction = $ecritureGenerator->pourRecetteACredit(
+            tiers: $tiers,
+            ventilations: [
+                ['compte' => $compteProduit, 'montant' => 1200.00, 'notes' => 'Formation initiale (2 jours)'],
+                ['compte' => $compteProduit, 'montant' => 200.00, 'notes' => 'Supports pédagogiques'],
+            ],
+            dateConstatation: Carbon::today()->subDay(),
+            libelle: "Facture {$factureCas2->numero}",
+        );
+        $transaction->update([
             'tiers_id' => $tiers->id,
-            'date' => Carbon::today()->subDays(1)->toDateString(),
-            'libelle' => "Facture {$factureCas2->numero}",
-            'montant_total' => 1400.00,
-            'mode_paiement' => ModePaiement::Virement->value,
+            'saisi_par' => $saisiParUser->id,
             'statut_reglement' => StatutReglement::EnAttente->value,
         ]);
 
-        $ligneTx1 = TransactionLigne::create([
-            'transaction_id' => $transaction->id,
-            'sous_categorie_id' => $sousCategorie->id,
-            'montant' => 1200.00,
-            'notes' => 'Formation initiale (2 jours)',
-        ]);
+        $ligneTx1 = $transaction->lignes->firstWhere('notes', 'Formation initiale (2 jours)');
+        $ligneTx2 = $transaction->lignes->firstWhere('notes', 'Supports pédagogiques');
 
-        $ligneTx2 = TransactionLigne::create([
-            'transaction_id' => $transaction->id,
-            'sous_categorie_id' => $sousCategorie->id,
-            'montant' => 200.00,
-            'notes' => 'Supports pédagogiques',
-        ]);
+        if ($ligneTx1 === null || $ligneTx2 === null) {
+            throw new \LogicException('Les ventilations de la facture démo n\'ont pas été générées.');
+        }
 
         FactureLigne::create([
             'facture_id' => $factureCas2->id,
@@ -188,7 +183,7 @@ final class FactureManuelSeeder extends Seeder
             'prix_unitaire' => '600.00',
             'quantite' => '2.000',
             'montant' => '1200.00',
-            'sous_categorie_id' => $sousCategorie->id,
+            'compte_id' => $compteProduit->id,
             'transaction_ligne_id' => $ligneTx1->id,
             'ordre' => 1,
         ]);
@@ -200,7 +195,7 @@ final class FactureManuelSeeder extends Seeder
             'prix_unitaire' => '200.00',
             'quantite' => '1.000',
             'montant' => '200.00',
-            'sous_categorie_id' => $sousCategorie->id,
+            'compte_id' => $compteProduit->id,
             'transaction_ligne_id' => $ligneTx2->id,
             'ordre' => 2,
         ]);
@@ -213,23 +208,24 @@ final class FactureManuelSeeder extends Seeder
 
         // ── Cas 3 : Facture libre directe brouillon — mix Montant ref + MontantLibre + Texte ──
         // Transaction pré-existante pour la ligne Montant ref
-        $txRefCas3 = Transaction::create([
-            'association_id' => (int) TenantContext::currentId(),
-            'type' => TypeTransaction::Recette,
+        $txRefCas3 = $ecritureGenerator->pourRecetteACredit(
+            tiers: $tiers,
+            ventilations: [
+                ['compte' => $compteProduit, 'montant' => 300.00, 'notes' => 'Recette à refacturer — ligne démo'],
+            ],
+            dateConstatation: Carbon::today()->subDays(3),
+            libelle: '[Démo] Recette à refacturer (mix)',
+        );
+        $txRefCas3->update([
             'tiers_id' => $tiers->id,
-            'date' => Carbon::today()->subDays(3)->toDateString(),
-            'libelle' => '[Démo] Recette à refacturer (mix)',
-            'montant_total' => 300.00,
-            'mode_paiement' => ModePaiement::Virement->value,
+            'saisi_par' => $saisiParUser->id,
             'statut_reglement' => StatutReglement::EnAttente->value,
         ]);
 
-        $ligneTxRef = TransactionLigne::create([
-            'transaction_id' => $txRefCas3->id,
-            'sous_categorie_id' => $sousCategorie->id,
-            'montant' => 300.00,
-            'notes' => 'Recette à refacturer — ligne démo',
-        ]);
+        $ligneTxRef = $txRefCas3->lignes->firstWhere('notes', 'Recette à refacturer — ligne démo');
+        if ($ligneTxRef === null) {
+            throw new \LogicException('La ventilation de la recette à refacturer n\'a pas été générée.');
+        }
 
         $factureCas3 = Facture::create([
             'numero' => null,
@@ -263,7 +259,7 @@ final class FactureManuelSeeder extends Seeder
             'prix_unitaire' => '500.00',
             'quantite' => '1.000',
             'montant' => '500.00',
-            'sous_categorie_id' => $sousCategorie->id,
+            'compte_id' => $compteProduit->id,
             'ordre' => 2,
         ]);
 

@@ -70,7 +70,6 @@ function creerFactureValideeAssociation(Association $assoBprime, Tiers $tiersBpr
         'montant' => 500.0,
         'ordre' => 1,
         'transaction_ligne_id' => null,
-        'sous_categorie_id' => null,
         'operation_id' => null,
         'seance' => null,
     ]);

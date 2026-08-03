@@ -48,6 +48,11 @@ jobs:
           php-version: '8.4'
           extensions: pdo, pdo_sqlite, mbstring, xml, dom, curl, zip, intl, bcmath, imagick
           coverage: none
+          # La suite tourne dans un seul processus et dépasse 512 Mo : mesuré le
+          # 2026-08-03, `php artisan test` y meurt sur « Allowed memory size
+          # exhausted » avant même d'avoir fini le premier fichier. La valeur par
+          # défaut du runner n'est pas journalisée, donc pas vérifiable : on la pose.
+          ini-values: memory_limit=-1
 
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist

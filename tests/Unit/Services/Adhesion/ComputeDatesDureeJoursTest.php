@@ -2,19 +2,28 @@
 
 declare(strict_types=1);
 
+use App\Enums\UsageComptable;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\FormuleAdhesion;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Services\Adhesion\NouvelleAdhesionDTO;
 use App\Services\AdhesionService;
+use App\Tenant\TenantContext;
 use Illuminate\Support\Carbon;
 
 beforeEach(function (): void {
-    $this->sc = SousCategorie::factory()->pourCotisations()->create();
+    $this->sc = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '756DJ',
+        'intitule' => 'Cotisations',
+        'classe' => 7,
+        'actif' => true,
+    ]);
+    $this->sc->usages()->create(['usage' => UsageComptable::Cotisation->value]);
     $this->tiers = Tiers::factory()->create();
     $this->user = User::factory()->create();
     $this->compte = CompteBancaire::factory()->create();
@@ -22,7 +31,7 @@ beforeEach(function (): void {
 
 it('creerDepuisTransaction : formule duree_jours=10, tx date 2025-10-15 → date_fin=2025-10-24', function (): void {
     $formule = FormuleAdhesion::factory()->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'mode' => 'duree',
         'duree_mois' => null,
         'duree_jours' => 10,
@@ -38,7 +47,10 @@ it('creerDepuisTransaction : formule duree_jours=10, tx date 2025-10-15 → date
     TransactionLigne::where('transaction_id', $tx->id)->delete();
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
+        'montant' => 50.00,
+        'debit' => 0,
+        'credit' => 50.00,
     ]);
 
     $adhesion = $service->creerDepuisTransaction($tx);
@@ -51,7 +63,7 @@ it('creerDepuisTransaction : formule duree_jours=10, tx date 2025-10-15 → date
 
 it('creerDepuisWizard : formule duree_jours=300 (saison ~10 mois), date_debut=2025-09-01 → date_fin=2026-06-27', function (): void {
     $formule = FormuleAdhesion::factory()->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'mode' => 'duree',
         'duree_mois' => null,
         'duree_jours' => 300,
@@ -81,7 +93,7 @@ it('creerDepuisWizard : formule duree_jours=300 (saison ~10 mois), date_debut=20
 
 it('creerDepuisTransaction : formule duree_mois=12 reste inchangé (régression)', function (): void {
     $formule = FormuleAdhesion::factory()->modeDuree(12)->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'actif' => true,
     ]);
 
@@ -94,7 +106,10 @@ it('creerDepuisTransaction : formule duree_mois=12 reste inchangé (régression)
     TransactionLigne::where('transaction_id', $tx->id)->delete();
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
+        'montant' => 50.00,
+        'debit' => 0,
+        'credit' => 50.00,
     ]);
 
     $adhesion = $service->creerDepuisTransaction($tx);

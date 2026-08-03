@@ -6,10 +6,11 @@ use App\Enums\StatutExercice;
 use App\Enums\TypeTransaction;
 use App\Livewire\Provisions\ProvisionIndex;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\Exercice;
 use App\Models\Provision;
-use App\Models\SousCategorie;
 use App\Models\User;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
@@ -23,6 +24,8 @@ beforeEach(function () {
 
     $this->exercice = Exercice::create(['association_id' => $this->association->id, 'annee' => 2025, 'statut' => StatutExercice::Ouvert]);
     session(['exercice_actif' => 2025]);
+
+    SystemeSeeder::seed();
 });
 
 afterEach(function () {
@@ -30,7 +33,7 @@ afterEach(function () {
 });
 
 it('renders the provision list', function () {
-    $sousCategorie = SousCategorie::factory()->create(['association_id' => $this->association->id]);
+    $compteVentilation = Compte::factory()->create();
 
     Provision::factory()->create([
         'association_id' => $this->association->id,
@@ -38,7 +41,7 @@ it('renders the provision list', function () {
         'libelle' => 'Provision congés payés',
         'type' => TypeTransaction::Depense,
         'montant' => 1200.00,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
         'saisi_par' => $this->user->id,
     ]);
 
@@ -50,13 +53,13 @@ it('renders the provision list', function () {
 });
 
 it('creates a provision via modal', function () {
-    $sousCategorie = SousCategorie::factory()->create(['association_id' => $this->association->id]);
+    $compte = Compte::factory()->numero('606')->create();
 
     Livewire::test(ProvisionIndex::class)
         ->call('openCreate')
         ->assertSet('showModal', true)
         ->set('libelle', 'Provision loyer')
-        ->set('sous_categorie_id', (string) $sousCategorie->id)
+        ->set('compte_id', (string) $compte->id)
         ->set('type', 'depense')
         ->set('montant', '500')
         ->call('save')
@@ -74,7 +77,7 @@ it('creates a provision via modal', function () {
 });
 
 it('edits a provision via modal', function () {
-    $sousCategorie = SousCategorie::factory()->create(['association_id' => $this->association->id]);
+    $compteVentilation = Compte::factory()->numero('606')->create();
 
     $provision = Provision::factory()->create([
         'association_id' => $this->association->id,
@@ -82,7 +85,7 @@ it('edits a provision via modal', function () {
         'libelle' => 'Provision initiale',
         'type' => TypeTransaction::Depense,
         'montant' => 300.00,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
         'saisi_par' => $this->user->id,
     ]);
 
@@ -102,13 +105,13 @@ it('edits a provision via modal', function () {
 });
 
 it('deletes a provision', function () {
-    $sousCategorie = SousCategorie::factory()->create(['association_id' => $this->association->id]);
+    $compteVentilation = Compte::factory()->create();
 
     $provision = Provision::factory()->create([
         'association_id' => $this->association->id,
         'exercice' => 2025,
         'libelle' => 'À supprimer',
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
         'saisi_par' => $this->user->id,
     ]);
 
@@ -121,13 +124,13 @@ it('deletes a provision', function () {
 it('blocks editing when exercice is closed', function () {
     $this->exercice->update(['statut' => StatutExercice::Cloture]);
 
-    $sousCategorie = SousCategorie::factory()->create(['association_id' => $this->association->id]);
+    $compteBloque = Compte::factory()->numero('606')->create();
 
     Livewire::test(ProvisionIndex::class)
         ->assertSee('clôturé')
         ->call('openCreate')
         ->set('libelle', 'Provision bloquée')
-        ->set('sous_categorie_id', (string) $sousCategorie->id)
+        ->set('compte_id', (string) $compteBloque->id)
         ->set('type', 'depense')
         ->set('montant', '100')
         ->call('save')
@@ -141,5 +144,5 @@ it('validates required fields', function () {
     Livewire::test(ProvisionIndex::class)
         ->call('openCreate')
         ->call('save')
-        ->assertHasErrors(['libelle', 'sous_categorie_id', 'type', 'montant']);
+        ->assertHasErrors(['libelle', 'compte_id', 'type', 'montant']);
 });

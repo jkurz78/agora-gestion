@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Association;
-use App\Models\SousCategorie;
+use App\Models\Compte;
 use App\Services\RecuFiscalService;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Schema;
@@ -51,15 +51,15 @@ it('annule auto le reçu si le montant change', function () {
     expect($recu->annule_motif)->toContain('modifi');
 });
 
-it('annule auto le reçu si la sous_categorie_id change', function () {
+it('annule auto le reçu si le compte_id change', function () {
     setupAssoEligible12();
     $ligne = $this->ligneDonValide();
 
     $recu = app(RecuFiscalService::class)->obtenirOuGenerer($ligne);
 
-    // Créer une autre sous-cat (un usage Don aussi pour rester cohérent)
-    $autreSousCat = SousCategorie::factory()->pourDons()->create();
-    $ligne->update(['sous_categorie_id' => $autreSousCat->id]);
+    // Créer un autre compte (usage Don aussi pour rester cohérent).
+    $autreCompte = Compte::factory()->pourDons()->create();
+    $ligne->update(['compte_id' => $autreCompte->id]);
     $recu->refresh();
 
     expect($recu->isAnnule())->toBeTrue();

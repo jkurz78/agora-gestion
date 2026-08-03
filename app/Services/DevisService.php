@@ -10,6 +10,7 @@ use App\Enums\StatutFacture;
 use App\Enums\TypeLigneDevis;
 use App\Enums\TypeLigneFacture;
 use App\Mail\DevisManuelMail;
+use App\Models\Compte;
 use App\Models\Devis;
 use App\Models\DevisLigne;
 use App\Models\EmailLog;
@@ -80,7 +81,7 @@ final class DevisService
      * son numéro (rebascule). Le statut résultant est Brouillon dans les deux cas.
      *
      * Clés acceptées dans $data : libelle (requis), prix_unitaire (requis),
-     * quantite (défaut 1), sous_categorie_id (nullable).
+     * quantite (défaut 1), compte_id (nullable).
      *
      * @param  array<string, mixed>  $data
      *
@@ -88,7 +89,11 @@ final class DevisService
      */
     public function ajouterLigne(Devis $devis, array $data): DevisLigne
     {
-        return DB::transaction(function () use ($devis, $data): DevisLigne {
+        $compte = $this->resolveCompteProduit(
+            isset($data['compte_id']) ? (int) $data['compte_id'] : null
+        );
+
+        return DB::transaction(function () use ($devis, $data, $compte): DevisLigne {
             $locked = Devis::withoutGlobalScopes()
                 ->whereKey($devis->getKey())
                 ->lockForUpdate()
@@ -111,7 +116,7 @@ final class DevisService
                 'prix_unitaire' => $prixUnitaire,
                 'quantite' => $quantite,
                 'montant' => $montant,
-                'sous_categorie_id' => $data['sous_categorie_id'] ?? null,
+                'compte_id' => $compte?->id,
             ]);
 
             $this->rebasculerSiEnvoye($locked);
@@ -127,7 +132,7 @@ final class DevisService
      * Ajoute une ligne de type texte (commentaire / titre de section) au devis.
      *
      * Une ligne texte porte uniquement un libellé ; prix_unitaire, quantite, montant
-     * et sous_categorie_id sont nuls. Elle n'impacte pas le montant_total.
+     * et compte_id sont nuls. Elle n'impacte pas le montant_total.
      *
      * Mêmes guards que ajouterLigne : refuse si statut verrouillé (Accepte/Refuse/Annule).
      * Si le devis est au statut Valide, le repasse en Brouillon (rebascule).
@@ -155,7 +160,7 @@ final class DevisService
                 'prix_unitaire' => null,
                 'quantite' => null,
                 'montant' => null,
-                'sous_categorie_id' => null,
+                'compte_id' => null,
             ]);
 
             $this->rebasculerSiEnvoye($locked);
@@ -228,7 +233,7 @@ final class DevisService
      * son numéro (rebascule). Le statut résultant est Brouillon dans les deux cas.
      *
      * Seuls les champs fournis dans $data sont mis à jour.
-     * Clés acceptées : libelle, prix_unitaire, quantite, sous_categorie_id.
+     * Clés acceptées : libelle, prix_unitaire, quantite, compte_id.
      *
      * @param  array<string, mixed>  $data
      *
@@ -253,8 +258,11 @@ final class DevisService
                 $updates['libelle'] = $data['libelle'];
             }
 
-            if (array_key_exists('sous_categorie_id', $data)) {
-                $updates['sous_categorie_id'] = $data['sous_categorie_id'];
+            if (array_key_exists('compte_id', $data)) {
+                $compte = $this->resolveCompteProduit(
+                    $data['compte_id'] !== null ? (int) $data['compte_id'] : null
+                );
+                $updates['compte_id'] = $compte?->id;
             }
 
             if (array_key_exists('prix_unitaire', $data)) {
@@ -525,7 +533,7 @@ final class DevisService
      *   tiers_id et libelle copiés depuis la source, association_id hérité de TenantModel,
      *   saisi_par_user_id = auth()->id(), aucune trace accepte/refuse/annule
      * - Lignes recopiées à l'identique (libelle, prix_unitaire, quantite, montant,
-     *   sous_categorie_id, ordre)
+     *   compte_id, ordre)
      * - montant_total = somme des montants des lignes copiées
      * - Aucun lien retour vers le devis source (pas de parent_id)
      */
@@ -562,6 +570,10 @@ final class DevisService
             $nouveau->save();
 
             foreach ($lignesSource as $ligne) {
+                $compte = $this->resolveCompteProduit(
+                    $ligne->compte_id !== null ? (int) $ligne->compte_id : null
+                );
+
                 DevisLigne::create([
                     'devis_id' => $nouveau->id,
                     'ordre' => $ligne->ordre,
@@ -570,7 +582,7 @@ final class DevisService
                     'prix_unitaire' => $ligne->prix_unitaire,
                     'quantite' => $ligne->quantite,
                     'montant' => $ligne->montant,
-                    'sous_categorie_id' => $ligne->sous_categorie_id,
+                    'compte_id' => $compte?->id,
                 ]);
             }
 
@@ -588,7 +600,7 @@ final class DevisService
      *
      * Mapping des lignes :
      * - DevisLigne type Montant → FactureLigne type MontantManuel
-     *   (libelle, prix_unitaire, quantite, montant = PU × Qté, sous_categorie_id recopiés)
+     *   (libelle, prix_unitaire, quantite, montant = PU × Qté, compte_id recopiés)
      * - DevisLigne type Texte → FactureLigne type Texte (libelle seul, reste null)
      *
      * L'ordre des lignes est préservé. Le devis source reste à l'état Accepté.
@@ -697,7 +709,7 @@ final class DevisService
                 'quantite' => null,
                 'montant' => null,
                 'transaction_ligne_id' => null,
-                'sous_categorie_id' => null,
+                'compte_id' => null,
                 'operation_id' => null,
                 'seance' => null,
             ]);
@@ -705,6 +717,9 @@ final class DevisService
 
         // TypeLigneDevis::Montant → TypeLigneFacture::MontantManuel
         $montant = round((float) $ligne->prix_unitaire * (float) $ligne->quantite, 2);
+        $compte = $this->resolveCompteProduit(
+            $ligne->compte_id !== null ? (int) $ligne->compte_id : null
+        );
 
         return FactureLigne::create([
             'facture_id' => $facture->id,
@@ -715,7 +730,7 @@ final class DevisService
             'quantite' => (float) $ligne->quantite,
             'montant' => $montant,
             'transaction_ligne_id' => null,
-            'sous_categorie_id' => $ligne->sous_categorie_id !== null ? (int) $ligne->sous_categorie_id : null,
+            'compte_id' => $compte?->id,
             'operation_id' => null,
             'seance' => null,
         ]);
@@ -993,5 +1008,31 @@ final class DevisService
         if ((int) $locked->association_id !== (int) TenantContext::currentId()) {
             throw new RuntimeException('Accès interdit : ce devis n\'appartient pas à votre association.');
         }
+    }
+
+    /**
+     * Résout un compte produit valide dans le tenant courant.
+     *
+     * Le scope tenant et SoftDeletes de Compte rendent la recherche fail-closed.
+     */
+    private function resolveCompteProduit(?int $compteId): ?Compte
+    {
+        if ($compteId === null) {
+            return null;
+        }
+
+        $compte = Compte::query()
+            ->whereKey($compteId)
+            ->where('actif', true)
+            ->where('classe', 7)
+            ->first();
+
+        if ($compte === null) {
+            throw new RuntimeException(
+                "Le compte de ventilation doit être un compte actif de classe 7 de l'association courante."
+            );
+        }
+
+        return $compte;
     }
 }

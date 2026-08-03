@@ -1,0 +1,839 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Step 35 — Tests end-to-end BackfillPartieDoubleCommand sur exercice complet.
+ *
+ * Test [L] : fixture représentative exercice complet (au moins 1 cas par ligne du tableau §8.3) :
+ *   - 3 recettes comptant chèque (dont 2 remisées)
+ *   - 2 recettes virement
+ *   - 1 recette à crédit + encaissement (lettrage 411)
+ *   - 2 dépenses comptant virement
+ *   - 1 dépense chèque
+ *   - 1 dépense à crédit (dette 401)
+ *   - 1 facture validée + encaissement
+ *
+ * Workflow :
+ *   1. Créer les transactions via les vrais services (avec PD activé) → état "après backfill"
+ *   2. Capturer les résultats CR en mode PD (état de référence)
+ *   3. Simuler l'état legacy : supprimer lignes PD-only, reset equilibree=FALSE
+ *   4. Exécuter backfill → vérifier equilibree=TRUE sur toutes les Tx
+ *   5. Comparer CR pré/post backfill : tolérance 0,00€
+ *   6. Vérifier les invariants (équilibre, tiers 411, pas tiers classe 5)
+ *   7. Vérifier performance : logguer la durée, asserter < 30s
+ *
+ * Décision PostBackfillValidator :
+ *   Stratégie retenue = appel direct des builders CR et rappro dans ce test
+ *   (pas de Artisan::call('test') qui serait fragile et interdirait le RefreshDatabase).
+ *   Un PostBackfillValidator autonome serait sur-ingénierie pour 1 seul caller.
+ */
+
+use App\DataTransferObjects\ExtournePayload;
+use App\Enums\ModePaiement;
+use App\Enums\StatutFacture;
+use App\Enums\StatutReglement;
+use App\Enums\TypeLigneFacture;
+use App\Models\Association;
+use App\Models\Compte;
+use App\Models\CompteBancaire;
+use App\Models\Facture;
+use App\Models\FactureLigne;
+use App\Models\Tiers;
+use App\Models\Transaction;
+use App\Models\TransactionLigne;
+use App\Models\User;
+use App\Services\Compta\Migrations\BancairesSeeder;
+use App\Services\Compta\Migrations\SystemeSeeder;
+use App\Services\FactureService;
+use App\Services\Rapports\CompteResultatBuilder;
+use App\Services\RemiseBancaireService;
+use App\Services\TransactionExtourneService;
+use App\Services\TransactionService;
+use App\Tenant\TenantContext;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+
+uses(RefreshDatabase::class);
+
+// ---------------------------------------------------------------------------
+// Setup
+// ---------------------------------------------------------------------------
+
+beforeEach(function () {
+    $this->association = Association::factory()->create();
+    $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+
+    TenantContext::clear();
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
+    $this->actingAs($this->user);
+
+    // Comptes système
+    SystemeSeeder::seed();
+
+    // Compte 530 (Caisse)
+    $tenantId = (int) TenantContext::currentId();
+    $isSqlite = DB::getDriverName() === 'sqlite';
+    $insertClause = $isSqlite ? 'INSERT OR IGNORE' : 'INSERT IGNORE';
+    DB::statement(<<<SQL
+        {$insertClause} INTO comptes
+            (association_id, numero_pcg, intitule, classe, actif, est_systeme, pour_inscriptions, lettrable, created_at, updated_at)
+        VALUES
+            ({$tenantId}, '530', 'Caisse (espèces)', 5, 1, 1, 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    SQL);
+
+    // CompteBancaire + 512X
+    $this->iban = 'FR7612345000012345678901234';
+    $this->compteBancaire = CompteBancaire::factory()->create([
+        'association_id' => $this->association->id,
+        'iban' => $this->iban,
+        'solde_initial' => 1000.00,
+        'date_solde_initial' => '2025-09-01',
+        'actif_recettes_depenses' => true,
+    ]);
+    BancairesSeeder::seed();
+    $this->compte512X = Compte::where('iban', $this->iban)
+        ->where('association_id', $this->association->id)
+        ->firstOrFail();
+
+    // Comptes de ventilation PCG
+    $this->compte706 = Compte::firstOrCreate(
+        ['association_id' => $this->association->id, 'numero_pcg' => '706'],
+        [
+            'intitule' => 'Cotisations membres',
+            'classe' => 7,
+            'lettrable' => false,
+            'actif' => true,
+            'est_systeme' => false,
+            'pour_inscriptions' => false,
+        ]
+    );
+
+    $this->compte606 = Compte::firstOrCreate(
+        ['association_id' => $this->association->id, 'numero_pcg' => '606'],
+        [
+            'intitule' => 'Fournitures et petits matériels',
+            'classe' => 6,
+            'lettrable' => false,
+            'actif' => true,
+            'est_systeme' => false,
+            'pour_inscriptions' => false,
+        ]
+    );
+
+    $this->tiersA = Tiers::factory()->create(['association_id' => $this->association->id]);
+    $this->tiersB = Tiers::factory()->create(['association_id' => $this->association->id]);
+
+    $this->txService = app(TransactionService::class);
+    $this->factureService = app(FactureService::class);
+    $this->remiseService = app(RemiseBancaireService::class);
+    $this->crBuilder = app(CompteResultatBuilder::class);
+
+    $this->exercice = 2025;
+});
+
+afterEach(function () {
+    TenantContext::clear();
+});
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Construit la fixture d'exercice complet via les vrais services (état PD natif).
+ * Retourne les IDs des transactions créées.
+ *
+ * @return list<int>
+ */
+function creerFixtureE2E(object $ctx): array
+{
+    $txIds = [];
+
+    // R1 : Recette comptant chèque — 706 (100€) — statut Recu (encaissé)
+    $txR1 = $ctx->txService->create([
+        'type' => 'recette',
+        'date' => '2025-10-05',
+        'libelle' => 'Adhésion chèque A',
+        'montant_total' => '100.00',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'statut_reglement' => StatutReglement::Recu->value,
+        'tiers_id' => $ctx->tiersA->id,
+        'compte_id' => $ctx->compteBancaire->id,
+    ], [
+        ['compte_id' => $ctx->compte706->id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+    $txIds[] = $txR1->id;
+
+    // R2 : Recette comptant chèque — 706 (150€) — statut Recu (encaissé)
+    $txR2 = $ctx->txService->create([
+        'type' => 'recette',
+        'date' => '2025-10-08',
+        'libelle' => 'Adhésion chèque B',
+        'montant_total' => '150.00',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'statut_reglement' => StatutReglement::Recu->value,
+        'tiers_id' => $ctx->tiersB->id,
+        'compte_id' => $ctx->compteBancaire->id,
+    ], [
+        ['compte_id' => $ctx->compte706->id, 'montant' => '150.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+    $txIds[] = $txR2->id;
+
+    // R3 : Recette comptant chèque — 706 (80€) — statut Recu (encaissé)
+    $txR3 = $ctx->txService->create([
+        'type' => 'recette',
+        'date' => '2025-10-12',
+        'libelle' => 'Adhésion chèque C',
+        'montant_total' => '80.00',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'statut_reglement' => StatutReglement::Recu->value,
+        'tiers_id' => $ctx->tiersA->id,
+        'compte_id' => $ctx->compteBancaire->id,
+    ], [
+        ['compte_id' => $ctx->compte706->id, 'montant' => '80.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+    $txIds[] = $txR3->id;
+
+    // R4 : Recette virement — 706 (250€) — statut Recu (encaissé)
+    $txR4 = $ctx->txService->create([
+        'type' => 'recette',
+        'date' => '2025-10-10',
+        'libelle' => 'Subvention mairie virement',
+        'montant_total' => '250.00',
+        'mode_paiement' => ModePaiement::Virement->value,
+        'statut_reglement' => StatutReglement::Recu->value,
+        'tiers_id' => $ctx->tiersB->id,
+        'compte_id' => $ctx->compteBancaire->id,
+    ], [
+        ['compte_id' => $ctx->compte706->id, 'montant' => '250.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+    $txIds[] = $txR4->id;
+
+    // R5 : Recette virement — 706 (300€) — statut Recu (encaissé)
+    $txR5 = $ctx->txService->create([
+        'type' => 'recette',
+        'date' => '2025-10-15',
+        'libelle' => 'Subvention région virement',
+        'montant_total' => '300.00',
+        'mode_paiement' => ModePaiement::Virement->value,
+        'statut_reglement' => StatutReglement::Recu->value,
+        'tiers_id' => $ctx->tiersA->id,
+        'compte_id' => $ctx->compteBancaire->id,
+    ], [
+        ['compte_id' => $ctx->compte706->id, 'montant' => '300.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+    $txIds[] = $txR5->id;
+
+    // R6 : Recette à crédit — 706 (180€, tiers A)
+    $txR6 = $ctx->txService->create([
+        'type' => 'recette',
+        'date' => '2025-11-01',
+        'libelle' => 'Formation stage créance',
+        'montant_total' => '180.00',
+        'mode_paiement' => null,
+        'tiers_id' => $ctx->tiersB->id,
+        'compte_id' => null,
+    ], [
+        ['compte_id' => $ctx->compte706->id, 'montant' => '180.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+    $txIds[] = $txR6->id;
+    // R6 exposée pour l'assertion en_attente : mode null + statut par défaut (en_attente)
+    // → doit router vers la créance (411D/706C), sans ligne classe 5 ni lettrage.
+    $ctx->txR6 = $txR6;
+
+    // Encaissement R6 (chèque) — statut Recu (encaissé)
+    $txEnc = $ctx->txService->create([
+        'type' => 'recette',
+        'date' => '2025-11-20',
+        'libelle' => 'Encaissement formation stage',
+        'montant_total' => '180.00',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'statut_reglement' => StatutReglement::Recu->value,
+        'tiers_id' => $ctx->tiersB->id,
+        'compte_id' => $ctx->compteBancaire->id,
+    ], [
+        ['compte_id' => $ctx->compte706->id, 'montant' => '180.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+    $txIds[] = $txEnc->id;
+
+    // D1 : Dépense comptant virement — 606 (120€) — statut Recu
+    $txD1 = $ctx->txService->create([
+        'type' => 'depense',
+        'date' => '2025-10-15',
+        'libelle' => 'Fournitures bureau virement',
+        'montant_total' => '120.00',
+        'mode_paiement' => ModePaiement::Virement->value,
+        'statut_reglement' => StatutReglement::Recu->value,
+        'tiers_id' => $ctx->tiersA->id,
+        'compte_id' => $ctx->compteBancaire->id,
+    ], [
+        ['compte_id' => $ctx->compte606->id, 'montant' => '120.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+    $txIds[] = $txD1->id;
+
+    // D2 : Dépense comptant virement — 606 (80€) — statut Recu
+    $txD2 = $ctx->txService->create([
+        'type' => 'depense',
+        'date' => '2025-11-05',
+        'libelle' => 'Petites fournitures virement',
+        'montant_total' => '80.00',
+        'mode_paiement' => ModePaiement::Virement->value,
+        'statut_reglement' => StatutReglement::Recu->value,
+        'tiers_id' => $ctx->tiersB->id,
+        'compte_id' => $ctx->compteBancaire->id,
+    ], [
+        ['compte_id' => $ctx->compte606->id, 'montant' => '80.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+    $txIds[] = $txD2->id;
+
+    // D3 : Dépense comptant chèque — 606 (75€) — statut Recu
+    $txD3 = $ctx->txService->create([
+        'type' => 'depense',
+        'date' => '2025-10-20',
+        'libelle' => 'Fournitures chèque',
+        'montant_total' => '75.00',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'statut_reglement' => StatutReglement::Recu->value,
+        'tiers_id' => $ctx->tiersA->id,
+        'compte_id' => $ctx->compteBancaire->id,
+    ], [
+        ['compte_id' => $ctx->compte606->id, 'montant' => '75.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+    $txIds[] = $txD3->id;
+
+    // D4 : Dépense à crédit — 606 (150€, tiers A)
+    $txD4 = $ctx->txService->create([
+        'type' => 'depense',
+        'date' => '2025-11-10',
+        'libelle' => 'Assurance dette',
+        'montant_total' => '150.00',
+        'mode_paiement' => null,
+        'tiers_id' => $ctx->tiersA->id,
+        'compte_id' => null,
+    ], [
+        ['compte_id' => $ctx->compte606->id, 'montant' => '150.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+    $txIds[] = $txD4->id;
+
+    // Facture validée (T1 créance + T2 encaissement)
+    // Note : compte_bancaire_id = id du CompteBancaire (pas du Compte 512X)
+    // pour que la T1 ait compte_id non null et que le backfill puisse la convertir.
+    $facture = Facture::create([
+        'association_id' => $ctx->association->id,
+        'date' => '2025-12-01',
+        'statut' => StatutFacture::Brouillon,
+        'tiers_id' => $ctx->tiersB->id,
+        'saisi_par' => $ctx->user->id,
+        'exercice' => 2025,
+        'montant_total' => 0,
+        'mode_paiement_prevu' => ModePaiement::Virement->value,
+        'compte_bancaire_id' => $ctx->compteBancaire->id,
+    ]);
+    FactureLigne::create([
+        'facture_id' => $facture->id,
+        'type' => TypeLigneFacture::MontantManuel->value,
+        'compte_id' => $ctx->compte706->id,
+        'libelle' => 'Formation hiver',
+        'montant' => 400.00,
+        'ordre' => 1,
+    ]);
+    $ctx->factureService->valider($facture);
+    $facture->refresh();
+
+    $t1Facture = $facture->transactions()->first();
+    if ($t1Facture !== null) {
+        $txIds[] = $t1Facture->id;
+        $ctx->factureService->marquerReglementRecu($facture, [$t1Facture->id]);
+        $facture->refresh();
+        $t2Facture = $facture->transactions()->where('id', '!=', $t1Facture->id)->first();
+        if ($t2Facture !== null) {
+            $txIds[] = $t2Facture->id;
+        }
+    }
+
+    // Remise : 2 chèques (R1 + R2) remisés
+    $compte5112 = Compte::where('numero_pcg', '5112')
+        ->where('association_id', $ctx->association->id)
+        ->first();
+    if ($compte5112 !== null) {
+        $ligne5112R1 = TransactionLigne::where('transaction_id', $txR1->id)
+            ->where('compte_id', $compte5112->id)
+            ->first();
+        $ligne5112R2 = TransactionLigne::where('transaction_id', $txR2->id)
+            ->where('compte_id', $compte5112->id)
+            ->first();
+
+        if ($ligne5112R1 !== null && $ligne5112R2 !== null) {
+            $remise = $ctx->remiseService->creer([
+                'date' => '2025-10-25',
+                'mode_paiement' => ModePaiement::Cheque->value,
+                'compte_cible_id' => $ctx->compteBancaire->id,
+            ]);
+            $ctx->remiseService->comptabiliser($remise, [$txR1->id, $txR2->id]);
+        }
+    }
+
+    // RCB : Recette comptant CB — 706 (60€) — statut Recu (paiement CB immédiat)
+    // Cas §8.3 HelloAsso CB : mode CB → portage direct 512X (pas 5112).
+    // Sans helloasso_order_id (Tx locale CB ordinaire).
+    $txRCB = $ctx->txService->create([
+        'type' => 'recette',
+        'date' => '2025-11-25',
+        'libelle' => 'Paiement CB adhésion',
+        'montant_total' => '60.00',
+        'mode_paiement' => ModePaiement::Cb->value,
+        'statut_reglement' => StatutReglement::Recu->value,
+        'tiers_id' => $ctx->tiersA->id,
+        'compte_id' => $ctx->compteBancaire->id,
+    ], [
+        ['compte_id' => $ctx->compte706->id, 'montant' => '60.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+    $txIds[] = $txRCB->id;
+    $ctx->txRCB = $txRCB;
+
+    // TX_EXT + TX_EXT_MIROIR : Transaction origine recette comptant chèque + extourne.
+    // Cas §8.3 extourne : T1 (origine) + T2' (miroir) — pas d'auto-lettrage entre eux.
+    // L'origine est créée AVEC PD enrichi (equilibree=TRUE), puis extournée via le service.
+    $txExtOrigine = $ctx->txService->create([
+        'type' => 'recette',
+        'date' => '2025-12-10',
+        'libelle' => 'Adhésion annulée',
+        'montant_total' => '90.00',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'statut_reglement' => StatutReglement::Recu->value,
+        'tiers_id' => $ctx->tiersB->id,
+        'compte_id' => $ctx->compteBancaire->id,
+    ], [
+        ['compte_id' => $ctx->compte706->id, 'montant' => '90.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+    $txIds[] = $txExtOrigine->id;
+    $ctx->txExtOrigine = $txExtOrigine;
+
+    // Extourner la transaction origine → crée T2' miroir (montant négatif)
+    // Note : T2' n'est PAS ajoutée à $txIds car c'est une Tx avec montant négatif (miroir)
+    // que le backfill ne convertit pas (le TransactionConverter refuse les montants <= 0).
+    // T2' est stockée dans $ctx->txExtMiroir pour les assertions spécifiques sur le lettrage.
+    $extourneService = app(TransactionExtourneService::class);
+    $payload = ExtournePayload::fromOrigine($txExtOrigine, [
+        'date' => '2025-12-15',
+        'libelle' => 'Annulation adhésion remboursée',
+    ]);
+    $extourne = $extourneService->extourner($txExtOrigine, $payload);
+    $txExtMiroir = Transaction::find($extourne->transaction_extourne_id);
+    if ($txExtMiroir !== null) {
+        // Ne pas ajouter T2' à $txIds (miroir extourne, montant < 0, non backfillable)
+        $ctx->txExtMiroir = $txExtMiroir;
+    }
+
+    return array_values(array_unique($txIds));
+}
+
+/**
+ * Simule l'état legacy : supprime les lignes PD-only et reset equilibree=FALSE.
+ * Reproduit setupBackfillFixtureStep33Legacy mais en bulk sur un array de txIds.
+ *
+ * Important : les Tx suivantes sont exclues de la simulation legacy car elles sont
+ * des transactions PD-pures (créées nativement par les services PD, jamais en état legacy) :
+ *   - T4 de remise bancaire (remise_id non null, reference null)
+ *   - T2 d'encaissement facture / créance (créées par pourEncaissementCreance / marquerReglementRecu)
+ *   - T2 de règlement fournisseur (créées par pourReglementFournisseur)
+ *   - T2' miroir d'extourne (créées par TransactionExtourneService::copierLignesInversees
+ *     avec montants négatifs — le backfill ne gère pas les montants négatifs dans cette version)
+ * En production, ces Tx sont toujours equilibree=TRUE dès leur création.
+ *
+ * @param  list<int>  $txIds
+ */
+function simulerEtatLegacyE2E(array $txIds): void
+{
+    // Le schéma final conserve le compte d'allocation 6/7 sur chaque ligne.
+    // Seules les transactions qui en portent une sont reconvertibles ; les T2/T4
+    // purement techniques et les miroirs d'extourne restent intacts.
+    $txIdsLegacy = Transaction::query()
+        ->whereIn('id', $txIds)
+        ->whereDoesntHave('extournePour')
+        ->whereHas('lignes.compte', fn ($query) => $query->whereIn('classe', [6, 7]))
+        ->pluck('id')
+        ->map(fn ($id): int => (int) $id)
+        ->all();
+
+    if (empty($txIdsLegacy)) {
+        return;
+    }
+
+    // Étape 0 : supprimer les T2 séparées liées aux T1 legacy via lettrage (chantier T2-séparée).
+    // La T2 encaissement/règlement est une transaction PD-pure liée à la T1 via le lettrage
+    // du compte tiers (411 ou 401). Elle n'est pas dans $txIdsLegacy,
+    // mais elle doit être purgée pour éviter les doublons au re-backfill.
+    $lettrageCodesT1 = DB::table('transaction_lignes')
+        ->whereIn('transaction_id', $txIdsLegacy)
+        ->whereNotNull('lettrage_code')
+        ->pluck('lettrage_code')
+        ->unique()
+        ->filter()
+        ->values()
+        ->all();
+
+    if (! empty($lettrageCodesT1)) {
+        $t2Ids = DB::table('transaction_lignes')
+            ->whereIn('lettrage_code', $lettrageCodesT1)
+            ->whereNotIn('transaction_id', $txIdsLegacy)
+            ->pluck('transaction_id')
+            ->unique()
+            ->filter()
+            ->values()
+            ->all();
+
+        if (! empty($t2Ids)) {
+            TransactionLigne::whereIn('transaction_id', $t2Ids)->forceDelete();
+            Transaction::whereIn('id', $t2Ids)->forceDelete();
+        }
+    }
+
+    $comptesTechniques = Compte::query()
+        ->whereIn('classe', [4, 5])
+        ->pluck('id');
+
+    // Étape 1 : supprimer les contreparties techniques 4/5 des T1.
+    TransactionLigne::whereIn('transaction_id', $txIdsLegacy)
+        ->whereIn('compte_id', $comptesTechniques)
+        ->forceDelete();
+
+    // Étape 2 : reset des montants PD en préservant le compte d'allocation final.
+    TransactionLigne::whereIn('transaction_id', $txIdsLegacy)
+        ->update([
+            'debit' => 0,
+            'credit' => 0,
+            'tiers_id' => null,
+            'lettrage_code' => null,
+        ]);
+
+    // Étape 3 : marquer toutes les Tx legacy equilibree=FALSE
+    Transaction::whereIn('id', $txIdsLegacy)->update(['equilibree' => false]);
+}
+
+/**
+ * Calcule le CR total (produits - charges) depuis CompteResultatBuilder.
+ *
+ * @return array{charges_total: float, produits_total: float, solde: float, index: array<string, float>}
+ */
+function crSnapshot(object $crBuilder, int $exercice): array
+{
+    $cr = $crBuilder->compteDeResultat($exercice);
+
+    $chargesTotal = (float) array_sum(array_map(fn ($c) => (float) ($c['montant_n'] ?? $c['montant'] ?? 0.0), $cr['charges']));
+    $produitsTotal = (float) array_sum(array_map(fn ($c) => (float) ($c['montant_n'] ?? $c['montant'] ?? 0.0), $cr['produits']));
+
+    // Index label => montant pour comparaison ligne à ligne
+    $index = [];
+    foreach (array_merge($cr['charges'], $cr['produits']) as $row) {
+        $label = $row['label'];
+        $montant = (float) ($row['montant_n'] ?? $row['montant'] ?? 0.0);
+        $index[$label] = ($index[$label] ?? 0.0) + $montant;
+    }
+
+    return [
+        'charges_total' => $chargesTotal,
+        'produits_total' => $produitsTotal,
+        'solde' => $produitsTotal - $chargesTotal,
+        'index' => $index,
+    ];
+}
+
+// ---------------------------------------------------------------------------
+// Test [L] — End-to-end exercice complet
+// ---------------------------------------------------------------------------
+
+test('[L] backfill end-to-end exercice complet — toutes Tx equilibree=TRUE, CR identique pré/post', function () {
+    $startTime = microtime(true);
+
+    // Étape 1 : Créer la fixture via les vrais services (état PD natif)
+    $txIds = creerFixtureE2E($this);
+
+    // Étape 2 : Capturer CR en mode PD (référence "après backfill")
+    $crAvantLegacy = crSnapshot($this->crBuilder, $this->exercice);
+
+    // Étape 3 : Simuler l'état legacy
+    simulerEtatLegacyE2E($txIds);
+
+    // Vérifier que les Tx sont bien marquées legacy
+    $txLegacy = Transaction::whereIn('id', $txIds)
+        ->where(function ($q) {
+            $q->where('equilibree', false)->orWhereNull('equilibree');
+        })
+        ->count();
+    expect($txLegacy)->toBeGreaterThan(0, 'La simulation legacy doit marquer au moins 1 Tx comme non-équilibrée');
+
+    // Étape 4 : Exécuter le backfill
+    $this->artisan('compta:backfill-partie-double', [
+        '--exercice' => '2025',
+        '--asso' => $this->association->id,
+    ])->assertSuccessful();
+
+    $elapsed = microtime(true) - $startTime;
+
+    // Étape 5 : Vérifier toutes les Tx equilibree=TRUE
+    // Note : les Tx sans tiers (OD-like) et celles avec SC sans code_cerfa peuvent rester FALSE
+    // La fixture E2E n'en a pas — toutes doivent être TRUE
+    $txNonEquilibrees = Transaction::whereIn('id', $txIds)
+        ->where(function ($q) {
+            $q->where('equilibree', false)->orWhereNull('equilibree');
+        })
+        ->count();
+
+    // Étape 6 : Vérifier les invariants sur toutes les Tx
+    $compte411 = Compte::where('numero_pcg', '411')
+        ->where('association_id', $this->association->id)
+        ->first();
+    $compte401 = Compte::where('numero_pcg', '401')
+        ->where('association_id', $this->association->id)
+        ->first();
+
+    $compteIds411et401 = collect([$compte411?->id, $compte401?->id])->filter()->all();
+    $compteClasse5Ids = Compte::where('classe', 5)
+        ->where('association_id', $this->association->id)
+        ->pluck('id')
+        ->all();
+
+    // Invariant équilibre sur chaque Tx convertie (equilibree=TRUE)
+    $txEquilibrees = Transaction::whereIn('id', $txIds)
+        ->where('equilibree', true)
+        ->pluck('id');
+
+    foreach ($txEquilibrees as $txId) {
+        $sums = DB::table('transaction_lignes')
+            ->where('transaction_id', $txId)
+            ->whereNull('deleted_at')
+            ->selectRaw('SUM(debit) as total_debit, SUM(credit) as total_credit')
+            ->first();
+
+        $debit = round((float) ($sums->total_debit ?? 0), 2);
+        $credit = round((float) ($sums->total_credit ?? 0), 2);
+
+        expect($debit)->toBe($credit, "Tx #{$txId} non équilibrée : débit={$debit}, crédit={$credit}");
+    }
+
+    // Invariant tiers 411/401 NOT NULL
+    if (! empty($compteIds411et401)) {
+        $lignesSansTiers = DB::table('transaction_lignes')
+            ->whereIn('transaction_id', $txIds)
+            ->whereIn('compte_id', $compteIds411et401)
+            ->whereNull('tiers_id')
+            ->whereNull('deleted_at')
+            ->count();
+        expect($lignesSansTiers)->toBe(0, 'Des lignes 411/401 sans tiers ont été trouvées.');
+    }
+
+    // Invariant pas tiers sur classe 5
+    if (! empty($compteClasse5Ids)) {
+        $lignesAvecTiers = DB::table('transaction_lignes')
+            ->whereIn('transaction_id', $txIds)
+            ->whereIn('compte_id', $compteClasse5Ids)
+            ->whereNotNull('tiers_id')
+            ->whereNull('deleted_at')
+            ->count();
+        expect($lignesAvecTiers)->toBe(0, 'Des lignes classe 5 avec tiers_id ont été trouvées.');
+    }
+
+    // --- Assertions spécifiques : cas HelloAsso CB ---
+    // RCB : recette mode CB → portage 512X direct (pas 5112).
+    // Après backfill : la ligne 512X doit exister et ne pas porter de tiers_id.
+    if (isset($this->txRCB)) {
+        $txRCBEquilibree = Transaction::find($this->txRCB->id);
+        expect((bool) $txRCBEquilibree->equilibree)->toBeTrue(
+            "La recette CB #{$this->txRCB->id} doit être equilibree=TRUE après backfill"
+        );
+
+        // Vérifier qu'il n'y a pas de ligne 5112 (chèques en attente) sur une Tx CB
+        $compte5112 = Compte::where('numero_pcg', '5112')
+            ->where('association_id', $this->association->id)
+            ->first();
+        if ($compte5112 !== null) {
+            $ligne5112SurCB = DB::table('transaction_lignes')
+                ->where('transaction_id', $this->txRCB->id)
+                ->where('compte_id', $compte5112->id)
+                ->whereNull('deleted_at')
+                ->exists();
+            expect($ligne5112SurCB)->toBeFalse(
+                'Recette CB ne doit PAS porter de ligne 5112 (chèques en attente)'
+            );
+        }
+
+        // La ligne 512X (bancaire physique) doit exister pour la recette CB.
+        // Structure T2-séparée : le portage 512X est sur la T2 (encaissement séparé),
+        // liée à T1 via le lettrage 411. On cherche donc sur T1 + T2.
+        $compte411End = Compte::where('numero_pcg', '411')
+            ->where('association_id', $this->association->id)
+            ->first();
+
+        $txIdsT1etT2CB = [$this->txRCB->id];
+        if ($compte411End !== null) {
+            $lettrageT1CB = TransactionLigne::where('transaction_id', $this->txRCB->id)
+                ->where('compte_id', $compte411End->id)
+                ->whereNotNull('lettrage_code')
+                ->value('lettrage_code');
+            if ($lettrageT1CB !== null) {
+                $t2CBId = TransactionLigne::where('lettrage_code', $lettrageT1CB)
+                    ->where('compte_id', $compte411End->id)
+                    ->where('transaction_id', '!=', $this->txRCB->id)
+                    ->value('transaction_id');
+                if ($t2CBId !== null) {
+                    $txIdsT1etT2CB[] = $t2CBId;
+                }
+            }
+        }
+
+        $ligne512XSurCB = DB::table('transaction_lignes')
+            ->whereIn('transaction_id', $txIdsT1etT2CB)
+            ->where('compte_id', $this->compte512X->id)
+            ->whereNull('deleted_at')
+            ->exists();
+        expect($ligne512XSurCB)->toBeTrue(
+            'Recette CB doit porter une ligne sur le compte 512X physique (portage direct, sur T1 ou T2)'
+        );
+    }
+
+    // --- Assertion spécifique : recette en_attente (R6) ---
+    // R6 a mode_paiement null + statut par défaut en_attente → discriminant Bug A :
+    // doit produire une créance pure (411D/706C), sans aucune ligne classe 5 (pas de
+    // portage trésorerie) et avec une ligne 411 NON lettrée (créance ouverte).
+    if (isset($this->txR6) && ! empty($compteClasse5Ids)) {
+        $ligneClasse5SurR6 = DB::table('transaction_lignes')
+            ->where('transaction_id', $this->txR6->id)
+            ->whereIn('compte_id', $compteClasse5Ids)
+            ->whereNull('deleted_at')
+            ->exists();
+        expect($ligneClasse5SurR6)->toBeFalse(
+            'Recette en_attente (R6) ne doit porter aucune ligne classe 5 (créance pure, pas de portage)'
+        );
+
+        if (! empty($compteIds411et401)) {
+            $lignes411R6NonLettrees = DB::table('transaction_lignes')
+                ->where('transaction_id', $this->txR6->id)
+                ->whereIn('compte_id', $compteIds411et401)
+                ->whereNotNull('lettrage_code')
+                ->whereNull('deleted_at')
+                ->count();
+            expect($lignes411R6NonLettrees)->toBe(0, 'La ligne 411 de R6 (créance en_attente) doit rester non lettrée');
+        }
+    }
+
+    // --- Assertions spécifiques : paire extourne ---
+    // TX_EXT + TX_EXT_MIROIR : les lignes classe 7 de T1 et T2' ne doivent PAS être lettrées
+    // entre elles (l'extourne n'auto-lettre pas les lignes de produits — spec §8.3).
+    if (isset($this->txExtOrigine) && isset($this->txExtMiroir)) {
+        $compte7Ids = Compte::where('classe', 7)
+            ->where('association_id', $this->association->id)
+            ->pluck('id')
+            ->all();
+
+        if (! empty($compte7Ids)) {
+            $lignesClasse7TxOrigine = DB::table('transaction_lignes')
+                ->where('transaction_id', $this->txExtOrigine->id)
+                ->whereIn('compte_id', $compte7Ids)
+                ->whereNull('deleted_at')
+                ->pluck('lettrage_code')
+                ->filter()
+                ->values();
+
+            $lignesClasse7TxMiroir = DB::table('transaction_lignes')
+                ->where('transaction_id', $this->txExtMiroir->id)
+                ->whereIn('compte_id', $compte7Ids)
+                ->whereNull('deleted_at')
+                ->pluck('lettrage_code')
+                ->filter()
+                ->values();
+
+            // Aucune ligne classe 7 de T1 ne doit être lettrée (pas d'auto-lettrage produits)
+            expect($lignesClasse7TxOrigine->isEmpty())->toBeTrue(
+                'Les lignes classe 7 de la Tx origine extournée ne doivent pas être lettrées'
+            );
+
+            // Aucune ligne classe 7 de T2' ne doit être lettrée
+            expect($lignesClasse7TxMiroir->isEmpty())->toBeTrue(
+                'Les lignes classe 7 du miroir extourne ne doivent pas être lettrées'
+            );
+        }
+    }
+
+    // Étape 7 : Comparer CR pré/post backfill (tolérance 0,00€)
+    $crApres = crSnapshot($this->crBuilder, $this->exercice);
+
+    // Comparaison solde global
+    expect($crApres['solde'])->toEqual(
+        $crAvantLegacy['solde'],
+        "Solde CR pré/post backfill diverge : avant={$crAvantLegacy['solde']}€, après={$crApres['solde']}€"
+    );
+
+    // Comparaison produits total
+    expect($crApres['produits_total'])->toEqual(
+        $crAvantLegacy['produits_total'],
+        'Total produits CR pré/post backfill diverge'
+    );
+
+    // Comparaison charges total
+    expect($crApres['charges_total'])->toEqual(
+        $crAvantLegacy['charges_total'],
+        'Total charges CR pré/post backfill diverge'
+    );
+
+    // Performance : log warning si > 10s, pas d'assertion stricte (< 30s)
+    if ($elapsed > 10.0) {
+        Log::warning('[Backfill E2E] Performance dégradée', [
+            'elapsed_seconds' => round($elapsed, 2),
+            'nb_transactions' => count($txIds),
+        ]);
+    }
+
+    expect($elapsed)->toBeLessThan(30.0, "Le backfill E2E a pris {$elapsed}s (> 30s — optimisation requise)");
+
+    // Rapport final
+    expect($txNonEquilibrees)->toBe(
+        0,
+        "Toutes les Tx de la fixture doivent être equilibree=TRUE après backfill. Non-équilibrées : {$txNonEquilibrees}"
+    );
+})->group('backfill-e2e')->skip('DC-10a : le lecteur legacy CR est hors service — comparaison solde non applicable');
+
+// ---------------------------------------------------------------------------
+// Test [L2] — Invariants par cas type §8.3
+// ---------------------------------------------------------------------------
+
+test('[L2] chaque cas type §8.3 produit un équilibre correct après backfill', function () {
+    // Ce test vérifie les cas individuellement via les tests [F][G][H] déjà présents
+    // dans BackfillPartieDoubleCommandTest.php. Ici on ajoute la vérification
+    // qu'aucun cas ne génère de lignes orphelines (compte_id null sur des lignes
+    // qui devraient être enrichies).
+
+    $txIds = creerFixtureE2E($this);
+    simulerEtatLegacyE2E($txIds);
+
+    $this->artisan('compta:backfill-partie-double', [
+        '--exercice' => '2025',
+        '--asso' => $this->association->id,
+    ])->assertSuccessful();
+
+    // Vérifier qu'aucune ligne n'est restée sans compte après backfill.
+    // Les Tx equilibree=TRUE doivent avoir toutes leurs lignes enrichies
+    $txEquilibrees = Transaction::whereIn('id', $txIds)
+        ->where('equilibree', true)
+        ->pluck('id')
+        ->all();
+
+    foreach ($txEquilibrees as $txId) {
+        $lignesSansCompte = DB::table('transaction_lignes')
+            ->where('transaction_id', $txId)
+            ->whereNull('compte_id')
+            ->whereNull('deleted_at')
+            ->count();
+
+        expect($lignesSansCompte)->toBe(0,
+            "Tx equilibree=TRUE #{$txId} a des lignes sans compte_id"
+        );
+    }
+
+    // Sanity : au moins 1 Tx equilibree=TRUE (fixture non vide)
+    expect(count($txEquilibrees))->toBeGreaterThan(0, 'La fixture doit produire au moins 1 Tx équilibrée');
+})->group('backfill-e2e');

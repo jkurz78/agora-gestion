@@ -7,10 +7,10 @@ use App\Enums\StatutFacture;
 use App\Enums\TypeLigneDevis;
 use App\Enums\TypeLigneFacture;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\Devis;
 use App\Models\DevisLigne;
 use App\Models\Facture;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\User;
 use App\Services\DevisService;
@@ -32,7 +32,13 @@ beforeEach(function () {
     TenantContext::boot($this->association);
     $this->actingAs($this->user);
     $this->tiers = Tiers::factory()->create();
-    $this->sousCategorie = SousCategorie::factory()->create();
+    $this->compteVentilation = Compte::create([
+        'association_id' => $this->association->id,
+        'numero_pcg' => '706T',
+        'intitule' => 'Prestations transformées',
+        'classe' => 7,
+        'actif' => true,
+    ]);
     $this->service = app(DevisService::class);
 });
 
@@ -45,7 +51,7 @@ afterEach(function () {
 /**
  * Crée un devis au statut Accepté avec 2 lignes Montant + 1 ligne Texte.
  */
-function creerDevisAccepte(Tiers $tiers, SousCategorie $sousCategorie): Devis
+function creerDevisAccepte(Tiers $tiers, Compte $compteVentilation): Devis
 {
     $devis = new Devis([
         'tiers_id' => $tiers->id,
@@ -67,7 +73,7 @@ function creerDevisAccepte(Tiers $tiers, SousCategorie $sousCategorie): Devis
         'prix_unitaire' => 800.00,
         'quantite' => 2.0,
         'montant' => 1600.00,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
     ]);
 
     DevisLigne::create([
@@ -78,7 +84,7 @@ function creerDevisAccepte(Tiers $tiers, SousCategorie $sousCategorie): Devis
         'prix_unitaire' => 200.00,
         'quantite' => 1.0,
         'montant' => 200.00,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
     ]);
 
     DevisLigne::create([
@@ -89,7 +95,7 @@ function creerDevisAccepte(Tiers $tiers, SousCategorie $sousCategorie): Devis
         'prix_unitaire' => null,
         'quantite' => null,
         'montant' => null,
-        'sous_categorie_id' => null,
+        'compte_id' => null,
     ]);
 
     return $devis;
@@ -100,7 +106,7 @@ function creerDevisAccepte(Tiers $tiers, SousCategorie $sousCategorie): Devis
 describe('Happy path : devis accepté (2 lignes Montant + 1 Texte) → Facture brouillon', function () {
 
     it('crée une facture brouillon avec tiers_id et devis_id corrects', function () {
-        $devis = creerDevisAccepte($this->tiers, $this->sousCategorie);
+        $devis = creerDevisAccepte($this->tiers, $this->compteVentilation);
 
         $facture = $this->service->transformerEnFacture($devis);
 
@@ -113,7 +119,7 @@ describe('Happy path : devis accepté (2 lignes Montant + 1 Texte) → Facture b
     });
 
     it('la facture n\'a pas de numéro (statut brouillon)', function () {
-        $devis = creerDevisAccepte($this->tiers, $this->sousCategorie);
+        $devis = creerDevisAccepte($this->tiers, $this->compteVentilation);
 
         $facture = $this->service->transformerEnFacture($devis);
 
@@ -121,7 +127,7 @@ describe('Happy path : devis accepté (2 lignes Montant + 1 Texte) → Facture b
     });
 
     it('crée 3 FactureLignes recopiant les lignes du devis', function () {
-        $devis = creerDevisAccepte($this->tiers, $this->sousCategorie);
+        $devis = creerDevisAccepte($this->tiers, $this->compteVentilation);
 
         $facture = $this->service->transformerEnFacture($devis);
 
@@ -129,7 +135,7 @@ describe('Happy path : devis accepté (2 lignes Montant + 1 Texte) → Facture b
     });
 
     it('les deux lignes Montant du devis sont converties en MontantManuel sur la facture', function () {
-        $devis = creerDevisAccepte($this->tiers, $this->sousCategorie);
+        $devis = creerDevisAccepte($this->tiers, $this->compteVentilation);
 
         $facture = $this->service->transformerEnFacture($devis);
 
@@ -146,7 +152,7 @@ describe('Happy path : devis accepté (2 lignes Montant + 1 Texte) → Facture b
     });
 
     it('la ligne Texte du devis est copiée comme ligne Texte sur la facture', function () {
-        $devis = creerDevisAccepte($this->tiers, $this->sousCategorie);
+        $devis = creerDevisAccepte($this->tiers, $this->compteVentilation);
 
         $facture = $this->service->transformerEnFacture($devis);
 
@@ -164,8 +170,8 @@ describe('Happy path : devis accepté (2 lignes Montant + 1 Texte) → Facture b
             ->and($ligneTexte->transaction_ligne_id)->toBeNull();
     });
 
-    it('les libelle, prix_unitaire, quantite et sous_categorie_id sont recopiés sur les lignes MontantManuel', function () {
-        $devis = creerDevisAccepte($this->tiers, $this->sousCategorie);
+    it('les libelle, prix_unitaire, quantite et compte_id sont recopiés sur les lignes MontantManuel', function () {
+        $devis = creerDevisAccepte($this->tiers, $this->compteVentilation);
 
         $facture = $this->service->transformerEnFacture($devis);
 
@@ -179,18 +185,18 @@ describe('Happy path : devis accepté (2 lignes Montant + 1 Texte) → Facture b
             ->and((float) $premiere->prix_unitaire)->toBe(800.0)
             ->and((float) $premiere->quantite)->toBe(2.0)
             ->and((float) $premiere->montant)->toBe(1600.0)
-            ->and((int) $premiere->sous_categorie_id)->toBe((int) $this->sousCategorie->id);
+            ->and((int) $premiere->compte_id)->toBe((int) $this->compteVentilation->id);
 
         $seconde = $lignesMontantManuel->skip(1)->first();
         expect($seconde->libelle)->toBe('Frais déplacement')
             ->and((float) $seconde->prix_unitaire)->toBe(200.0)
             ->and((float) $seconde->quantite)->toBe(1.0)
             ->and((float) $seconde->montant)->toBe(200.0)
-            ->and((int) $seconde->sous_categorie_id)->toBe((int) $this->sousCategorie->id);
+            ->and((int) $seconde->compte_id)->toBe((int) $this->compteVentilation->id);
     });
 
     it('le montant_total est la somme des montants des lignes Montant (1600 + 200 = 1800)', function () {
-        $devis = creerDevisAccepte($this->tiers, $this->sousCategorie);
+        $devis = creerDevisAccepte($this->tiers, $this->compteVentilation);
 
         $facture = $this->service->transformerEnFacture($devis);
 
@@ -198,7 +204,7 @@ describe('Happy path : devis accepté (2 lignes Montant + 1 Texte) → Facture b
     });
 
     it('l\'ordre des lignes est préservé', function () {
-        $devis = creerDevisAccepte($this->tiers, $this->sousCategorie);
+        $devis = creerDevisAccepte($this->tiers, $this->compteVentilation);
 
         $facture = $this->service->transformerEnFacture($devis);
 
@@ -218,7 +224,7 @@ describe('Happy path : devis accepté (2 lignes Montant + 1 Texte) → Facture b
     });
 
     it('transaction_ligne_id est null partout (brouillon, pas encore validée)', function () {
-        $devis = creerDevisAccepte($this->tiers, $this->sousCategorie);
+        $devis = creerDevisAccepte($this->tiers, $this->compteVentilation);
 
         $facture = $this->service->transformerEnFacture($devis);
 
@@ -228,7 +234,7 @@ describe('Happy path : devis accepté (2 lignes Montant + 1 Texte) → Facture b
     });
 
     it('le devis reste au statut Accepté après transformation', function () {
-        $devis = creerDevisAccepte($this->tiers, $this->sousCategorie);
+        $devis = creerDevisAccepte($this->tiers, $this->compteVentilation);
 
         $this->service->transformerEnFacture($devis);
 
@@ -236,7 +242,7 @@ describe('Happy path : devis accepté (2 lignes Montant + 1 Texte) → Facture b
     });
 
     it('persiste la facture et les lignes en base de données', function () {
-        $devis = creerDevisAccepte($this->tiers, $this->sousCategorie);
+        $devis = creerDevisAccepte($this->tiers, $this->compteVentilation);
 
         $facture = $this->service->transformerEnFacture($devis);
 
@@ -259,6 +265,22 @@ describe('Happy path : devis accepté (2 lignes Montant + 1 Texte) → Facture b
             'type' => TypeLigneFacture::Texte->value,
             'libelle' => 'Détail de la prestation selon annexe',
         ]);
+    });
+
+    it('refuse un compte devenu hors classe 7 sans créer de facture partielle', function () {
+        $devis = creerDevisAccepte($this->tiers, $this->compteVentilation);
+        $this->compteVentilation->update([
+            'numero_pcg' => '606T',
+            'classe' => 6,
+        ]);
+
+        $nombreFacturesAvant = Facture::withoutGlobalScopes()->count();
+
+        expect(fn () => $this->service->transformerEnFacture($devis))
+            ->toThrow(RuntimeException::class, 'compte actif de classe 7');
+
+        expect(Facture::withoutGlobalScopes()->count())->toBe($nombreFacturesAvant)
+            ->and($devis->fresh()->statut)->toBe(StatutDevis::Accepte);
     });
 });
 
@@ -359,7 +381,7 @@ describe('Guard statut : seul un devis Accepté peut être transformé', functio
 describe('Guard déjà transformé : un devis accepté ne peut être transformé qu\'une seule fois', function () {
 
     it('lève une exception si une facture issue du devis existe déjà', function () {
-        $devis = creerDevisAccepte($this->tiers, $this->sousCategorie);
+        $devis = creerDevisAccepte($this->tiers, $this->compteVentilation);
 
         // Première transformation — réussit
         $this->service->transformerEnFacture($devis);
@@ -370,7 +392,7 @@ describe('Guard déjà transformé : un devis accepté ne peut être transformé
     });
 
     it('il n\'y a qu\'une seule facture en DB après deux tentatives', function () {
-        $devis = creerDevisAccepte($this->tiers, $this->sousCategorie);
+        $devis = creerDevisAccepte($this->tiers, $this->compteVentilation);
 
         $this->service->transformerEnFacture($devis);
 
@@ -388,7 +410,7 @@ describe('Guard déjà transformé : un devis accepté ne peut être transformé
 describe('Race : double transformation simultanée → une seule facture créée', function () {
 
     it('la seconde transformation séquentielle lève et n\'insère pas de doublon', function () {
-        $devis = creerDevisAccepte($this->tiers, $this->sousCategorie);
+        $devis = creerDevisAccepte($this->tiers, $this->compteVentilation);
 
         // Premier appel : réussit
         $this->service->transformerEnFacture($devis);
@@ -455,7 +477,7 @@ describe('Multi-tenant : un devis d\'une autre association lève une exception',
 describe('Logs : devis.transforme_en_facture émis avec devis_id + facture_id', function () {
 
     it('émet le log devis.transforme_en_facture avec les bons IDs', function () {
-        $devis = creerDevisAccepte($this->tiers, $this->sousCategorie);
+        $devis = creerDevisAccepte($this->tiers, $this->compteVentilation);
 
         $spy = Log::spy();
 
@@ -480,7 +502,7 @@ describe('Logs : devis.transforme_en_facture émis avec devis_id + facture_id', 
 describe('Numérotation : la facture brouillon créée n\'a pas de numéro', function () {
 
     it('facture.numero est null après transformation', function () {
-        $devis = creerDevisAccepte($this->tiers, $this->sousCategorie);
+        $devis = creerDevisAccepte($this->tiers, $this->compteVentilation);
 
         $facture = $this->service->transformerEnFacture($devis);
 

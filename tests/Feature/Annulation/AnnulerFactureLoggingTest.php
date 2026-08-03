@@ -8,14 +8,15 @@ use App\Enums\StatutReglement;
 use App\Enums\TypeLigneFacture;
 use App\Enums\TypeTransaction;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
 use App\Models\FactureLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\ExerciceService;
 use App\Services\FactureService;
 use App\Tenant\TenantContext;
@@ -40,6 +41,7 @@ beforeEach(function (): void {
     $this->comptable->update(['derniere_association_id' => $this->association->id]);
 
     TenantContext::boot($this->association);
+    SystemeSeeder::seed();
     $this->actingAs($this->comptable);
 
     $this->service = app(FactureService::class);
@@ -63,7 +65,7 @@ afterEach(function (): void {
 function loggingCreerFactureMixteValidee(
     FactureService $service,
     Tiers $tiers,
-    SousCategorie $sousCategorie,
+    Compte $compteVentilation,
     CompteBancaire $compte,
 ): array {
     // Tref préexistante 50 € Recu
@@ -79,7 +81,7 @@ function loggingCreerFactureMixteValidee(
 
     TransactionLigne::create([
         'transaction_id' => $tref->id,
-        'sous_categorie_id' => null,
+        'compte_id' => null,
         'montant' => 50.0,
     ]);
 
@@ -97,7 +99,7 @@ function loggingCreerFactureMixteValidee(
         'quantite' => 1.0,
         'montant' => 100.0,
         'transaction_ligne_id' => null,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
         'ordre' => 1,
     ]);
 
@@ -124,12 +126,12 @@ function loggingCreerFactureMixteValidee(
 
 test('annuler dispatche un log facture.annulee avec les IDs enrichis', function (): void {
     $tiers = Tiers::factory()->create(['pour_recettes' => true]);
-    $sousCategorie = SousCategorie::factory()->create();
+    $compteVentilation = Compte::factory()->numero('706')->create();
 
     [$facture, $tg, $tref] = loggingCreerFactureMixteValidee(
         $this->service,
         $tiers,
-        $sousCategorie,
+        $compteVentilation,
         $this->compte,
     );
 

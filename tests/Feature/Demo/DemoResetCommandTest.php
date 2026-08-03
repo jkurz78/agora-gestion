@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Models\Association;
+use App\Models\Compte;
+use App\Models\Famille;
 use App\Models\User;
 use App\Support\Demo\DateDelta;
 use App\Support\Demo\SnapshotConfig;
@@ -45,7 +47,7 @@ function buildMinimalSnapshot(Carbon $ref, array $overrides = []): string
 
     $snapshot = array_merge([
         'captured_at' => $capturedAt,
-        'schema_version' => 1,
+        'schema_version' => SnapshotConfig::SCHEMA_VERSION,
         'tables' => [
             'association' => [
                 [
@@ -172,6 +174,53 @@ it('resets DB from valid snapshot with correct date rehydration and password', f
 
     // DEMO_USER_PASSWORD_HASH must verify against 'demo'
     expect(Hash::check('demo', $user->password))->toBeTrue();
+});
+
+it('refuses a V1 snapshot before maintenance and preserves the database', function (): void {
+    app()->detectEnvironment(fn (): string => 'demo');
+    config(['app.url' => 'https://demo.agoragestion.org']);
+
+    $sentinel = TenantContext::current();
+    $sentinel->update(['nom' => 'Sentinelle V1 intacte']);
+    $snapshotPath = buildMinimalSnapshot(Carbon::parse('2026-04-15T10:00:00+00:00'), [
+        'schema_version' => 1,
+    ]);
+
+    $exitCode = Artisan::call('demo:reset', [
+        '--snapshot' => $snapshotPath,
+        '--skip-migrate' => true,
+    ]);
+
+    expect($exitCode)->not->toBe(0);
+    expect(Artisan::output())->toContain('version 1', 'version 2 attendue');
+
+    expect(DB::table('association')->where('id', $sentinel->id)->value('nom'))
+        ->toBe('Sentinelle V1 intacte');
+    expect(app()->isDownForMaintenance())->toBeFalse();
+});
+
+it('refuses a snapshot without schema version before maintenance and preserves the database', function (): void {
+    app()->detectEnvironment(fn (): string => 'demo');
+    config(['app.url' => 'https://demo.agoragestion.org']);
+
+    $sentinel = TenantContext::current();
+    $sentinel->update(['nom' => 'Sentinelle sans version intacte']);
+    $snapshotPath = buildMinimalSnapshot(Carbon::parse('2026-04-15T10:00:00+00:00'));
+    $snapshot = Yaml::parseFile($snapshotPath);
+    unset($snapshot['schema_version']);
+    file_put_contents($snapshotPath, Yaml::dump($snapshot, 8, 2));
+
+    $exitCode = Artisan::call('demo:reset', [
+        '--snapshot' => $snapshotPath,
+        '--skip-migrate' => true,
+    ]);
+
+    expect($exitCode)->not->toBe(0);
+    expect(Artisan::output())->toContain('schema_version', 'absente');
+
+    expect(DB::table('association')->where('id', $sentinel->id)->value('nom'))
+        ->toBe('Sentinelle sans version intacte');
+    expect(app()->isDownForMaintenance())->toBeFalse();
 });
 
 // ---------------------------------------------------------------------------
@@ -312,4 +361,36 @@ it('round-trips data through demo:capture then demo:reset', function (): void {
     expect(Hash::check('demo', $restoredUser->password))->toBeTrue();
 
     @unlink($snapPath);
+});
+
+// ---------------------------------------------------------------------------
+// T6 — le snapshot versionné est directement rejouable sur le schéma final.
+// ---------------------------------------------------------------------------
+it('loads the real V2 snapshot on the final account-first schema', function (): void {
+    app()->detectEnvironment(fn (): string => 'demo');
+    config(['app.url' => 'https://demo.agoragestion.org']);
+
+    $snapshotPath = base_path('database/demo/snapshot.yaml');
+    $snapshot = Yaml::parseFile($snapshotPath);
+
+    expect(SnapshotConfig::SCHEMA_VERSION)->toBe(2);
+    expect($snapshot['schema_version'])->toBe(2);
+    expect($snapshot['tables'])->toHaveKeys(['comptes', 'familles', 'transaction_lignes']);
+
+    $exitCode = $this->artisan('demo:reset', [
+        '--snapshot' => $snapshotPath,
+        '--skip-migrate' => true,
+    ])->execute();
+
+    expect($exitCode)->toBe(0);
+
+    expect(Compte::withoutGlobalScopes()->count())->toBeGreaterThan(0);
+    expect(Famille::withoutGlobalScopes()->count())->toBeGreaterThan(0);
+    expect(DB::table('transactions')->count())->toBeGreaterThan(0);
+    expect(DB::table('transaction_lignes')
+        ->select('transaction_id')
+        ->groupBy('transaction_id')
+        ->havingRaw('ROUND(SUM(debit), 2) <> ROUND(SUM(credit), 2)')
+        ->count())->toBe(0);
+    expect(DB::select('PRAGMA foreign_key_check'))->toBe([]);
 });

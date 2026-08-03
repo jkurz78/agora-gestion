@@ -6,11 +6,10 @@ namespace App\Models;
 
 use App\Enums\HelloAssoEnvironnement;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-final class HelloAssoParametres extends Model
+final class HelloAssoParametres extends TenantModel
 {
     use HasFactory;
 
@@ -30,7 +29,7 @@ final class HelloAssoParametres extends Model
         'callback_token',
         'compte_helloasso_id',
         'compte_versement_id',
-        'sous_categorie_don_id',
+        'compte_don_id',
     ];
 
     protected function casts(): array
@@ -42,13 +41,8 @@ final class HelloAssoParametres extends Model
             'environnement' => HelloAssoEnvironnement::class,
             'compte_helloasso_id' => 'integer',
             'compte_versement_id' => 'integer',
-            'sous_categorie_don_id' => 'integer',
+            'compte_don_id' => 'integer',
         ];
-    }
-
-    public function association(): BelongsTo
-    {
-        return $this->belongsTo(Association::class);
     }
 
     public function compteHelloasso(): BelongsTo

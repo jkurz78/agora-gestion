@@ -3,11 +3,12 @@
 declare(strict_types=1);
 
 use App\Enums\StatutNoteDeFrais;
+use App\Models\Compte;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Services\Portail\NoteDeFrais\NoteDeFraisService;
+use App\Tenant\TenantContext;
 use Illuminate\Validation\ValidationException;
 
 function submitService(): NoteDeFraisService
@@ -17,11 +18,17 @@ function submitService(): NoteDeFraisService
 
 function validLigne(int $noteDeFraisId, array $override = []): NoteDeFraisLigne
 {
-    $sousCategorie = SousCategorie::factory()->create();
+    $compte = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '61SS'.random_int(100, 999),
+        'intitule' => 'Charge NDF',
+        'classe' => 6,
+        'actif' => true,
+    ]);
 
     return NoteDeFraisLigne::factory()->create(array_merge([
         'note_de_frais_id' => $noteDeFraisId,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compte->id,
         'montant' => 25.00,
         'piece_jointe_path' => 'associations/1/notes-de-frais/1/ligne-1.pdf',
     ], $override));
@@ -120,17 +127,17 @@ it('submit: refuse si aucune ligne', function () {
 });
 
 // ---------------------------------------------------------------------------
-// 5. Refus : ligne sans sous-catégorie
+// 5. Refus : ligne sans compte
 // ---------------------------------------------------------------------------
 
-it('submit: refuse une ligne sans sous-catégorie', function () {
+it('submit: refuse une ligne sans compte', function () {
     $tiers = Tiers::factory()->create();
     $ndf = NoteDeFrais::factory()->brouillon()->create([
         'tiers_id' => $tiers->id,
         'date' => now()->subDay()->format('Y-m-d'),
         'libelle' => 'Déplacement',
     ]);
-    validLigne($ndf->id, ['sous_categorie_id' => null]);
+    validLigne($ndf->id, ['compte_id' => null]);
 
     try {
         submitService()->submit($ndf);
@@ -138,7 +145,7 @@ it('submit: refuse une ligne sans sous-catégorie', function () {
     } catch (ValidationException $e) {
         $errors = $e->errors();
         $allMessages = array_merge(...array_values($errors));
-        expect(implode(' ', $allMessages))->toContain('La sous-catégorie est obligatoire.');
+        expect(implode(' ', $allMessages))->toContain('La nature de la dépense est obligatoire.');
     }
 });
 
@@ -201,10 +208,10 @@ it('submit: refuse une NDF déjà soumise (DomainException)', function () {
 });
 
 // ---------------------------------------------------------------------------
-// 9. Ligne km sans sous_categorie_id → soumission autorisée
+// 9. Ligne km sans compte_id → soumission autorisée
 // ---------------------------------------------------------------------------
 
-it('submit: autorise la soumission d\'une ligne km sans sous_categorie_id (cas 0 flag flaggée)', function () {
+it('submit: autorise la soumission d\'une ligne km sans compte_id (cas 0 flag flaggée)', function () {
     $tiers = Tiers::factory()->create();
     $ndf = NoteDeFrais::factory()->brouillon()->create([
         'tiers_id' => $tiers->id,
@@ -212,11 +219,11 @@ it('submit: autorise la soumission d\'une ligne km sans sous_categorie_id (cas 0
         'libelle' => 'Déplacement kilométrique',
     ]);
 
-    // Ligne km sans sous_categorie_id ni metadata — le comptable tranchera
+    // Ligne km sans compte_id ni metadata — le comptable tranchera
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
         'type' => 'kilometrique',
-        'sous_categorie_id' => null,
+        'compte_id' => null,
         'montant' => 50.00,
         'piece_jointe_path' => 'associations/1/notes-de-frais/1/carte-grise.pdf',
     ]);

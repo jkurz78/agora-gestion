@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Enums\UsageComptable;
 use App\Models\CompteBancaire;
 use App\Models\Tiers;
+use App\Services\Compta\PostesTiersOuvertsService;
 use App\Tenant\TenantContext;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Query\Builder;
@@ -30,23 +31,25 @@ final class TransactionUniverselleService
         ?string $searchNumeroPiece,
         ?string $modePaiement,
         ?string $statutReglement,
-        ?string $sousCategorieFilter = null,
+        ?string $usageFilter = null,
         bool $computeSolde = false,
         string $sortColumn = 'date',
         string $sortDirection = 'desc',
         int $perPage = 25,
         int $page = 1,
         bool $ndfUniquement = false,
+        ?int $exercice = null,
     ): array {
         $allowedColumns = ['id', 'date', 'numero_piece', 'reference', 'tiers', 'libelle',
-            'categorie_label', 'nb_lignes', 'compte_id', 'compte_nom', 'mode_paiement',
+            'compte_ventilation_nom', 'nb_lignes', 'compte_id', 'compte_nom', 'mode_paiement',
             'montant', 'pointe', 'source_type', 'tiers_type', 'tiers_id'];
         if (! in_array($sortColumn, $allowedColumns, true)) {
             $sortColumn = 'date';
         }
         $sortDirection = $sortDirection === 'asc' ? 'asc' : 'desc';
 
-        $union = $this->buildUnion($compteId, $tiersId, $types, $dateDebut, $dateFin, $sousCategorieFilter, $ndfUniquement);
+        $exerciceAffiche = $exercice ?? app(ExerciceService::class)->current();
+        $union = $this->buildUnion($compteId, $tiersId, $types, $dateDebut, $dateFin, $usageFilter, $ndfUniquement, $exerciceAffiche);
 
         $outer = DB::query()->fromSub($union, 't')
             ->when($searchTiers, fn ($q) => $q->where('t.tiers', 'like', "%{$searchTiers}%"))
@@ -76,7 +79,7 @@ final class TransactionUniverselleService
                 $offset = ($paginator->currentPage() - 1) * $perPage;
                 $sumAvant = 0.0;
                 if ($offset > 0) {
-                    $unionForSolde = $this->buildUnion($compteId, $tiersId, $types, $dateDebut, $dateFin, $sousCategorieFilter, $ndfUniquement);
+                    $unionForSolde = $this->buildUnion($compteId, $tiersId, $types, $dateDebut, $dateFin, $usageFilter, $ndfUniquement, $exerciceAffiche);
                     $inner = DB::query()->fromSub($unionForSolde, 'u')
                         ->select('montant')
                         ->orderBy("u.{$sortColumn}", $sortDirection)
@@ -104,8 +107,9 @@ final class TransactionUniverselleService
         ?array $types,
         ?string $dateDebut,
         ?string $dateFin,
-        ?string $sousCategorieFilter = null,
+        ?string $usageFilter = null,
         bool $ndfUniquement = false,
+        ?int $exercice = null,
     ): Builder {
         // Map external string filter to UsageComptable (preserves external API, eliminates column interpolation)
         $flagToUsage = [
@@ -113,7 +117,7 @@ final class TransactionUniverselleService
             'pour_cotisations' => UsageComptable::Cotisation,
             'pour_inscriptions' => UsageComptable::Inscription,
         ];
-        $usageFilter = $flagToUsage[$sousCategorieFilter] ?? null;
+        $usage = $flagToUsage[$usageFilter] ?? null;
 
         $include = [
             'depense' => $types === null || in_array('depense', $types, true),
@@ -123,14 +127,36 @@ final class TransactionUniverselleService
 
         $queries = [];
         if ($include['depense']) {
-            $queries[] = $this->brancheDepense($compteId, $tiersId, $dateDebut, $dateFin, $usageFilter, $ndfUniquement);
+            $queries[] = $this->brancheDepense($compteId, $tiersId, $dateDebut, $dateFin, $usage, $ndfUniquement);
         }
         if ($include['recette']) {
-            $queries[] = $this->brancheRecette($compteId, $tiersId, $dateDebut, $dateFin, $usageFilter, $ndfUniquement);
+            $queries[] = $this->brancheRecette($compteId, $tiersId, $dateDebut, $dateFin, $usage, $ndfUniquement);
         }
-        if ($include['virement'] && $usageFilter === null && ! $ndfUniquement) {
+        if ($include['virement'] && $usage === null && ! $ndfUniquement) {
             $queries[] = $this->brancheVirementSortant($compteId, $tiersId, $dateDebut, $dateFin);
             $queries[] = $this->brancheVirementEntrant($compteId, $tiersId, $dateDebut, $dateFin);
+        }
+        if ($compteId === null && $usage === null && ! $ndfUniquement && ($include['depense'] || $include['recette'])) {
+            $reports = DB::query()
+                ->fromSub(
+                    app(PostesTiersOuvertsService::class)->brancheReportsTransactions(
+                        $exercice ?? app(ExerciceService::class)->current()
+                    ),
+                    'report_an',
+                )
+                ->select('report_an.*')
+                ->when($tiersId !== null, fn (Builder $query) => $query->where('report_an.tiers_id', $tiersId))
+                ->when($dateDebut, fn (Builder $query) => $query->where('report_an.date', '>=', $dateDebut))
+                ->when($dateFin, fn (Builder $query) => $query->where('report_an.date', '<=', $dateFin));
+
+            if (! $include['depense']) {
+                $reports->where('report_an.sens_tresorerie', 'recette');
+            }
+            if (! $include['recette']) {
+                $reports->where('report_an.sens_tresorerie', 'depense');
+            }
+
+            $queries[] = $reports;
         }
 
         if (empty($queries)) {
@@ -138,11 +164,12 @@ final class TransactionUniverselleService
             return DB::table('transactions')->whereRaw('1 = 0')->selectRaw(
                 "id, 'depense' as source_type, NULL as date, NULL as numero_piece, NULL as reference,
                  NULL as tiers, NULL as tiers_type, NULL as tiers_id, NULL as libelle,
-                 NULL as categorie_label, 0 as nb_lignes, NULL as compte_id, NULL as compte_nom,
+                 NULL as compte_ventilation_nom, 0 as nb_lignes, NULL as compte_id, NULL as compte_nom,
                  NULL as mode_paiement, 0 as montant, NULL as pointe,
                  NULL as statut_reglement, NULL as remise_id, NULL as rapprochement_id,
                  NULL as notes, NULL as piece_jointe_path, NULL as piece_jointe_nom, 0 as is_helloasso,
-                 NULL as extournee_at, 0 as is_extourne_miroir, NULL as reglement_id, 0 as is_locked_by_facture"
+                 NULL as extournee_at, 0 as is_extourne_miroir, NULL as reglement_id, 0 as is_locked_by_facture,
+                 'depense' as sens_tresorerie, NULL as poste_tiers_ligne_id, 0 as is_report_an"
             );
         }
 
@@ -175,9 +202,9 @@ final class TransactionUniverselleService
                 t.type as tiers_type,
                 tx.tiers_id,
                 tx.libelle,
-                (SELECT sc.nom FROM transaction_lignes tl
-                 JOIN sous_categories sc ON sc.id = tl.sous_categorie_id
-                 WHERE tl.transaction_id = tx.id ORDER BY tl.id LIMIT 1) as categorie_label,
+                (SELECT c.intitule FROM transaction_lignes tl
+                 JOIN comptes c ON c.id = tl.compte_id AND c.classe IN (6, 7)
+                 WHERE tl.transaction_id = tx.id ORDER BY tl.id LIMIT 1) as compte_ventilation_nom,
                 (SELECT COUNT(*) FROM transaction_lignes WHERE transaction_id = tx.id) as nb_lignes,
                 tx.compte_id,
                 cb.nom as compte_nom,
@@ -194,9 +221,13 @@ final class TransactionUniverselleService
                 tx.extournee_at,
                 EXISTS(SELECT 1 FROM extournes e WHERE e.transaction_extourne_id = tx.id AND e.deleted_at IS NULL) as is_extourne_miroir,
                 tx.reglement_id,
-                EXISTS(SELECT 1 FROM facture_transaction ft JOIN factures f ON f.id = ft.facture_id WHERE ft.transaction_id = tx.id AND f.statut = 'validee') as is_locked_by_facture
+                EXISTS(SELECT 1 FROM facture_transaction ft JOIN factures f ON f.id = ft.facture_id WHERE ft.transaction_id = tx.id AND f.statut = 'validee') as is_locked_by_facture,
+                CASE WHEN tx.type_ecriture = 'extourne' THEN 'recette' ELSE 'depense' END AS sens_tresorerie,
+                NULL as poste_tiers_ligne_id,
+                0 as is_report_an
             ")
             ->where('tx.type', 'depense')
+            ->whereIn('tx.journal', ['vente', 'achat'])
             ->whereNull('tx.deleted_at')
             ->when(TenantContext::hasBooted(), fn ($q) => $q->where('tx.association_id', TenantContext::currentId()))
             ->when($compteId !== null, fn ($q) => $q->where('tx.compte_id', $compteId))
@@ -206,7 +237,7 @@ final class TransactionUniverselleService
             ->when($usageFilter !== null, fn ($q) => $q->whereExists(function ($sub) use ($usageFilter) {
                 $sub->select(DB::raw(1))
                     ->from('transaction_lignes as tl_filter')
-                    ->join('usages_sous_categories as usc_filter', 'usc_filter.sous_categorie_id', '=', 'tl_filter.sous_categorie_id')
+                    ->join('usages_comptes as usc_filter', 'usc_filter.compte_id', '=', 'tl_filter.compte_id')
                     ->whereColumn('tl_filter.transaction_id', 'tx.id')
                     ->where('usc_filter.usage', $usageFilter->value);
             }))
@@ -239,9 +270,9 @@ final class TransactionUniverselleService
                 t.type as tiers_type,
                 tx.tiers_id,
                 tx.libelle,
-                (SELECT sc.nom FROM transaction_lignes tl
-                 JOIN sous_categories sc ON sc.id = tl.sous_categorie_id
-                 WHERE tl.transaction_id = tx.id ORDER BY tl.id LIMIT 1) as categorie_label,
+                (SELECT c.intitule FROM transaction_lignes tl
+                 JOIN comptes c ON c.id = tl.compte_id AND c.classe IN (6, 7)
+                 WHERE tl.transaction_id = tx.id ORDER BY tl.id LIMIT 1) as compte_ventilation_nom,
                 (SELECT COUNT(*) FROM transaction_lignes WHERE transaction_id = tx.id) as nb_lignes,
                 tx.compte_id,
                 cb.nom as compte_nom,
@@ -258,9 +289,13 @@ final class TransactionUniverselleService
                 tx.extournee_at,
                 EXISTS(SELECT 1 FROM extournes e WHERE e.transaction_extourne_id = tx.id AND e.deleted_at IS NULL) as is_extourne_miroir,
                 tx.reglement_id,
-                EXISTS(SELECT 1 FROM facture_transaction ft JOIN factures f ON f.id = ft.facture_id WHERE ft.transaction_id = tx.id AND f.statut = 'validee') as is_locked_by_facture
+                EXISTS(SELECT 1 FROM facture_transaction ft JOIN factures f ON f.id = ft.facture_id WHERE ft.transaction_id = tx.id AND f.statut = 'validee') as is_locked_by_facture,
+                CASE WHEN tx.type_ecriture = 'extourne' THEN 'depense' ELSE 'recette' END AS sens_tresorerie,
+                NULL as poste_tiers_ligne_id,
+                0 as is_report_an
             ")
             ->where('tx.type', 'recette')
+            ->whereIn('tx.journal', ['vente', 'achat', 'od'])
             ->whereNull('tx.deleted_at')
             ->when(TenantContext::hasBooted(), fn ($q) => $q->where('tx.association_id', TenantContext::currentId()))
             ->when($compteId !== null, fn ($q) => $q->where('tx.compte_id', $compteId))
@@ -270,7 +305,7 @@ final class TransactionUniverselleService
             ->when($usageFilter !== null, fn ($q) => $q->whereExists(function ($sub) use ($usageFilter) {
                 $sub->select(DB::raw(1))
                     ->from('transaction_lignes as tl_filter')
-                    ->join('usages_sous_categories as usc_filter', 'usc_filter.sous_categorie_id', '=', 'tl_filter.sous_categorie_id')
+                    ->join('usages_comptes as usc_filter', 'usc_filter.compte_id', '=', 'tl_filter.compte_id')
                     ->whereColumn('tl_filter.transaction_id', 'tx.id')
                     ->where('usc_filter.usage', $usageFilter->value);
             }))
@@ -301,7 +336,7 @@ final class TransactionUniverselleService
                 NULL as tiers_type,
                 NULL as tiers_id,
                 CONCAT('Virement vers ', cb_dest.nom) as libelle,
-                NULL as categorie_label,
+                NULL as compte_ventilation_nom,
                 1 as nb_lignes,
                 vi.compte_source_id as compte_id,
                 cb_src.nom as compte_nom,
@@ -318,7 +353,10 @@ final class TransactionUniverselleService
                 NULL as extournee_at,
                 0 as is_extourne_miroir,
                 NULL as reglement_id,
-                0 as is_locked_by_facture
+                0 as is_locked_by_facture,
+                'virement' AS sens_tresorerie,
+                NULL as poste_tiers_ligne_id,
+                0 as is_report_an
             ")
             ->whereNull('vi.deleted_at')
             ->when(TenantContext::hasBooted(), fn ($q) => $q->where('vi.association_id', TenantContext::currentId()))
@@ -347,7 +385,7 @@ final class TransactionUniverselleService
                 NULL as tiers_type,
                 NULL as tiers_id,
                 CONCAT('Virement depuis ', cb_src.nom) as libelle,
-                NULL as categorie_label,
+                NULL as compte_ventilation_nom,
                 1 as nb_lignes,
                 vi.compte_destination_id as compte_id,
                 cb_dest.nom as compte_nom,
@@ -364,7 +402,10 @@ final class TransactionUniverselleService
                 NULL as extournee_at,
                 0 as is_extourne_miroir,
                 NULL as reglement_id,
-                0 as is_locked_by_facture
+                0 as is_locked_by_facture,
+                'virement' AS sens_tresorerie,
+                NULL as poste_tiers_ligne_id,
+                0 as is_report_an
             ")
             ->whereNull('vi.deleted_at')
             ->when(TenantContext::hasBooted(), fn ($q) => $q->where('vi.association_id', TenantContext::currentId()))

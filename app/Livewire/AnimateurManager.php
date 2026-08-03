@@ -12,11 +12,11 @@ use App\Enums\TypeTransaction;
 use App\Exceptions\OcrAnalysisException;
 use App\Exceptions\OcrNotConfiguredException;
 use App\Livewire\Concerns\MontantValidation;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\EncadrementPrevision;
 use App\Models\Operation;
 use App\Models\Seance;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -65,7 +65,7 @@ final class AnimateurManager extends Component
 
     public ?int $modalCompteId = null;
 
-    /** @var array<int, array{sous_categorie_id: int|string|null, operation_id: int|string|null, seance: int|string|null, montant: string, id: int|null}> */
+    /** @var array<int, array{compte_id: int|string|null, operation_id: int|string|null, seance: int|string|null, montant: string, id: int|null}> */
     public array $modalLignes = [];
 
     public string $errorMessage = '';
@@ -102,11 +102,11 @@ final class AnimateurManager extends Component
         $this->newTiersId = null;
     }
 
-    public function ajouterEncadrantAvecSousCategorie(int $tiersId, int $sousCategorieId): void
+    public function ajouterEncadrantAvecCompte(int $tiersId, int $compteId): void
     {
         $this->guardCanEdit();
 
-        if (! $this->upsertPrevisionPremierSeance($tiersId, $sousCategorieId)) {
+        if (! $this->upsertPrevisionPremierSeance($tiersId, $compteId)) {
             $this->addError('ajouterEncadrant', "Aucune séance définie sur l'opération.");
 
             return;
@@ -132,11 +132,11 @@ final class AnimateurManager extends Component
         $this->addingScForTiersId = null;
     }
 
-    public function ajouterLigneSousCategorie(int $tiersId, int $sousCategorieId): void
+    public function ajouterLigneCompte(int $tiersId, int $compteId): void
     {
         $this->guardCanEdit();
 
-        if (! $this->upsertPrevisionPremierSeance($tiersId, $sousCategorieId)) {
+        if (! $this->upsertPrevisionPremierSeance($tiersId, $compteId)) {
             $this->addError('ajouterLigne', "Aucune séance définie sur l'opération.");
 
             return;
@@ -145,7 +145,7 @@ final class AnimateurManager extends Component
         $this->fermerAjoutLigne();
     }
 
-    public function updateMontantPrevu(int $tiersId, int $sousCategorieId, int $seanceId, string $montant): void
+    public function updateMontantPrevu(int $tiersId, int $compteId, int $seanceId, string $montant): void
     {
         $this->guardCanEdit();
 
@@ -170,14 +170,14 @@ final class AnimateurManager extends Component
             [
                 'operation_id' => $this->operation->id,
                 'tiers_id' => $tiersId,
-                'sous_categorie_id' => $sousCategorieId,
+                'compte_id' => $compteId,
                 'seance_id' => $seanceId,
             ],
             ['montant_prevu' => $parsed]
         );
     }
 
-    public function recopierLigne(int $tiersId, int $sousCategorieId): void
+    public function recopierLigne(int $tiersId, int $compteId): void
     {
         $this->guardCanEdit();
 
@@ -189,7 +189,7 @@ final class AnimateurManager extends Component
         $premiere = $seances->first();
         $source = EncadrementPrevision::where('operation_id', $this->operation->id)
             ->where('tiers_id', $tiersId)
-            ->where('sous_categorie_id', $sousCategorieId)
+            ->where('compte_id', $compteId)
             ->where('seance_id', $premiere->id)
             ->first();
 
@@ -202,7 +202,7 @@ final class AnimateurManager extends Component
                 [
                     'operation_id' => $this->operation->id,
                     'tiers_id' => $tiersId,
-                    'sous_categorie_id' => $sousCategorieId,
+                    'compte_id' => $compteId,
                     'seance_id' => $seance->id,
                 ],
                 ['montant_prevu' => $source->montant_prevu]
@@ -210,14 +210,14 @@ final class AnimateurManager extends Component
         }
     }
 
-    public function supprimerLigne(int $tiersId, int $sousCategorieId): void
+    public function supprimerLigne(int $tiersId, int $compteId): void
     {
         $this->guardCanEdit();
 
         $realiseCount = TransactionLigne::query()
             ->whereHas('transaction', fn ($q) => $q->where('type', TypeTransaction::Depense)->where('tiers_id', $tiersId))
             ->where('operation_id', $this->operation->id)
-            ->where('sous_categorie_id', $sousCategorieId)
+            ->where('compte_id', $compteId)
             ->count();
 
         if ($realiseCount > 0) {
@@ -228,7 +228,7 @@ final class AnimateurManager extends Component
 
         EncadrementPrevision::where('operation_id', $this->operation->id)
             ->where('tiers_id', $tiersId)
-            ->where('sous_categorie_id', $sousCategorieId)
+            ->where('compte_id', $compteId)
             ->delete();
     }
 
@@ -252,7 +252,7 @@ final class AnimateurManager extends Component
             ->delete();
     }
 
-    private function upsertPrevisionPremierSeance(int $tiersId, int $sousCategorieId): bool
+    private function upsertPrevisionPremierSeance(int $tiersId, int $compteId): bool
     {
         $premiereSeance = Seance::where('operation_id', $this->operation->id)->orderBy('numero')->first();
         if ($premiereSeance === null) {
@@ -263,7 +263,7 @@ final class AnimateurManager extends Component
             [
                 'operation_id' => $this->operation->id,
                 'tiers_id' => $tiersId,
-                'sous_categorie_id' => $sousCategorieId,
+                'compte_id' => $compteId,
                 'seance_id' => $premiereSeance->id,
             ],
             ['montant_prevu' => 0]
@@ -290,19 +290,22 @@ final class AnimateurManager extends Component
     }
 
     /**
+     * Options du sélecteur : comptes de charge (classe 6), affichés « numéro — intitulé ».
+     *
      * @return array<int, array{id: int, nom: string}>
      */
-    public function getSousCategoriesDepenseProperty(): array
+    public function getComptesDepenseProperty(): array
     {
-        return SousCategorie::query()
-            ->whereHas('categorie', fn ($q) => $q->where('type', 'depense'))
-            ->orderBy('nom')
-            ->get(['id', 'nom'])
-            ->map(fn ($sc) => ['id' => (int) $sc->id, 'nom' => $sc->nom])
+        return Compte::query()
+            ->where('classe', 6)
+            ->where('actif', true)
+            ->orderBy('numero_pcg')
+            ->get(['id', 'numero_pcg', 'intitule'])
+            ->map(fn (Compte $c) => ['id' => (int) $c->id, 'nom' => $c->numero_pcg.' — '.$c->intitule])
             ->toArray();
     }
 
-    public function openCreateModal(int $tiersId, int $sousCategorieId, ?int $seanceNum): void
+    public function openCreateModal(int $tiersId, int $compteId, ?int $seanceNum): void
     {
         $tiers = Tiers::find($tiersId);
         if ($tiers === null) {
@@ -327,7 +330,7 @@ final class AnimateurManager extends Component
 
         $this->modalLignes = [
             [
-                'sous_categorie_id' => $sousCategorieId,
+                'compte_id' => $compteId,
                 'operation_id' => $this->operation->id,
                 'seance' => $seanceNum,
                 'montant' => '',
@@ -450,7 +453,7 @@ final class AnimateurManager extends Component
         $this->modalLignes = [];
         foreach ($transaction->lignes as $ligne) {
             $this->modalLignes[] = [
-                'sous_categorie_id' => $ligne->sous_categorie_id,
+                'compte_id' => $ligne->compte_id,
                 'operation_id' => $ligne->operation_id,
                 'seance' => $ligne->seance,
                 'montant' => number_format((float) $ligne->montant, 2, '.', ''),
@@ -461,7 +464,7 @@ final class AnimateurManager extends Component
         if (empty($this->modalLignes)) {
             $this->modalLignes = [
                 [
-                    'sous_categorie_id' => null,
+                    'compte_id' => null,
                     'operation_id' => $this->operation->id,
                     'seance' => null,
                     'montant' => '',
@@ -539,7 +542,7 @@ final class AnimateurManager extends Component
         $lastLigne = end($this->modalLignes) ?: [];
 
         $this->modalLignes[] = [
-            'sous_categorie_id' => null,
+            'compte_id' => null,
             'operation_id' => $lastLigne['operation_id'] ?? $this->operation->id,
             'seance' => $lastLigne['seance'] ?? null,
             'montant' => '',
@@ -565,7 +568,7 @@ final class AnimateurManager extends Component
             'modalDate' => ['required', 'date'],
             'modalReference' => ['required', 'string', 'max:100'],
             'modalLignes' => ['required', 'array', 'min:1'],
-            'modalLignes.*.sous_categorie_id' => ['required', 'integer', 'exists:sous_categories,id'],
+            'modalLignes.*.compte_id' => ['required', 'integer', 'exists:comptes,id'],
             'modalLignes.*.montant' => ['required', 'numeric', 'min:0.01'],
         ], [
             'modalDate.required' => 'La date est obligatoire.',
@@ -574,8 +577,8 @@ final class AnimateurManager extends Component
             'modalReference.max' => 'La référence ne doit pas dépasser 100 caractères.',
             'modalLignes.required' => 'Au moins une ligne est requise.',
             'modalLignes.min' => 'Au moins une ligne est requise.',
-            'modalLignes.*.sous_categorie_id.required' => 'La sous-catégorie est obligatoire.',
-            'modalLignes.*.sous_categorie_id.exists' => 'Sous-catégorie invalide.',
+            'modalLignes.*.compte_id.required' => 'Le compte est obligatoire.',
+            'modalLignes.*.compte_id.exists' => 'Compte invalide.',
             'modalLignes.*.montant.required' => 'Le montant est obligatoire.',
             'modalLignes.*.montant.numeric' => 'Le montant doit être un nombre.',
             'modalLignes.*.montant.min' => 'Le montant doit être supérieur à 0.',
@@ -601,8 +604,8 @@ final class AnimateurManager extends Component
 
         $operationIds = collect($this->modalLignes)->pluck('operation_id')->filter()->unique()->map(fn ($v) => (int) $v);
         $operations = Operation::whereIn('id', $operationIds)->pluck('nom', 'id');
-        $scIds = collect($this->modalLignes)->pluck('sous_categorie_id')->filter()->unique()->map(fn ($v) => (int) $v);
-        $sousCategories = SousCategorie::whereIn('id', $scIds)->pluck('nom', 'id');
+        $compteIds = collect($this->modalLignes)->pluck('compte_id')->filter()->unique()->map(fn ($v) => (int) $v);
+        $comptes = Compte::whereIn('id', $compteIds)->pluck('intitule', 'id');
 
         $lignes = [];
         foreach ($this->modalLignes as $modalLigne) {
@@ -615,11 +618,11 @@ final class AnimateurManager extends Component
                 : null;
 
             $ligneData = [
-                'sous_categorie_id' => (int) $modalLigne['sous_categorie_id'],
+                'compte_id' => (int) $modalLigne['compte_id'],
                 'operation_id' => $operationId,
                 'seance' => $seance,
                 'montant' => round((float) $modalLigne['montant'], 2),
-                'notes' => $this->buildLigneNotes($modalLigne, $operations, $sousCategories),
+                'notes' => $this->buildLigneNotes($modalLigne, $operations, $comptes),
             ];
 
             if ($this->isEditing && isset($modalLigne['id']) && $modalLigne['id'] !== null) {
@@ -684,13 +687,13 @@ final class AnimateurManager extends Component
             'matrixData' => $matrixData,
             'comptes' => $comptes,
             'modesPaiement' => ModePaiement::cases(),
-            'sousCategoriesDepense' => $this->sousCategoriesDepense,
+            'comptesDepense' => $this->comptesDepense,
         ]);
     }
 
     private function applyOcrResult(InvoiceOcrResult $result): void
     {
-        $validScIds = SousCategorie::whereHas('categorie', fn ($q) => $q->where('type', 'depense'))->pluck('id')->toArray();
+        $validCompteIds = Compte::where('classe', 6)->pluck('id')->map(fn ($id) => (int) $id)->toArray();
 
         if ($result->date !== null) {
             $this->modalDate = $this->adjustDateToExercice($result->date);
@@ -707,7 +710,7 @@ final class AnimateurManager extends Component
             $this->modalLignes = [];
             foreach ($result->lignes as $ligne) {
                 $this->modalLignes[] = [
-                    'sous_categorie_id' => $ligne->sous_categorie_id !== null && in_array($ligne->sous_categorie_id, $validScIds, true) ? $ligne->sous_categorie_id : null,
+                    'compte_id' => $ligne->compte_id !== null && in_array((int) $ligne->compte_id, $validCompteIds, true) ? (int) $ligne->compte_id : null,
                     'operation_id' => $existingOpId,
                     'seance' => $existingSeance,
                     'montant' => number_format($ligne->montant, 2, '.', ''),
@@ -745,7 +748,7 @@ final class AnimateurManager extends Component
         return $date;
     }
 
-    private function buildLigneNotes(array $ligne, Collection $operations, Collection $sousCategories): string
+    private function buildLigneNotes(array $ligne, Collection $operations, Collection $comptes): string
     {
         $parts = [];
 
@@ -765,12 +768,12 @@ final class AnimateurManager extends Component
             $parts[] = "Séance {$seance}";
         }
 
-        $scId = ($ligne['sous_categorie_id'] !== null && $ligne['sous_categorie_id'] !== '')
-            ? (int) $ligne['sous_categorie_id']
+        $compteId = ($ligne['compte_id'] !== null && $ligne['compte_id'] !== '')
+            ? (int) $ligne['compte_id']
             : null;
 
-        if ($scId !== null && $sousCategories->has($scId)) {
-            $parts[] = $sousCategories->get($scId);
+        if ($compteId !== null && $comptes->has($compteId)) {
+            $parts[] = $comptes->get($compteId);
         }
 
         return implode(' — ', $parts);

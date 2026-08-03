@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 use App\Enums\UsageComptable;
 use App\Livewire\Parametres\Adhesions\FormulesList;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\FormuleAdhesion;
-use App\Models\SousCategorie;
 use App\Models\User;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
@@ -14,12 +13,13 @@ use Livewire\Livewire;
 beforeEach(function (): void {
     $this->user = User::factory()->create();
     $this->user->associations()->attach(TenantContext::currentId(), ['role' => 'admin', 'joined_at' => now()]);
-    $this->sc = SousCategorie::factory()->pourCotisations()->create();
+    // DC-8/DC-10a : le sélecteur porte des ids de comptes — création directe.
+    $this->compte = Compte::factory()->numero('756')->pourCotisations()->create();
 });
 
 it('affiche la liste des formules', function (): void {
-    FormuleAdhesion::factory()->create(['sous_categorie_id' => $this->sc->id, 'nom' => 'Adhésion adulte']);
-    FormuleAdhesion::factory()->create(['sous_categorie_id' => SousCategorie::factory()->pourCotisations(), 'nom' => 'Adhésion étudiant']);
+    FormuleAdhesion::factory()->create(['compte_id' => $this->compte->id, 'nom' => 'Adhésion adulte']);
+    FormuleAdhesion::factory()->create(['compte_id' => Compte::factory()->pourCotisations(), 'nom' => 'Adhésion étudiant']);
 
     Livewire::actingAs($this->user)
         ->test(FormulesList::class)
@@ -34,7 +34,7 @@ it('crée une formule mode exercice via la modale', function (): void {
         ->assertSet('showModal', true)
         ->set('nom', 'Nouvelle formule')
         ->set('mode', 'exercice')
-        ->set('sousCategorieId', $this->sc->id)
+        ->set('compteId', $this->compte->id)
         ->set('montantParDefaut', 30.00)
         ->set('actif', true)
         ->call('save')
@@ -51,7 +51,7 @@ it('crée une formule mode durée avec duree_mois', function (): void {
         ->set('nom', 'Adhésion 12 mois')
         ->set('mode', 'duree')
         ->set('dureeMois', 12)
-        ->set('sousCategorieId', $this->sc->id)
+        ->set('compteId', $this->compte->id)
         ->call('save');
 
     $formule = FormuleAdhesion::first();
@@ -65,9 +65,9 @@ it('valide les champs obligatoires', function (): void {
         ->call('openCreate')
         ->set('nom', '')
         ->set('mode', 'exercice')
-        ->set('sousCategorieId', null)
+        ->set('compteId', null)
         ->call('save')
-        ->assertHasErrors(['nom', 'sousCategorieId']);
+        ->assertHasErrors(['nom', 'compteId']);
 });
 
 it('refuse mode durée sans duree_mois', function (): void {
@@ -77,27 +77,27 @@ it('refuse mode durée sans duree_mois', function (): void {
         ->set('nom', 'Test')
         ->set('mode', 'duree')
         ->set('dureeMois', null)
-        ->set('sousCategorieId', $this->sc->id)
+        ->set('compteId', $this->compte->id)
         ->call('save')
         ->assertHasErrors(['dureeMois']);
 });
 
-it('refuse une 2e formule active sur la même sous-cat (contrainte applicative remontée à l\'UI)', function (): void {
-    FormuleAdhesion::factory()->create(['sous_categorie_id' => $this->sc->id, 'actif' => true]);
+it('refuse une 2e formule active sur le même compte (contrainte applicative remontée à l\'UI)', function (): void {
+    FormuleAdhesion::factory()->create(['compte_id' => $this->compte->id, 'actif' => true]);
 
     Livewire::actingAs($this->user)
         ->test(FormulesList::class)
         ->call('openCreate')
         ->set('nom', 'Doublon')
         ->set('mode', 'exercice')
-        ->set('sousCategorieId', $this->sc->id)
+        ->set('compteId', $this->compte->id)
         ->set('actif', true)
         ->call('save')
         ->assertSee('déjà une formule active');
 });
 
 it('édite une formule existante via la modale', function (): void {
-    $formule = FormuleAdhesion::factory()->create(['sous_categorie_id' => $this->sc->id, 'nom' => 'Ancien nom']);
+    $formule = FormuleAdhesion::factory()->create(['compte_id' => $this->compte->id, 'nom' => 'Ancien nom']);
 
     Livewire::actingAs($this->user)
         ->test(FormulesList::class)
@@ -111,7 +111,7 @@ it('édite une formule existante via la modale', function (): void {
 });
 
 it('soft-delete une formule', function (): void {
-    $formule = FormuleAdhesion::factory()->create(['sous_categorie_id' => $this->sc->id]);
+    $formule = FormuleAdhesion::factory()->create(['compte_id' => $this->compte->id]);
 
     Livewire::actingAs($this->user)
         ->test(FormulesList::class)
@@ -121,22 +121,22 @@ it('soft-delete une formule', function (): void {
     expect(FormuleAdhesion::withTrashed()->find($formule->id))->not->toBeNull();
 });
 
-it('refuse une sous-cat dont l\'usage n\'est pas Cotisation', function (): void {
-    $scDon = SousCategorie::factory()->pourDons()->create();
+it('refuse un compte dont l\'usage n\'est pas Cotisation', function (): void {
+    $compteDon = Compte::factory()->numero('754')->pourDons()->create();
 
     Livewire::actingAs($this->user)
         ->test(FormulesList::class)
         ->call('openCreate')
         ->set('nom', 'Test')
         ->set('mode', 'exercice')
-        ->set('sousCategorieId', $scDon->id)
+        ->set('compteId', $compteDon->id)
         ->call('save')
-        ->assertHasErrors(['sousCategorieId']);
+        ->assertHasErrors(['compteId']);
 });
 
 it('édition d\'une formule HelloAsso : seul le flag actif est modifiable', function (): void {
     $formule = FormuleAdhesion::factory()->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->compte->id,
         'nom' => 'Adhésion HA',
         'est_helloasso' => true,
         'helloasso_form_slug' => 'cotisation-2025',
@@ -157,7 +157,7 @@ it('édition d\'une formule HelloAsso : seul le flag actif est modifiable', func
 });
 
 it('création d\'une formule mode illimite OK', function (): void {
-    // Désactiver toute formule active existante sur la sous-cat pour éviter la contrainte
+    // Désactiver toute formule active existante sur le compte pour éviter la contrainte
     FormuleAdhesion::query()->update(['actif' => false]);
 
     Livewire::actingAs($this->user)
@@ -165,7 +165,7 @@ it('création d\'une formule mode illimite OK', function (): void {
         ->call('openCreate')
         ->set('nom', 'Membre à vie')
         ->set('mode', 'illimite')
-        ->set('sousCategorieId', $this->sc->id)
+        ->set('compteId', $this->compte->id)
         ->set('actif', true)
         ->call('save')
         ->assertSet('showModal', false);
@@ -186,24 +186,20 @@ it('openCreateSousCat ouvre le sub-bloc et reset les champs', function (): void 
         ->assertSet('newSousCatCodeCerfa', '');
 });
 
-it('saveNewSousCat crée la sous-cat avec usage Cotisation et la pré-sélectionne', function (): void {
-    $categorie = Categorie::factory()->create();
-
+it('saveNewSousCat crée le compte avec usage Cotisation et le pré-sélectionne', function (): void {
     Livewire::actingAs($this->user)
         ->test(FormulesList::class)
         ->call('openCreate')
         ->call('openCreateSousCat')
         ->set('newSousCatNom', 'Cotisations 2026')
         ->set('newSousCatCodeCerfa', '751')
-        ->set('newSousCatCategorieId', $categorie->id)
         ->call('saveNewSousCat')
         ->assertSet('showCreateSousCat', false);
 
-    $sc = SousCategorie::where('nom', 'Cotisations 2026')->first();
-    expect($sc)->not->toBeNull();
-    expect($sc->code_cerfa)->toBe('751');
-    expect($sc->categorie_id)->toBe($categorie->id);
-    expect($sc->hasUsage(UsageComptable::Cotisation))->toBeTrue();
+    $compte = Compte::where('numero_pcg', '751')->first();
+    expect($compte)->not->toBeNull();
+    expect($compte->intitule)->toBe('Cotisations 2026');
+    expect($compte->hasUsage(UsageComptable::Cotisation))->toBeTrue();
 });
 
 it('saveNewSousCat valide les champs obligatoires', function (): void {
@@ -212,9 +208,9 @@ it('saveNewSousCat valide les champs obligatoires', function (): void {
         ->call('openCreate')
         ->call('openCreateSousCat')
         ->set('newSousCatNom', '')
-        ->set('newSousCatCategorieId', null)
+        ->set('newSousCatCodeCerfa', '')
         ->call('saveNewSousCat')
-        ->assertHasErrors(['newSousCatNom', 'newSousCatCategorieId']);
+        ->assertHasErrors(['newSousCatNom', 'newSousCatCodeCerfa']);
 });
 
 // ─── Tests extension duree_jours (Phase 3) ───────────────────────────────────
@@ -227,7 +223,7 @@ it('crée une formule mode duree avec unité jours (duree_jours=10)', function (
         ->set('mode', 'duree')
         ->set('uniteDuree', 'jours')
         ->set('dureeJours', 10)
-        ->set('sousCategorieId', $this->sc->id)
+        ->set('compteId', $this->compte->id)
         ->call('save')
         ->assertSet('showModal', false);
 
@@ -239,7 +235,7 @@ it('crée une formule mode duree avec unité jours (duree_jours=10)', function (
 
 it('la liste affiche "N jours" dans la colonne Durée pour une formule en jours', function (): void {
     FormuleAdhesion::factory()->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->compte->id,
         'nom' => 'Saison 300j',
         'mode' => 'duree',
         'duree_mois' => null,
@@ -254,11 +250,11 @@ it('la liste affiche "N jours" dans la colonne Durée pour une formule en jours'
 });
 
 it('openEdit d\'une formule duree_jours=300 pré-remplit uniteDuree=jours et dureeJours=300', function (): void {
-    // Désactiver la formule du beforeEach pour libérer la sous-cat
+    // Désactiver la formule du beforeEach pour libérer le compte
     FormuleAdhesion::query()->update(['actif' => false]);
 
     $formule = FormuleAdhesion::factory()->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->compte->id,
         'nom' => 'Saison sportive',
         'mode' => 'duree',
         'duree_mois' => null,
@@ -282,7 +278,7 @@ it('validation refuse mode=duree sans valeur (uniteDuree=jours, dureeJours=null)
         ->set('mode', 'duree')
         ->set('uniteDuree', 'jours')
         ->set('dureeJours', null)
-        ->set('sousCategorieId', $this->sc->id)
+        ->set('compteId', $this->compte->id)
         ->call('save')
         ->assertHasErrors(['dureeJours']);
 });

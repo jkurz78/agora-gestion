@@ -6,11 +6,10 @@ use App\Enums\StatutFacture;
 use App\Enums\TypeLigneFacture;
 use App\Livewire\FactureEdit;
 use App\Models\Association;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
 use App\Models\FactureLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
@@ -50,15 +49,7 @@ beforeEach(function (): void {
         'saisi_par' => $this->user->id,
     ]);
 
-    $this->categorie = Categorie::factory()->create([
-        'association_id' => $this->association->id,
-        'type' => 'recette',
-    ]);
-
-    $this->sousCategorie = SousCategorie::factory()->create([
-        'association_id' => $this->association->id,
-        'categorie_id' => $this->categorie->id,
-    ]);
+    $this->compteVentilation = Compte::factory()->numero('706')->create();
 });
 
 afterEach(function (): void {
@@ -92,7 +83,7 @@ it('ajouterLigneManuelle crée une ligne MontantManuel et recalcule le total', f
         ->set('nouvelleLigneMontantLibelle', 'Mission audit')
         ->set('nouvelleLigneMontantPrixUnitaire', '800')
         ->set('nouvelleLigneMontantQuantite', '3')
-        ->set('nouvelleLigneMontantSousCategorieId', $this->sousCategorie->id)
+        ->set('nouvelleLigneMontantCompteId', $this->compteVentilation->id)
         ->call('ajouterLigneManuelle')
         ->assertHasNoErrors();
 
@@ -114,7 +105,7 @@ it('ajouterLigneTexteManuelle crée une ligne Texte sans modifier le total', fun
         ->set('nouvelleLigneMontantLibelle', 'Prestation de base')
         ->set('nouvelleLigneMontantPrixUnitaire', '500')
         ->set('nouvelleLigneMontantQuantite', '1')
-        ->set('nouvelleLigneMontantSousCategorieId', $this->sousCategorie->id)
+        ->set('nouvelleLigneMontantCompteId', $this->compteVentilation->id)
         ->call('ajouterLigneManuelle');
 
     $this->facture->refresh();
@@ -216,7 +207,7 @@ it('mix Montant ref + MontantManuel + Texte donne les 3 types et un total cohér
         ->set('nouvelleLigneMontantLibelle', 'Frais annexes')
         ->set('nouvelleLigneMontantPrixUnitaire', '100')
         ->set('nouvelleLigneMontantQuantite', '1')
-        ->set('nouvelleLigneMontantSousCategorieId', $this->sousCategorie->id)
+        ->set('nouvelleLigneMontantCompteId', $this->compteVentilation->id)
         ->call('ajouterLigneManuelle');
 
     // Ajouter ligne Texte

@@ -2,8 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Models\Adhesion;
 use App\Models\Association;
-use App\Models\SousCategorie;
+use App\Models\Compte;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -16,10 +17,12 @@ beforeEach(function () {
     $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
     TenantContext::boot($this->association);
     session(['current_association_id' => $this->association->id]);
+    session(['exercice_actif' => 2025]);
 });
 
 afterEach(function () {
     TenantContext::clear();
+    session()->forget('exercice_actif');
 });
 
 // ── tiers.index ──────────────────────────────────────────────────────────────
@@ -56,21 +59,9 @@ it('affiche un bouton Voir sur la liste des adhérents', function (): void {
         'nom' => 'Lebrun',
     ]);
 
-    // Créer une cotisation pour que ce tiers apparaisse dans AdherentList (filtre a_jour)
-    $cotSousCategorie = SousCategorie::factory()->pourCotisations()->create([
-        'association_id' => $this->association->id,
-    ]);
-
-    $transaction = Transaction::factory()->asRecette()->create([
-        'association_id' => $this->association->id,
+    Adhesion::factory()->create([
         'tiers_id' => $tiers->id,
-        'date' => now()->format('Y-m-d'),
-    ]);
-    $transaction->lignes()->forceDelete();
-    TransactionLigne::factory()->create([
-        'transaction_id' => $transaction->id,
-        'sous_categorie_id' => $cotSousCategorie->id,
-        'montant' => 50,
+        'exercice' => 2025,
     ]);
 
     $this->actingAs($this->user)
@@ -87,9 +78,7 @@ it('affiche un bouton Voir sur la liste des dons', function (): void {
         'nom' => 'Donateur',
     ]);
 
-    $donSousCategorie = SousCategorie::factory()->pourDons()->create([
-        'association_id' => $this->association->id,
-    ]);
+    $compte = Compte::factory()->numero('754')->pourDons()->create(['association_id' => $this->association->id]);
 
     $transaction = Transaction::factory()->asRecette()->create([
         'association_id' => $this->association->id,
@@ -97,10 +86,12 @@ it('affiche un bouton Voir sur la liste des dons', function (): void {
         'date' => now()->format('Y-m-d'),
     ]);
     $transaction->lignes()->forceDelete();
-    TransactionLigne::factory()->create([
+    TransactionLigne::create([
         'transaction_id' => $transaction->id,
-        'sous_categorie_id' => $donSousCategorie->id,
+        'compte_id' => $compte->id,
         'montant' => 100,
+        'debit' => 0,
+        'credit' => 100,
     ]);
 
     $this->actingAs($this->user)
@@ -117,9 +108,7 @@ it('affiche un bouton Voir sur la liste des cotisations', function (): void {
         'nom' => 'Cotisant',
     ]);
 
-    $cotSousCategorie = SousCategorie::factory()->pourCotisations()->create([
-        'association_id' => $this->association->id,
-    ]);
+    $compte = Compte::factory()->numero('751')->pourCotisations()->create(['association_id' => $this->association->id]);
 
     $transaction = Transaction::factory()->asRecette()->create([
         'association_id' => $this->association->id,
@@ -127,10 +116,12 @@ it('affiche un bouton Voir sur la liste des cotisations', function (): void {
         'date' => now()->format('Y-m-d'),
     ]);
     $transaction->lignes()->forceDelete();
-    TransactionLigne::factory()->create([
+    TransactionLigne::create([
         'transaction_id' => $transaction->id,
-        'sous_categorie_id' => $cotSousCategorie->id,
+        'compte_id' => $compte->id,
         'montant' => 50,
+        'debit' => 0,
+        'credit' => 50,
     ]);
 
     $this->actingAs($this->user)

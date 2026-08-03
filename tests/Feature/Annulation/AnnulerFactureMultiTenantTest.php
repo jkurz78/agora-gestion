@@ -12,6 +12,7 @@ use App\Models\Facture;
 use App\Models\FactureLigne;
 use App\Models\Tiers;
 use App\Models\User;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\ExerciceService;
 use App\Services\FactureService;
 use App\Tenant\TenantContext;
@@ -69,7 +70,6 @@ function mtCreerFactureValidee(Association $asso, Tiers $tiers, int $exercice, U
         'montant' => 100.0,
         'ordre' => 1,
         'transaction_ligne_id' => null,
-        'sous_categorie_id' => null,
         'operation_id' => null,
         'seance' => null,
     ]);
@@ -114,6 +114,7 @@ beforeEach(function (): void {
 
     // Contexte courant = Asso A (l'intrus)
     TenantContext::boot($this->assoA);
+    SystemeSeeder::seed();
     $this->actingAs($this->comptableA);
 });
 

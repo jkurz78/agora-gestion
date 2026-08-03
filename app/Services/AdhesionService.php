@@ -12,8 +12,9 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Observers\AdhesionTransactionLigneObserver;
+use App\Services\Adhesion\CompteFormuleResolver;
 use App\Services\Adhesion\NouvelleAdhesionDTO;
-use App\Services\Adhesion\SousCategorieFormuleResolver;
 use App\Tenant\TenantContext;
 use Carbon\CarbonImmutable;
 use DomainException;
@@ -24,7 +25,8 @@ final class AdhesionService
 {
     public function __construct(
         private readonly ExerciceService $exerciceService,
-        private readonly SousCategorieFormuleResolver $formuleResolver,
+        private readonly CompteFormuleResolver $formuleResolver,
+        private readonly TransactionService $transactionService,
     ) {}
 
     public function creerDepuisTransaction(Transaction $tx): ?Adhesion
@@ -37,12 +39,29 @@ final class AdhesionService
             return null;
         }
 
+        // DC-10a : la détection cotisation lit l'usage porté par le compte de la
+        // ligne (compte_id, source unique) — plus de traversée comptes.
         $ligneCotisation = $tx->lignes()
             ->whereNull('helloasso_option_id')  // exclure les lignes options HA (B1)
-            ->whereHas('sousCategorie.usages', function ($q): void {
+            ->whereHas('compte.usages', function ($q): void {
                 $q->where('usage', UsageComptable::Cotisation->value);
             })
             ->first();
+
+        // Palier HelloAsso à 0 € (cotisation offerte par code promo) : la ligne ne
+        // porte pas de compte (l'invariant XOR interdit compte_id sans debit/credit,
+        // et une écriture nulle n'a pas de valeur comptable) — détection via la
+        // formule HelloAsso auto-créée (paire form_slug + tier_id).
+        if ($ligneCotisation === null && $tx->helloasso_form_slug !== null) {
+            $ligneCotisation = $tx->lignes()
+                ->whereNull('helloasso_option_id')
+                ->whereNotNull('helloasso_tier_id')
+                ->get()
+                ->first(fn (TransactionLigne $l) => FormuleAdhesion::query()
+                    ->where('helloasso_form_slug', $tx->helloasso_form_slug)
+                    ->where('helloasso_tier_id', $l->helloasso_tier_id)
+                    ->exists());
+        }
 
         if ($ligneCotisation === null) {
             return null;
@@ -111,7 +130,7 @@ final class AdhesionService
     /**
      * Résout la formule applicable selon priorité :
      *   1. HelloAsso — formule auto-créée par la sync (lookup direct helloasso_form_slug + helloasso_tier_id)
-     *   2. Formule active sur la sous-catégorie de la ligne cotisation
+     *   2. Formule active sur le compte de ventilation de la ligne cotisation
      *   3. null (adhésion legacy)
      */
     private function resolveFormule(Transaction $tx, TransactionLigne $ligneCotisation): ?FormuleAdhesion
@@ -136,9 +155,10 @@ final class AdhesionService
             }
         }
 
-        // Priorité 2 : sous-cat → formule active
-        if ($ligneCotisation->sous_categorie_id !== null) {
-            return $this->formuleResolver->resolve((int) $ligneCotisation->sous_categorie_id);
+        // Priorité 2 : compte de ventilation → formule active (DC-10a — compte_id
+        // est la source unique ; sans compte, pas de formule résolvable).
+        if ($ligneCotisation->compte_id !== null) {
+            return $this->formuleResolver->resolve((int) $ligneCotisation->compte_id);
         }
 
         return null;
@@ -381,33 +401,47 @@ final class AdhesionService
         }
     }
 
+    /**
+     * Crée la transaction de paiement via TransactionService::create() pour
+     * bénéficier de l'enrichissement PD (411 D / 7xx C + T2 encaissement),
+     * de la garde exercice ouvert et du syncer statut dérivé.
+     *
+     * L'observer AdhesionTransactionLigneObserver est supprimé le temps de la
+     * création pour éviter une double création d'adhésion (le wizard la gère).
+     */
     private function creerTransactionPaiement(NouvelleAdhesionDTO $dto, FormuleAdhesion $formule, User $createur): int
     {
         if ($dto->datePaiement === null) {
             throw new \InvalidArgumentException('datePaiement est requis lorsque le montant est positif.');
         }
 
-        $tx = Transaction::create([
-            'type' => TypeTransaction::Recette->value,
-            'date' => $dto->datePaiement,
-            'libelle' => "Cotisation — {$formule->nom}",
-            'montant_total' => $dto->montant,
-            'mode_paiement' => $dto->modePaiement?->value,
-            'tiers_id' => $dto->tiersId,
-            'compte_id' => $dto->compteId,
-            'reference' => $dto->reference,
-            'saisi_par' => (int) $createur->id,
-            'numero_piece' => app(NumeroPieceService::class)->assign(Carbon::parse($dto->datePaiement)),
-        ]);
+        // Supprimer l'observer adhésion le temps de la création — le wizard
+        // gère lui-même la création de l'adhésion après la transaction.
+        AdhesionTransactionLigneObserver::$suppress = true;
 
-        // Suppress AdhesionTransactionLigneObserver: the wizard manages adhesion creation itself.
-        TransactionLigne::withoutEvents(function () use ($tx, $formule, $dto): void {
-            TransactionLigne::create([
-                'transaction_id' => $tx->id,
-                'sous_categorie_id' => $formule->sous_categorie_id,
-                'montant' => $dto->montant,
-            ]);
-        });
+        try {
+            $tx = $this->transactionService->create(
+                data: [
+                    'type' => TypeTransaction::Recette->value,
+                    'date' => $dto->datePaiement,
+                    'libelle' => "Cotisation — {$formule->nom}",
+                    'montant_total' => $dto->montant,
+                    'mode_paiement' => $dto->modePaiement?->value,
+                    'tiers_id' => $dto->tiersId,
+                    'compte_id' => $dto->compteId,
+                    'reference' => $dto->reference,
+                ],
+                lignes: [
+                    [
+                        // DC-10a : la formule porte le compte de ventilation (compte_id).
+                        'compte_id' => $formule->compte_id,
+                        'montant' => $dto->montant,
+                    ],
+                ],
+            );
+        } finally {
+            AdhesionTransactionLigneObserver::$suppress = false;
+        }
 
         return (int) $tx->id;
     }

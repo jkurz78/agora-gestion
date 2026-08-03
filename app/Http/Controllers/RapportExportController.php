@@ -8,18 +8,24 @@ use App\Http\Controllers\Concerns\ResolvesLogos;
 use App\Livewire\AnalysePivot;
 use App\Models\Association;
 use App\Services\ExerciceService;
-use App\Services\ProvisionService;
+use App\Services\Rapports\BalanceComptableBuilder;
+use App\Services\Rapports\GrandLivreBuilder;
+use App\Services\Rapports\JournauxBuilder;
 use App\Services\Rapports\ProjectionMatrix;
 use App\Services\Rapports\VentilationFinanciereService;
 use App\Services\RapportService;
 use App\Support\CurrentAssociation;
 use App\Support\PdfFooterRenderer;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -32,6 +38,9 @@ final class RapportExportController extends Controller
     /** Rapports and their allowed formats */
     private const RAPPORTS = [
         'compte-resultat' => ['xlsx', 'pdf'],
+        'balance' => ['xlsx', 'pdf'],
+        'grand-livre' => ['xlsx', 'pdf'],
+        'journaux' => ['xlsx', 'pdf'],
         'operations' => ['xlsx', 'pdf'],
         'flux-tresorerie' => ['xlsx', 'pdf'],
         'analyse-financier' => ['xlsx'],
@@ -41,6 +50,9 @@ final class RapportExportController extends Controller
     /** PDF orientations */
     private const PDF_ORIENTATION = [
         'compte-resultat' => 'portrait',
+        'balance' => 'landscape',
+        'grand-livre' => 'landscape',
+        'journaux' => 'landscape',
         'operations' => 'landscape',
         'flux-tresorerie' => 'portrait',
     ];
@@ -48,6 +60,9 @@ final class RapportExportController extends Controller
     /** Human-readable rapport names (for filenames and titles) */
     private const TITLES = [
         'compte-resultat' => 'Compte de resultat',
+        'balance' => 'Balance comptable',
+        'grand-livre' => 'Grand livre',
+        'journaux' => 'Journaux',
         'operations' => 'CR par operations',
         'flux-tresorerie' => 'Flux de tresorerie',
         'analyse-financier' => 'Analyse financiere',
@@ -73,7 +88,7 @@ final class RapportExportController extends Controller
 
         return match ($format) {
             'xlsx' => $this->exportXlsx($rapport, $exercice, $label, $request, $rapportService, $exerciceService, $filename),
-            'pdf' => $this->exportPdf($rapport, $exercice, $label, $request, $rapportService, $association, $filename),
+            'pdf' => $this->exportPdf($rapport, $exercice, $label, $request, $rapportService, $exerciceService, $association, $filename),
         };
     }
 
@@ -105,6 +120,9 @@ final class RapportExportController extends Controller
                 $request->boolean('n1', true),
                 $request->boolean('budget', true),
             ),
+            'balance' => $this->xlsxBalance($request, $exercice, $exerciceService),
+            'grand-livre' => $this->xlsxGrandLivre($request, $exercice, $exerciceService),
+            'journaux' => $this->xlsxJournaux($request, $exercice, $exerciceService),
             'operations' => $this->xlsxOperations($rapportService, $exercice, $request),
             'flux-tresorerie' => $this->xlsxFluxTresorerie($rapportService, $exercice),
             'analyse-financier' => $this->xlsxAnalyse('financier', $exercice, $exerciceService),
@@ -132,15 +150,12 @@ final class RapportExportController extends Controller
     ): Spreadsheet {
         $data = $rapportService->compteDeResultat($exercice);
 
-        $provisionService = app(ProvisionService::class);
-        $provisions = $provisionService->provisionsExercice($exercice);
-        $provisionsN1 = $provisionService->provisionsExercice($exercice - 1);
-        $extournes = $provisionService->extournesExercice($exercice);
-        $extournesN1 = $provisionService->extournesExercice($exercice - 1);
-        $totalProvisions = $provisionService->totalProvisions($exercice);
-        $totalProvisionsN1 = $provisionService->totalProvisions($exercice - 1);
-        $totalExtournes = $provisionService->totalExtournes($exercice);
-        $totalExtournesN1 = $provisionService->totalExtournes($exercice - 1);
+        $totalChargesN = collect($data['charges'])->sum('montant_n');
+        $totalProduitsN = collect($data['produits'])->sum('montant_n');
+        $totalChargesN1 = collect($data['charges'])->sum('montant_n1');
+        $totalProduitsN1 = collect($data['produits'])->sum('montant_n1');
+        $resultatCourant = (float) $totalProduitsN - (float) $totalChargesN;
+        $resultatCourantN1 = (float) $totalProduitsN1 - (float) $totalChargesN1;
 
         $labelN1 = ($exercice - 1).'-'.$exercice;
         $spreadsheet = new Spreadsheet;
@@ -148,20 +163,20 @@ final class RapportExportController extends Controller
         $sheet->setTitle('Compte de résultat');
 
         $row = 1;
-        $sheet->fromArray([['Type', 'Catégorie', 'Sous-catégorie', $labelN1, $label, 'Budget', 'Écart']], null, 'A'.$row);
+        $sheet->fromArray([['Nature', 'Famille', 'Compte', $labelN1, $label, 'Budget', 'Écart']], null, 'A'.$row);
         $sheet->getStyle('A1:G1')->getFont()->setBold(true);
         $row++;
 
         foreach ([['Charge', $data['charges']], ['Produit', $data['produits']]] as [$type, $sections]) {
             foreach ($sections as $cat) {
-                foreach ($cat['sous_categories'] as $sc) {
+                foreach ($cat['comptes'] as $sc) {
                     $ecart = ($sc['budget'] !== null && $sc['montant_n'] !== null)
                         ? (float) $sc['montant_n'] - (float) $sc['budget']
                         : null;
                     $sheet->fromArray([[
                         $type,
-                        $cat['label'],
-                        $sc['label'],
+                        $cat['famille_nom'],
+                        $sc['compte_nom'],
                         $sc['montant_n1'] !== null ? (float) $sc['montant_n1'] : null,
                         (float) $sc['montant_n'],
                         $sc['budget'] !== null ? (float) $sc['budget'] : null,
@@ -172,7 +187,7 @@ final class RapportExportController extends Controller
                 // Category subtotal
                 $sheet->fromArray([[
                     $type,
-                    $cat['label'],
+                    $cat['famille_nom'],
                     'TOTAL',
                     $cat['montant_n1'] !== null ? (float) $cat['montant_n1'] : null,
                     (float) $cat['montant_n'],
@@ -184,125 +199,26 @@ final class RapportExportController extends Controller
             }
         }
 
-        // Compute résultat values
-        $totalChargesN = collect($data['charges'])->sum('montant_n');
-        $totalProduitsN = collect($data['produits'])->sum('montant_n');
-        $totalChargesN1 = collect($data['charges'])->sum('montant_n1');
-        $totalProduitsN1 = collect($data['produits'])->sum('montant_n1');
-        $resultatCourant = (float) $totalProduitsN - (float) $totalChargesN;
-        $resultatCourantN1 = (float) $totalProduitsN1 - (float) $totalChargesN1;
-        $resultatBrut = $resultatCourant + $totalExtournes;
-        $resultatBrutN1 = $resultatCourantN1 + $totalExtournesN1;
-        $resultatNet = $resultatBrut + $totalProvisions;
-        $resultatNetN1 = $resultatBrutN1 + $totalProvisionsN1;
-
         // Blank separator row
         $row++;
 
-        // Extournes section
-        if ($extournes->isNotEmpty() || $extournesN1->isNotEmpty()) {
-            $extournesN1Keyed = $extournesN1->keyBy(fn (array $e) => $e['libelle'].'|'.$e['sous_categorie_id']);
-            $extournesNKeyed = $extournes->keyBy(fn (array $e) => $e['libelle'].'|'.$e['sous_categorie_id']);
-            $allExtourneKeys = $extournesN1Keyed->keys()->merge($extournesNKeyed->keys())->unique();
-
-            foreach ($allExtourneKeys as $key) {
-                $eN = $extournesNKeyed->get($key);
-                $eN1 = $extournesN1Keyed->get($key);
-                $scNom = $eN['sous_categorie_nom'] ?? $eN1['sous_categorie_nom'];
-                $libelle = $eN['libelle'] ?? $eN1['libelle'];
-                $sheet->fromArray([[
-                    'Extourne',
-                    $scNom,
-                    $libelle,
-                    $eN1 !== null ? $eN1['montant_signe'] : null,
-                    $eN !== null ? $eN['montant_signe'] : null,
-                    null,
-                    null,
-                ]], null, 'A'.$row);
-                $row++;
-            }
-
-            // Extournes total row
-            $sheet->fromArray([[
-                'Extourne',
-                '',
-                'TOTAL EXTOURNES',
-                $totalExtournesN1 !== 0.0 ? $totalExtournesN1 : null,
-                $totalExtournes !== 0.0 ? $totalExtournes : null,
-                null,
-                null,
-            ]], null, 'A'.$row);
-            $sheet->getStyle('A'.$row.':G'.$row)->getFont()->setBold(true);
-            $row++;
-        }
-
-        // Résultat brut row
+        // Résultat row
         $sheet->fromArray([[
             '',
             '',
-            'RÉSULTAT BRUT',
-            $resultatBrutN1,
-            $resultatBrut,
+            'RÉSULTAT',
+            $resultatCourantN1,
+            $resultatCourant,
             null,
             null,
         ]], null, 'A'.$row);
         $sheet->getStyle('A'.$row.':G'.$row)->getFont()->setBold(true);
         $row++;
 
-        // Provisions section
-        if ($provisions->isNotEmpty() || $provisionsN1->isNotEmpty()) {
-            $provisionsN1Keyed = $provisionsN1->keyBy(fn (array $p) => $p['libelle'].'|'.$p['sous_categorie_id']);
-            $provisionsNKeyed = $provisions->keyBy(fn (array $p) => $p['libelle'].'|'.$p['sous_categorie_id']);
-            $allProvisionKeys = $provisionsN1Keyed->keys()->merge($provisionsNKeyed->keys())->unique();
-
-            foreach ($allProvisionKeys as $key) {
-                $pN = $provisionsNKeyed->get($key);
-                $pN1 = $provisionsN1Keyed->get($key);
-                $scNom = $pN['sous_categorie_nom'] ?? $pN1['sous_categorie_nom'];
-                $libelle = $pN['libelle'] ?? $pN1['libelle'];
-                $sheet->fromArray([[
-                    'Provision',
-                    $scNom,
-                    $libelle,
-                    $pN1 !== null ? $pN1['montant_signe'] : null,
-                    $pN !== null ? $pN['montant_signe'] : null,
-                    null,
-                    null,
-                ]], null, 'A'.$row);
-                $row++;
-            }
-
-            // Provisions total row
-            $sheet->fromArray([[
-                'Provision',
-                '',
-                'TOTAL PROVISIONS',
-                $totalProvisionsN1 !== 0.0 ? $totalProvisionsN1 : null,
-                $totalProvisions !== 0.0 ? $totalProvisions : null,
-                null,
-                null,
-            ]], null, 'A'.$row);
-            $sheet->getStyle('A'.$row.':G'.$row)->getFont()->setBold(true);
-            $row++;
-        }
-
-        // Résultat net ajusté row
-        $sheet->fromArray([[
-            '',
-            '',
-            'RÉSULTAT AJUSTÉ',
-            $resultatNetN1,
-            $resultatNet,
-            null,
-            null,
-        ]], null, 'A'.$row);
-        $sheet->getStyle('A'.$row.':G'.$row)->getFont()->setBold(true);
-        $row++;
-
-        // Format number columns (covers all rows including provisions/extournes)
+        // Format number columns
         $sheet->getStyle('D2:G'.$row)->getNumberFormat()->setFormatCode('#,##0.00');
 
-        // Colonnes : A Type | B Catégorie | C Sous-catégorie | D N-1 | E N | F Budget | G Écart
+        // Colonnes : A Type | B Famille | C Compte | D N-1 | E N | F Budget | G Écart
         if (! $compareBudget) {
             $sheet->removeColumn('F', 2); // Budget + Écart
         }
@@ -311,6 +227,269 @@ final class RapportExportController extends Controller
         }
 
         return $spreadsheet;
+    }
+
+    private function xlsxBalance(Request $request, int $exercice, ExerciceService $exerciceService): Spreadsheet
+    {
+        $params = $this->balanceParams($request, $exercice, $exerciceService);
+        $balance = app(BalanceComptableBuilder::class)->balance(
+            $params['date_debut'],
+            $params['date_fin'],
+            $params['prefixes'],
+            $params['uniquement_non_soldes'],
+            $params['detail_par_tiers'],
+        );
+
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Balance');
+
+        $headers = $this->balanceHeaders($params['colonnes']);
+        $lastCol = Coordinate::stringFromColumnIndex(count($headers));
+
+        $sheet->setCellValue('A1', 'Balance comptable');
+        $sheet->mergeCells('A1:'.$lastCol.'1');
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+
+        $sheet->fromArray([['Période', $this->periodeLabel($params['date_debut'], $params['date_fin'])]], null, 'A2');
+        $sheet->fromArray([['Comptes', $params['comptes']]], null, 'A3');
+        $sheet->getStyle('A2:A3')->getFont()->setBold(true);
+
+        $headerRow = 5;
+        $sheet->fromArray([$headers], null, 'A'.$headerRow);
+        $sheet->getStyle('A'.$headerRow.':'.$lastCol.$headerRow)->applyFromArray([
+            'font' => [
+                'bold' => true,
+                'color' => ['rgb' => 'FFFFFF'],
+            ],
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['rgb' => '3D5473'],
+            ],
+        ]);
+
+        $row = $headerRow + 1;
+
+        foreach ($balance['lignes'] as $ligne) {
+            $sheet->fromArray([$this->balanceRow($ligne, $params['colonnes'])], null, 'A'.$row);
+            $sheet->setCellValueExplicit('A'.$row, (string) $ligne['numero_compte'], DataType::TYPE_STRING);
+            $row++;
+        }
+
+        if ($balance['lignes'] !== []) {
+            $totalRow = $this->balanceTotalRow($balance, $params['colonnes']);
+            $sheet->fromArray([$totalRow], null, 'A'.$row);
+            $sheet->getStyle('A'.$row.':'.$lastCol.$row)->applyFromArray([
+                'font' => [
+                    'bold' => true,
+                    'color' => ['rgb' => 'FFFFFF'],
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => '5A7FA8'],
+                ],
+            ]);
+        }
+
+        if ($row > $headerRow + 1) {
+            $firstAmountCol = Coordinate::stringFromColumnIndex(4);
+            $sheet->getStyle($firstAmountCol.($headerRow + 1).':'.$lastCol.$row)
+                ->getNumberFormat()
+                ->setFormatCode('#,##0.00');
+        }
+
+        return $spreadsheet;
+    }
+
+    private function xlsxGrandLivre(Request $request, int $exercice, ExerciceService $exerciceService): Spreadsheet
+    {
+        $params = $this->grandLivreParams($request, $exercice, $exerciceService);
+        $grandLivre = app(GrandLivreBuilder::class)->grandLivre(
+            $params['date_debut'],
+            $params['date_fin'],
+            $params['prefixes'],
+            $params['uniquement_non_soldes'],
+            $params['uniquement_non_lettrees'],
+        );
+
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Grand livre');
+
+        $headers = ['Compte', 'Intitulé', 'Tiers', 'Date', 'Journal', 'Pièce', 'Libellé', 'Règlement', 'Lettrage', 'Débit', 'Crédit', 'Solde'];
+        $lastCol = Coordinate::stringFromColumnIndex(count($headers));
+
+        $sheet->setCellValue('A1', 'Grand livre');
+        $sheet->mergeCells('A1:'.$lastCol.'1');
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+
+        $sheet->fromArray([['Période', $this->periodeLabel($params['date_debut'], $params['date_fin'])]], null, 'A2');
+        $sheet->fromArray([['Comptes', $params['comptes']]], null, 'A3');
+        $sheet->getStyle('A2:A3')->getFont()->setBold(true);
+
+        $headerRow = 5;
+        $sheet->fromArray([$headers], null, 'A'.$headerRow);
+        $this->styleEnteteXlsx($sheet, 'A'.$headerRow.':'.$lastCol.$headerRow);
+
+        $row = $headerRow + 1;
+
+        foreach ($grandLivre['comptes'] as $compte) {
+            // Solde d'ouverture, puis chaque écriture — chaque ligne porte le
+            // compte et le tiers pour rester exploitable après un tri Excel.
+            $sheet->fromArray([[
+                $compte['numero_compte'],
+                $compte['intitule_compte'],
+                $compte['tiers'],
+                null, null, null, 'Solde ouverture', null, null, null, null,
+                $this->euros((int) $compte['solde_ouverture_centimes']),
+            ]], null, 'A'.$row);
+            $sheet->setCellValueExplicit('A'.$row, (string) $compte['numero_compte'], DataType::TYPE_STRING);
+            $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFont()->setBold(true);
+            $row++;
+
+            foreach ($compte['lignes'] as $ligne) {
+                $sheet->fromArray([[
+                    $compte['numero_compte'],
+                    $compte['intitule_compte'],
+                    $compte['tiers'],
+                    $ligne['date'],
+                    $ligne['journal'],
+                    $ligne['numero_piece'] ?? $ligne['reference'],
+                    $ligne['libelle'],
+                    $ligne['mode_paiement'],
+                    $ligne['lettrage_code'],
+                    $this->euros((int) $ligne['debit_centimes']),
+                    $this->euros((int) $ligne['credit_centimes']),
+                    $this->euros((int) $ligne['solde_progressif_centimes']),
+                ]], null, 'A'.$row);
+                $sheet->setCellValueExplicit('A'.$row, (string) $compte['numero_compte'], DataType::TYPE_STRING);
+                $row++;
+            }
+
+            $sheet->fromArray([[
+                $compte['numero_compte'],
+                $compte['intitule_compte'],
+                $compte['tiers'],
+                null, null, null, 'TOTAL', null, null,
+                $this->euros((int) $compte['mouvement_debit_centimes']),
+                $this->euros((int) $compte['mouvement_credit_centimes']),
+                $this->euros((int) $compte['solde_fin_centimes']),
+            ]], null, 'A'.$row);
+            $sheet->setCellValueExplicit('A'.$row, (string) $compte['numero_compte'], DataType::TYPE_STRING);
+            $this->styleTotalXlsx($sheet, 'A'.$row.':'.$lastCol.$row);
+            $row++;
+        }
+
+        if ($row > $headerRow + 1) {
+            $sheet->getStyle('J'.($headerRow + 1).':'.$lastCol.($row - 1))
+                ->getNumberFormat()
+                ->setFormatCode('#,##0.00');
+        }
+
+        return $spreadsheet;
+    }
+
+    /**
+     * Journaux — export à plat : chaque ligne porte l'intégralité du contexte
+     * (date, pièce, libellé, compte, règlement, lettrage), de sorte que le
+     * fichier reste exploitable après un tri ou un filtre Excel. Les totaux
+     * sont posés par journal, pas par pièce.
+     */
+    private function xlsxJournaux(Request $request, int $exercice, ExerciceService $exerciceService): Spreadsheet
+    {
+        $params = $this->journauxParams($request, $exercice, $exerciceService);
+        $resultat = app(JournauxBuilder::class)->journaux(
+            $params['date_debut'],
+            $params['date_fin'],
+            $params['journaux'],
+        );
+
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Journaux');
+
+        $headers = ['Journal', 'Date', 'Pièce', 'Libellé', 'Compte', 'Intitulé', 'Tiers', 'Règlement', 'Lettrage', 'Débit', 'Crédit'];
+        $lastCol = Coordinate::stringFromColumnIndex(count($headers));
+
+        $sheet->setCellValue('A1', 'Journaux');
+        $sheet->mergeCells('A1:'.$lastCol.'1');
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+
+        $sheet->fromArray([['Période', $this->periodeLabel($params['date_debut'], $params['date_fin'])]], null, 'A2');
+        $sheet->fromArray([['Journaux', $params['journaux'] === [] ? 'Tous' : implode(', ', $params['journaux'])]], null, 'A3');
+        $sheet->getStyle('A2:A3')->getFont()->setBold(true);
+
+        $headerRow = 5;
+        $sheet->fromArray([$headers], null, 'A'.$headerRow);
+        $this->styleEnteteXlsx($sheet, 'A'.$headerRow.':'.$lastCol.$headerRow);
+
+        $row = $headerRow + 1;
+
+        foreach ($resultat['journaux'] as $bloc) {
+            foreach ($bloc['pieces'] as $piece) {
+                foreach ($piece['lignes'] as $ligne) {
+                    $sheet->fromArray([[
+                        $bloc['libelle'],
+                        $piece['date'],
+                        $piece['numero_piece'] ?? $piece['reference'],
+                        $piece['libelle'],
+                        $ligne['numero_compte'],
+                        $ligne['intitule_compte'],
+                        $ligne['tiers'],
+                        $piece['mode_paiement'],
+                        $ligne['lettrage_code'],
+                        $this->euros((int) $ligne['debit_centimes']),
+                        $this->euros((int) $ligne['credit_centimes']),
+                    ]], null, 'A'.$row);
+                    $sheet->setCellValueExplicit('E'.$row, (string) $ligne['numero_compte'], DataType::TYPE_STRING);
+                    $row++;
+                }
+            }
+
+            $sheet->fromArray([[
+                'TOTAL '.$bloc['libelle'],
+                null, null, null, null, null, null, null, null,
+                $this->euros((int) $bloc['debit_centimes']),
+                $this->euros((int) $bloc['credit_centimes']),
+            ]], null, 'A'.$row);
+            $this->styleTotalXlsx($sheet, 'A'.$row.':'.$lastCol.$row);
+            $row++;
+        }
+
+        if ($resultat['journaux'] !== []) {
+            $sheet->fromArray([[
+                'TOTAL GÉNÉRAL',
+                null, null, null, null, null, null, null, null,
+                $this->euros((int) $resultat['totaux']['debit_centimes']),
+                $this->euros((int) $resultat['totaux']['credit_centimes']),
+            ]], null, 'A'.$row);
+            $this->styleTotalXlsx($sheet, 'A'.$row.':'.$lastCol.$row);
+            $row++;
+        }
+
+        if ($row > $headerRow + 1) {
+            $sheet->getStyle('J'.($headerRow + 1).':'.$lastCol.($row - 1))
+                ->getNumberFormat()
+                ->setFormatCode('#,##0.00');
+        }
+
+        return $spreadsheet;
+    }
+
+    private function styleEnteteXlsx(Worksheet $sheet, string $plage): void
+    {
+        $sheet->getStyle($plage)->applyFromArray([
+            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '3D5473']],
+        ]);
+    }
+
+    private function styleTotalXlsx(Worksheet $sheet, string $plage): void
+    {
+        $sheet->getStyle($plage)->applyFromArray([
+            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '5A7FA8']],
+        ]);
     }
 
     private function xlsxOperations(RapportService $rapportService, int $exercice, Request $request): Spreadsheet
@@ -346,8 +525,8 @@ final class RapportExportController extends Controller
         $buildPrevIdx = function (array $hierarchy) use ($parOperations): array {
             $idx = [];
             foreach ($hierarchy as $cat) {
-                foreach ($cat['sous_categories'] as $sc) {
-                    $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
+                foreach ($cat['comptes'] as $sc) {
+                    $scId = (int) ($sc['compte_id'] ?? $sc['id'] ?? 0);
                     $entry = [
                         'montant' => (float) ($sc['montant'] ?? 0),
                         'seances' => $sc['seances'] ?? [],
@@ -381,7 +560,7 @@ final class RapportExportController extends Controller
 
         // ── combinedMode: 2-level header (op → séances) with merge cells ────────
         if ($combinedMode) {
-            $labelCols = ['Type', 'Catégorie', 'Sous-catégorie'];
+            $labelCols = ['Type', 'Famille', 'Compte'];
             if ($parTiers) {
                 $labelCols[] = 'Tiers';
             }
@@ -428,13 +607,13 @@ final class RapportExportController extends Controller
                 $projMatrix = $projMatrixFor($sectionLabel);
 
                 foreach ($sections as $cat) {
-                    foreach ($cat['sous_categories'] as $sc) {
-                        $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
+                    foreach ($cat['comptes'] as $sc) {
+                        $scId = (int) ($sc['compte_id'] ?? $sc['id'] ?? 0);
 
                         if ($parTiers && ! empty($sc['tiers'])) {
                             foreach ($sc['tiers'] as $t) {
                                 $tId = (int) ($t['tiers_id'] ?? 0);
-                                $tValues = [$type, $cat['label'], $sc['label'], $t['label']];
+                                $tValues = [$type, $cat['famille_nom'], $sc['compte_nom'], $t['label']];
                                 $projTSO = ($mode === 'projection' && $projMatrix) ? ($projMatrix->byScTiersSeanceOp($scId)[$tId] ?? []) : [];
                                 foreach ($operationNames as $opId => $opName) {
                                     foreach ($seancesParOperation[$opId] ?? [] as $s) {
@@ -452,7 +631,7 @@ final class RapportExportController extends Controller
                             }
                         }
 
-                        $values = [$type, $cat['label'], $sc['label']];
+                        $values = [$type, $cat['famille_nom'], $sc['compte_nom']];
                         if ($parTiers) {
                             $values[] = 'TOTAL';
                         }
@@ -474,15 +653,15 @@ final class RapportExportController extends Controller
                         $row++;
                     }
 
-                    $catValues = [$type, $cat['label'], 'TOTAL'];
+                    $catValues = [$type, $cat['famille_nom'], 'TOTAL'];
                     if ($parTiers) {
                         $catValues[] = '';
                     }
-                    $catId = (int) ($cat['categorie_id'] ?? 0);
+                    $catId = (int) ($cat['famille_id'] ?? 0);
                     foreach ($operationNames as $opId => $opName) {
                         foreach ($seancesParOperation[$opId] ?? [] as $s) {
                             $catValues[] = ($mode === 'projection' && $projMatrix)
-                                ? collect($cat['sous_categories'])->sum(fn ($__sc) => (float) ($projMatrix->byScSeanceOp()[(int) ($__sc['sous_categorie_id'] ?? 0)][$s][$opId] ?? 0))
+                                ? collect($cat['comptes'])->sum(fn ($__sc) => (float) ($projMatrix->byScSeanceOp()[(int) ($__sc['compte_id'] ?? 0)][$s][$opId] ?? 0))
                                 : (float) ($cat['seance_operations'][$s][$opId] ?? 0);
                         }
                         $catValues[] = ($mode === 'projection' && $projMatrix)
@@ -566,7 +745,7 @@ final class RapportExportController extends Controller
 
         // ── parOperations: header and data rows ──────────────────────────────────
         if ($parOperations) {
-            $labelCols = ['Type', 'Catégorie', 'Sous-catégorie'];
+            $labelCols = ['Type', 'Famille', 'Compte'];
             if ($parSeances) {
                 $labelCols[] = 'Séance';
             }
@@ -588,8 +767,8 @@ final class RapportExportController extends Controller
 
             foreach ([['Charge', $data['charges'], $prevChargesIdx, 'DÉPENSES'], ['Produit', $data['produits'], $prevProduitsIdx, 'RECETTES']] as [$type, $sections, $prevIdx, $sectionLabel]) {
                 foreach ($sections as $cat) {
-                    foreach ($cat['sous_categories'] as $sc) {
-                        $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
+                    foreach ($cat['comptes'] as $sc) {
+                        $scId = (int) ($sc['compte_id'] ?? $sc['id'] ?? 0);
 
                         // Séance sub-rows (combined mode)
                         if ($parSeances) {
@@ -597,7 +776,7 @@ final class RapportExportController extends Controller
                             $projMatrix = $sectionLabel === 'DÉPENSES' ? $projChargesMatrix : $projProduitsMatrix;
                             foreach ($seances as $s) {
                                 $sLabel = $s === 0 ? 'Hors séances' : 'S'.$s;
-                                $sValues = [$type, $cat['label'], $sc['label'], $sLabel];
+                                $sValues = [$type, $cat['famille_nom'], $sc['compte_nom'], $sLabel];
                                 if ($parTiers) {
                                     $sValues[] = '';
                                 }
@@ -623,7 +802,7 @@ final class RapportExportController extends Controller
                             $projMatrix = $projMatrixFor($sectionLabel);
                             foreach ($sc['tiers'] as $t) {
                                 $tId = (int) ($t['tiers_id'] ?? 0);
-                                $tValues = [$type, $cat['label'], $sc['label']];
+                                $tValues = [$type, $cat['famille_nom'], $sc['compte_nom']];
                                 if ($parSeances) {
                                     $tValues[] = '';
                                 }
@@ -646,7 +825,7 @@ final class RapportExportController extends Controller
                         }
 
                         // SC row (subtotal when parTiers or parSeances)
-                        $values = [$type, $cat['label'], $sc['label']];
+                        $values = [$type, $cat['famille_nom'], $sc['compte_nom']];
                         if ($parSeances) {
                             $values[] = 'TOTAL';
                         }
@@ -678,7 +857,7 @@ final class RapportExportController extends Controller
                     }
 
                     // Category total row
-                    $catValues = [$type, $cat['label'], 'TOTAL'];
+                    $catValues = [$type, $cat['famille_nom'], 'TOTAL'];
                     if ($parSeances) {
                         $catValues[] = '';
                     }
@@ -688,7 +867,7 @@ final class RapportExportController extends Controller
 
                     $projMatrix = $projMatrixFor($sectionLabel);
                     if ($mode === 'projection' && $projMatrix) {
-                        $catId = (int) ($cat['categorie_id'] ?? 0);
+                        $catId = (int) ($cat['famille_id'] ?? 0);
                         foreach ($operationNames as $opId => $opName) {
                             $catValues[] = (float) ($projMatrix->byCatOp()[$catId][$opId] ?? 0);
                         }
@@ -784,7 +963,7 @@ final class RapportExportController extends Controller
 
         // ── Standard (non-parOperations) header ──────────────────────────────────
         if ($parSeances) {
-            $headers = ['Type', 'Catégorie', 'Sous-catégorie'];
+            $headers = ['Type', 'Famille', 'Compte'];
             if ($parTiers) {
                 $headers[] = 'Tiers';
             }
@@ -793,7 +972,7 @@ final class RapportExportController extends Controller
             }
             $headers[] = 'Total';
         } else {
-            $headers = ['Type', 'Catégorie', 'Sous-catégorie'];
+            $headers = ['Type', 'Famille', 'Compte'];
             if ($parTiers) {
                 $headers[] = 'Tiers';
             }
@@ -812,14 +991,14 @@ final class RapportExportController extends Controller
 
         foreach ([['Charge', $data['charges'], $prevChargesIdx, 'DÉPENSES'], ['Produit', $data['produits'], $prevProduitsIdx, 'RECETTES']] as [$type, $sections, $prevIdx, $sectionLabel]) {
             foreach ($sections as $cat) {
-                foreach ($cat['sous_categories'] as $sc) {
-                    $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
+                foreach ($cat['comptes'] as $sc) {
+                    $scId = (int) ($sc['compte_id'] ?? $sc['id'] ?? 0);
 
                     if ($parTiers && ! empty($sc['tiers'])) {
                         $projMatrix = $projMatrixFor($sectionLabel);
                         foreach ($sc['tiers'] as $t) {
                             $tId = (int) ($t['tiers_id'] ?? 0);
-                            $values = [$type, $cat['label'], $sc['label'], $t['label']];
+                            $values = [$type, $cat['famille_nom'], $sc['compte_nom'], $t['label']];
                             if ($parSeances) {
                                 if ($mode === 'projection' && $projMatrix) {
                                     $projTSeances = $projMatrix->byScTiersSeance($scId)[$tId] ?? [];
@@ -844,8 +1023,8 @@ final class RapportExportController extends Controller
                             $row++;
                         }
                     }
-                    // Sous-catégorie subtotal row
-                    $values = [$type, $cat['label'], $sc['label']];
+                    // Sous-total du compte
+                    $values = [$type, $cat['famille_nom'], $sc['compte_nom']];
                     if ($parTiers) {
                         $values[] = 'TOTAL';
                     }
@@ -876,18 +1055,18 @@ final class RapportExportController extends Controller
                     $row++;
                 }
                 // Category total row
-                $values = [$type, $cat['label'], 'TOTAL'];
+                $values = [$type, $cat['famille_nom'], 'TOTAL'];
                 if ($parTiers) {
                     $values[] = '';
                 }
-                $catId = (int) ($cat['categorie_id'] ?? 0);
+                $catId = (int) ($cat['famille_id'] ?? 0);
                 $projMatrix = $projMatrixFor($sectionLabel);
                 if ($parSeances) {
                     if ($mode === 'projection' && $projMatrix) {
                         foreach ($seances as $s) {
                             $catSeanceProjected = 0.0;
-                            foreach ($cat['sous_categories'] as $sc) {
-                                $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
+                            foreach ($cat['comptes'] as $sc) {
+                                $scId = (int) ($sc['compte_id'] ?? $sc['id'] ?? 0);
                                 $catSeanceProjected += (float) ($projMatrix->byScSeance()[$scId][$s] ?? 0);
                             }
                             $values[] = $catSeanceProjected;
@@ -924,8 +1103,8 @@ final class RapportExportController extends Controller
                     foreach ($seances as $s) {
                         $seanceTotal = 0.0;
                         foreach ($sections as $cat) {
-                            foreach ($cat['sous_categories'] as $sc) {
-                                $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
+                            foreach ($cat['comptes'] as $sc) {
+                                $scId = (int) ($sc['compte_id'] ?? $sc['id'] ?? 0);
                                 $seanceTotal += (float) ($projMatrix->byScSeance()[$scId][$s] ?? 0);
                             }
                         }
@@ -1107,6 +1286,7 @@ final class RapportExportController extends Controller
         string $label,
         Request $request,
         RapportService $rapportService,
+        ExerciceService $exerciceService,
         ?Association $association,
         string $filename,
     ): Response {
@@ -1117,6 +1297,9 @@ final class RapportExportController extends Controller
 
         $viewData = match ($rapport) {
             'compte-resultat' => $this->pdfCompteResultatData($rapportService, $exercice, $label, $request),
+            'balance' => $this->pdfBalanceData($request, $exercice, $exerciceService),
+            'grand-livre' => $this->pdfGrandLivreData($request, $exercice, $exerciceService),
+            'journaux' => $this->pdfJournauxData($request, $exercice, $exerciceService),
             'operations' => $this->pdfOperationsData($rapportService, $exercice, $request),
             'flux-tresorerie' => $this->pdfFluxTresorerieData($rapportService, $exercice),
         };
@@ -1159,21 +1342,6 @@ final class RapportExportController extends Controller
         $resultatCourant = $totalProduitsN - $totalChargesN;
         $resultatCourantN1 = $totalProduitsN1 - $totalChargesN1;
 
-        $provisionService = app(ProvisionService::class);
-        $provisions = $provisionService->provisionsExercice($exercice);
-        $provisionsN1 = $provisionService->provisionsExercice($exercice - 1);
-        $extournes = $provisionService->extournesExercice($exercice);
-        $extournesN1 = $provisionService->extournesExercice($exercice - 1);
-        $totalProvisions = $provisionService->totalProvisions($exercice);
-        $totalProvisionsN1 = $provisionService->totalProvisions($exercice - 1);
-        $totalExtournes = $provisionService->totalExtournes($exercice);
-        $totalExtournesN1 = $provisionService->totalExtournes($exercice - 1);
-
-        $resultatBrut = $resultatCourant + $totalExtournes;
-        $resultatBrutN1 = $resultatCourantN1 + $totalExtournesN1;
-        $resultatNet = $resultatBrut + $totalProvisions;
-        $resultatNetN1 = $resultatBrutN1 + $totalProvisionsN1;
-
         return [
             'charges' => $data['charges'],
             'produits' => $data['produits'],
@@ -1183,18 +1351,8 @@ final class RapportExportController extends Controller
             'totalProduitsN' => $totalProduitsN,
             'totalChargesN1' => $totalChargesN1,
             'totalProduitsN1' => $totalProduitsN1,
-            'provisions' => $provisions,
-            'provisionsN1' => $provisionsN1,
-            'extournes' => $extournes,
-            'extournesN1' => $extournesN1,
-            'totalProvisions' => $totalProvisions,
-            'totalProvisionsN1' => $totalProvisionsN1,
-            'totalExtournes' => $totalExtournes,
-            'totalExtournesN1' => $totalExtournesN1,
-            'resultatBrut' => $resultatBrut,
-            'resultatBrutN1' => $resultatBrutN1,
-            'resultatNet' => $resultatNet,
-            'resultatNetN1' => $resultatNetN1,
+            'resultatCourant' => $resultatCourant,
+            'resultatCourantN1' => $resultatCourantN1,
             'compareN1' => $request->boolean('n1', true),
             'compareBudget' => $request->boolean('budget', true),
         ];
@@ -1258,7 +1416,233 @@ final class RapportExportController extends Controller
         return $rapportService->fluxTresorerie($exercice);
     }
 
+    private function pdfBalanceData(Request $request, int $exercice, ExerciceService $exerciceService): array
+    {
+        $params = $this->balanceParams($request, $exercice, $exerciceService);
+        $balance = app(BalanceComptableBuilder::class)->balance(
+            $params['date_debut'],
+            $params['date_fin'],
+            $params['prefixes'],
+            $params['uniquement_non_soldes'],
+            $params['detail_par_tiers'],
+        );
+
+        return [
+            'subtitle' => $this->periodeLabel($params['date_debut'], $params['date_fin']),
+            'balance' => $balance,
+            'colonnes' => $params['colonnes'],
+            'dateDebut' => $params['date_debut'],
+            'dateFin' => $params['date_fin'],
+            'comptes' => $params['comptes'],
+        ];
+    }
+
+    private function pdfGrandLivreData(Request $request, int $exercice, ExerciceService $exerciceService): array
+    {
+        $params = $this->grandLivreParams($request, $exercice, $exerciceService);
+
+        return [
+            'subtitle' => $this->periodeLabel($params['date_debut'], $params['date_fin']),
+            'grandLivre' => app(GrandLivreBuilder::class)->grandLivre(
+                $params['date_debut'],
+                $params['date_fin'],
+                $params['prefixes'],
+                $params['uniquement_non_soldes'],
+                $params['uniquement_non_lettrees'],
+            ),
+            'comptes' => $params['comptes'],
+            'afficherModeReglement' => $params['mode_reglement'],
+        ];
+    }
+
+    private function pdfJournauxData(Request $request, int $exercice, ExerciceService $exerciceService): array
+    {
+        $params = $this->journauxParams($request, $exercice, $exerciceService);
+
+        return [
+            'subtitle' => $this->periodeLabel($params['date_debut'], $params['date_fin']),
+            'journal' => app(JournauxBuilder::class)->journaux(
+                $params['date_debut'],
+                $params['date_fin'],
+                $params['journaux'],
+            ),
+            'afficherModeReglement' => $params['mode_reglement'],
+        ];
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────────
+
+    /**
+     * @return array{date_debut: string, date_fin: string, comptes: string, prefixes: array<int, string>, uniquement_non_soldes: bool, uniquement_non_lettrees: bool, mode_reglement: bool}
+     */
+    private function grandLivreParams(Request $request, int $exercice, ExerciceService $exerciceService): array
+    {
+        $range = $exerciceService->dateRange($exercice);
+        $comptes = trim((string) $request->query('comptes', '1,2,3,4,5,6,7'));
+
+        if ($comptes === '') {
+            $comptes = '1,2,3,4,5,6,7';
+        }
+
+        return [
+            'date_debut' => (string) $request->query('du', $range['start']->toDateString()),
+            'date_fin' => (string) $request->query('au', $range['end']->toDateString()),
+            'comptes' => $comptes,
+            'prefixes' => $this->balancePrefixes($comptes),
+            'uniquement_non_soldes' => $request->boolean('non_soldes'),
+            'uniquement_non_lettrees' => $request->boolean('non_lettrees'),
+            'mode_reglement' => $request->boolean('mode_reglement'),
+        ];
+    }
+
+    /**
+     * @return array{date_debut: string, date_fin: string, journaux: array<int, string>, mode_reglement: bool}
+     */
+    private function journauxParams(Request $request, int $exercice, ExerciceService $exerciceService): array
+    {
+        $range = $exerciceService->dateRange($exercice);
+
+        return [
+            'date_debut' => (string) $request->query('du', $range['start']->toDateString()),
+            'date_fin' => (string) $request->query('au', $range['end']->toDateString()),
+            'journaux' => array_values(array_filter(
+                array_map('strval', (array) $request->query('journaux', [])),
+                static fn (string $code): bool => $code !== '',
+            )),
+            'mode_reglement' => $request->boolean('mode_reglement'),
+        ];
+    }
+
+    /**
+     * @return array{date_debut: string, date_fin: string, comptes: string, prefixes: array<int, string>, colonnes: int}
+     */
+    private function balanceParams(Request $request, int $exercice, ExerciceService $exerciceService): array
+    {
+        $range = $exerciceService->dateRange($exercice);
+        $comptes = trim((string) $request->query('comptes', '1,2,3,4,5,6,7'));
+
+        if ($comptes === '') {
+            $comptes = '1,2,3,4,5,6,7';
+        }
+
+        return [
+            'date_debut' => (string) $request->query('du', $range['start']->toDateString()),
+            'date_fin' => (string) $request->query('au', $range['end']->toDateString()),
+            'comptes' => $comptes,
+            'prefixes' => $this->balancePrefixes($comptes),
+            'colonnes' => $this->balanceColonnes($request->integer('colonnes', 6)),
+            'uniquement_non_soldes' => $request->boolean('non_soldes'),
+            'detail_par_tiers' => $request->boolean('detail_tiers'),
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function balancePrefixes(string $comptes): array
+    {
+        return collect(preg_split('/[,\s;]+/', $comptes) ?: [])
+            ->map(fn (string $prefixe): string => trim($prefixe))
+            ->filter(fn (string $prefixe): bool => $prefixe !== '')
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function balanceColonnes(int $colonnes): int
+    {
+        return in_array($colonnes, [2, 4, 6], true) ? $colonnes : 6;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function balanceHeaders(int $colonnes): array
+    {
+        $headers = ['Compte', 'Intitulé', 'Tiers'];
+
+        if ($colonnes >= 4) {
+            $headers[] = 'Ouverture débit';
+            $headers[] = 'Ouverture crédit';
+        }
+
+        if ($colonnes === 6) {
+            $headers[] = 'Mouvement débit';
+            $headers[] = 'Mouvement crédit';
+        }
+
+        $headers[] = 'Solde final débit';
+        $headers[] = 'Solde final crédit';
+
+        return $headers;
+    }
+
+    /**
+     * @param  array<string, mixed>  $ligne
+     * @return list<string|float|null>
+     */
+    private function balanceRow(array $ligne, int $colonnes): array
+    {
+        $row = [
+            (string) $ligne['numero_compte'],
+            (string) $ligne['intitule_compte'],
+            $ligne['tiers'] !== null ? (string) $ligne['tiers'] : null,
+        ];
+
+        if ($colonnes >= 4) {
+            $row[] = $this->euros((int) $ligne['solde_ouverture_debit_centimes']);
+            $row[] = $this->euros((int) $ligne['solde_ouverture_credit_centimes']);
+        }
+
+        if ($colonnes === 6) {
+            $row[] = $this->euros((int) $ligne['mouvement_debit_centimes']);
+            $row[] = $this->euros((int) $ligne['mouvement_credit_centimes']);
+        }
+
+        $row[] = $this->euros((int) $ligne['solde_fin_debit_centimes']);
+        $row[] = $this->euros((int) $ligne['solde_fin_credit_centimes']);
+
+        return $row;
+    }
+
+    /**
+     * @param  array{lignes: list<array<string, mixed>>, totaux: array<string, int>}  $balance
+     * @return list<string|float|null>
+     */
+    private function balanceTotalRow(array $balance, int $colonnes): array
+    {
+        $lignes = $balance['lignes'];
+        $totaux = $balance['totaux'];
+        $row = ['TOTAL', null, null];
+
+        if ($colonnes >= 4) {
+            $row[] = $this->euros((int) collect($lignes)->sum('solde_ouverture_debit_centimes'));
+            $row[] = $this->euros((int) collect($lignes)->sum('solde_ouverture_credit_centimes'));
+        }
+
+        if ($colonnes === 6) {
+            $row[] = $this->euros((int) $totaux['mouvement_debit_centimes']);
+            $row[] = $this->euros((int) $totaux['mouvement_credit_centimes']);
+        }
+
+        $row[] = $this->euros((int) $totaux['solde_fin_debit_centimes']);
+        $row[] = $this->euros((int) $totaux['solde_fin_credit_centimes']);
+
+        return $row;
+    }
+
+    private function euros(int $centimes): float
+    {
+        return $centimes / 100;
+    }
+
+    private function periodeLabel(string $dateDebut, string $dateFin): string
+    {
+        return 'Du '
+            .CarbonImmutable::parse($dateDebut)->format('d/m/Y')
+            .' au '
+            .CarbonImmutable::parse($dateFin)->format('d/m/Y');
+    }
 
     private function autoSizeColumns(Spreadsheet $spreadsheet): void
     {

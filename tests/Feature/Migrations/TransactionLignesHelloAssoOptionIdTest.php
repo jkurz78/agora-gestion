@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
-use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
@@ -32,7 +32,7 @@ it('transaction_lignes a la colonne helloasso_option_id', function (): void {
 
 it('accepte deux lignes avec le même helloasso_item_id et deux helloasso_option_id différents', function (): void {
     $compte = CompteBancaire::factory()->create();
-    $sousCat = SousCategorie::factory()->create();
+    $compteVentilation = Compte::factory()->create(['classe' => 7]);
 
     $tx = Transaction::create([
         'type' => 'recette',
@@ -46,16 +46,18 @@ it('accepte deux lignes avec le même helloasso_item_id et deux helloasso_option
 
     TransactionLigne::create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compteVentilation->id,
         'montant' => 12.00,
+        'credit' => 12.00,
         'helloasso_item_id' => 87070,
         'helloasso_option_id' => 18596,
     ]);
 
     TransactionLigne::create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compteVentilation->id,
         'montant' => 12.00,
+        'credit' => 12.00,
         'helloasso_item_id' => 87070,
         'helloasso_option_id' => 18597,
     ]);
@@ -65,7 +67,7 @@ it('accepte deux lignes avec le même helloasso_item_id et deux helloasso_option
 
 it('rejette deux lignes avec le même helloasso_item_id et le même helloasso_option_id non-null', function (): void {
     $compte = CompteBancaire::factory()->create();
-    $sousCat = SousCategorie::factory()->create();
+    $compteVentilation = Compte::factory()->create(['classe' => 7]);
 
     $tx = Transaction::create([
         'type' => 'recette',
@@ -79,16 +81,18 @@ it('rejette deux lignes avec le même helloasso_item_id et le même helloasso_op
 
     TransactionLigne::create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compteVentilation->id,
         'montant' => 12.00,
+        'credit' => 12.00,
         'helloasso_item_id' => 87070,
         'helloasso_option_id' => 18596,
     ]);
 
     TransactionLigne::create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compteVentilation->id,
         'montant' => 12.00,
+        'credit' => 12.00,
         'helloasso_item_id' => 87070,
         'helloasso_option_id' => 18596,
     ]);

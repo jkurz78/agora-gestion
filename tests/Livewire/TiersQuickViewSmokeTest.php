@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
-use App\Enums\UsageComptable;
 use App\Livewire\TiersQuickView;
-use App\Models\SousCategorie;
+use App\Models\Compte;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -24,8 +23,7 @@ it('quick view affiche un don pour le tiers ouvert', function (): void {
         'code_postal' => '69000',
         'ville' => 'Lyon',
     ]);
-    $sousCat = SousCategorie::factory()->create(['nom' => 'Don courant']);
-    $sousCat->usages()->create(['usage' => UsageComptable::Don->value]);
+    $compte = Compte::factory()->pourDons()->create(['intitule' => 'Don courant']);
 
     $tx = Transaction::factory()->create([
         'tiers_id' => $tiers->id,
@@ -35,7 +33,8 @@ it('quick view affiche un don pour le tiers ouvert', function (): void {
     ]);
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compte->id,
+        'credit' => 80,
         'montant' => 80,
     ]);
 

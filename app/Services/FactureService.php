@@ -5,17 +5,25 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\DataTransferObjects\ExtournePayload;
+use App\Enums\ModePaiement;
+use App\Enums\Sens;
 use App\Enums\StatutFacture;
 use App\Enums\StatutReglement;
 use App\Enums\TypeLigneFacture;
 use App\Enums\TypeTransaction;
+use App\Exceptions\Compta\LettrageDejaPresentException;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\Facture;
 use App\Models\FactureLigne;
 use App\Models\Seance;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Services\Compta\CompteTresorerieResolver;
+use App\Services\Compta\EcritureGenerator;
+use App\Services\Compta\EtatReglementResolver;
+use App\Services\Compta\PartieDoubleGuard;
 use App\Support\CurrentAssociation;
 use App\Support\PdfFooterRenderer;
 use App\Tenant\TenantContext;
@@ -33,6 +41,7 @@ final class FactureService
         private readonly ExerciceService $exerciceService,
         private readonly TransactionExtourneService $extourneService,
         private readonly NumeroPieceService $numeroPiece,
+        private readonly EcritureGenerator $ecritureGenerator,
     ) {}
 
     /**
@@ -129,7 +138,7 @@ final class FactureService
         $this->assertBrouillon($facture);
 
         DB::transaction(function () use ($facture, $transactionIds): void {
-            $transactions = Transaction::with(['lignes.sousCategorie', 'lignes.operation'])
+            $transactions = Transaction::with(['lignes.compte', 'lignes.operation'])
                 ->whereIn('id', $transactionIds)
                 ->get();
 
@@ -378,12 +387,15 @@ final class FactureService
     }
 
     /**
-     * Mise à jour de la sous-catégorie d'une ligne manuelle (MontantManuel).
+     * Mise à jour du compte de ventilation d'une ligne manuelle (MontantManuel).
+     *
+     * DC-10a : écrit compte_id (source unique de la ventilation).
+     * Nom de méthode conservé jusqu'au drop DC-10b (rename différé).
      *
      * @throws \RuntimeException si la facture n'est pas brouillon, si le tenant ne correspond pas,
      *                           ou si la ligne n'est pas de type MontantManuel
      */
-    public function majSousCategorieLigne(Facture $facture, int $ligneId, ?int $sousCategorieId): void
+    public function majCompteLigne(Facture $facture, int $ligneId, ?int $compteId): void
     {
         $this->assertBrouillon($facture);
         $this->assertTenantOwnership($facture);
@@ -391,10 +403,12 @@ final class FactureService
         $ligne = $facture->lignes()->findOrFail($ligneId);
 
         if ($ligne->type !== TypeLigneFacture::MontantManuel) {
-            throw new \RuntimeException('La sous-catégorie ne peut être modifiée que sur une ligne manuelle.');
+            throw new \RuntimeException('Le compte ne peut être modifié que sur une ligne manuelle.');
         }
 
-        $ligne->update(['sous_categorie_id' => $sousCategorieId]);
+        $compte = $this->resolveCompteProduit($compteId);
+
+        $ligne->update(['compte_id' => $compte?->id]);
     }
 
     /**
@@ -665,6 +679,19 @@ XML;
      * Mark selected transactions as "payment received" (statut_reglement = recu).
      * Does not move transactions — used for chèques/espèces awaiting deposit.
      *
+     * Step 24 : pour chaque Transaction T1 marquée Recu, si T1 porte une ligne 411 non lettrée,
+     * délègue à EcritureGenerator::pourEncaissementCreance pour créer T2 (encaissement) et
+     * lettrer automatiquement la paire 411 (T1 créance ↔ T2 encaissement).
+     * T2 est attachée au pivot facture_transaction pour traçabilité.
+     *
+     * Skip silencieux (Log::warning + continue) si :
+     * — mode_paiement null sur T1
+     * — mode nécessitant 512X (Virement/CB/Prélèvement) et compte_id null ou IBAN non matché
+     * — T1 ne porte pas de ligne 411 (Transaction legacy sans double écriture)
+     *
+     * LettrageDejaPresentException propagée telle quelle si la ligne 411 est déjà lettrée
+     * (double encaissement = bug) → rollback DB::transaction englobante.
+     *
      * @param  array<int>  $transactionIds
      */
     public function marquerReglementRecu(
@@ -679,22 +706,113 @@ XML;
             throw new \RuntimeException('Cette facture est déjà intégralement réglée.');
         }
 
-        DB::transaction(function () use ($facture, $transactionIds): void {
+        // Preload Compte 411 hors boucle (N+1 fix — Vague 3b Item C)
+        $compte411 = Compte::ofNumero('411');
+
+        DB::transaction(function () use ($facture, $transactionIds, $compte411): void {
             foreach ($transactionIds as $transactionId) {
                 $transaction = $facture->transactions()->findOrFail($transactionId);
 
+                // Legacy fallback : Recu. PD : le syncer dérive EnMain (5112 non remisé = chèque en main).
                 $transaction->update([
                     'statut_reglement' => StatutReglement::Recu->value,
                 ]);
+
+                // --- Partie double : génère T2 (encaissement) si T1 porte une ligne 411 valide ---
+                $this->encaisserPartieDouble($facture, $transaction, $compte411);
+
+                // --- Chantier 4 : syncer le miroir depuis le ledger (écrase le Recu legacy si PD) ---
+                // Lazy app() pour éviter la dépendance circulaire
+                // (EtatReglementResolver → ReglementOperationService → FactureService).
+                app(EtatReglementResolver::class)->syncer($transaction->fresh());
             }
         });
+    }
+
+    /**
+     * Génère la T2 (encaissement créance) via EcritureGenerator::pourEncaissementCreance
+     * et l'attache au pivot facture_transaction.
+     *
+     * Skip silencieux si les prérequis partie double ne sont pas satisfaits
+     * (mode null, compte 512X introuvable pour Virement/CB/Prélèvement, pas de ligne 411).
+     *
+     * @throws LettrageDejaPresentException Si ligne 411 déjà lettrée.
+     */
+    private function encaisserPartieDouble(Facture $facture, Transaction $transaction, ?Compte $compte411 = null): void
+    {
+        // --- 1. Résolution mode de paiement ---
+        /** @var ModePaiement|null $mode */
+        $mode = $transaction->mode_paiement;
+
+        if ($mode === null) {
+            Log::warning('[PartieDouble][FactureService] — skip : mode_paiement null sur T1', [
+                'transaction_id' => (int) $transaction->id,
+                'facture_id' => (int) $facture->id,
+            ]);
+
+            return;
+        }
+
+        // --- 2. Résolution compte de trésorerie (CompteBancaire → 512X via IBAN, ou placeholder 5112) ---
+        $compteTresorerie = CompteTresorerieResolver::resoudre(
+            compteBancaireId: $transaction->compte_id !== null ? (int) $transaction->compte_id : null,
+            mode: $mode,
+            contextLog: 'FactureService',
+            sens: Sens::Recette, // encaissement créance = côté recette (chèque reçu → 5112 OK)
+        );
+
+        if ($compteTresorerie === null) {
+            // Skip silencieux déjà loggué par CompteTresorerieResolver
+            return;
+        }
+
+        // --- 3. Vérifie que T1 porte une ligne 411 (transaction issue de la double écriture) ---
+        // Compte 411 préchargé par le caller (N+1 fix — Vague 3b Item C).
+        // On utilise ofNumero() (nullable) plutôt que ofNumeroSysteme() (throw) car ce skip
+        // est défensif : si le compte 411 n'existe pas (tenant sans double écriture activée),
+        // on skip sans exception.
+        $compte411 ??= Compte::ofNumero('411');
+        if ($compte411 === null) {
+            Log::warning('[PartieDouble][FactureService] — skip : compte 411 absent (tenant sans schéma PD)', [
+                'transaction_id' => (int) $transaction->id,
+                'facture_id' => (int) $facture->id,
+            ]);
+
+            return;
+        }
+
+        $ligne411 = TransactionLigne::where('transaction_id', $transaction->id)
+            ->where('compte_id', $compte411->id)
+            ->first();
+
+        if ($ligne411 === null || $ligne411->tiers_id === null) {
+            Log::warning('[PartieDouble][FactureService] — skip : T1 legacy sans ligne 411 ou sans tiers', [
+                'transaction_id' => (int) $transaction->id,
+                'facture_id' => (int) $facture->id,
+            ]);
+
+            return;
+        }
+
+        // --- 4. Délègue à EcritureGenerator (crée T2 + auto-lettre la paire 411) ---
+        // LettrageDejaPresentException propagée telle quelle → rollback DB::transaction englobante.
+        $t2 = $this->ecritureGenerator->pourEncaissementCreance(
+            transactionCreance: $transaction,
+            mode: $mode,
+            compteTresorerie: $compteTresorerie,
+            datePaiement: now(),
+            libelle: "Encaissement facture {$facture->numero}",
+        );
+
+        // --- 5. Attache T2 au pivot facture_transaction (traçabilité : facture voit T1 + T2) ---
+        $facture->transactions()->attach($t2->id);
     }
 
     /**
      * Ajoute une ligne manuelle de type MontantManuel à une facture brouillon.
      *
      * $attrs accepte : libelle (requis), prix_unitaire (requis, > 0), quantite (requis, > 0),
-     * sous_categorie_id (optionnel), operation_id (optionnel), seance (optionnel).
+     * compte_id (optionnel), operation_id (optionnel), seance (optionnel).
      *
      * @param  array<string, mixed>  $attrs
      *
@@ -715,7 +833,11 @@ XML;
             );
         }
 
-        return DB::transaction(function () use ($facture, $attrs, $prixUnitaire, $quantite): FactureLigne {
+        $compte = $this->resolveCompteProduit(
+            isset($attrs['compte_id']) ? (int) $attrs['compte_id'] : null
+        );
+
+        return DB::transaction(function () use ($facture, $attrs, $prixUnitaire, $quantite, $compte): FactureLigne {
             $maxOrdre = (int) FactureLigne::where('facture_id', $facture->id)->max('ordre');
 
             $montant = round($prixUnitaire * $quantite, 2);
@@ -728,7 +850,8 @@ XML;
                 'quantite' => $quantite,
                 'montant' => $montant,
                 'transaction_ligne_id' => null,
-                'sous_categorie_id' => $attrs['sous_categorie_id'] ?? null,
+                // DC-10a : la ventilation est portée par compte_id (source unique).
+                'compte_id' => $compte?->id,
                 'operation_id' => $attrs['operation_id'] ?? null,
                 'seance' => $attrs['seance'] ?? null,
                 'ordre' => $maxOrdre + 1,
@@ -763,7 +886,7 @@ XML;
                 'quantite' => null,
                 'montant' => null,
                 'transaction_ligne_id' => null,
-                'sous_categorie_id' => null,
+                'compte_id' => null,
                 'operation_id' => null,
                 'seance' => null,
                 'ordre' => $maxOrdre + 1,
@@ -851,7 +974,7 @@ XML;
      * Exécutés AVANT toute mutation et AVANT l'attribution du numéro.
      *
      * 1. mode_paiement_prevu doit être non-null.
-     * 2. Chaque ligne MontantManuel doit avoir sous_categorie_id non-null.
+     * 2. Chaque ligne MontantManuel doit avoir compte_id non-null.
      *
      * Si la facture ne porte aucune ligne MontantManuel, cette méthode est no-op
      * (les factures classiques ne sont pas impactées).
@@ -874,13 +997,14 @@ XML;
             );
         }
 
-        $lignesSansSousCat = $lignesManuelles->filter(
-            fn (FactureLigne $l) => $l->sous_categorie_id === null
+        // DC-10a : ventilation compte-first (source unique).
+        $lignesSansVentilation = $lignesManuelles->filter(
+            fn (FactureLigne $l) => $l->compte_id === null
         );
 
-        if ($lignesSansSousCat->isNotEmpty()) {
+        if ($lignesSansVentilation->isNotEmpty()) {
             throw new \RuntimeException(
-                'La sous-catégorie est requise sur chaque ligne montant pour valider la facture.'
+                'Le compte est requis sur chaque ligne montant pour valider la facture.'
             );
         }
     }
@@ -919,23 +1043,80 @@ XML;
             'numero_piece' => $this->numeroPiece->assign($dateTransaction),
         ]);
 
-        // 2. Crée les TransactionLignes + 3. set facture_lignes.transaction_ligne_id
+        // 2. Crée les TransactionLignes legacy + 3. set facture_lignes.transaction_ligne_id
+        //    + 4. Enrichit chaque ligne avec compte_id/debit/credit (partie double)
+        $ventilations = [];
+        $skipPartieDouble = false;
+
         foreach ($lignesManuelles as $factureLigne) {
+            // 4. Résolution du Compte (classe 7 attendue pour recette).
+            // DC-10a — compte_id de la FactureLigne est la source unique de ventilation.
+            $compte = $factureLigne->compte_id !== null ? $factureLigne->compte : null;
+
+            if ($compte !== null && (int) $compte->classe !== 7) {
+                Log::warning('[PartieDouble][FactureService] — skip : compte_id porté par la ligne invalide (classe ≠ 7)', [
+                    'transaction_id' => (int) $transaction->id,
+                    'facture_ligne_id' => (int) $factureLigne->id,
+                    'compte_id' => $factureLigne->compte_id,
+                ]);
+                $compte = null;
+            }
+
+            // 2. Crée la TransactionLigne compte-first : compte_id + credit posés à la
+            // création (recette), invariant XOR satisfait d'emblée. Compte invalide →
+            // ligne sans compte (PD skippée, best-effort).
             $transactionLigne = TransactionLigne::create([
                 'transaction_id' => $transaction->id,
-                'sous_categorie_id' => $factureLigne->sous_categorie_id,
+                'compte_id' => $compte?->id,
                 'operation_id' => $factureLigne->operation_id,
                 'seance' => $factureLigne->seance,
                 'montant' => $factureLigne->montant,
                 'notes' => $factureLigne->libelle,
+                'debit' => 0,
+                'credit' => $compte !== null ? (float) $factureLigne->montant : 0,
             ]);
 
             // 3. Lie la FactureLigne à sa TransactionLigne
             $factureLigne->update(['transaction_ligne_id' => $transactionLigne->id]);
+
+            if (! $skipPartieDouble) {
+                if ($compte !== null) {
+                    $ventilations[] = [
+                        'compte' => $compte,
+                        'montant' => (float) $factureLigne->montant,
+                        'operation_id' => $factureLigne->operation_id,
+                        'seance' => $factureLigne->seance,
+                        'notes' => $factureLigne->libelle,
+                    ];
+                } else {
+                    // Une résolution a échoué : on abandonne toute la partie double (Skip PD).
+                    // Note : on ne fait PAS break ici (contrairement à Step 21) car la boucle sert
+                    // aussi à créer les TransactionLignes legacy pour toutes les FactureLignes.
+                    // TODO DRY Step 25+ : réconcilier avec TransactionService quand le helper
+                    // partagé sera extrait — la sémantique du break sera unifiée.
+                    $skipPartieDouble = true;
+                }
+            }
         }
 
-        // 4. Attache la Transaction au pivot facture_transaction
+        // 5. Attache la Transaction au pivot facture_transaction
         $facture->transactions()->attach($transaction->id);
+
+        // 6. Ajoute la ligne 411 D tiers (créance ouverte) via EcritureGenerator
+        if (! $skipPartieDouble && ! empty($ventilations)) {
+            $tiers = Tiers::findOrFail((int) $facture->tiers_id);
+
+            $this->ecritureGenerator->pourRecetteACredit(
+                tiers: $tiers,
+                ventilations: $ventilations,
+                dateConstatation: $dateTransaction,
+                libelle: $transaction->libelle,
+                existingTransaction: $transaction,
+            );
+
+            $transaction->forceFill(['equilibree' => true])->save();
+            PartieDoubleGuard::assertComplete($transaction->fresh());
+        }
 
         return $transaction;
     }
@@ -980,18 +1161,44 @@ XML;
     }
 
     /**
+     * Résout un compte produit valide dans le tenant courant.
+     *
+     * Le scope tenant et SoftDeletes de Compte rendent la recherche fail-closed.
+     */
+    private function resolveCompteProduit(?int $compteId): ?Compte
+    {
+        if ($compteId === null) {
+            return null;
+        }
+
+        $compte = Compte::query()
+            ->whereKey($compteId)
+            ->where('actif', true)
+            ->where('classe', 7)
+            ->first();
+
+        if ($compte === null) {
+            throw new \RuntimeException(
+                "Le compte de ventilation doit être un compte actif de classe 7 de l'association courante."
+            );
+        }
+
+        return $compte;
+    }
+
+    /**
      * Generate auto-libellé for a facture ligne based on the transaction ligne.
      */
     private function genererLibelleLigne(TransactionLigne $ligne): string
     {
-        $sousCategorie = $ligne->sousCategorie?->nom ?? '';
+        $compteLibelle = $ligne->compte?->intitule ?? '';
         $operation = $ligne->operation?->nom;
 
         if ($operation === null) {
-            return $sousCategorie;
+            return $compteLibelle;
         }
 
-        $parts = [$sousCategorie, $operation];
+        $parts = [$compteLibelle, $operation];
 
         if ($ligne->seance !== null) {
             $seanceLabel = "Séance {$ligne->seance}";

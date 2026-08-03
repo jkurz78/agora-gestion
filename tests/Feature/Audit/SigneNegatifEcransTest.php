@@ -21,11 +21,10 @@ use App\Livewire\TiersTransactions;
 use App\Livewire\TransactionCompteList;
 use App\Livewire\TransactionUniverselle;
 use App\Models\Association;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Exercice;
 use App\Models\RapprochementBancaire;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -49,12 +48,7 @@ beforeEach(function () {
     session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
 
-    // Catégorie / sous-catégorie de recette
-    $this->categorie = Categorie::factory()->create(['association_id' => $this->association->id]);
-    $this->sc = SousCategorie::factory()->create([
-        'categorie_id' => $this->categorie->id,
-        'association_id' => $this->association->id,
-    ]);
+    $this->sc = Compte::factory()->numero('706')->create();
 
     // Compte bancaire
     $this->compte = CompteBancaire::factory()->create([
@@ -137,8 +131,10 @@ it('creances_a_recevoir_exclut_montants_negatifs', function () {
     ]);
     TransactionLigne::create([
         'transaction_id' => $txPositif->id,
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'montant' => 100.0,
+        'debit' => 0.0,
+        'credit' => 100.0,
     ]);
 
     $txNegatif = Transaction::create([
@@ -154,8 +150,10 @@ it('creances_a_recevoir_exclut_montants_negatifs', function () {
     ]);
     TransactionLigne::create([
         'transaction_id' => $txNegatif->id,
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'montant' => -50.0,
+        'debit' => 50.0,
+        'credit' => 0.0,
     ]);
 
     // La vue "Créances à recevoir" utilise TransactionUniverselle + filterStatut = 'en_attente'.
@@ -191,8 +189,10 @@ it('creances_a_recevoir_exclut_montants_negatifs_sans_locked_types', function ()
     ]);
     TransactionLigne::create([
         'transaction_id' => $txPositif->id,
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'montant' => 100.0,
+        'debit' => 0.0,
+        'credit' => 100.0,
     ]);
 
     $txNegatif = Transaction::create([
@@ -208,8 +208,10 @@ it('creances_a_recevoir_exclut_montants_negatifs_sans_locked_types', function ()
     ]);
     TransactionLigne::create([
         'transaction_id' => $txNegatif->id,
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'montant' => -50.0,
+        'debit' => 50.0,
+        'credit' => 0.0,
     ]);
 
     // Sans lockedTypes → types=null → le union inclut dépenses + recettes + virements.
@@ -232,12 +234,9 @@ it('dashboard_render_avec_negatifs', function () {
     $this->makeAuditTransaction('recette', 150.0, $this->sc, $this->compte, 2025);
     $this->makeAuditTransaction('recette', -80.0, $this->sc, $this->compte, 2025);
 
-    // Sous-catégorie dépense
-    $scDep = SousCategorie::factory()->create([
-        'categorie_id' => $this->categorie->id,
-        'association_id' => $this->association->id,
-    ]);
-    $this->makeAuditTransaction('depense', 50.0, $scDep, $this->compte, 2025);
+    // Compte dépense
+    $compteDep = Compte::factory()->depense()->numero('606')->create();
+    $this->makeAuditTransaction('depense', 50.0, $compteDep, $this->compte, 2025);
 
     Livewire::test(Dashboard::class)
         ->assertOk()

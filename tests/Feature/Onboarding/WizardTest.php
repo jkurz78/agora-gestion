@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 use App\Livewire\Onboarding\Wizard;
 use App\Models\Association;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
+use App\Models\Famille;
 use App\Models\HelloAssoParametres;
 use App\Models\IncomingMailParametres;
 use App\Models\SmtpParametres;
-use App\Models\SousCategorie;
 use App\Models\User;
 use App\Services\SmtpService;
 use App\Tenant\TenantContext;
@@ -518,10 +518,12 @@ it('saves step 7 with default plan comptable and advances to step 8', function (
         ->call('saveStep7')
         ->assertSet('currentStep', 8);
 
-    $catCount = Categorie::where('association_id', $this->association->id)->count();
-    $scCount = SousCategorie::where('association_id', $this->association->id)->count();
-    expect($catCount)->toBeGreaterThan(0);
-    expect($scCount)->toBeGreaterThan(0);
+    // Comptes et familles constituent le plan comptable.
+    // encore lu par le pont CR legacy tant que DC-10 ne les a pas dropées.
+    $familleCount = Famille::where('association_id', $this->association->id)->count();
+    $compteCount = Compte::where('association_id', $this->association->id)->count();
+    expect($familleCount)->toBeGreaterThan(0);
+    expect($compteCount)->toBeGreaterThan(0);
 });
 
 it('saves step 7 with empty plan and advances to step 8', function () {
@@ -533,8 +535,8 @@ it('saves step 7 with empty plan and advances to step 8', function () {
         ->call('saveStep7')
         ->assertSet('currentStep', 8);
 
-    $catCount = Categorie::where('association_id', $this->association->id)->count();
-    expect($catCount)->toBe(0);
+    $familleCount = Famille::where('association_id', $this->association->id)->count();
+    expect($familleCount)->toBe(0);
 });
 
 it('does not re-apply default plan on step 7 re-submit', function () {
@@ -546,7 +548,7 @@ it('does not re-apply default plan on step 7 re-submit', function () {
         ->call('saveStep7')
         ->assertSet('currentStep', 8);
 
-    $firstCount = Categorie::where('association_id', $this->association->id)->count();
+    $firstCount = Compte::where('association_id', $this->association->id)->count();
     expect($firstCount)->toBeGreaterThan(0);
 
     // Simulate back + re-submit
@@ -555,11 +557,11 @@ it('does not re-apply default plan on step 7 re-submit', function () {
         ->set('planComptableChoix', 'default')
         ->call('saveStep7');
 
-    $secondCount = Categorie::where('association_id', $this->association->id)->count();
+    $secondCount = Compte::where('association_id', $this->association->id)->count();
     expect($secondCount)->toBe($firstCount);
 });
 
-it('saves step 7 with empty plan leaves zero sous-categories', function () {
+it('saves step 7 with empty plan leaves zero comptes', function () {
     $this->association->update(['wizard_current_step' => 7]);
 
     Livewire::actingAs($this->admin)
@@ -568,8 +570,8 @@ it('saves step 7 with empty plan leaves zero sous-categories', function () {
         ->call('saveStep7')
         ->assertSet('currentStep', 8);
 
-    $scCount = SousCategorie::where('association_id', $this->association->id)->count();
-    expect($scCount)->toBe(0);
+    $compteCount = Compte::where('association_id', $this->association->id)->count();
+    expect($compteCount)->toBe(0);
 });
 
 it('finalizes wizard and redirects to dashboard', function () {

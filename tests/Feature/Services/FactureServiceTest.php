@@ -9,13 +9,13 @@ use App\Enums\TypeLigneFacture;
 use App\Enums\TypeTransaction;
 use App\Exceptions\ExerciceCloturedException;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Exercice;
 use App\Models\Facture;
 use App\Models\FactureLigne;
 use App\Models\Operation;
 use App\Models\Seance;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -110,7 +110,7 @@ describe('creer()', function () {
 
 describe('ajouterTransactions()', function () {
     beforeEach(function () {
-        $this->sousCategorie = SousCategorie::factory()->create(['nom' => 'Inscription Yoga']);
+        $this->compte = Compte::factory()->create(['intitule' => 'Inscription Yoga']);
         $this->operation = Operation::factory()->create(['nom' => 'Yoga Adultes']);
         $this->facture = Facture::create([
             'date' => now()->toDateString(),
@@ -129,14 +129,18 @@ describe('ajouterTransactions()', function () {
 
         $ligne1 = TransactionLigne::create([
             'transaction_id' => $transaction->id,
-            'sous_categorie_id' => $this->sousCategorie->id,
+            'compte_id' => $this->compte->id,
+            'debit' => 0,
+            'credit' => 60.00,
             'operation_id' => $this->operation->id,
             'montant' => 60.00,
         ]);
 
         $ligne2 = TransactionLigne::create([
             'transaction_id' => $transaction->id,
-            'sous_categorie_id' => $this->sousCategorie->id,
+            'compte_id' => $this->compte->id,
+            'debit' => 0,
+            'credit' => 40.00,
             'operation_id' => $this->operation->id,
             'montant' => 40.00,
         ]);
@@ -161,7 +165,7 @@ describe('ajouterTransactions()', function () {
             ->and($lignes[1]->ordre)->toBe(2);
     });
 
-    it('generates correct auto-libellé with sous-catégorie, opération, séance', function () {
+    it('generates correct auto-libellé with compte, opération, séance', function () {
         Seance::create([
             'operation_id' => $this->operation->id,
             'numero' => 3,
@@ -174,7 +178,9 @@ describe('ajouterTransactions()', function () {
 
         TransactionLigne::create([
             'transaction_id' => $transaction->id,
-            'sous_categorie_id' => $this->sousCategorie->id,
+            'compte_id' => $this->compte->id,
+            'debit' => 0,
+            'credit' => 30.00,
             'operation_id' => $this->operation->id,
             'seance' => 3,
             'montant' => 30.00,
@@ -182,7 +188,9 @@ describe('ajouterTransactions()', function () {
 
         TransactionLigne::create([
             'transaction_id' => $transaction->id,
-            'sous_categorie_id' => $this->sousCategorie->id,
+            'compte_id' => $this->compte->id,
+            'debit' => 0,
+            'credit' => 20.00,
             'operation_id' => $this->operation->id,
             'seance' => null,
             'montant' => 20.00,
@@ -205,7 +213,9 @@ describe('ajouterTransactions()', function () {
 
         TransactionLigne::create([
             'transaction_id' => $transaction->id,
-            'sous_categorie_id' => $this->sousCategorie->id,
+            'compte_id' => $this->compte->id,
+            'debit' => 0,
+            'credit' => 30.00,
             'operation_id' => $this->operation->id,
             'seance' => 5,
             'montant' => 30.00,
@@ -224,7 +234,9 @@ describe('ajouterTransactions()', function () {
 
         TransactionLigne::create([
             'transaction_id' => $transaction->id,
-            'sous_categorie_id' => $this->sousCategorie->id,
+            'compte_id' => $this->compte->id,
+            'debit' => 0,
+            'credit' => 30.00,
             'operation_id' => null,
             'montant' => 30.00,
         ]);
@@ -244,7 +256,9 @@ describe('ajouterTransactions()', function () {
 
         TransactionLigne::create([
             'transaction_id' => $transaction->id,
-            'sous_categorie_id' => $this->sousCategorie->id,
+            'compte_id' => $this->compte->id,
+            'debit' => 0,
+            'credit' => 50.00,
             'montant' => 50.00,
         ]);
 
@@ -258,7 +272,9 @@ describe('ajouterTransactions()', function () {
 
         TransactionLigne::create([
             'transaction_id' => $transaction->id,
-            'sous_categorie_id' => $this->sousCategorie->id,
+            'compte_id' => $this->compte->id,
+            'debit' => 0,
+            'credit' => 50.00,
             'montant' => 50.00,
         ]);
 
@@ -283,7 +299,9 @@ describe('ajouterTransactions()', function () {
 
         TransactionLigne::create([
             'transaction_id' => $transaction->id,
-            'sous_categorie_id' => $this->sousCategorie->id,
+            'compte_id' => $this->compte->id,
+            'debit' => 0,
+            'credit' => 50.00,
             'montant' => 50.00,
         ]);
 
@@ -309,7 +327,9 @@ describe('ajouterTransactions()', function () {
 
         TransactionLigne::create([
             'transaction_id' => $transaction->id,
-            'sous_categorie_id' => $this->sousCategorie->id,
+            'compte_id' => $this->compte->id,
+            'debit' => 50.00,
+            'credit' => 0,
             'montant' => 50.00,
         ]);
 
@@ -319,7 +339,7 @@ describe('ajouterTransactions()', function () {
 
 describe('retirerTransaction()', function () {
     beforeEach(function () {
-        $this->sousCategorie = SousCategorie::factory()->create();
+        $this->compte = Compte::factory()->create();
         $this->facture = Facture::create([
             'date' => now()->toDateString(),
             'statut' => StatutFacture::Brouillon,
@@ -337,7 +357,9 @@ describe('retirerTransaction()', function () {
 
         TransactionLigne::create([
             'transaction_id' => $transaction->id,
-            'sous_categorie_id' => $this->sousCategorie->id,
+            'compte_id' => $this->compte->id,
+            'debit' => 0,
+            'credit' => 100.00,
             'montant' => 100.00,
         ]);
 
@@ -368,7 +390,7 @@ describe('retirerTransaction()', function () {
 
 describe('supprimerBrouillon()', function () {
     it('deletes facture, lignes, and pivot', function () {
-        $sousCategorie = SousCategorie::factory()->create();
+        $compte = Compte::factory()->create();
         $facture = Facture::create([
             'date' => now()->toDateString(),
             'statut' => StatutFacture::Brouillon,
@@ -384,7 +406,9 @@ describe('supprimerBrouillon()', function () {
 
         TransactionLigne::create([
             'transaction_id' => $transaction->id,
-            'sous_categorie_id' => $sousCategorie->id,
+            'compte_id' => $compte->id,
+            'debit' => 0,
+            'credit' => 50.00,
             'montant' => 50.00,
         ]);
 
@@ -417,7 +441,6 @@ describe('supprimerBrouillon()', function () {
 
 describe('majOrdre()', function () {
     beforeEach(function () {
-        $this->sousCategorie = SousCategorie::factory()->create();
         $this->facture = Facture::create([
             'date' => now()->toDateString(),
             'statut' => StatutFacture::Brouillon,

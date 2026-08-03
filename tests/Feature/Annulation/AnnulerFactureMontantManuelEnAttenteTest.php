@@ -5,20 +5,20 @@ declare(strict_types=1);
 use App\Enums\ModePaiement;
 use App\Enums\RoleAssociation;
 use App\Enums\StatutFacture;
-use App\Enums\StatutRapprochement;
 use App\Enums\StatutReglement;
 use App\Enums\TypeLigneFacture;
 use App\Enums\TypeRapprochement;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Extourne;
 use App\Models\Facture;
 use App\Models\FactureLigne;
 use App\Models\RapprochementBancaire;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\ExerciceService;
 use App\Services\FactureService;
 use App\Tenant\TenantContext;
@@ -44,6 +44,7 @@ beforeEach(function (): void {
     $this->comptable->update(['derniere_association_id' => $this->association->id]);
 
     TenantContext::boot($this->association);
+    SystemeSeeder::seed();
     $this->actingAs($this->comptable);
 
     $this->service = app(FactureService::class);
@@ -63,7 +64,7 @@ afterEach(function (): void {
 function enAttenteCreerFactureValideeAvecMontantManuel(
     FactureService $service,
     Tiers $tiers,
-    SousCategorie $sousCategorie,
+    Compte $compteVentilation,
     float $montant = 80.0,
 ): array {
     $facture = $service->creerManuelleVierge($tiers->id);
@@ -78,7 +79,7 @@ function enAttenteCreerFactureValideeAvecMontantManuel(
         'quantite' => 1.0,
         'montant' => $montant,
         'transaction_ligne_id' => null,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
         'ordre' => 1,
     ]);
 
@@ -94,16 +95,16 @@ function enAttenteCreerFactureValideeAvecMontantManuel(
     return [$facture, $tg];
 }
 
-// ─── BDD §2 Scénario #1 : MontantManuel EnAttente → extourne + lettrage auto ─
+// ─── BDD §2 Scénario #1 : MontantManuel EnAttente → extourne sans lettrage ─
 
-test('annulation facture MontantManuel EnAttente produit extourne et lettrage automatique', function (): void {
+test('annulation facture MontantManuel EnAttente produit extourne sans lettrage', function (): void {
     $tiers = Tiers::factory()->create(['pour_recettes' => true]);
-    $sousCategorie = SousCategorie::factory()->create();
+    $compteVentilation = Compte::factory()->numero('706')->create();
 
     [$facture, $tg] = enAttenteCreerFactureValideeAvecMontantManuel(
         $this->service,
         $tiers,
-        $sousCategorie,
+        $compteVentilation,
         80.0,
     );
 
@@ -135,11 +136,9 @@ test('annulation facture MontantManuel EnAttente produit extourne et lettrage au
 
     expect($tgFrais->extournee_at)->not->toBeNull();
     expect($tgFrais->statut_reglement)->toBe(StatutReglement::Pointe);
-    expect($tgFrais->rapprochement_id)->not->toBeNull();
 
     // ── Assertions transaction miroir (Tm) ───────────────────────────────────
 
-    // Tm est la dernière transaction créée
     $tm = Transaction::where('id', '!=', $tg->id)
         ->orderByDesc('id')
         ->first();
@@ -149,16 +148,9 @@ test('annulation facture MontantManuel EnAttente produit extourne et lettrage au
     expect($tm->libelle)->toBe("Annulation - Facture {$numeroFacture}");
     expect($tm->statut_reglement)->toBe(StatutReglement::Pointe);
 
-    // ── Assertion rapprochement de type Lettrage ──────────────────────────────
+    // ── Pas de rapprochement de type Lettrage ────────────────────────────────
 
-    $lettrage = RapprochementBancaire::where('type', TypeRapprochement::Lettrage)->first();
-
-    expect($lettrage)->not->toBeNull();
-    expect($lettrage->statut)->toBe(StatutRapprochement::Verrouille);
-
-    // Tg et Tm sont tous les deux liés à ce lettrage
-    expect((int) $tgFrais->rapprochement_id)->toBe((int) $lettrage->id);
-    expect((int) $tm->rapprochement_id)->toBe((int) $lettrage->id);
+    expect(RapprochementBancaire::where('type', TypeRapprochement::Lettrage)->count())->toBe(0);
 
     // ── Assertion entrée extournes ────────────────────────────────────────────
 
@@ -167,8 +159,7 @@ test('annulation facture MontantManuel EnAttente produit extourne et lettrage au
     expect($extourne)->not->toBeNull();
     expect((int) $extourne->transaction_origine_id)->toBe((int) $tg->id);
     expect((int) $extourne->transaction_extourne_id)->toBe((int) $tm->id);
-    expect($extourne->rapprochement_lettrage_id)->not->toBeNull();
-    expect((int) $extourne->rapprochement_lettrage_id)->toBe((int) $lettrage->id);
+    expect($extourne->rapprochement_lettrage_id)->toBeNull();
 
     // ── Assertion pivot facture_transaction conservé pour MontantManuel ───────
 

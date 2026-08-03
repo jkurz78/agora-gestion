@@ -5,18 +5,17 @@ declare(strict_types=1);
 use App\Enums\RoleAssociation;
 use App\Enums\StatutNoteDeFrais;
 use App\Enums\StatutReglement;
-use App\Enums\TypeCategorie;
 use App\Enums\TypeTransaction;
 use App\Livewire\BackOffice\NoteDeFrais\Show;
 use App\Models\Association;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -43,22 +42,27 @@ function constaterAbandonBootTenant(Association $association): void
 }
 
 /**
- * Creates an NDF with abandon_creance_propose + one ligne + one AbandonCreance sous-cat.
+ * Creates an NDF with abandon_creance_propose + one ligne + one AbandonCreance compte.
  *
- * @return array{ndf: NoteDeFrais, compte: CompteBancaire, scAbandon: SousCategorie}
+ * @return array{ndf: NoteDeFrais, compte: CompteBancaire, scAbandon: Compte}
  */
 function constaterAbandonSetupHappyPath(Association $association, string $ndfDate = '2026-03-10'): array
 {
     Storage::fake('local');
 
-    $catRecette = Categorie::factory()->create([
+    // Infrastructure partie double — comptes système 411, 401, 467 requis par abandonCreancePd()
+    SystemeSeeder::seed();
+
+    // Compte Dépense classe 6 pour PD
+    $compteDepense = Compte::factory()->depense()->numero('625')->create([
         'association_id' => $association->id,
-        'type' => TypeCategorie::Recette->value,
+        'intitule' => 'Frais missions déplacements',
     ]);
-    $scAbandon = SousCategorie::factory()->pourAbandonCreance()->create([
+
+    // Compte AbandonCreance classe 7 pour PD
+    $compteAbandon = Compte::factory()->pourAbandonCreance()->numero('771')->create([
         'association_id' => $association->id,
-        'categorie_id' => $catRecette->id,
-        'nom' => 'Don abandon test',
+        'intitule' => 'Dons et abandons de créances',
     ]);
 
     $compte = CompteBancaire::factory()->create([
@@ -76,16 +80,15 @@ function constaterAbandonSetupHappyPath(Association $association, string $ndfDat
         'abandon_creance_propose' => true,
     ]);
 
-    $sousCategorie = SousCategorie::factory()->create(['association_id' => $association->id]);
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteDepense->id,
         'libelle' => 'Déplacement',
         'montant' => '75.00',
         'piece_jointe_path' => null,
     ]);
 
-    return ['ndf' => $ndf, 'compte' => $compte, 'scAbandon' => $scAbandon];
+    return ['ndf' => $ndf, 'compte' => $compte, 'scAbandon' => $compteAbandon];
 }
 
 // ── 1. Propriété dateDon initialisée à ndf->date au mount ────────────────────
@@ -171,8 +174,8 @@ it('confirmValidation avec choix=abandon crée 2 Transactions et passe la NDF en
         ->set('dateDon', '2026-03-10')
         ->call('confirmValidation');
 
-    // 2 nouvelles Transactions
-    expect(Transaction::count())->toBe($countBefore + 2);
+    // 4 nouvelles Transactions en mode PD : T1-dépense, T1-don, OD-compensation × 2
+    expect(Transaction::count())->toBe($countBefore + 4);
 
     // Statut NDF mis à jour
     $ndf->refresh();
@@ -255,6 +258,7 @@ it('confirmValidation avec choix=normal valide normalement et ferme le miniForm'
 
     $association = Association::factory()->create();
     constaterAbandonBootTenant($association);
+    SystemeSeeder::seed();
     $admin = constaterAbandonMakeAdmin($association);
 
     $compte = CompteBancaire::factory()->create([
@@ -270,10 +274,10 @@ it('confirmValidation avec choix=normal valide normalement et ferme le miniForm'
         'date' => '2026-03-10',
     ]);
 
-    $scDepense = SousCategorie::factory()->create(['association_id' => $association->id]);
+    $compteDepense = Compte::factory()->depense()->create(['association_id' => $association->id]);
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $scDepense->id,
+        'compte_id' => $compteDepense->id,
         'montant' => '50.00',
         'piece_jointe_path' => null,
     ]);
@@ -299,9 +303,9 @@ it('confirmValidation avec choix=normal valide normalement et ferme le miniForm'
     expect($ndf->getRawOriginal('statut'))->toBe(StatutNoteDeFrais::Validee->value);
 });
 
-// ── 8. Échec service — pas de sous-cat AbandonCreance → flash error, NDF Soumise
+// ── 8. Échec service — pas de compte AbandonCreance → flash error, NDF Soumise
 
-it('confirmValidation avec choix=abandon flash error si aucune sous-cat AbandonCreance', function (): void {
+it('confirmValidation avec choix=abandon flash error si aucun compte AbandonCreance', function (): void {
     Storage::fake('local');
 
     $association = Association::factory()->create();
@@ -321,10 +325,10 @@ it('confirmValidation avec choix=abandon flash error si aucune sous-cat AbandonC
         'date' => '2026-03-10',
     ]);
 
-    $sousCategorie = SousCategorie::factory()->create(['association_id' => $association->id]);
+    $compteVentilation = Compte::factory()->create(['association_id' => $association->id]);
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
         'montant' => '50.00',
         'piece_jointe_path' => null,
     ]);
@@ -394,10 +398,10 @@ it('confirmValidation avec choix=normal ignore dateDon vide', function (): void 
         'date' => '2026-03-10',
     ]);
 
-    $sc = SousCategorie::factory()->create(['association_id' => $association->id]);
+    $compteVentilation = Compte::factory()->create(['association_id' => $association->id]);
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $compteVentilation->id,
         'montant' => '40.00',
         'piece_jointe_path' => null,
     ]);

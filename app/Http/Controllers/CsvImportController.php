@@ -14,7 +14,7 @@ final class CsvImportController extends Controller
             abort(404);
         }
 
-        $headers_csv = 'date;reference;sous_categorie;montant_ligne;mode_paiement;compte;libelle;tiers;operation;seance;notes';
+        $headers_csv = 'date;reference;compte;montant_ligne;mode_paiement;compte_bancaire;libelle;tiers;operation;seance;notes';
 
         // 3 example rows based on type
         if ($type === 'depense') {

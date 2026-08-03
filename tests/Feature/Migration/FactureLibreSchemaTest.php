@@ -72,10 +72,10 @@ it('facture_lignes has quantite column (decimal nullable)', function () {
     expect($column['type_name'])->toBeIn(['decimal', 'numeric']);
 });
 
-it('facture_lignes has sous_categorie_id column (nullable)', function () {
-    expect(Schema::hasColumn('facture_lignes', 'sous_categorie_id'))->toBeTrue();
+it('facture_lignes has compte_id column (nullable)', function () {
+    expect(Schema::hasColumn('facture_lignes', 'compte_id'))->toBeTrue();
 
-    $column = collect(Schema::getColumns('facture_lignes'))->firstWhere('name', 'sous_categorie_id');
+    $column = collect(Schema::getColumns('facture_lignes'))->firstWhere('name', 'compte_id');
     expect($column)->not->toBeNull();
     expect($column['nullable'])->toBeTrue();
 });

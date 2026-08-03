@@ -10,16 +10,17 @@ use App\Enums\TypeLigneFacture;
 use App\Enums\TypeRapprochement;
 use App\Enums\TypeTransaction;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Extourne;
 use App\Models\Facture;
 use App\Models\FactureLigne;
 use App\Models\RapprochementBancaire;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\ExerciceService;
 use App\Services\FactureService;
 use App\Tenant\TenantContext;
@@ -43,6 +44,7 @@ beforeEach(function (): void {
     $this->comptable->update(['derniere_association_id' => $this->association->id]);
 
     TenantContext::boot($this->association);
+    SystemeSeeder::seed();
     $this->actingAs($this->comptable);
 
     $this->service = app(FactureService::class);
@@ -57,7 +59,7 @@ afterEach(function (): void {
 
 /**
  * Crée une facture brouillon avec :
- *   - 1 ligne MontantManuel "Stage avril" 100 € (sous-catégorie recette donnée)
+ *   - 1 ligne MontantManuel "Stage avril" 100 € (compte recette donnée)
  *   - 1 TX recette préexistante Tref 50 € Recu rattachée via ajouterTransactions
  * La valide (ce qui génère Tg EnAttente pour la ligne MM).
  * Retourne [facture rafraîchie, Tg, Tref].
@@ -67,7 +69,7 @@ afterEach(function (): void {
 function mixteCreerFactureValidee(
     FactureService $service,
     Tiers $tiers,
-    SousCategorie $sousCategorie,
+    Compte $compteVentilation,
     CompteBancaire $compte,
 ): array {
     // Tref préexistante 50 € Recu
@@ -83,7 +85,7 @@ function mixteCreerFactureValidee(
 
     TransactionLigne::create([
         'transaction_id' => $tref->id,
-        'sous_categorie_id' => null,
+        'compte_id' => null,
         'montant' => 50.0,
     ]);
 
@@ -101,7 +103,7 @@ function mixteCreerFactureValidee(
         'quantite' => 1.0,
         'montant' => 100.0,
         'transaction_ligne_id' => null,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
         'ordre' => 1,
     ]);
 
@@ -128,12 +130,12 @@ function mixteCreerFactureValidee(
 
 test('annulation facture mixte extourne MM uniquement et detache pivot ref', function (): void {
     $tiers = Tiers::factory()->create(['pour_recettes' => true]);
-    $sousCategorie = SousCategorie::factory()->create();
+    $compteVentilation = Compte::factory()->numero('706')->create();
 
     [$facture, $tg, $tref] = mixteCreerFactureValidee(
         $this->service,
         $tiers,
-        $sousCategorie,
+        $compteVentilation,
         $this->compte,
     );
 
@@ -168,10 +170,9 @@ test('annulation facture mixte extourne MM uniquement et detache pivot ref', fun
     expect(Extourne::where('transaction_origine_id', $tg->id)->exists())->toBeTrue();
     expect(Extourne::where('transaction_origine_id', $tref->id)->exists())->toBeFalse();
 
-    // ── Lettrage automatique créé pour Tg (EnAttente → Pointe) ───────────────
+    // ── Pas de lettrage automatique (EnAttente → Pointe sans lettrage) ─────────
 
-    $lettrage = RapprochementBancaire::where('type', TypeRapprochement::Lettrage)->first();
-    expect($lettrage)->not->toBeNull();
+    expect(RapprochementBancaire::where('type', TypeRapprochement::Lettrage)->count())->toBe(0);
 
     $tgFrais = $tg->fresh();
     expect($tgFrais->extournee_at)->not->toBeNull();

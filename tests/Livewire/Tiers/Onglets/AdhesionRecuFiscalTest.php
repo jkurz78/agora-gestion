@@ -9,9 +9,9 @@ use App\Enums\UsageComptable;
 use App\Livewire\Tiers\Onglets\Adhesion as AdhesionComponent;
 use App\Models\Adhesion;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\FormuleAdhesion;
 use App\Models\RecuFiscalEmis;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -53,10 +53,10 @@ function creerAdhesionDeductiblePayee(array $tiersOverrides = [], array $adhesio
         'ville' => 'Lyon',
     ], $tiersOverrides));
 
-    $sousCat = SousCategorie::query()
-        ->whereHas('usages', fn ($q) => $q->where('usage', UsageComptable::Cotisation->value))
+    $compteCotisation = Compte::query()
+        ->forUsage(UsageComptable::Cotisation)
         ->first()
-        ?? SousCategorie::factory()->pourCotisations()->create();
+        ?? Compte::factory()->pourCotisations()->create();
 
     $transaction = Transaction::factory()->create([
         'tiers_id' => $tiers->id,
@@ -71,8 +71,9 @@ function creerAdhesionDeductiblePayee(array $tiersOverrides = [], array $adhesio
 
     TransactionLigne::factory()->create([
         'transaction_id' => $transaction->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compteCotisation->id,
         'montant' => 75.00,
+        'credit' => 75.00,
     ]);
 
     // Supprimer les adhésions auto-créées par les observers
@@ -178,13 +179,13 @@ function creerAdhesionHelloAsso(): Adhesion
         'ville' => 'Paris',
     ]);
 
-    $sousCat = SousCategorie::query()
-        ->whereHas('usages', fn ($q) => $q->where('usage', UsageComptable::Cotisation->value))
+    $compteCotisation = Compte::query()
+        ->forUsage(UsageComptable::Cotisation)
         ->first()
-        ?? SousCategorie::factory()->pourCotisations()->create();
+        ?? Compte::factory()->pourCotisations()->create();
 
     $formule = FormuleAdhesion::factory()->helloasso('form-slug-test', 42)->create([
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compteCotisation->id,
         'deductible_fiscal' => true,
     ]);
 
@@ -200,8 +201,10 @@ function creerAdhesionHelloAsso(): Adhesion
 
     TransactionLigne::factory()->create([
         'transaction_id' => $transaction->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compteCotisation->id,
         'montant' => 50.00,
+        'credit' => 50.00,
+        'helloasso_tier_id' => 42,
     ]);
 
     Adhesion::withTrashed()->where('tiers_id', $tiers->id)->forceDelete();

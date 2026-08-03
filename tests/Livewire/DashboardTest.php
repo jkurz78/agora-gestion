@@ -2,8 +2,8 @@
 
 use App\Livewire\Dashboard;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
-use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
@@ -67,7 +67,7 @@ it('displays solde general', function () {
 });
 
 it('shows dernieres adhesions', function () {
-    $cotSc = SousCategorie::factory()->pourCotisations()->create(['association_id' => $this->association->id]);
+    $compteCotisation = Compte::factory()->pourCotisations()->create(['association_id' => $this->association->id]);
 
     $tx = Transaction::factory()->asRecette()->create([
         'association_id' => $this->association->id,
@@ -78,8 +78,9 @@ it('shows dernieres adhesions', function () {
     $tx->lignes()->forceDelete();
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $cotSc->id,
+        'compte_id' => $compteCotisation->id,
         'montant' => 30.00,
+        'credit' => 30.00,
     ]);
 
     Livewire::test(Dashboard::class)

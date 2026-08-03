@@ -16,7 +16,7 @@ it('télécharge le template dépense', function () {
 
     // Check header row and example data are present
     expect($response->getContent())
-        ->toContain('date;reference;sous_categorie')
+        ->toContain('date;reference;compte;montant_ligne;mode_paiement;compte_bancaire')
         ->toContain('FAC-001');
 });
 
@@ -31,7 +31,7 @@ it('télécharge le template recette', function () {
     $response->assertDownload('modele-recette.csv');
 
     expect($response->getContent())
-        ->toContain('date;reference;sous_categorie')
+        ->toContain('date;reference;compte;montant_ligne;mode_paiement;compte_bancaire')
         ->toContain('SUB-001');
 });
 

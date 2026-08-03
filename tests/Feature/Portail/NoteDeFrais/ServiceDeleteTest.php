@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Models\Compte;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Services\Portail\NoteDeFrais\NoteDeFraisService;
 use App\Tenant\TenantContext;
@@ -43,7 +43,13 @@ it('delete: supprime les fichiers PJ des lignes du storage local', function () {
     $tiers = Tiers::factory()->create();
     $ndf = NoteDeFrais::factory()->brouillon()->create(['tiers_id' => $tiers->id]);
 
-    $sousCategorie = SousCategorie::factory()->create();
+    $compte = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '61SD'.random_int(100, 999),
+        'intitule' => 'Charge NDF',
+        'classe' => 6,
+        'actif' => true,
+    ]);
 
     $path1 = "associations/{$associationId}/notes-de-frais/{$ndf->id}/ligne-1.pdf";
     $path2 = "associations/{$associationId}/notes-de-frais/{$ndf->id}/ligne-2.pdf";
@@ -53,12 +59,12 @@ it('delete: supprime les fichiers PJ des lignes du storage local', function () {
 
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compte->id,
         'piece_jointe_path' => $path1,
     ]);
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compte->id,
         'piece_jointe_path' => $path2,
     ]);
 
@@ -79,10 +85,16 @@ it('delete: fonctionne quand les lignes n\'ont pas de PJ', function () {
     $tiers = Tiers::factory()->create();
     $ndf = NoteDeFrais::factory()->brouillon()->create(['tiers_id' => $tiers->id]);
 
-    $sousCategorie = SousCategorie::factory()->create();
+    $compte = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '61SD'.random_int(100, 999),
+        'intitule' => 'Charge NDF',
+        'classe' => 6,
+        'actif' => true,
+    ]);
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compte->id,
         'piece_jointe_path' => null,
     ]);
 
@@ -127,10 +139,16 @@ it('delete: ne plante pas si un fichier PJ référencé n\'existe pas en storage
     $tiers = Tiers::factory()->create();
     $ndf = NoteDeFrais::factory()->brouillon()->create(['tiers_id' => $tiers->id]);
 
-    $sousCategorie = SousCategorie::factory()->create();
+    $compte = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '61SD'.random_int(100, 999),
+        'intitule' => 'Charge NDF',
+        'classe' => 6,
+        'actif' => true,
+    ]);
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compte->id,
         'piece_jointe_path' => 'associations/999/notes-de-frais/999/inexistant.pdf',
     ]);
 

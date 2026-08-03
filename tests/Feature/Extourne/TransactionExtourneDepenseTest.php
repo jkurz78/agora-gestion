@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\DataTransferObjects\ExtournePayload;
 use App\Enums\ModePaiement;
 use App\Enums\RoleAssociation;
-use App\Enums\StatutRapprochement;
 use App\Enums\StatutReglement;
 use App\Enums\TypeRapprochement;
 use App\Enums\TypeTransaction;
@@ -43,7 +42,6 @@ function depenseCreate(StatutReglement $statut, ?CompteBancaire $compte = null):
     ]);
     TransactionLigne::create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => null,
         'montant' => 80,
     ]);
 
@@ -66,11 +64,11 @@ test('extourner dépense Recu — crée extourne EnAttente sans lettrage', funct
     expect($miroir->libelle)->toBe('Annulation - Achat fournitures Mr Fournisseur');
 
     $origine->refresh();
-    expect($origine->statut_reglement)->toBe(StatutReglement::Recu);
+    expect($origine->statut_reglement)->toBe(StatutReglement::Pointe);
     expect($origine->extournee_at)->not->toBeNull();
 });
 
-test('extourner dépense EnAttente — crée extourne + lettrage automatique', function (): void {
+test('extourner dépense EnAttente — crée extourne sans lettrage, statuts Pointe', function (): void {
     depenseActAsComptable();
     $compte = CompteBancaire::factory()->create();
     $origine = depenseCreate(StatutReglement::EnAttente, $compte);
@@ -78,14 +76,13 @@ test('extourner dépense EnAttente — crée extourne + lettrage automatique', f
     $extourne = app(TransactionExtourneService::class)
         ->extourner($origine, ExtournePayload::fromOrigine($origine));
 
-    expect($extourne->rapprochement_lettrage_id)->not->toBeNull();
-    expect($extourne->lettrage)->toBeInstanceOf(RapprochementBancaire::class);
-    expect($extourne->lettrage->type)->toBe(TypeRapprochement::Lettrage);
-    expect($extourne->lettrage->statut)->toBe(StatutRapprochement::Verrouille);
+    // Pas de lettrage automatique
+    expect($extourne->rapprochement_lettrage_id)->toBeNull();
+    expect(RapprochementBancaire::where('type', TypeRapprochement::Lettrage)->count())->toBe(0);
 
     $origine->refresh();
     expect($origine->statut_reglement)->toBe(StatutReglement::Pointe);
-    expect($origine->rapprochement_id)->toBe($extourne->lettrage->id);
+    expect($origine->rapprochement_id)->toBeNull();
 
     $miroir = $extourne->extourne;
     $miroir->refresh();

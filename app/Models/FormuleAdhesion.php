@@ -25,7 +25,7 @@ final class FormuleAdhesion extends TenantModel
         'duree_jours',
         'montant_par_defaut',
         'deductible_fiscal',
-        'sous_categorie_id',
+        'compte_id',
         'actif',
         'est_helloasso',
         'helloasso_form_slug',
@@ -40,7 +40,7 @@ final class FormuleAdhesion extends TenantModel
         'duree_jours' => 'integer',
         'montant_par_defaut' => 'decimal:2',
         'deductible_fiscal' => 'boolean',
-        'sous_categorie_id' => 'integer',
+        'compte_id' => 'integer',
         'actif' => 'boolean',
         'est_helloasso' => 'boolean',
         'helloasso_tier_id' => 'integer',
@@ -70,16 +70,12 @@ final class FormuleAdhesion extends TenantModel
                 return;
             }
 
-            // La contrainte "1 active par sous-cat" ne s'applique qu'aux formules MANUELLES.
-            // Les formules HelloAsso peuvent être plusieurs sur la même sous-cat (4 paliers
-            // d'un form Membership = 4 formules) — la priorité 1 du resolver utilise
-            // (helloasso_form_slug, helloasso_tier_id), pas la sous-cat.
             if ($formule->est_helloasso) {
                 return;
             }
 
             $existante = static::query()
-                ->where('sous_categorie_id', $formule->sous_categorie_id)
+                ->where('compte_id', $formule->compte_id)
                 ->where('actif', true)
                 ->where('est_helloasso', false)
                 ->when($formule->exists, fn ($q) => $q->where('id', '!=', $formule->id))
@@ -87,15 +83,15 @@ final class FormuleAdhesion extends TenantModel
 
             if ($existante) {
                 throw new \DomainException(
-                    "La sous-catégorie a déjà une formule active. Désactivez-la avant d'en activer une nouvelle."
+                    "Ce compte a déjà une formule active. Désactivez-la avant d'en activer une nouvelle."
                 );
             }
         });
     }
 
-    public function sousCategorie(): BelongsTo
+    public function compte(): BelongsTo
     {
-        return $this->belongsTo(SousCategorie::class, 'sous_categorie_id');
+        return $this->belongsTo(Compte::class, 'compte_id');
     }
 
     public function scopeActif(Builder $query): Builder

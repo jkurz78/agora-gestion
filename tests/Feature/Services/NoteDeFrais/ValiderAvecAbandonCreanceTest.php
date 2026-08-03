@@ -2,23 +2,23 @@
 
 declare(strict_types=1);
 
+use App\Enums\JournalComptable;
 use App\Enums\ModePaiement;
 use App\Enums\NoteDeFraisLigneType;
 use App\Enums\StatutNoteDeFrais;
 use App\Enums\StatutReglement;
-use App\Enums\TypeCategorie;
 use App\Enums\TypeTransaction;
 use App\Enums\UsageComptable;
 use App\Models\Association;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
 use App\Models\Operation;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
-use App\Models\UsageSousCategorie;
+use App\Models\UsageCompte;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\NoteDeFrais\NoteDeFraisValidationService;
 use App\Services\NoteDeFrais\ValidationData;
 use App\Tenant\TenantContext;
@@ -34,7 +34,7 @@ use Illuminate\Support\Facades\Storage;
 function makeNdfSoumise(
     Association $asso,
     Tiers $tiers,
-    SousCategorie $sc,
+    Compte $sc,
     int $count = 1,
     float $montantParLigne = 100.0,
 ): NoteDeFrais {
@@ -49,7 +49,7 @@ function makeNdfSoumise(
         NoteDeFraisLigne::factory()->create([
             'note_de_frais_id' => $ndf->id,
             'type' => NoteDeFraisLigneType::Standard->value,
-            'sous_categorie_id' => $sc->id,
+            'compte_id' => $sc->id,
             'libelle' => "Ligne $i",
             'montant' => $montantParLigne,
             'piece_jointe_path' => null,
@@ -67,27 +67,21 @@ beforeEach(function (): void {
 
     $this->tiers = Tiers::factory()->create(['association_id' => $this->asso->id]);
 
-    // Sous-catégorie Dépense (pour les lignes NDF)
-    $this->catDepense = Categorie::factory()->create([
-        'association_id' => $this->asso->id,
-        'type' => TypeCategorie::Depense->value,
-    ]);
-    $this->scDepense = SousCategorie::factory()->create([
-        'association_id' => $this->asso->id,
-        'categorie_id' => $this->catDepense->id,
-        'nom' => 'Frais divers',
-    ]);
+    // Infrastructure partie double — comptes système 411, 401, 467 requis par abandonCreancePd()
+    SystemeSeeder::seed();
 
-    // Sous-catégorie Recette pour AbandonCreance
-    $this->catRecette = Categorie::factory()->create([
-        'association_id' => $this->asso->id,
-        'type' => TypeCategorie::Recette->value,
-    ]);
-    $this->scAbandon = SousCategorie::factory()->pourAbandonCreance()->create([
-        'association_id' => $this->asso->id,
-        'categorie_id' => $this->catRecette->id,
-        'nom' => 'Abandon de creance',
-    ]);
+    // DC-10a : compte de charge (classe 6) pour les lignes NDF
+    $this->scDepense = Compte::firstOrCreate(
+        ['association_id' => $this->asso->id, 'numero_pcg' => '625'],
+        ['intitule' => 'Frais missions déplacements', 'classe' => 6, 'lettrable' => false, 'actif' => true, 'est_systeme' => false, 'pour_inscriptions' => false]
+    );
+
+    // Compte recette flaggé AbandonCreance (classe 7)
+    $this->scAbandon = Compte::firstOrCreate(
+        ['association_id' => $this->asso->id, 'numero_pcg' => '771'],
+        ['intitule' => 'Dons et abandons de créances', 'classe' => 7, 'lettrable' => false, 'actif' => true, 'est_systeme' => false, 'pour_inscriptions' => false]
+    );
+    $this->scAbandon->usages()->create(['usage' => UsageComptable::AbandonCreance->value]);
 
     $this->compte = CompteBancaire::factory()->create(['association_id' => $this->asso->id]);
 
@@ -110,8 +104,8 @@ it('cree deux transactions (depense + don) reglees pour un abandon de creance', 
 
     $txDon = $this->service->validerAvecAbandonCreance($ndf, $this->data, $dateDon);
 
-    // 2 transactions créées
-    expect(Transaction::count())->toBe(2);
+    // 4 transactions créées en mode PD : T1-dépense, T1-don, OD-compensation × 2
+    expect(Transaction::count())->toBe(4);
 
     // Transaction Don retournée est du bon type
     expect($txDon)->toBeInstanceOf(Transaction::class);
@@ -138,7 +132,7 @@ it('cree deux transactions (depense + don) reglees pour un abandon de creance', 
 
 // ---------------------------------------------------------------------------
 // 1b. Le Don clone les lignes de la Dépense (operation, seance, notes, montant)
-//     seule la sous-catégorie diffère → pointe sur AbandonCreance
+//     seule le compte diffère → pointe sur AbandonCreance
 // ---------------------------------------------------------------------------
 
 it('clone les lignes de la Depense vers le Don (operation, seance, notes, montant)', function (): void {
@@ -156,7 +150,7 @@ it('clone les lignes de la Depense vers le Don (operation, seance, notes, montan
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
         'type' => NoteDeFraisLigneType::Standard->value,
-        'sous_categorie_id' => $this->scDepense->id,
+        'compte_id' => $this->scDepense->id,
         'operation_id' => $operation->id,
         'seance' => 1,
         'libelle' => 'Transport',
@@ -166,7 +160,7 @@ it('clone les lignes de la Depense vers le Don (operation, seance, notes, montan
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
         'type' => NoteDeFraisLigneType::Standard->value,
-        'sous_categorie_id' => $this->scDepense->id,
+        'compte_id' => $this->scDepense->id,
         'operation_id' => $operation->id,
         'seance' => 2,
         'libelle' => 'Hébergement',
@@ -179,8 +173,10 @@ it('clone les lignes de la Depense vers le Don (operation, seance, notes, montan
     $ndf->refresh();
     $txDepense = Transaction::find($ndf->transaction_id);
 
-    $lignesDepense = $txDepense->lignes()->orderBy('id')->get();
-    $lignesDon = $txDon->lignes()->orderBy('id')->get();
+    // En mode PD, les lignes incluent des lignes comptables pures (401 C, 411 D).
+    // On compare uniquement les lignes de ventilation (classe 6/7).
+    $lignesDepense = $txDepense->lignes()->ventilation()->orderBy('id')->get();
+    $lignesDon = $txDon->lignes()->ventilation()->orderBy('id')->get();
 
     expect($lignesDon)->toHaveCount($lignesDepense->count());
 
@@ -193,9 +189,9 @@ it('clone les lignes de la Depense vers le Don (operation, seance, notes, montan
         expect($ligneDon->notes)->toBe($ligneDepense->notes);
         expect((float) $ligneDon->montant)->toBe((float) $ligneDepense->montant);
 
-        // Sous-catégorie pointe vers AbandonCreance (pas la sous-cat Dépense d'origine)
-        expect((int) $ligneDon->sous_categorie_id)->toBe((int) $this->scAbandon->id);
-        expect((int) $ligneDon->sous_categorie_id)->not->toBe((int) $ligneDepense->sous_categorie_id);
+        // Le compte pointe vers AbandonCreance (pas le compte Dépense d'origine)
+        expect((int) $ligneDon->compte_id)->toBe((int) $this->scAbandon->id);
+        expect((int) $ligneDon->compte_id)->not->toBe((int) $ligneDepense->compte_id);
     }
 });
 
@@ -211,24 +207,26 @@ it('met le Don sur le meme compte que la Depense', function (): void {
     $ndf->refresh();
     $txDepense = Transaction::find($ndf->transaction_id);
 
-    expect((int) $txDon->compte_id)->toBe((int) $this->compte->id);
-    expect((int) $txDon->compte_id)->toBe((int) $txDepense->compte_id);
+    // En mode PD, txDepense est liée au compte bancaire ; txDon est une écriture comptable
+    // pure (411/7xx) sans compte bancaire → compte_id null.
+    expect((int) $txDepense->compte_id)->toBe((int) $this->compte->id);
+    expect($txDon->compte_id)->toBeNull();
 });
 
 // ---------------------------------------------------------------------------
-// 2. Pas de sous-cat AbandonCreance désignée → DomainException + rollback
+// 2. Pas de compte AbandonCreance désignée → DomainException + rollback
 // ---------------------------------------------------------------------------
 
-it('leve DomainException si aucune sous-categorie AbandonCreance configuree', function (): void {
+it('leve DomainException si aucun compte AbandonCreance configuree', function (): void {
     // Supprimer le lien pivot créé dans beforeEach
-    UsageSousCategorie::where('sous_categorie_id', $this->scAbandon->id)
+    UsageCompte::where('compte_id', $this->scAbandon->id)
         ->where('usage', UsageComptable::AbandonCreance->value)
         ->delete();
 
     $ndf = makeNdfSoumise($this->asso, $this->tiers, $this->scDepense);
 
     expect(fn () => $this->service->validerAvecAbandonCreance($ndf, $this->data, '2025-10-20'))
-        ->toThrow(DomainException::class, 'Aucune sous-categorie');
+        ->toThrow(DomainException::class, 'Aucun compte');
 
     // Aucune transaction créée (rollback)
     expect(Transaction::count())->toBe(0);
@@ -253,21 +251,24 @@ it('leve DomainException si la NDF nest pas en statut Soumise', function (): voi
 });
 
 // ---------------------------------------------------------------------------
-// 4. Plusieurs sous-cat AbandonCreance → DomainException (cas pathologique)
+// 4. Plusieurs comptes AbandonCreance → DomainException (cas pathologique)
 // ---------------------------------------------------------------------------
 
-it('leve DomainException si plusieurs sous-categories AbandonCreance sont designees', function (): void {
-    // Créer une seconde sous-cat avec le même usage pour l'asso
-    SousCategorie::factory()->pourAbandonCreance()->create([
+it('leve DomainException si plusieurs comptes AbandonCreance sont designes', function (): void {
+    // Créer un second compte avec le même usage pour l'asso
+    $bis = Compte::create([
         'association_id' => $this->asso->id,
-        'categorie_id' => $this->catRecette->id,
-        'nom' => 'Abandon de creance bis',
+        'numero_pcg' => '771B',
+        'intitule' => 'Abandon de creance bis',
+        'classe' => 7,
+        'actif' => true,
     ]);
+    $bis->usages()->create(['usage' => UsageComptable::AbandonCreance->value]);
 
     $ndf = makeNdfSoumise($this->asso, $this->tiers, $this->scDepense);
 
     expect(fn () => $this->service->validerAvecAbandonCreance($ndf, $this->data, '2025-10-20'))
-        ->toThrow(DomainException::class, 'Plusieurs sous-categories');
+        ->toThrow(DomainException::class, 'Plusieurs comptes');
 });
 
 // ---------------------------------------------------------------------------
@@ -276,7 +277,7 @@ it('leve DomainException si plusieurs sous-categories AbandonCreance sont design
 
 it('rollback atomique : aucune transaction si la creation du don echoue', function (): void {
     // Supprimer le pivot pour déclencher DomainException dans la transaction
-    UsageSousCategorie::where('sous_categorie_id', $this->scAbandon->id)->delete();
+    UsageCompte::where('compte_id', $this->scAbandon->id)->delete();
 
     $ndf = makeNdfSoumise($this->asso, $this->tiers, $this->scDepense);
     $initial = Transaction::count();
@@ -316,7 +317,7 @@ it('copie les pieces jointes des lignes NDF dans le repertoire de la transaction
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
         'type' => NoteDeFraisLigneType::Standard->value,
-        'sous_categorie_id' => $this->scDepense->id,
+        'compte_id' => $this->scDepense->id,
         'libelle' => 'Repas client',
         'montant' => 45.0,
         'piece_jointe_path' => $path1,
@@ -324,7 +325,7 @@ it('copie les pieces jointes des lignes NDF dans le repertoire de la transaction
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
         'type' => NoteDeFraisLigneType::Standard->value,
-        'sous_categorie_id' => $this->scDepense->id,
+        'compte_id' => $this->scDepense->id,
         'libelle' => 'Transport',
         'montant' => 30.0,
         'piece_jointe_path' => $path2,
@@ -334,7 +335,9 @@ it('copie les pieces jointes des lignes NDF dans le repertoire de la transaction
 
     $ndf->refresh();
     $txDepense = Transaction::find($ndf->transaction_id);
-    $lignesTx = $txDepense->lignes()->orderBy('id')->get();
+    // En mode PD, les lignes incluent une ligne comptable pure (401 C) sans PJ.
+    // On vérifie uniquement les lignes ayant une pièce jointe copiée.
+    $lignesTx = $txDepense->lignes()->whereNotNull('piece_jointe_path')->orderBy('id')->get();
 
     expect($lignesTx)->toHaveCount(2);
 
@@ -398,18 +401,20 @@ it('une NDF de asso A est non traitable depuis asso B (isolation tenant - abando
     // NDF créée dans le contexte asso A (depuis beforeEach)
     $ndf = makeNdfSoumise($this->asso, $this->tiers, $this->scDepense);
 
-    // Basculer vers asso B et lui configurer SA PROPRE sous-cat AbandonCreance
-    // (pour prouver que la garde lève AVANT la résolution de sous-cat, même quand B est bien configuré)
+    // Basculer vers asso B et lui configurer SON PROPRE compte AbandonCreance
+    // (pour prouver que la garde lève AVANT la résolution du compte, même quand B est bien configuré)
     $assoB = Association::factory()->create();
 
-    $catRecetteB = Categorie::factory()->create([
+    $compteAbandonB = Compte::create([
         'association_id' => $assoB->id,
-        'type' => TypeCategorie::Recette->value,
+        'numero_pcg' => '771',
+        'intitule' => 'Abandon creance B',
+        'classe' => 7,
+        'actif' => true,
     ]);
-    SousCategorie::factory()->pourAbandonCreance()->create([
+    $compteAbandonB->usages()->create([
         'association_id' => $assoB->id,
-        'categorie_id' => $catRecetteB->id,
-        'nom' => 'Abandon creance B',
+        'usage' => UsageComptable::AbandonCreance->value,
     ]);
 
     TenantContext::boot($assoB);
@@ -475,7 +480,11 @@ it('apres abandon aucune des deux transactions nest en statut EnAttente', functi
 
     $this->service->validerAvecAbandonCreance($ndf, $this->data, '2025-10-20');
 
-    $enAttente = Transaction::where('statut_reglement', StatutReglement::EnAttente->value)->count();
+    // En mode PD, les 2 OD de compensation (journal=OD) restent en_attente (écritures comptables
+    // internes non soumises au flux de trésorerie). Les T1 txDepense et txDon doivent être Recu.
+    $enAttente = Transaction::where('statut_reglement', StatutReglement::EnAttente->value)
+        ->where(fn ($q) => $q->whereNull('journal')->orWhere('journal', '!=', JournalComptable::Od->value))
+        ->count();
     expect($enAttente)->toBe(0);
 });
 

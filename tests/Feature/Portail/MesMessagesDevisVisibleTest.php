@@ -17,12 +17,12 @@ use App\Enums\CategorieEmail;
 use App\Livewire\Portail\MesMessages;
 use App\Livewire\ReglementTable;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\DocumentPrevisionnel;
 use App\Models\EmailLog;
 use App\Models\EmailTemplate;
 use App\Models\Operation;
 use App\Models\Participant;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Models\User;
@@ -60,9 +60,9 @@ beforeEach(function (): void {
     ]);
 
     // ─── Opération + participant ───────────────────────────────────────────────
-    $sousCategorie = SousCategorie::factory()->create();
+    $compteVentilation = Compte::factory()->create();
     $typeOp = TypeOperation::factory()->create([
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compteVentilation->id,
         'email_from' => 'asso@example.com',
         'email_from_name' => 'Association Test',
     ]);

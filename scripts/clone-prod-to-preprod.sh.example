@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+#
+# clone-prod-to-preprod.sh — Clone production data to preprod (NAS staging)
+#
+# Reference: docs/specs/2026-05-19-fondations-partie-double-slice1.md §16.4
+#
+# Run from the NAS staging host. Pulls a fresh dump from prod, restores
+# into the preprod DB, syncs the storage tree. The preprod APP_KEY is
+# NOT replaced — encrypted columns (participant_donnees_medicales,
+# presences.commentaire_medical_chiffre) will be unreadable as expected.
+#
+# This is an EXAMPLE template. Copy to clone-prod-to-preprod.sh,
+# fill in the credentials, and never commit the result (gitignored).
+#
+# Usage: ./clone-prod-to-preprod.sh
+
+set -euo pipefail
+
+# === Configuration (fill in before use) ===
+PROD_SSH_HOST="user@prod.example.com"        # prod O2Switch host
+PROD_DB_NAME="agora_prod"
+PROD_DB_USER="readonly_user"
+
+PREPROD_DB_HOST="localhost"
+PREPROD_DB_NAME="agora_preprod"
+PREPROD_DB_USER="preprod_user"
+
+PROD_STORAGE_PATH="/path/to/prod/storage/app/associations/"
+PREPROD_STORAGE_PATH="/path/to/preprod/storage/app/associations/"
+
+LOG_DIR="storage/logs"
+LOG_FILE="${LOG_DIR}/clone-prod-$(date +%Y-%m-%d-%H%M%S).log"
+
+# === Steps ===
+
+mkdir -p "${LOG_DIR}"
+exec > >(tee -a "${LOG_FILE}") 2>&1
+
+echo "[$(date)] Step 1: Dumping prod DB ${PROD_DB_NAME}"
+ssh "${PROD_SSH_HOST}" "mysqldump --single-transaction --skip-lock-tables -u ${PROD_DB_USER} -p ${PROD_DB_NAME} | gzip" \
+  > /tmp/prod-dump.sql.gz
+
+echo "[$(date)] Step 2: Restoring into preprod DB ${PREPROD_DB_NAME}"
+mysql -h "${PREPROD_DB_HOST}" -u "${PREPROD_DB_USER}" -p \
+  -e "DROP DATABASE IF EXISTS ${PREPROD_DB_NAME}; CREATE DATABASE ${PREPROD_DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+gunzip < /tmp/prod-dump.sql.gz | mysql -h "${PREPROD_DB_HOST}" -u "${PREPROD_DB_USER}" -p "${PREPROD_DB_NAME}"
+
+echo "[$(date)] Step 3: Syncing storage tree"
+rsync -av --delete "${PROD_SSH_HOST}:${PROD_STORAGE_PATH}" "${PREPROD_STORAGE_PATH}"
+
+echo "[$(date)] Step 4: Locking down preprod (.env.preprod must be in place)"
+# Verifies the preprod .env has the bridging flags set
+grep -q "APP_ENV=preprod" .env.preprod || { echo "ERROR: APP_ENV=preprod missing in .env.preprod"; exit 1; }
+grep -q "MAIL_MAILER=log" .env.preprod || { echo "ERROR: MAIL_MAILER=log missing in .env.preprod"; exit 1; }
+grep -q "HELLOASSO_WEBHOOK_DISABLED=true" .env.preprod || { echo "ERROR: HELLOASSO_WEBHOOK_DISABLED missing"; exit 1; }
+grep -q "INCOMING_MAIL_DISABLED=true" .env.preprod || { echo "ERROR: INCOMING_MAIL_DISABLED missing"; exit 1; }
+
+# Encrypted columns will be unreadable: by design, APP_KEY is NOT copied from prod.
+# Reading participant_donnees_medicales etc. on preprod returns DecryptException
+# which should be handled gracefully by the app (placeholder text).
+
+echo "[$(date)] Step 5: Done. Preprod ready for deploy-preprod-v5.sh"
+rm -f /tmp/prod-dump.sql.gz
+
+echo "[$(date)] Log saved to ${LOG_FILE}"

@@ -2,11 +2,9 @@
 
 declare(strict_types=1);
 
-use App\Enums\TypeCategorie;
 use App\Models\Association;
 use App\Models\BudgetLine;
-use App\Models\Categorie;
-use App\Models\SousCategorie;
+use App\Models\Compte;
 use App\Models\User;
 use App\Services\BudgetImportService;
 use App\Tenant\TenantContext;
@@ -27,9 +25,9 @@ beforeEach(function () {
     TenantContext::boot($this->association);
     $this->actingAs($this->user);
 
-    $catCharge = Categorie::factory()->create(['nom' => 'Charges', 'type' => TypeCategorie::Depense]);
-    $this->scLoyers = SousCategorie::factory()->create(['nom' => 'Loyers', 'categorie_id' => $catCharge->id]);
-    $this->scElec = SousCategorie::factory()->create(['nom' => 'Électricité', 'categorie_id' => $catCharge->id]);
+    // Comptes classe 6 → l'import résout les libellés contre comptes.intitule.
+    $this->scLoyers = Compte::factory()->numero('613')->create(['intitule' => 'Loyers']);
+    $this->scElec = Compte::factory()->numero('616')->create(['intitule' => 'Électricité']);
 });
 
 afterEach(function () {
@@ -37,7 +35,7 @@ afterEach(function () {
 });
 
 it('importe un CSV valide et insère les lignes non nulles', function () {
-    $csv = "exercice;categorie;sous_categorie;montant_prevu\n"
+    $csv = "exercice;famille;compte;montant_prevu\n"
          ."2025-2026;Charges;Loyers;1200.00\n"
          ."2025-2026;Charges;Électricité;\n"; // vide → ignoré
 
@@ -47,11 +45,11 @@ it('importe un CSV valide et insère les lignes non nulles', function () {
         ->and($result->linesImported)->toBe(1);
 
     expect(BudgetLine::where('exercice', 2025)->count())->toBe(1);
-    expect(BudgetLine::where('sous_categorie_id', $this->scLoyers->id)->value('montant_prevu'))->toBe('1200.00');
+    expect(BudgetLine::where('compte_id', $this->scLoyers->id)->value('montant_prevu'))->toBe('1200.00');
 });
 
 it('ignore les lignes avec montant à zéro', function () {
-    $csv = "exercice;categorie;sous_categorie;montant_prevu\n"
+    $csv = "exercice;famille;compte;montant_prevu\n"
          ."2025-2026;Charges;Loyers;0\n"
          ."2025-2026;Charges;Électricité;0.00\n";
 
@@ -64,17 +62,17 @@ it('ignore les lignes avec montant à zéro', function () {
 });
 
 it('supprime les lignes existantes de l\'exercice avant import', function () {
-    BudgetLine::factory()->create(['sous_categorie_id' => $this->scLoyers->id, 'exercice' => 2025, 'montant_prevu' => 999]);
-    BudgetLine::factory()->create(['sous_categorie_id' => $this->scLoyers->id, 'exercice' => 2024, 'montant_prevu' => 500]); // autre exercice
+    BudgetLine::factory()->create(['compte_id' => $this->scLoyers->id, 'exercice' => 2025, 'montant_prevu' => 999]);
+    BudgetLine::factory()->create(['compte_id' => $this->scLoyers->id, 'exercice' => 2024, 'montant_prevu' => 500]); // autre exercice
 
-    $csv = "exercice;categorie;sous_categorie;montant_prevu\n"
+    $csv = "exercice;famille;compte;montant_prevu\n"
          ."2025-2026;Charges;Électricité;300.00\n";
 
     $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
 
     expect($result->success)->toBeTrue();
     // L'ancienne ligne 2025 est supprimée
-    expect(BudgetLine::where('sous_categorie_id', $this->scLoyers->id)->where('exercice', 2025)->exists())->toBeFalse();
+    expect(BudgetLine::where('compte_id', $this->scLoyers->id)->where('exercice', 2025)->exists())->toBeFalse();
     // La ligne 2024 est préservée
     expect(BudgetLine::where('exercice', 2024)->count())->toBe(1);
 });
@@ -89,7 +87,7 @@ it('rejette si l\'en-tête est invalide', function () {
 });
 
 it('rejette si l\'exercice dans le fichier ne correspond pas', function () {
-    $csv = "exercice;categorie;sous_categorie;montant_prevu\n"
+    $csv = "exercice;famille;compte;montant_prevu\n"
          ."2024-2025;Charges;Loyers;100.00\n";
 
     $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
@@ -100,7 +98,7 @@ it('rejette si l\'exercice dans le fichier ne correspond pas', function () {
 });
 
 it('liste tous les exercices incorrects distincts dans le message d\'erreur', function () {
-    $csv = "exercice;categorie;sous_categorie;montant_prevu\n"
+    $csv = "exercice;famille;compte;montant_prevu\n"
          ."2024-2025;Charges;Loyers;100.00\n"
          ."2023-2024;Charges;Électricité;200.00\n";
 
@@ -111,8 +109,8 @@ it('liste tous les exercices incorrects distincts dans le message d\'erreur', fu
         ->and($result->errors[0]['message'])->toContain('2024-2025');
 });
 
-it('rejette si une sous-catégorie est introuvable', function () {
-    $csv = "exercice;categorie;sous_categorie;montant_prevu\n"
+it('rejette si un compte est introuvable', function () {
+    $csv = "exercice;famille;compte;montant_prevu\n"
          ."2025-2026;Charges;Inconnu;100.00\n";
 
     $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
@@ -122,11 +120,10 @@ it('rejette si une sous-catégorie est introuvable', function () {
         ->and($result->errors[0]['line'])->toBe(2);
 });
 
-it('rejette si une sous-catégorie est ambiguë (doublon de nom)', function () {
-    $cat2 = Categorie::factory()->create(['nom' => 'Produits', 'type' => TypeCategorie::Recette]);
-    SousCategorie::factory()->create(['nom' => 'Loyers', 'categorie_id' => $cat2->id]); // doublon !
+it('rejette si un compte est ambigu (doublon d\'intitulé)', function () {
+    Compte::factory()->numero('756')->create(['intitule' => 'Loyers']); // compte doublon d'intitulé !
 
-    $csv = "exercice;categorie;sous_categorie;montant_prevu\n"
+    $csv = "exercice;famille;compte;montant_prevu\n"
          ."2025-2026;Charges;Loyers;100.00\n";
 
     $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
@@ -136,7 +133,7 @@ it('rejette si une sous-catégorie est ambiguë (doublon de nom)', function () {
 });
 
 it('rejette si un montant est invalide (négatif)', function () {
-    $csv = "exercice;categorie;sous_categorie;montant_prevu\n"
+    $csv = "exercice;famille;compte;montant_prevu\n"
          ."2025-2026;Charges;Loyers;-50.00\n";
 
     $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
@@ -146,7 +143,7 @@ it('rejette si un montant est invalide (négatif)', function () {
 });
 
 it('rejette si un montant est invalide (non numérique)', function () {
-    $csv = "exercice;categorie;sous_categorie;montant_prevu\n"
+    $csv = "exercice;famille;compte;montant_prevu\n"
          ."2025-2026;Charges;Loyers;abc\n";
 
     $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
@@ -155,9 +152,9 @@ it('rejette si un montant est invalide (non numérique)', function () {
 });
 
 it('rejette un fichier sans lignes de données', function () {
-    $csv = "exercice;categorie;sous_categorie;montant_prevu\n";
+    $csv = "exercice;famille;compte;montant_prevu\n";
 
-    BudgetLine::factory()->create(['sous_categorie_id' => $this->scLoyers->id, 'exercice' => 2025, 'montant_prevu' => 999]);
+    BudgetLine::factory()->create(['compte_id' => $this->scLoyers->id, 'exercice' => 2025, 'montant_prevu' => 999]);
 
     $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
 
@@ -169,7 +166,7 @@ it('rejette un fichier sans lignes de données', function () {
 });
 
 it('ignore les montants à zéro sous toutes les formes', function () {
-    $csv = "exercice;categorie;sous_categorie;montant_prevu\n"
+    $csv = "exercice;famille;compte;montant_prevu\n"
          ."2025-2026;Charges;Loyers;0.0\n"
          ."2025-2026;Charges;Électricité;0.000\n";
 
@@ -180,9 +177,9 @@ it('ignore les montants à zéro sous toutes les formes', function () {
 });
 
 it('n\'insère rien si validation échoue (atomicité)', function () {
-    BudgetLine::factory()->create(['sous_categorie_id' => $this->scLoyers->id, 'exercice' => 2025, 'montant_prevu' => 999]);
+    BudgetLine::factory()->create(['compte_id' => $this->scLoyers->id, 'exercice' => 2025, 'montant_prevu' => 999]);
 
-    $csv = "exercice;categorie;sous_categorie;montant_prevu\n"
+    $csv = "exercice;famille;compte;montant_prevu\n"
          ."2025-2026;Charges;Loyers;100.00\n"
          ."2025-2026;Charges;Inconnu;200.00\n"; // erreur
 

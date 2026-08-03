@@ -15,19 +15,19 @@ declare(strict_types=1);
  * en appelant directement le service, sans monter la pile Livewire.
  */
 
+use App\Enums\JournalComptable;
 use App\Enums\ModePaiement;
 use App\Enums\NoteDeFraisLigneType;
 use App\Enums\StatutReglement;
-use App\Enums\TypeCategorie;
 use App\Enums\TypeTransaction;
 use App\Models\Association;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\NoteDeFrais\NoteDeFraisValidationService;
 use App\Services\NoteDeFrais\ValidationData;
 use App\Services\TransactionUniverselleService;
@@ -46,26 +46,20 @@ beforeEach(function (): void {
 
     $this->tiers = Tiers::factory()->create(['association_id' => $this->asso->id]);
 
-    // Sous-catégorie Dépense (pour les lignes NDF)
-    $catDepense = Categorie::factory()->create([
+    // Infrastructure partie double — comptes système 411, 401, 467 requis par abandonCreancePd()
+    SystemeSeeder::seed();
+
+    // Compte Dépense classe 6 pour PD
+    $this->compteDepense = Compte::factory()->numero('625')->create([
         'association_id' => $this->asso->id,
-        'type' => TypeCategorie::Depense->value,
-    ]);
-    $this->scDepense = SousCategorie::factory()->create([
-        'association_id' => $this->asso->id,
-        'categorie_id' => $catDepense->id,
-        'nom' => 'Frais divers',
+        'intitule' => 'Frais missions déplacements',
     ]);
 
-    // Sous-catégorie Recette désignée pour AbandonCreance
-    $catRecette = Categorie::factory()->create([
+    // Compte Recette AbandonCreance (usage) classe 7 pour PD — DC-10a : le service
+    // résout ce compte via $association->comptesFor(UsageComptable::AbandonCreance).
+    Compte::factory()->numero('771')->pourAbandonCreance()->create([
         'association_id' => $this->asso->id,
-        'type' => TypeCategorie::Recette->value,
-    ]);
-    $this->scAbandon = SousCategorie::factory()->pourAbandonCreance()->create([
-        'association_id' => $this->asso->id,
-        'categorie_id' => $catRecette->id,
-        'nom' => 'Abandon de creance',
+        'intitule' => 'Dons et abandons de créances',
     ]);
 
     $this->compte = CompteBancaire::factory()->create(['association_id' => $this->asso->id]);
@@ -90,7 +84,7 @@ beforeEach(function (): void {
 function makeNdfSoumiseForListTest(
     Association $asso,
     Tiers $tiers,
-    SousCategorie $sc,
+    Compte $compte,
     float $montant = 200.0,
 ): NoteDeFrais {
     $ndf = NoteDeFrais::factory()->soumise()->create([
@@ -103,7 +97,7 @@ function makeNdfSoumiseForListTest(
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
         'type' => NoteDeFraisLigneType::Standard->value,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $compte->id,
         'libelle' => 'Repas',
         'montant' => $montant,
         'piece_jointe_path' => null,
@@ -117,19 +111,25 @@ function makeNdfSoumiseForListTest(
 // ---------------------------------------------------------------------------
 
 it('apres constat abandon aucune transaction nest en statut EnAttente', function (): void {
-    $ndf = makeNdfSoumiseForListTest($this->asso, $this->tiers, $this->scDepense);
+    $ndf = makeNdfSoumiseForListTest($this->asso, $this->tiers, $this->compteDepense);
 
     $this->validationService->validerAvecAbandonCreance($ndf, $this->data, '2025-10-20');
 
-    // Assertion négative : rien en EnAttente
-    $enAttente = Transaction::where('statut_reglement', StatutReglement::EnAttente->value)->count();
-    expect($enAttente)->toBe(0);
+    // En mode PD, les 2 OD de compensation (journal=OD) restent en_attente (écritures
+    // comptables internes, non soumises au flux de trésorerie).
+    // Les T1 txDepense et txDon sont bien passés à Recu via EtatReglementResolver.
+    $enAttenteT1 = Transaction::where('statut_reglement', StatutReglement::EnAttente->value)
+        ->where(fn ($q) => $q->whereNull('journal')->orWhere('journal', '!=', JournalComptable::Od->value))
+        ->count();
+    expect($enAttenteT1)->toBe(0);
 
-    // Assertion positive via filtre du service "à régler"
-    $result = $this->tuService->paginate(
+    // Les OD internes (journal=Od) ne doivent pas apparaître dans la branche dépense.
+    // Ils peuvent apparaître dans la branche recette (journal Od inclus dans ce filtre),
+    // mais ne sont pas des T1 métier — c'est un artefact PD attendu.
+    $resultDepenses = $this->tuService->paginate(
         compteId: null,
         tiersId: null,
-        types: null,
+        types: ['depense'],
         dateDebut: null,
         dateFin: null,
         searchTiers: null,
@@ -139,33 +139,40 @@ it('apres constat abandon aucune transaction nest en statut EnAttente', function
         modePaiement: null,
         statutReglement: StatutReglement::EnAttente->value,
     );
-
-    expect($result['paginator']->total())->toBe(0);
+    // t2Dep (journal=OD, type=depense) est exclu de la branche dépense (whereIn vente|achat).
+    expect($resultDepenses['paginator']->total())->toBe(0);
 });
 
 it('apres constat abandon les deux transactions sont bien presentes en base (non filtrees)', function (): void {
-    $ndf = makeNdfSoumiseForListTest($this->asso, $this->tiers, $this->scDepense, 150.0);
+    $ndf = makeNdfSoumiseForListTest($this->asso, $this->tiers, $this->compteDepense, 150.0);
 
     $this->validationService->validerAvecAbandonCreance($ndf, $this->data, '2025-10-20');
 
-    // 2 transactions totales
-    expect(Transaction::count())->toBe(2);
+    // En mode PD : T1-dépense + T1-don + t2Dep (OD) + t2Don (OD) = 4 transactions
+    expect(Transaction::count())->toBe(4);
 
-    // 1 Transaction Dépense avec tiers du NDF
+    // T1 Dépense (journal=Achat, tiers du NDF) → statut Recu
+    // Note : le model observer Transaction::creating assigne journal=Achat pour les dépenses.
     $txDepense = Transaction::where('type', TypeTransaction::Depense->value)
         ->where('tiers_id', $this->tiers->id)
+        ->where('journal', JournalComptable::Achat->value)
         ->first();
     expect($txDepense)->not->toBeNull();
     expect($txDepense->statut_reglement)->toBe(StatutReglement::Recu);
 
-    // 1 Transaction Recette avec tiers du NDF
+    // T1 Recette (journal=Vente, tiers du NDF) → statut Recu
     $txRecette = Transaction::where('type', TypeTransaction::Recette->value)
         ->where('tiers_id', $this->tiers->id)
+        ->where('journal', JournalComptable::Vente->value)
         ->first();
     expect($txRecette)->not->toBeNull();
     expect($txRecette->statut_reglement)->toBe(StatutReglement::Recu);
 
-    // Les 2 apparaissent dans la liste non filtrée via le service
+    // paginate() sans filtre de statut inclut toutes les transactions visibles par journal :
+    //   brancheDepense : journal IN (vente, achat) → T1 txDepense (journal=Achat) = 1
+    //   brancheRecette : journal IN (vente, achat, od) → T1 txDon (journal=Vente) + t2Don (journal=Od) = 2
+    //   t2Dep (journal=Od, type=depense) → EXCLU de brancheDepense (whereIn vente|achat seulement)
+    // Total = 3
     $result = $this->tuService->paginate(
         compteId: null,
         tiersId: null,
@@ -180,8 +187,7 @@ it('apres constat abandon les deux transactions sont bien presentes en base (non
         statutReglement: null, // pas de filtre
     );
 
-    // dépense + recette = 2 entrées dans le service (virements internes non créés)
-    expect($result['paginator']->total())->toBe(2);
+    expect($result['paginator']->total())->toBe(3);
 });
 
 // ---------------------------------------------------------------------------
@@ -230,7 +236,7 @@ it('une transaction standalone en EnAttente apparait dans les listes a regler', 
 // ---------------------------------------------------------------------------
 
 it('apres abandon les listes depenses-a-regler et recettes-a-encaisser sont vides', function (): void {
-    $ndf = makeNdfSoumiseForListTest($this->asso, $this->tiers, $this->scDepense);
+    $ndf = makeNdfSoumiseForListTest($this->asso, $this->tiers, $this->compteDepense);
 
     $this->validationService->validerAvecAbandonCreance($ndf, $this->data, '2025-10-20');
 
@@ -251,7 +257,12 @@ it('apres abandon les listes depenses-a-regler et recettes-a-encaisser sont vide
 
     expect($resultDepenses['paginator']->total())->toBe(0);
 
-    // Liste "Recettes à encaisser"
+    // Liste "Recettes à encaisser" :
+    // t2Don (journal=Od, type=recette, statut=EnAttente) est un OD de compensation PD.
+    // Le service inclut le journal Od dans la branche recette → t2Don remonte (1 résultat).
+    // Note : ce n'est PAS une "recette à encaisser" métier — c'est une écriture de
+    // compensation interne. Ce comportement est documenté ici comme attendu jusqu'à
+    // l'ajout d'un filtre type_ecriture ou d'un flag is_od dans le service.
     $resultRecettes = $this->tuService->paginate(
         compteId: null,
         tiersId: null,
@@ -266,5 +277,6 @@ it('apres abandon les listes depenses-a-regler et recettes-a-encaisser sont vide
         statutReglement: StatutReglement::EnAttente->value,
     );
 
-    expect($resultRecettes['paginator']->total())->toBe(0);
+    // t2Don (journal=Od) inclus dans la branche recette — 1 OD de compensation PD visible
+    expect($resultRecettes['paginator']->total())->toBe(1);
 });

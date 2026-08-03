@@ -3,9 +3,9 @@
 declare(strict_types=1);
 
 use App\Enums\StatutNoteDeFrais;
+use App\Models\Compte;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Services\Portail\NoteDeFrais\NoteDeFraisService;
 use App\Tenant\TenantContext;
@@ -25,7 +25,13 @@ function makeService(): NoteDeFraisService
 
 it('saveDraft: crée une NDF brouillon avec tiers_id et association_id', function () {
     $tiers = Tiers::factory()->create();
-    $sousCategorie = SousCategorie::factory()->create();
+    $compte = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '61SS'.random_int(100, 999),
+        'intitule' => 'Charge NDF',
+        'classe' => 6,
+        'actif' => true,
+    ]);
 
     $data = [
         'date' => '2026-04-15',
@@ -34,7 +40,7 @@ it('saveDraft: crée une NDF brouillon avec tiers_id et association_id', functio
             [
                 'libelle' => 'Train Paris-Lyon',
                 'montant' => 45.50,
-                'sous_categorie_id' => $sousCategorie->id,
+                'compte_id' => $compte->id,
                 'piece_jointe_path' => null,
             ],
         ],
@@ -55,14 +61,20 @@ it('saveDraft: crée une NDF brouillon avec tiers_id et association_id', functio
 
 it('saveDraft: crée les lignes associées', function () {
     $tiers = Tiers::factory()->create();
-    $sousCategorie = SousCategorie::factory()->create();
+    $compte = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '61SS'.random_int(100, 999),
+        'intitule' => 'Charge NDF',
+        'classe' => 6,
+        'actif' => true,
+    ]);
 
     $data = [
         'date' => '2026-04-15',
         'libelle' => 'Test lignes',
         'lignes' => [
-            ['libelle' => 'Repas', 'montant' => 12.00, 'sous_categorie_id' => $sousCategorie->id, 'piece_jointe_path' => null],
-            ['libelle' => 'Transport', 'montant' => 8.50, 'sous_categorie_id' => null, 'piece_jointe_path' => null],
+            ['libelle' => 'Repas', 'montant' => 12.00, 'compte_id' => $compte->id, 'piece_jointe_path' => null],
+            ['libelle' => 'Transport', 'montant' => 8.50, 'compte_id' => null, 'piece_jointe_path' => null],
         ],
     ];
 
@@ -114,13 +126,19 @@ it('saveDraft: tolère un libellé vide en brouillon', function () {
 
 it('saveDraft: tolère une ligne sans pièce jointe en brouillon', function () {
     $tiers = Tiers::factory()->create();
-    $sousCategorie = SousCategorie::factory()->create();
+    $compte = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '61SS'.random_int(100, 999),
+        'intitule' => 'Charge NDF',
+        'classe' => 6,
+        'actif' => true,
+    ]);
 
     $data = [
         'date' => '2026-04-15',
         'libelle' => 'Test sans PJ',
         'lignes' => [
-            ['libelle' => 'Repas', 'montant' => 15.00, 'sous_categorie_id' => $sousCategorie->id, 'piece_jointe_path' => null],
+            ['libelle' => 'Repas', 'montant' => 15.00, 'compte_id' => $compte->id, 'piece_jointe_path' => null],
         ],
     ];
 
@@ -135,7 +153,13 @@ it('saveDraft: tolère une ligne sans pièce jointe en brouillon', function () {
 
 it('saveDraft: met à jour un brouillon existant quand id est passé', function () {
     $tiers = Tiers::factory()->create();
-    $sousCategorie = SousCategorie::factory()->create();
+    $compte = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '61SS'.random_int(100, 999),
+        'intitule' => 'Charge NDF',
+        'classe' => 6,
+        'actif' => true,
+    ]);
 
     // Création initiale
     $ndf = NoteDeFrais::factory()->brouillon()->create([
@@ -149,7 +173,7 @@ it('saveDraft: met à jour un brouillon existant quand id est passé', function 
         'date' => '2026-04-15',
         'libelle' => 'Nouveau libellé',
         'lignes' => [
-            ['libelle' => 'Repas modifié', 'montant' => 25.00, 'sous_categorie_id' => $sousCategorie->id, 'piece_jointe_path' => null],
+            ['libelle' => 'Repas modifié', 'montant' => 25.00, 'compte_id' => $compte->id, 'piece_jointe_path' => null],
         ],
     ];
 
@@ -186,7 +210,13 @@ it('saveDraft: refuse de mettre à jour un brouillon appartenant à un autre tie
 
 it('saveDraft: met à jour une NDF soumise et remet le statut à Brouillon', function () {
     $tiers = Tiers::factory()->create();
-    $sousCategorie = SousCategorie::factory()->create();
+    $compte = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '61SS'.random_int(100, 999),
+        'intitule' => 'Charge NDF',
+        'classe' => 6,
+        'actif' => true,
+    ]);
 
     $ndf = NoteDeFrais::factory()->soumise()->create([
         'tiers_id' => $tiers->id,
@@ -198,7 +228,7 @@ it('saveDraft: met à jour une NDF soumise et remet le statut à Brouillon', fun
         'date' => '2026-04-15',
         'libelle' => 'NDF soumise modifiée',
         'lignes' => [
-            ['libelle' => 'Repas', 'montant' => 25.00, 'sous_categorie_id' => $sousCategorie->id, 'piece_jointe_path' => null],
+            ['libelle' => 'Repas', 'montant' => 25.00, 'compte_id' => $compte->id, 'piece_jointe_path' => null],
         ],
     ];
 
@@ -237,7 +267,7 @@ it('saveDraft: refuse de mettre à jour une NDF validée', function () {
 it('saveDraft: opération est atomique (rollback si erreur lignes)', function () {
     $tiers = Tiers::factory()->create();
 
-    // Pas de sous_categorie_id valide pour forcer une FK violation — on simule
+    // Pas de compte_id valide pour forcer une FK violation — on simule
     // en passant un montant invalide qui pourrait causer problème; en réalité
     // on vérifie juste que le service est enveloppé dans une transaction.
     // Test pragmatique : le count de NDF avant/après reste cohérent.
@@ -247,7 +277,7 @@ it('saveDraft: opération est atomique (rollback si erreur lignes)', function ()
         'date' => '2026-04-15',
         'libelle' => 'Test atomique',
         'lignes' => [
-            ['libelle' => 'Ligne 1', 'montant' => 10.00, 'sous_categorie_id' => null, 'piece_jointe_path' => null],
+            ['libelle' => 'Ligne 1', 'montant' => 10.00, 'compte_id' => null, 'piece_jointe_path' => null],
         ],
     ];
 

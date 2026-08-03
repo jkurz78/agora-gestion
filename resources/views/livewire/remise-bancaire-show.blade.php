@@ -93,16 +93,18 @@
                             </td>
                             <td class="small">
                                 @if ($transaction->statut_reglement?->value === 'en_attente')
-                                    <span class="badge bg-warning text-dark">En attente</span>
+                                    <span class="badge bg-warning text-dark">Dû</span>
+                                @elseif ($transaction->statut_reglement?->value === 'en_main')
+                                    <span class="badge bg-warning text-dark">À remettre</span>
                                 @elseif ($transaction->statut_reglement?->value === 'recu')
-                                    <span class="badge bg-success">Reçu</span>
+                                    <span class="badge bg-success">Remis</span>
                                 @elseif ($transaction->statut_reglement?->value === 'pointe')
                                     <span class="badge bg-secondary">Pointé</span>
                                 @else
                                     —
                                 @endif
                             </td>
-                            <td class="text-end small fw-semibold text-nowrap">{{ number_format((float) $transaction->montant_total, 2, ',', "\u{00A0}") }}&nbsp;€</td>
+                            <td class="text-end small fw-semibold text-nowrap">{{ number_format(abs((float) $transaction->montant_total), 2, ',', "\u{00A0}") }}&nbsp;€</td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -118,6 +120,11 @@
 
     {{-- Actions --}}
     <div class="d-flex gap-2 mt-3">
+        @if ($isBrouillon && $this->canEdit && $transactions->isNotEmpty())
+            <button data-bs-toggle="modal" data-bs-target="#modalComptabiliser" class="btn btn-success">
+                <i class="bi bi-check-circle"></i> Comptabiliser
+            </button>
+        @endif
         @if (! $isBrouillon)
             <a href="{{ route('banques.remises.pdf', $remise) }}?mode=inline"
                class="btn btn-outline-dark" target="_blank">
@@ -137,6 +144,21 @@
             <i class="bi bi-arrow-left"></i> Retour
         </a>
     </div>
+
+    {{-- Modal confirmation comptabilisation --}}
+    @if ($isBrouillon && $this->canEdit && $transactions->isNotEmpty())
+    <div class="modal fade" id="modalComptabiliser" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-body text-center py-4">
+                    <p>Comptabiliser cette remise ?<br><small class="text-muted">Les transactions passeront au statut « Remis » et l'écriture de dépôt sera générée.</small></p>
+                    <button class="btn btn-secondary me-2" data-bs-dismiss="modal">Annuler</button>
+                    <button wire:click="comptabiliser" data-bs-dismiss="modal" class="btn btn-success">Comptabiliser</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
 
     {{-- Modal confirmation suppression --}}
     <div class="modal fade" id="modalSupprimer" tabindex="-1">

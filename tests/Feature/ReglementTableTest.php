@@ -5,18 +5,20 @@ declare(strict_types=1);
 use App\Enums\ModePaiement;
 use App\Livewire\ReglementTable;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Reglement;
 use App\Models\RemiseBancaire;
 use App\Models\Seance;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\TypeOperation;
 use App\Models\User;
+use App\Services\Compta\EcritureGenerator;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Tenant\TenantContext;
 use Illuminate\Database\QueryException;
 use Livewire\Livewire;
@@ -134,6 +136,35 @@ it('cycles through reglement payment modes', function () {
 it('renders reglement table', function () {
     Livewire::test(ReglementTable::class, ['operation' => $this->operation])
         ->assertOk();
+});
+
+it('ouvre la modale de règlement daté sans créer de T2', function (): void {
+    SystemeSeeder::seed();
+    $produit = Compte::create([
+        'numero_pcg' => '706-REGLEMENT-TABLE',
+        'intitule' => 'Produit règlement table',
+        'classe' => 7,
+        'actif' => true,
+        'est_systeme' => false,
+        'pour_inscriptions' => false,
+        'lettrable' => false,
+    ]);
+    $t1 = app(EcritureGenerator::class)->pourRecetteACredit(
+        tiers: Tiers::factory()->create(),
+        ventilations: [['compte' => $produit, 'montant' => 30.00]],
+        dateConstatation: new DateTimeImmutable('2025-12-01'),
+        libelle: 'Créance depuis règlements',
+    );
+    $ligne411 = $t1->lignes->first(
+        fn (TransactionLigne $ligne): bool => $ligne->compte?->numero_pcg === '411'
+    );
+
+    Livewire::test(ReglementTable::class, ['operation' => $this->operation])
+        ->call('marquerRecu', (int) $t1->id)
+        ->assertDispatched('poste-tiers-reglement:ouvrir', ligneId: (int) $ligne411?->id, exercice: 2025);
+
+    expect(Transaction::count())->toBe(1)
+        ->and($ligne411?->fresh()->lettrage_code)->toBeNull();
 });
 
 it('can cycle mode paiement', function () {
@@ -340,8 +371,16 @@ it('displays realized amounts from transactions', function () {
 });
 
 it('comptabilise une séance à la date saisie (défaut = date de la séance)', function () {
-    $sousCategorie = SousCategorie::factory()->create();
-    $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $sousCategorie->id]);
+    // DC-10a : ventilation compte-first — comptes système requis pour la PD (411).
+    SystemeSeeder::seed();
+    $compteVentilation = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '706R',
+        'intitule' => 'Recettes séances',
+        'classe' => 7,
+        'actif' => true,
+    ]);
+    $typeOp = TypeOperation::factory()->create(['compte_id' => $compteVentilation->id]);
     $operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
     $compte = CompteBancaire::factory()->create(['actif_recettes_depenses' => true]);
 
@@ -373,8 +412,16 @@ it('comptabilise une séance à la date saisie (défaut = date de la séance)', 
 });
 
 it('le bouton Aujourd\'hui remplace la date par celle du jour et est utilisée à la comptabilisation', function () {
-    $sousCategorie = SousCategorie::factory()->create();
-    $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $sousCategorie->id]);
+    // DC-10a : ventilation compte-first — comptes système requis pour la PD (411).
+    SystemeSeeder::seed();
+    $compteVentilation = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '706R',
+        'intitule' => 'Recettes séances',
+        'classe' => 7,
+        'actif' => true,
+    ]);
+    $typeOp = TypeOperation::factory()->create(['compte_id' => $compteVentilation->id]);
     $operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
     $compte = CompteBancaire::factory()->create(['actif_recettes_depenses' => true]);
 

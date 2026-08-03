@@ -3,17 +3,17 @@
 declare(strict_types=1);
 
 use App\Enums\TypeLigneFacture;
+use App\Models\Compte;
 use App\Models\Facture;
 use App\Models\FactureLigne;
 use App\Models\Operation;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\User;
 
-it('FactureLigne::sousCategorie() returns the related SousCategorie', function (): void {
+it('FactureLigne::compte() returns the related Compte', function (): void {
     $tiers = Tiers::factory()->create();
     $user = User::factory()->create();
-    $sousCategorie = SousCategorie::factory()->create();
+    $compte = Compte::factory()->create();
 
     $facture = Facture::create([
         'date' => now()->toDateString(),
@@ -32,13 +32,13 @@ it('FactureLigne::sousCategorie() returns the related SousCategorie', function (
         'quantite' => 3.000,
         'montant' => 2400.00,
         'ordre' => 1,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compte->id,
     ]);
 
     $ligne->refresh();
 
-    expect($ligne->sousCategorie)->not->toBeNull()
-        ->and((int) $ligne->sousCategorie->id)->toBe((int) $sousCategorie->id);
+    expect($ligne->compte)->not->toBeNull()
+        ->and((int) $ligne->compte->id)->toBe((int) $compte->id);
 });
 
 it('FactureLigne::operation() returns the related Operation', function (): void {
@@ -103,10 +103,10 @@ it('FactureLigne decimal casts for prix_unitaire and quantite', function (): voi
         ->and($ligne->quantite)->toBe('2.500');
 });
 
-it('FactureLigne integer casts for sous_categorie_id and operation_id', function (): void {
+it('FactureLigne integer casts for compte_id and operation_id', function (): void {
     $tiers = Tiers::factory()->create();
     $user = User::factory()->create();
-    $sousCategorie = SousCategorie::factory()->create();
+    $compte = Compte::factory()->create();
     $operation = Operation::factory()->create();
 
     $facture = Facture::create([
@@ -126,15 +126,15 @@ it('FactureLigne integer casts for sous_categorie_id and operation_id', function
         'quantite' => 1.000,
         'montant' => 50.00,
         'ordre' => 1,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compte->id,
         'operation_id' => $operation->id,
         'seance' => 42,
     ]);
 
     $ligne->refresh();
 
-    expect($ligne->sous_categorie_id)->toBeInt()
-        ->and($ligne->sous_categorie_id)->toBe((int) $sousCategorie->id)
+    expect($ligne->compte_id)->toBeInt()
+        ->and($ligne->compte_id)->toBe((int) $compte->id)
         ->and($ligne->operation_id)->toBeInt()
         ->and($ligne->operation_id)->toBe((int) $operation->id)
         ->and($ligne->seance)->toBeInt()
@@ -144,7 +144,7 @@ it('FactureLigne integer casts for sous_categorie_id and operation_id', function
 it('FactureLigne new fields are accepted via create()', function (): void {
     $tiers = Tiers::factory()->create();
     $user = User::factory()->create();
-    $sousCategorie = SousCategorie::factory()->create();
+    $compte = Compte::factory()->create();
     $operation = Operation::factory()->create();
 
     $facture = Facture::create([
@@ -164,14 +164,14 @@ it('FactureLigne new fields are accepted via create()', function (): void {
         'quantite' => 5.000,
         'montant' => 1000.00,
         'ordre' => 1,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compte->id,
         'operation_id' => $operation->id,
         'seance' => 7,
     ]);
 
     expect($ligne->exists)->toBeTrue()
         ->and($ligne->libelle)->toBe('Mission complète')
-        ->and((int) $ligne->sous_categorie_id)->toBe((int) $sousCategorie->id)
+        ->and((int) $ligne->compte_id)->toBe((int) $compte->id)
         ->and((int) $ligne->operation_id)->toBe((int) $operation->id)
         ->and((int) $ligne->seance)->toBe(7);
 });

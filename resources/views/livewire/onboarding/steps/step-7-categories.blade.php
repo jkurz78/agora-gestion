@@ -1,19 +1,19 @@
 <h3>7. Plan comptable</h3>
-<p class="text-muted">Choisissez votre point de départ. Vous pourrez toujours ajouter, modifier ou supprimer des catégories ensuite.</p>
+<p class="text-muted">Choisissez votre point de départ. Vous pourrez toujours ajouter, modifier ou supprimer des comptes ensuite.</p>
 
 <form wire:submit="saveStep7">
     <div class="form-check mb-3">
         <input class="form-check-input" type="radio" wire:model="planComptableChoix" id="planDefault" value="default">
         <label class="form-check-label" for="planDefault">
             <strong>Importer le plan comptable associatif par défaut</strong>
-            <br><small class="text-muted">~9 catégories, ~26 sous-catégories correspondant aux codes CERFA usuels (achats, charges de fonctionnement, services extérieurs, ventes, subventions, cotisations, dons…). Recommandé.</small>
+            <br><small class="text-muted">~9 familles, ~26 comptes correspondant aux comptes comptables usuels (achats, charges de fonctionnement, services extérieurs, ventes, subventions, cotisations, dons…). Recommandé.</small>
         </label>
     </div>
     <div class="form-check mb-3">
         <input class="form-check-input" type="radio" wire:model="planComptableChoix" id="planEmpty" value="empty">
         <label class="form-check-label" for="planEmpty">
             <strong>Commencer avec un plan vide</strong>
-            <br><small class="text-muted">Vous créerez vos propres catégories au fur et à mesure.</small>
+            <br><small class="text-muted">Vous créerez vos propres comptes au fur et à mesure.</small>
         </label>
     </div>
 

@@ -3,13 +3,12 @@
 declare(strict_types=1);
 
 use App\Models\Association;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\EncadrementPrevision;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Reglement;
 use App\Models\Seance;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Services\Rapports\CompteResultatBuilder;
@@ -21,13 +20,10 @@ beforeEach(function (): void {
     $this->association = Association::factory()->create();
     TenantContext::boot($this->association);
 
-    $this->categorieDep = Categorie::factory()->depense()->create();
-    $this->scDep = SousCategorie::factory()->create(['categorie_id' => $this->categorieDep->id, 'nom' => 'Encadrement']);
+    $this->scDep = Compte::factory()->depense()->numero('606')->create(['intitule' => 'Encadrement']);
+    $this->scRec = Compte::factory()->numero('706')->create(['intitule' => 'Cotisations']);
 
-    $this->categorieRec = Categorie::factory()->recette()->create();
-    $this->scRec = SousCategorie::factory()->create(['categorie_id' => $this->categorieRec->id, 'nom' => 'Cotisations']);
-
-    $this->typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $this->scRec->id]);
+    $this->typeOp = TypeOperation::factory()->create(['compte_id' => $this->scRec->id]);
     $this->operation = Operation::factory()->create([
         'type_operation_id' => $this->typeOp->id,
         'date_debut' => Carbon::create(2026, 9, 5),
@@ -54,7 +50,7 @@ it('affiche la raison sociale d\'un tiers entreprise dans les prévisions par ti
     EncadrementPrevision::create([
         'operation_id' => $this->operation->id,
         'tiers_id' => $entreprise->id,
-        'sous_categorie_id' => $this->scDep->id,
+        'compte_id' => $this->scDep->id,
         'seance_id' => $this->seance->id,
         'montant_prevu' => 100,
     ]);
@@ -68,7 +64,7 @@ it('affiche la raison sociale d\'un tiers entreprise dans les prévisions par ti
     );
 
     $labels = collect($data['previsions_charges'])
-        ->flatMap(fn ($cat) => collect($cat['sous_categories'])
+        ->flatMap(fn ($cat) => collect($cat['comptes'])
             ->flatMap(fn ($sc) => collect($sc['tiers'])->pluck('label')));
 
     expect($labels)->toContain('EPONA');
@@ -78,7 +74,7 @@ it('retourne previsions_charges quand previsionnel=true', function (): void {
     EncadrementPrevision::create([
         'operation_id' => $this->operation->id,
         'tiers_id' => $this->tiersEnc->id,
-        'sous_categorie_id' => $this->scDep->id,
+        'compte_id' => $this->scDep->id,
         'seance_id' => $this->seance->id,
         'montant_prevu' => 200,
     ]);
@@ -95,7 +91,7 @@ it('retourne previsions_charges quand previsionnel=true', function (): void {
         ->and($data['previsions_charges'])->not->toBeEmpty();
 
     $total = collect($data['previsions_charges'])->sum(function ($cat) {
-        return collect($cat['sous_categories'])->sum(fn ($sc) => $sc['total'] ?? $sc['montant'] ?? 0);
+        return collect($cat['comptes'])->sum(fn ($sc) => $sc['total'] ?? $sc['montant'] ?? 0);
     });
     expect($total)->toBe(200.0);
 });
@@ -119,7 +115,7 @@ it('retourne previsions_produits depuis les reglements', function (): void {
         ->and($data['previsions_produits'])->not->toBeEmpty();
 
     $total = collect($data['previsions_produits'])->sum(function ($cat) {
-        return collect($cat['sous_categories'])->sum(fn ($sc) => $sc['total'] ?? $sc['montant'] ?? 0);
+        return collect($cat['comptes'])->sum(fn ($sc) => $sc['total'] ?? $sc['montant'] ?? 0);
     });
     expect($total)->toBe(80.0);
 });
@@ -128,7 +124,7 @@ it("n'expose pas previsions quand previsionnel=false (rétrocompat)", function (
     EncadrementPrevision::create([
         'operation_id' => $this->operation->id,
         'tiers_id' => $this->tiersEnc->id,
-        'sous_categorie_id' => $this->scDep->id,
+        'compte_id' => $this->scDep->id,
         'seance_id' => $this->seance->id,
         'montant_prevu' => 200,
     ]);
@@ -153,9 +149,7 @@ it("filtre fail-closed les prévisions d'autres associations", function (): void
     EncadrementPrevision::create([
         'operation_id' => $opAutre->id,
         'tiers_id' => Tiers::factory()->create()->id,
-        'sous_categorie_id' => SousCategorie::factory()->create([
-            'categorie_id' => Categorie::factory()->depense()->create()->id,
-        ])->id,
+        'compte_id' => Compte::factory()->depense()->create()->id,
         'seance_id' => $sAutre->id,
         'montant_prevu' => 9999,
     ]);
@@ -165,7 +159,7 @@ it("filtre fail-closed les prévisions d'autres associations", function (): void
     EncadrementPrevision::create([
         'operation_id' => $this->operation->id,
         'tiers_id' => $this->tiersEnc->id,
-        'sous_categorie_id' => $this->scDep->id,
+        'compte_id' => $this->scDep->id,
         'seance_id' => $this->seance->id,
         'montant_prevu' => 50,
     ]);
@@ -178,7 +172,7 @@ it("filtre fail-closed les prévisions d'autres associations", function (): void
         previsionnel: true,
     );
 
-    $total = collect($data['previsions_charges'])->sum(fn ($cat) => collect($cat['sous_categories'])->sum('montant'));
+    $total = collect($data['previsions_charges'])->sum(fn ($cat) => collect($cat['comptes'])->sum('montant'));
     expect($total)->toBe(50.0);
 });
 
@@ -194,9 +188,7 @@ it("filtre fail-closed les previsions produits d'autres associations", function 
     $autre = Association::factory()->create();
     TenantContext::boot($autre);
     $typeOpAutre = TypeOperation::factory()->create([
-        'sous_categorie_id' => SousCategorie::factory()->create([
-            'categorie_id' => Categorie::factory()->recette()->create()->id,
-        ])->id,
+        'compte_id' => Compte::factory()->create()->id,
     ]);
     $opAutre = Operation::factory()->create([
         'type_operation_id' => $typeOpAutre->id,
@@ -224,7 +216,7 @@ it("filtre fail-closed les previsions produits d'autres associations", function 
         previsionnel: true,
     );
 
-    $total = collect($data['previsions_produits'])->sum(fn ($cat) => collect($cat['sous_categories'])->sum('montant'));
+    $total = collect($data['previsions_produits'])->sum(fn ($cat) => collect($cat['comptes'])->sum('montant'));
     expect($total)->toBe(60.0); // pas 9999 + 60
 });
 
@@ -232,7 +224,7 @@ it('retourne ProjectionMatrix dans proj_charges/proj_produits', function (): voi
     EncadrementPrevision::create([
         'operation_id' => $this->operation->id,
         'tiers_id' => $this->tiersEnc->id,
-        'sous_categorie_id' => $this->scDep->id,
+        'compte_id' => $this->scDep->id,
         'seance_id' => $this->seance->id,
         'montant_prevu' => 200,
     ]);
@@ -265,7 +257,7 @@ it('ProjectionMatrix contient les valeurs projetées au grain tiers', function (
     EncadrementPrevision::create([
         'operation_id' => $this->operation->id,
         'tiers_id' => $this->tiersEnc->id,
-        'sous_categorie_id' => $this->scDep->id,
+        'compte_id' => $this->scDep->id,
         'seance_id' => $this->seance->id,
         'montant_prevu' => 350,
     ]);

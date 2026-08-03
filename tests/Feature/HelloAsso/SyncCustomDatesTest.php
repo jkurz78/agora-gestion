@@ -3,24 +3,40 @@
 declare(strict_types=1);
 
 use App\Enums\HelloAssoEnvironnement;
+use App\Enums\UsageComptable;
 use App\Models\Adhesion;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\FormuleAdhesion;
 use App\Models\HelloAssoFormMapping;
 use App\Models\HelloAssoParametres;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Services\HelloAssoSyncService;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Http;
+
+// DC-10a : compte classe 7 flaggé Cotisation (compte-first).
+function compteHelloAssoCustomDates(): Compte
+{
+    $compte = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '756C',
+        'intitule' => 'Cotisations',
+        'classe' => 7,
+        'actif' => true,
+    ]);
+    $compte->usages()->create(['usage' => UsageComptable::Cotisation->value]);
+
+    return $compte;
+}
 
 beforeEach(function (): void {
     $association = Association::firstOrCreate(['id' => 1], ['nom' => 'Asso test', 'slug' => 'test-asso']);
     TenantContext::boot($association);
 
     $compte = CompteBancaire::factory()->create();
-    $sc = SousCategorie::factory()->pourCotisations()->create();
+    $sc = compteHelloAssoCustomDates();
     $this->parametres = HelloAssoParametres::factory()->create([
         'association_id' => 1,
         'environnement' => HelloAssoEnvironnement::Sandbox,
@@ -42,7 +58,7 @@ beforeEach(function (): void {
         'form_slug' => 'cotisation-custom',
         'form_type' => 'Membership',
         'form_title' => 'Cotisation Custom',
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $sc->id,
     ]);
 });
 

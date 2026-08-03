@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 use App\Enums\TypeTransaction;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\Provision;
-use App\Models\SousCategorie;
 use App\Models\User;
 use App\Tenant\TenantContext;
 
@@ -14,7 +14,7 @@ beforeEach(function () {
     $this->user = User::factory()->create();
     $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
     TenantContext::boot($this->association);
-    $this->sc = SousCategorie::factory()->create();
+    $this->sc = Compte::factory()->create();
 });
 
 afterEach(function () {
@@ -25,7 +25,7 @@ it('computes montantSigne for depense (FNP)', function () {
     $provision = Provision::factory()->create([
         'type' => TypeTransaction::Depense,
         'montant' => 500.00,
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'saisi_par' => $this->user->id,
         'exercice' => 2025,
         'date' => '2026-08-31',
@@ -38,7 +38,7 @@ it('computes montantSigne for recette (PCA negative)', function () {
     $provision = Provision::factory()->create([
         'type' => TypeTransaction::Recette,
         'montant' => -5000.00,
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'saisi_par' => $this->user->id,
         'exercice' => 2025,
         'date' => '2026-08-31',
@@ -50,13 +50,13 @@ it('computes montantSigne for recette (PCA negative)', function () {
 it('scopes by exercice', function () {
     Provision::factory()->create([
         'exercice' => 2025,
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'saisi_par' => $this->user->id,
         'date' => '2026-08-31',
     ]);
     Provision::factory()->create([
         'exercice' => 2024,
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'saisi_par' => $this->user->id,
         'date' => '2025-08-31',
     ]);
@@ -64,20 +64,20 @@ it('scopes by exercice', function () {
     expect(Provision::forExercice(2025)->count())->toBe(1);
 });
 
-it('has sousCategorie relation', function () {
+it('has compte relation', function () {
     $provision = Provision::factory()->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'saisi_par' => $this->user->id,
         'exercice' => 2025,
         'date' => '2026-08-31',
     ]);
 
-    expect($provision->sousCategorie->id)->toBe($this->sc->id);
+    expect($provision->compte->id)->toBe($this->sc->id);
 });
 
 it('soft deletes', function () {
     $provision = Provision::factory()->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'saisi_par' => $this->user->id,
         'exercice' => 2025,
         'date' => '2026-08-31',

@@ -2,11 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Enums\StatutExercice;
 use App\Livewire\Provisions\ProvisionIndex;
 use App\Models\Association;
+use App\Models\Compte;
+use App\Models\Exercice;
 use App\Models\Provision;
-use App\Models\SousCategorie;
 use App\Models\User;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Tenant\TenantContext;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -22,6 +25,10 @@ beforeEach(function () {
     $this->actingAs($this->user);
 
     $this->aid = $this->association->id;
+
+    Exercice::create(['association_id' => $this->association->id, 'annee' => 2025, 'statut' => StatutExercice::Ouvert]);
+    session(['exercice_actif' => 2025]);
+    SystemeSeeder::seed();
 });
 
 afterEach(function () {
@@ -56,12 +63,13 @@ it('upload PJ dans ProvisionIndex place le fichier sous associations/{aid}/provi
     $component = Livewire\Livewire::test(ProvisionIndex::class);
 
     // On prépare les données du formulaire
-    $sc = SousCategorie::factory()->create();
+    // DC-10a : le sélecteur porte directement un id de compte.
+    $compte = Compte::factory()->numero('606')->create();
     $file = UploadedFile::fake()->create('contrat.pdf', 100, 'application/pdf');
 
     $component
         ->set('libelle', 'Provision test')
-        ->set('sous_categorie_id', (string) $sc->id)
+        ->set('compte_id', (string) $compte->id)
         ->set('type', 'depense')
         ->set('montant', '500')
         ->set('piece_jointe', $file)
@@ -81,11 +89,11 @@ it('upload PJ dans ProvisionIndex place le fichier sous associations/{aid}/provi
 });
 
 it('piece_jointe_path sans PJ reste null', function () {
-    $sc = SousCategorie::factory()->create();
+    $compte = Compte::factory()->numero('706')->create();
 
     Livewire\Livewire::test(ProvisionIndex::class)
         ->set('libelle', 'Provision sans PJ')
-        ->set('sous_categorie_id', (string) $sc->id)
+        ->set('compte_id', (string) $compte->id)
         ->set('type', 'recette')
         ->set('montant', '200')
         ->call('save');

@@ -20,6 +20,8 @@ use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\Exercice;
 use App\Models\User;
+use App\Services\Compta\Migrations\BancairesSeeder;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
@@ -41,6 +43,8 @@ beforeEach(function (): void {
     ]);
     session(['exercice_actif' => 2025]);
 
+    SystemeSeeder::seed();
+
     $this->compteSource = CompteBancaire::factory()->create([
         'association_id' => $this->association->id,
         'solde_initial' => 1000.0,
@@ -49,6 +53,9 @@ beforeEach(function (): void {
         'association_id' => $this->association->id,
         'solde_initial' => 0.0,
     ]);
+
+    // Infrastructure PD : Compte 512X lié à chaque CompteBancaire (requis par pourVirementInterne)
+    BancairesSeeder::seed();
 });
 
 afterEach(function (): void {

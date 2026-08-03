@@ -3,12 +3,13 @@
 declare(strict_types=1);
 
 use App\Enums\HelloAssoEnvironnement;
+use App\Enums\UsageComptable;
 use App\Models\Adhesion;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\HelloAssoFormMapping;
 use App\Models\HelloAssoParametres;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Services\HelloAssoSyncService;
@@ -22,7 +23,14 @@ beforeEach(function (): void {
     TenantContext::boot($association);
 
     $compte = CompteBancaire::factory()->create();
-    $this->sc = SousCategorie::factory()->pourCotisations()->create();
+    $this->sc = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '756IF',
+        'intitule' => 'Cotisations',
+        'classe' => 7,
+        'actif' => true,
+    ]);
+    $this->sc->usages()->create(['usage' => UsageComptable::Cotisation->value]);
     $this->parametres = HelloAssoParametres::factory()->create([
         'association_id' => 1,
         'environnement' => HelloAssoEnvironnement::Sandbox,
@@ -59,7 +67,7 @@ it('skip un form en état ignore', function (): void {
         'form_slug' => 'cotisation-2025',
         'form_type' => 'Membership',
         'form_title' => 'Cotisation 2025',
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'ignore' => true,
     ]);
 
@@ -70,13 +78,13 @@ it('skip un form en état ignore', function (): void {
     expect(Adhesion::count())->toBe(0);
 });
 
-it('skip un form Membership sans sous_categorie_id', function (): void {
+it('skip un form Membership sans compte_id', function (): void {
     HelloAssoFormMapping::create([
         'helloasso_parametres_id' => $this->parametres->id,
         'form_slug' => 'cotisation-2025',
         'form_type' => 'Membership',
         'form_title' => 'Cotisation 2025',
-        'sous_categorie_id' => null,
+        'compte_id' => null,
     ]);
 
     $service = new HelloAssoSyncService($this->parametres);

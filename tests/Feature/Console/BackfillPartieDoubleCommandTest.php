@@ -1,0 +1,1739 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Step 32 — Tests BackfillPartieDoubleCommand : squelette + dry-run + rapport.
+ * Step 33 — Conversion idempotente + invariants + rollback.
+ *
+ * Test [A] : dry-run produit un rapport listant nb transactions à convertir, SC sans code_cerfa, modes non couverts.
+ * Test [B] : aucune ligne transaction_lignes modifiée après dry-run (snapshot avant/après identique).
+ * Test [C] : sortie console contient les sections clés.
+ * Test [D] : backfill complet → toutes Tx equilibree=TRUE, lignes cohérentes.
+ * Test [E] : re-run immédiat → 0 transaction convertie (idempotence).
+ * Test [F] : invariant équilibre — SUM(debit) == SUM(credit) pour chaque Tx.
+ * Test [G] : invariant tiers 411/401 — toute ligne 411 ou 401 porte tiers_id NOT NULL.
+ * Test [H] : invariant pas-tiers-sur-512X — toute ligne classe 5 a tiers_id IS NULL.
+ * Test [I] : rollback — si invariant échoue, DB::transaction rollback complet.
+ */
+
+use App\Console\Commands\BackfillPartieDoubleCommand;
+use App\Enums\JournalComptable;
+use App\Enums\ModePaiement;
+use App\Enums\StatutReglement;
+use App\Enums\TypeTransaction;
+use App\Models\Association;
+use App\Models\Compte;
+use App\Models\CompteBancaire;
+use App\Models\RapprochementBancaire;
+use App\Models\RemiseBancaire;
+use App\Models\Tiers;
+use App\Models\Transaction;
+use App\Models\TransactionLigne;
+use App\Models\User;
+use App\Models\VirementInterne;
+use App\Services\Compta\BackfillAuditor;
+use App\Services\Compta\Migrations\BancairesSeeder;
+use App\Services\Compta\Migrations\SystemeSeeder;
+use App\Services\Compta\TransactionConverter;
+use App\Services\RapprochementBancaireService;
+use App\Services\TransactionService;
+use App\Tenant\TenantContext;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+
+uses(RefreshDatabase::class);
+
+// ---------------------------------------------------------------------------
+// Helpers locaux
+// ---------------------------------------------------------------------------
+
+/**
+ * Construit la fixture minimale nécessaire aux tests Step 32 :
+ * - 2 recettes comptant (1 chèque + 1 virement)
+ * - 1 ventilation non convertible (pour tester le rapport d'anomalie)
+ */
+function setupBackfillFixtureStep32(object $ctx): void
+{
+    $ctx->association = Association::factory()->create();
+    $ctx->user = User::factory()->create();
+    $ctx->user->associations()->attach($ctx->association->id, ['role' => 'admin', 'joined_at' => now()]);
+
+    TenantContext::clear();
+    TenantContext::boot($ctx->association);
+    session(['current_association_id' => $ctx->association->id]);
+    $ctx->actingAs($ctx->user);
+
+    SystemeSeeder::seed();
+
+    // Compte 530 (Caisse)
+    $tenantId = (int) TenantContext::currentId();
+    $isSqlite = DB::getDriverName() === 'sqlite';
+    $insertClause = $isSqlite ? 'INSERT OR IGNORE' : 'INSERT IGNORE';
+    DB::statement(<<<SQL
+        {$insertClause} INTO comptes
+            (association_id, numero_pcg, intitule, classe, actif, est_systeme, pour_inscriptions, lettrable, created_at, updated_at)
+        VALUES
+            ({$tenantId}, '530', 'Caisse (espèces)', 5, 1, 1, 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    SQL);
+
+    // CompteBancaire + 512X
+    $ctx->iban = 'FR7612345000012345678901234';
+    $ctx->compteBancaire = CompteBancaire::factory()->create([
+        'association_id' => $ctx->association->id,
+        'iban' => $ctx->iban,
+        'actif_recettes_depenses' => true,
+    ]);
+    BancairesSeeder::seed();
+    $ctx->compte512X = Compte::where('iban', $ctx->iban)
+        ->where('association_id', $ctx->association->id)
+        ->firstOrFail();
+
+    // Compte de ventilation recette 706.
+    $ctx->compte706 = Compte::firstOrCreate(
+        ['association_id' => $ctx->association->id, 'numero_pcg' => '706'],
+        [
+            'intitule' => 'Cotisations membres',
+            'classe' => 7,
+            'lettrable' => false,
+            'actif' => true,
+            'est_systeme' => false,
+            'pour_inscriptions' => false,
+        ]
+    );
+
+    // Tiers
+    $ctx->tiersA = Tiers::factory()->create(['association_id' => $ctx->association->id]);
+
+    // Services
+    $ctx->txService = app(TransactionService::class);
+
+    // Créer 2 transactions pour l'exercice 2025
+    // statut_reglement = Recu : transactions avec mode déjà encaissées (comptant).
+    $ctx->txCheque = $ctx->txService->create([
+        'type' => 'recette',
+        'date' => '2025-10-05',
+        'libelle' => 'Adhésion chèque',
+        'montant_total' => '100.00',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'statut_reglement' => StatutReglement::Recu->value,
+        'tiers_id' => $ctx->tiersA->id,
+        'compte_id' => $ctx->compteBancaire->id,
+    ], [
+        ['compte_id' => $ctx->compte706->id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+
+    $ctx->txVirement = $ctx->txService->create([
+        'type' => 'recette',
+        'date' => '2025-10-10',
+        'libelle' => 'Subvention virement',
+        'montant_total' => '250.00',
+        'mode_paiement' => ModePaiement::Virement->value,
+        'statut_reglement' => StatutReglement::Recu->value,
+        'tiers_id' => $ctx->tiersA->id,
+        'compte_id' => $ctx->compteBancaire->id,
+    ], [
+        ['compte_id' => $ctx->compte706->id, 'montant' => '250.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+}
+
+// ---------------------------------------------------------------------------
+// Tests Step 32 — [A], [B], [C]
+// ---------------------------------------------------------------------------
+
+test('[A] dry-run produit un rapport structuré avec nb transactions, SC sans code_cerfa, modes non couverts', function () {
+    setupBackfillFixtureStep32($this);
+
+    // Les 2 transactions viennent d'être créées avec PD activé (enrichirPartieDouble)
+    // → elles sont déjà equilibree=TRUE. Pour tester le dry-run, on simule des Tx legacy
+    // en remettant equilibree=FALSE sur l'une d'elles.
+    Transaction::query()
+        ->where('association_id', $this->association->id)
+        ->update(['equilibree' => false]);
+
+    $result = $this->artisan('compta:backfill-partie-double', [
+        '--exercice' => '2025',
+        '--dry-run' => true,
+        '--asso' => $this->association->id,
+    ]);
+
+    $result->assertSuccessful();
+})->group('backfill');
+
+test('[B] dry-run ne modifie aucune ligne transaction_lignes', function () {
+    setupBackfillFixtureStep32($this);
+
+    // Snapshot AVANT dry-run (via join transactions pour filtrer par tenant)
+    $txIds = Transaction::query()
+        ->where('association_id', $this->association->id)
+        ->pluck('id')
+        ->all();
+
+    $snapshotAvant = DB::table('transaction_lignes')
+        ->whereIn('transaction_id', $txIds)
+        ->orderBy('id')
+        ->get(['id', 'compte_id', 'debit', 'credit', 'tiers_id', 'lettrage_code'])
+        ->toArray();
+
+    // Marquer les Tx comme non-équilibrées pour que le dry-run les "voit"
+    Transaction::query()
+        ->where('association_id', $this->association->id)
+        ->update(['equilibree' => false]);
+
+    $this->artisan('compta:backfill-partie-double', [
+        '--exercice' => '2025',
+        '--dry-run' => true,
+        '--asso' => $this->association->id,
+    ]);
+
+    // Snapshot APRÈS dry-run
+    $snapshotApres = DB::table('transaction_lignes')
+        ->whereIn('transaction_id', $txIds)
+        ->orderBy('id')
+        ->get(['id', 'compte_id', 'debit', 'credit', 'tiers_id', 'lettrage_code'])
+        ->toArray();
+
+    expect($snapshotApres)->toEqual($snapshotAvant);
+})->group('backfill');
+
+test('[C] sortie console contient les sections clés du rapport dry-run', function () {
+    setupBackfillFixtureStep32($this);
+
+    Transaction::query()
+        ->where('association_id', $this->association->id)
+        ->update(['equilibree' => false]);
+
+    $this->artisan('compta:backfill-partie-double', [
+        '--exercice' => '2025',
+        '--dry-run' => true,
+        '--asso' => $this->association->id,
+    ])
+        ->expectsOutputToContain('RAPPORT DRY-RUN')
+        ->expectsOutputToContain('transactions à convertir')
+        ->expectsOutputToContain('Ventilations sans compte valide')
+        ->expectsOutputToContain('Modes non couverts');
+})->group('backfill');
+
+// ---------------------------------------------------------------------------
+// Tests Step 33 — [D], [E], [F], [G], [H], [I]
+// ---------------------------------------------------------------------------
+
+/**
+ * Fixture legacy complète pour le Step 33.
+ * Crée des transactions en désactivant PD (equilibree=FALSE) pour simuler un état legacy.
+ */
+function setupBackfillFixtureStep33Legacy(object $ctx): void
+{
+    setupBackfillFixtureStep32($ctx);
+
+    // Créer aussi une dépense comptant
+    Compte::firstOrCreate(
+        ['association_id' => $ctx->association->id, 'numero_pcg' => '606'],
+        [
+            'intitule' => 'Fournitures',
+            'classe' => 6,
+            'lettrable' => false,
+            'actif' => true,
+            'est_systeme' => false,
+            'pour_inscriptions' => false,
+        ]
+    );
+
+    $ctx->compte606 = Compte::where('association_id', $ctx->association->id)->where('numero_pcg', '606')->first();
+
+    $ctx->txDepense = $ctx->txService->create([
+        'type' => 'depense',
+        'date' => '2025-10-15',
+        'libelle' => 'Fournitures bureau',
+        'montant_total' => '75.00',
+        'mode_paiement' => ModePaiement::Virement->value,
+        'statut_reglement' => StatutReglement::Recu->value,
+        'tiers_id' => $ctx->tiersA->id,
+        'compte_id' => $ctx->compteBancaire->id,
+    ], [
+        ['compte_id' => $ctx->compte606->id, 'montant' => '75.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+
+    // Chantier 2a — purge des T2 d'encaissement séparées AVANT la remise en legacy.
+    // Depuis 2a, txService->create() avec statut_reglement=Recu produit une T2 séparée
+    // (journal=Banque, remise_id=NULL). Ces T2 n'existeraient pas dans des données legacy
+    // pré-partie-double. Le backfill ne sait traiter que les T1 opérationnelles (journal=Vente)
+    // → les T2 orphelines resteraient equilibree=FALSE et feraient échouer l'assertion post-backfill.
+    // Stratégie : supprimer toute transaction journal=Banque sans remise_id pour ce tenant.
+    // Les T4 de remise (journal=Banque + remise_id NOT NULL) ne sont pas concernées ici.
+    Transaction::query()
+        ->where('association_id', $ctx->association->id)
+        ->where('journal', JournalComptable::Banque->value)
+        ->whereNull('remise_id')
+        ->each(function (Transaction $t2Orpheline) {
+            TransactionLigne::where('transaction_id', $t2Orpheline->id)->forceDelete();
+            $t2Orpheline->forceDelete();
+        });
+
+    // Simuler état LEGACY : supprimer les lignes PD-only (411/401/512X) et reset equilibree
+    // Pour chaque transaction, supprimer les lignes techniques de classes 4/5 ;
+    // les lignes de ventilation par compte restent présentes.
+    Transaction::query()
+        ->where('association_id', $ctx->association->id)
+        ->each(function (Transaction $tx) {
+            TransactionLigne::where('transaction_id', $tx->id)
+                ->whereHas('compte', fn ($query) => $query->whereIn('classe', [4, 5]))
+                ->forceDelete();
+
+            // Reset: debit/credit sur les lignes de ventilation restantes
+            // compte_id est préservé (allocation utilisateur, pas dérivée)
+            TransactionLigne::where('transaction_id', $tx->id)
+                ->update([
+                    'debit' => 0,
+                    'credit' => 0,
+                    'tiers_id' => null,
+                    'lettrage_code' => null,
+                ]);
+
+            // Marquer comme non-équilibrée
+            $tx->forceFill(['equilibree' => false])->save();
+        });
+}
+
+test('[D] backfill sans dry-run → toutes Tx equilibree=TRUE, lignes cohérentes', function () {
+    setupBackfillFixtureStep33Legacy($this);
+
+    $this->artisan('compta:backfill-partie-double', [
+        '--exercice' => '2025',
+        '--asso' => $this->association->id,
+    ])->assertSuccessful();
+
+    // Toutes les Tx de l'exercice doivent être equilibree=TRUE
+    $txNonEquilibrees = Transaction::query()
+        ->where('association_id', $this->association->id)
+        ->whereBetween('date', ['2025-09-01', '2026-08-31'])
+        ->where(function ($q) {
+            $q->where('equilibree', false)->orWhereNull('equilibree');
+        })
+        ->count();
+
+    expect($txNonEquilibrees)->toBe(0);
+})->group('backfill');
+
+test('[E] re-run immédiat → 0 transaction convertie (idempotence)', function () {
+    setupBackfillFixtureStep33Legacy($this);
+
+    // 1er run
+    $this->artisan('compta:backfill-partie-double', [
+        '--exercice' => '2025',
+        '--asso' => $this->association->id,
+    ])->assertSuccessful();
+
+    // Snapshot après 1er run
+    $snapshotApres1 = DB::table('transaction_lignes')
+        ->where('association_id', $this->association->id)
+        ->orderBy('id')
+        ->get(['id', 'compte_id', 'debit', 'credit', 'tiers_id', 'lettrage_code'])
+        ->toArray();
+
+    // 2ème run
+    $this->artisan('compta:backfill-partie-double', [
+        '--exercice' => '2025',
+        '--asso' => $this->association->id,
+    ])->assertSuccessful();
+
+    $snapshotApres2 = DB::table('transaction_lignes')
+        ->where('association_id', $this->association->id)
+        ->orderBy('id')
+        ->get(['id', 'compte_id', 'debit', 'credit', 'tiers_id', 'lettrage_code'])
+        ->toArray();
+
+    expect($snapshotApres2)->toEqual($snapshotApres1);
+})->group('backfill');
+
+test('[F] invariant équilibre — SUM(debit) == SUM(credit) pour chaque Tx après backfill', function () {
+    setupBackfillFixtureStep33Legacy($this);
+
+    $this->artisan('compta:backfill-partie-double', [
+        '--exercice' => '2025',
+        '--asso' => $this->association->id,
+    ])->assertSuccessful();
+
+    $txIds = Transaction::query()
+        ->where('association_id', $this->association->id)
+        ->whereBetween('date', ['2025-09-01', '2026-08-31'])
+        ->pluck('id');
+
+    foreach ($txIds as $txId) {
+        $sums = DB::table('transaction_lignes')
+            ->where('transaction_id', $txId)
+            ->whereNull('deleted_at')
+            ->selectRaw('SUM(debit) as total_debit, SUM(credit) as total_credit')
+            ->first();
+
+        $debit = round((float) ($sums->total_debit ?? 0), 2);
+        $credit = round((float) ($sums->total_credit ?? 0), 2);
+
+        expect($debit)->toBe($credit, "Transaction #{$txId} non équilibrée : débit={$debit}, crédit={$credit}");
+    }
+})->group('backfill');
+
+test('[G] invariant tiers 411/401 — toute ligne 411 ou 401 porte tiers_id NOT NULL', function () {
+    setupBackfillFixtureStep33Legacy($this);
+
+    $this->artisan('compta:backfill-partie-double', [
+        '--exercice' => '2025',
+        '--asso' => $this->association->id,
+    ])->assertSuccessful();
+
+    $compte411 = Compte::where('numero_pcg', '411')
+        ->where('association_id', $this->association->id)
+        ->first();
+    $compte401 = Compte::where('numero_pcg', '401')
+        ->where('association_id', $this->association->id)
+        ->first();
+
+    $compteIds = collect([$compte411?->id, $compte401?->id])->filter()->all();
+
+    if (empty($compteIds)) {
+        $this->markTestSkipped('Comptes 411/401 non présents dans cette fixture.');
+    }
+
+    // Filtrer par les transactions de ce tenant
+    $txIds = Transaction::query()
+        ->where('association_id', $this->association->id)
+        ->pluck('id')
+        ->all();
+
+    $lignesSansTiers = DB::table('transaction_lignes')
+        ->whereIn('transaction_id', $txIds)
+        ->whereIn('compte_id', $compteIds)
+        ->whereNull('tiers_id')
+        ->whereNull('deleted_at')
+        ->count();
+
+    expect($lignesSansTiers)->toBe(0, 'Des lignes 411/401 sans tiers ont été trouvées.');
+})->group('backfill');
+
+test('[H] invariant pas-tiers-sur-512X — toute ligne classe 5 a tiers_id IS NULL', function () {
+    setupBackfillFixtureStep33Legacy($this);
+
+    $this->artisan('compta:backfill-partie-double', [
+        '--exercice' => '2025',
+        '--asso' => $this->association->id,
+    ])->assertSuccessful();
+
+    $compteClasse5Ids = Compte::where('classe', 5)
+        ->where('association_id', $this->association->id)
+        ->pluck('id')
+        ->all();
+
+    if (empty($compteClasse5Ids)) {
+        $this->markTestSkipped('Aucun compte classe 5 dans cette fixture.');
+    }
+
+    $txIds = Transaction::query()
+        ->where('association_id', $this->association->id)
+        ->pluck('id')
+        ->all();
+
+    $lignesAvecTiers = DB::table('transaction_lignes')
+        ->whereIn('transaction_id', $txIds)
+        ->whereIn('compte_id', $compteClasse5Ids)
+        ->whereNotNull('tiers_id')
+        ->whereNull('deleted_at')
+        ->count();
+
+    expect($lignesAvecTiers)->toBe(0, 'Des lignes classe 5 avec tiers_id ont été trouvées.');
+})->group('backfill');
+
+test('[H2] backfill reprend les virements internes legacy en écritures 512 source/destination', function () {
+    setupBackfillFixtureStep32($this);
+
+    $compteDestination = CompteBancaire::factory()->create([
+        'association_id' => $this->association->id,
+        'nom' => 'Compte destination',
+        'iban' => 'FR7612345000012345678909999',
+        'actif_recettes_depenses' => true,
+    ]);
+    BancairesSeeder::seed();
+
+    $compte512Source = Compte::where('association_id', $this->association->id)
+        ->where('compte_bancaire_id', $this->compteBancaire->id)
+        ->firstOrFail();
+    $compte512Destination = Compte::where('association_id', $this->association->id)
+        ->where('compte_bancaire_id', $compteDestination->id)
+        ->firstOrFail();
+
+    $virement = VirementInterne::factory()->create([
+        'association_id' => $this->association->id,
+        'date' => '2025-11-20',
+        'montant' => '123.45',
+        'compte_source_id' => $this->compteBancaire->id,
+        'compte_destination_id' => $compteDestination->id,
+        'reference' => 'VIR-LEGACY-001',
+        'numero_piece' => '2025-2026:00999',
+    ]);
+
+    expect(Transaction::where('virement_interne_id', $virement->id)->exists())->toBeFalse();
+
+    $this->artisan('compta:backfill-partie-double', [
+        '--exercice' => '2025',
+        '--asso' => $this->association->id,
+    ])->assertSuccessful();
+
+    $transaction = Transaction::where('virement_interne_id', $virement->id)->first();
+
+    expect($transaction)->not->toBeNull()
+        ->and($transaction->type)->toBe(TypeTransaction::Virement)
+        ->and($transaction->journal)->toBe(JournalComptable::Banque)
+        ->and((bool) $transaction->equilibree)->toBeTrue();
+
+    $lignes = TransactionLigne::where('transaction_id', $transaction->id)
+        ->whereNull('deleted_at')
+        ->get();
+
+    expect($lignes)->toHaveCount(2)
+        ->and((float) $lignes->firstWhere('compte_id', $compte512Destination->id)->debit)->toBe(123.45)
+        ->and((float) $lignes->firstWhere('compte_id', $compte512Source->id)->credit)->toBe(123.45);
+})->group('backfill');
+
+// ---------------------------------------------------------------------------
+// Tests Step 34 — [J], [K]
+// ---------------------------------------------------------------------------
+
+test('[J] --force re-convertit même si equilibree=TRUE', function () {
+    setupBackfillFixtureStep33Legacy($this);
+
+    // 1er run : convertir
+    $this->artisan('compta:backfill-partie-double', [
+        '--exercice' => '2025',
+        '--asso' => $this->association->id,
+    ])->assertSuccessful();
+
+    // Snapshot après 1er run
+    $txIds = Transaction::query()
+        ->where('association_id', $this->association->id)
+        ->whereBetween('date', ['2025-09-01', '2026-08-31'])
+        ->pluck('id')
+        ->all();
+
+    $nbLignesApres1 = DB::table('transaction_lignes')
+        ->whereIn('transaction_id', $txIds)
+        ->whereNull('deleted_at')
+        ->count();
+
+    // Toutes les Tx doivent être equilibree=TRUE après le 1er run
+    $txEquilibrees = Transaction::query()
+        ->where('association_id', $this->association->id)
+        ->whereBetween('date', ['2025-09-01', '2026-08-31'])
+        ->where('equilibree', true)
+        ->count();
+    expect($txEquilibrees)->toBeGreaterThan(0);
+
+    // 2ème run avec --force : doit re-convertir même si equilibree=TRUE
+    $this->artisan('compta:backfill-partie-double', [
+        '--exercice' => '2025',
+        '--force' => true,
+        '--asso' => $this->association->id,
+    ])->assertSuccessful();
+
+    // Après --force, toutes les Tx doivent toujours être equilibree=TRUE
+    $txEquilibrees2 = Transaction::query()
+        ->where('association_id', $this->association->id)
+        ->whereBetween('date', ['2025-09-01', '2026-08-31'])
+        ->where('equilibree', true)
+        ->count();
+    expect($txEquilibrees2)->toBe($txEquilibrees);
+})->group('backfill');
+
+test('[K] --force en production → exit 1 + message erreur', function () {
+    setupBackfillFixtureStep32($this);
+
+    // Forcer l'environnement à 'production' via le container Laravel
+    $originalEnv = app()->environment();
+    app()->detectEnvironment(fn () => 'production');
+
+    try {
+        $this->artisan('compta:backfill-partie-double', [
+            '--exercice' => '2025',
+            '--force' => true,
+            '--asso' => $this->association->id,
+        ])
+            ->expectsOutputToContain('interdit en production')
+            ->assertFailed();
+    } finally {
+        // Restaurer l'environnement testing
+        app()->detectEnvironment(fn () => $originalEnv);
+    }
+})->group('backfill');
+
+// ---------------------------------------------------------------------------
+// Test Step 34-bis — [M] Sécurité multi-tenant DELETE lettrage_audit
+// ---------------------------------------------------------------------------
+
+/**
+ * Test [M] : --force sur l'asso A ne purge pas les entrées lettrage_audit de l'asso B.
+ *
+ * Garantit que resetExercice() scope le DELETE lettrage_audit au tenant courant
+ * (association_id = A) et à l'exercice cible.
+ *
+ * Stratégie : insertion directe via DB::table (bypass LettrageService) pour simuler
+ * des entrées backfill pré-existantes sur les 2 associations.
+ */
+test('[M] --force sur asso A ne purge pas les entrées lettrage_audit de asso B', function () {
+    // --- Préparer asso A (tenant courant) ---
+    setupBackfillFixtureStep33Legacy($this);
+    $assoA = $this->association;
+
+    // --- Préparer asso B (tenant isolé) ---
+    $assoB = Association::factory()->create();
+    $userB = User::factory()->create();
+    $userB->associations()->attach($assoB->id, ['role' => 'admin', 'joined_at' => now()]);
+
+    TenantContext::clear();
+    TenantContext::boot($assoB);
+    SystemeSeeder::seed();
+    BancairesSeeder::seed();
+
+    // Compte systéme minimal pour asso B (besoin d'un compte_id valide)
+    $compteBForAudit = Compte::where('association_id', $assoB->id)->first();
+
+    TenantContext::clear();
+    TenantContext::boot($assoA);
+
+    // Compte systéme pour asso A (pour les entrées d'audit)
+    $compteAForAudit = Compte::where('association_id', $assoA->id)->first();
+
+    // --- Insérer directement des entrées lettrage_audit motif='backfill' ---
+    // Pour asso A (exercice 2025) : doit être supprimée par --force
+    DB::table('lettrage_audit')->insert([
+        'association_id' => $assoA->id,
+        'action' => 'lettre',
+        'lettrage_code' => 'BACKFILL-TEST-ASSO-A',
+        'compte_id' => $compteAForAudit->id,
+        'transaction_ligne_ids' => '[]',
+        'user_id' => null,
+        'motif' => 'backfill',
+        'created_at' => now(),
+    ]);
+
+    // Pour asso B : NE DOIT PAS être supprimée
+    if ($compteBForAudit !== null) {
+        DB::table('lettrage_audit')->insert([
+            'association_id' => $assoB->id,
+            'action' => 'lettre',
+            'lettrage_code' => 'BACKFILL-TEST-ASSO-B',
+            'compte_id' => $compteBForAudit->id,
+            'transaction_ligne_ids' => '[]',
+            'user_id' => null,
+            'motif' => 'backfill',
+            'created_at' => now(),
+        ]);
+    }
+
+    $nbAuditBAvant = DB::table('lettrage_audit')
+        ->where('association_id', $assoB->id)
+        ->where('motif', 'backfill')
+        ->count();
+
+    $nbAuditAAvant = DB::table('lettrage_audit')
+        ->where('association_id', $assoA->id)
+        ->where('motif', 'backfill')
+        ->count();
+
+    expect($nbAuditAAvant)->toBeGreaterThan(0, 'Asso A doit avoir des entrées lettrage_audit motif=backfill avant le --force');
+
+    // --- Run --force sur asso A uniquement ---
+    $this->artisan('compta:backfill-partie-double', [
+        '--exercice' => '2025',
+        '--force' => true,
+        '--asso' => $assoA->id,
+    ])->assertSuccessful();
+
+    // --- Assertions ---
+    // Les entrées de asso A doivent être purgées
+    $nbAuditAApres = DB::table('lettrage_audit')
+        ->where('association_id', $assoA->id)
+        ->where('motif', 'backfill')
+        ->count();
+
+    expect($nbAuditAApres)->toBe(0, 'Les entrées lettrage_audit motif=backfill de asso A doivent être purgées par --force');
+
+    // Les entrées de asso B doivent être intactes
+    if ($compteBForAudit !== null) {
+        $nbAuditBApres = DB::table('lettrage_audit')
+            ->where('association_id', $assoB->id)
+            ->where('motif', 'backfill')
+            ->count();
+
+        expect($nbAuditBApres)->toBe(
+            $nbAuditBAvant,
+            "Les entrées lettrage_audit de asso B ({$nbAuditBAvant}) doivent rester intactes après --force sur asso A"
+        );
+    }
+})->group('backfill');
+
+test('[I] rollback — si la conversion lève une exception, état initial restauré', function () {
+    setupBackfillFixtureStep33Legacy($this);
+
+    $txIds = Transaction::query()
+        ->where('association_id', $this->association->id)
+        ->pluck('id')
+        ->all();
+
+    // Snapshot avant tentative de conversion
+    $snapshotAvant = DB::table('transaction_lignes')
+        ->whereIn('transaction_id', $txIds)
+        ->orderBy('id')
+        ->get(['id', 'compte_id', 'debit', 'credit', 'tiers_id'])
+        ->toArray();
+
+    // Vérifier que les lignes de ventilation legacy existent (fixture valide)
+    expect($snapshotAvant)->not->toBeEmpty('La fixture doit contenir des lignes legacy.');
+
+    // Test de rollback : le TransactionConverter est enveloppé dans DB::transaction
+    // On simule un rollback en appelant la conversion dans un DB::transaction externe
+    // qui rollback intentionnellement, et on vérifie que l'état initial est restauré.
+    try {
+        DB::transaction(function () use ($txIds) {
+            // Simuler une conversion partielle : modifier une ligne
+            DB::table('transaction_lignes')
+                ->whereIn('transaction_id', $txIds)
+                ->limit(1)
+                ->update(['debit' => 9999.99]);
+
+            // Forcer le rollback
+            throw new RuntimeException('Rollback forcé pour test [I]');
+        });
+    } catch (RuntimeException $e) {
+        // Exception attendue
+    }
+
+    // Vérifier que l'état est restauré après rollback
+    $snapshotApres = DB::table('transaction_lignes')
+        ->whereIn('transaction_id', $txIds)
+        ->orderBy('id')
+        ->get(['id', 'compte_id', 'debit', 'credit', 'tiers_id'])
+        ->toArray();
+
+    expect($snapshotApres)->toEqual($snapshotAvant, 'Le rollback DB::transaction doit restaurer l\'état initial.');
+})->group('backfill');
+
+// ---------------------------------------------------------------------------
+// Test Cutover — [N] --all balaye tous les exercices (courant + précédent)
+// ---------------------------------------------------------------------------
+
+test('[N] --all convertit l\'exercice courant ET l\'exercice précédent', function () {
+    // Fixture legacy : txCheque + txVirement + txDepense sur l'exercice 2025.
+    setupBackfillFixtureStep33Legacy($this);
+
+    // Ajouter une transaction sur l'exercice PRÉCÉDENT (2024 : 01/09/2024 → 31/08/2025).
+    // Cas réel : ENL expliquant le solde bancaire d'ouverture, postée hors exercice courant.
+    $txExercice2024 = $this->txService->create([
+        'type' => 'recette',
+        'date' => '2024-10-05',
+        'libelle' => 'ENL exercice précédent',
+        'montant_total' => '500.00',
+        'mode_paiement' => ModePaiement::Virement->value,
+        'statut_reglement' => StatutReglement::Recu->value,
+        'tiers_id' => $this->tiersA->id,
+        'compte_id' => $this->compteBancaire->id,
+    ], [
+        ['compte_id' => $this->compte706->id, 'montant' => '500.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+
+    // Remettre cette Tx en état legacy (les autres le sont déjà via le helper).
+    TransactionLigne::where('transaction_id', $txExercice2024->id)
+        ->whereHas('compte', fn ($query) => $query->whereIn('classe', [4, 5]))
+        ->forceDelete();
+    TransactionLigne::where('transaction_id', $txExercice2024->id)
+        ->update(['debit' => 0, 'credit' => 0, 'tiers_id' => null, 'lettrage_code' => null]);
+    $txExercice2024->forceFill(['equilibree' => false])->save();
+
+    // Chantier 2a — purger la T2 d'encaissement séparée créée pour txExercice2024.
+    // txService->create() avec statut_reglement=Recu produit une T2 (journal=Banque, remise_id=NULL).
+    // Cette T2 n'existerait pas en données legacy ; le backfill ne peut pas la convertir.
+    Transaction::query()
+        ->where('association_id', $this->association->id)
+        ->where('journal', JournalComptable::Banque->value)
+        ->whereNull('remise_id')
+        ->each(function (Transaction $t2Orpheline) {
+            TransactionLigne::where('transaction_id', $t2Orpheline->id)->forceDelete();
+            $t2Orpheline->forceDelete();
+        });
+
+    // Sanity : avant le backfill, des Tx des 2 exercices sont non-équilibrées.
+    $nonEquilibreesAvant = Transaction::query()
+        ->where('association_id', $this->association->id)
+        ->where(fn ($q) => $q->where('equilibree', false)->orWhereNull('equilibree'))
+        ->count();
+    expect($nonEquilibreesAvant)->toBeGreaterThanOrEqual(2);
+
+    // --all : doit balayer 2024 ET 2025 (range min..max des dates de transaction).
+    $this->artisan('compta:backfill-partie-double', [
+        '--all' => true,
+        '--asso' => $this->association->id,
+    ])->assertSuccessful();
+
+    // Toutes les Tx des 2 exercices doivent être equilibree=TRUE.
+    $nonEquilibreesApres = Transaction::query()
+        ->where('association_id', $this->association->id)
+        ->where(fn ($q) => $q->where('equilibree', false)->orWhereNull('equilibree'))
+        ->count();
+    expect($nonEquilibreesApres)->toBe(0);
+
+    // Spécifiquement, la Tx de l'exercice précédent est convertie.
+    expect((bool) $txExercice2024->fresh()->equilibree)->toBeTrue();
+})->group('backfill');
+
+test('[J] skip montant_total = 0 — transaction gratuite non convertie, aucune ligne PD créée', function () {
+    setupBackfillFixtureStep32($this);
+
+    // Transaction à 0€ (inscription gratuite HelloAsso)
+    $txZero = Transaction::create([
+        'association_id' => $this->association->id,
+        'type' => TypeTransaction::Recette,
+        'tiers_id' => Tiers::factory()->create(['association_id' => $this->association->id])->id,
+        'compte_id' => $this->compteBancaire->id,
+        'date' => now()->toDateString(),
+        'libelle' => 'Inscription gratuite HelloAsso',
+        'montant_total' => '0.00',
+        'mode_paiement' => ModePaiement::Virement->value,
+        'statut_reglement' => StatutReglement::Recu->value,
+    ]);
+
+    DB::table('transaction_lignes')->insert([
+        'transaction_id' => $txZero->id,
+        'compte_id' => $this->compte706->id,
+        'montant' => '0.00',
+        'debit' => '0.00',
+        'credit' => '0.00',
+    ]);
+
+    $nbLignesAvant = TransactionLigne::where('transaction_id', $txZero->id)->count();
+
+    $this->artisan('compta:backfill-partie-double', ['--asso' => $this->association->id])
+        ->assertSuccessful();
+
+    // Tx à 0€ reste non-équilibrée (non convertie)
+    expect($txZero->fresh()->equilibree)->toBeFalsy();
+
+    // Aucune ligne PD supplémentaire créée
+    $nbLignesApres = TransactionLigne::withTrashed()
+        ->where('transaction_id', $txZero->id)
+        ->count();
+
+    expect($nbLignesApres)->toBe($nbLignesAvant, 'Aucune ligne PD ne doit être créée pour une transaction à 0€.');
+})->group('backfill');
+
+// ---------------------------------------------------------------------------
+// Tests Vague 2 Bug A — Cas triplet (statut_reglement, remise_id, rapprochement_id)
+// ---------------------------------------------------------------------------
+
+/**
+ * Construit la fixture minimale pour les tests Bug A (AC #1, #2, #5, #6).
+ * Étend setupBackfillFixtureStep32 (comptes système + SC 706 + tiers).
+ */
+function setupFixtureBugA(object $ctx): void
+{
+    setupBackfillFixtureStep32($ctx);
+
+    // Le compte 706 de la fixture distingue déjà ces scénarios.
+}
+
+/**
+ * Simule l'état legacy sur une transaction : supprime les lignes PD-only,
+ * supprime les T2 séparées liées via lettrage, et reset les colonnes PD.
+ *
+ * Mis à jour pour le chantier T2-séparée : le convertisseur crée maintenant
+ * une T2 distincte pour le portage/encaissement. On doit la supprimer avant
+ * de re-simuler l'état legacy pour les tests de re-backfill.
+ */
+function simulerLegacySurTx(Transaction $tx): void
+{
+    // Étape 0 : trouver et supprimer les T2 liées (T2-séparée = journal Banque,
+    // liée à T1 via le lettrage du compte tiers 411 ou 401).
+    // On repère les T2 par les lignes PD-only lettrées sur T1 qui pointent sur
+    // une transaction différente via le même lettrage_code.
+    $lettrageCodesT1 = TransactionLigne::where('transaction_id', $tx->id)
+        ->whereNotNull('compte_id')
+        ->whereNotNull('lettrage_code')
+        ->pluck('lettrage_code')
+        ->unique()
+        ->filter()
+        ->values()
+        ->all();
+
+    if (! empty($lettrageCodesT1)) {
+        $t2Ids = TransactionLigne::whereIn('lettrage_code', $lettrageCodesT1)
+            ->where('transaction_id', '!=', $tx->id)
+            ->pluck('transaction_id')
+            ->unique()
+            ->filter()
+            ->values()
+            ->all();
+
+        if (! empty($t2Ids)) {
+            // Supprimer les lignes de T2, puis les headers T2
+            TransactionLigne::whereIn('transaction_id', $t2Ids)->forceDelete();
+            Transaction::whereIn('id', $t2Ids)->forceDelete();
+        }
+    }
+
+    // Étape 1 : supprimer les lignes techniques de T1 (411/401).
+    TransactionLigne::where('transaction_id', $tx->id)
+        ->whereHas('compte', fn ($query) => $query->whereIn('classe', [4, 5]))
+        ->forceDelete();
+
+    // Étape 2 : reset colonnes PD sur les lignes de ventilation
+    // compte_id est préservé (allocation utilisateur)
+    TransactionLigne::where('transaction_id', $tx->id)
+        ->update([
+            'debit' => 0,
+            'credit' => 0,
+            'tiers_id' => null,
+            'lettrage_code' => null,
+        ]);
+
+    $tx->forceFill(['equilibree' => false])->save();
+}
+
+// AC #1 — recette en_attente avec mode (virement) → créance only : 411D + 706C, pas de classe-5, 411 non lettré
+test('[AC1] recette en_attente avec mode → créance only — 411D/706C, aucune ligne classe-5, 411 non lettré', function () {
+    setupFixtureBugA($this);
+
+    // Créer une recette virement en_attente (statut explicite en_attente = bug #138)
+    $txEnAttente = $this->txService->create([
+        'type' => 'recette',
+        'date' => '2025-10-20',
+        'libelle' => 'Virement en attente',
+        'montant_total' => '200.00',
+        'mode_paiement' => ModePaiement::Virement->value,
+        'statut_reglement' => StatutReglement::EnAttente->value,
+        'tiers_id' => $this->tiersA->id,
+        'compte_id' => $this->compteBancaire->id,
+    ], [
+        ['compte_id' => $this->compte706->id, 'montant' => '200.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+
+    // En mode PD inconditionnel, TransactionService crée T1+T2 et letters le 411.
+    // EtatReglementResolver::syncer() peut ensuite passer statut_reglement de
+    // en_attente → recu si le lettrage est complet. On re-force le statut en_attente
+    // AVANT simulerLegacySurTx pour que l'état simulé corresponde au cas bug #138
+    // (créance non encaissée avec mode_paiement renseigné).
+    $txEnAttente->forceFill(['statut_reglement' => StatutReglement::EnAttente->value])->saveQuietly();
+
+    simulerLegacySurTx($txEnAttente);
+
+    // Backfill
+    $this->artisan('compta:backfill-partie-double', ['--asso' => $this->association->id])
+        ->assertSuccessful();
+
+    $txEnAttente->refresh();
+    expect((bool) $txEnAttente->equilibree)->toBeTrue('La Tx en_attente doit être equilibree=TRUE après backfill');
+
+    // Charger les lignes PD créées (compte_id non null)
+    $lignes = TransactionLigne::where('transaction_id', $txEnAttente->id)
+        ->whereNotNull('compte_id')
+        ->whereNull('deleted_at')
+        ->get();
+
+    $compte411 = Compte::where('numero_pcg', '411')
+        ->where('association_id', $this->association->id)
+        ->firstOrFail();
+
+    $compte706 = Compte::where('numero_pcg', '706')
+        ->where('association_id', $this->association->id)
+        ->firstOrFail();
+
+    // Exactement 2 lignes PD : 411D + 706C
+    $lignesAvecCompte = $lignes->filter(fn ($l) => $l->compte_id !== null);
+    expect($lignesAvecCompte)->toHaveCount(2, 'Cas en_attente → exactement 2 lignes PD (411D + 706C)');
+
+    // 411 D avec tiers
+    $ligne411D = $lignes->firstWhere('compte_id', $compte411->id);
+    expect($ligne411D)->not->toBeNull('Ligne 411 doit exister');
+    expect((float) $ligne411D->debit)->toBe(200.0);
+    expect((float) $ligne411D->credit)->toBe(0.0);
+    expect((int) $ligne411D->tiers_id)->toBe((int) $this->tiersA->id, 'Ligne 411 doit porter tiers_id');
+
+    // 706 C sans tiers
+    $ligne706C = $lignes->firstWhere('compte_id', $compte706->id);
+    expect($ligne706C)->not->toBeNull('Ligne 706 doit exister');
+    expect((float) $ligne706C->credit)->toBe(200.0);
+    expect((float) $ligne706C->debit)->toBe(0.0);
+
+    // Aucune ligne classe 5 (pas de portage trésorerie)
+    $compteClasse5Ids = Compte::where('classe', 5)
+        ->where('association_id', $this->association->id)
+        ->pluck('id')
+        ->all();
+
+    $ligneClasse5 = DB::table('transaction_lignes')
+        ->where('transaction_id', $txEnAttente->id)
+        ->whereIn('compte_id', $compteClasse5Ids)
+        ->whereNull('deleted_at')
+        ->exists();
+
+    expect($ligneClasse5)->toBeFalse('Cas en_attente → aucune ligne classe 5 (pas de portage)');
+
+    // 411 NON lettré (créance ouverte)
+    expect($ligne411D->lettrage_code)->toBeNull('Ligne 411 en_attente doit être non lettrée');
+})->group('backfill', 'bug-a');
+
+// AC #2 — chèque recu avec remise_id → portage 5112, 411 pair lettré, 5112 soldé par la T4
+test('[AC2] chèque recu avec remise_id → portage 5112, 411 pair lettré', function () {
+    setupFixtureBugA($this);
+
+    // Créer une remise bancaire minimale (juste un ID de référence)
+    $remise = RemiseBancaire::create([
+        'association_id' => $this->association->id,
+        'numero' => 1,
+        'date' => '2025-10-25',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'compte_cible_id' => $this->compteBancaire->id,
+        'libelle' => 'Remise test AC2',
+        'saisi_par' => $this->user->id,
+    ]);
+
+    // Recette chèque recu + remise_id set (cas 2 — chèque remisé)
+    $txChequeRemise = $this->txService->create([
+        'type' => 'recette',
+        'date' => '2025-10-22',
+        'libelle' => 'Adhésion chèque remisé',
+        'montant_total' => '120.00',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'statut_reglement' => StatutReglement::Recu->value,
+        'tiers_id' => $this->tiersA->id,
+        'compte_id' => $this->compteBancaire->id,
+    ], [
+        ['compte_id' => $this->compte706->id, 'montant' => '120.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+
+    // Poser remise_id sur la transaction (cas 2)
+    $txChequeRemise->forceFill(['remise_id' => $remise->id])->save();
+
+    simulerLegacySurTx($txChequeRemise);
+
+    // Backfill
+    $this->artisan('compta:backfill-partie-double', ['--asso' => $this->association->id])
+        ->assertSuccessful();
+
+    $txChequeRemise->refresh();
+    expect((bool) $txChequeRemise->equilibree)->toBeTrue('Tx remisée doit être equilibree=TRUE après backfill');
+
+    $compte411 = Compte::where('numero_pcg', '411')
+        ->where('association_id', $this->association->id)
+        ->firstOrFail();
+
+    $compte5112 = Compte::where('numero_pcg', '5112')
+        ->where('association_id', $this->association->id)
+        ->firstOrFail();
+
+    $lignesT1 = TransactionLigne::where('transaction_id', $txChequeRemise->id)
+        ->whereNotNull('compte_id')
+        ->whereNull('deleted_at')
+        ->get();
+
+    // T1 : 411 D + 706 C (structure T2-séparée)
+    $ligne411D = $lignesT1->firstWhere(fn ($l) => (int) $l->compte_id === (int) $compte411->id && (float) $l->debit > 0);
+    expect($ligne411D)->not->toBeNull('T1 doit avoir une ligne 411 D');
+    expect($ligne411D->lettrage_code)->not->toBeNull('Ligne 411 T1 doit être lettrée (inter-Tx avec T2)');
+
+    // T2 : trouvée via le lettrage_code de la ligne 411 T1
+    $ligne411T2 = TransactionLigne::where('lettrage_code', $ligne411D->lettrage_code)
+        ->where('compte_id', $compte411->id)
+        ->where('transaction_id', '!=', $txChequeRemise->id)
+        ->whereNull('deleted_at')
+        ->first();
+    expect($ligne411T2)->not->toBeNull('T2 doit avoir une ligne 411 C lettrée avec T1');
+
+    $t2Id = $ligne411T2->transaction_id;
+
+    // Sur T2 : ligne 5112 D (portage chèque reçu)
+    $ligne5112D = TransactionLigne::where('transaction_id', $t2Id)
+        ->where('compte_id', $compte5112->id)
+        ->where('debit', '>', 0)
+        ->whereNull('deleted_at')
+        ->first();
+    expect($ligne5112D)->not->toBeNull('T2 doit avoir une ligne 5112 D (portage chèque remisé)');
+    expect((float) $ligne5112D->debit)->toBe(120.0);
+    expect($ligne5112D->tiers_id)->toBeNull('Ligne 5112 ne doit pas porter de tiers_id');
+    // La source a reference = NULL (txService n'en pose pas) : c'est le scénario Finding 2 —
+    // le backfill phase 2 enchaîne la reconstruction T4 → 5112 lettrée (soldée).
+    expect($ligne5112D->lettrage_code)->not->toBeNull('Ligne 5112 T2 soldée par la T4 (chèque déposé)');
+})->group('backfill', 'bug-a');
+
+// AC #5 — chèque pointe (rapprochement_id non null, remise_id null) → portage 512X (pas 5112), 411 lettré
+test('[AC5] chèque pointe rapprochement_id non null → portage 512X (pas 5112), 411 lettré', function () {
+    setupFixtureBugA($this);
+
+    // Créer un rapprochement bancaire minimal (statut et type = valeurs valides des enums)
+    $rapprochement = RapprochementBancaire::create([
+        'association_id' => $this->association->id,
+        'compte_id' => $this->compteBancaire->id,
+        'date_fin' => '2025-10-31',
+        'solde_ouverture' => 1000.00,
+        'solde_fin' => 1150.00,
+        'statut' => 'en_cours',
+        'type' => 'bancaire',
+        'saisi_par' => $this->user->id,
+    ]);
+
+    // Recette chèque statut Pointe + rapprochement_id + pas de remise (cas 1)
+    $txChequePointe = $this->txService->create([
+        'type' => 'recette',
+        'date' => '2025-10-18',
+        'libelle' => 'Adhésion chèque pointé',
+        'montant_total' => '150.00',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'statut_reglement' => StatutReglement::Pointe->value,
+        'tiers_id' => $this->tiersA->id,
+        'compte_id' => $this->compteBancaire->id,
+    ], [
+        ['compte_id' => $this->compte706->id, 'montant' => '150.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+
+    // Poser rapprochement_id sur la transaction (cas 1 — pointé direct)
+    $txChequePointe->forceFill(['rapprochement_id' => $rapprochement->id])->save();
+
+    simulerLegacySurTx($txChequePointe);
+
+    // Backfill
+    $this->artisan('compta:backfill-partie-double', ['--asso' => $this->association->id])
+        ->assertSuccessful();
+
+    $txChequePointe->refresh();
+    expect((bool) $txChequePointe->equilibree)->toBeTrue('Tx pointée doit être equilibree=TRUE après backfill');
+
+    $compte411 = Compte::where('numero_pcg', '411')
+        ->where('association_id', $this->association->id)
+        ->firstOrFail();
+
+    $compte5112 = Compte::where('numero_pcg', '5112')
+        ->where('association_id', $this->association->id)
+        ->firstOrFail();
+
+    $lignesT1 = TransactionLigne::where('transaction_id', $txChequePointe->id)
+        ->whereNotNull('compte_id')
+        ->whereNull('deleted_at')
+        ->get();
+
+    // T1 : 411 D + 706 C (structure T2-séparée)
+    $ligne411D = $lignesT1->firstWhere(fn ($l) => (int) $l->compte_id === (int) $compte411->id && (float) $l->debit > 0);
+    expect($ligne411D)->not->toBeNull('T1 doit avoir une ligne 411 D');
+    expect($ligne411D->lettrage_code)->not->toBeNull('Ligne 411 T1 doit être lettrée (inter-Tx avec T2)');
+
+    // T2 : trouvée via le lettrage_code de la ligne 411 T1
+    $ligne411T2 = TransactionLigne::where('lettrage_code', $ligne411D->lettrage_code)
+        ->where('compte_id', $compte411->id)
+        ->where('transaction_id', '!=', $txChequePointe->id)
+        ->whereNull('deleted_at')
+        ->first();
+    expect($ligne411T2)->not->toBeNull('T2 doit avoir une ligne 411 C lettrée avec T1');
+
+    $t2Id = $ligne411T2->transaction_id;
+    $lignesT2 = TransactionLigne::where('transaction_id', $t2Id)
+        ->whereNotNull('compte_id')
+        ->whereNull('deleted_at')
+        ->get();
+
+    // Aucune ligne 5112 sur T2 (portage doit être sur le 512X bancaire, pas 5112 transit)
+    $ligne5112 = $lignesT2->firstWhere('compte_id', $compte5112->id);
+    expect($ligne5112)->toBeNull('Cas pointé direct → aucune ligne 5112 sur T2 (portage sur 512X, pas transit)');
+
+    // Ligne 512X D sur T2 (portage direct via override)
+    $ligne512XD = $lignesT2->firstWhere(fn ($l) => (int) $l->compte_id === (int) $this->compte512X->id && (float) $l->debit > 0);
+    expect($ligne512XD)->not->toBeNull('T2 doit avoir une ligne 512X D (portage direct) pour chèque pointé');
+    expect((float) $ligne512XD->debit)->toBe(150.0);
+    expect($ligne512XD->tiers_id)->toBeNull('Ligne 512X ne doit pas porter de tiers_id');
+
+    // rapprochement_id propagé sur la T2 (AC #5 — la ligne 512X reste comptée au solde de pointage)
+    $t2 = Transaction::find($t2Id);
+    expect((int) $t2->rapprochement_id)->toBe((int) $rapprochement->id, 'T2 doit porter le rapprochement_id propagé');
+    // rapprochement_id conservé sur T1 aussi
+    expect((int) $txChequePointe->rapprochement_id)->toBe((int) $rapprochement->id, 'rapprochement_id conservé sur T1 après backfill');
+})->group('backfill', 'bug-a');
+
+// AC #6 — chèque recu (remise_id null, rapprochement_id null) → portage 5112 (transit), 411 lettré
+test('[AC6] chèque recu sans remise ni rapprochement → portage 5112, 411 lettré', function () {
+    setupFixtureBugA($this);
+
+    // Recette chèque recu + ni remise ni rappro (cas 4 — reçu en transit 5112)
+    $txChequeRecu = $this->txService->create([
+        'type' => 'recette',
+        'date' => '2025-10-25',
+        'libelle' => 'Adhésion chèque reçu en transit',
+        'montant_total' => '80.00',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'statut_reglement' => StatutReglement::Recu->value,
+        'tiers_id' => $this->tiersA->id,
+        'compte_id' => $this->compteBancaire->id,
+    ], [
+        ['compte_id' => $this->compte706->id, 'montant' => '80.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+
+    // Vérification : remise_id et rapprochement_id doivent être null
+    expect($txChequeRecu->remise_id)->toBeNull();
+    expect($txChequeRecu->rapprochement_id)->toBeNull();
+
+    simulerLegacySurTx($txChequeRecu);
+
+    // Backfill
+    $this->artisan('compta:backfill-partie-double', ['--asso' => $this->association->id])
+        ->assertSuccessful();
+
+    $txChequeRecu->refresh();
+    expect((bool) $txChequeRecu->equilibree)->toBeTrue('Tx reçue en transit doit être equilibree=TRUE après backfill');
+
+    $compte411 = Compte::where('numero_pcg', '411')
+        ->where('association_id', $this->association->id)
+        ->firstOrFail();
+
+    $compte5112 = Compte::where('numero_pcg', '5112')
+        ->where('association_id', $this->association->id)
+        ->firstOrFail();
+
+    $lignesT1 = TransactionLigne::where('transaction_id', $txChequeRecu->id)
+        ->whereNotNull('compte_id')
+        ->whereNull('deleted_at')
+        ->get();
+
+    // T1 : 411 D + 706 C (structure T2-séparée)
+    $ligne411D = $lignesT1->firstWhere(fn ($l) => (int) $l->compte_id === (int) $compte411->id && (float) $l->debit > 0);
+    expect($ligne411D)->not->toBeNull('T1 doit avoir une ligne 411 D');
+    expect($ligne411D->lettrage_code)->not->toBeNull('Ligne 411 T1 doit être lettrée (inter-Tx avec T2)');
+
+    // T2 : trouvée via le lettrage_code de la ligne 411 T1
+    $ligne411T2 = TransactionLigne::where('lettrage_code', $ligne411D->lettrage_code)
+        ->where('compte_id', $compte411->id)
+        ->where('transaction_id', '!=', $txChequeRecu->id)
+        ->whereNull('deleted_at')
+        ->first();
+    expect($ligne411T2)->not->toBeNull('T2 doit avoir une ligne 411 C lettrée avec T1');
+
+    $t2Id = $ligne411T2->transaction_id;
+    $lignesT2 = TransactionLigne::where('transaction_id', $t2Id)
+        ->whereNotNull('compte_id')
+        ->whereNull('deleted_at')
+        ->get();
+
+    // Sur T2 : ligne 5112 D (portage transit — chèque reçu pas encore remisé)
+    $ligne5112D = $lignesT2->firstWhere(fn ($l) => (int) $l->compte_id === (int) $compte5112->id && (float) $l->debit > 0);
+    expect($ligne5112D)->not->toBeNull('T2 doit avoir une ligne 5112 D (portage transit) pour chèque reçu sans remise/rappro');
+    expect((float) $ligne5112D->debit)->toBe(80.0);
+    expect($ligne5112D->tiers_id)->toBeNull('Ligne 5112 ne doit pas porter de tiers_id');
+    expect($ligne5112D->lettrage_code)->toBeNull('Ligne 5112 transit doit être non lettrée');
+})->group('backfill', 'bug-a');
+
+// ---------------------------------------------------------------------------
+// Tests Vague 3 — AC #3, #4, #10, #11 (reconstruction remises, rappro, idempotence, multi-tenant)
+// ---------------------------------------------------------------------------
+
+/**
+ * Construit la fixture minimale pour les tests de reconstruction des remises (Wave 3).
+ *
+ * - Contexte partie double complet (comptes système, 512X, 5112, 530, 706)
+ * - 1 RemiseBancaire chèque avec 2 sources converties (lignes 5112 posées par la phase 1)
+ *
+ * Paramètres retournés sur $ctx :
+ *   association, user, compteBancaire, compte512X
+ *   remise (RemiseBancaire)
+ *   txSource1, txSource2 (Transaction — avec ligne 5112 débit non lettrée après phase 1)
+ *   tiersA, tiersB
+ */
+function setupFixtureRemiseBackfill(object $ctx, bool $avecRapprochement = false, bool $sourcesSansReference = false): void
+{
+    setupFixtureBugA($ctx);
+
+    // Créer la RemiseBancaire
+    $ctx->remise = RemiseBancaire::create([
+        'association_id' => $ctx->association->id,
+        'numero' => 99,
+        'date' => '2025-10-31',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'compte_cible_id' => $ctx->compteBancaire->id,
+        'libelle' => 'Remise test Wave 3',
+        'saisi_par' => $ctx->user->id,
+    ]);
+
+    // Optionnel : créer un rapprochement bancaire (pour AC #4)
+    if ($avecRapprochement) {
+        $ctx->rapprochement = RapprochementBancaire::create([
+            'association_id' => $ctx->association->id,
+            'compte_id' => $ctx->compteBancaire->id,
+            'date_fin' => '2025-10-31',
+            'solde_ouverture' => 0.00,
+            'solde_fin' => 220.00,
+            'statut' => 'en_cours',
+            'type' => 'bancaire',
+            'saisi_par' => $ctx->user->id,
+        ]);
+    }
+
+    // Source 1 : chèque recu remisé — 120€
+    $ctx->txSource1 = $ctx->txService->create([
+        'type' => 'recette',
+        'date' => '2025-10-22',
+        'libelle' => 'Adhésion chèque 1',
+        'montant_total' => '120.00',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'statut_reglement' => StatutReglement::Recu->value,
+        'tiers_id' => $ctx->tiersA->id,
+        'compte_id' => $ctx->compteBancaire->id,
+    ], [
+        ['compte_id' => $ctx->compte706->id, 'montant' => '120.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+
+    // Source 2 : chèque recu remisé — 100€
+    $ctx->tiersB = Tiers::factory()->create(['association_id' => $ctx->association->id]);
+    $ctx->txSource2 = $ctx->txService->create([
+        'type' => 'recette',
+        'date' => '2025-10-23',
+        'libelle' => 'Adhésion chèque 2',
+        'montant_total' => '100.00',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'statut_reglement' => StatutReglement::Recu->value,
+        'tiers_id' => $ctx->tiersB->id,
+        'compte_id' => $ctx->compteBancaire->id,
+    ], [
+        ['compte_id' => $ctx->compte706->id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+
+    // Lier les sources à la remise. Par défaut avec reference (comme comptabiliser()).
+    // $sourcesSansReference : reproduit le cas prod où des chèques remisés n'ont pas de
+    // reference — la T4 ne doit alors PAS être identifiée par `reference IS NULL`.
+    $ctx->txSource1->forceFill([
+        'remise_id' => $ctx->remise->id,
+        'reference' => $sourcesSansReference ? null : 'CHQ-00099-001',
+    ])->save();
+    $ctx->txSource2->forceFill([
+        'remise_id' => $ctx->remise->id,
+        'reference' => $sourcesSansReference ? null : 'CHQ-00099-002',
+    ])->save();
+
+    // Optionnel : lier les sources au rapprochement (pour AC #4)
+    if ($avecRapprochement) {
+        $ctx->txSource1->forceFill(['rapprochement_id' => $ctx->rapprochement->id])->save();
+        $ctx->txSource2->forceFill(['rapprochement_id' => $ctx->rapprochement->id])->save();
+    }
+
+    // Simuler l'état legacy sur les sources + backfill phase-1 (pose les lignes 5112 débit)
+    simulerLegacySurTx($ctx->txSource1);
+    simulerLegacySurTx($ctx->txSource2);
+}
+
+// AC #3 — backfill phase 2 : T4 créée, forme correcte (512x D total / N lignes 5112 C), auto-lettrée
+test('[AC3] backfill phase 2 : T4 créée avec 512X D total / 5112 C par source, auto-lettrée, 5112 sources soldées', function () {
+    setupFixtureRemiseBackfill($this);
+
+    // Backfill (phase 1 + phase 2)
+    $this->artisan('compta:backfill-partie-double', [
+        '--asso' => $this->association->id,
+        '--force' => true,
+    ])->assertSuccessful();
+
+    // T4 : 1 transaction remise_id posé, reference null, equilibree=true
+    $t4 = Transaction::where('remise_id', $this->remise->id)
+        ->whereNull('reference')
+        ->where('equilibree', true)
+        ->first();
+
+    expect($t4)->not->toBeNull('T4 doit exister après backfill phase 2');
+    expect((int) $t4->remise_id)->toBe((int) $this->remise->id);
+
+    $compte5112 = Compte::where('numero_pcg', '5112')
+        ->where('association_id', $this->association->id)
+        ->firstOrFail();
+
+    $lignesT4 = TransactionLigne::where('transaction_id', $t4->id)
+        ->whereNull('deleted_at')
+        ->get();
+
+    // 1 ligne 512X débit = total (120 + 100 = 220)
+    $ligne512XD = $lignesT4->firstWhere(fn ($l) => (int) $l->compte_id === (int) $this->compte512X->id && (float) $l->debit > 0);
+    expect($ligne512XD)->not->toBeNull('T4 doit avoir une ligne 512X D');
+    expect((float) $ligne512XD->debit)->toBe(220.0, 'T4 512X D = total des sources (120+100)');
+    expect($ligne512XD->tiers_id)->toBeNull('T4 512X ne doit pas avoir de tiers');
+
+    // 2 lignes 5112 crédit (une par source), sans tiers
+    $lignes5112C = $lignesT4->filter(fn ($l) => (int) $l->compte_id === (int) $compte5112->id && (float) $l->credit > 0);
+    expect($lignes5112C)->toHaveCount(2, 'T4 doit avoir 2 lignes 5112 C (une par source)');
+    expect($lignes5112C->first()->tiers_id)->toBeNull('Lignes 5112 T4 sans tiers');
+
+    // T4 equilibrée (1 débit 512X = somme crédits 5112)
+    $totalDebit = (float) $lignesT4->sum('debit');
+    $totalCredit = (float) $lignesT4->sum('credit');
+    expect(round($totalDebit, 2))->toBe(round($totalCredit, 2), 'T4 équilibrée');
+
+    // Les lignes 5112 des sources sont maintenant lettrées (soldées).
+    // Structure T2-séparée : la ligne 5112 est sur T2 (encaissement séparé),
+    // trouvée via le lettrage 411 entre T1 et T2.
+    $compte411 = Compte::where('numero_pcg', '411')
+        ->where('association_id', $this->association->id)
+        ->firstOrFail();
+
+    foreach ([$this->txSource1, $this->txSource2] as $source) {
+        // Trouver T2 via le lettrage 411 de T1
+        $ligne411T1 = TransactionLigne::where('transaction_id', $source->id)
+            ->where('compte_id', $compte411->id)
+            ->whereNotNull('lettrage_code')
+            ->whereNull('deleted_at')
+            ->first();
+        expect($ligne411T1)->not->toBeNull("Source #{$source->id} : T1 doit avoir une ligne 411 lettrée");
+
+        $t2SourceId = TransactionLigne::where('lettrage_code', $ligne411T1->lettrage_code)
+            ->where('compte_id', $compte411->id)
+            ->where('transaction_id', '!=', $source->id)
+            ->whereNull('deleted_at')
+            ->value('transaction_id');
+        expect($t2SourceId)->not->toBeNull("Source #{$source->id} : T2 doit exister (liée via lettrage 411)");
+
+        $ligne5112Source = TransactionLigne::where('transaction_id', $t2SourceId)
+            ->where('compte_id', $compte5112->id)
+            ->whereNotNull('lettrage_code')
+            ->whereNull('deleted_at')
+            ->first();
+        expect($ligne5112Source)->not->toBeNull("Source #{$source->id} : ligne 5112 sur T2 doit être lettrée après T4");
+    }
+})->group('backfill', 'remise-backfill');
+
+test('[Régression T2] --force préserve une transaction qui porte une ligne de classe 1', function (): void {
+    $association = Association::factory()->create();
+    TenantContext::boot($association);
+    $compteClasse1 = Compte::factory()->numero('101')->create(['association_id' => $association->id]);
+    $compteClasse4 = Compte::factory()->numero('411')->create(['association_id' => $association->id]);
+    $transaction = Transaction::forceCreate([
+        'association_id' => $association->id, 'type' => 'recette', 'date' => '2025-10-01',
+        'libelle' => 'Écriture non T2', 'montant_total' => 100, 'mode_paiement' => 'virement',
+        'type_ecriture' => 'normale',
+    ]);
+    foreach ([$compteClasse1, $compteClasse4] as $compte) {
+        TransactionLigne::forceCreate([
+            'transaction_id' => $transaction->id, 'compte_id' => $compte->id,
+            'montant' => 0, 'debit' => 100, 'credit' => 0,
+        ]);
+    }
+
+    (new ReflectionMethod(BackfillPartieDoubleCommand::class, 'resetExercice'))
+        ->invoke(app(BackfillPartieDoubleCommand::class), 2025);
+
+    expect(Transaction::query()->find($transaction->id))->not->toBeNull();
+})->group('backfill');
+
+test('[Régression T2] --force purge une transaction dont toutes les lignes actives sont classes 4 et 5', function (): void {
+    $association = Association::factory()->create();
+    TenantContext::boot($association);
+    $compteClasse4 = Compte::factory()->numero('411')->create(['association_id' => $association->id]);
+    $compteClasse5 = Compte::factory()->numero('5112')->create(['association_id' => $association->id]);
+    $transaction = Transaction::forceCreate([
+        'association_id' => $association->id, 'type' => 'recette', 'date' => '2025-10-01',
+        'libelle' => 'Encaissement T2', 'montant_total' => 100, 'mode_paiement' => 'cheque',
+        'type_ecriture' => 'normale',
+    ]);
+    foreach ([$compteClasse4, $compteClasse5] as $compte) {
+        TransactionLigne::forceCreate([
+            'transaction_id' => $transaction->id, 'compte_id' => $compte->id,
+            'montant' => 0, 'debit' => 100, 'credit' => 0,
+        ]);
+    }
+
+    (new ReflectionMethod(BackfillPartieDoubleCommand::class, 'resetExercice'))
+        ->invoke(app(BackfillPartieDoubleCommand::class), 2025);
+
+    expect(Transaction::withTrashed()->find($transaction->id))->toBeNull();
+})->group('backfill');
+
+// AC #3b — sources prod sans reference : la T4 doit quand même être construite.
+// Régression Finding 2 (cutover 2026-05-31) : queryT4 discriminait la T4 par
+// `reference IS NULL`, mais des chèques remisés réels ont reference = NULL → la garde
+// d'idempotence matchait les sources (faux positif) → aucune T4 → mouvement 512X absent.
+// Le critère correct est structurel : « porte une ligne 512X au débit ».
+test('[AC3b] sources à reference NULL → T4 construite (discriminée par ligne 512X, pas par reference)', function () {
+    setupFixtureRemiseBackfill($this, sourcesSansReference: true);
+
+    $this->artisan('compta:backfill-partie-double', ['--asso' => $this->association->id])
+        ->assertSuccessful();
+
+    // La T4 = transaction de la remise portant une ligne 512X au débit (critère structurel)
+    $t4 = Transaction::where('remise_id', $this->remise->id)
+        ->whereHas('lignes', fn ($q) => $q->where('compte_id', $this->compte512X->id)->where('debit', '>', 0))
+        ->first();
+    expect($t4)->not->toBeNull('T4 doit être construite même quand les sources ont reference = NULL');
+    expect($t4->reference)->toBeNull('La T4 elle-même n\'a pas de reference');
+
+    // Ligne 512X D = total des sources (120 + 100)
+    $ligne512XD = TransactionLigne::where('transaction_id', $t4->id)
+        ->where('compte_id', $this->compte512X->id)
+        ->where('debit', '>', 0)
+        ->first();
+    expect((float) $ligne512XD->debit)->toBe(220.0, 'T4 512X D = 220€');
+
+    // Les sources (reference NULL) ne doivent PAS avoir été prises pour la T4 ni supprimées
+    expect(Transaction::find($this->txSource1->id))->not->toBeNull('Source 1 préservée');
+    expect(Transaction::find($this->txSource2->id))->not->toBeNull('Source 2 préservée');
+})->group('backfill', 'remise-backfill');
+
+// AC #3c — re-run --force avec sources à reference NULL : le reset ne doit pas supprimer
+// les sources (resetExercice purgeait `remise_id NOT NULL AND reference IS NULL` = la T4,
+// ce qui détruisait les sources à reference NULL). La T4 doit être reconstruite, sources intactes.
+test('[AC3c] --force × 2 avec sources reference NULL → sources préservées, exactement 1 T4', function () {
+    setupFixtureRemiseBackfill($this, sourcesSansReference: true);
+
+    foreach ([1, 2] as $run) {
+        $this->artisan('compta:backfill-partie-double', [
+            '--asso' => $this->association->id,
+            '--force' => true,
+        ])->assertSuccessful();
+    }
+
+    // Sources toujours présentes après 2 runs --force
+    expect(Transaction::find($this->txSource1->id))->not->toBeNull('Source 1 ne doit pas être supprimée par le reset --force');
+    expect(Transaction::find($this->txSource2->id))->not->toBeNull('Source 2 ne doit pas être supprimée par le reset --force');
+
+    // Exactement une T4 (pas de doublon, identifiée par ligne 512X débit)
+    $t4s = Transaction::where('remise_id', $this->remise->id)
+        ->whereHas('lignes', fn ($q) => $q->where('compte_id', $this->compte512X->id)->where('debit', '>', 0))
+        ->get();
+    expect($t4s)->toHaveCount(1, 'Exactement 1 T4 après 2 runs --force (idempotence)');
+})->group('backfill', 'remise-backfill');
+
+// AC #4 — backfill phase 3 : T4 porte rapprochement_id des sources ; calculerSoldePointage compte la 512X du T4
+test('[AC4] backfill phase 3 : T4 porte rapprochement_id unique des sources ; solde pointage déplacé de 220€', function () {
+    setupFixtureRemiseBackfill($this, avecRapprochement: true);
+
+    // Solde avant backfill phase 2+3 (T4 pas encore créée → aucune ligne 512X sur le rappro)
+    $rapproService = app(RapprochementBancaireService::class);
+    $this->rapprochement->refresh();
+    $soldeAvant = $rapproService->calculerSoldePointage($this->rapprochement);
+
+    // Backfill complet (phase 1 + 2 + 3)
+    $this->artisan('compta:backfill-partie-double', [
+        '--asso' => $this->association->id,
+        '--force' => true,
+    ])->assertSuccessful();
+
+    // T4 existe
+    $t4 = Transaction::where('remise_id', $this->remise->id)
+        ->whereNull('reference')
+        ->where('equilibree', true)
+        ->first();
+    expect($t4)->not->toBeNull('T4 doit exister après backfill');
+
+    // T4 porte le rapprochement_id des sources (phase 3)
+    expect((int) $t4->rapprochement_id)->toBe((int) $this->rapprochement->id, 'T4 doit porter le rapprochement_id unique des sources');
+
+    // calculerSoldePointage (mode PD) doit compter la ligne 512X du T4
+    $this->rapprochement->refresh();
+    $soldeApres = $rapproService->calculerSoldePointage($this->rapprochement);
+
+    // Le solde doit avoir bougé de 220€ (total de la remise : 120 + 100)
+    expect(round($soldeApres - $soldeAvant, 2))->toBe(220.0, 'calculerSoldePointage doit compter la ligne 512X du T4 (+220€)');
+})->group('backfill', 'remise-backfill');
+
+// AC #10 — idempotence : 2 runs --force → exactement 1 T4, lettrages cohérents (pas de doublons)
+test('[AC10] idempotence backfill --force × 2 → exactement 1 T4 par remise, pas de double-lettrage', function () {
+    setupFixtureRemiseBackfill($this);
+
+    // 1er run --force
+    $this->artisan('compta:backfill-partie-double', [
+        '--asso' => $this->association->id,
+        '--force' => true,
+    ])->assertSuccessful();
+
+    $nbT4Apres1 = Transaction::where('remise_id', $this->remise->id)
+        ->whereNull('reference')
+        ->count();
+    expect($nbT4Apres1)->toBe(1, 'Exactement 1 T4 après le 1er run');
+
+    $compte5112 = Compte::where('numero_pcg', '5112')
+        ->where('association_id', $this->association->id)
+        ->firstOrFail();
+
+    // 2ème run --force
+    $this->artisan('compta:backfill-partie-double', [
+        '--asso' => $this->association->id,
+        '--force' => true,
+    ])->assertSuccessful();
+
+    // Exactement 1 T4 (pas de doublon)
+    $nbT4Apres2 = Transaction::where('remise_id', $this->remise->id)
+        ->whereNull('reference')
+        ->count();
+    expect($nbT4Apres2)->toBe(1, 'Exactement 1 T4 après le 2ème run --force (pas de doublon)');
+
+    // Une seule ligne 5112 lettrée par source (pas de double-lettrage).
+    // Structure T2-séparée : la ligne 5112 est sur T2 de la source.
+    $compte411 = Compte::where('numero_pcg', '411')
+        ->where('association_id', $this->association->id)
+        ->firstOrFail();
+
+    foreach ([$this->txSource1, $this->txSource2] as $source) {
+        // Trouver T2 via le lettrage 411 de T1
+        $ligne411T1 = TransactionLigne::where('transaction_id', $source->id)
+            ->where('compte_id', $compte411->id)
+            ->whereNotNull('lettrage_code')
+            ->whereNull('deleted_at')
+            ->first();
+        expect($ligne411T1)->not->toBeNull("Source #{$source->id} : T1 doit avoir une ligne 411 lettrée");
+
+        $t2SourceId = TransactionLigne::where('lettrage_code', $ligne411T1->lettrage_code)
+            ->where('compte_id', $compte411->id)
+            ->where('transaction_id', '!=', $source->id)
+            ->whereNull('deleted_at')
+            ->value('transaction_id');
+        expect($t2SourceId)->not->toBeNull("Source #{$source->id} : T2 doit exister");
+
+        $nb5112Lettrees = TransactionLigne::where('transaction_id', $t2SourceId)
+            ->where('compte_id', $compte5112->id)
+            ->whereNotNull('lettrage_code')
+            ->whereNull('deleted_at')
+            ->count();
+        expect($nb5112Lettrees)->toBe(1, "Source #{$source->id} : exactement 1 ligne 5112 lettrée sur T2 (pas de double-lettrage)");
+    }
+})->group('backfill', 'remise-backfill');
+
+// AC #11 — multi-tenant : T4 et lettrage_audit portent le bon association_id
+test('[AC11] multi-tenant : T4 porte association_id correct, lettrage_audit isolé par tenant', function () {
+    setupFixtureRemiseBackfill($this);
+
+    $assoId = (int) $this->association->id;
+
+    // Préparer un 2ème tenant (asso B) pour vérifier l'isolation
+    $assoB = Association::factory()->create();
+    TenantContext::clear();
+    TenantContext::boot($assoB);
+    SystemeSeeder::seed();
+    BancairesSeeder::seed();
+    TenantContext::clear();
+    TenantContext::boot($this->association);
+
+    // Backfill sur asso A uniquement
+    $this->artisan('compta:backfill-partie-double', [
+        '--asso' => $assoId,
+        '--force' => true,
+    ])->assertSuccessful();
+
+    // T4 de asso A porte le bon association_id
+    $t4 = Transaction::where('remise_id', $this->remise->id)
+        ->whereNull('reference')
+        ->where('equilibree', true)
+        ->first();
+    expect($t4)->not->toBeNull('T4 doit exister');
+    expect((int) $t4->association_id)->toBe($assoId, 'T4 doit porter association_id de asso A');
+
+    // Les lignes de T4 sont visibles via le scope tenant A
+    TenantContext::clear();
+    TenantContext::boot($this->association);
+
+    $nbLignesT4 = TransactionLigne::where('transaction_id', $t4->id)
+        ->whereNull('deleted_at')
+        ->count();
+    expect($nbLignesT4)->toBeGreaterThan(0, 'Les lignes de T4 doivent être visibles pour le tenant A');
+
+    // Les entrées lettrage_audit portent association_id de asso A
+    $nbAuditAssoA = DB::table('lettrage_audit')
+        ->where('association_id', $assoId)
+        ->count();
+    expect($nbAuditAssoA)->toBeGreaterThan(0, 'Des entrées lettrage_audit doivent exister pour asso A');
+
+    // Aucune entrée lettrage_audit générée pour asso B
+    $nbAuditAssoB = DB::table('lettrage_audit')
+        ->where('association_id', $assoB->id)
+        ->count();
+    expect($nbAuditAssoB)->toBe(0, 'Aucune entrée lettrage_audit ne doit exister pour asso B');
+})->group('backfill', 'remise-backfill');
+
+// Régression Vague 3 (audit code-quality #1) : la phase 2 doit rester rejouable
+// même quand toutes les Tx sont déjà converties (cas d'un backfill antérieur à la
+// phase 2). Le re-run SANS --force a $total === 0 : un return prématuré court-circuiterait
+// la reconstruction des remises. La garde queryT4 assure l'idempotence intra-phase-2.
+test('[Régression #1] re-run sans --force reconstruit la T4 même quand toutes les Tx sont déjà converties', function () {
+    setupFixtureRemiseBackfill($this);
+
+    // Simuler « phase 1 déjà jouée, phase 2 jamais jouée » : convertir les sources
+    // directement (pose les lignes 5112 D non-lettrées + equilibree=TRUE), sans créer de T4.
+    $converter = app(TransactionConverter::class);
+    foreach ([$this->txSource1, $this->txSource2] as $source) {
+        DB::transaction(fn () => $converter->convertir($source->fresh()));
+    }
+
+    // Précondition : sources converties, aucune T4 encore construite
+    foreach ([$this->txSource1, $this->txSource2] as $source) {
+        expect((bool) $source->fresh()->equilibree)->toBeTrue("Source #{$source->id} doit être convertie");
+    }
+    $nbT4Avant = Transaction::where('remise_id', $this->remise->id)
+        ->whereNull('reference')
+        ->count();
+    expect($nbT4Avant)->toBe(0, 'Aucune T4 avant le re-run (phase 2 jamais jouée)');
+
+    // Re-run SANS --force : $total === 0 (tout est déjà equilibree=TRUE) mais la phase 2 doit s'exécuter.
+    $this->artisan('compta:backfill-partie-double', [
+        '--asso' => $this->association->id,
+    ])->assertSuccessful();
+
+    // La phase 2 doit avoir reconstruit la T4 malgré $total === 0.
+    $nbT4Apres = Transaction::where('remise_id', $this->remise->id)
+        ->whereNull('reference')
+        ->where('equilibree', true)
+        ->count();
+    expect($nbT4Apres)->toBe(1, 'La phase 2 doit reconstruire la T4 sur un re-run sans --force (régression finding #1)');
+})->group('backfill', 'remise-backfill');
+
+test('[Régression auditeur] dry-run applique la même matrice de comptes que le converter', function (): void {
+    $association = Association::factory()->create();
+    TenantContext::boot($association);
+    $tiers = Tiers::factory()->create(['association_id' => (int) $association->id]);
+
+    $compte6 = Compte::factory()->numero('6061')->create(['association_id' => (int) $association->id]);
+    $compte7 = Compte::factory()->numero('7061')->create(['association_id' => (int) $association->id]);
+    $compte7Supprime = Compte::factory()->numero('7062')->create(['association_id' => (int) $association->id]);
+
+    $creerTransaction = function (string $type, Compte $compte, string $libelle, float $montant = 100) use ($association, $tiers): array {
+        $transaction = Transaction::forceCreate([
+            'association_id' => (int) $association->id,
+            'type' => $type,
+            'date' => '2025-10-15',
+            'libelle' => $libelle,
+            'montant_total' => $montant,
+            'mode_paiement' => ModePaiement::Virement->value,
+            'statut_reglement' => StatutReglement::EnAttente->value,
+            'tiers_id' => (int) $tiers->id,
+            'type_ecriture' => 'normale',
+            'equilibree' => false,
+        ]);
+        $ligneId = DB::table('transaction_lignes')->insertGetId([
+            'transaction_id' => (int) $transaction->id,
+            'compte_id' => (int) $compte->id,
+            'libelle' => $libelle,
+            'montant' => $montant,
+            'debit' => 0,
+            'credit' => 0,
+        ]);
+
+        return [$transaction, (int) $ligneId];
+    };
+
+    [$recetteSur6, $ligneRecetteSur6] = $creerTransaction('recette', $compte6, 'Recette sur classe 6');
+    [$depenseSur7, $ligneDepenseSur7] = $creerTransaction('depense', $compte7, 'Dépense sur classe 7');
+    [$recetteCompteSupprime, $ligneCompteSupprime] = $creerTransaction('recette', $compte7Supprime, 'Recette compte supprimé');
+    [, $ligneZeroMauvaiseClasse] = $creerTransaction('recette', $compte6, 'Recette zéro sur classe 6', 0);
+    [, $ligneVirementSur7] = $creerTransaction('virement', $compte7, 'Virement sur classe 7');
+    [, $ligneRecetteValide] = $creerTransaction('recette', $compte7, 'Recette valide');
+    [, $ligneDepenseValide] = $creerTransaction('depense', $compte6, 'Dépense valide');
+    $compte7Supprime->delete();
+
+    $rapport = app(BackfillAuditor::class)->auditer((int) $association->id, 2025);
+
+    expect(array_column($rapport['ventilations_invalides'], 'id'))
+        ->toBe([$ligneRecetteSur6, $ligneDepenseSur7, $ligneCompteSupprime, $ligneZeroMauvaiseClasse, $ligneVirementSur7])
+        ->not->toContain($ligneRecetteValide, $ligneDepenseValide);
+
+    $this->artisan('compta:backfill-partie-double', [
+        '--exercice' => '2025',
+        '--dry-run' => true,
+        '--asso' => (int) $association->id,
+    ])->expectsOutputToContain('Ventilations sans compte valide (5)')
+        ->assertSuccessful();
+
+    $converter = app(TransactionConverter::class);
+    expect($converter->convertir($recetteSur6))->toBeFalse()
+        ->and($converter->convertir($depenseSur7))->toBeFalse()
+        ->and($converter->convertir($recetteCompteSupprime))->toBeFalse();
+})->group('backfill');

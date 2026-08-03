@@ -9,8 +9,8 @@ use App\Enums\ModePaiement;
 final readonly class ValidationData
 {
     public function __construct(
-        public int $compte_id,
-        public ModePaiement $mode_paiement,
+        public ?int $compte_id,
+        public ?ModePaiement $mode_paiement,
         public string $date,
     ) {}
 }

@@ -8,22 +8,27 @@ use App\DTOs\InvoiceOcrResult;
 use App\Enums\Espace;
 use App\Enums\ModePaiement;
 use App\Enums\RoleAssociation;
+use App\Enums\Sens;
 use App\Enums\StatutFactureDeposee;
 use App\Enums\StatutOperation;
+use App\Enums\StatutReglement;
 use App\Enums\UsageComptable;
 use App\Exceptions\OcrAnalysisException;
 use App\Exceptions\OcrNotConfiguredException;
 use App\Livewire\Concerns\MontantValidation;
 use App\Livewire\Concerns\RespectsExerciceCloture;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\FacturePartenaireDeposee;
 use App\Models\IncomingDocument;
 use App\Models\NoteDeFrais;
 use App\Models\Operation;
-use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\TransactionLigneAffectation;
+use App\Services\Compta\PlanComptableSelecteur;
+use App\Services\Compta\PostesTiersOuvertsService;
+use App\Services\Compta\TransactionAvecReglementService;
 use App\Services\ExerciceService;
 use App\Services\InvoiceOcrService;
 use App\Services\Portail\FacturePartenaireService;
@@ -35,6 +40,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -55,6 +61,38 @@ final class TransactionForm extends Component
 
     public string $mode_paiement = '';
 
+    public string $dateReglement = '';
+
+    public string $etatPaiement = 'ouvert';
+
+    public int $soldeRestantCentimes = 0;
+
+    public bool $isLockedByReglement = false;
+
+    /** @var array<int, array{transactionId:int,date:string,montant:string,mode:string,annulable:bool}> */
+    public array $reglementsEnregistres = [];
+
+    public ?int $posteTiersLigneId = null;
+
+    /**
+     * Pour les recettes : true = paiement déjà reçu (comptant), false = recette attendue (créance).
+     * Pour les dépenses : true = paiement déjà effectué (comptant), false = dette ouverte.
+     */
+    public bool $paiementRecu = true;
+
+    /**
+     * Le bascule « Paiement effectué ? » peut-il encore agir ?
+     *
+     * `save()` n'écrit `statut_reglement` qu'à la création, et ne crée un
+     * règlement que si la transaction n'a pas déjà son mode de paiement. Sur
+     * tout le reste, basculer l'option ne produit rien : l'offrir quand même
+     * fait croire à un échec de l'application. Constaté le 2026-08-03, où
+     * l'utilisateur a conclu qu'une annulation de règlement pourtant réussie
+     * n'avait pas fonctionné. Le retrait d'un règlement passe par la modale
+     * « Annuler le règlement », qui demande confirmation.
+     */
+    public bool $paiementModifiable = true;
+
     public ?int $tiers_id = null;
 
     public ?string $reference = null;
@@ -63,7 +101,13 @@ final class TransactionForm extends Component
 
     public ?string $notes = null;
 
-    /** @var array<int, array{sous_categorie_id: string, operation_id: string, seance: string, montant: string, notes: string}> */
+    /**
+     * DC-10a : la clé `compte_id` porte l'id `comptes.id` sélectionné par le
+     * composant d'autocomplete de ventilation (classe 6/7) et est transmise
+     * telle quelle à `TransactionService` (contrat lignes compte-first).
+     *
+     * @var array<int, array{compte_id: string, operation_id: string, seance: string, montant: string, notes: string}>
+     */
     public array $lignes = [];
 
     public bool $showForm = false;
@@ -74,7 +118,17 @@ final class TransactionForm extends Component
 
     public bool $isLockedByHelloAsso = false;
 
-    public ?string $sousCategorieFilter = null;
+    /** Transaction miroir d'extourne — verrouille les champs comptables. */
+    public bool $isExtourneMiroir = false;
+
+    /**
+     * Sens de trésorerie pour l'affichage IHM (« depense » ou « recette »).
+     * Différent de $type pour les miroirs d'extourne (recette → depense et vice-versa).
+     * La logique comptable (filtre comptes, save, validation) reste sur $type.
+     */
+    public string $sensTresorerie = '';
+
+    public ?string $usageFilter = null;
 
     /** @var TemporaryUploadedFile|null */
     public $pieceJointe = null;
@@ -107,7 +161,7 @@ final class TransactionForm extends Component
     // État du panneau de ventilation
     public ?int $ventilationLigneId = null;
 
-    public string $ventilationLigneSousCategorie = '';
+    public string $ventilationLigneCompteLabel = '';
 
     public string $ventilationLigneMontant = '';
 
@@ -126,21 +180,30 @@ final class TransactionForm extends Component
         return round(collect($this->lignes)->sum(fn ($l) => (float) ($l['montant'] ?? 0)), 2);
     }
 
+    public function mount(): void
+    {
+        $this->dateReglement = app(ExerciceService::class)->defaultDate();
+    }
+
     public function showNewForm(string $type): void
     {
-        $this->reset(['transactionId', 'type', 'date', 'libelle', 'mode_paiement',
+        $this->reset(['transactionId', 'type', 'date', 'libelle', 'mode_paiement', 'dateReglement', 'paiementRecu', 'paiementModifiable',
             'tiers_id', 'reference', 'compte_id', 'notes', 'lignes',
-            'ventilationLigneId', 'ventilationLigneSousCategorie', 'ventilationLigneMontant', 'affectations',
+            'etatPaiement', 'soldeRestantCentimes', 'isLockedByReglement', 'reglementsEnregistres', 'posteTiersLigneId',
+            'ventilationLigneId', 'ventilationLigneCompteLabel', 'ventilationLigneMontant', 'affectations',
             'ventilationHasAffectations',
             'pieceJointe', 'existingPieceJointeNom', 'existingPieceJointeUrl',
             'ocrMode', 'ocrWaitingForFile', 'ocrAnalyzing', 'ocrError', 'ocrWarnings', 'ocrTiersNom',
             'incomingDocumentId', 'factureDeposeeId', 'incomingDocumentPreviewUrl', 'linkedNdf']);
         $this->type = $type;
+        $this->sensTresorerie = $type;
+        $this->isExtourneMiroir = false;
         $this->isLocked = false;
         $this->isLockedByHelloAsso = false;
         $this->resetValidation();
         $this->showForm = true;
         $this->date = app(ExerciceService::class)->defaultDate();
+        $this->dateReglement = $this->date;
         $this->compte_id = Transaction::where('saisi_par', auth()->id())
             ->whereNotNull('compte_id')
             ->latest()
@@ -149,9 +212,9 @@ final class TransactionForm extends Component
     }
 
     #[On('open-transaction-form')]
-    public function openForm(string $type, ?int $id = null, ?string $sousCategorieFilter = null): void
+    public function openForm(string $type, ?int $id = null, ?string $usageFilter = null): void
     {
-        $this->sousCategorieFilter = $sousCategorieFilter;
+        $this->usageFilter = $usageFilter;
         if ($id !== null) {
             $this->edit($id);
         } else {
@@ -262,7 +325,7 @@ final class TransactionForm extends Component
     {
         $this->lignes[] = [
             'id' => null,
-            'sous_categorie_id' => '',
+            'compte_id' => '',
             'operation_id' => '',
             'seance' => '',
             'montant' => '',
@@ -288,9 +351,11 @@ final class TransactionForm extends Component
             abort(403);
         }
 
-        $ligne = TransactionLigne::with('affectations', 'sousCategorie')->findOrFail($ligneId);
+        $ligne = TransactionLigne::with('affectations', 'compte')->findOrFail($ligneId);
+        $this->assertVentilationModifiable($ligne);
         $this->ventilationLigneId = $ligneId;
-        $this->ventilationLigneSousCategorie = $ligne->sousCategorie->nom ?? '';
+        // DC-10a : libellé lu depuis le compte (source unique de la ventilation).
+        $this->ventilationLigneCompteLabel = $ligne->compte?->intitule ?? '';
         $this->ventilationLigneMontant = (string) $ligne->montant;
         $this->ventilationHasAffectations = $ligne->affectations->isNotEmpty();
 
@@ -314,7 +379,7 @@ final class TransactionForm extends Component
     public function fermerVentilation(): void
     {
         $this->ventilationLigneId = null;
-        $this->ventilationLigneSousCategorie = '';
+        $this->ventilationLigneCompteLabel = '';
         $this->ventilationLigneMontant = '';
         $this->affectations = [];
         $this->ventilationHasAffectations = false;
@@ -359,6 +424,7 @@ final class TransactionForm extends Component
         );
 
         $ligne = TransactionLigne::findOrFail($this->ventilationLigneId);
+        $this->assertVentilationModifiable($ligne);
         $ligneMontantCents = (int) round((float) $ligne->montant * 100);
         $affectationCents = (int) round(collect($this->affectations)->sum(fn ($a) => (float) ($a['montant'] ?? 0)) * 100);
         if ($ligneMontantCents !== $affectationCents) {
@@ -393,6 +459,7 @@ final class TransactionForm extends Component
         }
 
         $ligne = TransactionLigne::findOrFail($this->ventilationLigneId);
+        $this->assertVentilationModifiable($ligne);
         app(TransactionService::class)->supprimerAffectations($ligne);
         $this->fermerVentilation();
         $this->dispatch('transaction-saved');
@@ -402,18 +469,25 @@ final class TransactionForm extends Component
     public function edit(int $id): void
     {
         $this->ventilationLigneId = null;
-        $this->ventilationLigneSousCategorie = '';
+        $this->ventilationLigneCompteLabel = '';
         $this->ventilationLigneMontant = '';
         $this->affectations = [];
         $this->ventilationHasAffectations = false;
 
-        $transaction = Transaction::with(['lignes', 'noteDeFrais'])->findOrFail($id);
+        // Filtre `ventilation()` — exclut les lignes PD-only (411/5121/411)
+        // générées par EcritureGenerator. L'utilisateur ne saisit/n'édite que
+        // les lignes de ventilation métier (classe 6/7).
+        $transaction = Transaction::with([
+            'lignes' => fn ($q) => $q->ventilation(),
+            'noteDeFrais',
+        ])->findOrFail($id);
 
         $this->transactionId = $transaction->id;
         $this->type = $transaction->type->value;
         $this->date = $transaction->date->format('Y-m-d');
         $this->libelle = $transaction->libelle;
         $this->mode_paiement = $transaction->mode_paiement?->value ?? '';
+        $this->dateReglement = app(ExerciceService::class)->defaultDate();
         $this->tiers_id = $transaction->tiers_id;
         $this->reference = $transaction->reference;
         $this->compte_id = $transaction->compte_id;
@@ -421,7 +495,8 @@ final class TransactionForm extends Component
 
         $this->lignes = $transaction->lignes->map(fn ($ligne) => [
             'id' => $ligne->id,
-            'sous_categorie_id' => (string) $ligne->sous_categorie_id,
+            // DC-10a : le sélecteur de ventilation lit compte_id directement (source unique).
+            'compte_id' => (string) ($ligne->compte_id ?? ''),
             'operation_id' => (string) ($ligne->operation_id ?? ''),
             'seance' => (string) ($ligne->seance ?? ''),
             'montant' => (string) $ligne->montant,
@@ -445,15 +520,26 @@ final class TransactionForm extends Component
         $this->isLocked = $transaction->isLockedByRapprochement() || $transaction->isLockedByRemise();
         $this->isLockedByFacture = $transaction->isLockedByFacture();
         $this->isLockedByHelloAsso = $transaction->helloasso_order_id !== null;
+        $this->chargerEtatReglement($transaction);
+
+        // Miroir d'extourne : le sens de trésorerie est inversé par rapport au type comptable.
+        // $type reste le type réel (recette/depense) pour le filtrage comptes 6xx/7xx.
+        // $sensTresorerie reflète le sens du flux d'argent pour l'IHM.
+        $this->isExtourneMiroir = $transaction->type_ecriture === 'extourne';
+        $this->sensTresorerie = $this->isExtourneMiroir
+            ? ($transaction->sensTresorerie() === Sens::Depense ? 'depense' : 'recette')
+            : $this->type;
+
         $this->showForm = true;
     }
 
     public function resetForm(): void
     {
         $this->reset([
-            'transactionId', 'type', 'date', 'libelle', 'mode_paiement',
-            'tiers_id', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked', 'isLockedByFacture', 'isLockedByHelloAsso',
-            'ventilationLigneId', 'ventilationLigneSousCategorie', 'ventilationLigneMontant', 'affectations',
+            'transactionId', 'type', 'date', 'libelle', 'mode_paiement', 'dateReglement', 'paiementRecu', 'paiementModifiable',
+            'tiers_id', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked', 'isLockedByFacture', 'isLockedByHelloAsso', 'isLockedByReglement', 'isExtourneMiroir', 'sensTresorerie',
+            'etatPaiement', 'soldeRestantCentimes', 'reglementsEnregistres', 'posteTiersLigneId',
+            'ventilationLigneId', 'ventilationLigneCompteLabel', 'ventilationLigneMontant', 'affectations',
             'ventilationHasAffectations',
             'pieceJointe', 'existingPieceJointeNom', 'existingPieceJointeUrl',
             'ocrMode', 'ocrWaitingForFile', 'ocrAnalyzing', 'ocrError', 'ocrWarnings', 'ocrTiersNom',
@@ -486,8 +572,8 @@ final class TransactionForm extends Component
                 }
             }
 
-            // Montant total via somme des lignes
-            $sourceTotal = round((float) $source->lignes()->sum('montant'), 2);
+            // Montant total via somme des lignes de ventilation (exclut lignes PD-only).
+            $sourceTotal = round((float) $source->lignes()->ventilation()->sum('montant'), 2);
             $currentTotal = round(collect($this->lignes)->sum(fn ($l) => (float) ($l['montant'] ?? 0)), 2);
             if (abs($sourceTotal - $currentTotal) > 0.001) {
                 $this->addError('lignes', 'Montant verrouillé pour les transactions HelloAsso.');
@@ -497,6 +583,13 @@ final class TransactionForm extends Component
             if ($hasDrift) {
                 return;
             }
+        }
+
+        // --- Chemin dédié miroir extourne : seuls les champs bancaires/opérationnels ---
+        if ($this->isExtourneMiroir && $this->transactionId !== null) {
+            $this->saveExtourneMiroir();
+
+            return;
         }
 
         $exerciceService = app(ExerciceService::class);
@@ -515,11 +608,34 @@ final class TransactionForm extends Component
                     : ['required', 'date', 'after_or_equal:'.$dateDebut, 'before_or_equal:'.$dateFin],
                 'libelle' => ['nullable', 'string', 'max:255'],
                 'reference' => ['nullable', 'string', 'max:100'],
-                'mode_paiement' => ['required', 'in:virement,cheque,especes,cb,prelevement'],
-                'tiers_id' => ['nullable', 'exists:tiers,id'],
+                'mode_paiement' => [
+                    // Requis sauf : recette non reçue, ou dépense non payée
+                    Rule::requiredIf(fn () => match ($this->type) {
+                        'recette' => $this->paiementRecu && ! $this->isLockedByReglement,
+                        'depense' => $this->paiementRecu && ! $this->isLockedByReglement,
+                        default => true,
+                    }),
+                    'nullable',
+                    'in:virement,cheque,especes,cb,prelevement',
+                ],
+                'dateReglement' => [
+                    Rule::requiredIf(fn (): bool => in_array($this->type, ['recette', 'depense'], true)
+                        && $this->paiementRecu
+                        && ! $this->isLockedByReglement),
+                    'nullable',
+                    'date_format:Y-m-d',
+                    'after_or_equal:'.$dateDebut,
+                    'before_or_equal:'.$dateFin,
+                ],
+                // Tiers obligatoire : toute recette/dépense génère sa contrepartie
+                // via le compte de tiers (411 client / 401 fournisseur), qui porte
+                // le tiers. Sans tiers, EcritureGenerator ne peut pas équilibrer
+                // l'écriture — la transaction resterait déséquilibrée (equilibree=false).
+                'tiers_id' => ['required', 'exists:tiers,id'],
                 'compte_id' => ['nullable', 'exists:comptes_bancaires,id'],
                 'lignes' => ['required', 'array', 'min:1'],
-                'lignes.*.sous_categorie_id' => ['required', 'exists:sous_categories,id'],
+                // DC-10a : ventilation compte-first (classe 6/7 via le sélecteur).
+                'lignes.*.compte_id' => ['required', 'exists:comptes,id'],
                 'lignes.*.montant' => ['required', 'numeric', MontantValidation::RULE],
                 'lignes.*.operation_id' => ['nullable'],
                 'lignes.*.seance' => ['nullable', 'integer', 'min:1'],
@@ -529,12 +645,15 @@ final class TransactionForm extends Component
                 [
                     'date.after_or_equal' => 'La date doit être dans l\'exercice en cours (à partir du '.$range['start']->format('d/m/Y').').',
                     'date.before_or_equal' => 'La date doit être dans l\'exercice en cours (jusqu\'au '.$range['end']->format('d/m/Y').').',
+                    'dateReglement.after_or_equal' => 'La date de règlement doit être dans l\'exercice en cours (à partir du '.$range['start']->format('d/m/Y').').',
+                    'dateReglement.before_or_equal' => 'La date de règlement doit être dans l\'exercice en cours (jusqu\'au '.$range['end']->format('d/m/Y').').',
+                    'tiers_id.required' => 'Un tiers est obligatoire : il porte la contrepartie comptable de l\'écriture.',
                 ],
                 MontantValidation::messages(['lignes.*.montant'])
             )
         );
 
-        if ($this->pieceJointe !== null && $this->type === 'depense') {
+        if ($this->pieceJointe !== null) {
             $this->validate([
                 'pieceJointe' => ['file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
             ], [
@@ -557,30 +676,67 @@ final class TransactionForm extends Component
             $this->validate($lignesPjRules, $lignesPjMessages);
         }
 
+        $transactionExistante = $this->transactionId === null
+            ? null
+            : Transaction::findOrFail($this->transactionId);
+
+        $doitRegler = ($this->type === 'recette' || $this->type === 'depense')
+            && $this->paiementRecu
+            && ! $this->isLockedByReglement
+            && $transactionExistante?->mode_paiement === null;
+        $modeReglement = $this->mode_paiement;
+        $compteReglementId = $this->compte_id;
+
         $data = [
             'type' => $this->type,
             'date' => $this->date,
             'libelle' => $this->libelle,
             'montant_total' => $this->montantTotal,
-            'mode_paiement' => $this->mode_paiement,
+            // Les nouvelles T1 et les créances/dettes modernes (mode nul) restent
+            // ouvertes : leur règlement est porté par une T2 distincte. Les flux
+            // historiques gardent en revanche leur mode sur la transaction source.
+            //
+            // « Non » le retire : sans cela une dette portant un mode résiduel se
+            // déclarait payée à la première mise à jour — enrichirPartieDouble()
+            // déduit « comptant » de ce seul champ. Une facture non payée sortait
+            // ainsi son montant du solde bancaire sur un simple enregistrement.
+            // « Non » ne retire ce mode que là où le bascule est réellement en
+            // jeu. Sur une transaction déjà réglée, TransactionService refuse le
+            // changement — et le formulaire n'a pas à lui soumettre ce qu'il sait
+            // refusé : le retrait y passe par « Annuler le règlement ».
+            'mode_paiement' => ($this->paiementModifiable && ! $this->paiementRecu)
+                ? null
+                : $transactionExistante?->mode_paiement?->value,
             'tiers_id' => $this->tiers_id,
             'reference' => $this->reference,
             'compte_id' => $this->compte_id,
             'notes' => $this->notes ?: null,
         ];
 
-        $lignes = collect($this->lignes)->map(fn ($l) => [
-            'id' => isset($l['id']) ? (int) $l['id'] : null,
-            'sous_categorie_id' => (int) $l['sous_categorie_id'],
-            'operation_id' => $l['operation_id'] !== '' ? (int) $l['operation_id'] : null,
-            'seance' => $l['seance'] !== '' ? (int) $l['seance'] : null,
-            'montant' => $l['montant'],
-            'notes' => $l['notes'] ?: null,
-        ])->toArray();
+        if ($this->transactionId === null && in_array($this->type, ['recette', 'depense'], true)) {
+            $data['statut_reglement'] = StatutReglement::EnAttente->value;
+        }
 
-        $inscriptionIds = SousCategorie::forUsage(UsageComptable::Inscription)->pluck('id')->toArray();
+        // DC-10a : le wire property `compte_id` porte l'id de compte sélectionné,
+        // transmis tel quel au contrat `$lignes[]` de TransactionService.
+        $lignes = [];
+        foreach ($this->lignes as $index => $l) {
+            $lignes[] = [
+                'id' => isset($l['id']) ? (int) $l['id'] : null,
+                'compte_id' => (int) $l['compte_id'],
+                'operation_id' => $l['operation_id'] !== '' ? (int) $l['operation_id'] : null,
+                'seance' => $l['seance'] !== '' ? (int) $l['seance'] : null,
+                'montant' => $l['montant'],
+                'notes' => $l['notes'] ?: null,
+            ];
+        }
+
+        $inscriptionCompteIds = Compte::forUsage(UsageComptable::Inscription)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->toArray();
         foreach ($this->lignes as $index => $ligne) {
-            if (in_array((int) ($ligne['sous_categorie_id'] ?? 0), $inscriptionIds, true)
+            if (in_array((int) ($ligne['compte_id'] ?? 0), $inscriptionCompteIds, true)
                 && empty($ligne['operation_id'])) {
                 $this->addError("lignes.{$index}.operation_id", "L'opération est obligatoire pour une inscription.");
 
@@ -590,10 +746,11 @@ final class TransactionForm extends Component
 
         $service = app(TransactionService::class);
 
-        // Capturer les anciens paths PJ par index AVANT l'update (le service forceDelete les lignes)
+        // Capturer les anciens paths PJ par index AVANT l'update (le service forceDelete les lignes).
+        // Filtre ventilation() : aligne les indices avec $this->lignes (qui n'a que les ventilations).
         $anciensPieceJointePaths = [];
         if ($this->transactionId) {
-            $existingLignes = Transaction::findOrFail($this->transactionId)->lignes()->get()->values();
+            $existingLignes = Transaction::findOrFail($this->transactionId)->lignes()->ventilation()->get()->values();
             foreach ($this->lignes as $index => $ligneData) {
                 $existingLigne = $existingLignes->get($index);
                 if ($existingLigne !== null) {
@@ -605,10 +762,25 @@ final class TransactionForm extends Component
         $createdTransaction = null;
         try {
             if ($this->transactionId) {
-                $transaction = Transaction::findOrFail($this->transactionId);
-                $service->update($transaction, $data, $lignes);
+                $createdTransaction = app(TransactionAvecReglementService::class)->enregistrer(
+                    transaction: Transaction::findOrFail($this->transactionId),
+                    data: $data,
+                    lignes: $lignes,
+                    dateReglement: $doitRegler ? CarbonImmutable::parse($this->dateReglement) : null,
+                    mode: $doitRegler ? ModePaiement::from($modeReglement) : null,
+                    compteBancaireId: $doitRegler ? $compteReglementId : null,
+                    exercice: $exerciceService->current(),
+                );
             } else {
-                $createdTransaction = $service->create($data, $lignes);
+                $createdTransaction = app(TransactionAvecReglementService::class)->enregistrer(
+                    transaction: null,
+                    data: $data,
+                    lignes: $lignes,
+                    dateReglement: $doitRegler ? CarbonImmutable::parse($this->dateReglement) : null,
+                    mode: $doitRegler ? ModePaiement::from($modeReglement) : null,
+                    compteBancaireId: $doitRegler ? $compteReglementId : null,
+                    exercice: $exerciceService->current(),
+                );
             }
         } catch (\RuntimeException $e) {
             $this->addError('lignes', $e->getMessage());
@@ -617,7 +789,7 @@ final class TransactionForm extends Component
         }
 
         // Sauvegarder la pièce jointe si uploadée
-        if ($this->pieceJointe !== null && $this->type === 'depense') {
+        if ($this->pieceJointe !== null) {
             $tx = $createdTransaction ?? Transaction::find($this->transactionId);
             if ($tx) {
                 $service->storePieceJointe($tx, $this->pieceJointe);
@@ -625,7 +797,7 @@ final class TransactionForm extends Component
         }
 
         // Sauvegarder depuis un IncomingDocument (flux inbox)
-        if ($this->incomingDocumentId !== null && $this->type === 'depense') {
+        if ($this->incomingDocumentId !== null) {
             $tx = $createdTransaction ?? Transaction::find($this->transactionId);
             if ($tx !== null) {
                 $this->finalizeIncomingDocumentCleanup($tx, $service);
@@ -633,7 +805,7 @@ final class TransactionForm extends Component
         }
 
         // Sauvegarder depuis un FacturePartenaireDeposee (flux portail back-office)
-        if ($this->factureDeposeeId !== null && $this->type === 'depense') {
+        if ($this->factureDeposeeId !== null) {
             $tx = $createdTransaction ?? Transaction::find($this->transactionId);
             if ($tx !== null) {
                 try {
@@ -660,10 +832,11 @@ final class TransactionForm extends Component
             }
         }
 
-        // Sauvegarder les PJ de lignes
-        $tx = $createdTransaction ?? Transaction::with('lignes')->find($this->transactionId);
+        // Sauvegarder les PJ de lignes.
+        // Filtre ventilation() : aligne les indices avec $this->lignes (qui n'a que les ventilations).
+        $tx = $createdTransaction ?? Transaction::with(['lignes' => fn ($q) => $q->ventilation()])->find($this->transactionId);
         if ($tx !== null) {
-            $tx->load('lignes');
+            $tx->load(['lignes' => fn ($q) => $q->ventilation()]);
             $lignesModels = $tx->lignes->values();
             foreach ($this->lignes as $index => $ligneData) {
                 $ligneModel = $lignesModels->get($index);
@@ -704,6 +877,38 @@ final class TransactionForm extends Component
                     $ligneModel->update(['piece_jointe_path' => $ancienPath]);
                 }
             }
+        }
+
+        $this->dispatch('transaction-saved');
+        $this->resetForm();
+    }
+
+    private function saveExtourneMiroir(): void
+    {
+        $this->validate([
+            'mode_paiement' => ['nullable', 'in:virement,cheque,especes,cb,prelevement'],
+            'compte_id' => ['nullable', 'exists:comptes_bancaires,id'],
+        ]);
+
+        $modeEffectif = $this->mode_paiement !== '' ? $this->mode_paiement : null;
+
+        $transaction = Transaction::findOrFail($this->transactionId);
+
+        $data = [
+            'date' => $transaction->date->toDateString(),
+            'libelle' => $transaction->libelle,
+            'mode_paiement' => $modeEffectif,
+            'compte_id' => $this->compte_id ?: null,
+            'notes' => $this->notes ?: null,
+            'reference' => $this->reference,
+        ];
+
+        try {
+            app(TransactionService::class)->updateExtourneMiroir($transaction, $data);
+        } catch (\RuntimeException $e) {
+            $this->addError('lignes', $e->getMessage());
+
+            return;
         }
 
         $this->dispatch('transaction-saved');
@@ -893,7 +1098,13 @@ final class TransactionForm extends Component
 
     private function applyOcrResult(InvoiceOcrResult $result): void
     {
-        $validScIds = SousCategorie::whereHas('categorie', fn ($q) => $q->where('type', 'depense'))->pluck('id')->toArray();
+        // DC-10a : InvoiceOcrService renvoie directement des ids comptes.id (classe 6).
+        // On valide l'id contre les comptes de charge actifs avant de le poser.
+        $validCompteIds = Compte::where('classe', 6)
+            ->where('actif', true)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->toArray();
         $validOpIds = Operation::pluck('id')->toArray();
 
         if ($result->date !== null) {
@@ -924,9 +1135,13 @@ final class TransactionForm extends Component
         if (! empty($result->lignes)) {
             $this->lignes = [];
             foreach ($result->lignes as $ligne) {
+                $compteId = ($ligne->compte_id !== null && in_array($ligne->compte_id, $validCompteIds, true))
+                    ? (string) $ligne->compte_id
+                    : '';
+
                 $this->lignes[] = [
                     'id' => null,
-                    'sous_categorie_id' => $ligne->sous_categorie_id !== null && in_array($ligne->sous_categorie_id, $validScIds, true) ? (string) $ligne->sous_categorie_id : '',
+                    'compte_id' => $compteId,
                     'operation_id' => $ligne->operation_id !== null && in_array($ligne->operation_id, $validOpIds, true) ? (string) $ligne->operation_id : '',
                     'seance' => $ligne->seance !== null ? (string) $ligne->seance : '',
                     'montant' => (string) $ligne->montant,
@@ -971,24 +1186,94 @@ final class TransactionForm extends Component
         return $date;
     }
 
+    #[On('poste-tiers-reglement:enregistre')]
+    #[On('poste-tiers-reglement:annule')]
+    public function rafraichirEtatReglement(): void
+    {
+        if ($this->transactionId === null) {
+            return;
+        }
+
+        $this->chargerEtatReglement(Transaction::findOrFail($this->transactionId));
+    }
+
+    public function reglerReliquat(): void
+    {
+        if ($this->posteTiersLigneId === null) {
+            return;
+        }
+
+        $this->dispatch(
+            'poste-tiers-reglement:ouvrir',
+            ligneId: $this->posteTiersLigneId,
+            exercice: app(ExerciceService::class)->current(),
+        );
+    }
+
+    public function annulerReglement(int $transactionReglementId): void
+    {
+        $this->dispatch('poste-tiers-reglement:annuler', transactionReglementId: $transactionReglementId);
+    }
+
+    private function chargerEtatReglement(Transaction $transaction): void
+    {
+        // Le bascule suit l'état réel, y compris après l'annulation d'un
+        // règlement : sans cela le formulaire affichait « En attente de
+        // règlement » et « Paiement effectué : oui » en même temps.
+        $this->paiementRecu = $transaction->statut_reglement !== StatutReglement::EnAttente;
+
+        $service = app(PostesTiersOuvertsService::class);
+        $exercice = app(ExerciceService::class)->current();
+        $poste = $service->pourTransaction($transaction, $exercice);
+        $reglements = $service->reglements($transaction);
+
+        $this->posteTiersLigneId = $poste?->ligneActionId;
+        $this->soldeRestantCentimes = $poste?->soldeCentimes ?? 0;
+        $this->reglementsEnregistres = $reglements
+            ->map(fn ($reglement): array => [
+                'transactionId' => $reglement->transactionId,
+                'date' => $reglement->date->toDateString(),
+                'montant' => number_format($reglement->montantCentimes / 100, 2, ',', ' '),
+                'mode' => $reglement->mode?->label() ?? '—',
+                'annulable' => $reglement->annulable,
+            ])
+            ->all();
+        $this->isLockedByReglement = $reglements->isNotEmpty();
+
+        // Le bascule n'agit que tant qu'aucun règlement n'existe. Au-delà,
+        // TransactionService refuse tout changement de mode sur une transaction
+        // réglée — « Le mode de paiement ne peut pas être modifié sur une
+        // transaction réglée » — et le retrait passe par « Annuler le règlement ».
+        // Une dette portant un mode résiduel, elle, reste modifiable : c'est la
+        // forme héritée du backfill, et lui refuser le bascule laissait la
+        // contradiction en place.
+        $this->paiementModifiable = $reglements->isEmpty();
+        $this->etatPaiement = $reglements->isEmpty()
+            ? 'ouvert'
+            : ($poste === null ? 'solde' : 'partiel');
+    }
+
+    private function assertVentilationModifiable(TransactionLigne $ligne): void
+    {
+        $transaction = Transaction::findOrFail((int) $ligne->transaction_id);
+        if ($transaction->aUnReglementTiers()) {
+            abort(403);
+        }
+    }
+
     public function render(): View
     {
-        $flagToUsage = [
-            'pour_dons' => UsageComptable::Don,
-            'pour_cotisations' => UsageComptable::Cotisation,
-            'pour_inscriptions' => UsageComptable::Inscription,
-        ];
-        $scUsage = $flagToUsage[$this->sousCategorieFilter] ?? null;
-
-        $sousCategories = SousCategorie::with('categorie')
-            ->when($this->type !== '', fn ($q) => $q->whereHas('categorie', fn ($q2) => $q2->where('type', $this->type)))
-            ->when($scUsage !== null, fn ($q) => $q->forUsage($scUsage))
-            ->orderBy('nom')
-            ->get();
+        // DC-8 : source des options de ventilation (comptes classe 6/7, groupés par
+        // famille) — remplace l'ex-liste `comptes` (déjà morte côté blade, le
+        // select vit dans <livewire:compte-autocomplete>, gardé pour tout
+        // futur consommateur direct de ce render()).
+        $groupesComptesVentilation = $this->type !== ''
+            ? PlanComptableSelecteur::groupesPourType($this->type)
+            : collect();
 
         return view('livewire.transaction-form', [
             'comptes' => CompteBancaire::saisieManuelle()->orderBy('nom')->get(),
-            'sousCategories' => $sousCategories,
+            'groupesComptesVentilation' => $groupesComptesVentilation,
             'operations' => Operation::with('typeOperation')
                 ->forExercice(app(ExerciceService::class)->current())
                 ->where('statut', StatutOperation::EnCours)

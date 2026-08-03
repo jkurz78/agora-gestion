@@ -4,15 +4,21 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\JournalComptable;
 use App\Enums\StatutRapprochement;
 use App\Enums\StatutReglement;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Models\VirementInterne;
+use App\Services\Compta\EtatReglementResolver;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
@@ -26,6 +32,8 @@ final class RapprochementBancaireService
 
     public function __construct(
         private readonly ExerciceService $exerciceService,
+        private readonly ReglementOperationService $reglementService,
+        private readonly EtatReglementResolver $etatReglementResolver,
     ) {}
 
     /**
@@ -36,6 +44,24 @@ final class RapprochementBancaireService
     {
         $dernier = RapprochementBancaire::where('compte_id', $compte->id)
             ->where('statut', StatutRapprochement::Verrouille)
+            ->orderByDesc('date_fin')
+            ->orderByDesc('id')
+            ->first();
+
+        return $dernier ? (float) $dernier->solde_fin : (float) $compte->solde_initial;
+    }
+
+    /**
+     * Retourne le solde du dernier rapprochement verrouillé connu à une date,
+     * ou le solde initial du compte si aucun rapprochement n'existait encore.
+     */
+    public function calculerSoldeRapprochementAu(
+        CompteBancaire $compte,
+        CarbonInterface $dateLimite,
+    ): float {
+        $dernier = RapprochementBancaire::where('compte_id', $compte->id)
+            ->where('statut', StatutRapprochement::Verrouille)
+            ->whereDate('date_fin', '<=', $dateLimite->toDateString())
             ->orderByDesc('date_fin')
             ->orderByDesc('id')
             ->first();
@@ -103,6 +129,7 @@ final class RapprochementBancaireService
 
             if (! empty($transactionIds)) {
                 Transaction::whereIn('id', $transactionIds)
+                    ->where('journal', '!=', JournalComptable::AN->value)
                     ->update([
                         'rapprochement_id' => $rapprochement->id,
                         'statut_reglement' => StatutReglement::Pointe->value,
@@ -119,14 +146,43 @@ final class RapprochementBancaireService
     /**
      * Calcule le solde pointé courant :
      * solde_ouverture + entrées pointées − sorties pointées.
+     *
+     * transaction_lignes.compte_id IN (512X du compte) jointure sur
+     * transactions.rapprochement_id → SUM(debit) - SUM(credit).
+     *
+     * Les virements internes restent calculés via
+     * VirementInterne.rapprochement_source_id / rapprochement_destination_id
+     * (ils n'ont pas de transaction_lignes PD dans slice 1).
+     *
+     * Comportement mixte (transactions non enrichies) : les transactions
+     * sans ligne 512X enrichie sont invisibles au calcul. C'est documenté et
+     * attendu — le backfill (slice 1d) les rendra visibles.
      */
     public function calculerSoldePointage(RapprochementBancaire $rapprochement): float
     {
         $solde = (float) $rapprochement->solde_ouverture;
 
-        $solde += (float) Transaction::where('rapprochement_id', $rapprochement->id)
-            ->selectRaw("SUM(CASE WHEN type = 'depense' THEN -montant_total ELSE montant_total END) as total")
-            ->value('total');
+        // Lire les lignes 512X du compte bancaire de ce rapprochement,
+        // liées aux transactions pointées (rapprochement_id = ce rapprochement).
+        $compte512X = $this->resoudreCompte512X($rapprochement->compte);
+
+        if ($compte512X !== null) {
+            $mouvement = (float) TransactionLigne::where('transaction_lignes.compte_id', $compte512X->id)
+                ->join('transactions', 'transactions.id', '=', 'transaction_lignes.transaction_id')
+                ->where('transactions.rapprochement_id', $rapprochement->id)
+                ->where('transactions.journal', '!=', JournalComptable::AN->value)
+                ->selectRaw('SUM(transaction_lignes.debit) - SUM(transaction_lignes.credit) as net')
+                ->value('net');
+
+            $solde += $mouvement;
+        } else {
+            Log::warning('[PartieDouble][RapprochementBancaireService] — skip solde : compte 512X introuvable pour CompteBancaire', [
+                'compte_bancaire_id' => (int) $rapprochement->compte_id,
+                'rapprochement_id' => (int) $rapprochement->id,
+            ]);
+        }
+        // Si compte 512X introuvable (tenant sans schéma PD), solde = ouverture seul.
+
         $solde += (float) VirementInterne::where('rapprochement_destination_id', $rapprochement->id)->sum('montant');
         $solde -= (float) VirementInterne::where('rapprochement_source_id', $rapprochement->id)->sum('montant');
 
@@ -172,7 +228,18 @@ final class RapprochementBancaireService
                 'depense', 'recette' => Transaction::findOrFail($id),
                 default => throw new \InvalidArgumentException("Type de transaction inconnu : {$type}"),
             };
-            if ((int) $model->compte_id !== (int) $rapprochement->compte_id) {
+            if ($model->journal === JournalComptable::AN) {
+                throw new \InvalidArgumentException('Une écriture d’à-nouveaux ne peut pas être pointée.');
+            }
+            $appartientAuCompte = (int) $model->compte_id === (int) $rapprochement->compte_id;
+
+            if (! $appartientAuCompte) {
+                $compte512X = $this->resoudreCompte512X($rapprochement->compte);
+                $appartientAuCompte = $compte512X !== null
+                    && $model->lignes()->where('compte_id', $compte512X->id)->exists();
+            }
+
+            if (! $appartientAuCompte) {
                 throw new \InvalidArgumentException("La transaction n'appartient pas au compte de ce rapprochement.");
             }
         }
@@ -195,24 +262,63 @@ final class RapprochementBancaireService
                 default => throw new \InvalidArgumentException("Type de transaction inconnu : {$type}"),
             };
 
-            if ((int) $model->rapprochement_id === $rapprochement->id) {
+            if ((int) $model->rapprochement_id === (int) $rapprochement->id) {
+                // Dé-pointage : effacer rapprochement_id sur T1 et sur T2 séparée si présente.
+                // Chantier 2a : recette comptant → T2 via lettrage 411.
+                // Chantier 3a-i : dépense comptant → T2 via lettrage 401.
+                $t2 = $this->reglementService->trouverT2($model);
+
                 $model->rapprochement_id = null;
+                // Legacy fallback — sert aussi d'état de base pour le syncer PD ci-dessous.
                 $model->statut_reglement = $model->remise_id !== null
                     ? StatutReglement::Recu
                     : StatutReglement::EnAttente;
+                $model->save();
+
+                if ($t2 !== null && (int) $t2->rapprochement_id === (int) $rapprochement->id) {
+                    $t2->rapprochement_id = null;
+                    $t2->save();
+                }
+
+                // Chantier 4 — statut dérivé du ledger (après effacement du rapprochement_id sur T1 et T2).
+                // En mode PD, overrides le fallback legacy ci-dessus avec la valeur dérivée.
+                $this->etatReglementResolver->syncer($model);
             } else {
+                // Pointage : générer T2 si en_attente (Fix D — idempotent, recettes et dépenses)
+                $this->reglementService->reglerOuEncaisser($model);
+
                 $model->rapprochement_id = $rapprochement->id;
+                // Legacy fallback — sert aussi d'état de base pour le syncer PD ci-dessous.
                 $model->statut_reglement = StatutReglement::Pointe;
+                $model->save();
+
+                // Propager rapprochement_id sur T2 séparée si elle existe.
+                // Chantier 2a : recettes comptant → T2 via lettrage 411.
+                // Chantier 3a-i : dépenses comptant → T2 via lettrage 401.
+                // Appelé sans condition : les T2 sont créées systématiquement depuis
+                // les chantiers 2a/3a-i. Les méthodes retournent null pour les transactions
+                // legacy (lumpées) ou sans T2 → no-op.
+                $t2 = $this->reglementService->trouverT2($model);
+
+                if ($t2 !== null) {
+                    $t2->rapprochement_id = $rapprochement->id;
+                    $t2->save();
+                }
+
+                // Chantier 4 — statut dérivé du ledger (après propagation du rapprochement_id sur T2).
+                $this->etatReglementResolver->syncer($model);
             }
-            $model->save();
         });
     }
 
     private function toggleRemise(RapprochementBancaire $rapprochement, int $remiseId): void
     {
         $transactions = Transaction::where('remise_id', $remiseId)->get();
-        $allPointed = $transactions->every(fn (Transaction $tx) => (int) $tx->rapprochement_id === $rapprochement->id);
+        $allPointed = $transactions->every(fn (Transaction $tx) => (int) $tx->rapprochement_id === (int) $rapprochement->id);
 
+        // Passe 1 : poser/effacer rapprochement_id + fallback legacy sur TOUTES les tx
+        // (sources T1 + T4) AVANT toute dérivation, sinon le syncer d'une source lirait
+        // un rapprochement_id de T4 pas encore posé/effacé (bug d'ordonnancement).
         foreach ($transactions as $tx) {
             if ($allPointed) {
                 $tx->rapprochement_id = null;
@@ -223,6 +329,12 @@ final class RapprochementBancaireService
             }
             $tx->save();
         }
+
+        // Passe 2 : statut dérivé (toutes les rapprochement_id posées → le resolver lit
+        // l'état complet, T4 512X rapproché compris). En mode PD, overrides le fallback.
+        foreach ($transactions as $tx) {
+            $this->etatReglementResolver->syncer($tx);
+        }
     }
 
     // VirementInterne n'a pas de champ 'pointe' — le pointage est indiqué
@@ -232,7 +344,7 @@ final class RapprochementBancaireService
         $virement = VirementInterne::findOrFail($id);
         $field = $type === 'virement_source' ? 'rapprochement_source_id' : 'rapprochement_destination_id';
 
-        if ((int) $virement->{$field} === $rapprochement->id) {
+        if ((int) $virement->{$field} === (int) $rapprochement->id) {
             $virement->{$field} = null;
         } else {
             $virement->{$field} = $rapprochement->id;
@@ -260,14 +372,24 @@ final class RapprochementBancaireService
             // Supprimer la pièce jointe si présente
             $this->deletePieceJointe($rapprochement);
 
-            Transaction::where('rapprochement_id', $id)->each(function (Transaction $tx): void {
+            $txs = Transaction::where('rapprochement_id', $id)->get();
+
+            // Passe 1 : effacer rapprochement_id + fallback legacy sur TOUTES les tx
+            // (T1, T2 séparées, T4 remise) AVANT toute dérivation, sinon le syncer d'une
+            // T1 lirait une T2/T4 encore rapprochée (bug d'ordonnancement) → Pointe à tort.
+            foreach ($txs as $tx) {
                 $tx->update([
                     'rapprochement_id' => null,
                     'statut_reglement' => $tx->remise_id !== null
                         ? StatutReglement::Recu->value
                         : StatutReglement::EnAttente->value,
                 ]);
-            });
+            }
+
+            // Passe 2 : statut dérivé (tous les rapprochement_id effacés). En mode PD, overrides.
+            foreach ($txs as $tx) {
+                $this->etatReglementResolver->syncer($tx);
+            }
 
             VirementInterne::where('rapprochement_source_id', $id)
                 ->update(['rapprochement_source_id' => null]);
@@ -381,5 +503,31 @@ final class RapprochementBancaireService
             'piece_jointe_nom' => null,
             'piece_jointe_mime' => null,
         ]);
+    }
+
+    // =========================================================================
+    // Helpers partie double (Step 29)
+    // =========================================================================
+
+    /**
+     * Résout le compte PCG classe 5 (512X) correspondant au CompteBancaire du rapprochement.
+     *
+     * Le lien est établi via l'IBAN : BancairesSeeder crée un Compte avec le même IBAN
+     * que le CompteBancaire (numéro PCG 5121, 5122, etc.). Ce compte est le « compte de
+     * trésorerie » des écritures partie double.
+     *
+     * Retourne null si le tenant n'a pas encore de schéma PD (compte 512X manquant).
+     * Dans ce cas, calculerSoldePointage retourne solde_ouverture seul (comportement
+     * documenté mode mixte legacy/PD pendant la transition — Step 29).
+     *
+     * Exposé public pour être utilisé par RapprochementDetail::render() afin de
+     * filtrer la liste des écritures pointables sur le 512X strict du compte.
+     */
+    public function resoudreCompte512X(CompteBancaire $compteBancaire): ?Compte
+    {
+        // Résolution par compte_bancaire_id (clé stable — l'IBAN est nullable et non unique).
+        return Compte::where('compte_bancaire_id', $compteBancaire->id)
+            ->bancaires()
+            ->first();
     }
 }

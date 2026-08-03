@@ -5,13 +5,15 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\ModePaiement;
-use App\Enums\StatutReglement;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Livewire\Concerns\WithPerPage;
+use App\Models\ANouveauLigneOrigine;
 use App\Models\CompteBancaire;
 use App\Models\NoteDeFrais;
 use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Models\VirementInterne;
+use App\Services\Compta\PostesTiersOuvertsService;
 use App\Services\ExerciceService;
 use App\Services\TransactionService;
 use App\Services\TransactionUniverselleService;
@@ -46,7 +48,7 @@ final class TransactionUniverselle extends Component
     public bool $showImport = false;      // affiche les boutons import CSV dans le header
 
     #[Locked]
-    public ?string $sousCategorieFilter = null; // filtre sous-catégorie par usage (dons, cotisations, inscriptions)
+    public ?string $usageFilter = null; // filtre comptes par usage (dons, cotisations, inscriptions)
 
     // === Filtres libres (manipulables par l'utilisateur) ===
     /** @var array<string> */
@@ -89,7 +91,7 @@ final class TransactionUniverselle extends Component
         ?string $pageTitle = null,
         string $pageTitleIcon = 'list-ul',
         bool $showImport = false,
-        ?string $sousCategorieFilter = null,
+        ?string $usageFilter = null,
     ): void {
         $this->compteId = $compteId;
         $this->tiersId = $tiersId;
@@ -98,7 +100,7 @@ final class TransactionUniverselle extends Component
         $this->pageTitle = $pageTitle;
         $this->pageTitleIcon = $pageTitleIcon;
         $this->showImport = $showImport;
-        $this->sousCategorieFilter = $sousCategorieFilter;
+        $this->usageFilter = $usageFilter;
 
         // Initialiser plage dates sur l'exercice courant
         $exerciceService = app(ExerciceService::class);
@@ -217,7 +219,7 @@ final class TransactionUniverselle extends Component
     public function sortBy(string $column): void
     {
         $allowed = ['id', 'date', 'numero_piece', 'reference', 'tiers', 'libelle',
-            'categorie_label', 'nb_lignes', 'compte_id', 'compte_nom', 'mode_paiement',
+            'compte_ventilation_nom', 'nb_lignes', 'compte_id', 'compte_nom', 'mode_paiement',
             'montant', 'pointe', 'source_type'];
         if (! in_array($column, $allowed, true)) {
             return;
@@ -238,7 +240,7 @@ final class TransactionUniverselle extends Component
             return;
         }
         match ($sourceType) {
-            'depense', 'recette' => $this->dispatch('open-transaction-form', type: $sourceType, id: $id, sousCategorieFilter: $this->sousCategorieFilter),
+            'depense', 'recette' => $this->dispatch('open-transaction-form', type: $sourceType, id: $id, usageFilter: $this->usageFilter),
             'virement_sortant', 'virement_entrant' => $this->dispatch('open-virement-form', id: $id),
         };
     }
@@ -258,22 +260,58 @@ final class TransactionUniverselle extends Component
     {
         return match ($sourceType) {
             'depense', 'recette' => $this->fetchTransactionDetail($id),
+            'report_an' => $this->fetchReportANDetail($id),
             'virement_sortant', 'virement_entrant' => [],
             default => [],
         };
     }
 
+    private function fetchReportANDetail(int $id): array
+    {
+        $ligne = TransactionLigne::with(['compte', 'tiers'])->find($id);
+        if ($ligne === null) {
+            return [];
+        }
+
+        $ligneCanoniqueId = (int) ($ligne->poste_tiers_parent_id ?? $ligne->id);
+        $origine = ANouveauLigneOrigine::with('ligneRacine.transaction')
+            ->where('ligne_an_id', $ligneCanoniqueId)
+            ->first();
+        $transactionOrigine = $origine?->ligneRacine?->transaction;
+
+        return [
+            'lignes' => [[
+                'id' => (int) $ligne->id,
+                'compte' => $ligne->compte?->numero_pcg.' — '.$ligne->compte?->intitule,
+                'operation' => $ligne->tiers?->displayName() ?? 'Tiers non renseigné',
+                'operation_id' => null,
+                'seance' => null,
+                'montant' => (float) $ligne->montant_signe,
+                'notes' => $transactionOrigine?->libelle ?? $ligne->libelle,
+                'libelle' => $transactionOrigine?->libelle ?? $ligne->libelle,
+                'tiers' => $ligne->tiers?->displayName(),
+            ]],
+            'factures' => [],
+            'transaction_id' => $transactionOrigine?->id,
+        ];
+    }
+
     private function fetchTransactionDetail(int $id): array
     {
-        $tx = Transaction::with(['lignes.sousCategorie.categorie', 'lignes.operation', 'factures'])->find($id);
+        // Filtre ventilation() : exclut les lignes PD-only (411/5121/etc.) — UI utilisateur.
+        $tx = Transaction::with([
+            'lignes' => fn ($q) => $q->ventilation()->with(['compte', 'operation']),
+            'factures',
+        ])->find($id);
         if (! $tx) {
             return [];
         }
 
         return [
+            // DC-10a : libellé lu depuis le compte (source unique).
             'lignes' => $tx->lignes->map(fn ($l) => [
                 'id' => $l->id,
-                'sous_categorie' => $l->sousCategorie?->nom,
+                'compte' => $l->compte?->intitule,
                 'operation' => $l->operation?->nom,
                 'operation_id' => $l->operation_id,
                 'seance' => $l->seance,
@@ -326,16 +364,30 @@ final class TransactionUniverselle extends Component
         app(VirementInterneService::class)->delete($v);
     }
 
-    public function marquerRecu(int $id): void
+    public function marquerRecu(int $id, string $sourceType = 'recette', ?int $posteTiersLigneId = null): void
     {
-        $tx = Transaction::find($id);
-        if (! $tx || $tx->statut_reglement !== StatutReglement::EnAttente) {
-            return;
+        $exercice = $this->exercice ?? app(ExerciceService::class)->current();
+        if ($sourceType === 'report_an') {
+            if ($posteTiersLigneId === null) {
+                return;
+            }
+
+            $ligneId = $posteTiersLigneId;
+        } else {
+            $transaction = Transaction::find($id);
+            if ($transaction === null || $transaction->isLockedByRapprochement() || $transaction->isLockedByFacture()) {
+                return;
+            }
+
+            $poste = app(PostesTiersOuvertsService::class)->pourTransaction($transaction, $exercice);
+            if ($poste === null) {
+                return;
+            }
+
+            $ligneId = $poste->ligneActionId;
         }
-        if ($tx->isLockedByRapprochement() || $tx->isLockedByFacture()) {
-            return;
-        }
-        $tx->update(['statut_reglement' => StatutReglement::Recu->value]);
+
+        $this->dispatch('poste-tiers-reglement:ouvrir', ligneId: $ligneId, exercice: $exercice);
     }
 
     // Écouter les événements des modaux pour rafraîchir la liste
@@ -347,6 +399,9 @@ final class TransactionUniverselle extends Component
 
     #[On('extourne:success')]
     public function onExtourneSuccess(): void {}
+
+    #[On('poste-tiers-reglement:enregistre')]
+    public function onPosteTiersReglementEnregistre(): void {}
 
     public function render(): View
     {
@@ -389,13 +444,14 @@ final class TransactionUniverselle extends Component
             searchNumeroPiece: $this->filterNumeroPiece ?: null,
             modePaiement: $this->filterModePaiement ?: null,
             statutReglement: $this->filterStatut ?: null,
-            sousCategorieFilter: $this->sousCategorieFilter,
+            usageFilter: $this->usageFilter,
             computeSolde: $showSolde,
             sortColumn: $this->sortColumn,
             sortDirection: $sortDirection,
             perPage: $this->effectivePerPage(),
             page: $this->getPage(),
             ndfUniquement: $this->filterNdfUniquement,
+            exercice: $this->exercice,
         );
 
         $rows = collect($result['paginator']->items());
@@ -423,14 +479,16 @@ final class TransactionUniverselle extends Component
                 });
         }
 
+        $comptesBancaires = CompteBancaire::orderBy('nom')->get();
+
         return view('livewire.transaction-universelle', [
             'rows' => $rows,
             'paginator' => $result['paginator'],
             'showSolde' => $showSolde,
-            'comptes' => $this->compteId === null ? CompteBancaire::orderBy('nom')->get() : collect(),
+            'comptes' => $this->compteId === null ? $comptesBancaires : collect(),
             'modesPaiement' => ModePaiement::cases(),
             'availableTypes' => $this->lockedTypes ?? ['depense', 'recette', 'virement'],
-            'sousCategorieFilter' => $this->sousCategorieFilter,
+            'usageFilter' => $this->usageFilter,
             'showCompteCol' => $this->compteId === null,
             'showTiersCol' => $this->tiersId === null,
             'ndfByTransactionId' => $ndfByTransactionId,

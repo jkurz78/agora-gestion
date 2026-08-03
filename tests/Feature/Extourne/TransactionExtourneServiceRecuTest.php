@@ -43,7 +43,6 @@ function extourneMakeRecette(StatutReglement $statut, float $montant = 80.0, ?ar
 
     TransactionLigne::create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => null,
         'montant' => $montant,
     ]);
 
@@ -70,7 +69,7 @@ test('extourner recette Recu — crée une extourne EnAttente sans lettrage', fu
     expect($miroir->rapprochement_id)->toBeNull();
 
     $origine->refresh();
-    expect($origine->statut_reglement)->toBe(StatutReglement::Recu);
+    expect($origine->statut_reglement)->toBe(StatutReglement::Pointe);
     expect($origine->extournee_at)->not->toBeNull();
 });
 
@@ -109,7 +108,7 @@ test('extourner copie tiers, compte, libellé et inverse les lignes', function (
     expect($lignesMiroir)->toHaveCount($lignesOrigine->count());
     foreach ($lignesMiroir as $i => $ligneM) {
         expect((float) $ligneM->montant)->toBe(-1 * (float) $lignesOrigine[$i]->montant);
-        expect($ligneM->sous_categorie_id)->toBe($lignesOrigine[$i]->sous_categorie_id);
+        expect($ligneM->compte_id)->toBe($lignesOrigine[$i]->compte_id);
     }
 });
 
@@ -205,4 +204,38 @@ test('extourner dispatche l event TransactionExtournee à l intérieur d une DB:
 
     expect($levelInsideListener)->not->toBeNull();
     expect($levelInsideListener)->toBeGreaterThan(0);
+});
+
+test('extourner recette Recu — miroir reste EnAttente (dette de remboursement)', function (): void {
+    extourneActingComptable();
+    $origine = extourneMakeRecette(StatutReglement::Recu);
+
+    $payload = ExtournePayload::fromOrigine($origine);
+    $extourne = app(TransactionExtourneService::class)->extourner($origine, $payload);
+
+    $miroir = $extourne->extourne;
+
+    // Miroir garde EnAttente (origine était Recu → remboursement à effectuer)
+    expect($miroir->statut_reglement)->toBe(StatutReglement::EnAttente);
+
+    // Origine → Pointé + extournee_at
+    $origine->refresh();
+    expect($origine->statut_reglement)->toBe(StatutReglement::Pointe);
+    expect($origine->extournee_at)->not->toBeNull();
+});
+
+test('extourner recette EnAttente — miroir force Pointé (annulation pure)', function (): void {
+    extourneActingComptable();
+    $origine = extourneMakeRecette(StatutReglement::EnAttente);
+
+    $payload = ExtournePayload::fromOrigine($origine);
+    $extourne = app(TransactionExtourneService::class)->extourner($origine, $payload);
+
+    $miroir = $extourne->extourne;
+
+    // Miroir → Pointé (origine était EnAttente → annulation comptable pure)
+    expect($miroir->statut_reglement)->toBe(StatutReglement::Pointe);
+
+    $origine->refresh();
+    expect($origine->statut_reglement)->toBe(StatutReglement::Pointe);
 });

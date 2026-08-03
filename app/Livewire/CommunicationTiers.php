@@ -10,10 +10,10 @@ use App\Enums\UsageComptable;
 use App\Helpers\EmailLogo;
 use App\Mail\CommunicationTiersMail;
 use App\Models\CampagneEmail;
+use App\Models\Compte;
 use App\Models\EmailLog;
 use App\Models\EmailTemplate;
 use App\Models\MessageTemplate;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Services\ExerciceService;
@@ -183,34 +183,35 @@ final class CommunicationTiers extends Component
         }
 
         if ($this->filtreDonateurs !== null && $this->filtreDonateurs !== '') {
-            $donSousCategorieIds = SousCategorie::forUsage(UsageComptable::Don)->pluck('id');
+            // DC-8 : filtre par compte_id (posé par le pipeline PD sur les lignes).
+            $donCompteIds = Compte::forUsage(UsageComptable::Don)->pluck('id');
             $ex = $this->filtreDonateurs === 'exercice' ? $exercice : null;
 
-            $filters[] = function (Builder $q) use ($donSousCategorieIds, $ex): void {
-                $q->whereHas('transactions', function (Builder $tq) use ($donSousCategorieIds, $ex): void {
+            $filters[] = function (Builder $q) use ($donCompteIds, $ex): void {
+                $q->whereHas('transactions', function (Builder $tq) use ($donCompteIds, $ex): void {
                     $tq->where('type', 'recette');
                     if ($ex !== null) {
                         $tq->forExercice($ex);
                     }
-                    $tq->whereHas('lignes', function (Builder $lq) use ($donSousCategorieIds): void {
-                        $lq->whereIn('sous_categorie_id', $donSousCategorieIds);
+                    $tq->whereHas('lignes', function (Builder $lq) use ($donCompteIds): void {
+                        $lq->whereIn('compte_id', $donCompteIds);
                     });
                 });
             };
         }
 
         if ($this->filtreAdherents !== null && $this->filtreAdherents !== '') {
-            $cotSousCategorieIds = SousCategorie::forUsage(UsageComptable::Cotisation)->pluck('id');
+            $cotCompteIds = Compte::forUsage(UsageComptable::Cotisation)->pluck('id');
             $ex = $this->filtreAdherents === 'exercice' ? $exercice : null;
 
-            $filters[] = function (Builder $q) use ($cotSousCategorieIds, $ex): void {
-                $q->whereHas('transactions', function (Builder $tq) use ($cotSousCategorieIds, $ex): void {
+            $filters[] = function (Builder $q) use ($cotCompteIds, $ex): void {
+                $q->whereHas('transactions', function (Builder $tq) use ($cotCompteIds, $ex): void {
                     $tq->where('type', 'recette');
                     if ($ex !== null) {
                         $tq->forExercice($ex);
                     }
-                    $tq->whereHas('lignes', function (Builder $lq) use ($cotSousCategorieIds): void {
-                        $lq->whereIn('sous_categorie_id', $cotSousCategorieIds);
+                    $tq->whereHas('lignes', function (Builder $lq) use ($cotCompteIds): void {
+                        $lq->whereIn('compte_id', $cotCompteIds);
                     });
                 });
             };

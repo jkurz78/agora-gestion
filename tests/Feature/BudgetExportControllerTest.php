@@ -2,13 +2,12 @@
 
 declare(strict_types=1);
 
-use App\Enums\TypeCategorie;
 use App\Enums\TypeTransaction;
 use App\Models\Association;
 use App\Models\BudgetLine;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
-use App\Models\SousCategorie;
+use App\Models\Famille;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
@@ -21,8 +20,11 @@ beforeEach(function () {
     TenantContext::boot($this->association);
     session(['current_association_id' => $this->association->id]);
 
-    $cat = Categorie::factory()->create(['nom' => 'Charges', 'type' => TypeCategorie::Depense]);
-    $this->sc = SousCategorie::factory()->create(['nom' => 'Loyers', 'categorie_id' => $cat->id]);
+    // Famille nommée AVANT la matérialisation du compte (sinon fallback nom = code)
+    Famille::create(['association_id' => $this->association->id, 'code' => '61', 'nom' => 'Charges']);
+
+    $this->sc = Compte::factory()->numero('613')->create(['intitule' => 'Loyers']);
+    $this->compteLoyers = $this->sc;
 
     // Réalisé exercice 2025 (Sept 2025–Aug 2026) : Loyers=1200
     $compte = CompteBancaire::factory()->create();
@@ -34,8 +36,10 @@ beforeEach(function () {
     ]);
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $this->sc->id,
         'montant' => 1200.00,
+        'compte_id' => $this->compteLoyers->id,
+        'debit' => 1200.00,
+        'credit' => 0.0,
     ]);
 });
 
@@ -53,8 +57,8 @@ it('télécharge un CSV budget', function () {
     $response->assertDownload('budget-2026-2027.csv');
 
     expect($response->getContent())
-        ->toContain('exercice;categorie;sous_categorie;montant_prevu')
-        ->toContain('2026-2027;Charges;Loyers;1200.00');
+        ->toContain('exercice;famille;compte;montant_prevu')
+        ->toContain('2026-2027;61 — Charges;Loyers;1200.00');
 });
 
 it('source zero produit des montants vides dans le CSV', function () {
@@ -62,7 +66,7 @@ it('source zero produit des montants vides dans le CSV', function () {
         ->get(route('comptabilite.budget.export', ['format' => 'csv', 'exercice' => 2026, 'source' => 'zero']));
 
     $response->assertOk();
-    expect($response->getContent())->toContain('2026-2027;Charges;Loyers;');
+    expect($response->getContent())->toContain('2026-2027;61 — Charges;Loyers;');
     expect($response->getContent())->not->toContain('1200');
 });
 
@@ -75,14 +79,14 @@ it('télécharge un Excel budget', function () {
 });
 
 it('source budget exporte les montants_prevu', function () {
-    BudgetLine::factory()->create(['sous_categorie_id' => $this->sc->id, 'exercice' => 2025, 'montant_prevu' => 900.00]);
+    BudgetLine::factory()->create(['compte_id' => $this->sc->id, 'exercice' => 2025, 'montant_prevu' => 900.00]);
 
     $response = $this->actingAs($this->user)
         ->withSession(['exercice_actif' => 2025])
         ->get(route('comptabilite.budget.export', ['format' => 'csv', 'exercice' => 2026, 'source' => 'budget']));
 
     $response->assertOk();
-    expect($response->getContent())->toContain('2026-2027;Charges;Loyers;900.00');
+    expect($response->getContent())->toContain('2026-2027;61 — Charges;Loyers;900.00');
 });
 
 it('redirige les invités vers login', function () {

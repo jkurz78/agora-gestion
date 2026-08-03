@@ -6,7 +6,7 @@
         <div class="container py-4">
         <div class="card mb-4">
             @php
-                $formEntityLabel = match($sousCategorieFilter) {
+                $formEntityLabel = match($usageFilter) {
                     'pour_dons'         => 'don',
                     'pour_cotisations'  => 'cotisation',
                     'pour_inscriptions' => 'inscription',
@@ -16,11 +16,11 @@
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
                     @if($exerciceCloture)
-                        Visualiser {{ $formEntityLabel ? ($formEntityLabel === 'cotisation' || $formEntityLabel === 'inscription' ? 'la ' : 'le ') . $formEntityLabel : ($type === 'depense' ? 'la dépense' : 'la recette') }}
+                        Visualiser {{ $formEntityLabel ? ($formEntityLabel === 'cotisation' || $formEntityLabel === 'inscription' ? 'la ' : 'le ') . $formEntityLabel : ($sensTresorerie === 'depense' ? 'la dépense' : 'la recette') }}
                     @elseif($formEntityLabel)
                         {{ $transactionId ? 'Modifier le ' : ($formEntityLabel === 'cotisation' || $formEntityLabel === 'inscription' ? 'Nouvelle ' : 'Nouveau ') }}{{ $formEntityLabel }}
                     @else
-                        {{ $transactionId ? 'Modifier la ' : 'Nouvelle ' }}{{ $type === 'depense' ? 'dépense' : 'recette' }}
+                        {{ $transactionId ? 'Modifier la ' : 'Nouvelle ' }}{{ $sensTresorerie === 'depense' ? 'dépense' : 'recette' }}
                     @endif
                 </h5>
                 <button wire:click="resetForm" class="btn btn-sm btn-outline-secondary">
@@ -92,17 +92,28 @@
                     </div>
                 @endif
 
-                @if(!$sousCategorieFilter)
+                @if(!$usageFilter)
                 <div class="mb-3">
-                    @if ($type === 'depense')
+                    @if ($sensTresorerie === 'depense')
                         <span class="badge bg-danger fs-6">Dépense</span>
+                        @if ($isExtourneMiroir)
+                            <span class="badge bg-secondary fs-6 ms-1">Remboursement (extourne)</span>
+                        @endif
                     @else
                         <span class="badge bg-success fs-6">Recette</span>
+                        @if ($isExtourneMiroir)
+                            <span class="badge bg-secondary fs-6 ms-1">Remboursement (extourne)</span>
+                        @endif
                     @endif
                 </div>
                 @endif
 
                 <form wire:submit="save">
+                    @if ($isExtourneMiroir)
+                        <div class="alert alert-info small py-2 mb-3">
+                            <i class="bi bi-arrow-repeat"></i> Transaction de remboursement — les montants et catégories sont figés. Vous pouvez renseigner le mode de paiement, le compte bancaire et la date.
+                        </div>
+                    @endif
                     @if ($isLocked && $isLockedByFacture)
                         <div class="alert alert-warning small py-2 mb-3">
                             <i class="bi bi-lock"></i> Cette transaction est verrouillée (rapprochement/remise + facture). Seuls le libellé et les notes peuvent être modifiés.
@@ -120,13 +131,18 @@
                             </div>
                         </div>
                     @endif
+                    @if ($isLockedByReglement)
+                        <div class="alert alert-warning small py-2 mb-3">
+                            <i class="bi bi-lock"></i> Des règlements sont enregistrés : annulez-les avant de modifier la date, le tiers, le compte bancaire, les montants ou la ventilation.
+                        </div>
+                    @endif
                     <div class="row g-3 mb-4">
                         <div class="col-md-2">
                             <label for="date" class="form-label">
                                 Date <span class="text-danger">*</span>
-                                @if ($isLocked || $isLockedByHelloAsso) <i class="bi bi-lock text-warning" title="Champ verrouillé"></i> @endif
+                                @if ($isLocked || $isLockedByHelloAsso || $isLockedByReglement) <i class="bi bi-lock text-warning" title="Champ verrouillé"></i> @endif
                             </label>
-                            <x-date-input name="date" wire:model="date" :value="$date" :disabled="$isLocked || $isLockedByHelloAsso || $exerciceCloture" />
+                            <x-date-input name="date" wire:model="date" :value="$date" :disabled="$isLocked || $isLockedByHelloAsso || $isLockedByReglement || $exerciceCloture" />
                             @error('date') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
                         <div class="col-md-2">
@@ -145,17 +161,62 @@
                         </div>
                         <div class="col-md-2">
                             <label class="form-label">
-                                Tiers
-                                @if ($isLockedByHelloAsso) <i class="bi bi-lock text-warning" title="Champ verrouillé"></i> @endif
+                                Tiers <span class="text-danger">*</span>
+                                @if ($isLockedByHelloAsso || $isExtourneMiroir) <i class="bi bi-lock text-warning" title="Champ verrouillé"></i> @endif
                             </label>
-                            @if ($isLockedByHelloAsso)
+                            @if ($isLockedByHelloAsso || $isExtourneMiroir || $isLockedByReglement)
                                 <input type="text" value="{{ \App\Models\Tiers::find($tiers_id)?->displayName() ?? '—' }}"
                                        class="form-control bg-light" disabled>
                             @else
-                                <livewire:tiers-autocomplete wire:model="tiers_id" filtre="{{ $type === 'depense' ? 'depenses' : 'recettes' }}" :defaultSearch="$ocrTiersNom ?? ''" :key="'transaction-tiers-'.($transactionId ?? 'new').'-'.($tiers_id ?? '0').'-'.($ocrTiersNom ?? '')" />
+                                <livewire:tiers-autocomplete wire:model="tiers_id" filtre="tous" :defaultSearch="$ocrTiersNom ?? ''" :key="'transaction-tiers-'.($transactionId ?? 'new').'-'.($tiers_id ?? '0').'-'.($ocrTiersNom ?? '')" />
                             @endif
                             @error('tiers_id') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                         </div>
+                        @if (($type === 'recette' || $type === 'depense') && ! $paiementModifiable)
+                        {{-- Le règlement ne se retire pas ici : la mise à jour n'y toucherait pas.
+                             L'état est rappelé en lecture seule, et le geste renvoyé là où il agit. --}}
+                        <div class="col-md-2">
+                            <label class="form-label">
+                                @if ($sensTresorerie === 'depense')
+                                    Paiement effectué ?
+                                @else
+                                    Paiement déjà reçu ?
+                                @endif
+                            </label>
+                            <div class="mt-1">
+                                <span class="badge {{ $paiementRecu ? 'text-bg-success' : 'text-bg-secondary' }}">{{ $paiementRecu ? 'Oui' : 'Non' }}</span>
+                                @if ($paiementRecu)
+                                    <div class="form-text">Pour le retirer, utilisez « Annuler le règlement ».</div>
+                                @endif
+                            </div>
+                        </div>
+                        @endif
+                        @if (($type === 'recette' || $type === 'depense') && $paiementModifiable)
+                        <div class="col-md-2">
+                            <label class="form-label">
+                                @if ($sensTresorerie === 'depense')
+                                    Paiement effectué ?
+                                @else
+                                    Paiement déjà reçu ?
+                                @endif
+                            </label>
+                            <div class="d-flex gap-2 mt-1">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" wire:model.live="paiementRecu"
+                                           id="paiement_recu_oui" value="1"
+                                           {{ $exerciceCloture ? 'disabled' : '' }}>
+                                    <label class="form-check-label" for="paiement_recu_oui">Oui</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" wire:model.live="paiementRecu"
+                                           id="paiement_recu_non" value="0"
+                                           {{ $exerciceCloture ? 'disabled' : '' }}>
+                                    <label class="form-check-label" for="paiement_recu_non">Non</label>
+                                </div>
+                            </div>
+                        </div>
+                        @endif
+                        @if (($type !== 'recette' && $type !== 'depense') || ($paiementRecu && ! $isLockedByReglement))
                         <div class="col-md-2">
                             <label for="mode_paiement" class="form-label">Mode paiement <span class="text-danger">*</span></label>
                             <select wire:model="mode_paiement" id="mode_paiement"
@@ -168,12 +229,20 @@
                             </select>
                             @error('mode_paiement') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
+                        @endif
+                        @if (($type === 'recette' || $type === 'depense') && $paiementRecu && ! $isLockedByReglement)
+                        <div class="col-md-2">
+                            <label for="dateReglement" class="form-label">Date du règlement <span class="text-danger">*</span></label>
+                            <x-date-input name="dateReglement" wire:model="dateReglement" :value="$dateReglement" :disabled="$exerciceCloture" />
+                            @error('dateReglement') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                        </div>
+                        @endif
                         <div class="col-md-3">
                             <label for="compte_id" class="form-label">
                                 Compte bancaire
-                                @if ($isLocked || $isLockedByFacture || $isLockedByHelloAsso) <i class="bi bi-lock text-warning" title="Champ verrouillé"></i> @endif
+                            @if ($isLocked || $isLockedByFacture || $isLockedByHelloAsso || $isLockedByReglement) <i class="bi bi-lock text-warning" title="Champ verrouillé"></i> @endif
                             </label>
-                            @if ($isLocked || $isLockedByFacture || $isLockedByHelloAsso)
+                            @if ($isLocked || $isLockedByFacture || $isLockedByHelloAsso || $isLockedByReglement)
                                 <input type="text" value="{{ \App\Models\CompteBancaire::find($compte_id)?->nom ?? '—' }}"
                                        class="form-control bg-light" disabled>
                             @else
@@ -196,7 +265,7 @@
                             </div>
                         </div>
                         {{-- En mode OCR : PJ sur la même ligne que Montant total --}}
-                        @if ($ocrMode && $type === 'depense' && ! $exerciceCloture)
+                        @if ($ocrMode && ! $exerciceCloture)
                         <div class="col-md-3">
                             <label class="form-label"><i class="bi bi-paperclip"></i> Justificatif</label>
                             @if ($pieceJointe)
@@ -213,7 +282,7 @@
                         </div>
 
                         {{-- Pièce jointe (dépenses uniquement, hors OCR mode qui l'affiche au-dessus) --}}
-                        @if ($type === 'depense' && ! $exerciceCloture && ! $ocrMode)
+                        @if (! $exerciceCloture && ! $ocrMode)
                         <div class="col-12">
                             <label class="form-label"><i class="bi bi-paperclip"></i> Justificatif</label>
 
@@ -256,8 +325,36 @@
                         @endif
                     </div>
 
+                    @if ($transactionId && ($type === 'recette' || $type === 'depense'))
+                        <div class="border rounded p-3 mb-3 bg-light">
+                            @if ($etatPaiement === 'partiel')
+                                <div class="d-flex align-items-center justify-content-between gap-2">
+                                    <span class="fw-semibold">Partiellement réglé — reste {{ number_format($soldeRestantCentimes / 100, 2, ',', ' ') }} €</span>
+                                    <button type="button" wire:click="reglerReliquat" class="btn btn-sm btn-outline-primary">Régler le reliquat</button>
+                                </div>
+                            @elseif ($etatPaiement === 'solde')
+                                <span class="fw-semibold text-success">{{ $sensTresorerie === 'depense' ? 'Payé' : 'Reçu' }}</span>
+                            @else
+                                <span class="text-muted">En attente de règlement</span>
+                            @endif
+
+                            @if ($reglementsEnregistres !== [])
+                                <ul class="list-group list-group-flush mt-2">
+                                    @foreach ($reglementsEnregistres as $reglement)
+                                        <li class="list-group-item bg-light px-0 d-flex justify-content-between align-items-center">
+                                            <span>{{ $reglement['date'] }} — {{ $reglement['montant'] }} € — {{ $reglement['mode'] }}</span>
+                                            @if ($reglement['annulable'])
+                                                <button type="button" wire:click="annulerReglement({{ $reglement['transactionId'] }})" class="btn btn-sm btn-outline-danger">Annuler le règlement</button>
+                                            @endif
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                        </div>
+                    @endif
+
                     {{-- Lignes section --}}
-                    <h6 class="mb-2">Lignes de {{ $formEntityLabel ?? ($type === 'depense' ? 'dépense' : 'recette') }}</h6>
+                    <h6 class="mb-2">Lignes de {{ $formEntityLabel ?? ($sensTresorerie === 'depense' ? 'dépense' : 'recette') }}</h6>
                     @error('lignes')
                         <div class="alert alert-danger py-2">{{ $message }}</div>
                     @enderror
@@ -266,7 +363,7 @@
                         <table class="table table-sm table-bordered align-middle">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Sous-catégorie <span class="text-danger">*</span></th>
+                                    <th>Compte <span class="text-danger">*</span></th>
                                     <th>Opération</th>
                                     <th style="width: 100px;">Séance</th>
                                     <th style="width: 130px;">Montant <span class="text-danger">*</span></th>
@@ -278,25 +375,39 @@
                                 @forelse ($lignes as $index => $ligne)
                                     <tr wire:key="ligne-{{ $index }}">
                                         <td style="min-width:220px">
-                                            @if ($isLockedByFacture)
-                                                @php $sc = \App\Models\SousCategorie::find($ligne['sous_categorie_id']); @endphp
-                                                <span class="form-control-plaintext">{{ $sc?->nom ?? '—' }}</span>
+                                            @if ($isLockedByFacture || $isExtourneMiroir)
+                                                {{-- Même rendu que le chip CompteAutocomplete : famille + intitulé --}}
+                                                @php
+                                                    $compteLigne = \App\Models\Compte::find($ligne['compte_id']);
+                                                    $familleLigne = $compteLigne?->famille();
+                                                @endphp
+                                                @if ($compteLigne)
+                                                    <div class="form-control-plaintext d-flex align-items-center gap-2 py-1">
+                                                        @if ($familleLigne)
+                                                            <span class="text-muted small">{{ $familleLigne->libelle() }}</span>
+                                                            <span class="text-muted">/</span>
+                                                        @endif
+                                                        <span class="fw-medium">{{ $compteLigne->intitule }}</span>
+                                                    </div>
+                                                @else
+                                                    <span class="form-control-plaintext">—</span>
+                                                @endif
                                             @else
-                                                <livewire:sous-categorie-autocomplete
-                                                    :key="'sc-tx-'.$index.'-'.($sousCategorieFilter ?? 'all')"
-                                                    wire:model="lignes.{{ $index }}.sous_categorie_id"
+                                                <livewire:compte-autocomplete
+                                                    :key="'sc-tx-'.$index.'-'.($usageFilter ?? 'all')"
+                                                    wire:model="lignes.{{ $index }}.compte_id"
                                                     filtre="{{ $type }}"
-                                                    :sousCategorieFlag="$sousCategorieFilter"
+                                                    :usageFlag="$usageFilter"
                                                 />
                                             @endif
-                                            @error('lignes.' . $index . '.sous_categorie_id')
+                                            @error('lignes.' . $index . '.compte_id')
                                                 <div class="text-danger small mt-1">{{ $message }}</div>
                                             @enderror
                                         </td>
                                         <td>
                                             <select wire:model.live="lignes.{{ $index }}.operation_id"
                                                     class="form-select form-select-sm"
-                                                    {{ $exerciceCloture || $isLockedByFacture ? 'disabled' : '' }}>
+                                                    {{ $exerciceCloture || $isLockedByFacture || $isExtourneMiroir ? 'disabled' : '' }}>
                                                 <option value="">-- Aucune --</option>
                                                 @foreach ($operations->groupBy(fn ($op) => $op->typeOperation?->nom ?? 'Sans type') as $typeName => $ops)
                                                     <optgroup label="{{ $typeName }}">
@@ -315,7 +426,7 @@
                                             @if ($nbSeances)
                                                 <select wire:model="lignes.{{ $index }}.seance"
                                                         class="form-select form-select-sm"
-                                                        {{ $exerciceCloture || $isLockedByFacture ? 'disabled' : '' }}>
+                                                        {{ $exerciceCloture || $isLockedByFacture || $isExtourneMiroir ? 'disabled' : '' }}>
                                                     <option value="">--</option>
                                                     @for ($s = 1; $s <= $nbSeances; $s++)
                                                         <option value="{{ $s }}">{{ $s }}</option>
@@ -324,7 +435,7 @@
                                             @endif
                                         </td>
                                         <td>
-                                            @if ($isLocked || $isLockedByFacture || $isLockedByHelloAsso)
+                                            @if ($isLocked || $isLockedByFacture || $isLockedByHelloAsso || $isExtourneMiroir)
                                                 <span class="form-control-plaintext">{{ number_format((float) ($ligne['montant'] ?? 0), 2, ',', ' ') }} €</span>
                                             @else
                                                 <input type="number" wire:model.live="lignes.{{ $index }}.montant"
@@ -411,13 +522,13 @@
                                             @error("lignes.{$index}.piece_jointe_upload") <div class="text-danger small">{{ $message }}</div> @enderror
                                         </td>
                                         <td class="text-center">
-                                            @if (! $isLocked && ! $isLockedByFacture && ! $isLockedByHelloAsso && ! $exerciceCloture)
+                                            @if (! $isLocked && ! $isLockedByFacture && ! $isLockedByHelloAsso && ! $isExtourneMiroir && ! $exerciceCloture)
                                                 <button type="button" wire:click="removeLigne({{ $index }})"
                                                         class="btn btn-sm btn-outline-danger">
                                                     <i class="bi bi-trash"></i>
                                                 </button>
                                             @endif
-                                            @if ($isLocked && ! $isLockedByFacture && ! $exerciceCloture && ($ligne['id'] ?? null) !== null)
+                                            @if ($isLocked && ! $isLockedByFacture && ! $isLockedByReglement && ! $exerciceCloture && ($ligne['id'] ?? null) !== null)
                                                 <button type="button"
                                                         wire:click="ouvrirVentilation({{ $ligne['id'] }})"
                                                         class="btn btn-sm btn-outline-warning ms-1">
@@ -449,7 +560,7 @@
                         <div class="border border-primary border-2 rounded p-3 mb-3" style="background:#f0f7ff">
                             <div class="fw-bold text-primary mb-2">
                                 <i class="bi bi-scissors"></i>
-                                Ventilation — {{ $ventilationLigneSousCategorie }} ({{ number_format((float) $ventilationLigneMontant, 2, ',', ' ') }} €)
+                                Ventilation — {{ $ventilationLigneCompteLabel }} ({{ number_format((float) $ventilationLigneMontant, 2, ',', ' ') }} €)
                             </div>
 
                             <table class="table table-sm mb-2">
@@ -541,7 +652,7 @@
                     @endif
 
                     <div class="d-flex gap-2">
-                        @if (! $isLocked && ! $isLockedByFacture && ! $isLockedByHelloAsso && ! $exerciceCloture && $this->canEdit)
+                        @if (! $isLocked && ! $isLockedByFacture && ! $isLockedByHelloAsso && ! $isExtourneMiroir && ! $exerciceCloture && $this->canEdit)
                             <button type="button" wire:click="addLigne" class="btn btn-sm btn-outline-secondary">
                                 <i class="bi bi-plus-lg"></i> Ajouter une ligne
                             </button>
@@ -575,4 +686,6 @@
         </div>
     @endif
 
+    <livewire:compta.poste-tiers-reglement-modal />
+    <livewire:compta.annulation-reglement-tiers-modal />
 </div>

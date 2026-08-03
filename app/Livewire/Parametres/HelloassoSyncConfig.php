@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Livewire\Parametres;
 
 use App\Enums\UsageComptable;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\HelloAssoParametres;
-use App\Models\SousCategorie;
+use App\Tenant\TenantContext;
 use Illuminate\Contracts\View\View;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 
 final class HelloassoSyncConfig extends Component
@@ -17,7 +19,7 @@ final class HelloassoSyncConfig extends Component
 
     public ?int $compteVersementId = null;
 
-    public ?int $sousCategorieDonId = null;
+    public ?int $compteDonId = null;
 
     public ?string $message = null;
 
@@ -25,17 +27,24 @@ final class HelloassoSyncConfig extends Component
 
     public function mount(): void
     {
-        $p = HelloAssoParametres::where('association_id', 1)->first();
+        $p = HelloAssoParametres::query()->first();
         if ($p !== null) {
             $this->compteHelloassoId = $p->compte_helloasso_id;
             $this->compteVersementId = $p->compte_versement_id;
-            $this->sousCategorieDonId = $p->sous_categorie_don_id;
+            $this->compteDonId = $p->compte_don_id;
         }
     }
 
     public function sauvegarder(): void
     {
-        $p = HelloAssoParametres::where('association_id', 1)->first();
+        $associationId = (int) TenantContext::currentId();
+        $this->validate([
+            'compteHelloassoId' => ['nullable', 'integer', Rule::exists('comptes_bancaires', 'id')->where('association_id', $associationId)],
+            'compteVersementId' => ['nullable', 'integer', Rule::exists('comptes_bancaires', 'id')->where('association_id', $associationId)],
+            'compteDonId' => ['nullable', 'integer', Rule::exists('comptes', 'id')->where('association_id', $associationId)],
+        ]);
+
+        $p = HelloAssoParametres::query()->first();
         if ($p === null) {
             $this->erreur = 'Paramètres HelloAsso non configurés.';
 
@@ -45,7 +54,7 @@ final class HelloassoSyncConfig extends Component
         $p->update([
             'compte_helloasso_id' => $this->compteHelloassoId ?: null,
             'compte_versement_id' => $this->compteVersementId ?: null,
-            'sous_categorie_don_id' => $this->sousCategorieDonId ?: null,
+            'compte_don_id' => $this->compteDonId ?: null,
         ]);
 
         $this->dispatch('form-saved');
@@ -60,7 +69,8 @@ final class HelloassoSyncConfig extends Component
                 ->orderBy('nom')
                 ->get(),
             'comptesVersement' => CompteBancaire::saisieManuelle()->orderBy('nom')->get(),
-            'sousCategoriesDon' => SousCategorie::forUsage(UsageComptable::Don)->orderBy('nom')->get(),
+            // Le sélecteur liste les comptes en usage Don.
+            'comptesDon' => Compte::forUsage(UsageComptable::Don)->orderBy('numero_pcg')->get(),
         ]);
     }
 }

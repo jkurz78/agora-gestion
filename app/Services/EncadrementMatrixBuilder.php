@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\TypeTransaction;
+use App\Models\Compte;
 use App\Models\EncadrementPrevision;
 use App\Models\Operation;
 use App\Models\Seance;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\TransactionLigne;
 use Illuminate\Database\Eloquent\Collection;
@@ -20,9 +20,9 @@ final class EncadrementMatrixBuilder
      *     animateurs: array<int, array{
      *         tiersId: int,
      *         tiersName: string,
-     *         sousCategories: array<int, array{
-     *             scId: int,
-     *             scName: string,
+     *         comptes: array<int, array{
+     *             compteId: int,
+     *             compteName: string,
      *             previsionIds: array<int, int|null>,
      *             prevuParSeance: array<int, float>,
      *             realiseParSeance: array<int, float>,
@@ -55,33 +55,40 @@ final class EncadrementMatrixBuilder
         $seanceRealiseTotaux = [];
         $orphanRealiseHorsSeance = [];
 
-        // 1) Charger les prévisions
-        $previsions = EncadrementPrevision::with(['tiers', 'sousCategorie'])
+        // 1) Charger les prévisions — matrice keyée par compte_id (DC-10a).
+        $previsions = EncadrementPrevision::with(['tiers', 'compte'])
             ->where('operation_id', $operation->id)
             ->get();
 
         foreach ($previsions as $p) {
+            if ($p->compte === null) {
+                // Prévision legacy non mappable vers un compte — ignorée.
+                continue;
+            }
+
             $tId = (int) $p->tiers_id;
-            $scId = (int) $p->sous_categorie_id;
+            $cId = (int) $p->compte_id;
             $sId = (int) $p->seance_id;
             $montant = (float) $p->montant_prevu;
 
             $this->ensureAnimateur($animateurs, $p->tiers);
-            $this->ensureSousCategorie($animateurs, $tId, $p->sousCategorie);
+            $this->ensureCompte($animateurs, $tId, $cId, $p->compte);
 
-            $animateurs[$tId]['sousCategories'][$scId]['previsionIds'][$sId] = (int) $p->id;
-            $animateurs[$tId]['sousCategories'][$scId]['prevuParSeance'][$sId] = $montant;
-            $animateurs[$tId]['sousCategories'][$scId]['totalPrevu'] += $montant;
+            $animateurs[$tId]['comptes'][$cId]['previsionIds'][$sId] = (int) $p->id;
+            $animateurs[$tId]['comptes'][$cId]['prevuParSeance'][$sId] = $montant;
+            $animateurs[$tId]['comptes'][$cId]['totalPrevu'] += $montant;
             $animateurs[$tId]['totalPrevuParSeance'][$sId] = ($animateurs[$tId]['totalPrevuParSeance'][$sId] ?? 0.0) + $montant;
             $animateurs[$tId]['totalPrevu'] += $montant;
             $seancePrevuTotaux[$sId] = ($seancePrevuTotaux[$sId] ?? 0.0) + $montant;
         }
 
-        // 2) Charger les réalisés (transaction_lignes Dépense sur l'opération)
+        // 2) Charger les réalisés (transaction_lignes Dépense sur l'opération) —
+        // ventilation() exclut par construction les lignes PD-only (411/401/512X).
         $lignes = TransactionLigne::query()
             ->whereHas('transaction', fn ($q) => $q->where('type', TypeTransaction::Depense))
             ->where('operation_id', $operation->id)
-            ->with(['transaction.tiers', 'sousCategorie'])
+            ->ventilation()
+            ->with(['transaction.tiers', 'compte'])
             ->get();
 
         foreach ($lignes as $ligne) {
@@ -91,7 +98,7 @@ final class EncadrementMatrixBuilder
             }
 
             $tId = (int) $tx->tiers_id;
-            $scId = (int) $ligne->sous_categorie_id;
+            $cId = (int) $ligne->compte_id;
             $montant = (float) $ligne->montant;
             $seanceNumero = $ligne->seance;
 
@@ -114,14 +121,14 @@ final class EncadrementMatrixBuilder
                 continue;
             }
 
-            $this->ensureSousCategorie($animateurs, $tId, $ligne->sousCategorie);
-            $animateurs[$tId]['sousCategories'][$scId]['realiseParSeance'][$sId] = ($animateurs[$tId]['sousCategories'][$scId]['realiseParSeance'][$sId] ?? 0.0) + $montant;
-            $animateurs[$tId]['sousCategories'][$scId]['transactionIdsParSeance'][$sId][] = (int) $tx->id;
+            $this->ensureCompte($animateurs, $tId, $cId, $ligne->compte);
+            $animateurs[$tId]['comptes'][$cId]['realiseParSeance'][$sId] = ($animateurs[$tId]['comptes'][$cId]['realiseParSeance'][$sId] ?? 0.0) + $montant;
+            $animateurs[$tId]['comptes'][$cId]['transactionIdsParSeance'][$sId][] = (int) $tx->id;
             if ($tx->numero_piece) {
-                $animateurs[$tId]['sousCategories'][$scId]['numeroPiecesParSeance'][$sId][] = (string) $tx->numero_piece;
+                $animateurs[$tId]['comptes'][$cId]['numeroPiecesParSeance'][$sId][] = (string) $tx->numero_piece;
             }
-            $animateurs[$tId]['sousCategories'][$scId]['totalRealise'] += $montant;
-            $animateurs[$tId]['sousCategories'][$scId]['hasRealise'] = true;
+            $animateurs[$tId]['comptes'][$cId]['totalRealise'] += $montant;
+            $animateurs[$tId]['comptes'][$cId]['hasRealise'] = true;
             $animateurs[$tId]['totalRealiseParSeance'][$sId] = ($animateurs[$tId]['totalRealiseParSeance'][$sId] ?? 0.0) + $montant;
             $animateurs[$tId]['totalRealise'] += $montant;
             $seanceRealiseTotaux[$sId] = ($seanceRealiseTotaux[$sId] ?? 0.0) + $montant;
@@ -153,7 +160,7 @@ final class EncadrementMatrixBuilder
         $animateurs[$tId] = [
             'tiersId' => $tId,
             'tiersName' => $tiers->displayName(),
-            'sousCategories' => [],
+            'comptes' => [],
             'totalPrevuParSeance' => [],
             'totalRealiseParSeance' => [],
             'totalPrevu' => 0.0,
@@ -164,19 +171,15 @@ final class EncadrementMatrixBuilder
     /**
      * @param  array<int, array<string, mixed>>  $animateurs
      */
-    private function ensureSousCategorie(array &$animateurs, int $tiersId, ?SousCategorie $sousCategorie): void
+    private function ensureCompte(array &$animateurs, int $tiersId, int $compteId, Compte $compte): void
     {
-        if ($sousCategorie === null) {
-            return;
-        }
-        $scId = (int) $sousCategorie->id;
-        if (isset($animateurs[$tiersId]['sousCategories'][$scId])) {
+        if (isset($animateurs[$tiersId]['comptes'][$compteId])) {
             return;
         }
 
-        $animateurs[$tiersId]['sousCategories'][$scId] = [
-            'scId' => $scId,
-            'scName' => $sousCategorie->nom,
+        $animateurs[$tiersId]['comptes'][$compteId] = [
+            'compteId' => $compteId,
+            'compteName' => $compte->intitule,
             'previsionIds' => [],
             'prevuParSeance' => [],
             'realiseParSeance' => [],

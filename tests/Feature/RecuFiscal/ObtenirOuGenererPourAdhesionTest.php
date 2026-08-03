@@ -9,8 +9,8 @@ use App\Enums\UsageComptable;
 use App\Exceptions\RecuFiscalException;
 use App\Models\Adhesion;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\RecuFiscalEmis;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -47,10 +47,10 @@ function adhesionPayeeDeductible(array $adhesionOverrides = []): Adhesion
         'ville' => 'Lyon',
     ]);
 
-    $sousCat = SousCategorie::query()
-        ->whereHas('usages', fn ($q) => $q->where('usage', UsageComptable::Cotisation->value))
+    $compteCotisation = Compte::query()
+        ->forUsage(UsageComptable::Cotisation)
         ->first()
-        ?? SousCategorie::factory()->pourCotisations()->create();
+        ?? Compte::factory()->pourCotisations()->create();
 
     $transaction = Transaction::factory()->create([
         'tiers_id' => $tiers->id,
@@ -65,8 +65,9 @@ function adhesionPayeeDeductible(array $adhesionOverrides = []): Adhesion
 
     TransactionLigne::factory()->create([
         'transaction_id' => $transaction->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compteCotisation->id,
         'montant' => 75.00,
+        'credit' => 75.00,
     ]);
 
     // L'observer AdhesionTransactionLigneObserver peut avoir auto-créé une adhésion

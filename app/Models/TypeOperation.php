@@ -21,7 +21,7 @@ final class TypeOperation extends TenantModel
         'nom',
         'libelle_article',
         'description',
-        'sous_categorie_id',
+        'compte_id',
         'nombre_seances',
         'reserve_adherents',
         'actif',
@@ -43,7 +43,7 @@ final class TypeOperation extends TenantModel
             'reserve_adherents' => 'boolean',
             'actif' => 'boolean',
             'nombre_seances' => 'integer',
-            'sous_categorie_id' => 'integer',
+            'compte_id' => 'integer',
             'formulaire_actif' => 'boolean',
             'formulaire_prescripteur' => 'boolean',
             'formulaire_parcours_therapeutique' => 'boolean',
@@ -59,9 +59,9 @@ final class TypeOperation extends TenantModel
         return $query->where('actif', true);
     }
 
-    public function sousCategorie(): BelongsTo
+    public function compte(): BelongsTo
     {
-        return $this->belongsTo(SousCategorie::class);
+        return $this->belongsTo(Compte::class, 'compte_id');
     }
 
     public function tarifs(): HasMany

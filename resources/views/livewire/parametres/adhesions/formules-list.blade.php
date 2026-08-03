@@ -28,7 +28,7 @@
             <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                 <tr>
                     <th>Nom</th>
-                    <th>Sous-catégorie</th>
+                    <th>Compte</th>
                     <th>Origine</th>
                     <th>Mode</th>
                     <th>Durée</th>
@@ -42,7 +42,7 @@
                 @forelse($formules as $formule)
                     <tr>
                         <td class="small fw-semibold">{{ $formule->nom }}</td>
-                        <td class="small">{{ $formule->sousCategorie?->nom ?? '—' }}</td>
+                        <td class="small">{{ $formule->compte?->intitule ?? 'Compte supprimé' }}</td>
                         <td class="small">
                             @if ($formule->est_helloasso)
                                 <span class="badge text-bg-info"><i class="bi bi-link-45deg"></i> HelloAsso</span>
@@ -155,33 +155,33 @@
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label fw-semibold" for="formule-souscat">Sous-catégorie (usage Cotisation)</label>
+                                <label class="form-label fw-semibold" for="formule-souscat">Compte (usage Cotisation)</label>
                                 <div class="d-flex gap-1">
                                     <select id="formule-souscat"
-                                            class="form-select form-select-sm @error('sousCategorieId') is-invalid @enderror"
-                                            wire:model="sousCategorieId"
+                                            class="form-select form-select-sm @error('compteId') is-invalid @enderror"
+                                            wire:model="compteId"
                                             @if($this->isEditingHelloasso()) disabled @endif>
                                         <option value="">— Choisir —</option>
-                                        @foreach($sousCategoriesCotisation as $sc)
-                                            <option value="{{ $sc->id }}">{{ $sc->nom }}@if($sc->code_cerfa) ({{ $sc->code_cerfa }})@endif</option>
+                                        @foreach($comptesCotisation as $compte)
+                                            <option value="{{ $compte->id }}">{{ $compte->numero_pcg }} — {{ $compte->intitule }}</option>
                                         @endforeach
                                     </select>
                                     @if(! $this->isEditingHelloasso())
                                         <button type="button"
                                                 class="btn btn-sm btn-outline-primary"
-                                                title="Créer une nouvelle sous-catégorie"
+                                                title="Créer un nouveau compte"
                                                 wire:click="openCreateSousCat"
                                                 style="padding:.15rem .5rem">
                                             <i class="bi bi-plus-lg"></i>
                                         </button>
                                     @endif
                                 </div>
-                                @error('sousCategorieId')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                                @error('compteId')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
 
                                 {{-- Sub-bloc inline : création nouvelle sous-cat --}}
                                 @if($showCreateSousCat)
                                     <div class="bg-light rounded p-3 mt-2 border">
-                                        <h6 class="mb-2"><i class="bi bi-plus-circle me-1"></i> Nouvelle sous-catégorie</h6>
+                                        <h6 class="mb-2"><i class="bi bi-plus-circle me-1"></i> Nouveau compte</h6>
                                         <p class="text-muted small mb-2">L'usage <strong>Cotisation</strong> sera automatiquement attaché.</p>
 
                                         @if($newSousCatErreur)
@@ -200,25 +200,13 @@
                                                 @error('newSousCatNom')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                             </div>
                                             <div class="col-md-3">
-                                                <label class="form-label small mb-1" for="new-sc-cerfa">Code CERFA</label>
+                                                <label class="form-label small mb-1" for="new-sc-cerfa">Numéro de compte *</label>
                                                 <input id="new-sc-cerfa"
                                                        type="text"
                                                        class="form-control form-control-sm"
                                                        wire:model="newSousCatCodeCerfa"
                                                        maxlength="10"
                                                        placeholder="751">
-                                            </div>
-                                            <div class="col-md-3">
-                                                <label class="form-label small mb-1" for="new-sc-cat">Catégorie *</label>
-                                                <select id="new-sc-cat"
-                                                        class="form-select form-select-sm @error('newSousCatCategorieId') is-invalid @enderror"
-                                                        wire:model="newSousCatCategorieId">
-                                                    <option value="">— Choisir —</option>
-                                                    @foreach($categories as $cat)
-                                                        <option value="{{ $cat->id }}">{{ $cat->nom }}</option>
-                                                    @endforeach
-                                                </select>
-                                                @error('newSousCatCategorieId')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                             </div>
                                         </div>
                                         <div class="d-flex gap-1 justify-content-end">

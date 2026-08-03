@@ -25,7 +25,7 @@ final class HelloAssoCallbackController extends Controller
             return response()->json(['status' => 'skipped_demo'], 200);
         }
 
-        $parametres = HelloAssoParametres::all()
+        $parametres = HelloAssoParametres::withoutGlobalScopes()->get()
             ->first(fn ($p) => hash_equals((string) ($p->callback_token ?? ''), $token));
 
         if ($parametres === null) {

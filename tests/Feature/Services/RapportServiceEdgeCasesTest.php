@@ -2,11 +2,9 @@
 
 declare(strict_types=1);
 
-use App\Enums\TypeCategorie;
 use App\Enums\TypeTransaction;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
-use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\RapportService;
@@ -37,8 +35,7 @@ it('fluxTresorerie returns structure with zero balances when no data', function 
 
 it('compteDeResultat handles negative transaction amounts correctly', function () {
     $compte = CompteBancaire::factory()->create();
-    $cat = Categorie::factory()->create(['type' => TypeCategorie::Depense]);
-    $sc = SousCategorie::factory()->create(['categorie_id' => $cat->id]);
+    $compteVentilation = Compte::factory()->numero('606')->create();
 
     $tx = Transaction::factory()->create([
         'type' => TypeTransaction::Depense,
@@ -51,8 +48,10 @@ it('compteDeResultat handles negative transaction amounts correctly', function (
     TransactionLigne::where('transaction_id', $tx->id)->forceDelete();
     TransactionLigne::create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sc->id,
         'montant' => -50.00,
+        'compte_id' => $compteVentilation->id,
+        'debit' => -50.00,
+        'credit' => 0.0,
     ]);
 
     $result = $this->service->compteDeResultat(2025);
@@ -96,8 +95,7 @@ it('toCsv handles empty rows', function () {
 
 it('compteDeResultat exercice boundaries are correct (sept-aug)', function () {
     $compte = CompteBancaire::factory()->create();
-    $cat = Categorie::factory()->create(['type' => TypeCategorie::Depense]);
-    $sc = SousCategorie::factory()->create(['categorie_id' => $cat->id]);
+    $compteVentilation = Compte::factory()->numero('606')->create();
 
     // Transaction in September 2025 = exercice 2025
     $tx = Transaction::factory()->create([
@@ -111,8 +109,10 @@ it('compteDeResultat exercice boundaries are correct (sept-aug)', function () {
     TransactionLigne::where('transaction_id', $tx->id)->forceDelete();
     TransactionLigne::create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sc->id,
         'montant' => 100.00,
+        'compte_id' => $compteVentilation->id,
+        'debit' => 100.00,
+        'credit' => 0.0,
     ]);
 
     $result2025 = $this->service->compteDeResultat(2025);

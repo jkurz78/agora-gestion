@@ -8,9 +8,9 @@ use App\Enums\ModePaiement;
 use App\Enums\StatutNoteDeFrais;
 use App\Enums\UsageComptable;
 use App\Exceptions\ExerciceCloturedException;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\NoteDeFrais;
-use App\Models\SousCategorie;
 use App\Services\NoteDeFrais\NoteDeFraisValidationService;
 use App\Services\NoteDeFrais\ValidationData;
 use DomainException;
@@ -69,7 +69,13 @@ final class Show extends Component
         $isAbandon = $this->ndf->abandon_creance_propose && $this->choixValidation === 'abandon';
 
         $rules = [
-            'compteId' => [
+            'dateComptabilisation' => ['required', 'date'],
+        ];
+
+        // Compte bancaire et mode de paiement ne sont requis qu'en validation
+        // normale — l'abandon de créance n'implique pas de mouvement bancaire.
+        if (! $isAbandon) {
+            $rules['compteId'] = [
                 'required',
                 'integer',
                 'exists:comptes_bancaires,id',
@@ -81,14 +87,13 @@ final class Show extends Component
                         $fail('Le compte bancaire sélectionné est invalide.');
                     }
                 },
-            ],
-            'modePaiement' => [
+            ];
+            $rules['modePaiement'] = [
                 'required',
                 'string',
                 'in:'.implode(',', array_column(ModePaiement::cases(), 'value')),
-            ],
-            'dateComptabilisation' => ['required', 'date'],
-        ];
+            ];
+        }
 
         $messages = [
             'compteId.required' => 'Veuillez sélectionner un compte bancaire.',
@@ -110,8 +115,8 @@ final class Show extends Component
 
         try {
             $data = new ValidationData(
-                compte_id: (int) $this->compteId,
-                mode_paiement: ModePaiement::from($this->modePaiement),
+                compte_id: $isAbandon ? null : (int) $this->compteId,
+                mode_paiement: $isAbandon ? null : ModePaiement::from($this->modePaiement),
                 date: $this->dateComptabilisation,
             );
 
@@ -179,16 +184,17 @@ final class Show extends Component
             ->get();
     }
 
-    private function sousCatAbandon(): ?SousCategorie
+    /** DC-8 : lecture compte-first du compte désigné « abandon de créance ». */
+    private function compteAbandon(): ?Compte
     {
         return $this->ndf->association
-            ->sousCategoriesFor(UsageComptable::AbandonCreance)
+            ->comptesFor(UsageComptable::AbandonCreance)
             ->first();
     }
 
     public function render(): View
     {
-        $this->ndf->loadMissing(['tiers', 'lignes', 'transaction', 'association']);
+        $this->ndf->loadMissing(['tiers', 'lignes.compte', 'transaction', 'association']);
 
         return view('livewire.back-office.note-de-frais.show', [
             'comptesBancaires' => $this->comptesBancaires(),
@@ -196,7 +202,7 @@ final class Show extends Component
             'statutSoumise' => StatutNoteDeFrais::Soumise,
             'statutValidee' => StatutNoteDeFrais::Validee,
             'statutRejetee' => StatutNoteDeFrais::Rejetee,
-            'sousCatAbandon' => $this->sousCatAbandon(),
+            'compteAbandon' => $this->compteAbandon(),
         ])->layout('layouts.app-sidebar', ['title' => 'Note de frais — Détail']);
     }
 }

@@ -1,0 +1,478 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Console\Commands;
+
+use App\Models\Association;
+use App\Models\RemiseBancaire;
+use App\Models\Transaction;
+use App\Models\TransactionLigne;
+use App\Models\VirementInterne;
+use App\Services\Compta\BackfillAuditor;
+use App\Services\Compta\EcritureGenerator;
+use App\Services\Compta\PartieDoubleGuard;
+use App\Services\Compta\TransactionConverter;
+use App\Services\ExerciceService;
+use App\Services\RemiseBancaireService;
+use App\Tenant\TenantContext;
+use Carbon\CarbonImmutable;
+use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+
+/**
+ * Commande artisan de backfill partie double (spec §4.3, sous-slice 1d).
+ *
+ * Convertit les transactions legacy (equilibree=FALSE) d'un exercice vers le modèle
+ * partie double (transaction_lignes avec compte_id, debit, credit).
+ *
+ * Options :
+ *   --exercice=current|YYYY  Exercice à convertir (défaut : exercice courant)
+ *   --all                    Backfille TOUS les exercices ayant des transactions (cutover)
+ *   --dry-run                Audit seulement — aucune écriture
+ *   --force                  Re-conversion totale même si equilibree=TRUE (interdit en prod)
+ *   --asso=ID                Limiter à une association (console interne only)
+ *
+ * Idempotent : skip si equilibree=TRUE (sauf --force).
+ * Step 32 : squelette + dry-run + rapport
+ * Step 33 : conversion idempotente + invariants + rollback
+ * Step 34 : --force + reset + guard prod
+ * Cutover  : --all (boucle sur tous les exercices ayant des transactions, ex. ENL de l'exercice précédent)
+ */
+final class BackfillPartieDoubleCommand extends Command
+{
+    protected $signature = 'compta:backfill-partie-double
+                            {--exercice=current : Exercice comptable à convertir (current ou YYYY)}
+                            {--all : Backfille tous les exercices ayant des transactions (ignore --exercice)}
+                            {--dry-run : Audit seulement, aucune écriture en base}
+                            {--force : Re-conversion totale même si equilibree=TRUE (interdit en prod)}
+                            {--asso= : Limiter à une association (ID)}';
+
+    protected $description = 'Backfill partie double : convertit l\'exercice legacy vers le modèle double-entrée.';
+
+    public function __construct(
+        private readonly ExerciceService $exerciceService,
+        private readonly BackfillAuditor $auditor,
+        private readonly TransactionConverter $converter,
+        private readonly RemiseBancaireService $remiseBancaireService,
+        private readonly EcritureGenerator $ecritureGenerator,
+    ) {
+        parent::__construct();
+    }
+
+    public function handle(): int
+    {
+        // -- Guard --force en production --
+        if ($this->option('force') && app()->environment('production')) {
+            $this->error('--force est interdit en production. Utilisez le mode staging ou testing.');
+
+            return self::FAILURE;
+        }
+
+        // -- Résolution de l'exercice (mode mono ; ignoré si --all) --
+        $exerciceOption = $this->option('exercice') ?: 'current';
+        $annee = $exerciceOption === 'current'
+            ? $this->exerciceService->current()
+            : (int) $exerciceOption;
+
+        $isDryRun = (bool) $this->option('dry-run');
+        $isForce = (bool) $this->option('force');
+        $isAll = (bool) $this->option('all');
+
+        // -- Résolution des associations à traiter --
+        $assoOption = $this->option('asso');
+        $associations = $assoOption !== null
+            ? Association::query()->whereKey((int) $assoOption)->get()
+            : Association::query()->get();
+
+        if ($associations->isEmpty()) {
+            $this->warn('Aucune association à traiter.');
+
+            return self::SUCCESS;
+        }
+
+        $previousTenant = TenantContext::current();
+
+        try {
+            foreach ($associations as $asso) {
+                TenantContext::clear();
+                TenantContext::boot($asso);
+
+                // --all : tous les exercices ayant des transactions (cutover) ;
+                // sinon l'exercice unique résolu ci-dessus.
+                $annees = $isAll ? $this->exercicesAvecTransactions() : [$annee];
+
+                foreach ($annees as $anneeCourante) {
+                    if ($isDryRun) {
+                        $this->runDryRun($anneeCourante);
+                    } else {
+                        $this->runConversion($anneeCourante, $isForce);
+                    }
+                }
+            }
+        } finally {
+            TenantContext::clear();
+            if ($previousTenant !== null) {
+                TenantContext::boot($previousTenant);
+            }
+        }
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * Liste triée des exercices (années comptables) ayant au moins une transaction
+     * pour le tenant courant. Utilisé par --all lors du cutover : garantit que les
+     * écritures de l'exercice précédent (ex. ENL expliquant le solde bancaire d'ouverture)
+     * sont aussi converties, sans hardcoder les années dans le script de déploiement.
+     *
+     * Couvre toute la plage [exerciceMin .. exerciceMax] ; les exercices intermédiaires
+     * sans transaction à convertir sont traités sans effet (runConversion = 0 converti).
+     *
+     * @return array<int>
+     */
+    private function exercicesAvecTransactions(): array
+    {
+        $bornes = Transaction::query()
+            ->selectRaw('MIN(date) as min_date, MAX(date) as max_date')
+            ->first();
+
+        if ($bornes === null || $bornes->min_date === null) {
+            return [];
+        }
+
+        $anneeMin = $this->exerciceService->anneeForDate(CarbonImmutable::parse($bornes->min_date));
+        $anneeMax = $this->exerciceService->anneeForDate(CarbonImmutable::parse($bornes->max_date));
+
+        return range($anneeMin, $anneeMax);
+    }
+
+    // =========================================================================
+    // Dry-run
+    // =========================================================================
+
+    private function runDryRun(int $annee): void
+    {
+        $assoId = (int) TenantContext::currentId();
+        $rapport = $this->auditor->auditer($assoId, $annee);
+
+        $this->line('');
+        $this->info('═══════════════════════════════════════');
+        $this->info('  RAPPORT DRY-RUN — Backfill Partie Double');
+        $this->info('  Association #'.$assoId.' — Exercice '.$annee);
+        $this->info('═══════════════════════════════════════');
+        $this->line('');
+
+        $this->info(sprintf(
+            '%d transactions à convertir (equilibree=FALSE) dans l\'exercice %d',
+            $rapport['nb_transactions_a_convertir'],
+            $annee
+        ));
+
+        $this->line('');
+        $this->line('Ventilations sans compte valide ('.count($rapport['ventilations_invalides']).')');
+        if (! empty($rapport['ventilations_invalides'])) {
+            $this->table(['ID', 'Nom'], array_map(
+                fn (array $sc): array => [$sc['id'], $sc['nom']],
+                $rapport['ventilations_invalides']
+            ));
+        } else {
+            $this->line('  (aucune)');
+        }
+
+        $this->line('');
+        $this->line('Modes non couverts ('.$rapport['modes_non_couverts_count'].')');
+        if (! empty($rapport['modes_non_couverts'])) {
+            $this->table(['Mode', 'Nb transactions'], array_map(
+                fn (array $m): array => [$m['mode_paiement'], $m['count']],
+                $rapport['modes_non_couverts']
+            ));
+        } else {
+            $this->line('  (aucun)');
+        }
+
+        $this->line('');
+        if ($rapport['nb_transactions_a_convertir'] === 0) {
+            $this->info('Aucune transaction à convertir — exercice déjà à jour.');
+        } else {
+            $this->warn("Dry-run terminé : {$rapport['nb_transactions_a_convertir']} transaction(s) à convertir. Relancer sans --dry-run pour effectuer la conversion.");
+        }
+    }
+
+    // =========================================================================
+    // Conversion réelle (Step 33)
+    // =========================================================================
+
+    /**
+     * Remet à zéro les lignes PD-only et le flag equilibree pour l'exercice.
+     *
+     * Utilisé par --force pour permettre la re-conversion totale.
+     *
+     * Actions :
+     *   1. Supprimer les lignes PD-only (comptes de classe 4/5) des Tx de l'exercice.
+     *   2. Reset les colonnes PD (compte_id, debit, credit, tiers_id, lettrage_code) sur les lignes de ventilation.
+     *   3. Marquer toutes les Tx de l'exercice equilibree=FALSE.
+     *   4. Supprimer les entrées lettrage_audit avec motif='backfill' pour ce tenant ET cet exercice.
+     */
+    private function resetExercice(int $annee): void
+    {
+        $dateDebut = "{$annee}-09-01";
+        $dateFin = ($annee + 1).'-08-31';
+
+        DB::transaction(function () use ($dateDebut, $dateFin) {
+            // Récupérer les IDs des transactions de l'exercice pour ce tenant
+            $txIds = Transaction::query()
+                ->whereBetween('date', [$dateDebut, $dateFin])
+                ->pluck('id')
+                ->all();
+
+            if (empty($txIds)) {
+                return;
+            }
+
+            // 1a. Capturer les T4 (transactions de remise portant une ligne 512X au débit)
+            //     AVANT de purger les lignes PD : le critère structurel (ligne 512X au débit)
+            //     n'est plus identifiable une fois les lignes supprimées à l'étape 1.
+            //     Critère volontairement indépendant de `reference` — des chèques remisés
+            //     réels (prod) ont reference = NULL, ce qui faisait que l'ancien critère
+            //     `reference IS NULL` supprimait les SOURCES au lieu des T4 (Finding 2,
+            //     cutover 2026-05-31).
+            $t4Ids = Transaction::whereIn('id', $txIds)
+                ->whereNotNull('remise_id')
+                ->whereHas('lignes', fn (Builder $q): Builder => $q
+                    ->where('debit', '>', 0)
+                    ->whereHas('compte', fn (Builder $c): Builder => $c->bancaires()))
+                ->pluck('id')
+                ->all();
+
+            // 1a-bis. Capturer les T2 séparées (encaissement/règlement) créées par le backfill
+            //         (chantier 2b/3b). Critère : remise_id null (pas une T4),
+            //         PD-pure (toutes les lignes sont classe 4/5, aucune classe 6/7).
+            $t2Ids = Transaction::whereIn('id', $txIds)
+                ->whereNotIn('id', $t4Ids)
+                ->whereNull('remise_id')
+                ->whereDoesntHave('lignes', fn (Builder $q): Builder => $q
+                    ->whereNull('deleted_at')
+                    ->where(function (Builder $ligne): void {
+                        $ligne->whereNull('compte_id')
+                            ->orWhereHas('compte', fn (Builder $c): Builder => $c->whereNotIn('classe', [4, 5]));
+                    }))
+                ->whereHas('lignes', fn (Builder $q): Builder => $q
+                    ->whereNotNull('compte_id')
+                    ->whereNull('deleted_at'))
+                ->pluck('id')
+                ->all();
+
+            // 1b. Supprimer les lignes PD-only (classe 4/5 — contreparties techniques)
+            TransactionLigne::whereIn('transaction_id', $txIds)
+                ->whereHas('compte', fn (Builder $q): Builder => $q->whereIn('classe', [4, 5]))
+                ->forceDelete();
+
+            // 1c. Supprimer les rows T4 et T2 orphelines (lignes PD purgées ci-dessus, mais
+            //     la row Transaction survit). Sans ça, le backfill créerait des doublons.
+            $orphanIds = array_merge($t4Ids, $t2Ids);
+            if (! empty($orphanIds)) {
+                Transaction::whereIn('id', $orphanIds)->forceDelete();
+            }
+
+            // 2. Reset colonnes PD sur les lignes de ventilation restantes
+            //    compte_id est préservé : c'est l'allocation utilisateur, pas une valeur dérivée.
+            TransactionLigne::whereIn('transaction_id', $txIds)
+                ->update([
+                    'debit' => 0,
+                    'credit' => 0,
+                    'tiers_id' => null,
+                    'lettrage_code' => null,
+                ]);
+
+            // 3. Marquer toutes les Tx equilibree=FALSE
+            Transaction::query()
+                ->whereIn('id', $txIds)
+                ->update(['equilibree' => false]);
+
+            // 4. Supprimer les entrées lettrage_audit motif='backfill' scopées tenant.
+            $nbDeleted = $this->resetLettrageAudit();
+
+            Log::info('[Backfill] Reset exercice terminé', [
+                'nb_transactions' => count($txIds),
+                'nb_audit_deleted' => $nbDeleted,
+            ]);
+        });
+    }
+
+    /**
+     * Supprime les entrées lettrage_audit motif='backfill' pour le tenant courant.
+     *
+     * Scopage : association_id = TenantContext::currentId() (isolation multi-tenant stricte).
+     * Pas de scope exercice : les mêmes comptes (411, 512X…) apparaissent dans tous les exercices,
+     * un filtre par compte_id ne discrimine pas. --force est destructif par nature.
+     */
+    private function resetLettrageAudit(): int
+    {
+        return DB::table('lettrage_audit')
+            ->where('association_id', TenantContext::currentId())
+            ->where('motif', 'backfill')
+            ->delete();
+    }
+
+    private function runConversion(int $annee, bool $isForce): void
+    {
+        $assoId = (int) TenantContext::currentId();
+        $dateDebut = "{$annee}-09-01";
+        $dateFin = ($annee + 1).'-08-31';
+
+        $this->info("Backfill exercice {$annee} — association #{$assoId}");
+
+        // --force : reset les lignes PD existantes avant re-conversion
+        if ($isForce) {
+            $this->info('--force : reset des lignes PD existantes...');
+            $this->resetExercice($annee);
+        }
+
+        // Charger les transactions à convertir
+        // Après reset (--force), toutes les Tx sont equilibree=FALSE → query sans filtre supplémentaire
+        $query = Transaction::whereBetween('date', [$dateDebut, $dateFin]);
+
+        if (! $isForce) {
+            // Idempotence : skip si equilibree=TRUE
+            $query->where(function ($q) {
+                $q->where('equilibree', false)->orWhereNull('equilibree');
+            });
+        }
+
+        $transactions = $query->get();
+        $total = $transactions->count();
+
+        // Phase 1 — conversion des transactions individuelles.
+        // Note : on n'interrompt PAS la méthode quand $total === 0. Sur un re-run sans
+        // --force, toutes les Tx sont déjà equilibree=TRUE donc $total vaut 0, mais la
+        // phase 2 (reconstruction des remises) doit rester rejouable — sa propre garde
+        // queryT4 assure l'idempotence. Un return ici la court-circuiterait (audit Vague 3).
+        if ($total === 0) {
+            $this->info('Phase 1 : transactions déjà à jour, 0 convertie.');
+        } else {
+            $this->info("{$total} transaction(s) à convertir...");
+
+            $converted = 0;
+            $skipped = 0;
+            $errors = 0;
+
+            foreach ($transactions as $tx) {
+                try {
+                    DB::transaction(function () use ($tx, &$converted, &$skipped) {
+                        $result = $this->converter->convertir($tx);
+
+                        if ($result) {
+                            $converted++;
+                            Log::info('[Backfill] Transaction convertie', ['transaction_id' => $tx->id]);
+                        } else {
+                            $skipped++;
+                            Log::info('[Backfill] Transaction skippée (sans tiers ou SC sans code)', ['transaction_id' => $tx->id]);
+                        }
+                    });
+                } catch (\Throwable $e) {
+                    $errors++;
+                    Log::error('[Backfill] Erreur lors de la conversion', [
+                        'transaction_id' => $tx->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                    $this->warn("  Erreur Tx #{$tx->id} : {$e->getMessage()}");
+                }
+            }
+
+            $this->info("Backfill terminé : {$converted} convertie(s), {$skipped} skippée(s), {$errors} erreur(s).");
+
+            if ($errors > 0) {
+                $this->warn('Des erreurs sont survenues. Consulter les logs pour les détails.');
+            }
+        }
+
+        // --- Phase 2 : reconstruction des remises bancaires (T4 512x → 5112) ---
+        // Exécutée après la boucle de conversion (phase 1 a posé les lignes 5112 sources).
+        $remises = RemiseBancaire::whereBetween('date', [$dateDebut, $dateFin])->get();
+        $remisesReconstruites = 0;
+        $remisesErreurs = 0;
+
+        foreach ($remises as $remise) {
+            try {
+                $this->remiseBancaireService->reconstruireT4Backfill($remise);
+                $remisesReconstruites++;
+            } catch (\Throwable $e) {
+                $remisesErreurs++;
+                Log::error('[Backfill] Erreur reconstruction T4 remise', [
+                    'remise_id' => (int) $remise->id,
+                    'error' => $e->getMessage(),
+                ]);
+                $this->warn("  Erreur remise #{$remise->id} : {$e->getMessage()}");
+            }
+        }
+
+        $this->info("Phase 2 : {$remisesReconstruites} remise(s) traitée(s), {$remisesErreurs} erreur(s).");
+
+        if ($remisesErreurs > 0) {
+            $this->warn('Des erreurs sont survenues lors de la reconstruction des remises. Consulter les logs.');
+        }
+
+        // --- Phase 3 : reprise des virements internes legacy (512 destination D / 512 source C) ---
+        $this->reconstruireVirementsInternes($annee, $isForce);
+    }
+
+    private function reconstruireVirementsInternes(int $annee, bool $isForce): void
+    {
+        $dateDebut = "{$annee}-09-01";
+        $dateFin = ($annee + 1).'-08-31';
+
+        $query = VirementInterne::whereBetween('date', [$dateDebut, $dateFin]);
+
+        if (! $isForce) {
+            $query->whereDoesntHave('transaction');
+        }
+
+        $virements = $query->get();
+        $total = $virements->count();
+
+        if ($total === 0) {
+            $this->info('Phase 3 : virements internes déjà à jour, 0 repris.');
+
+            return;
+        }
+
+        $repris = 0;
+        $erreurs = 0;
+
+        foreach ($virements as $virement) {
+            try {
+                DB::transaction(function () use ($virement, $isForce, &$repris): void {
+                    if ($isForce) {
+                        Transaction::withTrashed()
+                            ->where('virement_interne_id', (int) $virement->id)
+                            ->get()
+                            ->each(function (Transaction $transaction): void {
+                                $transaction->lignes()->withTrashed()->forceDelete();
+                                $transaction->forceDelete();
+                            });
+                    }
+
+                    $transaction = $this->ecritureGenerator->pourVirementInterne($virement->fresh());
+                    PartieDoubleGuard::assertComplete($transaction);
+                    $repris++;
+                });
+            } catch (\Throwable $e) {
+                $erreurs++;
+                Log::error('[Backfill] Erreur reprise virement interne', [
+                    'virement_interne_id' => (int) $virement->id,
+                    'error' => $e->getMessage(),
+                ]);
+                $this->warn("  Erreur virement interne #{$virement->id} : {$e->getMessage()}");
+            }
+        }
+
+        $this->info("Phase 3 : {$repris} virement(s) interne(s) repris, {$erreurs} erreur(s).");
+
+        if ($erreurs > 0) {
+            $this->warn('Des erreurs sont survenues lors de la reprise des virements internes. Consulter les logs.');
+        }
+    }
+}

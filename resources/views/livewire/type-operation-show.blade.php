@@ -142,14 +142,14 @@ x-on:click.window="
                     <div class="card-header py-2"><span class="small fw-semibold">Comptabilité</span></div>
                     <div class="card-body">
                         <div class="mb-0">
-                            <label class="form-label small">Activité (sous-catégorie comptable) <span class="text-danger">*</span></label>
-                            <select wire:model="sous_categorie_id" class="form-select form-select-sm @error('sous_categorie_id') is-invalid @enderror">
+                            <label class="form-label small">Activité (compte comptable) <span class="text-danger">*</span></label>
+                            <select wire:model="compte_id" class="form-select form-select-sm @error('compte_id') is-invalid @enderror">
                                 <option value="">— Choisir —</option>
-                                @foreach($sousCategories as $sc)
-                                    <option value="{{ $sc->id }}">{{ $sc->nom }} ({{ $sc->categorie?->nom }})</option>
+                                @foreach($comptesInscription as $compte)
+                                    <option value="{{ $compte->id }}">{{ $compte->numero_pcg }} — {{ $compte->intitule }}</option>
                                 @endforeach
                             </select>
-                            @error('sous_categorie_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            @error('compte_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
                     </div>
                 </div>

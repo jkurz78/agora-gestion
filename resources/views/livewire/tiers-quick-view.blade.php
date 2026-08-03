@@ -186,7 +186,7 @@
                                            class="text-decoration-none text-muted">
                                             <i class="bi bi-link-45deg"></i>{{ $op['operation_nom'] }}
                                         </a>
-                                        @if($op['sous_categorie']) — {{ $op['sous_categorie'] }}@endif
+                                        @if($op['compte']) — {{ $op['compte'] }}@endif
                                         : {{ number_format((float)$op['total'], 2, ',', ' ') }} € ({{ $op['count'] }})
                                     </li>
                                 @endforeach
@@ -343,7 +343,7 @@
                             <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                                 <tr>
                                     <th>Date</th>
-                                    <th>Sous-catégorie</th>
+                                    <th>Compte</th>
                                     <th>Mode</th>
                                     <th class="text-end">Montant</th>
                                     <th>Reçu fiscal</th>
@@ -355,7 +355,7 @@
                                         <td data-sort="{{ $don->transaction->date->format('Y-m-d') }}">
                                             {{ $don->transaction->date->format('d/m/Y') }}
                                         </td>
-                                        <td>{{ $don->sousCategorie->nom }}</td>
+                                        <td>{{ $don->compte->intitule }}</td>
                                         <td>{{ ucfirst($don->transaction->mode_paiement?->value ?? '—') }}</td>
                                         <td class="text-end" data-sort="{{ $don->montant }}">
                                             {{ number_format((float) $don->montant, 2, ',', ' ') }} €

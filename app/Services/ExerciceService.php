@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\OrigineANouveau;
 use App\Enums\StatutExercice;
 use App\Enums\TypeActionExercice;
+use App\Exceptions\Compta\EtapeComptaRequiseException;
 use App\Exceptions\ExerciceCloturedException;
 use App\Models\Exercice;
 use App\Models\ExerciceAction;
 use App\Models\User;
+use App\Services\Compta\ANouveau\ANouveauPreviewBuilder;
+use App\Services\Compta\ANouveau\ANouveauService;
+use App\Services\Compta\EtatComptaResolver;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
@@ -121,9 +126,23 @@ final class ExerciceService
     {
         $exercice = Exercice::where('annee', $annee)->first();
 
-        if ($exercice !== null && $exercice->isCloture()) {
-            throw new ExerciceCloturedException($annee);
-        }
+        $this->assertModeleOuvert($exercice, $annee);
+    }
+
+    /**
+     * Verrouille l'exercice source pendant une écriture comptable.
+     *
+     * L'ordre canonique partagé avec cloturer() est : exercice source, exercice
+     * cible éventuel, puis écritures. Le verrou reste porté par la transaction
+     * appelante jusqu'au commit.
+     */
+    public function assertOuvertVerrouille(int $annee): void
+    {
+        $exercice = Exercice::where('annee', $annee)
+            ->lockForUpdate()
+            ->first();
+
+        $this->assertModeleOuvert($exercice, $annee);
     }
 
     /**
@@ -132,18 +151,62 @@ final class ExerciceService
     public function cloturer(Exercice $exercice, User $user): void
     {
         DB::transaction(function () use ($exercice, $user): void {
-            $exercice->update([
+            // Même premier verrou qu'ANouveauService::persister() afin d'éviter
+            // l'inversion tenant → exercice / exercice → tenant.
+            DB::table('association')
+                ->where('id', TenantContext::currentId())
+                ->lockForUpdate()
+                ->first();
+
+            $exerciceVerrouille = Exercice::query()
+                ->whereKey((int) $exercice->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            // Défense en profondeur : les gardes de l'assistant sont
+            // consultatives, ce service peut être appelé directement. Refuser ici
+            // rend la garde réelle. Un utilisateur normal ne voit jamais cette
+            // exception : l'assistant l'a arrêté avant.
+            $etatCompta = app(EtatComptaResolver::class)->pourTenantCourant();
+            if (! $etatCompta->estOperationnel()) {
+                throw EtapeComptaRequiseException::pour($etatCompta);
+            }
+
+            $exerciceCible = Exercice::query()
+                ->where('annee', (int) $exerciceVerrouille->annee + 1)
+                ->lockForUpdate()
+                ->first();
+
+            if ($exerciceCible?->isCloture()) {
+                throw new \RuntimeException('Impossible de générer les à-nouveaux : l’exercice cible est clôturé.');
+            }
+
+            $preview = app(ANouveauPreviewBuilder::class)->build((int) $exerciceVerrouille->annee);
+            app(ANouveauService::class)->persister(
+                $preview,
+                OrigineANouveau::Cloture,
+                $user,
+            );
+
+            $exerciceVerrouille->update([
                 'statut' => StatutExercice::Cloture,
                 'date_cloture' => now(),
                 'cloture_par_id' => $user->id,
             ]);
 
             ExerciceAction::create([
-                'exercice_id' => $exercice->id,
+                'exercice_id' => $exerciceVerrouille->id,
                 'action' => TypeActionExercice::Cloture,
                 'user_id' => $user->id,
             ]);
         });
+    }
+
+    private function assertModeleOuvert(?Exercice $exercice, int $annee): void
+    {
+        if ($exercice !== null && $exercice->isCloture()) {
+            throw new ExerciceCloturedException($annee);
+        }
     }
 
     /**
@@ -152,6 +215,8 @@ final class ExerciceService
     public function reouvrir(Exercice $exercice, User $user, string $commentaire): void
     {
         DB::transaction(function () use ($exercice, $user, $commentaire): void {
+            app(ANouveauService::class)->invalider($exercice, $user, $commentaire);
+
             $exercice->update([
                 'statut' => StatutExercice::Ouvert,
                 'date_cloture' => null,

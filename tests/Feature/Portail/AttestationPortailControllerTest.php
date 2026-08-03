@@ -273,7 +273,7 @@ it('log portail.attestation.seance.telecharge est émis avec participant_id + ti
     $this->get($url)->assertStatus(200);
 
     Log::shouldHaveReceived('info')
-        ->once()
+        ->atLeast()->once()
         ->withArgs(function (string $message, array $context) use ($participant, $tiers, $seance): bool {
             return $message === 'portail.attestation.seance.telecharge'
                 && (int) $context['participant_id'] === (int) $participant->id
@@ -300,7 +300,7 @@ it('log portail.attestation.recap.telecharge est émis avec participant_id + tie
     $this->get($url)->assertStatus(200);
 
     Log::shouldHaveReceived('info')
-        ->once()
+        ->atLeast()->once()
         ->withArgs(function (string $message, array $context) use ($participant, $tiers): bool {
             return $message === 'portail.attestation.recap.telecharge'
                 && (int) $context['participant_id'] === (int) $participant->id

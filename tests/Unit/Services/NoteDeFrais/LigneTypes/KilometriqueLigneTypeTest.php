@@ -3,9 +3,9 @@
 declare(strict_types=1);
 
 use App\Enums\NoteDeFraisLigneType;
+use App\Enums\UsageComptable;
 use App\Models\Association;
-use App\Models\Categorie;
-use App\Models\SousCategorie;
+use App\Models\Compte;
 use App\Services\NoteDeFrais\LigneTypes\KilometriqueLigneType;
 use App\Tenant\TenantContext;
 use Illuminate\Validation\ValidationException;
@@ -112,42 +112,43 @@ it('validate passe pour un draft km complet valide', function () {
     expect(true)->toBeTrue();
 });
 
-it('resolveSousCategorieId retourne null si aucune sous-cat flaggée', function () {
+// DC-10a : helper — compte de charge flaggé FraisKilometriques.
+function compteKmFlagge(int $assoId, string $numero, string $intitule): Compte
+{
+    $compte = Compte::create([
+        'association_id' => $assoId,
+        'numero_pcg' => $numero,
+        'intitule' => $intitule,
+        'classe' => 6,
+        'actif' => true,
+    ]);
+    $compte->usages()->create(['usage' => UsageComptable::FraisKilometriques->value]);
+
+    return $compte;
+}
+
+it('resolveCompteId retourne null si aucun compte flaggé', function () {
     $asso = Association::factory()->create();
     TenantContext::boot($asso);
 
-    expect($this->strategy->resolveSousCategorieId(null))->toBeNull();
+    expect($this->strategy->resolveCompteId(null))->toBeNull();
 });
 
-it('resolveSousCategorieId retourne l\'id unique si exactement une flaggée', function () {
+it('resolveCompteId retourne l\'id unique si exactement un flaggé', function () {
     $asso = Association::factory()->create();
     TenantContext::boot($asso);
 
-    $cat = Categorie::factory()->create(['association_id' => $asso->id]);
-    $sc = SousCategorie::factory()->pourFraisKilometriques()->create([
-        'association_id' => $asso->id,
-        'categorie_id' => $cat->id,
-        'nom' => 'Déplacements',
-    ]);
+    $compte = compteKmFlagge($asso->id, '625K', 'Déplacements');
 
-    expect($this->strategy->resolveSousCategorieId(null))->toBe($sc->id);
+    expect($this->strategy->resolveCompteId(null))->toBe($compte->id);
 });
 
-it('resolveSousCategorieId retourne null si plusieurs flaggées', function () {
+it('resolveCompteId retourne null si plusieurs flaggés', function () {
     $asso = Association::factory()->create();
     TenantContext::boot($asso);
 
-    $cat = Categorie::factory()->create(['association_id' => $asso->id]);
-    SousCategorie::factory()->pourFraisKilometriques()->create([
-        'association_id' => $asso->id,
-        'categorie_id' => $cat->id,
-        'nom' => 'Déplacements bénévoles',
-    ]);
-    SousCategorie::factory()->pourFraisKilometriques()->create([
-        'association_id' => $asso->id,
-        'categorie_id' => $cat->id,
-        'nom' => 'Déplacements salariés',
-    ]);
+    compteKmFlagge($asso->id, '625A', 'Déplacements bénévoles');
+    compteKmFlagge($asso->id, '625B', 'Déplacements salariés');
 
-    expect($this->strategy->resolveSousCategorieId(null))->toBeNull();
+    expect($this->strategy->resolveCompteId(null))->toBeNull();
 });

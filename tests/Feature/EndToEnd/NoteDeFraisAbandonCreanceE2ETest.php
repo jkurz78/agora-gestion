@@ -5,18 +5,17 @@ declare(strict_types=1);
 use App\Enums\RoleAssociation;
 use App\Enums\StatutNoteDeFrais;
 use App\Enums\StatutReglement;
-use App\Enums\TypeCategorie;
 use App\Livewire\BackOffice\NoteDeFrais\Show as BackOfficeShow;
 use App\Livewire\Portail\NoteDeFrais\Form;
 use App\Models\Association;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -71,33 +70,27 @@ function e2eCreateComptable(Association $asso): User
 }
 
 /**
- * Crée la sous-catégorie Dépense + sous-catégorie AbandonCreance (Recette).
+ * Crée le compte Dépense + compte AbandonCreance (Recette)
+ * + infrastructure partie double (comptes système 411/401/467 + comptes 625/771).
  *
- * @return array{scDepense: SousCategorie, scAbandon: SousCategorie}
+ * @return array{compteDepense: Compte, compteAbandon: Compte}
  */
 function e2eCreateCategories(Association $asso): array
 {
-    $catDepense = Categorie::factory()->create([
+    // Infrastructure partie double — comptes système 411, 401, 467 requis par abandonCreancePd()
+    SystemeSeeder::seed();
+
+    $compteDepense = Compte::factory()->depense()->numero('625')->create([
         'association_id' => $asso->id,
-        'type' => TypeCategorie::Depense->value,
-    ]);
-    $scDepense = SousCategorie::factory()->create([
-        'association_id' => $asso->id,
-        'categorie_id' => $catDepense->id,
-        'nom' => 'Frais divers E2E',
+        'intitule' => 'Frais missions déplacements',
     ]);
 
-    $catRecette = Categorie::factory()->create([
+    $compteAbandon = Compte::factory()->pourAbandonCreance()->create([
         'association_id' => $asso->id,
-        'type' => TypeCategorie::Recette->value,
-    ]);
-    $scAbandon = SousCategorie::factory()->pourAbandonCreance()->create([
-        'association_id' => $asso->id,
-        'categorie_id' => $catRecette->id,
-        'nom' => '771 Abandon de créance E2E',
+        'intitule' => 'Dons et abandons de créances',
     ]);
 
-    return ['scDepense' => $scDepense, 'scAbandon' => $scAbandon];
+    return ['compteDepense' => $compteDepense, 'compteAbandon' => $compteAbandon];
 }
 
 /**
@@ -121,8 +114,8 @@ it('Jean soumet une NDF avec abandon, le comptable constate, Jean voit le statut
     // ── Setup ──────────────────────────────────────────────────────────────
     $asso = e2eCreateAsso();
     $jean = e2eCreateJean($asso);
-    $categories = e2eCreateCategories($asso);
-    $scDepense = $categories['scDepense'];
+    $comptes = e2eCreateCategories($asso);
+    $compteDepense = $comptes['compteDepense'];
     $compte = e2eCreateCompte($asso);
     $comptable = e2eCreateComptable($asso);
 
@@ -144,7 +137,7 @@ it('Jean soumet une NDF avec abandon, le comptable constate, Jean voit le statut
 
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
-        'sous_categorie_id' => $scDepense->id,
+        'compte_id' => $compteDepense->id,
         'libelle' => 'Déplacement mission',
         'montant' => 120.00,
         'piece_jointe_path' => "associations/{$assoId}/notes-de-frais/{$ndf->id}/ligne-1.pdf",
@@ -201,8 +194,8 @@ it('Jean soumet une NDF avec abandon, le comptable constate, Jean voit le statut
     expect($ndf->transaction_id)->not->toBeNull();
     expect($ndf->don_transaction_id)->not->toBeNull();
 
-    // 2 nouvelles transactions
-    expect(Transaction::count())->toBe($countBefore + 2);
+    // 4 nouvelles transactions en mode PD : T1-dépense, T1-don, OD-compensation × 2
+    expect(Transaction::count())->toBe($countBefore + 4);
 
     // Transaction Dépense réglée
     $txDepense = Transaction::find($ndf->transaction_id);

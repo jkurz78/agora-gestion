@@ -5,15 +5,19 @@ declare(strict_types=1);
 namespace App\Livewire\Onboarding;
 
 use App\Models\Association;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
+use App\Models\Famille;
 use App\Models\HelloAssoParametres;
 use App\Models\IncomingMailParametres;
 use App\Models\SmtpParametres;
+use App\Services\Compta\ANouveau\RepriseAutomatiqueService;
+use App\Services\Compta\ComptesProvisioningService;
 use App\Services\Onboarding\DefaultChartOfAccountsService;
 use App\Services\SmtpService;
 use App\Tenant\TenantContext;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Validate;
@@ -144,7 +148,7 @@ final class Wizard extends Component
     #[Validate('required|in:default,empty')]
     public string $planComptableChoix = 'default';
 
-    public ?int $planComptableCategoriesCount = null;
+    public ?int $planComptableComptesCount = null;
 
     public function mount(): void
     {
@@ -207,8 +211,8 @@ final class Wizard extends Component
             $this->imapPasswordDejaEnregistre = $imap->imap_password !== null;
         }
 
-        if (isset($this->state['plan_comptable_categories_count'])) {
-            $this->planComptableCategoriesCount = (int) $this->state['plan_comptable_categories_count'];
+        if (isset($this->state['plan_comptable_comptes_count'])) {
+            $this->planComptableComptesCount = (int) $this->state['plan_comptable_comptes_count'];
         }
     }
 
@@ -520,9 +524,9 @@ final class Wizard extends Component
 
         if ($this->planComptableChoix === 'default' && ! ($this->state['plan_comptable_applied'] ?? false)) {
             $result = app(DefaultChartOfAccountsService::class)->applyTo($asso);
-            $this->planComptableCategoriesCount = $result['categories'];
+            $this->planComptableComptesCount = $result['comptes'];
             $this->state['plan_comptable_applied'] = true;
-            $this->state['plan_comptable_categories_count'] = $result['categories'];
+            $this->state['plan_comptable_comptes_count'] = $result['comptes'];
             $asso->update(['wizard_state' => $this->state]);
         }
 
@@ -535,6 +539,16 @@ final class Wizard extends Component
             return;
         }
 
+        // Provisionne les comptes (partie double) du nouveau tenant maintenant
+        // que le plan comptable et les comptes bancaires sont saisis. Idempotent.
+        app(ComptesProvisioningService::class)->provisionAll();
+
+        // Les soldes d'ouverture saisis à l'étape bancaire entrent en comptabilité
+        // maintenant que le plan comptable existe. Sans ça, l'association verrait
+        // sa trésorerie à l'écran au-dessus d'une comptabilité qui l'ignore, et sa
+        // première clôture serait refusée sans issue dans l'application.
+        app(RepriseAutomatiqueService::class)->tenter(Auth::user());
+
         $this->currentAssociation()->update([
             'wizard_completed_at' => now(),
         ]);
@@ -543,7 +557,7 @@ final class Wizard extends Component
     }
 
     /**
-     * @return array{association: Association, compte: ?CompteBancaire, smtp: ?SmtpParametres, helloasso: ?HelloAssoParametres, imap: ?IncomingMailParametres, nb_categories: int}
+     * @return array{association: Association, compte: ?CompteBancaire, smtp: ?SmtpParametres, helloasso: ?HelloAssoParametres, imap: ?IncomingMailParametres, nb_comptes: int, nb_familles: int}
      */
     public function getRecapProperty(): array
     {
@@ -555,7 +569,8 @@ final class Wizard extends Component
             'smtp' => SmtpParametres::first(),
             'helloasso' => HelloAssoParametres::first(),
             'imap' => IncomingMailParametres::first(),
-            'nb_categories' => Categorie::count(),
+            'nb_comptes' => Compte::count(),
+            'nb_familles' => Famille::count(),
         ];
     }
 

@@ -2,18 +2,27 @@
 
 declare(strict_types=1);
 
+use App\Enums\UsageComptable;
 use App\Models\Adhesion;
-use App\Models\SousCategorie;
+use App\Models\Compte;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Services\AdhesionService;
+use App\Tenant\TenantContext;
 
 it('creerDepuisTransaction crée une adhésion pour une transaction cotisation', function (): void {
     $service = app(AdhesionService::class);
 
-    $sc = SousCategorie::factory()->pourCotisations()->create();
+    $sc = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '756S1',
+        'intitule' => 'Cotisations',
+        'classe' => 7,
+        'actif' => true,
+    ]);
+    $sc->usages()->create(['usage' => UsageComptable::Cotisation->value]);
     $tiers = Tiers::factory()->create();
 
     $tx = Transaction::factory()->asRecette()->create([
@@ -24,7 +33,10 @@ it('creerDepuisTransaction crée une adhésion pour une transaction cotisation',
     TransactionLigne::where('transaction_id', $tx->id)->delete();
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $sc->id,
+        'montant' => 50.00,
+        'debit' => 0,
+        'credit' => 50.00,
     ]);
 
     $adhesion = $service->creerDepuisTransaction($tx);
@@ -41,7 +53,14 @@ it('creerDepuisTransaction crée une adhésion pour une transaction cotisation',
 it('creerDepuisTransaction est idempotent', function (): void {
     $service = app(AdhesionService::class);
 
-    $sc = SousCategorie::factory()->pourCotisations()->create();
+    $sc = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '756S2',
+        'intitule' => 'Cotisations',
+        'classe' => 7,
+        'actif' => true,
+    ]);
+    $sc->usages()->create(['usage' => UsageComptable::Cotisation->value]);
     $tiers = Tiers::factory()->create();
 
     $tx = Transaction::factory()->asRecette()->create([
@@ -51,7 +70,10 @@ it('creerDepuisTransaction est idempotent', function (): void {
     TransactionLigne::where('transaction_id', $tx->id)->delete();
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $sc->id,
+        'montant' => 50.00,
+        'debit' => 0,
+        'credit' => 50.00,
     ]);
 
     $service->creerDepuisTransaction($tx);
@@ -67,7 +89,14 @@ it('creerDepuisTransaction ne duplique pas une adhésion déjà liée à la tran
     // à la même transaction → doublon. Le bon idempotent = transaction_id.
     $service = app(AdhesionService::class);
 
-    $sc = SousCategorie::factory()->pourCotisations()->create();
+    $sc = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '756S3',
+        'intitule' => 'Cotisations',
+        'classe' => 7,
+        'actif' => true,
+    ]);
+    $sc->usages()->create(['usage' => UsageComptable::Cotisation->value]);
     $tiers = Tiers::factory()->create();
 
     $tx = Transaction::factory()->asRecette()->create([
@@ -79,7 +108,10 @@ it('creerDepuisTransaction ne duplique pas une adhésion déjà liée à la tran
         TransactionLigne::where('transaction_id', $tx->id)->delete();
         TransactionLigne::factory()->create([
             'transaction_id' => $tx->id,
-            'sous_categorie_id' => $sc->id,
+            'compte_id' => $sc->id,
+            'montant' => 50.00,
+            'debit' => 0,
+            'credit' => 50.00,
         ]);
     });
 

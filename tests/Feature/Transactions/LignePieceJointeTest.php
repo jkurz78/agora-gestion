@@ -2,12 +2,15 @@
 
 declare(strict_types=1);
 
+use App\Enums\ModePaiement;
 use App\Livewire\TransactionForm;
 use App\Models\Association;
-use App\Models\Categorie;
-use App\Models\SousCategorie;
+use App\Models\Compte;
+use App\Models\CompteBancaire;
+use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Tenant\TenantContext;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -22,13 +25,57 @@ beforeEach(function () {
     TenantContext::boot($this->association);
     session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
+    SystemeSeeder::seed();
+    $this->compteBancaire = CompteBancaire::factory()->create([
+        'association_id' => $this->association->id,
+    ]);
+    Compte::create([
+        'association_id' => $this->association->id,
+        'numero_pcg' => '512_TEST_PJ_'.$this->compteBancaire->id,
+        'intitule' => 'Banque PJ lignes',
+        'classe' => 5,
+        'actif' => true,
+        'est_systeme' => true,
+        'pour_inscriptions' => false,
+        'lettrable' => false,
+        'compte_bancaire_id' => $this->compteBancaire->id,
+    ]);
 
+    $this->tiers = Tiers::factory()->create([
+        'association_id' => $this->association->id,
+    ]);
+
+    // Mode de paiement figé : la factory en tire un au hasard, ce qui ferait
+    // varier le compte de trésorerie porté par l'écriture d'un run à l'autre.
+    // Le sujet de ce fichier étant les pièces jointes, on fixe le virement
+    // (compte 512 créé ci-dessus).
     $this->tx = Transaction::factory()->asDepense()->create([
         'association_id' => $this->association->id,
         'date' => '2025-10-01',
+        'tiers_id' => $this->tiers->id,
+        'compte_id' => $this->compteBancaire->id,
+        'mode_paiement' => ModePaiement::Virement,
     ]);
     // Prendre la première ligne créée par la factory
     $this->ligne = $this->tx->lignes()->first();
+
+    // DC-10a : les lignes de ventilation portent compte_id + debit/credit dès la
+    // création (contrat compte-first) — enrichir les lignes factory (dépense →
+    // debit = montant) pour que scopeVentilation (compte classe 6/7) les voie.
+    foreach ($this->tx->lignes()->get()->values() as $i => $ligne) {
+        $compte = Compte::create([
+            'association_id' => $this->association->id,
+            'numero_pcg' => '609'.($i + 1),
+            'intitule' => 'Compte test 609'.($i + 1),
+            'classe' => 6,
+            'actif' => true,
+        ]);
+        $ligne->fill([
+            'compte_id' => $compte->id,
+            'debit' => (float) $ligne->montant,
+            'credit' => 0,
+        ])->save();
+    }
 });
 
 afterEach(fn () => TenantContext::clear());
@@ -124,9 +171,14 @@ it('controller retourne 404 pour une transaction hors tenant (TenantScope)', fun
 // 5. Form : upload d'une PJ ligne au create → path persisté + fichier stocké
 // ─────────────────────────────────────────────────────────────────────────────
 it('persiste la PJ de ligne lors du create', function () {
-    $sousCategorie = SousCategorie::factory()
-        ->for(Categorie::factory()->depense()->create(['association_id' => $this->association->id]), 'categorie')
-        ->create(['association_id' => $this->association->id]);
+    // DC-10a : le sélecteur émet directement un id comptes.id (classe 6).
+    $compteVentilation = Compte::create([
+        'association_id' => $this->association->id,
+        'numero_pcg' => '607',
+        'intitule' => 'Achats de marchandises',
+        'classe' => 6,
+        'actif' => true,
+    ]);
 
     $file = UploadedFile::fake()->create('recu.pdf', 100, 'application/pdf');
 
@@ -135,7 +187,9 @@ it('persiste la PJ de ligne lors du create', function () {
         ->set('date', '2025-10-01')
         ->set('libelle', 'Test create PJ ligne')
         ->set('mode_paiement', 'virement')
-        ->set('lignes.0.sous_categorie_id', (string) $sousCategorie->id)
+        ->set('compte_id', $this->compteBancaire->id)
+        ->set('tiers_id', $this->tiers->id)
+        ->set('lignes.0.compte_id', (string) $compteVentilation->id)
         ->set('lignes.0.montant', '50')
         ->set('lignes.0.notes', 'recu-achat')
         ->set('lignes.0.piece_jointe_upload', $file)
@@ -164,6 +218,7 @@ it('remplace la PJ de ligne existante lors du update', function () {
 
     Livewire::test(TransactionForm::class)
         ->call('edit', $this->tx->id)
+        ->set('compte_id', $this->compteBancaire->id)
         ->set('lignes.0.piece_jointe_upload', $nouveauFichier)
         ->call('save')
         ->assertHasNoErrors();
@@ -186,6 +241,7 @@ it('supprime la PJ de ligne quand piece_jointe_remove est true', function () {
 
     Livewire::test(TransactionForm::class)
         ->call('edit', $this->tx->id)
+        ->set('compte_id', $this->compteBancaire->id)
         ->set('lignes.0.piece_jointe_remove', true)
         ->call('save')
         ->assertHasNoErrors();

@@ -68,20 +68,20 @@
                         <td style="text-align:center;padding:2px 6px;color:#2E7D32;font-weight:700;font-size:11px">{{ $fmt($anim['totalRealise']) }}</td>
                     </tr>
 
-                    {{-- Sous-lignes par sous-catégorie : 2 rangées (Prévu / Réalisé) --}}
-                    @foreach($anim['sousCategories'] as $scId => $sc)
+                    {{-- Sous-lignes par compte : 2 rangées (Prévu / Réalisé) --}}
+                    @foreach($anim['comptes'] as $compteId => $compte)
                         <tr>
                             <td rowspan="2" style="position:sticky;left:0;z-index:1;background:#fff;padding:2px 8px 2px 20px;font-size:11px;color:#6c757d;white-space:nowrap;vertical-align:middle">
                                 <div class="d-flex align-items-center justify-content-between">
-                                    <span>{{ $sc['scName'] }}</span>
+                                    <span>{{ $compte['compteName'] }}</span>
                                     @if($this->canEdit)
                                         <div class="d-flex gap-1">
                                             <button class="btn btn-sm p-0" style="color:#0d6efd;font-size:10px;border:1px solid #0d6efd;border-radius:3px;padding:0 3px !important;line-height:1.3"
-                                                    wire:click="recopierLigne({{ $tiersId }}, {{ $scId }})"
+                                                    wire:click="recopierLigne({{ $tiersId }}, {{ $compteId }})"
                                                     title="Recopier la 1re séance sur toute la ligne">→</button>
-                                            @if(! $sc['hasRealise'])
+                                            @if(! $compte['hasRealise'])
                                                 <button class="btn btn-sm p-0" style="color:#b00;font-size:11px;line-height:1;border:none;background:none"
-                                                        wire:click="supprimerLigne({{ $tiersId }}, {{ $scId }})"
+                                                        wire:click="supprimerLigne({{ $tiersId }}, {{ $compteId }})"
                                                         wire:confirm="Supprimer cette ligne ?"
                                                         title="Supprimer la ligne">✕</button>
                                             @endif
@@ -91,11 +91,11 @@
                             </td>
                             @foreach($seances as $seance)
                                 @php
-                                    $prevu = $sc['prevuParSeance'][$seance->id] ?? 0;
+                                    $prevu = $compte['prevuParSeance'][$seance->id] ?? 0;
                                     $val = number_format($prevu, 2, ',', '');
                                 @endphp
                                 <td style="text-align:center;padding:2px 4px;font-size:11px;color:#6c757d">
-                                    <span wire:key="prev-{{ $tiersId }}-{{ $scId }}-{{ $seance->id }}-{{ $val }}"
+                                    <span wire:key="prev-{{ $tiersId }}-{{ $compteId }}-{{ $seance->id }}-{{ $val }}"
                                           x-data="{ editing: false, value: @js($val) }"
                                           @if($this->canEdit) @click="if(!editing){editing=true;$nextTick(()=>{$refs.input.focus();$refs.input.select()})}" :style="!editing ? 'cursor:text' : ''" @endif>
                                         <template x-if="!editing">
@@ -103,7 +103,7 @@
                                         </template>
                                         <template x-if="editing">
                                             <input type="text" x-ref="input" x-model="value"
-                                                   @blur="editing=false; $wire.call('updateMontantPrevu', {{ $tiersId }}, {{ $scId }}, {{ $seance->id }}, value)"
+                                                   @blur="editing=false; $wire.call('updateMontantPrevu', {{ $tiersId }}, {{ $compteId }}, {{ $seance->id }}, value)"
                                                    @keydown.enter="$refs.input.blur()"
                                                    @keydown.escape="editing=false"
                                                    style="width:55px;border:1px solid #0d6efd;border-radius:3px;padding:1px 4px;font-size:11px;text-align:right;outline:none">
@@ -111,14 +111,14 @@
                                     </span>
                                 </td>
                             @endforeach
-                            <td style="text-align:center;padding:2px 6px;font-size:11px;font-weight:500;color:#6c757d">{{ $fmt($sc['totalPrevu']) }}</td>
+                            <td style="text-align:center;padding:2px 6px;font-size:11px;font-weight:500;color:#6c757d">{{ $fmt($compte['totalPrevu']) }}</td>
                         </tr>
                         <tr>
                             @foreach($seances as $seance)
                                 @php
-                                    $realise = $sc['realiseParSeance'][$seance->id] ?? 0;
-                                    $txIds = $sc['transactionIdsParSeance'][$seance->id] ?? [];
-                                    $pieces = $sc['numeroPiecesParSeance'][$seance->id] ?? [];
+                                    $realise = $compte['realiseParSeance'][$seance->id] ?? 0;
+                                    $txIds = $compte['transactionIdsParSeance'][$seance->id] ?? [];
+                                    $pieces = $compte['numeroPiecesParSeance'][$seance->id] ?? [];
                                 @endphp
                                 <td style="text-align:center;padding:2px 4px;font-size:11px;background:#f8f9fa">
                                     @if($realise > 0)
@@ -135,33 +135,33 @@
                                     @else
                                         @if($this->canEdit)
                                             <button class="btn btn-sm p-0" style="color:#198754;font-size:14px;line-height:1;border:none;background:none"
-                                                    wire:click="openCreateModal({{ $tiersId }}, {{ $scId }}, {{ $seance->numero }})"
+                                                    wire:click="openCreateModal({{ $tiersId }}, {{ $compteId }}, {{ $seance->numero }})"
                                                     title="Saisir le réalisé">&#8853;</button>
                                         @endif
                                     @endif
                                 </td>
                             @endforeach
-                            <td style="text-align:center;padding:2px 6px;font-size:11px;color:#2E7D32;font-weight:600">{{ $fmt($sc['totalRealise']) }}</td>
+                            <td style="text-align:center;padding:2px 6px;font-size:11px;color:#2E7D32;font-weight:600">{{ $fmt($compte['totalRealise']) }}</td>
                         </tr>
                     @endforeach
 
-                    {{-- Bouton + Ajouter une ligne sous-catégorie --}}
+                    {{-- Bouton + Ajouter une ligne compte --}}
                     @if($this->canEdit)
                     <tr>
                         <td colspan="{{ $colCount + 2 }}" style="padding:2px 8px 6px 20px;font-size:11px">
                             @if($addingScForTiersId === $tiersId)
-                                <div x-data="{ scId: null }" class="d-flex gap-2 align-items-center">
-                                    <select x-model.number="scId" class="form-select form-select-sm" style="max-width:240px;font-size:11px">
-                                        <option :value="null">Choisir une sous-catégorie…</option>
-                                        @foreach($sousCategoriesDepense as $sc)
-                                            @if(! isset($anim['sousCategories'][$sc['id']]))
-                                                <option value="{{ $sc['id'] }}">{{ $sc['nom'] }}</option>
+                                <div x-data="{ compteId: null }" class="d-flex gap-2 align-items-center">
+                                    <select x-model.number="compteId" class="form-select form-select-sm" style="max-width:240px;font-size:11px">
+                                        <option :value="null">Choisir un compte…</option>
+                                        @foreach($comptesDepense as $compte)
+                                            @if(! isset($anim['comptes'][$compte['id']]))
+                                                <option value="{{ $compte['id'] }}">{{ $compte['nom'] }}</option>
                                             @endif
                                         @endforeach
                                     </select>
                                     <button class="btn btn-sm btn-primary" style="font-size:11px"
-                                            @click="if(scId) { $wire.call('ajouterLigneSousCategorie', {{ $tiersId }}, scId) }"
-                                            :disabled="!scId">Ajouter</button>
+                                            @click="if(compteId) { $wire.call('ajouterLigneCompte', {{ $tiersId }}, compteId) }"
+                                            :disabled="!compteId">Ajouter</button>
                                     <button class="btn btn-sm btn-outline-secondary" style="font-size:11px"
                                             wire:click="fermerAjoutLigne">Annuler</button>
                                 </div>
@@ -207,7 +207,7 @@
         </table>
     </div>
 
-    {{-- Ajouter un encadrant : 2 étapes (sélection tiers puis sous-catégorie) --}}
+    {{-- Ajouter un encadrant : 2 étapes (sélection tiers puis compte) --}}
     <div class="mt-3 p-3 border rounded" style="max-width:520px;background:#fafafa">
         <label class="form-label fw-medium" style="font-size:13px">
             <i class="bi bi-plus-circle me-1"></i>Ajouter un encadrant
@@ -215,17 +215,17 @@
         @if($newTiersIdEnCours === null)
             <livewire:tiers-autocomplete wire:model="newTiersId" filtre="depenses" :key="'anim-tiers-'.$operation->id" />
         @else
-            <div x-data="{ scId: null }" class="d-flex gap-2 align-items-center">
-                <div class="text-muted small">Sous-catégorie :</div>
-                <select x-model.number="scId" class="form-select form-select-sm" style="max-width:240px;font-size:12px" x-init="$el.focus()">
+            <div x-data="{ compteId: null }" class="d-flex gap-2 align-items-center">
+                <div class="text-muted small">Compte :</div>
+                <select x-model.number="compteId" class="form-select form-select-sm" style="max-width:240px;font-size:12px" x-init="$el.focus()">
                     <option :value="null">Choisir…</option>
-                    @foreach($sousCategoriesDepense as $sc)
-                        <option value="{{ $sc['id'] }}">{{ $sc['nom'] }}</option>
+                    @foreach($comptesDepense as $compte)
+                        <option value="{{ $compte['id'] }}">{{ $compte['nom'] }}</option>
                     @endforeach
                 </select>
                 <button class="btn btn-sm btn-primary"
-                        @click="if(scId) { $wire.call('ajouterEncadrantAvecSousCategorie', {{ $newTiersIdEnCours }}, scId) }"
-                        :disabled="!scId">Ajouter</button>
+                        @click="if(compteId) { $wire.call('ajouterEncadrantAvecCompte', {{ $newTiersIdEnCours }}, compteId) }"
+                        :disabled="!compteId">Ajouter</button>
                 <button class="btn btn-sm btn-outline-secondary"
                         wire:click="annulerAjoutEncadrant">Annuler</button>
             </div>

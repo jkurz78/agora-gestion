@@ -52,7 +52,7 @@ final class BudgetExportController extends Controller
         $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->fromArray(
-            array_merge([['exercice', 'categorie', 'sous_categorie', 'montant_prevu']], $rows)
+            array_merge([['exercice', 'famille', 'compte', 'montant_prevu']], $rows)
         );
 
         $writer = new Xlsx($spreadsheet);

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\TypeLigneFacture;
 use App\Livewire\Portail\MesActivites;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\DocumentPrevisionnel;
 use App\Models\Facture;
 use App\Models\FactureLigne;
@@ -12,7 +13,6 @@ use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Reglement;
 use App\Models\Seance;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -106,7 +106,7 @@ function attachDevisToParticipant(Association $asso, Participant $participant): 
 
 function attachFactureToParticipant(Association $asso, Participant $participant): Facture
 {
-    $sousCat = SousCategorie::factory()->create(['association_id' => $asso->id]);
+    $compteVentilation = Compte::factory()->create();
 
     $transaction = Transaction::factory()->create([
         'association_id' => $asso->id,
@@ -116,8 +116,10 @@ function attachFactureToParticipant(Association $asso, Participant $participant)
 
     $txLigne = TransactionLigne::factory()->create([
         'transaction_id' => $transaction->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compteVentilation->id,
         'montant' => 100.00,
+        'debit' => 0.0,
+        'credit' => 100.00,
     ]);
 
     $seance = Seance::where('operation_id', $participant->operation_id)->first();

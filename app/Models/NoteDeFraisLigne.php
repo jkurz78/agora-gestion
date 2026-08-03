@@ -31,7 +31,7 @@ final class NoteDeFraisLigne extends Model
 
     protected $fillable = [
         'note_de_frais_id',
-        'sous_categorie_id',
+        'compte_id',
         'operation_id',
         'seance',
         'libelle',
@@ -48,6 +48,7 @@ final class NoteDeFraisLigne extends Model
             'seance' => 'integer',
             'type' => NoteDeFraisLigneType::class,
             'metadata' => 'array',
+            'compte_id' => 'integer',
         ];
     }
 
@@ -56,9 +57,9 @@ final class NoteDeFraisLigne extends Model
         return $this->belongsTo(NoteDeFrais::class);
     }
 
-    public function sousCategorie(): BelongsTo
+    public function compte(): BelongsTo
     {
-        return $this->belongsTo(SousCategorie::class);
+        return $this->belongsTo(Compte::class, 'compte_id');
     }
 
     public function operation(): BelongsTo

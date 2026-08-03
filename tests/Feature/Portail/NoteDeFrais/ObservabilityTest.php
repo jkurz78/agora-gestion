@@ -3,9 +3,9 @@
 declare(strict_types=1);
 
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Services\Portail\NoteDeFrais\NoteDeFraisService;
 use App\Tenant\TenantContext;
@@ -79,7 +79,13 @@ it('observabilité: saveDraft update émet portail.ndf.updated avec ndf_id, tier
 // 3. portail.ndf.submitted — soumission réussie
 // ─────────────────────────────────────────────────────────────────────────────
 it('observabilité: submit émet portail.ndf.submitted avec ndf_id, tiers_id, montant_total', function () {
-    $sousCategorie = SousCategorie::factory()->create();
+    $compte = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '61O'.random_int(100, 999),
+        'intitule' => 'Charge NDF',
+        'classe' => 6,
+        'actif' => true,
+    ]);
 
     $ndf = NoteDeFrais::factory()->brouillon()->create([
         'association_id' => $this->asso->id,
@@ -91,7 +97,7 @@ it('observabilité: submit émet portail.ndf.submitted avec ndf_id, tiers_id, mo
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
         'montant' => 42.50,
-        'sous_categorie_id' => $sousCategorie->id,
+        'compte_id' => $compte->id,
         'piece_jointe_path' => 'associations/1/notes-de-frais/1/ligne-1.pdf',
     ]);
 
@@ -129,7 +135,13 @@ it('observabilité: delete émet portail.ndf.deleted avec ndf_id, tiers_id', fun
 // 5. Sécurité : aucun log ne contient le chemin complet d'une PJ
 // ─────────────────────────────────────────────────────────────────────────────
 it('observabilité: aucun log ne contient le chemin complet d\'une pièce jointe', function () {
-    $sousCategorie = SousCategorie::factory()->create();
+    $compte = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '61O'.random_int(100, 999),
+        'intitule' => 'Charge NDF',
+        'classe' => 6,
+        'actif' => true,
+    ]);
 
     /** @var array<int, array{message: string, context: array<string, mixed>}> $loggedEntries */
     $loggedEntries = [];
@@ -150,7 +162,7 @@ it('observabilité: aucun log ne contient le chemin complet d\'une pièce jointe
             [
                 'libelle' => 'Ligne test',
                 'montant' => 10.00,
-                'sous_categorie_id' => $sousCategorie->id,
+                'compte_id' => $compte->id,
                 'piece_jointe_path' => $pjPath,
             ],
         ],

@@ -2,15 +2,32 @@
 
 use App\Livewire\RapportCompteResultatOperations;
 use App\Models\Association;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\Operation;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
+
+/**
+ * Ligne de ventilation compte-first : le compte est passé directement,
+ * debit/credit posés selon le type de la transaction (dépense: débit, recette: crédit).
+ */
+function crOpsTestLigne(Transaction $tx, Compte $compte, float $montant, ?int $operationId = null): TransactionLigne
+{
+    $estDepense = $tx->type->value === 'depense';
+
+    return TransactionLigne::factory()->create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $compte->id,
+        'operation_id' => $operationId,
+        'montant' => $montant,
+        'debit' => $estDepense ? $montant : 0.0,
+        'credit' => $estDepense ? 0.0 : $montant,
+    ]);
+}
 
 beforeEach(function () {
     $this->association = Association::factory()->create();
@@ -42,12 +59,12 @@ it('affiche un message si aucune opération sélectionnée', function () {
 
 it('affiche les données filtrées par opération', function () {
     $op = Operation::factory()->create(['association_id' => $this->association->id]);
-    $cat = Categorie::factory()->depense()->create(['association_id' => $this->association->id, 'nom' => 'Frais']);
-    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $cat->id, 'nom' => 'Transport']);
+    // DC-4 : le compte déclenche la matérialisation Famille nécessaire à CompteResultatBuilder.
+    $compte = Compte::factory()->numero('625')->create(['association_id' => $this->association->id, 'intitule' => 'Transport']);
 
     $d = Transaction::factory()->asDepense()->create(['association_id' => $this->association->id, 'date' => '2025-10-01', 'saisi_par' => $this->user->id]);
     $d->lignes()->forceDelete();
-    TransactionLigne::factory()->create(['transaction_id' => $d->id, 'sous_categorie_id' => $sc->id, 'operation_id' => $op->id, 'montant' => 100.00]);
+    crOpsTestLigne($d, $compte, 100.00, (int) $op->id);
 
     Livewire::test(RapportCompteResultatOperations::class)
         ->set('selectedOperationIds', [$op->id])
@@ -71,13 +88,13 @@ it('supporte parTiers via query string', function () {
 
 it('passe les données tiers quand parTiers est actif', function () {
     $op = Operation::factory()->create(['association_id' => $this->association->id]);
-    $cat = Categorie::factory()->depense()->create(['association_id' => $this->association->id, 'nom' => 'Frais']);
-    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id, 'categorie_id' => $cat->id, 'nom' => 'Transport']);
+    // DC-4 : le compte déclenche la matérialisation Famille nécessaire à CompteResultatBuilder.
+    $compte = Compte::factory()->numero('625')->create(['association_id' => $this->association->id, 'intitule' => 'Transport']);
     $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'type' => 'particulier', 'nom' => 'dupont', 'prenom' => 'Jean']);
 
     $d = Transaction::factory()->asDepense()->create(['association_id' => $this->association->id, 'date' => '2025-10-01', 'tiers_id' => $tiers->id, 'saisi_par' => $this->user->id]);
     $d->lignes()->forceDelete();
-    TransactionLigne::factory()->create(['transaction_id' => $d->id, 'sous_categorie_id' => $sc->id, 'operation_id' => $op->id, 'montant' => 100.00]);
+    crOpsTestLigne($d, $compte, 100.00, (int) $op->id);
 
     Livewire::test(RapportCompteResultatOperations::class)
         ->set('selectedOperationIds', [$op->id])

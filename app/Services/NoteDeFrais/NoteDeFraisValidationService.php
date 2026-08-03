@@ -8,8 +8,11 @@ use App\Enums\StatutNoteDeFrais;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Enums\UsageComptable;
+use App\Models\Compte;
 use App\Models\NoteDeFrais;
 use App\Models\Transaction;
+use App\Services\Compta\EcritureGenerator;
+use App\Services\Compta\EtatReglementResolver;
 use App\Services\NoteDeFrais\LigneTypes\LigneTypeRegistry;
 use App\Services\TransactionService;
 use App\Tenant\TenantContext;
@@ -26,6 +29,8 @@ final class NoteDeFraisValidationService
     public function __construct(
         private readonly TransactionService $transactionService,
         private readonly LigneTypeRegistry $ligneTypeRegistry,
+        private readonly EcritureGenerator $ecritureGenerator,
+        private readonly EtatReglementResolver $etatReglementResolver,
     ) {}
 
     /**
@@ -120,7 +125,7 @@ final class NoteDeFraisValidationService
      *
      * Crée deux transactions qui se neutralisent logiquement :
      * 1. Une Transaction Dépense (réglée) portant les lignes NDF.
-     * 2. Une Transaction Don/Recette (réglée) du même montant sur la sous-catégorie
+     * 2. Une Transaction Don/Recette (réglée) du même montant sur la compte
      *    désignée pour l'usage AbandonCreance.
      *
      * Les deux transactions ont statut_reglement = Recu → n'apparaissent pas dans
@@ -130,8 +135,8 @@ final class NoteDeFraisValidationService
      * @return Transaction La Transaction Don (recette)
      *
      * @throws DomainException si la NDF n'est pas Soumise
-     * @throws DomainException si aucune sous-catégorie AbandonCreance n'est configurée
-     * @throws DomainException si plusieurs sous-catégories AbandonCreance sont configurées
+     * @throws DomainException si aucune compte AbandonCreance n'est configurée
+     * @throws DomainException si plusieurs comptes AbandonCreance sont configurées
      */
     public function validerAvecAbandonCreance(
         NoteDeFrais $ndf,
@@ -150,58 +155,27 @@ final class NoteDeFraisValidationService
 
             $this->assertStatutSoumise($ndf);
 
-            // Résoudre la sous-catégorie AbandonCreance (cardinalité mono)
-            $sousCatsAbandon = $ndf->association->sousCategoriesFor(UsageComptable::AbandonCreance);
+            // Résoudre le compte AbandonCreance (cardinalité mono) — DC-10a : compte-first.
+            $comptesAbandon = $ndf->association->comptesFor(UsageComptable::AbandonCreance);
 
-            if ($sousCatsAbandon->count() === 0) {
+            if ($comptesAbandon->count() === 0) {
                 throw new DomainException(
-                    "Aucune sous-categorie n'est designee pour l'usage 'Abandon de creance'. "
-                    .'Configure-la dans Parametres -> Comptabilite -> Usages.'
+                    "Aucun compte n'est designe pour l'usage 'Abandon de creance'. "
+                    .'Configure-le dans Parametres -> Comptabilite -> Usages.'
                 );
             }
 
-            if ($sousCatsAbandon->count() > 1) {
+            if ($comptesAbandon->count() > 1) {
                 throw new DomainException(
-                    "Plusieurs sous-categories designees pour 'Abandon de creance' — cas anormal."
+                    "Plusieurs comptes designes pour 'Abandon de creance' — cas anormal."
                 );
             }
 
-            $sousCatAbandon = $sousCatsAbandon->first();
+            $compteAbandon = $comptesAbandon->first();
 
-            // 1. Créer la Transaction Dépense (réglée — pas de flux de tréso à attendre)
-            $txDepense = $this->createTransactionDepenseFromNdf($ndf, $data, StatutReglement::Recu);
+            [$txDepense, $txDon] = $this->abandonCreancePd($ndf, $data, $dateDon, $compteAbandon);
 
-            // 2. Calculer le montant total (déjà calculé dans createTransactionDepenseFromNdf,
-            //    mais on le recalcule ici depuis le modèle persisté pour être cohérent)
-            $montantTotal = (float) $txDepense->montant_total;
-
-            // 3. Créer la Transaction Don (recette réglée)
-            $txDonData = [
-                'type' => TypeTransaction::Recette->value,
-                'date' => $dateDon,
-                'libelle' => sprintf('Don par abandon de créance — NDF #%d', (int) $ndf->id),
-                'reference' => sprintf('NDF #%d — %s', (int) $ndf->id, $ndf->date->format('d/m/Y')),
-                'montant_total' => $montantTotal,
-                'mode_paiement' => $data->mode_paiement->value,
-                'tiers_id' => $ndf->tiers_id,
-                'compte_id' => $data->compte_id, // même compte que la dépense — les deux écritures se neutralisent sur ce compte
-                'statut_reglement' => StatutReglement::Recu->value,
-                'association_id' => TenantContext::currentId(),
-            ];
-
-            // Le Don clone les lignes de la Dépense : mêmes opération, séance, notes, montant.
-            // Seule la sous-catégorie diffère (pointe vers la sous-cat AbandonCreance).
-            $txDonLignes = $txDepense->lignes->map(fn ($ligne) => [
-                'sous_categorie_id' => (int) $sousCatAbandon->id,
-                'operation_id' => $ligne->operation_id,
-                'seance' => $ligne->seance,
-                'notes' => $ligne->notes,
-                'montant' => (float) $ligne->montant,
-            ])->all();
-
-            $txDon = $this->transactionService->create($txDonData, $txDonLignes);
-
-            // 4. Mettre à jour la NDF
+            // Mettre à jour la NDF
             $ndf->update([
                 'statut' => StatutNoteDeFrais::DonParAbandonCreances->value,
                 'transaction_id' => $txDepense->id,
@@ -214,7 +188,7 @@ final class NoteDeFraisValidationService
                 'tiers_id' => (int) $ndf->tiers_id,
                 'transaction_depense_id' => (int) $txDepense->id,
                 'transaction_don_id' => (int) $txDon->id,
-                'montant' => $montantTotal,
+                'montant' => (float) $txDepense->montant_total,
                 'date_don' => $dateDon,
                 'valide_par' => auth()->id(),
             ]);
@@ -267,14 +241,17 @@ final class NoteDeFraisValidationService
         // Calculer le montant total
         $montantTotal = $lignesNdf->sum(fn ($l) => (float) $l->montant);
 
-        // Construire les données transaction
+        // Construire les données transaction.
+        // mode_paiement est passé à null pour empêcher l'enrichissement PD de créer
+        // une T2 (la NDF n'est pas encore payée). Le mode_paiement est stocké sur
+        // la Transaction après création via saveQuietly() (pour affichage/référence).
         $txData = [
             'type' => TypeTransaction::Depense->value,
             'date' => $data->date,
             'libelle' => $ndf->libelle,
             'reference' => sprintf('NDF #%d — %s', (int) $ndf->id, $ndf->date->format('d/m/Y')),
             'montant_total' => $montantTotal,
-            'mode_paiement' => $data->mode_paiement->value,
+            'mode_paiement' => null,
             'tiers_id' => $ndf->tiers_id,
             'compte_id' => $data->compte_id,
             'statut_reglement' => $statutReglement->value,
@@ -291,7 +268,7 @@ final class NoteDeFraisValidationService
                 : $ligne->libelle;
 
             return [
-                'sous_categorie_id' => $ligne->sous_categorie_id,
+                'compte_id' => $ligne->compte_id,
                 'operation_id' => $ligne->operation_id,
                 'seance' => $ligne->seance,
                 'notes' => $notes,
@@ -301,6 +278,10 @@ final class NoteDeFraisValidationService
 
         // Créer la transaction (assertOuvert levée ici si exercice clôturé)
         $transaction = $this->transactionService->create($txData, $lignesData);
+
+        // Stocker mode_paiement pour affichage (pas passé à TransactionService
+        // pour éviter la création d'un T2 prématuré en mode PD).
+        $transaction->forceFill(['mode_paiement' => $data->mode_paiement])->saveQuietly();
 
         // Recharger les lignes de transaction dans l'ordre stable
         $lignesTx = $transaction->lignes()->orderBy('id')->get();
@@ -340,5 +321,115 @@ final class NoteDeFraisValidationService
         }
 
         return $transaction;
+    }
+
+    /**
+     * Abandon de créance en mode PD :
+     *   T1 Dépense (6xx D / 401 C) + T1 Don (411 D / 7xx C)
+     *   + 2 OD compensation via 467 (401→467, 467→411)
+     *
+     * Le don est une vraie transaction recette (tiers, compte, n° pièce)
+     * → visible dans Comptabilité/Dons et historique tiers.
+     *
+     * @return array{Transaction, Transaction} [$txDepense, $txDon]
+     */
+    private function abandonCreancePd(
+        NoteDeFrais $ndf,
+        ValidationData $data,
+        string $dateDon,
+        Compte $compteAbandon,
+    ): array {
+        // 1. Créer la Transaction Dépense (T1 : 6xx D / 401 C, pas de T2)
+        $txDepense = $this->createTransactionDepenseFromNdf($ndf, $data, StatutReglement::EnAttente);
+
+        // 2. Créer la Transaction Don (T1 : 411 D / 7xx C, pas de T2)
+        //    Transaction recette standard avec toutes les métadonnées métier.
+        $montantTotal = (float) $txDepense->montant_total;
+
+        $txDonData = [
+            'type' => TypeTransaction::Recette->value,
+            'date' => $dateDon,
+            'libelle' => sprintf('Don par abandon de créance — NDF #%d', (int) $ndf->id),
+            'reference' => sprintf('NDF #%d — %s', (int) $ndf->id, $ndf->date->format('d/m/Y')),
+            'montant_total' => $montantTotal,
+            'mode_paiement' => null,
+            'tiers_id' => $ndf->tiers_id,
+            'compte_id' => null,
+            'statut_reglement' => StatutReglement::EnAttente->value,
+            'association_id' => TenantContext::currentId(),
+        ];
+
+        // Filtrer les lignes métier (ventilation classe 6) — exclure les lignes PD pures (401 C)
+        $txDonLignes = $txDepense->lignes()->ventilation()->get()
+            ->filter(fn ($l) => (float) $l->montant > 0)
+            ->map(fn ($ligne) => [
+                'compte_id' => (int) $compteAbandon->id,
+                'operation_id' => $ligne->operation_id,
+                'seance' => $ligne->seance,
+                'notes' => $ligne->notes,
+                'montant' => (float) $ligne->montant,
+            ])->all();
+
+        $txDon = $this->transactionService->create($txDonData, $txDonLignes);
+
+        // 3. Créer les 2 OD de compensation (401→467, 467→411 + 3 lettrages)
+        $this->ecritureGenerator->pourCompensationAbandon(
+            t1Depense: $txDepense,
+            t1Don: $txDon,
+            dateCompensation: new \DateTimeImmutable($dateDon),
+            libelle: sprintf('NDF #%d', (int) $ndf->id),
+        );
+
+        // 4. Synchroniser les statuts dérivés (lettrage → Recu)
+        $txDepenseFresh = $txDepense->fresh();
+        $txDonFresh = $txDon->fresh();
+        $this->etatReglementResolver->syncer($txDepenseFresh);
+        $this->etatReglementResolver->syncer($txDonFresh);
+
+        return [$txDepenseFresh, $txDonFresh];
+    }
+
+    /**
+     * Abandon de créance en mode legacy : 2 transactions (Dépense Recu + Don Recette).
+     * Conserve le comportement original pour rétrocompatibilité.
+     *
+     * @return array{Transaction, Transaction} [$txDepense, $txDon]
+     */
+    private function abandonCreanceLegacy(
+        NoteDeFrais $ndf,
+        ValidationData $data,
+        string $dateDon,
+        Compte $compteAbandon,
+    ): array {
+        // 1. Créer la Transaction Dépense (réglée — pas de flux de tréso à attendre)
+        $txDepense = $this->createTransactionDepenseFromNdf($ndf, $data, StatutReglement::Recu);
+
+        // 2. Créer la Transaction Don (recette réglée)
+        $montantTotal = (float) $txDepense->montant_total;
+
+        $txDonData = [
+            'type' => TypeTransaction::Recette->value,
+            'date' => $dateDon,
+            'libelle' => sprintf('Don par abandon de créance — NDF #%d', (int) $ndf->id),
+            'reference' => sprintf('NDF #%d — %s', (int) $ndf->id, $ndf->date->format('d/m/Y')),
+            'montant_total' => $montantTotal,
+            'mode_paiement' => $data->mode_paiement?->value,
+            'tiers_id' => $ndf->tiers_id,
+            'compte_id' => $data->compte_id,
+            'statut_reglement' => StatutReglement::Recu->value,
+            'association_id' => TenantContext::currentId(),
+        ];
+
+        $txDonLignes = $txDepense->lignes()->ventilation()->get()->map(fn ($ligne) => [
+            'compte_id' => (int) $compteAbandon->id,
+            'operation_id' => $ligne->operation_id,
+            'seance' => $ligne->seance,
+            'notes' => $ligne->notes,
+            'montant' => (float) $ligne->montant,
+        ])->all();
+
+        $txDon = $this->transactionService->create($txDonData, $txDonLignes);
+
+        return [$txDepense, $txDon];
     }
 }

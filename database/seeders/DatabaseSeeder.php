@@ -9,12 +9,13 @@ use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\Exercice;
 use App\Models\User;
+use App\Services\Compta\ComptesProvisioningService;
 use App\Services\ExerciceService;
 use App\Tenant\TenantContext;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
-class DatabaseSeeder extends Seeder
+final class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
@@ -43,8 +44,7 @@ class DatabaseSeeder extends Seeder
             ],
         );
 
-        // Boot tenant context so sub-seeders can query tenant-scoped models
-        // (SousCategorie, TypeOperation, Tiers, EmailTemplate, etc.).
+        // Boot tenant context so sub-seeders can query tenant-scoped models.
         TenantContext::boot(Association::findOrFail(1));
 
         $admin = User::factory()->create([
@@ -87,11 +87,15 @@ class DatabaseSeeder extends Seeder
             'saisie_automatisee' => true,
         ]);
 
-        $this->call(CategoriesSeeder::class);
+        $this->call(PlanComptableSeeder::class);
         $this->call(TypeOperationSeeder::class);
         $this->call(EmailTemplateSeeder::class);
         $this->call(MessageTemplateSeeder::class);
         $this->call(OperationsTiersSeeder::class);
+
+        // Les seeders suivants génèrent des écritures : leurs comptes 401/411,
+        // 5112 et 512X doivent exister avant la première transaction.
+        app(ComptesProvisioningService::class)->provisionAll();
 
         // Create exercice for seeded data
         $exerciceService = app(ExerciceService::class);
@@ -105,5 +109,6 @@ class DatabaseSeeder extends Seeder
             $this->call(DevisManuelSeeder::class);
             $this->call(FactureManuelSeeder::class);
         }
+
     }
 }

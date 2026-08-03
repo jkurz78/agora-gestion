@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 use App\Enums\StatutFacture;
 use App\Enums\TypeTransaction;
+use App\Enums\UsageComptable;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
 use App\Models\Operation;
 use App\Models\Participant;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -38,11 +39,34 @@ afterEach(function () {
     TenantContext::clear();
 });
 
-// ─── Helper: create a raw transaction + explicit lignes (no factory auto-lignes) ───
+// ─── Helpers: comptes de ventilation + transaction + ligne compte-first (DC-10a) ───
 
-function makeDepense(int $tiersId, float $montant, string $date, ?SousCategorie $sc = null, ?Operation $op = null): Transaction
+function quickViewCompte(int $classe, ?string $intitule = null, ?UsageComptable $usage = null): Compte
 {
-    $sc ??= SousCategorie::factory()->create();
+    static $seq = 0;
+    $seq++;
+
+    $compte = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => $classe.'06QV'.$seq,
+        'intitule' => $intitule ?? 'Compte quick-view '.$seq,
+        'classe' => $classe,
+        'actif' => true,
+        'est_systeme' => false,
+        'lettrable' => false,
+        'pour_inscriptions' => false,
+    ]);
+
+    if ($usage !== null) {
+        $compte->usages()->create(['usage' => $usage->value]);
+    }
+
+    return $compte;
+}
+
+function makeDepense(int $tiersId, float $montant, string $date, ?Compte $compte = null, ?Operation $op = null): Transaction
+{
+    $compte ??= quickViewCompte(6);
     $tx = Transaction::forceCreate([
         'type' => TypeTransaction::Depense,
         'date' => $date,
@@ -54,17 +78,19 @@ function makeDepense(int $tiersId, float $montant, string $date, ?SousCategorie 
     ]);
     TransactionLigne::forceCreate([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $compte->id,
         'operation_id' => $op?->id,
         'montant' => $montant,
+        'debit' => $montant,
+        'credit' => 0,
     ]);
 
     return $tx;
 }
 
-function makeRecette(int $tiersId, float $montant, string $date, ?SousCategorie $sc = null, ?Operation $op = null): Transaction
+function makeRecette(int $tiersId, float $montant, string $date, ?Compte $compte = null, ?Operation $op = null): Transaction
 {
-    $sc ??= SousCategorie::factory()->create();
+    $compte ??= quickViewCompte(7);
     $tx = Transaction::forceCreate([
         'type' => TypeTransaction::Recette,
         'date' => $date,
@@ -76,9 +102,11 @@ function makeRecette(int $tiersId, float $montant, string $date, ?SousCategorie 
     ]);
     TransactionLigne::forceCreate([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sc->id,
+        'compte_id' => $compte->id,
         'operation_id' => $op?->id,
         'montant' => $montant,
+        'debit' => 0,
+        'credit' => $montant,
     ]);
 
     return $tx;
@@ -128,9 +156,9 @@ describe('depenses', function (): void {
 
     test('par_operation regroupe par opération', function (): void {
         $op = Operation::factory()->create(['nom' => 'Yoga Adultes']);
-        $sc = SousCategorie::factory()->create(['nom' => 'Inscription']);
-        makeDepense($this->tiers->id, 80.00, '2025-10-01', $sc, $op);
-        makeDepense($this->tiers->id, 40.00, '2025-12-01', $sc, $op);
+        $compte = quickViewCompte(6, 'Inscription');
+        makeDepense($this->tiers->id, 80.00, '2025-10-01', $compte, $op);
+        makeDepense($this->tiers->id, 40.00, '2025-12-01', $compte, $op);
 
         $result = $this->service->getSummary($this->tiers, $this->exercice);
 
@@ -138,7 +166,7 @@ describe('depenses', function (): void {
         $groupe = $result['depenses']['par_operation'][0];
         expect($groupe['operation_id'])->toBe($op->id)
             ->and($groupe['operation_nom'])->toBe('Yoga Adultes')
-            ->and($groupe['sous_categorie'])->toBe('Inscription')
+            ->and($groupe['compte'])->toBe('Inscription')
             ->and($groupe['count'])->toBe(2)
             ->and((float) $groupe['total'])->toBe(120.00);
     });
@@ -192,9 +220,9 @@ describe('recettes', function (): void {
     });
 
     test('présente avec count et total pour recettes ordinaires', function (): void {
-        $sc = SousCategorie::factory()->create();
-        makeRecette($this->tiers->id, 60.00, '2025-10-01', $sc);
-        makeRecette($this->tiers->id, 40.00, '2025-11-01', $sc);
+        $compte = quickViewCompte(7);
+        makeRecette($this->tiers->id, 60.00, '2025-10-01', $compte);
+        makeRecette($this->tiers->id, 40.00, '2025-11-01', $compte);
 
         $result = $this->service->getSummary($this->tiers, $this->exercice);
 
@@ -204,10 +232,10 @@ describe('recettes', function (): void {
     });
 
     test('exclut les recettes classifiées comme dons', function (): void {
-        $scDon = SousCategorie::factory()->pourDons()->create();
-        $scNormal = SousCategorie::factory()->create();
-        makeRecette($this->tiers->id, 50.00, '2025-10-01', $scDon);
-        makeRecette($this->tiers->id, 30.00, '2025-11-01', $scNormal);
+        $compteDon = quickViewCompte(7, usage: UsageComptable::Don);
+        $compteNormal = quickViewCompte(7);
+        makeRecette($this->tiers->id, 50.00, '2025-10-01', $compteDon);
+        makeRecette($this->tiers->id, 30.00, '2025-11-01', $compteNormal);
 
         $result = $this->service->getSummary($this->tiers, $this->exercice);
 
@@ -216,10 +244,10 @@ describe('recettes', function (): void {
     });
 
     test('exclut les recettes classifiées comme cotisations', function (): void {
-        $scCot = SousCategorie::factory()->pourCotisations()->create();
-        $scNormal = SousCategorie::factory()->create();
-        makeRecette($this->tiers->id, 120.00, '2025-10-01', $scCot);
-        makeRecette($this->tiers->id, 80.00, '2025-11-01', $scNormal);
+        $compteCot = quickViewCompte(7, usage: UsageComptable::Cotisation);
+        $compteNormal = quickViewCompte(7);
+        makeRecette($this->tiers->id, 120.00, '2025-10-01', $compteCot);
+        makeRecette($this->tiers->id, 80.00, '2025-11-01', $compteNormal);
 
         $result = $this->service->getSummary($this->tiers, $this->exercice);
 
@@ -228,10 +256,10 @@ describe('recettes', function (): void {
     });
 
     test('absente si toutes les recettes sont dons ou cotisations', function (): void {
-        $scDon = SousCategorie::factory()->pourDons()->create();
-        $scCot = SousCategorie::factory()->pourCotisations()->create();
-        makeRecette($this->tiers->id, 50.00, '2025-10-01', $scDon);
-        makeRecette($this->tiers->id, 30.00, '2025-11-01', $scCot);
+        $compteDon = quickViewCompte(7, usage: UsageComptable::Don);
+        $compteCot = quickViewCompte(7, usage: UsageComptable::Cotisation);
+        makeRecette($this->tiers->id, 50.00, '2025-10-01', $compteDon);
+        makeRecette($this->tiers->id, 30.00, '2025-11-01', $compteCot);
 
         $result = $this->service->getSummary($this->tiers, $this->exercice);
 
@@ -239,9 +267,9 @@ describe('recettes', function (): void {
     });
 
     test('exclut les recettes en dehors de l\'exercice', function (): void {
-        $sc = SousCategorie::factory()->create();
-        makeRecette($this->tiers->id, 100.00, '2024-03-01', $sc); // exercice 2023
-        makeRecette($this->tiers->id, 50.00, '2025-10-01', $sc); // exercice 2025 ✓
+        $compte = quickViewCompte(7);
+        makeRecette($this->tiers->id, 100.00, '2024-03-01', $compte); // exercice 2023
+        makeRecette($this->tiers->id, 50.00, '2025-10-01', $compte); // exercice 2025 ✓
 
         $result = $this->service->getSummary($this->tiers, $this->exercice);
 
@@ -260,9 +288,9 @@ describe('dons', function (): void {
     });
 
     test('présent avec count et total corrects', function (): void {
-        $scDon = SousCategorie::factory()->pourDons()->create();
-        makeRecette($this->tiers->id, 100.00, '2025-10-01', $scDon);
-        makeRecette($this->tiers->id, 50.00, '2025-12-01', $scDon);
+        $compteDon = quickViewCompte(7, usage: UsageComptable::Don);
+        makeRecette($this->tiers->id, 100.00, '2025-10-01', $compteDon);
+        makeRecette($this->tiers->id, 50.00, '2025-12-01', $compteDon);
 
         $result = $this->service->getSummary($this->tiers, $this->exercice);
 
@@ -272,9 +300,9 @@ describe('dons', function (): void {
     });
 
     test('exclut les dons hors exercice', function (): void {
-        $scDon = SousCategorie::factory()->pourDons()->create();
-        makeRecette($this->tiers->id, 200.00, '2024-01-01', $scDon); // hors exercice
-        makeRecette($this->tiers->id, 100.00, '2025-10-01', $scDon); // exercice 2025 ✓
+        $compteDon = quickViewCompte(7, usage: UsageComptable::Don);
+        makeRecette($this->tiers->id, 200.00, '2024-01-01', $compteDon); // hors exercice
+        makeRecette($this->tiers->id, 100.00, '2025-10-01', $compteDon); // exercice 2025 ✓
 
         $result = $this->service->getSummary($this->tiers, $this->exercice);
 
@@ -293,9 +321,9 @@ describe('cotisations', function (): void {
     });
 
     test('présente avec count et total corrects', function (): void {
-        $scCot = SousCategorie::factory()->pourCotisations()->create();
-        makeRecette($this->tiers->id, 75.00, '2025-10-01', $scCot);
-        makeRecette($this->tiers->id, 75.00, '2026-01-15', $scCot);
+        $compteCot = quickViewCompte(7, usage: UsageComptable::Cotisation);
+        makeRecette($this->tiers->id, 75.00, '2025-10-01', $compteCot);
+        makeRecette($this->tiers->id, 75.00, '2026-01-15', $compteCot);
 
         $result = $this->service->getSummary($this->tiers, $this->exercice);
 
@@ -305,9 +333,9 @@ describe('cotisations', function (): void {
     });
 
     test('exclut les cotisations hors exercice', function (): void {
-        $scCot = SousCategorie::factory()->pourCotisations()->create();
-        makeRecette($this->tiers->id, 90.00, '2024-06-01', $scCot); // hors exercice
-        makeRecette($this->tiers->id, 90.00, '2025-10-01', $scCot); // exercice 2025 ✓
+        $compteCot = quickViewCompte(7, usage: UsageComptable::Cotisation);
+        makeRecette($this->tiers->id, 90.00, '2024-06-01', $compteCot); // hors exercice
+        makeRecette($this->tiers->id, 90.00, '2025-10-01', $compteCot); // exercice 2025 ✓
 
         $result = $this->service->getSummary($this->tiers, $this->exercice);
 
@@ -614,8 +642,8 @@ describe('résumé complet', function (): void {
         // Dépense
         makeDepense($this->tiers->id, 100.00, '2025-10-01');
         // Don
-        $scDon = SousCategorie::factory()->pourDons()->create();
-        makeRecette($this->tiers->id, 50.00, '2025-10-15', $scDon);
+        $compteDon = quickViewCompte(7, usage: UsageComptable::Don);
+        makeRecette($this->tiers->id, 50.00, '2025-10-15', $compteDon);
         // Participation
         $op = Operation::factory()->create();
         Participant::create(['tiers_id' => $this->tiers->id, 'operation_id' => $op->id]);

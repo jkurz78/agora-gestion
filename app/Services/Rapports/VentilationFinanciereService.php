@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Rapports;
 
+use App\Models\Famille;
 use App\Services\ExerciceService;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
@@ -20,9 +21,9 @@ use Illuminate\Support\Facades\DB;
  * ventilé et l'Analyse par tiers).
  *
  * Le motif Q1 (lignes sans affectation) / Q2 (affectations) est repris en esprit de
- * {@see CompteResultatBuilder} mais NON agrégé (grain ligne).
- * CompteResultatBuilder est volontairement laissé inchangé : la duplication des JOINs
- * est assumée (cf. spec §3, §10).
+ * {@see CompteResultatBuilder::fetchClasseRowsPD()} — lecture compte-first : JOIN direct
+ * sur `transaction_lignes.compte_id`, `familles` résolue par préfixe à 2 chiffres du
+ * `numero_pcg` — la ventilation est portée par `compte_id` seul.
  */
 final class VentilationFinanciereService
 {
@@ -52,11 +53,10 @@ final class VentilationFinanciereService
      */
     private function q1(string $start, string $end): Builder
     {
-        return DB::table('transaction_lignes')
+        $q = DB::table('transaction_lignes')
             ->join('transactions as tx', 'tx.id', '=', 'transaction_lignes.transaction_id')
             ->join('tiers', 'tiers.id', '=', 'tx.tiers_id')
-            ->join('sous_categories as sc', 'sc.id', '=', 'transaction_lignes.sous_categorie_id')
-            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
+            ->join('comptes as cpt', 'cpt.id', '=', 'transaction_lignes.compte_id')
             ->join('comptes_bancaires as cb', 'cb.id', '=', 'tx.compte_id')
             ->leftJoin('operations as op', 'op.id', '=', 'transaction_lignes.operation_id')
             ->leftJoin('type_operations as topo', 'topo.id', '=', 'op.type_operation_id')
@@ -66,21 +66,23 @@ final class VentilationFinanciereService
             ->whereNull('tla.id')
             ->whereBetween('tx.date', [$start, $end])
             ->when(TenantContext::hasBooted(), fn ($q) => $q->where('tx.association_id', TenantContext::currentId()))
-            ->select($this->selectColumns('transaction_lignes.seance', 'transaction_lignes.montant'));
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('cpt.association_id', TenantContext::currentId()));
+        $this->joinFamille($q);
+
+        return $q->select($this->selectColumns('transaction_lignes.seance', 'transaction_lignes.montant'));
     }
 
     /**
      * Q2 — une ligne de sortie par affectation. Opération/séance/montant viennent de
-     * l'affectation ; tiers, sous-catégorie, catégorie et compte restent ceux de la ligne.
+     * l'affectation ; tiers, compte/famille et compte bancaire restent ceux de la ligne.
      */
     private function q2(string $start, string $end): Builder
     {
-        return DB::table('transaction_ligne_affectations as tla')
+        $q = DB::table('transaction_ligne_affectations as tla')
             ->join('transaction_lignes as tl', 'tl.id', '=', 'tla.transaction_ligne_id')
             ->join('transactions as tx', 'tx.id', '=', 'tl.transaction_id')
             ->join('tiers', 'tiers.id', '=', 'tx.tiers_id')
-            ->join('sous_categories as sc', 'sc.id', '=', 'tl.sous_categorie_id')
-            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
+            ->join('comptes as cpt', 'cpt.id', '=', 'tl.compte_id')
             ->join('comptes_bancaires as cb', 'cb.id', '=', 'tx.compte_id')
             ->leftJoin('operations as op', 'op.id', '=', 'tla.operation_id')
             ->leftJoin('type_operations as topo', 'topo.id', '=', 'op.type_operation_id')
@@ -88,7 +90,25 @@ final class VentilationFinanciereService
             ->whereNull('tx.deleted_at')
             ->whereBetween('tx.date', [$start, $end])
             ->when(TenantContext::hasBooted(), fn ($q) => $q->where('tx.association_id', TenantContext::currentId()))
-            ->select($this->selectColumns('tla.seance', 'tla.montant'));
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('cpt.association_id', TenantContext::currentId()));
+        $this->joinFamille($q);
+
+        return $q->select($this->selectColumns('tla.seance', 'tla.montant'));
+    }
+
+    /**
+     * Ajoute au query builder le LEFT JOIN vers `familles`, résolue par préfixe à
+     * 2 chiffres du `numero_pcg` (cf. {@see Famille}).
+     *
+     * Suppose que l'alias `cpt` (comptes, joint directement sur `compte_id`) est déjà
+     * présent sur la requête — lecture compte-first.
+     */
+    private function joinFamille(Builder $query): void
+    {
+        $query->leftJoin('familles as f', function ($join): void {
+            $join->on('f.code', '=', DB::raw('SUBSTR(cpt.numero_pcg, 1, 2)'))
+                ->on('f.association_id', '=', 'cpt.association_id');
+        });
     }
 
     /**
@@ -107,10 +127,10 @@ final class VentilationFinanciereService
             'tx.libelle as Libellé',
             DB::raw("CASE WHEN tiers.type = 'entreprise' THEN COALESCE(tiers.entreprise, tiers.nom, '') ELSE TRIM(CONCAT(COALESCE(tiers.prenom, ''), ' ', COALESCE(tiers.nom, ''))) END as Tiers"),
             'tiers.type as Type tiers',
-            'sc.nom as Sous-catégorie',
-            'c.nom as Catégorie',
+            'cpt.intitule as Compte comptable',
+            DB::raw("COALESCE(CONCAT(f.code, ' — ', f.nom), cpt.numero_pcg) as Famille"),
             'tx.type as Type',
-            'cb.nom as Compte',
+            'cb.nom as Compte bancaire',
             'op.nom as Opération',
             'topo.nom as Type opération',
             $seanceCol.' as Séance n°',

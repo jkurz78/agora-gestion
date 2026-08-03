@@ -8,7 +8,6 @@ use App\Models\CompteBancaire;
 use App\Models\Exercice;
 use App\Models\Transaction;
 use App\Models\VirementInterne;
-use App\Services\ProvisionService;
 use App\Services\SoldeService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -60,15 +59,10 @@ final class FluxTresorerieBuilder
         $soldeOuverture = round($soldeOuverture, 2);
 
         // --- Totaux consolidés (virements s'annulent) ---
-        $totalRecettes = round((float) Transaction::where('type', 'recette')->forExercice($exercice)->sum('montant_total'), 2);
-        $totalDepenses = round((float) Transaction::where('type', 'depense')->forExercice($exercice)->sum('montant_total'), 2);
+        $totalRecettes = round((float) Transaction::where('type', 'recette')->operationnel()->forExercice($exercice)->sum('montant_total'), 2);
+        $totalDepenses = round((float) Transaction::where('type', 'depense')->operationnel()->forExercice($exercice)->sum('montant_total'), 2);
         $variation = round($totalRecettes - $totalDepenses, 2);
         $soldeTheorique = round($soldeOuverture + $variation, 2);
-
-        // --- Provisions de fin d'exercice ---
-        $provisionService = app(ProvisionService::class);
-        $totalProvisions = $provisionService->totalProvisions($exercice);
-        $totalExtournes = $provisionService->totalExtournes($exercice);
 
         // --- Rapprochement (tous les comptes) ---
         $comptesReelsIds = CompteBancaire::pluck('id');
@@ -95,7 +89,7 @@ final class FluxTresorerieBuilder
         $yearExpr = $isSqlite ? "CAST(strftime('%Y', date) AS INTEGER)" : 'YEAR(date)';
         $monthExpr = $isSqlite ? "CAST(strftime('%m', date) AS INTEGER)" : 'MONTH(date)';
 
-        $mensuelRows = Transaction::forExercice($exercice)
+        $mensuelRows = Transaction::forExercice($exercice)->operationnel()
             ->selectRaw("
                 {$yearExpr} as annee, {$monthExpr} as mois_num,
                 SUM(CASE WHEN type = 'recette' THEN montant_total ELSE 0 END) as recettes,
@@ -154,8 +148,6 @@ final class FluxTresorerieBuilder
                 'total_depenses' => $totalDepenses,
                 'variation' => $variation,
                 'solde_theorique' => $soldeTheorique,
-                'total_provisions' => $totalProvisions,
-                'total_extournes' => $totalExtournes,
             ],
             'rapprochement' => [
                 'solde_theorique' => $soldeTheorique,

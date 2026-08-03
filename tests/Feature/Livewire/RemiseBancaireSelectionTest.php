@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\JournalComptable;
 use App\Enums\ModePaiement;
 use App\Enums\StatutReglement;
 use App\Livewire\RemiseBancaireSelection;
@@ -51,7 +52,7 @@ it('shows transactions matching mode_paiement and statut_reglement', function ()
         'compte_id' => $this->compteCible->id,
         'mode_paiement' => ModePaiement::Cheque,
         'montant_total' => 30.00,
-        'statut_reglement' => StatutReglement::EnAttente,
+        'statut_reglement' => StatutReglement::EnMain,
         'tiers_id' => $tiers->id,
         'remise_id' => null,
     ]);
@@ -77,6 +78,22 @@ it('does not show transactions with different mode_paiement', function () {
         ->assertDontSee('Jean DUPONT');
 });
 
+it('does not show transactions with statut_reglement=en_attente (chèque non reçu)', function () {
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Durand', 'prenom' => 'Luc']);
+    Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
+        'compte_id' => $this->compteCible->id,
+        'mode_paiement' => ModePaiement::Cheque,
+        'montant_total' => 25.00,
+        'statut_reglement' => StatutReglement::EnAttente,
+        'tiers_id' => $tiers->id,
+        'remise_id' => null,
+    ]);
+
+    Livewire::test(RemiseBancaireSelection::class, ['remise' => $this->remise])
+        ->assertDontSee('Luc DURAND');
+});
+
 it('does not show transactions with statut_reglement=pointe', function () {
     $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Dupont', 'prenom' => 'Jean']);
     Transaction::factory()->asRecette()->create([
@@ -99,7 +116,7 @@ it('toggleTransaction sélectionne et désélectionne une transaction', function
         'compte_id' => $this->compteCible->id,
         'mode_paiement' => ModePaiement::Cheque,
         'montant_total' => 45.00,
-        'statut_reglement' => StatutReglement::EnAttente,
+        'statut_reglement' => StatutReglement::EnMain,
         'remise_id' => null,
     ]);
 
@@ -130,7 +147,7 @@ it('valider enregistre le brouillon et redirige vers show', function () {
         'compte_id' => $this->compteCible->id,
         'mode_paiement' => ModePaiement::Cheque,
         'montant_total' => 45.00,
-        'statut_reglement' => StatutReglement::EnAttente,
+        'statut_reglement' => StatutReglement::EnMain,
         'remise_id' => null,
     ]);
 
@@ -173,4 +190,59 @@ it('exclut les transactions déjà dans une autre remise', function () {
 
     Livewire::test(RemiseBancaireSelection::class, ['remise' => $this->remise])
         ->assertDontSee('Sophie MARTIN');
+});
+
+test('un miroir extourne de dépense (type=depense, sens=recette) apparaît dans la remise', function () {
+    $tiers = Tiers::factory()->create([
+        'association_id' => $this->association->id,
+        'nom' => 'Remboursé',
+        'prenom' => 'Pierre',
+    ]);
+
+    // Miroir d'extourne : type=depense (origine était une dépense), type_ecriture=extourne.
+    // Le fournisseur rembourse par chèque → statut EnMain après marquer reçu.
+    // Sens de trésorerie = recette (argent entre).
+    $tx = Transaction::factory()->asDepense()->create([
+        'association_id' => $this->association->id,
+        'compte_id' => $this->compteCible->id,
+        'mode_paiement' => ModePaiement::Cheque,
+        'montant_total' => -50.00,
+        'statut_reglement' => StatutReglement::EnMain,
+        'tiers_id' => $tiers->id,
+        'remise_id' => null,
+        'type_ecriture' => 'extourne',
+        'journal' => JournalComptable::Achat,
+        'equilibree' => true,
+        'extournee_at' => null,
+    ]);
+
+    Livewire::test(RemiseBancaireSelection::class, ['remise' => $this->remise])
+        ->assertSee('Pierre REMBOURSÉ');
+});
+
+test('un miroir extourne de recette (type=recette, sens=depense) n apparaît PAS dans la remise', function () {
+    $tiers = Tiers::factory()->create([
+        'association_id' => $this->association->id,
+        'nom' => 'Client',
+        'prenom' => 'Marie',
+    ]);
+
+    // Miroir d'extourne : type=recette (origine était une recette), type_ecriture=extourne.
+    // On rembourse le client → sens = dépense (argent sort) → ne doit PAS être dans la remise.
+    $tx = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
+        'compte_id' => $this->compteCible->id,
+        'mode_paiement' => ModePaiement::Cheque,
+        'montant_total' => -100.00,
+        'statut_reglement' => StatutReglement::EnMain,
+        'tiers_id' => $tiers->id,
+        'remise_id' => null,
+        'type_ecriture' => 'extourne',
+        'journal' => JournalComptable::Vente,
+        'equilibree' => true,
+        'extournee_at' => null,
+    ]);
+
+    Livewire::test(RemiseBancaireSelection::class, ['remise' => $this->remise])
+        ->assertDontSee('Marie CLIENT');
 });

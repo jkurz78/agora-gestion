@@ -69,7 +69,6 @@ test('il annule une facture historique transaction-first sans ligne MM sans exto
 
     TransactionLigne::create([
         'transaction_id' => $tref->id,
-        'sous_categorie_id' => null,
         'montant' => 80.0,
     ]);
 

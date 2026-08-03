@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use App\Livewire\Dashboard;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -13,9 +13,9 @@ use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
-it('shows recent donations from transaction_lignes with pour_dons sous-categorie', function () {
+it('shows recent donations from transaction_lignes with pour_dons compte', function () {
     $compte = CompteBancaire::factory()->create();
-    $scDon = SousCategorie::factory()->pourDons()->create();
+    $compteDon = Compte::factory()->numero('754')->pourDons()->create();
     $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Jean']);
 
     $tx = Transaction::factory()->asRecette()->create([
@@ -27,8 +27,10 @@ it('shows recent donations from transaction_lignes with pour_dons sous-categorie
     ]);
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $scDon->id,
+        'compte_id' => $compteDon->id,
         'montant' => 100.00,
+        'debit' => 0.0,
+        'credit' => 100.00,
     ]);
 
     Livewire::test(Dashboard::class)
@@ -37,7 +39,7 @@ it('shows recent donations from transaction_lignes with pour_dons sous-categorie
 
 it('shows recent adhesions on dashboard', function () {
     $compte = CompteBancaire::factory()->create();
-    $scCot = SousCategorie::factory()->pourCotisations()->create();
+    $compteCot = Compte::factory()->numero('756')->pourCotisations()->create();
 
     $tx = Transaction::factory()->asRecette()->create([
         'compte_id' => $compte->id,
@@ -47,8 +49,10 @@ it('shows recent adhesions on dashboard', function () {
     ]);
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $scCot->id,
+        'compte_id' => $compteCot->id,
         'montant' => 50.00,
+        'debit' => 0.0,
+        'credit' => 50.00,
     ]);
 
     Livewire::test(Dashboard::class)

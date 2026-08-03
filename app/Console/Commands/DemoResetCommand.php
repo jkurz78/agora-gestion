@@ -4,8 +4,14 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Models\Association;
+use App\Models\User;
+use App\Services\Compta\ANouveau\RepriseAutomatiqueService;
+use App\Services\Compta\ComptesProvisioningService;
 use App\Support\Demo;
+use App\Support\Demo\SnapshotConfig;
 use App\Support\Demo\SnapshotLoader;
+use App\Tenant\TenantContext;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
 use Symfony\Component\Yaml\Exception\ParseException;
@@ -81,6 +87,28 @@ final class DemoResetCommand extends Command
             return self::FAILURE;
         }
 
+        if (is_array($snapshot) && ! array_key_exists('schema_version', $snapshot)) {
+            $this->error(
+                'Snapshot incompatible : clé "schema_version" absente '
+                .'(version '.SnapshotConfig::SCHEMA_VERSION.' attendue).'
+            );
+
+            return self::FAILURE;
+        }
+
+        if (is_array($snapshot) && $snapshot['schema_version'] !== SnapshotConfig::SCHEMA_VERSION) {
+            $receivedVersion = is_scalar($snapshot['schema_version'])
+                ? (string) $snapshot['schema_version']
+                : get_debug_type($snapshot['schema_version']);
+
+            $this->error(
+                "Snapshot incompatible : version {$receivedVersion} reçue, version "
+                .SnapshotConfig::SCHEMA_VERSION.' attendue. Régénérez-le avec demo:capture.'
+            );
+
+            return self::FAILURE;
+        }
+
         if (! is_array($snapshot) || ! isset($snapshot['tables']) || ! is_array($snapshot['tables'])) {
             $this->error('Snapshot YAML invalide : clé "tables" absente ou malformée.');
 
@@ -114,9 +142,46 @@ final class DemoResetCommand extends Command
             if (is_array($filesEntries) && $filesEntries !== []) {
                 $filesCopied = $this->syncStorage($filesEntries);
             }
+
         } finally {
             Artisan::call('up');
         }
+
+        // Le snapshot est rejoué sur une base créée par migrate:fresh, où le seed
+        // des comptes système n'a rien inséré faute d'association. On provisionne
+        // donc après coup, puis on reprend les soldes d'ouverture : sans cela la
+        // démo affiche une trésorerie correcte au-dessus d'une comptabilité qui
+        // l'ignore, et sa clôture est refusée. Constaté le 2026-07-31 : le site de
+        // démonstration tournait sans compte 102 ni 120/129.
+        app(ComptesProvisioningService::class)->provisionAll();
+
+        $reprises = 0;
+        $precedent = TenantContext::current();
+
+        try {
+            foreach (Association::query()->get() as $association) {
+                TenantContext::clear();
+                TenantContext::boot($association);
+
+                $acteur = User::query()
+                    ->whereHas('associations', fn ($query) => $query
+                        ->where('association_id', (int) $association->id)
+                        ->whereNull('revoked_at'))
+                    ->orderBy('id')
+                    ->first();
+
+                if (app(RepriseAutomatiqueService::class)->tenter($acteur) !== null) {
+                    $reprises++;
+                }
+            }
+        } finally {
+            TenantContext::clear();
+            if ($precedent !== null) {
+                TenantContext::boot($precedent);
+            }
+        }
+
+        $this->info("Comptes système provisionnés, {$reprises} reprise(s) de soldes créée(s).");
 
         $elapsed = round(microtime(true) - $startTime, 2);
         $totalRows = array_sum($rowsPerTable);

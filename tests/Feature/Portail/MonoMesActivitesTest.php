@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\StatutPresence;
 use App\Enums\TypeLigneFacture;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\DocumentPrevisionnel;
 use App\Models\Exercice;
 use App\Models\Facture;
@@ -14,7 +15,6 @@ use App\Models\Participant;
 use App\Models\Presence;
 use App\Models\Reglement;
 use App\Models\Seance;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -131,7 +131,7 @@ it('mode mono: GET /portail/documents/devis/{id} sert le PDF inline', function (
 it('mode mono: GET /portail/documents/facture/{id} sert le PDF inline', function () {
     [$asso, $tiers, $typeOp, $operation, $seance, $participant] = monoActivitesSetup();
 
-    $sousCat = SousCategorie::factory()->create(['association_id' => $asso->id]);
+    $compteVentilation = Compte::factory()->create();
 
     // Reglement → Participant chain required by ownership check
     $reglement = Reglement::factory()->create([
@@ -147,8 +147,10 @@ it('mode mono: GET /portail/documents/facture/{id} sert le PDF inline', function
     $transaction->lignes()->delete();
     $txLigne = TransactionLigne::factory()->create([
         'transaction_id' => $transaction->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compteVentilation->id,
         'montant' => 100.00,
+        'debit' => 0.0,
+        'credit' => 100.00,
     ]);
 
     $facture = Facture::factory()->validee()->create([

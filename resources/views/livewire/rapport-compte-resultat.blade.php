@@ -64,66 +64,6 @@
         $fmt = fn(?float $v): string => $v !== null ? number_format($v, 2, ',', ' ') . ' &euro;' : '&mdash;';
     @endphp
 
-    @if($extournes->isNotEmpty() || $extournesN1->isNotEmpty())
-    {{-- Extournes provisions N-1 --}}
-    <div class="card mb-3 border-0 shadow-sm">
-        <div class="card-body p-0">
-            <table class="table mb-0" style="font-size:13px;border-collapse:collapse;width:100%;">
-                <tbody>
-                    <tr class="cr-section-header">
-                        <td style="width:20px;"></td>
-                        <td></td>
-                        @if($compareN1)<td class="text-end" style="width:115px;font-weight:400;font-size:12px;opacity:.85;">{{ $labelN1 }}</td>@endif
-                        <td class="text-end" style="width:115px;font-weight:400;font-size:12px;opacity:.85;">{{ $labelN }}</td>
-                        @if($compareBudget)
-                        <td class="text-end" style="width:115px;font-weight:400;font-size:12px;opacity:.85;">Budget</td>
-                        <td class="text-end" style="width:90px;font-weight:400;font-size:12px;opacity:.85;">&Eacute;cart</td>
-                        <td class="text-center" style="width:130px;font-weight:400;font-size:12px;opacity:.85;">Conso. budget</td>
-                        @endif
-                    </tr>
-                    <tr class="cr-section-label">
-                        <td colspan="{{ 4 + ($compareN1 ? 1 : 0) + ($compareBudget ? 3 : 0) }}">EXTOURNES PROVISIONS N&minus;1</td>
-                    </tr>
-                    @php
-                        // Build a merged list keyed by libelle+sous_cat for alignment
-                        $extN1ByKey = $extournesN1->keyBy(fn($e) => $e['libelle'].'|'.$e['sous_categorie_id']);
-                        $extNByKey  = $extournes->keyBy(fn($e) => $e['libelle'].'|'.$e['sous_categorie_id']);
-                        $extAllKeys = $extN1ByKey->keys()->merge($extNByKey->keys())->unique();
-                    @endphp
-                    @foreach($extAllKeys as $key)
-                        @php
-                            $extN  = $extNByKey->get($key);
-                            $extN1 = $extN1ByKey->get($key);
-                            $item  = $extN ?? $extN1;
-                        @endphp
-                        <tr class="cr-sub">
-                            <td></td>
-                            <td style="padding-left:32px;">{{ $item['libelle'] }} <span class="text-muted">({{ $item['sous_categorie_nom'] }})</span></td>
-                            @if($compareN1)<td class="text-end cr-n1">{!! $extN1 ? number_format($extN1['montant_signe'], 2, ',', ' ').' &euro;' : '<span class="text-muted">&mdash;</span>' !!}</td>@endif
-                            <td class="text-end">{!! $extN ? number_format($extN['montant_signe'], 2, ',', ' ').' &euro;' : '<span class="text-muted">&mdash;</span>' !!}</td>
-                            @if($compareBudget)
-                            <td class="text-end"><span class="text-muted">&mdash;</span></td>
-                            <td class="text-end"><span class="text-muted">&mdash;</span></td>
-                            <td></td>
-                            @endif
-                        </tr>
-                    @endforeach
-                    <tr class="cr-total">
-                        <td colspan="2">TOTAL EXTOURNES</td>
-                        @if($compareN1)<td class="text-end" style="color:#d0e4f7;">{!! $totalExtournesN1 != 0 ? number_format($totalExtournesN1, 2, ',', ' ').' &euro;' : '&mdash;' !!}</td>@endif
-                        <td class="text-end">{{ number_format($totalExtournes, 2, ',', ' ') }} &euro;</td>
-                        @if($compareBudget)
-                        <td class="text-end">&mdash;</td>
-                        <td class="text-end">&mdash;</td>
-                        <td></td>
-                        @endif
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-    @endif
-
     @foreach ([['data' => $charges, 'label' => 'DEPENSES', 'isCharge' => true, 'total' => $totalChargesN],
                ['data' => $produits, 'label' => 'RECETTES', 'isCharge' => false, 'total' => $totalProduitsN]] as $section)
     <div class="card mb-3 border-0 shadow-sm">
@@ -149,8 +89,8 @@
 
                     @foreach ($section['data'] as $cat)
                         @php
-                            // Regle d'affichage : sous-cat visible si montant_n > 0, ou N-1 > 0, ou budget defini
-                            $scVisibles = collect($cat['sous_categories'])->filter(function($sc) {
+                            // Règle d'affichage : compte visible si N, N-1 ou budget est positif
+                            $scVisibles = collect($cat['comptes'])->filter(function($sc) {
                                 return $sc['montant_n'] > 0
                                     || ($sc['montant_n1'] !== null && $sc['montant_n1'] > 0)
                                     || ($sc['budget'] !== null && $sc['budget'] > 0);
@@ -159,7 +99,7 @@
                         @if (! $scVisibles->isEmpty())
                         <tr class="cr-cat">
                             <td></td>
-                            <td>{{ $cat['label'] }}</td>
+                            <td>{{ $cat['famille_nom'] }}</td>
                             @if($compareN1)<td class="text-end cr-n1">{!! $fmt($cat['montant_n1']) !!}</td>@endif
                             <td class="text-end">{!! $fmt($cat['montant_n']) !!}</td>
                             @if($compareBudget)
@@ -171,7 +111,7 @@
                         @foreach ($scVisibles as $sc)
                             <tr class="cr-sub">
                                 <td></td>
-                                <td style="padding-left:32px;">{{ $sc['label'] }}</td>
+                                <td style="padding-left:32px;">{{ $sc['compte_nom'] }}</td>
                                 @if($compareN1)<td class="text-end cr-n1">{!! $fmt($sc['montant_n1']) !!}</td>@endif
                                 <td class="text-end">{!! $fmt($sc['montant_n']) !!}</td>
                                 @if($compareBudget)
@@ -201,112 +141,8 @@
     </div>
     @endforeach
 
-    @if($provisions->isNotEmpty() || $provisionsN1->isNotEmpty() || $extournes->isNotEmpty() || $extournesN1->isNotEmpty())
-    {{-- Resultat brut (avant provisions) --}}
-    <div class="card mb-3 border-0 shadow-sm mt-2">
-        <div class="card-body p-0">
-            <table class="table mb-0" style="font-size:13px;border-collapse:collapse;width:100%;">
-                <tbody>
-                    <tr style="background:#5a7fa8;color:#fff;font-weight:700;font-size:14px;">
-                        <td style="width:20px;padding:9px 12px;"></td>
-                        <td style="padding:9px 12px;">RÉSULTAT BRUT</td>
-                        @if($compareN1)<td class="text-end" style="width:115px;padding:9px 12px;color:#d0e4f7;">{!! $resultatBrutN1 != 0 ? number_format($resultatBrutN1, 2, ',', ' ').' &euro;' : '&mdash;' !!}</td>@endif
-                        <td class="text-end" style="width:115px;padding:9px 12px;">{{ number_format($resultatBrut, 2, ',', ' ') }} &euro;</td>
-                        @if($compareBudget)
-                        <td style="width:115px;padding:9px 12px;"></td>
-                        <td style="width:90px;padding:9px 12px;"></td>
-                        <td style="width:130px;padding:9px 12px;"></td>
-                        @endif
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    @if($provisions->isNotEmpty() || $provisionsN1->isNotEmpty())
-    {{-- Provisions fin d'exercice --}}
-    <div class="card mb-3 border-0 shadow-sm">
-        <div class="card-body p-0">
-            <table class="table mb-0" style="font-size:13px;border-collapse:collapse;width:100%;">
-                <tbody>
-                    <tr class="cr-section-header">
-                        <td style="width:20px;"></td>
-                        <td></td>
-                        @if($compareN1)<td class="text-end" style="width:115px;font-weight:400;font-size:12px;opacity:.85;">{{ $labelN1 }}</td>@endif
-                        <td class="text-end" style="width:115px;font-weight:400;font-size:12px;opacity:.85;">{{ $labelN }}</td>
-                        @if($compareBudget)
-                        <td class="text-end" style="width:115px;font-weight:400;font-size:12px;opacity:.85;">Budget</td>
-                        <td class="text-end" style="width:90px;font-weight:400;font-size:12px;opacity:.85;">&Eacute;cart</td>
-                        <td class="text-center" style="width:130px;font-weight:400;font-size:12px;opacity:.85;">Conso. budget</td>
-                        @endif
-                    </tr>
-                    <tr class="cr-section-label">
-                        <td colspan="{{ 4 + ($compareN1 ? 1 : 0) + ($compareBudget ? 3 : 0) }}">PROVISIONS FIN D&#039;EXERCICE</td>
-                    </tr>
-                    @php
-                        $provN1ByKey = $provisionsN1->keyBy(fn($p) => $p['libelle'].'|'.$p['sous_categorie_id']);
-                        $provNByKey  = $provisions->keyBy(fn($p) => $p['libelle'].'|'.$p['sous_categorie_id']);
-                        $provAllKeys = $provN1ByKey->keys()->merge($provNByKey->keys())->unique();
-                    @endphp
-                    @foreach($provAllKeys as $key)
-                        @php
-                            $provN  = $provNByKey->get($key);
-                            $provN1 = $provN1ByKey->get($key);
-                            $item   = $provN ?? $provN1;
-                        @endphp
-                        <tr class="cr-sub">
-                            <td></td>
-                            <td style="padding-left:32px;">{{ $item['libelle'] }} <span class="text-muted">({{ $item['sous_categorie_nom'] }})</span></td>
-                            @if($compareN1)<td class="text-end cr-n1">{!! $provN1 ? number_format($provN1['montant_signe'], 2, ',', ' ').' &euro;' : '<span class="text-muted">&mdash;</span>' !!}</td>@endif
-                            <td class="text-end">{!! $provN ? number_format($provN['montant_signe'], 2, ',', ' ').' &euro;' : '<span class="text-muted">&mdash;</span>' !!}</td>
-                            @if($compareBudget)
-                            <td class="text-end"><span class="text-muted">&mdash;</span></td>
-                            <td class="text-end"><span class="text-muted">&mdash;</span></td>
-                            <td></td>
-                            @endif
-                        </tr>
-                    @endforeach
-                    <tr class="cr-total">
-                        <td colspan="2">TOTAL PROVISIONS</td>
-                        @if($compareN1)<td class="text-end" style="color:#d0e4f7;">{!! $totalProvisionsN1 != 0 ? number_format($totalProvisionsN1, 2, ',', ' ').' &euro;' : '&mdash;' !!}</td>@endif
-                        <td class="text-end">{{ number_format($totalProvisions, 2, ',', ' ') }} &euro;</td>
-                        @if($compareBudget)
-                        <td class="text-end">&mdash;</td>
-                        <td class="text-end">&mdash;</td>
-                        <td></td>
-                        @endif
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-    @endif
-
-    {{-- Resultat net ajuste --}}
-    @php $resultatColor = $resultatNet >= 0 ? '#2E7D32' : '#B5453A'; @endphp
-    <div class="card mb-3 border-0 shadow-sm mt-2">
-        <div class="card-body p-0">
-            <table class="table mb-0" style="font-size:13px;border-collapse:collapse;width:100%;">
-                <tbody>
-                    <tr style="background:{{ $resultatColor }};color:#fff;font-weight:700;font-size:14px;">
-                        <td style="width:20px;padding:12px;"></td>
-                        <td style="padding:12px;">RÉSULTAT AJUSTÉ</td>
-                        @if($compareN1)<td class="text-end" style="width:115px;padding:12px;color:rgba(255,255,255,.6);">{!! $resultatNetN1 != 0 ? number_format($resultatNetN1, 2, ',', ' ').' &euro;' : '&mdash;' !!}</td>@endif
-                        <td class="text-end" style="width:115px;padding:12px;">{{ number_format($resultatNet, 2, ',', ' ') }} &euro;</td>
-                        @if($compareBudget)
-                        <td style="width:115px;padding:12px;"></td>
-                        <td style="width:90px;padding:12px;"></td>
-                        <td style="width:130px;padding:12px;"></td>
-                        @endif
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    @else
-    {{-- Pas de provisions ni extournes --}}
-    @php $resultatColor = $resultatNet >= 0 ? '#2E7D32' : '#B5453A'; @endphp
+    {{-- Resultat --}}
+    @php $resultatColor = $resultatCourant >= 0 ? '#2E7D32' : '#B5453A'; @endphp
     <div class="card mb-3 border-0 shadow-sm mt-2">
         <div class="card-body p-0">
             <table class="table mb-0" style="font-size:13px;border-collapse:collapse;width:100%;">
@@ -314,8 +150,8 @@
                     <tr style="background:{{ $resultatColor }};color:#fff;font-weight:700;font-size:14px;">
                         <td style="width:20px;padding:12px;"></td>
                         <td style="padding:12px;">RÉSULTAT</td>
-                        @if($compareN1)<td class="text-end" style="width:115px;padding:12px;color:rgba(255,255,255,.6);">&mdash;</td>@endif
-                        <td class="text-end" style="width:115px;padding:12px;">{{ number_format($resultatNet, 2, ',', ' ') }} &euro;</td>
+                        @if($compareN1)<td class="text-end" style="width:115px;padding:12px;color:rgba(255,255,255,.6);">{!! $resultatCourantN1 != 0 ? number_format($resultatCourantN1, 2, ',', ' ').' &euro;' : '&mdash;' !!}</td>@endif
+                        <td class="text-end" style="width:115px;padding:12px;">{{ number_format($resultatCourant, 2, ',', ' ') }} &euro;</td>
                         @if($compareBudget)
                         <td style="width:115px;padding:12px;"></td>
                         <td style="width:90px;padding:12px;"></td>
@@ -326,5 +162,4 @@
             </table>
         </div>
     </div>
-    @endif
 </div>

@@ -21,7 +21,7 @@ final class TransactionLigneRecuFiscalObserver
 
     public function updating(TransactionLigne $ligne): void
     {
-        $champsCritiques = ['montant', 'sous_categorie_id'];
+        $champsCritiques = ['montant', 'compte_id'];
         $changements = array_intersect($champsCritiques, array_keys($ligne->getDirty()));
 
         if (empty($changements)) {

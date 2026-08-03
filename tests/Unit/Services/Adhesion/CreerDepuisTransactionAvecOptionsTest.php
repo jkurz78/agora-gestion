@@ -2,9 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Enums\UsageComptable;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\FormuleAdhesion;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -16,7 +17,14 @@ beforeEach(function (): void {
     TenantContext::boot($asso);
 
     $this->service = app(AdhesionService::class);
-    $this->scCotisation = SousCategorie::factory()->pourCotisations()->create();
+    $this->scCotisation = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '756OP',
+        'intitule' => 'Cotisations',
+        'classe' => 7,
+        'actif' => true,
+    ]);
+    $this->scCotisation->usages()->create(['usage' => UsageComptable::Cotisation->value]);
     $this->tiers = Tiers::factory()->create();
 });
 
@@ -31,7 +39,7 @@ it('creerDepuisTransaction : adhésion créée depuis ligne parent (option_id IS
     // L'adhésion doit être créée depuis la ligne parent (montant_facial=0)
     // et non depuis la ligne option.
     $formule = FormuleAdhesion::factory()->helloasso('mon-form', 18595)->create([
-        'sous_categorie_id' => $this->scCotisation->id,
+        'compte_id' => $this->scCotisation->id,
     ]);
 
     $tx = Transaction::factory()->create([
@@ -43,21 +51,24 @@ it('creerDepuisTransaction : adhésion créée depuis ligne parent (option_id IS
     // Supprimer les lignes auto-créées par Transaction::configure()
     TransactionLigne::where('transaction_id', $tx->id)->delete();
 
-    // Ligne parent cotisation (montant=0)
-    $ligneParent = TransactionLigne::factory()->create([
+    // Ligne parent cotisation à 0 € : le schéma final impose un compte ;
+    // l'événement est neutralisé pour représenter le palier HelloAsso gratuit.
+    $ligneParent = TransactionLigne::withoutEvents(fn (): TransactionLigne => TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $this->scCotisation->id,
+        'compte_id' => $this->scCotisation->id,
         'montant' => 0.00,
         'helloasso_item_id' => 87070,
         'helloasso_option_id' => null,
         'helloasso_tier_id' => 18595,
-    ]);
+    ]));
 
-    // Ligne option (montant=12€) — même sous-cat que le parent
+    // Ligne option (montant=12€) — même compte que le parent
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $this->scCotisation->id,
+        'compte_id' => $this->scCotisation->id,
         'montant' => 12.00,
+        'debit' => 0,
+        'credit' => 12.00,
         'helloasso_item_id' => 87070,
         'helloasso_option_id' => 18596,
         'helloasso_tier_id' => null,
@@ -78,7 +89,7 @@ it('creerDepuisTransaction : adhésion créée depuis ligne parent (option_id IS
 
 it('creerDepuisTransaction : pas d\'adhésion si seule une ligne option cotisation existe (sans ligne parent)', function (): void {
     // Si pour une raison quelconque on n'a qu'une ligne option (option_id non-null)
-    // avec une sous-cat cotisation, aucune adhésion ne doit être créée.
+    // avec un compte cotisation, aucune adhésion ne doit être créée.
     // (Ce cas ne devrait pas se produire en production mais on teste la robustesse.)
     $tx = Transaction::factory()->create([
         'type' => 'recette',
@@ -90,8 +101,10 @@ it('creerDepuisTransaction : pas d\'adhésion si seule une ligne option cotisati
     // Seulement une ligne option, pas de ligne parent
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $this->scCotisation->id,
+        'compte_id' => $this->scCotisation->id,
         'montant' => 12.00,
+        'debit' => 0,
+        'credit' => 12.00,
         'helloasso_item_id' => 87070,
         'helloasso_option_id' => 18596,
     ]);
@@ -113,8 +126,10 @@ it('creerDepuisTransaction : adhésion créée normalement si 1 ligne sans optio
 
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $this->scCotisation->id,
+        'compte_id' => $this->scCotisation->id,
         'montant' => 35.00,
+        'debit' => 0,
+        'credit' => 35.00,
         'helloasso_item_id' => null,
         'helloasso_option_id' => null,
     ]);

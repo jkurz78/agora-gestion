@@ -8,15 +8,17 @@ use App\Enums\StatutOperation;
 use App\Enums\UsageComptable;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\BudgetLine;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
+use App\Models\Famille;
 use App\Models\Operation;
-use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\BudgetService;
 use App\Services\ExerciceService;
 use App\Services\SoldeService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Livewire\Component;
 
 final class Dashboard extends Component
@@ -34,63 +36,68 @@ final class Dashboard extends Component
         $endDate = $range['end']->toDateString();
 
         // Solde général
-        $totalRecettes = (float) Transaction::where('type', 'recette')->forExercice($exercice)->sum('montant_total');
-        $totalDepenses = (float) Transaction::where('type', 'depense')->forExercice($exercice)->sum('montant_total');
+        $totalRecettes = (float) Transaction::where('type', 'recette')->operationnel()->forExercice($exercice)->sum('montant_total');
+        $totalDepenses = (float) Transaction::where('type', 'depense')->operationnel()->forExercice($exercice)->sum('montant_total');
         $soldeGeneral = $totalRecettes - $totalDepenses;
 
-        // Budget résumé — agrégation par catégorie pour sous-totaux
+        // Budget résumé — agrégation par famille (lecture compte-first)
         $budgetLines = BudgetLine::forExercice($exercice)
-            ->with('sousCategorie.categorie')
+            ->with(['compte'])
             ->get();
+
+        $familles = Famille::pourComptes(EloquentCollection::make($budgetLines->pluck('compte')->filter()));
 
         $totalPrevu = (float) $budgetLines->sum('montant_prevu');
         $totalRealise = 0.0;
-        $budgetParCategorie = []; // ['categorieNom' => ['type' => 'depense|recette', 'prevu' => float, 'realise' => float]]
+        $budgetParFamille = []; // ['nomGroupe' => ['type' => 'depense|recette', 'prevu' => float, 'realise' => float]]
         foreach ($budgetLines as $line) {
-            $r = (float) $budgetService->realise($line->sous_categorie_id, $exercice);
+            $r = $line->compte_id !== null ? (float) $budgetService->realise((int) $line->compte_id, $exercice) : 0.0;
             $totalRealise += $r;
-            $cat = $line->sousCategorie?->categorie;
-            $catKey = $cat?->nom ?? '—';
-            if (! isset($budgetParCategorie[$catKey])) {
-                $budgetParCategorie[$catKey] = [
-                    'type' => $cat?->type ?? 'depense',
+
+            $compte = $line->compte;
+            $famille = $compte !== null ? $familles->get(substr($compte->numero_pcg, 0, 2)) : null;
+
+            $familleKey = $famille?->nom ?? '—';
+            if (! isset($budgetParFamille[$familleKey])) {
+                $budgetParFamille[$familleKey] = [
+                    'type' => $famille !== null ? ($famille->estDepense() ? 'depense' : 'recette') : 'depense',
                     'prevu' => 0.0,
                     'realise' => 0.0,
                 ];
             }
-            $budgetParCategorie[$catKey]['prevu'] += (float) $line->montant_prevu;
-            $budgetParCategorie[$catKey]['realise'] += $r;
+            $budgetParFamille[$familleKey]['prevu'] += (float) $line->montant_prevu;
+            $budgetParFamille[$familleKey]['realise'] += $r;
         }
         // Tri : recettes en premier, puis dépenses, alpha dans chaque groupe
-        uksort($budgetParCategorie, function ($a, $b) use ($budgetParCategorie): int {
-            $ta = $budgetParCategorie[$a]['type'] === 'recette' ? 0 : 1;
-            $tb = $budgetParCategorie[$b]['type'] === 'recette' ? 0 : 1;
+        uksort($budgetParFamille, function ($a, $b) use ($budgetParFamille): int {
+            $ta = $budgetParFamille[$a]['type'] === 'recette' ? 0 : 1;
+            $tb = $budgetParFamille[$b]['type'] === 'recette' ? 0 : 1;
 
             return $ta <=> $tb ?: strcasecmp($a, $b);
         });
 
         // Dernières dépenses (avec tiers)
-        $dernieresDepenses = Transaction::where('type', 'depense')->forExercice($exercice)
+        $dernieresDepenses = Transaction::where('type', 'depense')->operationnel()->forExercice($exercice)
             ->with('tiers')
             ->latest('date')->latest('id')
             ->take(5)
             ->get();
 
         // Dernières recettes (avec tiers)
-        $dernieresRecettes = Transaction::where('type', 'recette')->forExercice($exercice)
+        $dernieresRecettes = Transaction::where('type', 'recette')->operationnel()->forExercice($exercice)
             ->with('tiers')
             ->latest('date')->latest('id')
             ->take(5)
             ->get();
 
-        // Derniers dons — lignes de transaction avec sous-cat usage Don
+        // Derniers dons — lignes de transaction avec compte usage Don
         // (et non transactions entières : une même transaction peut contenir
         // une adhésion ET un don, il faut isoler chaque ligne par montant).
-        $donSousCategorieIds = SousCategorie::forUsage(UsageComptable::Don)->pluck('id');
+        $donCompteIds = Compte::forUsage(UsageComptable::Don)->pluck('id');
         $derniersDons = TransactionLigne::query()
-            ->whereIn('transaction_lignes.sous_categorie_id', $donSousCategorieIds)
+            ->whereIn('transaction_lignes.compte_id', $donCompteIds)
             ->whereHas('transaction', fn ($q) => $q->where('type', 'recette')->forExercice($exercice))
-            ->with(['transaction.tiers', 'sousCategorie'])
+            ->with(['transaction.tiers', 'compte'])
             ->join('transactions', 'transactions.id', '=', 'transaction_lignes.transaction_id')
             ->orderByDesc('transactions.date')
             ->orderByDesc('transaction_lignes.id')
@@ -99,11 +106,11 @@ final class Dashboard extends Component
             ->get();
 
         // Dernières adhésions — lignes de cotisation, avec adhésion (formule + dates)
-        $cotSousCategorieIds = SousCategorie::forUsage(UsageComptable::Cotisation)->pluck('id');
+        $cotCompteIds = Compte::forUsage(UsageComptable::Cotisation)->pluck('id');
         $dernieresAdhesions = TransactionLigne::query()
-            ->whereIn('transaction_lignes.sous_categorie_id', $cotSousCategorieIds)
+            ->whereIn('transaction_lignes.compte_id', $cotCompteIds)
             ->whereHas('transaction', fn ($q) => $q->where('type', 'recette')->forExercice($exercice))
-            ->with(['transaction.tiers', 'transaction.adhesions.formuleAdhesion', 'sousCategorie'])
+            ->with(['transaction.tiers', 'transaction.adhesions.formuleAdhesion', 'compte'])
             ->join('transactions', 'transactions.id', '=', 'transaction_lignes.transaction_id')
             ->orderByDesc('transactions.date')
             ->orderByDesc('transaction_lignes.id')
@@ -114,7 +121,7 @@ final class Dashboard extends Component
         // Opérations de l'exercice (hors terminées)
         $range = $exerciceService->dateRange($exercice);
         $operations = Operation::query()
-            ->with(['typeOperation.sousCategorie.categorie'])
+            ->with(['typeOperation.compte'])
             ->withCount('participants')
             ->where('statut', '!=', StatutOperation::Cloturee)
             ->where(function ($q) use ($range): void {
@@ -132,7 +139,7 @@ final class Dashboard extends Component
             })
             ->get()
             ->sortBy([
-                fn ($a, $b) => ($a->typeOperation?->sousCategorie?->nom ?? '') <=> ($b->typeOperation?->sousCategorie?->nom ?? ''),
+                fn ($a, $b) => ($a->typeOperation?->compte?->intitule ?? '') <=> ($b->typeOperation?->compte?->intitule ?? ''),
                 fn ($a, $b) => ($a->typeOperation?->nom ?? '') <=> ($b->typeOperation?->nom ?? ''),
                 fn ($a, $b) => $a->nom <=> $b->nom,
             ])->values();
@@ -151,7 +158,7 @@ final class Dashboard extends Component
             'totalDepenses' => $totalDepenses,
             'totalPrevu' => $totalPrevu,
             'totalRealise' => $totalRealise,
-            'budgetParCategorie' => $budgetParCategorie,
+            'budgetParFamille' => $budgetParFamille,
             'dernieresDepenses' => $dernieresDepenses,
             'dernieresRecettes' => $dernieresRecettes,
             'derniersDons' => $derniersDons,

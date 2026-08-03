@@ -6,9 +6,10 @@ namespace App\Livewire\Provisions;
 
 use App\Enums\TypeTransaction;
 use App\Exceptions\ExerciceCloturedException;
-use App\Models\Categorie;
 use App\Models\Operation;
 use App\Models\Provision;
+use App\Services\Compta\PlanComptableSelecteur;
+use App\Services\Compta\ProvisionPDService;
 use App\Services\ExerciceService;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
@@ -28,7 +29,7 @@ final class ProvisionIndex extends Component
     // ── Form fields ──────────────────────────────────────────────
     public string $libelle = '';
 
-    public string $sous_categorie_id = '';
+    public string $compte_id = '';
 
     public string $type = '';
 
@@ -59,14 +60,15 @@ final class ProvisionIndex extends Component
         $exerciceModel = $exerciceService->exerciceAffiche();
         $isCloture = $exerciceModel !== null && $exerciceModel->isCloture();
 
-        $provisions = Provision::with(['sousCategorie.categorie', 'tiers', 'operation'])
+        $provisions = Provision::with(['compte', 'tiers', 'operation'])
             ->forExercice($exercice)
             ->orderBy('libelle')
             ->get();
 
-        $categories = Categorie::with('sousCategories')
-            ->orderBy('nom')
-            ->get();
+        // DC-8 : sélecteur de ventilation sur comptes (classes 6 et 7), groupés par famille.
+        $groupesComptes = PlanComptableSelecteur::groupesPourType('depense')
+            ->union(PlanComptableSelecteur::groupesPourType('recette'))
+            ->sortKeys();
 
         $operations = Operation::forExercice($exercice)
             ->orderBy('nom')
@@ -82,7 +84,7 @@ final class ProvisionIndex extends Component
 
         return view('livewire.provisions.provision-index', [
             'provisions' => $provisions,
-            'categories' => $categories,
+            'groupesComptes' => $groupesComptes,
             'operations' => $operations,
             'isCloture' => $isCloture,
             'exerciceLabel' => $exerciceLabel,
@@ -106,7 +108,7 @@ final class ProvisionIndex extends Component
 
         $this->editingId = $provision->id;
         $this->libelle = $provision->libelle;
-        $this->sous_categorie_id = (string) $provision->sous_categorie_id;
+        $this->compte_id = (string) $provision->compte_id;
         $this->type = $provision->type->value;
         $this->montant = (string) $provision->montant;
         $this->tiers_id = $provision->tiers_id ? (int) $provision->tiers_id : null;
@@ -135,7 +137,7 @@ final class ProvisionIndex extends Component
 
         $this->validate([
             'libelle' => 'required|string|max:255',
-            'sous_categorie_id' => 'required|exists:sous_categories,id',
+            'compte_id' => 'required|exists:comptes,id',
             'type' => 'required|in:depense,recette',
             'montant' => 'required|numeric',
             'tiers_id' => 'nullable|exists:tiers,id',
@@ -150,7 +152,7 @@ final class ProvisionIndex extends Component
         $data = [
             'exercice' => $exercice,
             'libelle' => $this->libelle,
-            'sous_categorie_id' => (int) $this->sous_categorie_id,
+            'compte_id' => (int) $this->compte_id,
             'type' => $this->type,
             'montant' => (float) $this->montant,
             'tiers_id' => $this->tiers_id,
@@ -167,6 +169,8 @@ final class ProvisionIndex extends Component
         } else {
             $provision = Provision::create($data);
         }
+
+        app(ProvisionPDService::class)->generer($provision);
 
         // Écriture physique de la pièce jointe après que l'id soit connu
         if ($this->piece_jointe !== null) {
@@ -211,7 +215,9 @@ final class ProvisionIndex extends Component
             return;
         }
 
-        Provision::findOrFail($id)->delete();
+        $provision = Provision::findOrFail($id);
+        app(ProvisionPDService::class)->supprimer($provision);
+        $provision->delete();
 
         $this->flashMessage = 'Provision supprimée.';
         $this->flashType = 'success';
@@ -223,7 +229,7 @@ final class ProvisionIndex extends Component
     {
         $this->editingId = null;
         $this->libelle = '';
-        $this->sous_categorie_id = '';
+        $this->compte_id = '';
         $this->type = '';
         $this->montant = '';
         $this->tiers_id = null;

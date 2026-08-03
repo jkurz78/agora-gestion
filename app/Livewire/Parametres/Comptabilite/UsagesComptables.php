@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace App\Livewire\Parametres\Comptabilite;
 
 use App\Enums\RoleAssociation;
-use App\Enums\TypeCategorie;
 use App\Enums\UsageComptable;
-use App\Models\Categorie;
-use App\Models\SousCategorie;
+use App\Models\Compte;
 use App\Services\UsagesComptablesService;
 use DomainException;
 use Illuminate\Contracts\View\View;
@@ -25,18 +23,17 @@ final class UsagesComptables extends Component
 
     public ?string $inlineUsage = null;
 
-    public ?int $inlineCategorieId = null;
-
     public string $inlineNom = '';
 
-    public ?string $inlineCodeCerfa = null;
+    public ?string $inlineNumeroPcg = null;
 
     public function mount(): void
     {
         $this->requireAdmin();
-        $fraisKm = SousCategorie::forUsage(UsageComptable::FraisKilometriques)->first();
+        // DC-8 : les sélections portent des ids de comptes (classe 6/7).
+        $fraisKm = Compte::forUsage(UsageComptable::FraisKilometriques)->first();
         $this->fraisKmSelectedId = $fraisKm?->id;
-        $abandon = SousCategorie::forUsage(UsageComptable::AbandonCreance)->first();
+        $abandon = Compte::forUsage(UsageComptable::AbandonCreance)->first();
         $this->abandonCreanceSelectedId = $abandon?->id;
     }
 
@@ -85,7 +82,7 @@ final class UsagesComptables extends Component
     public function openInline(string $usage): void
     {
         $this->requireAdmin();
-        $this->reset(['inlineCategorieId', 'inlineNom', 'inlineCodeCerfa']);
+        $this->reset(['inlineNom', 'inlineNumeroPcg']);
         $this->inlineUsage = $usage;
         $this->inlineOpen = true;
     }
@@ -93,45 +90,41 @@ final class UsagesComptables extends Component
     public function submitInline(): void
     {
         $this->requireAdmin();
+        // Numéro de compte requis — sans lui, pas de Compte, donc la nouvelle
+        // entrée serait invisible sur cet écran (liste de comptes).
         $this->validate([
             'inlineUsage' => 'required|string',
-            'inlineCategorieId' => 'required|integer|exists:categories,id',
             'inlineNom' => 'required|string|max:255',
-            'inlineCodeCerfa' => 'nullable|string|max:20',
+            'inlineNumeroPcg' => 'required|string|max:20',
         ]);
         $usage = UsageComptable::from($this->inlineUsage);
-        app(UsagesComptablesService::class)->createAndFlag([
-            'categorie_id' => $this->inlineCategorieId,
-            'nom' => $this->inlineNom,
-            'code_cerfa' => $this->inlineCodeCerfa,
-        ], $usage);
+        try {
+            app(UsagesComptablesService::class)->createAndFlag([
+                'intitule' => $this->inlineNom,
+                'numero_pcg' => $this->inlineNumeroPcg,
+            ], $usage);
+        } catch (DomainException $e) {
+            $this->addError('inlineNumeroPcg', $e->getMessage());
+
+            return;
+        }
         $this->inlineOpen = false;
         $this->dispatch('usage-created');
     }
 
     public function getAbandonCreanceCandidatesProperty(): array
     {
-        return SousCategorie::with('categorie')->forUsage(UsageComptable::Don)->orderBy('nom')->get()->all();
-    }
-
-    public function getInlineCategoriesEligiblesProperty(): array
-    {
-        if ($this->inlineUsage === null) {
-            return [];
-        }
-        $polarite = UsageComptable::from($this->inlineUsage)->polarite();
-
-        return Categorie::where('type', $polarite)->orderBy('nom')->get()->all();
+        return Compte::forUsage(UsageComptable::Don)->orderBy('numero_pcg')->get()->all();
     }
 
     public function render(): View
     {
         return view('livewire.parametres.comptabilite.usages-comptables', [
-            'sousCatsDepense' => SousCategorie::with('categorie')->whereHas('categorie', fn ($q) => $q->where('type', TypeCategorie::Depense))->join('categories', 'categories.id', '=', 'sous_categories.categorie_id')->orderBy('categories.nom')->orderBy('sous_categories.nom')->select('sous_categories.*')->get(),
-            'sousCatsRecette' => SousCategorie::with('categorie')->whereHas('categorie', fn ($q) => $q->where('type', TypeCategorie::Recette))->join('categories', 'categories.id', '=', 'sous_categories.categorie_id')->orderBy('categories.nom')->orderBy('sous_categories.nom')->select('sous_categories.*')->get(),
-            'sousCatsDon' => SousCategorie::forUsage(UsageComptable::Don)->pluck('id'),
-            'sousCatsCotisation' => SousCategorie::forUsage(UsageComptable::Cotisation)->pluck('id'),
-            'sousCatsInscription' => SousCategorie::forUsage(UsageComptable::Inscription)->pluck('id'),
+            'comptesDepense' => Compte::where('classe', 6)->where('actif', true)->orderBy('numero_pcg')->get(),
+            'comptesRecette' => Compte::where('classe', 7)->where('actif', true)->orderBy('numero_pcg')->get(),
+            'comptesDon' => Compte::forUsage(UsageComptable::Don)->pluck('id'),
+            'comptesCotisation' => Compte::forUsage(UsageComptable::Cotisation)->pluck('id'),
+            'comptesInscription' => Compte::forUsage(UsageComptable::Inscription)->pluck('id'),
         ])->layout('layouts.app-sidebar', ['title' => 'Comptabilité']);
     }
 }

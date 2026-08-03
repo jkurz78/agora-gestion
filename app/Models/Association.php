@@ -180,8 +180,13 @@ final class Association extends Model
         return preg_match('#^https?://#i', $url) === 1 ? $url : null;
     }
 
-    public function sousCategoriesFor(UsageComptable $usage): Collection
+    /**
+     * Comptes de résultat (classe 6/7) flaggés pour l'usage comptable donné.
+     *
+     * @return Collection<int, Compte>
+     */
+    public function comptesFor(UsageComptable $usage): Collection
     {
-        return SousCategorie::forUsage($usage)->where('association_id', $this->id)->orderBy('nom')->get();
+        return Compte::forUsage($usage)->where('association_id', $this->id)->orderBy('numero_pcg')->get();
     }
 }

@@ -2,101 +2,134 @@
 
 declare(strict_types=1);
 
-use App\Enums\TypeCategorie;
 use App\Enums\UsageComptable;
 use App\Models\Association;
-use App\Models\Categorie;
-use App\Models\SousCategorie;
+use App\Models\Compte;
 use App\Services\UsagesComptablesService;
 use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 
+/**
+ * DC-8 : le service accepte des ids de comptes (classe 6/7).
+ */
+function creerCompteVentilation(Association $asso, string $numeroPcg): Compte
+{
+    return Compte::factory()->numero($numeroPcg)->create([
+        'association_id' => $asso->id,
+        'classe' => (int) substr($numeroPcg, 0, 1),
+    ]);
+}
+
 beforeEach(function () {
     $this->asso = Association::factory()->create();
     TenantContext::boot($this->asso);
-    $this->catR = Categorie::factory()->for($this->asso, 'association')->create(['type' => TypeCategorie::Recette]);
-    $this->catD = Categorie::factory()->for($this->asso, 'association')->create(['type' => TypeCategorie::Depense]);
     $this->service = app(UsagesComptablesService::class);
 });
 
 it('setFraisKilometriques poses the link and removes previous', function () {
-    $sc1 = SousCategorie::factory()->for($this->asso, 'association')->for($this->catD)->create();
-    $sc2 = SousCategorie::factory()->for($this->asso, 'association')->for($this->catD)->create();
+    $compte1 = creerCompteVentilation($this->asso, '625A');
+    $compte2 = creerCompteVentilation($this->asso, '625B');
 
-    $this->service->setFraisKilometriques($sc1->id);
-    expect($sc1->fresh()->hasUsage(UsageComptable::FraisKilometriques))->toBeTrue();
+    $this->service->setFraisKilometriques($compte1->id);
+    expect($compte1->fresh()->hasUsage(UsageComptable::FraisKilometriques))->toBeTrue();
 
-    $this->service->setFraisKilometriques($sc2->id);
-    expect($sc1->fresh()->hasUsage(UsageComptable::FraisKilometriques))->toBeFalse();
-    expect($sc2->fresh()->hasUsage(UsageComptable::FraisKilometriques))->toBeTrue();
+    $this->service->setFraisKilometriques($compte2->id);
+    expect($compte1->fresh()->hasUsage(UsageComptable::FraisKilometriques))->toBeFalse();
+    expect($compte2->fresh()->hasUsage(UsageComptable::FraisKilometriques))->toBeTrue();
 });
 
 it('setFraisKilometriques(null) clears', function () {
-    $sc = SousCategorie::factory()->for($this->asso, 'association')->for($this->catD)->create();
-    $this->service->setFraisKilometriques($sc->id);
+    $compte = creerCompteVentilation($this->asso, '625A');
+    $this->service->setFraisKilometriques($compte->id);
     $this->service->setFraisKilometriques(null);
-    expect($sc->fresh()->hasUsage(UsageComptable::FraisKilometriques))->toBeFalse();
+    expect($compte->fresh()->hasUsage(UsageComptable::FraisKilometriques))->toBeFalse();
 });
 
 it('toggleDon / toggleCotisation / toggleInscription are idempotent', function () {
-    $sc = SousCategorie::factory()->for($this->asso, 'association')->for($this->catR)->create();
-    $this->service->toggleDon($sc->id, true);
-    $this->service->toggleDon($sc->id, true);
-    expect($sc->fresh()->usages()->where('usage', UsageComptable::Don->value)->count())->toBe(1);
+    $compte = creerCompteVentilation($this->asso, '754A');
+    $this->service->toggleDon($compte->id, true);
+    $this->service->toggleDon($compte->id, true);
+    expect($compte->fresh()->usages()->where('usage', UsageComptable::Don->value)->count())->toBe(1);
 
-    $this->service->toggleDon($sc->id, false);
-    expect($sc->fresh()->hasUsage(UsageComptable::Don))->toBeFalse();
+    $this->service->toggleDon($compte->id, false);
+    expect($compte->fresh()->hasUsage(UsageComptable::Don))->toBeFalse();
 });
 
-it('setAbandonCreance on non-Don sous-cat throws', function () {
-    $sc = SousCategorie::factory()->for($this->asso, 'association')->for($this->catR)->create();
-    expect(fn () => $this->service->setAbandonCreance($sc->id))->toThrow(DomainException::class);
+it('setAbandonCreance on non-Don compte throws', function () {
+    $compte = creerCompteVentilation($this->asso, '771A');
+    expect(fn () => $this->service->setAbandonCreance($compte->id))->toThrow(DomainException::class);
 });
 
-it('setAbandonCreance on Don sous-cat succeeds', function () {
-    $sc = SousCategorie::factory()->for($this->asso, 'association')->for($this->catR)->create();
-    $this->service->toggleDon($sc->id, true);
-    $this->service->setAbandonCreance($sc->id);
-    expect($sc->fresh()->hasUsage(UsageComptable::AbandonCreance))->toBeTrue();
+it('setAbandonCreance on Don compte succeeds', function () {
+    $compte = creerCompteVentilation($this->asso, '754A');
+    $this->service->toggleDon($compte->id, true);
+    $this->service->setAbandonCreance($compte->id);
+    expect($compte->fresh()->hasUsage(UsageComptable::AbandonCreance))->toBeTrue();
 });
 
 it('toggleDon(false) cascades and removes AbandonCreance', function () {
-    $sc = SousCategorie::factory()->for($this->asso, 'association')->for($this->catR)->create();
-    $this->service->toggleDon($sc->id, true);
-    $this->service->setAbandonCreance($sc->id);
-    $this->service->toggleDon($sc->id, false);
-    expect($sc->fresh()->hasUsage(UsageComptable::Don))->toBeFalse();
-    expect($sc->fresh()->hasUsage(UsageComptable::AbandonCreance))->toBeFalse();
+    $compte = creerCompteVentilation($this->asso, '754A');
+    $this->service->toggleDon($compte->id, true);
+    $this->service->setAbandonCreance($compte->id);
+    $this->service->toggleDon($compte->id, false);
+    expect($compte->fresh()->hasUsage(UsageComptable::Don))->toBeFalse();
+    expect($compte->fresh()->hasUsage(UsageComptable::AbandonCreance))->toBeFalse();
 });
 
-it('createAndFlag creates sous-cat and posts the pivot link', function () {
-    $sc = $this->service->createAndFlag([
-        'categorie_id' => $this->catR->id,
-        'nom' => 'Nouvelle sous-cat',
-        'code_cerfa' => null,
+it('createAndFlag creates a compte and posts the pivot link', function () {
+    $compte = $this->service->createAndFlag([
+        'intitule' => 'Nouveau compte',
+        'numero_pcg' => '758A',
     ], UsageComptable::Cotisation);
 
-    expect($sc)->toBeInstanceOf(SousCategorie::class);
-    expect($sc->hasUsage(UsageComptable::Cotisation))->toBeTrue();
+    expect($compte)->toBeInstanceOf(Compte::class);
+    expect($compte->hasUsage(UsageComptable::Cotisation))->toBeTrue();
+
+});
+
+it('createAndFlag throws on empty numero_pcg', function () {
+    expect(fn () => $this->service->createAndFlag([
+        'intitule' => 'Nouveau compte',
+        'numero_pcg' => '',
+    ], UsageComptable::Cotisation))->toThrow(DomainException::class);
+});
+
+it('createAndFlag throws on wrong-classe numero_pcg', function () {
+    // Cotisation est une Recette (classe 7 attendue) — '606' est classe 6.
+    expect(fn () => $this->service->createAndFlag([
+        'intitule' => 'Nouveau compte',
+        'numero_pcg' => '606',
+    ], UsageComptable::Cotisation))->toThrow(DomainException::class);
+});
+
+it('createAndFlag reuses an existing compte with the same numero_pcg', function () {
+    $existing = creerCompteVentilation($this->asso, '754A');
+
+    $compte = $this->service->createAndFlag([
+        'intitule' => 'Intitulé ignoré (compte déjà existant)',
+        'numero_pcg' => '754A',
+    ], UsageComptable::Cotisation);
+
+    expect((int) $compte->id)->toBe((int) $existing->id);
+    expect($compte->fresh()->hasUsage(UsageComptable::Cotisation))->toBeTrue();
 });
 
 it('createAndFlag(AbandonCreance) also posts Don', function () {
-    $sc = $this->service->createAndFlag([
-        'categorie_id' => $this->catR->id,
-        'nom' => 'Abandon de créance',
-        'code_cerfa' => '771',
+    $compte = $this->service->createAndFlag([
+        'intitule' => 'Abandon de créance',
+        'numero_pcg' => '771',
     ], UsageComptable::AbandonCreance);
 
-    expect($sc->hasUsage(UsageComptable::Don))->toBeTrue();
-    expect($sc->hasUsage(UsageComptable::AbandonCreance))->toBeTrue();
+    expect($compte->hasUsage(UsageComptable::Don))->toBeTrue();
+    expect($compte->hasUsage(UsageComptable::AbandonCreance))->toBeTrue();
+
 });
 
 it('is tenant-scoped', function () {
     $asso2 = Association::factory()->create();
     TenantContext::boot($asso2);
-    $catR2 = Categorie::factory()->for($asso2, 'association')->create(['type' => TypeCategorie::Recette]);
-    $sc2 = SousCategorie::factory()->for($asso2, 'association')->for($catR2)->create();
+    $compte2 = creerCompteVentilation($asso2, '754A');
 
     TenantContext::boot($this->asso);
-    expect(fn () => $this->service->toggleDon($sc2->id, true))->toThrow(ModelNotFoundException::class);
+    expect(fn () => $this->service->toggleDon($compte2->id, true))->toThrow(ModelNotFoundException::class);
 });

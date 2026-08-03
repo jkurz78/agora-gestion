@@ -70,7 +70,7 @@
 
             var defaults = view === 'participants'
                 ? { rows: ["Opération"], vals: ["Montant prévu"], aggregatorName: "Somme" }
-                : { rows: ["Catégorie"], vals: ["Montant"], aggregatorName: "Somme" };
+                : { rows: ["Famille"], vals: ["Montant"], aggregatorName: "Somme" };
 
             var config = Object.assign({
                 locale: "fr",

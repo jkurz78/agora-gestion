@@ -5,12 +5,15 @@ declare(strict_types=1);
 use App\Enums\StatutRapprochement;
 use App\Enums\StatutReglement;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Services\RapprochementBancaireService;
 use App\Tenant\TenantContext;
+use Carbon\CarbonImmutable;
 
 beforeEach(function () {
     $this->association = Association::factory()->create();
@@ -22,8 +25,32 @@ beforeEach(function () {
         'solde_initial' => 1000.00,
         'date_solde_initial' => '2025-09-01',
     ]);
+    // Compte de trésorerie 512X du compte bancaire. calculerSoldePointage() somme
+    // les lignes portées par ce compte ; sans lui la résolution échoue et le solde
+    // se réduit à l'ouverture (dégradation gracieuse documentée).
+    // Le scope bancaires() exige numero_pcg LIKE '512_%' : « 512 » seul ne matche pas.
+    $this->compte512X = Compte::factory()->numero('5121')->create([
+        'classe' => 5,
+        'compte_bancaire_id' => $this->compte->id,
+    ]);
     $this->service = app(RapprochementBancaireService::class);
 });
+
+/**
+ * Ajoute à une transaction la ligne 512X que produit EcritureGenerator en
+ * fonctionnement réel. Les factory Transaction ne créent qu'un entête ;
+ * le solde de pointage se calcule sur les lignes, pas sur montant_total.
+ */
+function ligneTresorerie(Transaction $tx, Compte $compte512X, float $contribution): void
+{
+    TransactionLigne::create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $compte512X->id,
+        'debit' => $contribution > 0 ? $contribution : 0.0,
+        'credit' => $contribution < 0 ? -$contribution : 0.0,
+        'montant' => abs($contribution),
+    ]);
+}
 
 afterEach(function () {
     TenantContext::clear();
@@ -46,6 +73,30 @@ test('calculerSoldeOuverture retourne solde_fin du dernier rapprochement verroui
     expect($solde)->toBe(1500.0);
 });
 
+test('calculerSoldeRapprochementAu ignore les rapprochements postérieurs à la date demandée', function () {
+    RapprochementBancaire::factory()->create([
+        'compte_id' => $this->compte->id,
+        'solde_fin' => 1200.00,
+        'statut' => StatutRapprochement::Verrouille,
+        'date_fin' => '2025-10-31',
+        'saisi_par' => $this->user->id,
+    ]);
+    RapprochementBancaire::factory()->create([
+        'compte_id' => $this->compte->id,
+        'solde_fin' => 1500.00,
+        'statut' => StatutRapprochement::Verrouille,
+        'date_fin' => '2026-01-31',
+        'saisi_par' => $this->user->id,
+    ]);
+
+    $solde = $this->service->calculerSoldeRapprochementAu(
+        $this->compte,
+        CarbonImmutable::parse('2025-12-31'),
+    );
+
+    expect($solde)->toBe(1200.0);
+});
+
 test('create crée un rapprochement avec le bon solde_ouverture', function () {
     $rapprochement = $this->service->create($this->compte, '2025-10-31', 1200.00);
 
@@ -63,12 +114,13 @@ test('create échoue si un rapprochement en cours existe déjà', function () {
 
 test('calculerSoldePointage prend en compte les recettes pointées', function () {
     $rapprochement = $this->service->create($this->compte, '2025-10-31', 1500.00);
-    Transaction::factory()->asRecette()->create([
+    $tx = Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
         'montant_total' => 300.00,
         'rapprochement_id' => $rapprochement->id,
         'statut_reglement' => StatutReglement::Pointe->value,
     ]);
+    ligneTresorerie($tx, $this->compte512X, 300.00);
 
     $solde = $this->service->calculerSoldePointage($rapprochement->fresh());
     expect($solde)->toBe(1300.0); // 1000 + 300
@@ -76,12 +128,13 @@ test('calculerSoldePointage prend en compte les recettes pointées', function ()
 
 test('calculerSoldePointage déduit les dépenses pointées', function () {
     $rapprochement = $this->service->create($this->compte, '2025-10-31', 800.00);
-    Transaction::factory()->asDepense()->create([
+    $tx = Transaction::factory()->asDepense()->create([
         'compte_id' => $this->compte->id,
         'montant_total' => 200.00,
         'rapprochement_id' => $rapprochement->id,
         'statut_reglement' => StatutReglement::Pointe->value,
     ]);
+    ligneTresorerie($tx, $this->compte512X, -200.00);
 
     $solde = $this->service->calculerSoldePointage($rapprochement->fresh());
     expect($solde)->toBe(800.0); // 1000 - 200

@@ -3,11 +3,9 @@
 declare(strict_types=1);
 
 use App\Livewire\AdherentList;
+use App\Models\Adhesion;
 use App\Models\Association;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
-use App\Models\Transaction;
-use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
@@ -19,31 +17,12 @@ beforeEach(function (): void {
     TenantContext::boot($this->association);
     session(['current_association_id' => $this->association->id]);
     session(['exercice_actif' => 2025]);
-    $this->cotSc = SousCategorie::factory()->pourCotisations()->create(['association_id' => $this->association->id]);
 });
 
 afterEach(function (): void {
     TenantContext::clear();
     session()->forget('exercice_actif');
 });
-
-/** Helper: create a cotisation transaction for a tiers */
-function createCotisation(Tiers $tiers, int $exercice, int $cotScId): Transaction
-{
-    $tx = Transaction::factory()->asRecette()->create([
-        'association_id' => TenantContext::currentId(),
-        'tiers_id' => $tiers->id,
-        'date' => "{$exercice}-10-01",
-    ]);
-    $tx->lignes()->forceDelete();
-    TransactionLigne::factory()->create([
-        'transaction_id' => $tx->id,
-        'sous_categorie_id' => $cotScId,
-        'montant' => 30.00,
-    ]);
-
-    return $tx;
-}
 
 it('renders without error', function (): void {
     Livewire::actingAs($this->user)
@@ -55,8 +34,8 @@ it('filtre a_jour retourne les tiers avec cotisation exercice courant', function
     $aJour = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'AJour']);
     $retard = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'EnRetard']);
 
-    createCotisation($aJour, 2025, $this->cotSc->id);
-    createCotisation($retard, 2024, $this->cotSc->id);
+    Adhesion::factory()->create(['tiers_id' => $aJour->id, 'exercice' => 2025]);
+    Adhesion::factory()->create(['tiers_id' => $retard->id, 'exercice' => 2024]);
 
     Livewire::actingAs($this->user)
         ->test(AdherentList::class)
@@ -69,9 +48,9 @@ it('filtre en_retard retourne les tiers avec cotisation N-1 sans cotisation N', 
     $aJour = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'AJour']);
     $retard = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'EnRetard']);
 
-    createCotisation($aJour, 2024, $this->cotSc->id);
-    createCotisation($aJour, 2025, $this->cotSc->id);
-    createCotisation($retard, 2024, $this->cotSc->id);
+    Adhesion::factory()->create(['tiers_id' => $aJour->id, 'exercice' => 2024]);
+    Adhesion::factory()->create(['tiers_id' => $aJour->id, 'exercice' => 2025]);
+    Adhesion::factory()->create(['tiers_id' => $retard->id, 'exercice' => 2024]);
 
     Livewire::actingAs($this->user)
         ->test(AdherentList::class)
@@ -84,7 +63,7 @@ it('filtre tous retourne tous les tiers avec au moins une cotisation', function 
     $avecCot = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'AvecCot']);
     $sansCot = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'SansCot']);
 
-    createCotisation($avecCot, 2024, $this->cotSc->id);
+    Adhesion::factory()->create(['tiers_id' => $avecCot->id, 'exercice' => 2024]);
 
     Livewire::actingAs($this->user)
         ->test(AdherentList::class)
@@ -94,9 +73,6 @@ it('filtre tous retourne tous les tiers avec au moins une cotisation', function 
 });
 
 it('filtre par recherche texte sur le nom', function (): void {
-    // Prénoms fixes pour éviter la flakiness fr_FR : fake()->firstName() peut
-    // retourner "Martine" (contient "Martin") et faire matcher la recherche
-    // sur le prenom de l'autre tiers.
     $martin = Tiers::factory()->create([
         'association_id' => $this->association->id,
         'nom' => 'Martin',
@@ -108,8 +84,8 @@ it('filtre par recherche texte sur le nom', function (): void {
         'prenom' => 'Bernard',
     ]);
 
-    createCotisation($martin, 2025, $this->cotSc->id);
-    createCotisation($dupont, 2025, $this->cotSc->id);
+    Adhesion::factory()->create(['tiers_id' => $martin->id, 'exercice' => 2025]);
+    Adhesion::factory()->create(['tiers_id' => $dupont->id, 'exercice' => 2025]);
 
     Livewire::actingAs($this->user)
         ->test(AdherentList::class)

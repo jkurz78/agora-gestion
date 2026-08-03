@@ -8,7 +8,7 @@ use App\Enums\ModePaiement;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Enums\UsageComptable;
-use App\Models\SousCategorie;
+use App\Models\Compte;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -18,7 +18,7 @@ trait LigneDonHelper
     /**
      * Crée une TransactionLigne éligible à l'émission d'un reçu fiscal :
      *  - Tiers de type particulier avec adresse complète
-     *  - Sous-catégorie portant l'usage Don
+     *  - Compte portant l'usage Don
      *  - Transaction de type Recette, encaissée (statut_reglement = Recu)
      *
      * @param  array<string, mixed>  $tiersOverrides
@@ -39,10 +39,10 @@ trait LigneDonHelper
             'ville' => 'Paris',
         ], $tiersOverrides));
 
-        $sousCategorieDon = SousCategorie::query()
-            ->whereHas('usages', fn ($q) => $q->where('usage', UsageComptable::Don->value))
+        $compteDon = Compte::query()
+            ->forUsage(UsageComptable::Don)
             ->first()
-            ?? SousCategorie::factory()->pourDons()->create();
+            ?? Compte::factory()->pourDons()->create();
 
         $transaction = Transaction::factory()->create(array_merge([
             'tiers_id' => $tiers->id,
@@ -52,10 +52,14 @@ trait LigneDonHelper
             'mode_paiement' => ModePaiement::Cheque,
         ], $transactionOverrides));
 
+        $montant = $ligneOverrides['montant'] ?? 150.00;
+
         return TransactionLigne::factory()->create(array_merge([
             'transaction_id' => $transaction->id,
-            'sous_categorie_id' => $sousCategorieDon->id,
-            'montant' => 150.00,
+            'compte_id' => $compteDon->id,
+            'debit' => 0,
+            'credit' => $montant,
+            'montant' => $montant,
         ], $ligneOverrides));
     }
 }

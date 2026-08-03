@@ -5,9 +5,9 @@ declare(strict_types=1);
 use App\Livewire\TypeOperationList;
 use App\Livewire\TypeOperationShow;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\Operation;
 use App\Models\Participant;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Models\TypeOperationSeance;
@@ -25,7 +25,8 @@ beforeEach(function () {
     TenantContext::boot($this->association);
     session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
-    $this->sousCategorie = SousCategorie::factory()->pourInscriptions()->create([
+    // DC-8 : le sélecteur porte des ids de comptes.
+    $this->compte = Compte::factory()->numero('706')->pourInscriptions()->create([
         'association_id' => $this->association->id,
     ]);
 });
@@ -36,7 +37,7 @@ afterEach(function () {
 
 it('displays the type operations list', function () {
     $type = TypeOperation::factory()->create([
-        'sous_categorie_id' => $this->sousCategorie->id,
+        'compte_id' => $this->compte->id,
         'association_id' => $this->association->id,
     ]);
 
@@ -48,7 +49,7 @@ it('displays the type operations list', function () {
 it('creates a new type operation', function () {
     Livewire::test(TypeOperationShow::class)
         ->set('nom', 'Nouveau type')
-        ->set('sous_categorie_id', $this->sousCategorie->id)
+        ->set('compte_id', (string) $this->compte->id)
         ->call('save');
 
     expect(TypeOperation::where('nom', 'Nouveau type')->exists())->toBeTrue();
@@ -57,7 +58,7 @@ it('creates a new type operation', function () {
 it('creates a type operation with tarifs', function () {
     Livewire::test(TypeOperationShow::class)
         ->set('nom', 'Yoga thérapeutique')
-        ->set('sous_categorie_id', $this->sousCategorie->id)
+        ->set('compte_id', $this->compte->id)
         ->set('nombre_seances', '10')
         ->set('formulaireParcoursTherapeutique', true)
         ->set('formulaireActif', true)
@@ -82,14 +83,29 @@ it('creates a type operation with tarifs', function () {
 it('validates required fields', function () {
     Livewire::test(TypeOperationShow::class)
         ->set('nom', '')
-        ->set('sous_categorie_id', '')
+        ->set('compte_id', '')
         ->call('save')
-        ->assertHasErrors(['nom', 'sous_categorie_id']);
+        ->assertHasErrors(['nom', 'compte_id']);
+});
+
+it('refuse un compte appartenant à une autre association', function () {
+    $autreAssociation = Association::factory()->create();
+    TenantContext::boot($autreAssociation);
+    $compteExterne = Compte::factory()->numero('706')->pourInscriptions()->create();
+    TenantContext::boot($this->association);
+
+    Livewire::test(TypeOperationShow::class)
+        ->set('nom', 'Type avec compte externe')
+        ->set('compte_id', (string) $compteExterne->id)
+        ->call('save')
+        ->assertHasErrors(['compte_id']);
+
+    expect(TypeOperation::where('nom', 'Type avec compte externe')->exists())->toBeFalse();
 });
 
 it('edits a type operation', function () {
     $type = TypeOperation::factory()->create([
-        'sous_categorie_id' => $this->sousCategorie->id,
+        'compte_id' => $this->compte->id,
         'association_id' => $this->association->id,
         'nom' => 'Ancien nom',
     ]);
@@ -104,7 +120,7 @@ it('edits a type operation', function () {
 
 it('prevents deletion when operations exist from list', function () {
     $type = TypeOperation::factory()->create([
-        'sous_categorie_id' => $this->sousCategorie->id,
+        'compte_id' => $this->compte->id,
         'association_id' => $this->association->id,
     ]);
     Operation::factory()->create([
@@ -122,7 +138,7 @@ it('prevents deletion when operations exist from list', function () {
 
 it('deletes a type operation without operations from list', function () {
     $type = TypeOperation::factory()->create([
-        'sous_categorie_id' => $this->sousCategorie->id,
+        'compte_id' => $this->compte->id,
         'association_id' => $this->association->id,
     ]);
 
@@ -134,7 +150,7 @@ it('deletes a type operation without operations from list', function () {
 
 it('prevents deletion of tarif used by participants', function () {
     $type = TypeOperation::factory()->create([
-        'sous_categorie_id' => $this->sousCategorie->id,
+        'compte_id' => $this->compte->id,
         'association_id' => $this->association->id,
     ]);
     $tarif = TypeOperationTarif::factory()->create([
@@ -166,7 +182,7 @@ it('uploads a logo', function () {
 
     Livewire::test(TypeOperationShow::class)
         ->set('nom', 'Test logo')
-        ->set('sous_categorie_id', $this->sousCategorie->id)
+        ->set('compte_id', $this->compte->id)
         ->set('logo', $file)
         ->call('save');
 
@@ -178,13 +194,13 @@ it('uploads a logo', function () {
 
 it('filters by active status', function () {
     TypeOperation::factory()->create([
-        'sous_categorie_id' => $this->sousCategorie->id,
+        'compte_id' => $this->compte->id,
         'association_id' => $this->association->id,
         'nom' => 'Type actif test',
         'actif' => true,
     ]);
     TypeOperation::factory()->create([
-        'sous_categorie_id' => $this->sousCategorie->id,
+        'compte_id' => $this->compte->id,
         'association_id' => $this->association->id,
         'nom' => 'Type inactif test',
         'actif' => false,
@@ -208,21 +224,21 @@ it('filters by active status', function () {
 
 it('enforces unique nom', function () {
     TypeOperation::factory()->create([
-        'sous_categorie_id' => $this->sousCategorie->id,
+        'compte_id' => $this->compte->id,
         'association_id' => $this->association->id,
         'nom' => 'Nom dupliqué',
     ]);
 
     Livewire::test(TypeOperationShow::class)
         ->set('nom', 'Nom dupliqué')
-        ->set('sous_categorie_id', $this->sousCategorie->id)
+        ->set('compte_id', $this->compte->id)
         ->call('save')
         ->assertHasErrors(['nom']);
 });
 
 it('saves seance titles', function () {
     $type = TypeOperation::factory()->create([
-        'sous_categorie_id' => $this->sousCategorie->id,
+        'compte_id' => $this->compte->id,
         'association_id' => $this->association->id,
         'nombre_seances' => 3,
     ]);
@@ -245,7 +261,7 @@ it('saves seance titles', function () {
 
 it('adjusts seance titles when nombre_seances changes', function () {
     $type = TypeOperation::factory()->create([
-        'sous_categorie_id' => $this->sousCategorie->id,
+        'compte_id' => $this->compte->id,
         'association_id' => $this->association->id,
         'nombre_seances' => 2,
     ]);
@@ -261,7 +277,7 @@ it('routes to the new type-operation pages', function () {
     $response->assertOk();
 
     $type = TypeOperation::factory()->create([
-        'sous_categorie_id' => $this->sousCategorie->id,
+        'compte_id' => $this->compte->id,
         'association_id' => $this->association->id,
     ]);
 

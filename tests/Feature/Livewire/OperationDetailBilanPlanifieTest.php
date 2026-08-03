@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 use App\Livewire\OperationDetail;
 use App\Models\Association;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\EncadrementPrevision;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Reglement;
 use App\Models\Seance;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Models\User;
@@ -25,14 +24,12 @@ beforeEach(function (): void {
     session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
 
-    $catRec = Categorie::factory()->recette()->create();
-    $scRec = SousCategorie::factory()->create(['categorie_id' => $catRec->id]);
-    $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $scRec->id]);
+    $compteRecette = Compte::factory()->create();
+    $typeOp = TypeOperation::factory()->create(['compte_id' => $compteRecette->id]);
     $this->operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
     $this->seance = Seance::create(['operation_id' => $this->operation->id, 'numero' => 1, 'date' => now()]);
 
-    $catDep = Categorie::factory()->depense()->create();
-    $this->scDep = SousCategorie::factory()->create(['categorie_id' => $catDep->id]);
+    $this->compteDep = Compte::factory()->depense()->create();
     $this->tiersEnc = Tiers::factory()->pourDepenses()->create();
     $this->tiersPart = Tiers::factory()->create();
     $this->participant = Participant::factory()->create([
@@ -45,7 +42,7 @@ it('affiche le total planifié dépenses + recettes dans le bilan', function ():
     EncadrementPrevision::create([
         'operation_id' => $this->operation->id,
         'tiers_id' => $this->tiersEnc->id,
-        'sous_categorie_id' => $this->scDep->id,
+        'compte_id' => $this->compteDep->id,
         'seance_id' => $this->seance->id,
         'montant_prevu' => 300,
     ]);
@@ -67,7 +64,7 @@ it('expose totaux planifiés et écarts dans les viewData', function (): void {
     EncadrementPrevision::create([
         'operation_id' => $this->operation->id,
         'tiers_id' => $this->tiersEnc->id,
-        'sous_categorie_id' => $this->scDep->id,
+        'compte_id' => $this->compteDep->id,
         'seance_id' => $this->seance->id,
         'montant_prevu' => 200,
     ]);

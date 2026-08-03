@@ -1,0 +1,304 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Volet A — Saisie de créance (Task A1 + A2)
+ *
+ * A1 : Teste que TransactionForm accepte paiementRecu = false (recette attendue)
+ * et que la transaction créée a mode_paiement = null avec une ligne 411 non lettrée
+ * et aucune ligne 5112.
+ *
+ * A2 : Teste que ReglementOperationService::marquerRecu accepte un ModePaiement
+ * pour une créance (mode_paiement null) et génère la T2 d'encaissement.
+ */
+
+use App\Enums\Espace;
+use App\Enums\ModePaiement;
+use App\Livewire\TransactionForm;
+use App\Models\Association;
+use App\Models\Compte;
+use App\Models\CompteBancaire;
+use App\Models\Tiers;
+use App\Models\Transaction;
+use App\Models\TransactionLigne;
+use App\Models\User;
+use App\Services\Compta\Migrations\SystemeSeeder;
+use App\Services\ReglementOperationService;
+use App\Tenant\TenantContext;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
+
+uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    $this->association = Association::factory()->create(['anthropic_api_key' => null]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
+    session(['exercice_actif' => 2025]);
+
+    $this->user = User::factory()->create(['dernier_espace' => Espace::Compta]);
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    $this->actingAs($this->user);
+
+    // Comptes système : 411, 5112, etc.
+    SystemeSeeder::seed();
+
+    // Tiers recette
+    $this->tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
+
+    // Compte de ventilation recette (classe 7)
+    $this->compteVentilation = Compte::firstOrCreate(
+        ['association_id' => $this->association->id, 'numero_pcg' => '706'],
+        [
+            'intitule' => 'Cotisations',
+            'classe' => 7,
+            'lettrable' => false,
+            'actif' => true,
+            'est_systeme' => false,
+            'pour_inscriptions' => false,
+        ]
+    );
+
+    // Compte bancaire (pas utilisé pour une créance, mais le formulaire peut en avoir un)
+    $this->compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
+    session()->forget('exercice_actif');
+});
+
+it('recette avec paiementRecu=false crée une transaction avec mode_paiement null (créance 411)', function () {
+    Livewire::test(TransactionForm::class)
+        ->call('showNewForm', 'recette')
+        ->set('paiementRecu', false)
+        ->set('date', '2025-10-15')
+        ->set('libelle', 'Cotisation attendue')
+        ->set('tiers_id', $this->tiers->id)
+        ->set('lignes', [[
+            'id' => null,
+            'compte_id' => (string) $this->compteVentilation->id,
+            'operation_id' => '',
+            'seance' => '',
+            'montant' => '100.00',
+            'notes' => '',
+            'piece_jointe_path' => null,
+            'piece_jointe_upload' => null,
+            'piece_jointe_remove' => false,
+            'piece_jointe_existing_url' => null,
+            'piece_jointe_filename' => null,
+        ]])
+        ->call('save')
+        ->assertHasNoErrors();
+
+    // Transaction créée avec mode_paiement null
+    $tx = Transaction::where('tiers_id', $this->tiers->id)->first();
+    expect($tx)->not->toBeNull();
+    expect($tx->mode_paiement)->toBeNull();
+
+    // Ligne 411 présente et non lettrée
+    $ligne411 = TransactionLigne::where('transaction_id', $tx->id)
+        ->whereHas('compte', fn ($q) => $q->where('numero_pcg', '411'))
+        ->first();
+    expect($ligne411)->not->toBeNull();
+    expect($ligne411->lettrage_code)->toBeNull();
+
+    // Aucune ligne 5112 (pas de portage trésorerie)
+    $ligne5112 = TransactionLigne::where('transaction_id', $tx->id)
+        ->whereHas('compte', fn ($q) => $q->where('numero_pcg', '5112'))
+        ->first();
+    expect($ligne5112)->toBeNull();
+});
+
+it('recette avec paiementRecu=true exige le mode_paiement (comportement actuel inchangé)', function () {
+    Livewire::test(TransactionForm::class)
+        ->call('showNewForm', 'recette')
+        ->set('paiementRecu', true)
+        ->set('date', '2025-10-15')
+        ->set('libelle', 'Cotisation reçue')
+        ->set('tiers_id', $this->tiers->id)
+        ->set('lignes', [[
+            'id' => null,
+            'compte_id' => (string) $this->compteVentilation->id,
+            'operation_id' => '',
+            'seance' => '',
+            'montant' => '100.00',
+            'notes' => '',
+            'piece_jointe_path' => null,
+            'piece_jointe_upload' => null,
+            'piece_jointe_remove' => false,
+            'piece_jointe_existing_url' => null,
+            'piece_jointe_filename' => null,
+        ]])
+        // mode_paiement vide → doit déclencher une erreur de validation
+        ->call('save')
+        ->assertHasErrors(['mode_paiement']);
+});
+
+// ============================================================
+// A2 — Marquer reçu d'une créance en capturant le mode
+// ============================================================
+
+it('marquerRecu avec mode capture le mode_paiement et génère la T2 encaissement', function () {
+    // 1. Créer une créance via le formulaire (mode_paiement = null)
+    Livewire::test(TransactionForm::class)
+        ->call('showNewForm', 'recette')
+        ->set('paiementRecu', false)
+        ->set('date', '2025-10-15')
+        ->set('libelle', 'Cotisation attendue A2')
+        ->set('tiers_id', $this->tiers->id)
+        ->set('lignes', [[
+            'id' => null,
+            'compte_id' => (string) $this->compteVentilation->id,
+            'operation_id' => '',
+            'seance' => '',
+            'montant' => '150.00',
+            'notes' => '',
+            'piece_jointe_path' => null,
+            'piece_jointe_upload' => null,
+            'piece_jointe_remove' => false,
+            'piece_jointe_existing_url' => null,
+            'piece_jointe_filename' => null,
+        ]])
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $tx = Transaction::where('tiers_id', $this->tiers->id)
+        ->where('libelle', 'Cotisation attendue A2')
+        ->first();
+    expect($tx)->not->toBeNull();
+    expect($tx->mode_paiement)->toBeNull();
+
+    // 2. Marquer reçu en fournissant le mode Cheque
+    app(ReglementOperationService::class)->marquerRecu($tx, ModePaiement::Cheque);
+
+    $tx->refresh();
+
+    // Le mode est désormais Cheque
+    expect($tx->mode_paiement)->toBe(ModePaiement::Cheque);
+
+    // La ligne 411 est lettrée (encaissement effectué)
+    $compte411 = Compte::ofNumero('411');
+    expect($compte411)->not->toBeNull();
+    $ligne411 = TransactionLigne::where('transaction_id', $tx->id)
+        ->where('compte_id', (int) $compte411->id)
+        ->first();
+    expect($ligne411)->not->toBeNull();
+    expect($ligne411->lettrage_code)->not->toBeNull();
+
+    // T2 d'encaissement créée
+    $service = app(ReglementOperationService::class);
+    $t2 = $service->trouverEncaissementT2($tx);
+    expect($t2)->not->toBeNull();
+});
+
+it('marquerRecu sans mode sur une créance reste rétro-compatible (skip T2 silencieux)', function () {
+    // Comportement PD inconditionnel : si mode null et aucun mode fourni,
+    // T2 n'est pas générée (skip silencieux). Le statut_reglement reste en_attente
+    // car EtatReglementResolver dérive le statut depuis le grand livre :
+    // la ligne 411 de T1 n'est pas lettrée (pas d'encaissement) → résout EnAttente.
+    // Note : avant PD inconditionnel, la garde « 411 absent → statut inchangé » permettait
+    // de forcer Recu sans lettrage ; avec PD systématique, la 411 est toujours présente.
+    Livewire::test(TransactionForm::class)
+        ->call('showNewForm', 'recette')
+        ->set('paiementRecu', false)
+        ->set('date', '2025-10-16')
+        ->set('libelle', 'Créance sans mode')
+        ->set('tiers_id', $this->tiers->id)
+        ->set('lignes', [[
+            'id' => null,
+            'compte_id' => (string) $this->compteVentilation->id,
+            'operation_id' => '',
+            'seance' => '',
+            'montant' => '50.00',
+            'notes' => '',
+            'piece_jointe_path' => null,
+            'piece_jointe_upload' => null,
+            'piece_jointe_remove' => false,
+            'piece_jointe_existing_url' => null,
+            'piece_jointe_filename' => null,
+        ]])
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $tx = Transaction::where('libelle', 'Créance sans mode')->first();
+    expect($tx)->not->toBeNull();
+    expect($tx->mode_paiement)->toBeNull();
+
+    // marquerRecu sans fournir de mode (rétro-compat)
+    app(ReglementOperationService::class)->marquerRecu($tx);
+
+    $tx->refresh();
+    // En mode PD inconditionnel : EtatReglementResolver recalcule le statut depuis le ledger.
+    // 411 non lettrée (pas d'encaissement T2 généré car mode=null) → statut reste EnAttente.
+    expect($tx->statut_reglement->value)->toBe('en_attente');
+    // Mode reste null
+    expect($tx->mode_paiement)->toBeNull();
+    // Pas de T2 (skip silencieux — mode null → reglerOuEncaisser ne crée pas de T2)
+    expect(app(ReglementOperationService::class)->trouverEncaissementT2($tx))->toBeNull();
+});
+
+// ============================================================
+// Réversion — éditer une recette reçue en « non reçu » supprime la T2
+// ============================================================
+
+it('éditer une recette réglée conserve la T2 : son annulation passe par le flux dédié', function () {
+    // 1. Créance
+    Livewire::test(TransactionForm::class)
+        ->call('showNewForm', 'recette')
+        ->set('paiementRecu', false)
+        ->set('date', '2025-10-15')
+        ->set('libelle', 'Réversion encaissement')
+        ->set('tiers_id', $this->tiers->id)
+        ->set('lignes', [[
+            'id' => null,
+            'compte_id' => (string) $this->compteVentilation->id,
+            'operation_id' => '',
+            'seance' => '',
+            'montant' => '120.00',
+            'notes' => '',
+            'piece_jointe_path' => null,
+            'piece_jointe_upload' => null,
+            'piece_jointe_remove' => false,
+            'piece_jointe_existing_url' => null,
+            'piece_jointe_filename' => null,
+        ]])
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $tx = Transaction::where('libelle', 'Réversion encaissement')->first();
+
+    // 2. Marquer reçu (chèque) → T2 séparée
+    app(ReglementOperationService::class)->marquerRecu($tx, ModePaiement::Cheque);
+    $t2 = app(ReglementOperationService::class)->trouverEncaissementT2($tx->fresh());
+    expect($t2)->not->toBeNull();
+    $t2Id = (int) $t2->id;
+
+    // 3. Éditer → « non reçu » (mode null)
+    Livewire::test(TransactionForm::class)
+        ->call('edit', $tx->id)
+        ->set('paiementRecu', false)
+        ->call('save')
+        ->assertHasNoErrors();
+
+    // 4. Une T1 réglée est verrouillée : la T2 reste la source de vérité.
+    expect(Transaction::find($t2Id))->not->toBeNull();
+
+    // Le portage reste sur la T2 (sans tiers en en-tête, conformément au FEC).
+    $orphan5112 = TransactionLigne::whereHas('compte', fn ($q) => $q->where('numero_pcg', '5112'))
+        ->whereHas('transaction', fn ($q) => $q->where('tiers_id', $this->tiers->id))
+        ->exists();
+    expect($orphan5112)->toBeFalse();
+    expect($t2->fresh()->lignes()->whereHas('compte', fn ($q) => $q->where('numero_pcg', '5112'))->exists())
+        ->toBeTrue();
+
+    // Le flux historique conserve son mode sur T1, mais son 411 demeure lettré vers la T2.
+    $tx->refresh();
+    expect($tx->mode_paiement)->toBe(ModePaiement::Cheque);
+    $ligne411 = TransactionLigne::where('transaction_id', $tx->id)
+        ->whereHas('compte', fn ($q) => $q->where('numero_pcg', '411'))
+        ->first();
+    expect($ligne411)->not->toBeNull();
+    expect($ligne411->lettrage_code)->not->toBeNull();
+});

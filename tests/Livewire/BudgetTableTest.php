@@ -3,8 +3,7 @@
 use App\Livewire\BudgetTable;
 use App\Models\Association;
 use App\Models\BudgetLine;
-use App\Models\Categorie;
-use App\Models\SousCategorie;
+use App\Models\Compte;
 use App\Models\User;
 use App\Services\ExerciceService;
 use App\Tenant\TenantContext;
@@ -18,18 +17,15 @@ beforeEach(function () {
     session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
 
-    $this->depenseCategorie = Categorie::factory()->depense()->create(['association_id' => $this->association->id, 'nom' => 'Cat Depense']);
-    $this->depenseSc = SousCategorie::factory()->create([
+    // L'écran budget est clé par compte : création directe des comptes affichés.
+    $this->depenseCompte = Compte::factory()->numero('606')->create([
         'association_id' => $this->association->id,
-        'categorie_id' => $this->depenseCategorie->id,
-        'nom' => 'SC Depense',
+        'intitule' => 'SC Depense',
     ]);
 
-    $this->recetteCategorie = Categorie::factory()->recette()->create(['association_id' => $this->association->id, 'nom' => 'Cat Recette']);
-    $this->recetteSc = SousCategorie::factory()->create([
+    $this->recetteCompte = Compte::factory()->numero('706')->create([
         'association_id' => $this->association->id,
-        'categorie_id' => $this->recetteCategorie->id,
-        'nom' => 'SC Recette',
+        'intitule' => 'SC Recette',
     ]);
 });
 
@@ -50,10 +46,10 @@ it('can add a budget line', function () {
     $exercice = app(ExerciceService::class)->current();
 
     Livewire::test(BudgetTable::class)
-        ->call('addLine', $this->depenseSc->id);
+        ->call('addLine', $this->depenseCompte->id);
 
     $this->assertDatabaseHas('budget_lines', [
-        'sous_categorie_id' => $this->depenseSc->id,
+        'compte_id' => $this->depenseCompte->id,
         'exercice' => $exercice,
         'montant_prevu' => '0.00',
     ]);
@@ -64,7 +60,7 @@ it('can edit montant_prevu inline', function () {
 
     $line = BudgetLine::factory()->create([
         'association_id' => $this->association->id,
-        'sous_categorie_id' => $this->depenseSc->id,
+        'compte_id' => $this->depenseCompte->id,
         'exercice' => $exercice,
         'montant_prevu' => 100.00,
     ]);
@@ -88,7 +84,7 @@ it('can delete a budget line', function () {
 
     $line = BudgetLine::factory()->create([
         'association_id' => $this->association->id,
-        'sous_categorie_id' => $this->depenseSc->id,
+        'compte_id' => $this->depenseCompte->id,
         'exercice' => $exercice,
         'montant_prevu' => 500.00,
     ]);
@@ -104,7 +100,7 @@ it('shows prevu vs realise', function () {
 
     BudgetLine::factory()->create([
         'association_id' => $this->association->id,
-        'sous_categorie_id' => $this->depenseSc->id,
+        'compte_id' => $this->depenseCompte->id,
         'exercice' => $exercice,
         'montant_prevu' => 1000.00,
     ]);

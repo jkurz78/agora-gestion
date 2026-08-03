@@ -21,13 +21,15 @@ use App\Livewire\Exercices\ClotureWizard;
 use App\Livewire\RapportCompteResultat;
 use App\Livewire\SuperAdmin\Dashboard as SuperAdminDashboard;
 use App\Models\Association;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Exercice;
 use App\Models\Provision;
 use App\Models\RapprochementBancaire;
-use App\Models\SousCategorie;
+use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\Rapports\CompteResultatBuilder;
 use App\Services\Rapports\FluxTresorerieBuilder;
 use App\Services\RapprochementBancaireService;
@@ -41,6 +43,10 @@ uses(MakesAuditTransactions::class);
 
 beforeEach(function () {
     $this->association = Association::factory()->create();
+    // Comptes système (dont 120/129) requis par ANouveauPreviewBuilder : la
+    // garde « Aperçu AN » de ClotureCheckService, désormais inconditionnelle,
+    // les recherche dès que le résultat de l'exercice est non nul.
+    SystemeSeeder::seed();
     $this->user = User::factory()->create();
     $this->user->associations()->attach($this->association->id, [
         'role' => 'admin',
@@ -50,12 +56,7 @@ beforeEach(function () {
     session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
 
-    // Catégorie / sous-catégorie de recette
-    $this->categorie = Categorie::factory()->create(['association_id' => $this->association->id]);
-    $this->sc = SousCategorie::factory()->create([
-        'categorie_id' => $this->categorie->id,
-        'association_id' => $this->association->id,
-    ]);
+    $this->sc = Compte::factory()->numero('706')->create();
 
     // Compte bancaire réel
     $this->compte = CompteBancaire::factory()->create([
@@ -76,19 +77,45 @@ afterEach(function () {
     TenantContext::clear();
 });
 
+/**
+ * Complète l'écriture à une seule ligne produite par makeAuditTransaction()
+ * par une contrepartie sur le compte bancaire.
+ *
+ * makeAuditTransaction() ne crée que la ligne de ventilation (706/606), ce
+ * qui suffisait tant que la garde « Aperçu AN » de ClotureCheckService restait
+ * de complaisance derrière le flag. Devenue réelle, elle bâtit un aperçu des
+ * à-nouveaux sur l'ensemble de l'exercice et le rejette si le grand livre ne
+ * s'équilibre pas — une écriture à une seule ligne ne s'équilibre jamais.
+ * Seuls les tests qui passent par ClotureWizard (5 et 6) ont besoin de cette
+ * contrepartie ; les huit autres testent des sommations de rapports qui ne
+ * déclenchent pas cette garde.
+ */
+function completerContrepartieBancaire(Transaction $transaction, Compte $compte512, string $type, float $montant): void
+{
+    $contribution = $type === 'depense' ? -$montant : $montant;
+
+    TransactionLigne::create([
+        'transaction_id' => $transaction->id,
+        'compte_id' => $compte512->id,
+        'debit' => $contribution > 0 ? $contribution : 0.0,
+        'credit' => $contribution < 0 ? -$contribution : 0.0,
+        'montant' => abs($montant),
+    ]);
+}
+
 // ── Test 1 ────────────────────────────────────────────────────────────────────
 
 it('compte_resultat_somme_correctement_les_negatifs', function () {
-    // +80 et -80 dans la même sous-cat → ∑ = 0
+    // +80 et -80 dans la même compte → ∑ = 0
     $this->makeAuditTransaction('recette', 80.0, $this->sc, $this->compte, 2025);
     $this->makeAuditTransaction('recette', -80.0, $this->sc, $this->compte, 2025);
 
     $builder = app(CompteResultatBuilder::class);
     $result = $builder->compteDeResultat(2025);
 
-    // La sous-catégorie doit avoir montant_n = 0
+    // Le compte doit avoir montant_n = 0
     $totalProduits = collect($result['produits'])->flatMap(
-        fn ($cat) => collect($cat['sous_categories'])->pluck('montant_n')
+        fn ($famille) => collect($famille['comptes'])->pluck('montant_n')
     )->sum();
 
     expect($totalProduits)->toBe(0.0);
@@ -129,11 +156,8 @@ it('dashboard_kpis_somme_negatifs', function () {
     $this->makeAuditTransaction('recette', 100.0, $this->sc, $this->compte, 2025);
     $this->makeAuditTransaction('recette', -30.0, $this->sc, $this->compte, 2025);
 
-    $scDepense = SousCategorie::factory()->create([
-        'categorie_id' => $this->categorie->id,
-        'association_id' => $this->association->id,
-    ]);
-    $this->makeAuditTransaction('depense', 50.0, $scDepense, $this->compte, 2025);
+    $compteDepense = Compte::factory()->depense()->numero('606')->create();
+    $this->makeAuditTransaction('depense', 50.0, $compteDepense, $this->compte, 2025);
 
     $component = Livewire::test(Dashboard::class);
 
@@ -172,7 +196,23 @@ it('super_admin_dashboard_renders_with_negative_transactions_in_db', function ()
 it('cloture_wizard_calcule_solde_ouverture_avec_negatifs', function () {
     // Tx recette -100 € : réduit totalRecettes, ce qui augmente soldeOuverture calculé
     // (formule : soldeReel - recettes + depenses - vIn + vOut)
-    $this->makeAuditTransaction('recette', -100.0, $this->sc, $this->compte, 2025);
+    // equilibree: true — makeAuditTransaction ne crée que la ligne de
+    // ventilation (pas de lignes PD 411/401/512) ; ce test exerce
+    // computeFinancialSummary(), pas la complétude comptable, et sans ce
+    // drapeau la nouvelle garde « Préalables comptables » de
+    // ClotureCheckService bloquerait le passage à l'étape 2.
+    $compte512 = Compte::create([
+        'numero_pcg' => '512',
+        'intitule' => 'Banque',
+        'classe' => 5,
+        'compte_bancaire_id' => $this->compte->id,
+        'actif' => true,
+        'est_systeme' => false,
+        'pour_inscriptions' => false,
+        'lettrable' => false,
+    ]);
+    $tx = $this->makeAuditTransaction('recette', -100.0, $this->sc, $this->compte, 2025, overrides: ['equilibree' => true]);
+    completerContrepartieBancaire($tx, $compte512, 'recette', -100.0);
 
     $component = Livewire::test(ClotureWizard::class)
         ->call('suite')   // step 1 → step 2
@@ -191,14 +231,27 @@ it('cloture_wizard_calcule_solde_ouverture_avec_negatifs', function () {
 
 it('cloture_wizard_resultat_avec_dataset_mixte', function () {
     // +200 recette, -50 recette, +80 dépense
-    $this->makeAuditTransaction('recette', 200.0, $this->sc, $this->compte, 2025);
-    $this->makeAuditTransaction('recette', -50.0, $this->sc, $this->compte, 2025);
-
-    $scDepense = SousCategorie::factory()->create([
-        'categorie_id' => $this->categorie->id,
-        'association_id' => $this->association->id,
+    // equilibree: true sur les trois — voir le commentaire du test précédent.
+    $compte512 = Compte::create([
+        'numero_pcg' => '512',
+        'intitule' => 'Banque',
+        'classe' => 5,
+        'compte_bancaire_id' => $this->compte->id,
+        'actif' => true,
+        'est_systeme' => false,
+        'pour_inscriptions' => false,
+        'lettrable' => false,
     ]);
-    $this->makeAuditTransaction('depense', 80.0, $scDepense, $this->compte, 2025);
+
+    $tx1 = $this->makeAuditTransaction('recette', 200.0, $this->sc, $this->compte, 2025, overrides: ['equilibree' => true]);
+    completerContrepartieBancaire($tx1, $compte512, 'recette', 200.0);
+
+    $tx2 = $this->makeAuditTransaction('recette', -50.0, $this->sc, $this->compte, 2025, overrides: ['equilibree' => true]);
+    completerContrepartieBancaire($tx2, $compte512, 'recette', -50.0);
+
+    $compteDepense = Compte::factory()->depense()->numero('606')->create();
+    $tx3 = $this->makeAuditTransaction('depense', 80.0, $compteDepense, $this->compte, 2025, overrides: ['equilibree' => true]);
+    completerContrepartieBancaire($tx3, $compte512, 'depense', 80.0);
 
     $component = Livewire::test(ClotureWizard::class)
         ->call('suite')
@@ -230,13 +283,17 @@ it('rapprochement_service_solde_avec_negatif', function () {
         'saisi_par' => $this->user->id,
     ]);
 
-    // Tx recette -50 € pointée au rapprochement
-    // La formule calculerSoldePointage :
-    //   solde_ouverture
-    //   + SUM(CASE WHEN type='depense' THEN -montant_total ELSE montant_total END)
-    // Pour une recette à -50 : contribution = -50
+    // Tx recette -50 € pointée au rapprochement.
+    //
+    // calculerSoldePointage() somme les lignes portées par le compte 512X du
+    // compte bancaire : solde_ouverture + SUM(debit) - SUM(credit).
+    // Une recette de -50 € porte donc une ligne 512X au crédit de 50 €.
     // Résultat attendu : 500 + (-50) = 450
-    $this->makeAuditTransaction('recette', -50.0, $this->sc, $this->compte, 2025, $rapprochement);
+    //
+    // Le compte 512X est créé par CompteBancaireObserver avec la fiche bancaire.
+    $compte512X = Compte::where('compte_bancaire_id', (int) $this->compte->id)->sole();
+    $tx = $this->makeAuditTransaction('recette', -50.0, $this->sc, $this->compte, 2025, $rapprochement);
+    completerContrepartieBancaire($tx, $compte512X, 'recette', -50.0);
 
     $service = app(RapprochementBancaireService::class);
     $solde = $service->calculerSoldePointage($rapprochement->fresh());
@@ -247,7 +304,7 @@ it('rapprochement_service_solde_avec_negatif', function () {
 // ── Test 8 ────────────────────────────────────────────────────────────────────
 
 it('rapport_compte_resultat_livewire_render_dataset_mixte', function () {
-    // +100 recette, -40 recette (même sous-cat) → ∑ produits = 60
+    // +100 recette, -40 recette (même compte) → ∑ produits = 60
     $this->makeAuditTransaction('recette', 100.0, $this->sc, $this->compte, 2025);
     $this->makeAuditTransaction('recette', -40.0, $this->sc, $this->compte, 2025);
 
@@ -278,13 +335,16 @@ it('compte_resultat_avec_transactions_negatives_ET_provisions_PCA', function () 
     // (a) Tx recette -50 € (future extourne Slice 1)
     $this->makeAuditTransaction('recette', -50.0, $this->sc, $this->compte, 2025);
 
-    // (b) Provision de type recette à montant négatif (PCA — déjà supporté)
-    // montantSigne() : type=recette → retourne montant tel quel = -30
+    // (b) Enregistrement `provisions` legacy à montant négatif (PCA), créé
+    // directement sans passer par ProvisionPDService : aucune écriture 681/781
+    // n'existe pour cette provision. En partie double, seules les écritures
+    // du grand livre alimentent le compte de résultat — ce record n'a donc
+    // aucun effet sur le résultat, et ne provoque plus de double comptage.
     Provision::factory()->create([
         'association_id' => $this->association->id,
         'exercice' => 2025,
         'type' => TypeTransaction::Recette,
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'libelle' => 'PCA Test',
         'montant' => -30.0,
         'saisi_par' => $this->user->id,
@@ -296,7 +356,7 @@ it('compte_resultat_avec_transactions_negatives_ET_provisions_PCA', function () 
     $result = $builder->compteDeResultat(2025);
 
     $totalProduits = collect($result['produits'])->flatMap(
-        fn ($cat) => collect($cat['sous_categories'])->pluck('montant_n')
+        fn ($famille) => collect($famille['comptes'])->pluck('montant_n')
     )->sum();
 
     // Tx seule contribue -50 au total des produits
@@ -306,19 +366,9 @@ it('compte_resultat_avec_transactions_negatives_ET_provisions_PCA', function () 
     $component = Livewire::test(RapportCompteResultat::class)
         ->assertOk();
 
-    // La provision PCA est gérée via totalProvisions (montantSigne = -30)
-    // elle n'est PAS incluse dans les produits du builder (sources séparées)
-    // Vérifier que les deux sources coexistent correctement
     $component->assertViewHas('totalProduitsN', -50.0);
 
-    // totalProvisions = sum(montantSigne) = -30 pour une PCA recette
-    $component->assertViewHas('totalProvisions', -30.0);
-
-    // resultatCourant = produits - charges = -50 - 0 = -50
+    // resultatCourant = produits - charges = -50 - 0 = -50 : la provision
+    // legacy sans écriture PD n'est pas comptée en sus.
     $component->assertViewHas('resultatCourant', -50.0);
-
-    // resultatNet = resultatBrut + totalProvisions
-    // = resultatCourant + totalExtournes + totalProvisions
-    // = (-50) + 0 + (-30) = -80
-    $component->assertViewHas('resultatNet', -80.0);
 });

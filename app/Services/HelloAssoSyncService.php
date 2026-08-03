@@ -16,6 +16,7 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\VirementInterne;
+use App\Services\Compta\TransactionConverter;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -26,8 +27,8 @@ final class HelloAssoSyncService
     /** @var array<string, int> Cache formSlug → operation_id */
     private array $formMappingCache = [];
 
-    /** @var array<int, ?int> operation_id => sous_categorie_id */
-    private array $operationSousCategorieCache = [];
+    /** @var array<int, ?int> operation_id => compte_id (ventilation du typeOperation) */
+    private array $operationCompteCache = [];
 
     /** @var array<string, ?array<string, mixed>> Cache form_slug → fetchFormDetail result */
     private array $formDetailsCache = [];
@@ -105,10 +106,11 @@ final class HelloAssoSyncService
             return $result;
         }
 
-        // Skip si form Membership/Donation sans sous_categorie_id configurée
+        // Skip si form Membership/Donation sans ventilation configurée.
+        // DC-10a — la ventilation est portée par compte_id (source unique).
         if ($formMapping !== null
             && in_array($formMapping->form_type, ['Membership', 'Donation'], true)
-            && $formMapping->sous_categorie_id === null) {
+            && $formMapping->compte_id === null) {
             $result['skipped']++;
 
             return $result;
@@ -143,7 +145,7 @@ final class HelloAssoSyncService
                 throw new \RuntimeException("Tiers non trouvé pour {$firstName} {$lastName} — rapprochez d'abord les tiers");
             }
 
-            // Pre-validate: resolve sous-catégories and opérations for all items
+            // Pre-validate: resolve comptes and opérations for all items
             // For Membership items, auto-create formule before creating lignes
             // (so the AdhesionTransactionLigneObserver can find it)
             $resolvedItems = [];
@@ -154,7 +156,7 @@ final class HelloAssoSyncService
                 if ($formMapping !== null
                     && $formMapping->form_type === 'Membership'
                     && isset($item['tierId'])
-                    && $formMapping->sous_categorie_id !== null) {
+                    && $formMapping->compte_id !== null) {
                     $itemFormSlug = $formMapping->form_slug;
                     if (! isset($this->formDetailsCache[$itemFormSlug])) {
                         try {
@@ -177,7 +179,7 @@ final class HelloAssoSyncService
                                 $itemFormSlug,
                                 $tier,
                                 $formDetail['validityType'] ?? null,
-                                (int) $formMapping->sous_categorie_id,
+                                (int) $formMapping->compte_id,
                                 $formDetail['startDate'] ?? null,
                                 $formDetail['endDate'] ?? null,
                                 $formMapping->form_title ?? $formDetail['title'] ?? null,
@@ -295,6 +297,20 @@ final class HelloAssoSyncService
                     'montant_total' => round((float) $tx->lignes()->sum('montant'), 2),
                 ]);
 
+                // Enrichissement partie double via le converter (même chemin que le backfill).
+                // Idempotent : skip si déjà equilibree=true (re-sync HA).
+                if (! $tx->equilibree) {
+                    try {
+                        $tx->refresh();
+                        app(TransactionConverter::class)->convertir($tx);
+                    } catch (\Throwable $e) {
+                        Log::warning('[HelloAsso] Enrichissement PD échoué — la transaction reste legacy', [
+                            'transaction_id' => $tx->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+
                 // Poser imported_at à la 1re importation réussie
                 if ($formMapping !== null && $formMapping->imported_at === null && $result['tx_created'] > 0) {
                     $formMapping->update(['imported_at' => now()]);
@@ -340,9 +356,9 @@ final class HelloAssoSyncService
     }
 
     /**
-     * Resolve sous-catégorie and opération for an item.
+     * Resolve compte de ventilation and opération for an item.
      *
-     * @return array{item: array, sous_categorie_id: int, operation_id: ?int}
+     * @return array{item: array, compte_id: int, operation_id: ?int}
      */
     private function resolveItem(array $item, string $formSlug): array
     {
@@ -355,55 +371,55 @@ final class HelloAssoSyncService
             throw new \RuntimeException("Formulaire '{$formSlug}' non mappé — impossible d'importer un item Registration sans opération");
         }
 
-        $sousCategorieId = null;
+        $compteId = null;
 
         // Cas spécial : un don additionnel (item.type='Donation') dans un form NON Donation
-        // (Membership ou Event) ne suit PAS la sous-cat de la cotisation/opération — il
-        // atterrit dans la sous-cat fallback "don additionnel" (fiscalement indépendant).
+        // (Membership ou Event) ne suit PAS le compte de la cotisation/opération — il
+        // atterrit dans le compte fallback "don additionnel" (fiscalement indépendant).
         // Doit passer AVANT la résolution opération sinon Event mappé à une opération
         // masquerait le fallback (bug observé sur HA-52045).
         // Note : on garde le rattachement à l'opération (operation_id) pour la traçabilité ;
-        // la catégorisation fiscale est portée par sous_categorie_id.
+        // la catégorisation fiscale est portée par compte_id.
         if ($type === 'Donation') {
             $formMapping = HelloAssoFormMapping::where('form_slug', $formSlug)->first();
             if ($formMapping?->form_type !== 'Donation') {
-                $sousCategorieId = $this->parametres->sous_categorie_don_id;
+                $compteId = $this->parametres->compte_don_id;
             }
         }
 
-        // Sinon : sous-cat de l'opération si form mappé à une opération
-        if ($sousCategorieId === null && $operationId !== null) {
-            $sousCategorieId = $this->getOperationSousCategorieId($operationId);
+        // Sinon : compte de l'opération si form mappé à une opération
+        if ($compteId === null && $operationId !== null) {
+            $compteId = $this->getOperationCompteId($operationId);
         }
 
-        // Sinon : fallback sur la sous-cat configurée au niveau du form mapping
-        if ($sousCategorieId === null) {
+        // Sinon : fallback sur le compte configuré au niveau du form mapping
+        if ($compteId === null) {
             $formMapping ??= HelloAssoFormMapping::where('form_slug', $formSlug)->first();
-            $sousCategorieId = $formMapping?->sous_categorie_id;
+            $compteId = $formMapping?->compte_id;
         }
 
-        if ($sousCategorieId === null) {
-            throw new \RuntimeException("Sous-catégorie non configurée pour le formulaire '{$formSlug}' (type item : '{$type}') — configurez la sous-catégorie sur le mapping de formulaire.");
+        if ($compteId === null) {
+            throw new \RuntimeException("Compte non configuré pour le formulaire '{$formSlug}' (type item : '{$type}') — configurez le compte sur le mapping de formulaire.");
         }
 
         return [
             'item' => $item,
-            'sous_categorie_id' => $sousCategorieId,
+            'compte_id' => (int) $compteId,
             'operation_id' => $operationId,
             'helloasso_tier_id' => isset($item['tierId']) ? (int) $item['tierId'] : null,
         ];
     }
 
-    private function getOperationSousCategorieId(int $operationId): ?int
+    private function getOperationCompteId(int $operationId): ?int
     {
-        if (! array_key_exists($operationId, $this->operationSousCategorieCache)) {
-            $this->operationSousCategorieCache[$operationId] = Operation::with('typeOperation')
+        if (! array_key_exists($operationId, $this->operationCompteCache)) {
+            $this->operationCompteCache[$operationId] = Operation::with('typeOperation')
                 ->find($operationId)
                 ?->typeOperation
-                ?->sous_categorie_id;
+                ?->compte_id;
         }
 
-        return $this->operationSousCategorieCache[$operationId];
+        return $this->operationCompteCache[$operationId];
     }
 
     private function resolveModePaiement(array $payments): ModePaiement
@@ -467,7 +483,7 @@ final class HelloAssoSyncService
         string $formSlug,
         array $tier,
         ?string $validityType,
-        int $sousCategorieId,
+        int $compteId,
         ?string $startDate = null,
         ?string $endDate = null,
         ?string $formTitle = null,
@@ -510,7 +526,7 @@ final class HelloAssoSyncService
                 'helloasso_end_date' => $validityType === 'Custom' ? $endDate : null,
                 'montant_par_defaut' => isset($tier['price']) ? round($tier['price'] / 100, 2) : null,
                 'deductible_fiscal' => (bool) ($tier['isEligibleTaxReceipt'] ?? false),
-                'sous_categorie_id' => $sousCategorieId,
+                'compte_id' => $compteId,
                 'actif' => true,
                 'est_helloasso' => true,
             ]
@@ -571,12 +587,20 @@ final class HelloAssoSyncService
             $existingLigne->restore();
         }
 
+        // DC-10a — ligne compte-first : compte_id + credit posés dès la création
+        // (recette HelloAsso → crédit). Une ligne à 0 € (cotisation offerte par code
+        // promo) reste sans compte : l'invariant XOR interdit compte_id avec
+        // debit = credit = 0, et une écriture nulle n'a pas de valeur comptable.
+        $compteId = $montantEuros != 0.0 ? (int) $resolved['compte_id'] : null;
+
         if ($existingLigne) {
             $existingLigne->update([
                 'transaction_id' => $tx->id,
-                'sous_categorie_id' => $resolved['sous_categorie_id'],
+                'compte_id' => $compteId,
                 'operation_id' => $resolved['operation_id'],
                 'montant' => $montantEuros,
+                'debit' => 0,
+                'credit' => $compteId !== null ? $montantEuros : 0,
                 'helloasso_tier_id' => $resolved['helloasso_tier_id'],
                 'notes' => $notes,
             ]);
@@ -584,9 +608,11 @@ final class HelloAssoSyncService
         } else {
             TransactionLigne::create([
                 'transaction_id' => $tx->id,
-                'sous_categorie_id' => $resolved['sous_categorie_id'],
+                'compte_id' => $compteId,
                 'operation_id' => $resolved['operation_id'],
                 'montant' => $montantEuros,
+                'debit' => 0,
+                'credit' => $compteId !== null ? $montantEuros : 0,
                 'helloasso_item_id' => (int) $item['id'],
                 'helloasso_option_id' => $optionId,
                 'helloasso_tier_id' => $resolved['helloasso_tier_id'],

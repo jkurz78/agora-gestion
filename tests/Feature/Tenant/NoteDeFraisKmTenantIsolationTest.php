@@ -6,10 +6,9 @@ use App\Enums\NoteDeFraisLigneType;
 use App\Enums\StatutNoteDeFrais;
 use App\Enums\UsageComptable;
 use App\Models\Association;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\DB;
@@ -28,11 +27,9 @@ it('une ligne km de asso A est invisible de asso B', function () {
 
     TenantContext::boot($assoA);
     $tiersA = Tiers::factory()->create(['association_id' => $assoA->id]);
-    $catA = Categorie::factory()->create(['association_id' => $assoA->id]);
-    $scA = SousCategorie::factory()->pourFraisKilometriques()->create([
+    $compteA = Compte::factory()->depense()->pourFraisKilometriques()->create([
         'association_id' => $assoA->id,
-        'categorie_id' => $catA->id,
-        'nom' => 'Déplacements',
+        'intitule' => 'Déplacements',
     ]);
     $ndfA = NoteDeFrais::create([
         'association_id' => $assoA->id,
@@ -47,7 +44,7 @@ it('une ligne km de asso A est invisible de asso B', function () {
         'libelle' => 'Secret A',
         'montant' => 100,
         'metadata' => ['cv_fiscaux' => 5, 'distance_km' => 200, 'bareme_eur_km' => 0.5],
-        'sous_categorie_id' => $scA->id,
+        'compte_id' => $compteA->id,
     ]);
 
     TenantContext::boot($assoB);
@@ -59,10 +56,10 @@ it('une ligne km de asso A est invisible de asso B', function () {
     $visibleNdfIds = NoteDeFrais::query()->pluck('id');
     expect(NoteDeFraisLigne::whereIn('note_de_frais_id', $visibleNdfIds)->count())->toBe(0);
 
-    // SousCategorie scopée tenant → usage km invisible depuis assoB
-    $visibleScIds = SousCategorie::pluck('id');
-    expect(DB::table('usages_sous_categories')
-        ->whereIn('sous_categorie_id', $visibleScIds)
+    // Compte scopé tenant → usage km invisible depuis assoB
+    $visibleCompteIds = Compte::pluck('id');
+    expect(DB::table('usages_comptes')
+        ->whereIn('compte_id', $visibleCompteIds)
         ->where('usage', UsageComptable::FraisKilometriques->value)
         ->count())->toBe(0);
 });
@@ -72,34 +69,30 @@ it('le pivot frais_kilometriques est scope-locked au tenant', function () {
     $assoB = Association::factory()->create();
 
     TenantContext::boot($assoA);
-    $catA = Categorie::factory()->create(['association_id' => $assoA->id]);
-    SousCategorie::factory()->pourFraisKilometriques()->create([
+    Compte::factory()->depense()->pourFraisKilometriques()->create([
         'association_id' => $assoA->id,
-        'categorie_id' => $catA->id,
-        'nom' => 'Déplacements A',
+        'intitule' => 'Déplacements A',
     ]);
 
     TenantContext::boot($assoB);
-    $catB = Categorie::factory()->create(['association_id' => $assoB->id]);
-    SousCategorie::factory()->create([
+    Compte::factory()->depense()->create([
         'association_id' => $assoB->id,
-        'categorie_id' => $catB->id,
-        'nom' => 'Bureau B',
+        'intitule' => 'Bureau B',
     ]);
 
-    // En contexte B : aucune sous-cat avec usage km
-    $visibleScIdsB = SousCategorie::pluck('id');
-    $countB = DB::table('usages_sous_categories')
-        ->whereIn('sous_categorie_id', $visibleScIdsB)
+    // En contexte B : aucun compte avec usage km
+    $visibleComptesB = Compte::pluck('id');
+    $countB = DB::table('usages_comptes')
+        ->whereIn('compte_id', $visibleComptesB)
         ->where('usage', UsageComptable::FraisKilometriques->value)
         ->count();
     expect($countB)->toBe(0);
 
-    // En contexte A : 1 sous-cat avec usage km
+    // En contexte A : 1 compte avec usage km
     TenantContext::boot($assoA);
-    $visibleScIdsA = SousCategorie::pluck('id');
-    $countA = DB::table('usages_sous_categories')
-        ->whereIn('sous_categorie_id', $visibleScIdsA)
+    $visibleComptesA = Compte::pluck('id');
+    $countA = DB::table('usages_comptes')
+        ->whereIn('compte_id', $visibleComptesA)
         ->where('usage', UsageComptable::FraisKilometriques->value)
         ->count();
     expect($countA)->toBe(1);

@@ -3,11 +3,12 @@
 declare(strict_types=1);
 
 use App\Enums\HelloAssoEnvironnement;
+use App\Enums\UsageComptable;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\HelloAssoFormMapping;
 use App\Models\HelloAssoParametres;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Services\HelloAssoSyncService;
@@ -22,7 +23,14 @@ beforeEach(function (): void {
     TenantContext::boot($association);
 
     $compte = CompteBancaire::factory()->create();
-    $this->scCotisation = SousCategorie::factory()->pourCotisations()->create();
+    $this->scCotisation = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '756IO',
+        'intitule' => 'Cotisations',
+        'classe' => 7,
+        'actif' => true,
+    ]);
+    $this->scCotisation->usages()->create(['usage' => UsageComptable::Cotisation->value]);
 
     $this->parametres = HelloAssoParametres::factory()->create([
         'association_id' => 1,
@@ -45,7 +53,7 @@ beforeEach(function (): void {
         'form_slug' => 'un-an-glissant',
         'form_type' => 'Membership',
         'form_title' => 'Un an glissant',
-        'sous_categorie_id' => $this->scCotisation->id,
+        'compte_id' => $this->scCotisation->id,
     ]);
 });
 
@@ -96,13 +104,13 @@ it('split HA-55698 : 1 item + 1 option → 2 lignes séparées (cotisation 0€ 
     $tx = Transaction::first();
     expect($tx)->not->toBeNull();
     expect((float) $tx->montant_total)->toBe(12.00); // somme des 2 lignes
-    expect($tx->lignes()->count())->toBe(2);
+    expect($tx->lignes()->whereNotNull('helloasso_item_id')->count())->toBe(2);
 
-    $parent = $tx->lignes()->whereNull('helloasso_option_id')->first();
+    $parent = $tx->lignes()->whereNotNull('helloasso_item_id')->whereNull('helloasso_option_id')->first();
     expect((float) $parent->montant)->toBe(0.00); // item.amount = 0 (discount total)
     expect((int) $parent->helloasso_item_id)->toBe(87070);
 
-    $option = $tx->lignes()->whereNotNull('helloasso_option_id')->first();
+    $option = $tx->lignes()->whereNotNull('helloasso_item_id')->whereNotNull('helloasso_option_id')->first();
     expect((float) $option->montant)->toBe(12.00); // option.amount = 1200c
     expect((int) $option->helloasso_option_id)->toBe(18596);
 });
@@ -132,6 +140,6 @@ it('sync sans options garde item.amount tel quel (non-régression)', function ()
     $service = new HelloAssoSyncService($this->parametres);
     $service->synchroniser([$order], 2025);
 
-    $ligne = Transaction::first()->lignes()->first();
+    $ligne = Transaction::first()->lignes()->whereNotNull('helloasso_item_id')->first();
     expect((float) $ligne->montant)->toBe(35.00);
 });

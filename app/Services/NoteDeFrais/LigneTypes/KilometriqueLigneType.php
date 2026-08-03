@@ -6,7 +6,7 @@ namespace App\Services\NoteDeFrais\LigneTypes;
 
 use App\Enums\NoteDeFraisLigneType;
 use App\Enums\UsageComptable;
-use App\Models\SousCategorie;
+use App\Models\Compte;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
@@ -80,9 +80,9 @@ final class KilometriqueLigneType implements LigneTypeInterface
         return "Déplacement de {$km} km avec un véhicule {$cv} CV au barème de {$bareme} €/km";
     }
 
-    public function resolveSousCategorieId(?int $requestedId): ?int
+    public function resolveCompteId(?int $requestedId): ?int
     {
-        $flagged = SousCategorie::forUsage(UsageComptable::FraisKilometriques)->pluck('id');
+        $flagged = Compte::forUsage(UsageComptable::FraisKilometriques)->pluck('id');
 
         if ($flagged->count() === 1) {
             return (int) $flagged->first();

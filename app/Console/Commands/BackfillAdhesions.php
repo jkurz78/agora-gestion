@@ -32,8 +32,10 @@ final class BackfillAdhesions extends Command
 
             $this->info("Association #{$asso->id} ({$asso->nom})");
 
+            // DC-10a : la détection cotisation lit l'usage porté par le compte
+            // de la ligne (compte_id, source unique).
             Transaction::where('type', TypeTransaction::Recette->value)
-                ->whereHas('lignes.sousCategorie.usages', function ($q): void {
+                ->whereHas('lignes.compte.usages', function ($q): void {
                     $q->where('usage', UsageComptable::Cotisation->value);
                 })
                 ->chunkById(500, function ($transactions) use ($service, $dryRun, &$totalCreated, &$totalScanned): void {

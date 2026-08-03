@@ -15,17 +15,17 @@ use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 final class JustificatifAnalyser
 {
     /**
-     * @return array{libelle: ?string, montant: ?float, sous_categorie_hint: ?string}
+     * @return array{libelle: ?string, montant: ?float, compte_hint: ?string}
      */
     public function analyse(TemporaryUploadedFile $justif): array
     {
         if (config('portail.ocr.driver') !== 'claude') {
-            return ['libelle' => null, 'montant' => null, 'sous_categorie_hint' => null];
+            return ['libelle' => null, 'montant' => null, 'compte_hint' => null];
         }
 
         // TODO(v1): appeler l'API Claude avec config('portail.ocr.claude_api_key')
         //           et config('portail.ocr.claude_model') sur le contenu du fichier.
-        //           Parser la réponse pour retourner libelle/montant/sous_categorie_hint.
-        return ['libelle' => null, 'montant' => null, 'sous_categorie_hint' => null];
+        //           Parser la réponse pour retourner libelle/montant/compte_hint.
+        return ['libelle' => null, 'montant' => null, 'compte_hint' => null];
     }
 }

@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Enums\StatutReglement;
 use App\Livewire\AdherentList;
+use App\Models\Adhesion;
 use App\Models\Association;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
-use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
@@ -18,15 +18,13 @@ beforeEach(function () {
     $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
     TenantContext::boot($this->association);
     session(['current_association_id' => $this->association->id]);
+    session(['exercice_actif' => 2025]);
     $this->actingAs($this->user);
-
-    $this->cotSc = SousCategorie::factory()->pourCotisations()->create([
-        'association_id' => $this->association->id,
-    ]);
 });
 
 afterEach(function () {
     TenantContext::clear();
+    session()->forget('exercice_actif');
 });
 
 it('affiche bi-check-lg Bootstrap Icon pour un membre avec cotisation pointée', function () {
@@ -34,13 +32,12 @@ it('affiche bi-check-lg Bootstrap Icon pour un membre avec cotisation pointée',
     $tx = Transaction::factory()->asRecette()->create([
         'association_id' => $this->association->id,
         'tiers_id' => $tiers->id,
-        'statut_reglement' => 'pointe',
+        'statut_reglement' => StatutReglement::Pointe,
     ]);
-    $tx->lignes()->forceDelete();
-    TransactionLigne::factory()->create([
+    Adhesion::factory()->create([
+        'tiers_id' => $tiers->id,
+        'exercice' => 2025,
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $this->cotSc->id,
-        'montant' => 30.00,
     ]);
 
     Livewire::test(AdherentList::class)
@@ -53,13 +50,12 @@ it('n\'affiche pas le caractère unicode ✓', function () {
     $tx = Transaction::factory()->asRecette()->create([
         'association_id' => $this->association->id,
         'tiers_id' => $tiers->id,
-        'statut_reglement' => 'pointe',
+        'statut_reglement' => StatutReglement::Pointe,
     ]);
-    $tx->lignes()->forceDelete();
-    TransactionLigne::factory()->create([
+    Adhesion::factory()->create([
+        'tiers_id' => $tiers->id,
+        'exercice' => 2025,
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $this->cotSc->id,
-        'montant' => 30.00,
     ]);
 
     Livewire::test(AdherentList::class)
@@ -73,11 +69,10 @@ it('affiche un bouton bi-clock-history lié aux transactions du membre', functio
         'association_id' => $this->association->id,
         'tiers_id' => $tiers->id,
     ]);
-    $tx->lignes()->forceDelete();
-    TransactionLigne::factory()->create([
+    Adhesion::factory()->create([
+        'tiers_id' => $tiers->id,
+        'exercice' => 2025,
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $this->cotSc->id,
-        'montant' => 30.00,
     ]);
 
     Livewire::test(AdherentList::class)
@@ -92,11 +87,10 @@ it('les boutons d\'action ont la classe btn-sm sans style inline de padding', fu
         'association_id' => $this->association->id,
         'tiers_id' => $tiers->id,
     ]);
-    $tx->lignes()->forceDelete();
-    TransactionLigne::factory()->create([
+    Adhesion::factory()->create([
+        'tiers_id' => $tiers->id,
+        'exercice' => 2025,
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $this->cotSc->id,
-        'montant' => 30.00,
     ]);
 
     Livewire::test(AdherentList::class)

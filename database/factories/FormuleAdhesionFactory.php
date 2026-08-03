@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\FormuleAdhesion;
-use App\Models\SousCategorie;
 use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -28,7 +28,7 @@ final class FormuleAdhesionFactory extends Factory
             'duree_jours' => null,
             'montant_par_defaut' => $this->faker->randomFloat(2, 10, 100),
             'deductible_fiscal' => false,
-            'sous_categorie_id' => SousCategorie::factory()->pourCotisations(),
+            'compte_id' => Compte::factory()->pourCotisations(),
             'actif' => true,
             'est_helloasso' => false,
             'helloasso_form_slug' => null,

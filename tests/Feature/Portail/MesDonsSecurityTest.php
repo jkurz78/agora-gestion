@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
-use App\Enums\UsageComptable;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\RecuFiscalEmis;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -24,7 +23,7 @@ use Illuminate\Support\Facades\Storage;
  * (RecuPortailController) au lieu des actions Livewire supprimées.
  *
  *   8. Intrusion intra-asso : Alice ne peut pas voir le reçu de Bob (403).
- *   9. Intrusion cross-tenant : TiensDonsTimelineService filtre → 403.
+ *   9. Intrusion cross-tenant : scope tenant TransactionLigne filtre → 404.
  *  10. Logger : GET éligible émet Log::info avec ligne_id + tiers_id.
  */
 beforeEach(function () {
@@ -38,8 +37,7 @@ afterEach(function () {
 
 function makeEligibleDonLigneHttp(Association $asso, Tiers $tiers, string $date = '2025-06-01'): TransactionLigne
 {
-    $sousCat = SousCategorie::factory()->create(['association_id' => $asso->id]);
-    $sousCat->usages()->create(['usage' => UsageComptable::Don->value]);
+    $compte = Compte::factory()->pourDons()->create(['association_id' => $asso->id]);
 
     $tx = Transaction::factory()->create([
         'association_id' => $asso->id,
@@ -51,7 +49,8 @@ function makeEligibleDonLigneHttp(Association $asso, Tiers $tiers, string $date 
 
     return TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compte->id,
+        'credit' => 100.0,
         'montant' => 100.0,
     ]);
 }
@@ -89,7 +88,7 @@ it('[intrusion] Alice 403 GET recus.fiscal avec la ligne de Bob', function () {
 // ─────────────────────────────────────────────────────────────────────────────
 // Test 9 : Intrusion cross-tenant — ligne asso B invisible depuis asso A
 // ─────────────────────────────────────────────────────────────────────────────
-it('[intrusion] cross-tenant 403 — TenantScope filtre la ligne d\'un autre tenant', function () {
+it('[intrusion] cross-tenant 404 — TenantScope filtre la ligne d\'un autre tenant', function () {
     $assoA = Association::factory()->create([
         'eligible_recu_fiscal' => true,
         'signataire_nom' => 'Jean Test',
@@ -122,9 +121,10 @@ it('[intrusion] cross-tenant 403 — TenantScope filtre la ligne d\'un autre ten
     Auth::guard('tiers-portail')->login($alice);
     session(['portail.last_activity_at' => now()->timestamp]);
 
-    // Garde cross-tenant dans controller (association_id check) + forTiers filtre → 403
+    // Scope tenant de TransactionLigne (audit #8) : ligneB est hors tenant A → invisible
+    // → la résolution de modèle échoue → 404 (blocage plus fort, en amont du 403 applicatif).
     $url = route('portail.recus.fiscal', ['association' => $assoA->slug, 'ligne' => $ligneB->id]);
-    $this->get($url)->assertForbidden();
+    $this->get($url)->assertNotFound();
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

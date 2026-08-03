@@ -30,7 +30,7 @@ final class DevisLigneFactory extends Factory
             'prix_unitaire' => $prixUnitaire,
             'quantite' => $quantite,
             'montant' => $montant,
-            'sous_categorie_id' => null,
+            'compte_id' => null,
         ];
     }
 
@@ -55,7 +55,7 @@ final class DevisLigneFactory extends Factory
             'prix_unitaire' => null,
             'quantite' => null,
             'montant' => null,
-            'sous_categorie_id' => null,
+            'compte_id' => null,
         ]);
     }
 }

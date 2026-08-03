@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\ModePaiement;
-use App\Enums\TypeCategorie;
 use App\Livewire\Concerns\MontantValidation;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Operation;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use Illuminate\Http\UploadedFile;
@@ -28,8 +27,8 @@ use Illuminate\Support\Str;
 final class CsvImportService
 {
     private const EXPECTED_HEADERS = [
-        'date', 'reference', 'sous_categorie', 'montant_ligne',
-        'mode_paiement', 'compte', 'libelle', 'tiers', 'operation',
+        'date', 'reference', 'compte', 'montant_ligne',
+        'mode_paiement', 'compte_bancaire', 'libelle', 'tiers', 'operation',
         'seance', 'notes',
     ];
 
@@ -66,15 +65,18 @@ final class CsvImportService
         array_shift($rows); // Retirer la ligne d'en-tête
 
         // Charger les lookups DB une seule fois (case-insensitive via lowercase key)
-        $typeEnum = TypeCategorie::from($type);
+        // Colonne CSV « compte » résolue contre les comptes de ventilation
+        // PCG de la classe attendue — dépense → classe 6, recette → classe 7.
+        $classeVentilation = $type === 'depense' ? 6 : 7;
         $flagField = $type === 'depense' ? 'pour_depenses' : 'pour_recettes';
         $typeLabel = $type === 'depense' ? 'dépenses' : 'recettes';
 
-        $sousCategories = SousCategorie::whereHas('categorie', fn ($q) => $q->where('type', $typeEnum))
+        $comptesVentilation = Compte::where('classe', $classeVentilation)
+            ->where('actif', true)
             ->get()
-            ->keyBy(fn ($sc) => Str::lower(trim($sc->nom)));
+            ->keyBy(fn ($c) => Str::lower(trim($c->intitule)));
 
-        $comptes = CompteBancaire::saisieManuelle()
+        $comptesBancaires = CompteBancaire::saisieManuelle()
             ->get()
             ->keyBy(fn ($c) => Str::lower(trim($c->nom)));
 
@@ -96,7 +98,7 @@ final class CsvImportService
             $csvLine = $idx + 2; // +1 pour l'en-tête, +1 pour l'indexation 1-based
 
             // Validation des champs par ligne
-            $rowErrors = $this->validateRow($row, $csvLine, $sousCategories, $tiersMap, $operations, $flagField, $typeLabel);
+            $rowErrors = $this->validateRow($row, $csvLine, $comptesVentilation, $tiersMap, $operations, $flagField, $typeLabel);
             $errors = array_merge($errors, $rowErrors);
 
             if (! empty($rowErrors)) {
@@ -107,8 +109,8 @@ final class CsvImportService
             $reference = trim($row[1]);
             $groupKey = $date.'|'.$reference;
 
-            $scNom = Str::lower(trim($row[2]));
-            $sc = $sousCategories[$scNom];
+            $compteVentilationNom = Str::lower(trim($row[2]));
+            $compteVentilation = $comptesVentilation[$compteVentilationNom];
             $montant = trim($row[3]);
             $operationNom = Str::lower(trim($row[8] ?? ''));
             $operation = $operationNom !== '' ? ($operations[$operationNom] ?? null) : null;
@@ -127,9 +129,9 @@ final class CsvImportService
             }
 
             if (! isset($groups[$groupKey])) {
-                // Première ligne de ce groupe : mode_paiement et compte sont obligatoires
+                // Première ligne de ce groupe : mode_paiement et compte_bancaire sont obligatoires
                 $mode = trim($row[4] ?? '');
-                $compteNom = Str::lower(trim($row[5] ?? ''));
+                $compteBancaireNom = Str::lower(trim($row[5] ?? ''));
 
                 if ($mode === '') {
                     $errors[] = ['line' => $csvLine, 'message' => 'Colonne mode_paiement : obligatoire sur la première ligne d\'une transaction.'];
@@ -143,14 +145,14 @@ final class CsvImportService
                     continue;
                 }
 
-                if ($compteNom === '') {
-                    $errors[] = ['line' => $csvLine, 'message' => 'Colonne compte : obligatoire sur la première ligne d\'une transaction.'];
+                if ($compteBancaireNom === '') {
+                    $errors[] = ['line' => $csvLine, 'message' => 'Colonne compte_bancaire : obligatoire sur la première ligne d\'une transaction.'];
 
                     continue;
                 }
 
-                if (! isset($comptes[$compteNom])) {
-                    $errors[] = ['line' => $csvLine, 'message' => 'Colonne compte : "'.trim($row[5]).'" inconnu ou inactif (actif_recettes_depenses = false).'];
+                if (! isset($comptesBancaires[$compteBancaireNom])) {
+                    $errors[] = ['line' => $csvLine, 'message' => 'Colonne compte_bancaire : "'.trim($row[5]).'" inconnu ou inactif (actif_recettes_depenses = false).'];
 
                     continue;
                 }
@@ -169,7 +171,7 @@ final class CsvImportService
                         'reference' => $reference,
                         'libelle' => trim($row[6] ?? '') !== '' ? trim($row[6]) : null,
                         'mode_paiement' => $mode,
-                        'compte_id' => $comptes[$compteNom]->id,
+                        'compte_id' => $comptesBancaires[$compteBancaireNom]->id,
                         'tiers_id' => $tiersId,
                         'montant_total' => 0.0,
                     ],
@@ -181,7 +183,7 @@ final class CsvImportService
 
             $notesRaw = trim($row[10] ?? '');
             $groups[$groupKey]['lignes'][] = [
-                'sous_categorie_id' => $sc->id,
+                'compte_id' => $compteVentilation->id,
                 'montant' => (float) $montant,
                 'operation_id' => $operationId,
                 'seance' => $seance,
@@ -280,17 +282,18 @@ final class CsvImportService
 
     private function validateHeader(array $row): ?string
     {
-        $normalized = array_map(fn ($h) => Str::lower(trim($h)), $row);
-        $missing = array_diff(self::EXPECTED_HEADERS, $normalized);
-        if (! empty($missing)) {
-            return 'En-tête invalide. Colonnes manquantes : '.implode(', ', $missing).'.';
+        $normalized = array_values(array_map(fn ($h) => Str::lower(trim($h)), $row));
+
+        if ($normalized !== self::EXPECTED_HEADERS) {
+            return 'En-tête invalide. Les colonnes doivent correspondre exactement, dans l’ordre exact : '
+                .implode(';', self::EXPECTED_HEADERS).'.';
         }
 
         return null;
     }
 
     /**
-     * Valide les champs d'une ligne (hors mode_paiement et compte, validés lors du groupement).
+     * Valide les champs d'une ligne (hors mode_paiement et compte_bancaire, validés lors du groupement).
      *
      * @param  array<string, list<Tiers>>  $tiersMap
      * @return list<array{line: int, message: string}>
@@ -298,7 +301,7 @@ final class CsvImportService
     private function validateRow(
         array $row,
         int $csvLine,
-        Collection $sousCategories,
+        Collection $comptesVentilation,
         array $tiersMap,
         Collection $operations,
         string $flagField,
@@ -321,12 +324,12 @@ final class CsvImportService
             $errors[] = ['line' => $csvLine, 'message' => 'Colonne reference : valeur trop longue (max 100 caractères).'];
         }
 
-        // sous_categorie (col 2)
-        $scNom = Str::lower(trim($row[2] ?? ''));
-        if ($scNom === '') {
-            $errors[] = ['line' => $csvLine, 'message' => 'Colonne sous_categorie : valeur vide (champ obligatoire).'];
-        } elseif (! isset($sousCategories[$scNom])) {
-            $errors[] = ['line' => $csvLine, 'message' => "Colonne sous_categorie : \"{$row[2]}\" inconnue ou de mauvais type."];
+        // compte (col 2) — résolu contre un compte de ventilation (classe 6/7)
+        $compteNom = Str::lower(trim($row[2] ?? ''));
+        if ($compteNom === '') {
+            $errors[] = ['line' => $csvLine, 'message' => 'Colonne compte : valeur vide (champ obligatoire).'];
+        } elseif (! isset($comptesVentilation[$compteNom])) {
+            $errors[] = ['line' => $csvLine, 'message' => "Colonne compte : \"{$row[2]}\" inconnu ou de mauvaise classe."];
         }
 
         // montant_ligne (col 3)

@@ -6,29 +6,40 @@ namespace App\Services;
 
 use App\DataTransferObjects\ExtournePayload;
 use App\Enums\StatutFacture;
-use App\Enums\StatutRapprochement;
 use App\Enums\StatutReglement;
-use App\Enums\TypeRapprochement;
 use App\Events\TransactionExtournee;
 use App\Models\Extourne;
-use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Services\Compta\EcritureGenerator;
+use App\Services\Compta\PartieDoubleGuard;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
+/**
+ * Extourne (contre-passation comptable) d'une transaction.
+ *
+ * Crée une transaction miroir D↔C qui compense l'originale dans le grand livre.
+ * L'originale et le miroir restent dans les rapports — ils se compensent à zéro.
+ *
+ * Réservé aux transactions déjà dénouées en trésorerie (Remis, Pointé).
+ * Pour Dû/En main → utiliser TransactionService::annuler() (soft-delete).
+ */
 final class TransactionExtourneService
 {
-    public function __construct(private readonly NumeroPieceService $numeroPiece) {}
+    public function __construct(
+        private readonly NumeroPieceService $numeroPiece,
+    ) {}
 
     /**
-     * Extourne (annulation) d'une transaction recette.
+     * Extourne (contre-passation) d'une transaction déjà dénouée.
      *
-     * Crée une transaction miroir à montant négatif. Si l'origine était EnAttente,
-     * un lettrage automatique apparie origine et extourne (Step 6 — pas implémenté ici).
+     * Crée une transaction miroir à montant négatif avec D↔C swap sur les lignes PD.
+     * Les lettrages existants (T1↔T2, T2↔T4) restent intacts — le 411C du miroir
+     * reste ouvert et sera soldé lors du remboursement effectif.
      */
     public function extourner(Transaction $origine, ExtournePayload $payload): Extourne
     {
@@ -37,33 +48,46 @@ final class TransactionExtourneService
         $this->assertExtournable($origine);
 
         return DB::transaction(function () use ($origine, $payload): Extourne {
+            // Pas de délettrage ni de cross-lettrage :
+            //   - Remis/Pointé : les lettrages existants (T1↔T2, T2↔T4) sont réels
+            //     et doivent rester intacts. Le 411C du miroir reste ouvert = dette
+            //     de remboursement, soldée quand le remboursement sera émis.
+            //   - EnAttente : la modale route vers soft-delete (TransactionService::annuler),
+            //     pas ici. Si on arrive ici malgré tout, le miroir est créé sans lettrage.
+
             $miroir = $this->creerTransactionMiroir($origine, $payload);
             $this->copierLignesInversees($origine, $miroir);
-
-            $lettrageId = null;
-            if ($origine->statut_reglement === StatutReglement::EnAttente) {
-                $lettrage = $this->creerLettrage($origine, $miroir, $payload);
-                $lettrageId = $lettrage->id;
-
-                $origine->forceFill([
-                    'rapprochement_id' => $lettrage->id,
-                    'statut_reglement' => StatutReglement::Pointe,
-                ])->save();
-
-                $miroir->forceFill([
-                    'rapprochement_id' => $lettrage->id,
-                    'statut_reglement' => StatutReglement::Pointe,
-                ])->save();
+            $this->assertEquilibreMiroir($miroir);
+            // Guard PD uniquement si l'originale était une Tx PD (equilibree=true).
+            // Pour les Tx legacy (equilibree=false/null), le miroir est aussi non-PD.
+            if ($miroir->equilibree === true) {
+                PartieDoubleGuard::assertComplete($miroir);
             }
 
             $extourne = Extourne::create([
                 'transaction_origine_id' => $origine->id,
                 'transaction_extourne_id' => $miroir->id,
-                'rapprochement_lettrage_id' => $lettrageId,
+                'rapprochement_lettrage_id' => null,
                 'created_by' => (int) auth()->id(),
             ]);
 
-            $origine->forceFill(['extournee_at' => now()])->save();
+            // Capturer le statut d'origine AVANT de l'écraser.
+            $statutOriginal = $origine->statut_reglement;
+
+            // Origine → terminal (extournée, toujours Pointé).
+            $origine->forceFill([
+                'extournee_at' => now(),
+                'statut_reglement' => StatutReglement::Pointe,
+            ])->save();
+
+            // Miroir : conditionnel selon le statut d'origine.
+            // - EnAttente → annulation comptable pure, pas de flux de tréso → miroir Pointé
+            // - Recu/EnMain/Pointe → remboursement à effectuer → miroir EnAttente (déjà la valeur
+            //   par défaut de creerTransactionMiroir, on ne l'écrase pas)
+            if ($statutOriginal === StatutReglement::EnAttente) {
+                $miroir->forceFill(['statut_reglement' => StatutReglement::Pointe])->save();
+            }
+            // else: le miroir garde EnAttente (posé par creerTransactionMiroir)
 
             Log::info('Extourne — transaction extournée', [
                 'association_id' => TenantContext::currentId(),
@@ -104,6 +128,12 @@ final class TransactionExtourneService
             'helloasso_cashout_id' => null,
             'helloasso_payment_id' => null,
             'statut_reglement' => StatutReglement::EnAttente,
+            // PD : le miroir hérite du statut equilibree de l'originale.
+            // Si l'originale est une Tx legacy (sans lignes PD, equilibree=false/null),
+            // le miroir est aussi non-PD et le guard ne s'applique pas.
+            'equilibree' => (bool) $origine->equilibree,
+            'type_ecriture' => 'extourne',
+            'journal' => $origine->journal,
         ]);
     }
 
@@ -112,40 +142,40 @@ final class TransactionExtourneService
         foreach ($origine->lignes()->get() as $ligne) {
             TransactionLigne::create([
                 'transaction_id' => $miroir->id,
-                'sous_categorie_id' => $ligne->sous_categorie_id,
                 'operation_id' => $ligne->operation_id,
                 'seance' => $ligne->seance,
                 'montant' => -1 * (float) $ligne->montant,
                 'notes' => $ligne->notes,
                 'piece_jointe_path' => null,
                 'helloasso_item_id' => null,
+                // PD fields — D↔C swap (montants positifs, sens inversé)
+                'compte_id' => $ligne->compte_id,
+                'debit' => (float) $ligne->credit,
+                'credit' => (float) $ligne->debit,
+                'tiers_id' => $ligne->tiers_id,
+                'libelle' => $ligne->libelle,
             ]);
         }
     }
 
     /**
-     * Crée le lettrage automatique : un RapprochementBancaire de type Lettrage
-     * directement Verrouillé (∑=0, solde inchangé).
+     * Vérifie paranoïaquement que les lignes PD du miroir sont équilibrées (∑D = ∑C).
      */
-    private function creerLettrage(Transaction $origine, Transaction $miroir, ExtournePayload $payload): RapprochementBancaire
+    private function assertEquilibreMiroir(Transaction $miroir): void
     {
-        $solde = $this->soldeActuelCompte((int) $origine->compte_id);
+        $lignesPD = TransactionLigne::where('transaction_id', (int) $miroir->id)
+            ->whereNotNull('compte_id')
+            ->get();
 
-        return RapprochementBancaire::create([
-            'compte_id' => $origine->compte_id,
-            'date_fin' => $payload->date->toDateString(),
-            'solde_ouverture' => $solde,
-            'solde_fin' => $solde,
-            'statut' => StatutRapprochement::Verrouille,
-            'type' => TypeRapprochement::Lettrage,
-            'saisi_par' => (int) auth()->id(),
-            'verrouille_at' => now(),
-        ]);
+        if ($lignesPD->isEmpty()) {
+            return;
+        }
+
+        app(EcritureGenerator::class)->assertEquilibre($lignesPD);
     }
 
     /**
      * Vérifie que la transaction appartient au tenant courant.
-     * Ceinture-bretelles en plus du scope global qui agit déjà côté query builder.
      */
     private function assertSameTenant(Transaction $origine): void
     {
@@ -183,22 +213,5 @@ final class TransactionExtourneService
                 "Cette transaction est portée par la facture {$factureValidee->numero}. Annulez la facture pour la libérer."
             );
         }
-    }
-
-    /**
-     * Solde courant du compte = solde_fin du dernier rapprochement bancaire
-     * verrouillé (type Bancaire), ou 0 si aucun.
-     */
-    private function soldeActuelCompte(int $compteId): float
-    {
-        $dernier = RapprochementBancaire::query()
-            ->where('compte_id', $compteId)
-            ->where('type', TypeRapprochement::Bancaire)
-            ->where('statut', StatutRapprochement::Verrouille)
-            ->orderByDesc('date_fin')
-            ->orderByDesc('id')
-            ->first();
-
-        return $dernier ? (float) $dernier->solde_fin : 0.0;
     }
 }

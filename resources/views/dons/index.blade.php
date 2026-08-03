@@ -2,7 +2,7 @@
     <x-slot:title>Dons</x-slot:title>
     <div class="container-fluid py-3">
         <livewire:transaction-universelle
-            sous-categorie-filter="pour_dons"
+            usage-filter="pour_dons"
             page-title="Dons"
             page-title-icon="heart" />
     </div>

@@ -2,21 +2,31 @@
 
 declare(strict_types=1);
 
+use App\Enums\UsageComptable;
 use App\Models\Adhesion;
+use App\Models\Compte;
 use App\Models\FormuleAdhesion;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Tenant\TenantContext;
 
 beforeEach(function (): void {
-    $this->sc = SousCategorie::factory()->pourCotisations()->create();
+    // DC-10a : compte classe 7 flaggé Cotisation (compte-first).
+    $this->sc = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '756OW',
+        'intitule' => 'Cotisations',
+        'classe' => 7,
+        'actif' => true,
+    ]);
+    $this->sc->usages()->create(['usage' => UsageComptable::Cotisation->value]);
     $this->tiers = Tiers::factory()->create();
 });
 
-it('observer applique la formule active de la sous-catégorie (priorité 2)', function (): void {
+it('observer applique la formule active de le compte (priorité 2)', function (): void {
     $formule = FormuleAdhesion::factory()->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'mode' => 'exercice',
         'actif' => true,
     ]);
@@ -28,7 +38,10 @@ it('observer applique la formule active de la sous-catégorie (priorité 2)', fu
     TransactionLigne::where('transaction_id', $tx->id)->forceDelete();
     $ligne = TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
+        'montant' => 50.00,
+        'debit' => 0,
+        'credit' => 50.00,
     ]);
 
     $adhesion = Adhesion::first();
@@ -47,7 +60,7 @@ it('observer applique la formule active de la sous-catégorie (priorité 2)', fu
 
 it('observer en mode durée pose date_debut + date_fin et exercice null', function (): void {
     $formule = FormuleAdhesion::factory()->modeDuree(12)->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'actif' => true,
     ]);
 
@@ -58,7 +71,10 @@ it('observer en mode durée pose date_debut + date_fin et exercice null', functi
     TransactionLigne::where('transaction_id', $tx->id)->forceDelete();
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
+        'montant' => 50.00,
+        'debit' => 0,
+        'credit' => 50.00,
     ]);
 
     $adhesion = Adhesion::first();
@@ -69,16 +85,16 @@ it('observer en mode durée pose date_debut + date_fin et exercice null', functi
 });
 
 it('observer applique la formule depuis le mapping HelloAsso (priorité 1)', function (): void {
-    // Formule active sur la sous-cat : ne doit PAS être choisie (priorité 2 < priorité 1)
+    // Formule active sur le compte : ne doit PAS être choisie (priorité 2 < priorité 1)
     FormuleAdhesion::factory()->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'actif' => true,
-        'nom' => 'Adhésion sous-cat fallback',
+        'nom' => 'Adhésion compte fallback',
     ]);
 
     // Formule HelloAsso : auto-créée par la sync avec helloasso_form_slug + helloasso_tier_id
     $formuleHelloAsso = FormuleAdhesion::factory()->modeDuree(12)->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'actif' => false, // pas active via priorité 2 — choisie via priorité 1 (lookup direct)
         'nom' => 'Adhésion HelloAsso',
         'helloasso_form_slug' => 'cotisation-2025',
@@ -94,8 +110,11 @@ it('observer applique la formule depuis le mapping HelloAsso (priorité 1)', fun
     TransactionLigne::where('transaction_id', $tx->id)->forceDelete();
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'helloasso_tier_id' => 999,
+        'montant' => 50.00,
+        'debit' => 0,
+        'credit' => 50.00,
     ]);
 
     $adhesion = Adhesion::first();
@@ -112,7 +131,10 @@ it('observer crée une adhésion legacy si pas de formule paramétrée', functio
     TransactionLigne::where('transaction_id', $tx->id)->forceDelete();
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
+        'montant' => 50.00,
+        'debit' => 0,
+        'credit' => 50.00,
     ]);
 
     $adhesion = Adhesion::first();
@@ -126,7 +148,7 @@ it('observer crée une adhésion legacy si pas de formule paramétrée', functio
 
 it('observer reste idempotent (multi-cotisations même exercice)', function (): void {
     FormuleAdhesion::factory()->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'mode' => 'exercice',
         'actif' => true,
     ]);
@@ -139,7 +161,10 @@ it('observer reste idempotent (multi-cotisations même exercice)', function (): 
         TransactionLigne::where('transaction_id', $tx->id)->forceDelete();
         TransactionLigne::factory()->create([
             'transaction_id' => $tx->id,
-            'sous_categorie_id' => $this->sc->id,
+            'compte_id' => $this->sc->id,
+            'montant' => 50.00,
+            'debit' => 0,
+            'credit' => 50.00,
         ]);
     }
 
@@ -148,7 +173,7 @@ it('observer reste idempotent (multi-cotisations même exercice)', function (): 
 
 it('observer reste idempotent en mode durée (même date_debut)', function (): void {
     FormuleAdhesion::factory()->modeDuree(12)->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'actif' => true,
     ]);
 
@@ -160,7 +185,10 @@ it('observer reste idempotent en mode durée (même date_debut)', function (): v
         TransactionLigne::where('transaction_id', $tx->id)->forceDelete();
         TransactionLigne::factory()->create([
             'transaction_id' => $tx->id,
-            'sous_categorie_id' => $this->sc->id,
+            'compte_id' => $this->sc->id,
+            'montant' => 50.00,
+            'debit' => 0,
+            'credit' => 50.00,
         ]);
     }
 
@@ -169,7 +197,7 @@ it('observer reste idempotent en mode durée (même date_debut)', function (): v
 
 it('observer pose mode illimite avec date_fin null', function (): void {
     $formule = FormuleAdhesion::factory()->modeIllimite()->create([
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
         'actif' => true,
         'nom' => 'Adhésion à vie',
     ]);
@@ -181,7 +209,10 @@ it('observer pose mode illimite avec date_fin null', function (): void {
     TransactionLigne::where('transaction_id', $tx->id)->forceDelete();
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->sc->id,
+        'montant' => 50.00,
+        'debit' => 0,
+        'credit' => 50.00,
     ]);
 
     $adhesion = Adhesion::first();

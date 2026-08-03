@@ -181,6 +181,7 @@ return [
         'customer' => 'client',
         'date' => 'date',
         'date_of_birth' => 'date de naissance',
+        'dateReglement' => 'date de règlement',
         'dates' => 'rendez-vous',
         'day' => 'jour',
         'deleted_at' => 'date de suppression',

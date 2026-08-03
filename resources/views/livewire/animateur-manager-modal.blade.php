@@ -202,7 +202,7 @@
                                         <tr style="background:#3d5473;color:#fff">
                                             <th style="min-width:160px">Op&eacute;ration</th>
                                             <th style="min-width:80px">S&eacute;ance</th>
-                                            <th style="min-width:200px">Sous-cat&eacute;gorie</th>
+                                            <th style="min-width:200px">Compte</th>
                                             <th style="min-width:90px">Montant</th>
                                             <th style="width:40px"></th>
                                         </tr>
@@ -243,10 +243,10 @@
                                                     @endif
                                                 </td>
                                                 <td>
-                                                    <livewire:sous-categorie-autocomplete
-                                                        wire:model="modalLignes.{{ $idx }}.sous_categorie_id"
+                                                    <livewire:compte-autocomplete
+                                                        wire:model="modalLignes.{{ $idx }}.compte_id"
                                                         filtre="depense"
-                                                        :key="'sc-ac-'.$idx.'-'.($ligne['sous_categorie_id'] ?? 'null')"
+                                                        :key="'sc-ac-'.$idx.'-'.($ligne['compte_id'] ?? 'null')"
                                                     />
                                                 </td>
                                                 <td>

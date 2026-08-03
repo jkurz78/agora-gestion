@@ -9,6 +9,7 @@ use App\Traits\TenantStorage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 final class Provision extends TenantModel
@@ -19,7 +20,7 @@ final class Provision extends TenantModel
         'association_id',
         'exercice',
         'type',
-        'sous_categorie_id',
+        'compte_id',
         'libelle',
         'montant',
         'tiers_id',
@@ -40,7 +41,7 @@ final class Provision extends TenantModel
             'date' => 'date',
             'montant' => 'decimal:2',
             'exercice' => 'integer',
-            'sous_categorie_id' => 'integer',
+            'compte_id' => 'integer',
             'tiers_id' => 'integer',
             'operation_id' => 'integer',
             'seance' => 'integer',
@@ -48,9 +49,9 @@ final class Provision extends TenantModel
         ];
     }
 
-    public function sousCategorie(): BelongsTo
+    public function compte(): BelongsTo
     {
-        return $this->belongsTo(SousCategorie::class);
+        return $this->belongsTo(Compte::class, 'compte_id');
     }
 
     public function tiers(): BelongsTo
@@ -66,6 +67,11 @@ final class Provision extends TenantModel
     public function saisiPar(): BelongsTo
     {
         return $this->belongsTo(User::class, 'saisi_par');
+    }
+
+    public function transactions(): HasMany
+    {
+        return $this->hasMany(Transaction::class);
     }
 
     /**

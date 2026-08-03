@@ -8,9 +8,7 @@ use App\Enums\CategorieEmail;
 use App\Enums\Espace;
 use App\Enums\ModePaiement;
 use App\Enums\RoleAssociation;
-use App\Enums\StatutReglement;
 use App\Enums\TypeDocumentPrevisionnel;
-use App\Enums\TypeTransaction;
 use App\Livewire\Concerns\MontantValidation;
 use App\Mail\DocumentMail;
 use App\Models\CompteBancaire;
@@ -20,10 +18,11 @@ use App\Models\Operation;
 use App\Models\Reglement;
 use App\Models\Seance;
 use App\Models\Transaction;
-use App\Models\TransactionLigne;
+use App\Services\Compta\PostesTiersOuvertsService;
 use App\Services\DocumentPrevisionnelService;
 use App\Services\Email\EmailLogStorageService;
-use App\Services\NumeroPieceService;
+use App\Services\ExerciceService;
+use App\Services\ReglementOperationService;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
@@ -33,6 +32,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 final class ReglementTable extends Component
@@ -243,18 +243,22 @@ final class ReglementTable extends Component
             return;
         }
 
-        $tx = Transaction::findOrFail($transactionId);
-
-        if ($tx->statut_reglement !== StatutReglement::EnAttente) {
-            return; // Already received or reconciled
-        }
-
-        if ($tx->isLockedByRapprochement() || $tx->isLockedByFacture()) {
+        $transaction = Transaction::find($transactionId);
+        if ($transaction === null || $transaction->isLockedByRapprochement() || $transaction->isLockedByFacture()) {
             return;
         }
 
-        $tx->update(['statut_reglement' => StatutReglement::Recu->value]);
+        $exercice = app(ExerciceService::class)->current();
+        $poste = app(PostesTiersOuvertsService::class)->pourTransaction($transaction, $exercice);
+        if ($poste === null) {
+            return;
+        }
+
+        $this->dispatch('poste-tiers-reglement:ouvrir', ligneId: $poste->ligneActionId, exercice: $exercice);
     }
+
+    #[On('poste-tiers-reglement:enregistre')]
+    public function onPosteTiersReglementEnregistre(): void {}
 
     public function ouvrirComptabiliser(int $seanceId): void
     {
@@ -290,10 +294,11 @@ final class ReglementTable extends Component
 
         $seance = Seance::with('operation.typeOperation')->findOrFail((int) $this->comptabiliserSeanceId);
         $operation = $seance->operation;
-        $sousCategorieId = $operation->typeOperation?->sous_categorie_id;
+        // DC-10a : garde compte-first — aligné sur ReglementOperationService::comptabiliserSeance().
+        $ventilationId = $operation->typeOperation?->compte_id;
 
-        if ($sousCategorieId === null) {
-            $this->addError('comptabiliserCompteId', "Le type d'opération n'a pas de sous-catégorie configurée.");
+        if ($ventilationId === null) {
+            $this->addError('comptabiliserCompteId', "Le type d'opération n'a pas de compte configuré.");
 
             return;
         }
@@ -322,34 +327,12 @@ final class ReglementTable extends Component
 
         $date = Carbon::parse($this->comptabiliserDate);
 
-        DB::transaction(function () use ($reglements, $seance, $operation, $sousCategorieId, $date): void {
-            foreach ($reglements as $reglement) {
-                $tiers = $reglement->participant->tiers;
-                $libelle = "Règlement {$tiers->displayName()} — {$operation->nom} S{$seance->numero}";
-
-                $tx = Transaction::create([
-                    'type' => TypeTransaction::Recette->value,
-                    'date' => $date->toDateString(),
-                    'numero_piece' => app(NumeroPieceService::class)->assign($date),
-                    'libelle' => $libelle,
-                    'montant_total' => $reglement->montant_prevu,
-                    'mode_paiement' => $reglement->mode_paiement?->value,
-                    'tiers_id' => $tiers->id,
-                    'compte_id' => (int) $this->comptabiliserCompteId,
-                    'statut_reglement' => StatutReglement::EnAttente->value,
-                    'reglement_id' => $reglement->id,
-                    'saisi_par' => auth()->id(),
-                ]);
-
-                TransactionLigne::create([
-                    'transaction_id' => $tx->id,
-                    'sous_categorie_id' => $sousCategorieId,
-                    'operation_id' => $operation->id,
-                    'seance' => $seance->numero,
-                    'montant' => $reglement->montant_prevu,
-                ]);
-            }
-        });
+        // Délègue au service métier (Step 26) : crée les Transactions + enrichit partie double
+        app(ReglementOperationService::class)->comptabiliserSeance(
+            seance: $seance,
+            compteBancaireId: (int) $this->comptabiliserCompteId,
+            date: $date,
+        );
 
         $this->showComptabiliserModal = false;
         $this->dispatch('comptabiliser-modal-close');

@@ -8,8 +8,8 @@ use App\Enums\UsageComptable;
 use App\Exceptions\RecuFiscalException;
 use App\Models\Adhesion;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\RecuFiscalEmis;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\TransactionLigne;
 use App\Models\User;
@@ -34,13 +34,13 @@ final class RecuFiscalService
             throw RecuFiscalException::signataireManquant();
         }
 
-        if (! $ligne->sousCategorie) {
-            throw RecuFiscalException::sansSousCategorie();
+        if (! $ligne->compte) {
+            throw RecuFiscalException::sansCompte();
         }
 
         // Garde montant > 0 : un don ou une cotisation à 0€ (palier HelloAsso "offert"
         // par exemple) ne peut pas donner droit à un reçu fiscal — pas de versement.
-        if ((float) $ligne->montant <= 0) {
+        if ($this->montantRecu($ligne) <= 0) {
             throw RecuFiscalException::montantNul();
         }
 
@@ -48,6 +48,10 @@ final class RecuFiscalService
 
         if (! $transaction->statut_reglement->isEncaisse()) {
             throw RecuFiscalException::transactionNonEncaissee();
+        }
+
+        if ($transaction->tiers_id === null) {
+            throw RecuFiscalException::donateurManquant();
         }
 
         $tiers = $transaction->tiers;
@@ -81,15 +85,15 @@ final class RecuFiscalService
 
             $asso = Association::findOrFail(TenantContext::currentId());
             $tiers = $ligne->transaction->tiers;
-            $sousCat = $ligne->sousCategorie;
+            $compteVentilation = $ligne->compte;
             $dateVersement = $ligne->transaction->date;
             $anneeCivile = (int) $dateVersement->format('Y');
 
             $articleCgi = $this->determinerArticleCgi($tiers);
-            $formeDon = $this->determinerFormeDon($sousCat);
+            $formeDon = $this->determinerFormeDon($compteVentilation);
             $modeVersement = $ligne->transaction->mode_paiement?->value ?? 'autre';
             $numero = $this->allouerNumero($anneeCivile);
-            $objet = $this->determinerObjetRecu($sousCat);
+            $objet = $this->determinerObjetRecu($compteVentilation);
 
             $pdfBinaire = $this->genererPdfBinaire($asso, $tiers, $ligne, $numero, $articleCgi, $formeDon, $modeVersement, $objet);
             $relativePath = "recus_fiscaux/{$anneeCivile}/{$numero}.pdf";
@@ -104,7 +108,7 @@ final class RecuFiscalService
                 'annee_civile' => $anneeCivile,
                 'tiers_id' => $tiers->id,
                 'transaction_ligne_id' => $ligne->id,
-                'montant_centimes' => (int) round((float) $ligne->montant * 100),
+                'montant_centimes' => (int) round($this->montantRecu($ligne) * 100),
                 'date_versement' => $dateVersement,
                 'mode_versement' => $modeVersement,
                 'forme_don' => $formeDon,
@@ -226,7 +230,7 @@ final class RecuFiscalService
         }
 
         if ($adhesion->formuleAdhesion !== null) {
-            $ligne = $lignes->firstWhere('sous_categorie_id', $adhesion->formuleAdhesion->sous_categorie_id);
+            $ligne = $lignes->firstWhere('compte_id', $adhesion->formuleAdhesion->compte_id);
             if ($ligne !== null) {
                 return $ligne;
             }
@@ -262,16 +266,16 @@ final class RecuFiscalService
         return $donateur->type === 'entreprise' ? 'art_238_bis' : 'art_200';
     }
 
-    private function determinerFormeDon(SousCategorie $sc): string
+    private function determinerFormeDon(Compte $compte): string
     {
-        return $sc->hasUsage(UsageComptable::AbandonCreance)
+        return $compte->hasUsage(UsageComptable::AbandonCreance)
             ? 'abandon_revenus'
             : 'numeraire';
     }
 
-    private function determinerObjetRecu(SousCategorie $sc): string
+    private function determinerObjetRecu(Compte $compte): string
     {
-        return $sc->hasUsage(UsageComptable::Cotisation) ? 'cotisation' : 'don';
+        return $compte->hasUsage(UsageComptable::Cotisation) ? 'cotisation' : 'don';
     }
 
     private function genererPdfBinaire(
@@ -284,7 +288,7 @@ final class RecuFiscalService
         string $modeVersement,
         string $objet = 'don',
     ): string {
-        $montantFloat = (float) $ligne->montant;
+        $montantFloat = $this->montantRecu($ligne);
         $montantFormate = number_format($montantFloat, 2, ',', ' ').' €';
         $montantEnLettres = app(MontantEnLettresService::class)->convertir($montantFloat);
 
@@ -392,5 +396,14 @@ final class RecuFiscalService
         ])->setPaper('a4', 'portrait');
 
         return $pdf->output();
+    }
+
+    /**
+     * Montant du reçu fiscal : privilégie credit PD (colonne pérenne) ;
+     * fallback sur montant legacy tant que le backfill n'a pas enrichi toutes les lignes.
+     */
+    private function montantRecu(TransactionLigne $ligne): float
+    {
+        return (float) $ligne->credit > 0 ? (float) $ligne->credit : (float) $ligne->montant;
     }
 }

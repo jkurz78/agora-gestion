@@ -1,10 +1,26 @@
 # Fondations partie double — Slice 1
 
-- **Date** : 2026-05-19
+- **Date** : 2026-05-19 (amendée 2026-05-22 — voir note d'amendement)
 - **Programme** : Comptabilité élargie (modèle uniforme partie double + cohabitation cash/double via UX)
 - **Slice** : 1 / N — Fondations : modèle uniforme, lettrage, CR et rappro rebranchés
 - **Périmètre** : exercice courant uniquement, un seul tenant (instance SVS)
-- **Branche cible** : `feat/fondations-partie-double-slice1`
+- **Branche cible** : `feat/compta-v5`
+
+---
+
+## ⚠ Amendement 2026-05-22 — École « 411 systématique »
+
+Pendant l'implémentation de la sous-slice 1c (branchement Livewire `TransactionForm`), un trou de cadrage a été identifié : la matrice §4.3 d'origine court-circuitait le 411 pour les recettes comptant (`5112 D X tiers / 706 C X` direct, sans passer par 411). Cela posait trois problèmes :
+
+1. **Non conformité FEC** — la norme française (BOI-CF-IOR-60-40-20) réserve `CompAuxNum` (tiers comptable) aux comptes de classe 4. Les comptes de trésorerie (classe 5) ne portent jamais de tiers en FEC. Or §4.3 plaçait le tiers sur 5112/530/512.
+2. **Contradiction interne** avec l'invariant §4.2 #5 (« jamais de tiers sur 512X ») — la matrice gagnait par défaut, mais l'invariant restait fragile (cf. mémoire `project_compta_v5_sous_slice_1b.md`).
+3. **Désalignement** avec la pratique des logiciels comptables professionnels (Sage, Cegid, Pennylane, EBP Pro) qui passent systématiquement par 411 pour conserver la traçabilité tiers complète sur la fiche tiers (objectif AC §10 « solde ouvert tiers »).
+
+**Décision actée 2026-05-22** : bascule sur l'école **411 systématique** (PCG-conforme, FEC-conforme). Toute écriture mouvementant un compte de gestion (6, 7) est contrepassée par un compte de tiers (411 ou 401), y compris pour les recettes/dépenses comptant. Le tiers vit exclusivement sur les lignes 411/401. Les lignes de classe 5 (512X, 5112, 530) ne portent plus de tiers. Cette décision ouvre la voie à un usecase « association fiscalisée » avec production de FEC sans réécriture du modèle.
+
+**Sections amendées** : §4.1 (signatures multi-ventilation), §4.2 (invariant 5 simplifié), §4.3 (matrice réécrite), §4.4 (remise sans tiers), §11 (scénarios BDD réécrits + ajout multi-ventilation). Décisions #4 et #12 mises à jour. §6 / §7 / §10 inchangés.
+
+**Impact sur 1b livré** : 6 méthodes `EcritureGenerator::pour*` à réviser (5 majeures + 1 modérée pour remise). Tests Pest associés à adapter. Mémoire `project_compta_v5_sous_slice_1b.md` repassée en « en révision 2026-05-22 ».
 
 ## Vocabulaire
 
@@ -25,7 +41,7 @@
 1. **Stratégie cible** : **Modèle uniforme partie double partout**, avec une couche d'ergonomie qui assiste la saisie en mode cash basis (génération automatique des contreparties). Pas de cohabitation de deux moteurs.
 2. **Mode UX cash vs double** : pas dans ce slice. Le slice 1 livre les fondations qui rendent la cohabitation **possible** plus tard. L'UX actuelle (recettes/dépenses) reste inchangée fonctionnellement.
 3. **Périmètre fonctionnel utilisateur visible slice 1** : **inchangé** par rapport à aujourd'hui. Le compte de résultat continue d'être calculé, le rapprochement continue de fonctionner. Sous le capot tout est réécrit en partie double.
-4. **École de comptabilisation des recettes/dépenses** : **École C — hybride par mode** (voir matrice §4.3). Comptant saute le 411 ; à crédit passe par 411.
+4. **École de comptabilisation des recettes/dépenses** : **École « 411 systématique »** (amendée 2026-05-22 — voir note d'amendement en tête). Tout produit (classe 7) ou charge (classe 6) est obligatoirement contrepassé par 411 ou 401 portant le tiers, y compris pour les recettes/dépenses comptant. Une recette comptant produit donc une transaction à **4 lignes** : `411 D tiers / 7x C × N / 5xx D total / 411 C tiers` avec auto-lettrage interne des deux lignes 411. Voir matrice §4.3.
 5. **Comptes intermédiaires nouveaux** : `411 Clients`, `401 Fournisseurs`, `5112 Chèques à encaisser`, `530 Caisse` (si caisse espèces existe — à confirmer en step 1).
 6. **Tiers porté par la ligne, pas la transaction** : `transaction_lignes.tiers_id` (nouveau). `transactions.tiers_id` devient dénormalisé en lecture (ou supprimé — à arbitrer en step 1).
 7. **Comptes unifiés** : table `comptes` absorbe `sous_categories` ET `comptes_bancaires`. Les attributs bancaires (IBAN, BIC, solde initial) migrent dans une table satellite `comptes_bancaires_meta` ou en colonnes nullables sur `comptes` (à arbitrer en step 1).
@@ -33,7 +49,7 @@
 9. **Lettrage automatique** sur paires et lots à la génération (`EcritureGenerator`).
 10. **Délettrage** : mécanisme programmatique (`LettrageService::delettrer()`) + auto-délettrage sur extourne. Pas d'UI manuelle slice 1.
 11. **512 ne se lettre jamais** : son cycle de pointage est le rapprochement bancaire, pas le lettrage.
-12. **Remise bancaire = transaction multi-lignes splittée par tiers** (Variante 2a). La table `remises_bancaires` survit comme groupement logique avec lien vers la transaction de dépôt et les écritures sources.
+12. **Remise bancaire = transaction multi-lignes** (1 ligne 512 D total + N lignes 5112 C, une par chèque source, **sans tiers** — cf. amendement 2026-05-22 et §4.2 invariant 5). Le lettrage 5112↔5112 apparie chaque chèque source à sa ligne de remise (pas par tiers, par ligne source). La table `remises_bancaires` survit comme groupement logique avec lien vers la transaction de dépôt et les écritures sources.
 13. **Backfill** : exercice courant uniquement (un seul tenant, premier exercice → 1A = 1C). Pas de pivot date, pas de support legacy en lecture.
 14. **Hors slice 1 (slices ultérieurs)** : bilan, TVA, immobilisations, à-nouveau formel à la clôture, OD libres, UI manuelle de lettrage/délettrage, chèque impayé (flow dédié).
 15. **Gouvernance** : branche longue durée `feat/compta-v5`, `main` reste propre et livrable en hotfix pendant toute la durée. Sync `main → feat/compta-v5` régulier après chaque hotfix prod. Recette en préprod NAS sur clone prod non-anonymisé (compta + tiers réels, données médicales illisibles par construction — clé chiffrement préprod différente). Backfill **idempotent** avec option `--force` (préprod uniquement). Détails procéduraux : §16 Gouvernance.
@@ -266,48 +282,113 @@ Service central qui génère les écritures partie double pour un événement ut
 
 ### 4.1. Interface publique
 
+> Amendée 2026-05-22 — signatures multi-ventilation et école 411 systématique.
+
+Chaque méthode prend en entrée **un tiers payeur unique** (une transaction = un tiers payeur, V4 conservé) et **une collection de ventilations** sur des comptes de gestion (`Compte de classe 6 ou 7, float montant, ?Operation, ?int seance, ?string notes`).
+
 ```php
 final class EcritureGenerator
 {
+    /**
+     * Recette comptant : 1 transaction à (N + 3) lignes.
+     * Schéma : 411 D total tiers / [7x C × N] / [5xx D total — sans tiers] / 411 C total tiers
+     * Auto-lettrage interne des deux lignes 411 (D et C, même tiers, mêmes montants).
+     *
+     * @param iterable<int, array{compte: Compte, montant: float, operation_id?: ?int, seance?: ?int, notes?: ?string}> $ventilations
+     */
     public function pourRecetteComptant(
         Tiers $tiers,
-        Compte $compteProduit,
-        float $montant,
-        ModePaiement $mode,         // chèque, espèces, virement, CB
-        Compte $compteTresorerie,   // 512BNP (virement/CB) ou compte par défaut
+        iterable $ventilations,
+        ModePaiement $mode,         // chèque, espèces, virement, CB, prélèvement
+        Compte $compteTresorerie,   // 5112 (chèque) / 530 (espèces) / 512X (virement, CB, prélèvement)
         \DateTimeInterface $date,
         ?string $libelle = null,
-        ?Operation $operation = null,
-        ?int $seance = null,
     ): Transaction;
 
+    /**
+     * Recette à crédit : 1 transaction à (N + 1) lignes.
+     * Schéma : 411 D total tiers / [7x C × N]
+     * Pas de lettrage à ce stade (créance ouverte).
+     *
+     * @param iterable<int, array{compte: Compte, montant: float, operation_id?: ?int, seance?: ?int, notes?: ?string}> $ventilations
+     */
     public function pourRecetteACredit(
-        Tiers $tiers,                       // résolu en interne vers compte 411 + ligne.tiers_id
-        Compte $compteProduit,
-        float $montant,
+        Tiers $tiers,
+        iterable $ventilations,
         \DateTimeInterface $dateConstatation,
         ?string $libelle = null,
-        ?Operation $operation = null,
     ): Transaction;
 
+    /**
+     * Encaissement d'une créance précédemment constatée : 1 transaction à 2 lignes.
+     * Schéma : 5xx D total — sans tiers / 411 C total tiers
+     * Lettrage automatique avec la ligne 411 D de la transaction créance source.
+     */
     public function pourEncaissementCreance(
-        Transaction $transactionCreance,  // T1 = 411/706, dont on lettre la ligne 411
+        Transaction $transactionCreance,
         ModePaiement $mode,
         Compte $compteTresorerie,
         \DateTimeInterface $datePaiement,
         ?string $libelle = null,
     ): Transaction;
 
-    public function pourDepenseComptant(/* symétrique */): Transaction;
-    public function pourDepenseACredit(/* symétrique */): Transaction;
-    public function pourReglementFournisseur(/* symétrique */): Transaction;
+    /**
+     * Dépense comptant : symétrique recette comptant.
+     * Schéma : [6x D × N] / 401 C total tiers / 401 D total tiers / 5xx C total — sans tiers
+     * Auto-lettrage interne des deux lignes 401.
+     *
+     * @param iterable<int, array{compte: Compte, montant: float, operation_id?: ?int, seance?: ?int, notes?: ?string}> $ventilations
+     */
+    public function pourDepenseComptant(
+        Tiers $tiers,
+        iterable $ventilations,
+        ModePaiement $mode,
+        Compte $compteTresorerie,
+        \DateTimeInterface $date,
+        ?string $libelle = null,
+    ): Transaction;
 
+    /**
+     * Dépense à crédit (facture fournisseur) : symétrique recette à crédit.
+     * Schéma : [6x D × N] / 401 C total tiers
+     *
+     * @param iterable<int, array{compte: Compte, montant: float, operation_id?: ?int, seance?: ?int, notes?: ?string}> $ventilations
+     */
+    public function pourDepenseACredit(
+        Tiers $tiers,
+        iterable $ventilations,
+        \DateTimeInterface $dateConstatation,
+        ?string $libelle = null,
+    ): Transaction;
+
+    /**
+     * Règlement d'une dette fournisseur : symétrique encaissement créance.
+     * Schéma : 401 D total tiers / 5xx C total — sans tiers
+     * Lettrage automatique avec la ligne 401 C de la transaction dette source.
+     */
+    public function pourReglementFournisseur(
+        Transaction $transactionDette,
+        ModePaiement $mode,
+        Compte $compteTresorerie,
+        \DateTimeInterface $datePaiement,
+        ?string $libelle = null,
+    ): Transaction;
+
+    /**
+     * Dépôt remise : 1 transaction à (N + 1) lignes, sans tiers.
+     * Schéma : 512 D total — sans tiers / [5112 C × N — sans tiers, une par chèque source]
+     * Lettrage par paire (chaque ligne 5112 source ↔ sa ligne 5112 C de remise).
+     *
+     * @param Collection<TransactionLigne> $lignes5112Sources  Lignes 5112 D non encore remises à inclure.
+     */
     public function pourRemiseBancaire(
         RemiseBancaire $remise,
-        Collection $lignes5112Sources,   // les lignes 5112 à inclure dans le dépôt
-    ): Transaction;                       // T4 = 512/5112 splittée par tiers
+        Collection $lignes5112Sources,
+    ): Transaction;
 }
 ```
+
+**Convention sur le tiers payeur** : une transaction = un tiers payeur. Le cas « tiers payeur ≠ tiers cible » (ex. cotisation de Pauline payée par Pierre) est géré **en amont** par les modèles métier (`Cotisation`, `Don`, etc., via un attribut `payeur_id`), pas par `EcritureGenerator`. L'écriture comptable reste sur le tiers payeur unique (Pierre).
 
 ### 4.2. Invariants vérifiés par le service
 
@@ -315,39 +396,50 @@ final class EcritureGenerator
 2. **Cohérence comptes/classe** : produit sur classe 7, charge sur classe 6, trésorerie sur classe 5, tiers sur classe 4. Throw `CompteIncorrectException` sinon.
 3. **Tenant** : tous les comptes/tiers passés en argument appartiennent au tenant courant. Throw `TenantBoundaryException` sinon.
 4. **Lettrage** : si l'opération produit un appariement (encaissement créance, remise), un `lettrage_code` est généré (UUID-short 20 chars) et appliqué aux lignes appariées via `LettrageService::lettrer()`.
-5. **Tiers obligatoire sur 411 et 401** : toute ligne générée sur le compte 411 ou 401 porte `transaction_lignes.tiers_id NOT NULL`. Throw `TiersRequisException` sinon. Inversement, les lignes sur comptes de gestion (6, 7) peuvent porter un tiers ou non (cas dons anonymes, ajustements). Les lignes sur comptes de trésorerie principale (512X) ne portent jamais de tiers.
-6. **Résolution interne des comptes système** : `EcritureGenerator` résout lui-même les comptes 411, 401, 5112, 530 via `Compte::ofNumeroSysteme('411')`. Les callers passent uniquement le `Tiers` et le compte de gestion concerné. Aucun caller ne manipule directement la référence aux comptes système.
+5. **Tiers obligatoire et exclusif sur 411/401** (amendé 2026-05-22) :
+   - Toute ligne sur 411 ou 401 porte `transaction_lignes.tiers_id NOT NULL`. Throw `TiersRequisException` sinon.
+   - **Aucune ligne sur la classe 5** (512X, 5112, 530) ne porte de tiers. Throw `TiersInterditException` sinon. Cette règle est alignée sur la norme FEC française (BOI-CF-IOR-60-40-20 : `CompAuxNum` réservé aux comptes auxiliaires de tiers, classe 4).
+   - Les lignes sur comptes de gestion (6, 7) peuvent porter un tiers ou non — optionnel (cas dons anonymes, ajustements de fin d'exercice).
+6. **Résolution interne des comptes système** : `EcritureGenerator` résout lui-même les comptes 411, 401, 5112, 530 via `Compte::ofNumeroSysteme('411')`. Les callers passent uniquement le `Tiers` et la collection de ventilations (compte de gestion + montant). Aucun caller ne manipule directement la référence aux comptes système.
 
 ### 4.3. Matrice de génération (référence)
 
-| Saisie utilisateur | École C — écritures générées |
+> Amendée 2026-05-22 — école « 411 systématique ». Toutes les écritures contrepassent un compte de gestion par 411 ou 401. La classe 5 ne porte jamais de tiers. `T` indique le nombre total réel (∑ ventilations). `N` indique le nombre de lignes 7x ou 6x ventilées (peut valoir 1).
+
+| Saisie utilisateur | Écritures générées (école 411 systématique) |
 |---|---|
-| **Recette comptant chèque** | T1 : `5112 D X (tiers) / 706 C X` |
-| **Dépôt remise** | T4 : `512 D total / 5112 C par tiers splitté` + auto-lettrage par paire |
-| **Recette comptant espèces** | T1 : `530 D X (tiers) / 706 C X` |
-| **Dépôt espèces banque** | T4 : `512 D total / 530 C par tiers splitté` + auto-lettrage par paire |
-| **Recette virement** | T1 : `512 D X (tiers) / 706 C X` (1 transaction, pas de portage) |
-| **Recette CB HelloAsso** | T1 : `512 D X (tiers) / 706 C X` (1 transaction, sync API) |
-| **Recette à crédit** | T1 : `411 D X (tiers) / 706 C X` |
-| **Encaissement créance** | T2 : `5112 ou 530 ou 512 D X (tiers) / 411 C X (tiers)` + auto-lettrage paire 411 |
-| **Dépense comptant chèque** | T1 : `607 D X / 512 C X (tiers)` — chèque émis débite 512 directement. Le décalage entre émission et débit bancaire est géré par le rappro (ligne 512 non pointée tant que la banque n'a pas débité). Pas de 5112 miroir. |
-| **Dépense comptant CB** | T1 : `607 D X / 512 C X (tiers)` |
-| **Dépense comptant espèces** | T1 : `607 D X / 530 C X (tiers)` |
-| **Dépense à crédit (facture fournisseur)** | T1 : `607 D X / 401 C X (tiers)` |
-| **Règlement fournisseur** | T2 : `401 D X (tiers) / 512 C X` + auto-lettrage paire 401 |
+| **Recette comptant chèque** | 1 transaction à (N+3) lignes : `411 D T tiers / [706x C × N] / 5112 D T / 411 C T tiers` + auto-lettrage interne 411 |
+| **Recette comptant espèces** | 1 transaction à (N+3) lignes : `411 D T tiers / [706x C × N] / 530 D T / 411 C T tiers` + auto-lettrage interne 411 |
+| **Recette comptant virement** | 1 transaction à (N+3) lignes : `411 D T tiers / [706x C × N] / 512X D T / 411 C T tiers` + auto-lettrage interne 411 |
+| **Recette comptant CB / prélèvement (HelloAsso)** | 1 transaction à (N+3) lignes : `411 D T tiers / [706x C × N] / 512X D T / 411 C T tiers` + auto-lettrage interne 411 |
+| **Recette à crédit** | 1 transaction à (N+1) lignes : `411 D T tiers / [706x C × N]` (créance ouverte, pas de lettrage) |
+| **Encaissement créance** | 1 transaction à 2 lignes : `5xx D T / 411 C T tiers` + lettrage de la paire 411 (D créance source + C encaissement) |
+| **Dépense comptant chèque** | 1 transaction à (N+3) lignes : `[607x D × N] / 401 C T tiers / 401 D T tiers / 512 C T` + auto-lettrage interne 401. *Note : pas de 5112 miroir pour les chèques émis — voir décision en bas du tableau.* |
+| **Dépense comptant CB** | 1 transaction à (N+3) lignes : `[607x D × N] / 401 C T tiers / 401 D T tiers / 512 C T` + auto-lettrage interne 401 |
+| **Dépense comptant espèces** | 1 transaction à (N+3) lignes : `[607x D × N] / 401 C T tiers / 401 D T tiers / 530 C T` + auto-lettrage interne 401 |
+| **Dépense à crédit (facture fournisseur)** | 1 transaction à (N+1) lignes : `[607x D × N] / 401 C T tiers` (dette ouverte, pas de lettrage) |
+| **Règlement fournisseur** | 1 transaction à 2 lignes : `401 D T tiers / 5xx C T` + lettrage de la paire 401 (C dette source + D règlement) |
+| **Dépôt remise (chèques en banque)** | 1 transaction à (N+1) lignes : `512 D total / [5112 C × N — sans tiers, une par chèque source]` + lettrage par paire (chaque ligne 5112 D source ↔ sa ligne 5112 C de remise) |
+| **Dépôt espèces banque** | 1 transaction à (N+1) lignes : `512 D total / [530 C × N — sans tiers, une par dépôt source]` + lettrage par paire 530 ↔ 530 |
 
-**Décision actée** : pas de compte miroir pour les chèques émis (asymétrie volontaire avec les chèques reçus qui passent par 5112). Raison : le 5112 sert à représenter les **valeurs physiques en main** (chèques reçus qui dorment dans le tiroir). Pour un chèque émis, l'asso n'a plus rien en main — elle a confié le chèque au fournisseur. L'attente du débit bancaire est gérée par le statut « non pointé » sur 512. Plus simple, sémantiquement plus juste.
+**Décision actée** : pas de compte miroir pour les chèques émis (asymétrie volontaire avec les chèques reçus qui passent par 5112). Raison : le 5112 sert à représenter les **valeurs physiques en main** (chèques reçus qui dorment dans le tiroir). Pour un chèque émis, l'asso n'a plus rien en main — elle a confié le chèque au fournisseur. L'attente du débit bancaire est gérée par le statut « non pointé » sur la ligne 512 C de la dépense. Plus simple, sémantiquement plus juste.
 
-### 4.4. Splittage par tiers de la remise (Variante 2a validée)
+**Multi-ventilation** : pour `N > 1` ventilations (recette ou dépense), la **ligne 411 / 401 porte le montant total agrégé** sur le tiers payeur (une transaction = un tiers payeur). C'est la pratique V4 conservée. Le cas « tiers payeur ≠ tiers cible » est géré en amont par les modèles métier (`Cotisation.payeur_id`, `Don.payeur_id`), hors `EcritureGenerator`.
+
+### 4.4. Génération de la remise bancaire
+
+> Amendée 2026-05-22 — pas de splittage par tiers (la classe 5 ne porte jamais de tiers, cf. §4.2 invariant 5). Lettrage **par ligne source**, pas par tiers.
 
 Pour `pourRemiseBancaire(remise, lignes5112Sources)` :
 
-1. Grouper `lignes5112Sources` par `tiers_id` (si plusieurs lignes même tiers, somme par tiers)
-2. Calculer le total = ∑ montants entrants
-3. Créer la transaction T4 dans `DB::transaction` :
-   - 1 ligne `512` débit `total`, sans tiers
-   - N lignes `5112` crédit, **une par tiers groupé**, avec `tiers_id` rempli
-4. Pour chaque ligne sortante 5112 : générer un `lettrage_code` unique et appliquer à la paire (ligne entrante du tiers + ligne sortante du tiers via `LettrageService::lettrer()`). Si plusieurs lignes entrantes pour le même tiers → toutes lettrées sous le même code.
+1. Calculer le total = ∑ montants des lignes 5112 D sources non remises.
+2. Créer la transaction T4 dans `DB::transaction` :
+   - 1 ligne `512X` débit `total`, **sans tiers**
+   - N lignes `5112` crédit, **une par ligne source**, **sans tiers** — chaque ligne 5112 C reprend le montant exact de sa ligne 5112 D source
+3. Pour chaque paire (ligne 5112 D source ↔ ligne 5112 C de remise correspondante) : générer un `lettrage_code` unique et appliquer via `LettrageService::lettrer()`. Le lettrage est strictement par paire, indépendamment du tiers (qui n'est plus présent sur ces lignes).
+4. La traçabilité par tiers reste possible **en amont** : chaque ligne 5112 source a été créée par une transaction T1 (recette comptant chèque) qui porte le tiers sur ses lignes 411 D / 411 C. La fiche tiers 360° lit donc 411 (et 401), pas 5112.
+
+Le modèle équivalent symétrique s'applique au **dépôt espèces banque** (`530 C × N / 512X D total`, sans tiers, lettrage par paire 530 ↔ 530).
 
 ---
 
@@ -572,9 +664,9 @@ La table `categories` (catégorie comptable de regroupement, ex: « Recettes cou
 - [ ] **CR identique** : compte de résultat affiché pour l'exercice courant produit les mêmes lignes et les mêmes totaux que pré-slice 1 (tolérance 0,00€)
 - [ ] **Rappro identique** : rapprochement bancaire affiche les mêmes lignes pointables, mêmes libellés, mêmes montants, mêmes statuts pointés
 - [ ] **Saisie recette/dépense** : les écrans actuels continuent de fonctionner sans changement perceptible. Sous le capot, les écritures générées sont partie double équilibrées.
-- [ ] **Saisie remise bancaire** : écran inchangé. La remise génère une transaction T4 partie double splittée par tiers, auto-lettrée.
-- [ ] **Saisie facture (Factur-X)** : `FactureService::valider()` continue de fonctionner. Il appelle désormais `EcritureGenerator::pourRecetteACredit()` pour générer la transaction `411/706`. Encaissement via `pourEncaissementCreance()` lette automatiquement la paire 411. Pas de régression visible utilisateur. Test de non-régression dédié sur le module facturation.
-- [ ] **Encaissement créance** : depuis l'écran existant, génère T2 `5112 ou 512 / 411` avec auto-lettrage de la paire 411
+- [ ] **Saisie remise bancaire** : écran inchangé. La remise génère une transaction T4 partie double avec 1 ligne 512 D total + N lignes 5112 C (une par chèque source, sans tiers), auto-lettrée par paire (cf. §4.4 amendé).
+- [ ] **Saisie facture (Factur-X)** : `FactureService::valider()` continue de fonctionner. Il appelle désormais `EcritureGenerator::pourRecetteACredit()` (signature multi-ventilation amendée 2026-05-22) pour générer la transaction `411 D total tiers / [706x C × N]`. Encaissement via `pourEncaissementCreance()` lette automatiquement la paire 411. Pas de régression visible utilisateur. Test de non-régression dédié sur le module facturation.
+- [ ] **Encaissement créance** : depuis l'écran existant, génère T2 `5xx D total (sans tiers) / 411 C total tiers` avec auto-lettrage de la paire 411 (D créance source + C encaissement)
 - [ ] **Fiche tiers** : affiche désormais **solde ouvert** (= ce que le tiers doit / ce qu'on lui doit) au lieu d'un solde courant qui mélange tout
 - [ ] **Extourne d'une transaction lettrée** : déclenche auto-délettrage des lignes lettrées de la transaction origine
 - [ ] **Provisions** : continue de fonctionner inchangé (alimente le CR comme avant)
@@ -594,7 +686,7 @@ La table `categories` (catégorie comptable de regroupement, ex: « Recettes cou
 - [ ] **Invariant lettrage** : pour chaque `lettrage_code` distinct, ∑ (debit - credit) = 0. Test global.
 - [ ] **Invariant tenant** : aucune `transaction_ligne.compte_id` ne pointe vers un compte d'un autre tenant. Test cross-check `comptes.association_id = transactions.association_id`.
 - [ ] **Invariant tiers obligatoire 411/401** : toute ligne sur le compte 411 ou 401 porte un `tiers_id NOT NULL`. Test global Pest scanne toutes les lignes de l'exercice. Aucune fuite après backfill.
-- [ ] **Invariant pas de tiers sur 512** : aucune ligne sur un compte de classe 5 préfixé `512` ne porte de `tiers_id`. Le tiers est sur les lignes 5112/530/411/401, jamais sur 512. Test global.
+- [ ] **Invariant pas de tiers sur classe 5** (amendé 2026-05-22) : aucune ligne sur un compte de classe 5 (512X, 5112, 530) ne porte de `tiers_id`. Conformément à la norme FEC : `CompAuxNum` réservé aux comptes de tiers (classe 4). Test global Pest.
 
 ### Audit
 
@@ -615,34 +707,59 @@ Contexte:
 # Génération automatique des écritures
 # ============================================================
 
-Scénario: Recette comptant chèque — génération T1
+Scénario: Recette comptant chèque — génération T1 (4 lignes, école 411 systématique, amendée 2026-05-22)
   Étant donné un tiers "Pierre Dupont"
   Et le compte "706 Cotisations"
   Quand je saisis une recette de 50€ par chèque de Pierre Dupont sur le compte 706 le 15/09/2025
   Alors une transaction T1 est créée le 15/09/2025
-  Et T1 contient 2 lignes :
+  Et T1 contient 4 lignes :
     | compte | debit | credit | tiers          | lettrage |
-    | 5112   | 50.00 | 0.00   | Pierre Dupont  | NULL     |
+    | 411    | 50.00 | 0.00   | Pierre Dupont  | XXX      |
     | 706    | 0.00  | 50.00  | NULL           | NULL     |
-  Et T1 est équilibrée (∑ debit = ∑ credit = 50.00)
+    | 5112   | 50.00 | 0.00   | NULL           | NULL     |
+    | 411    | 0.00  | 50.00  | Pierre Dupont  | XXX      |
+  Et T1 est équilibrée (∑ debit = ∑ credit = 100.00)
+  Et les deux lignes 411 sont lettrées (code XXX, ∑ debit - credit = 0)
+  Et le solde ouvert 411 pour Pierre Dupont est 0.00 (créance immédiatement soldée par l'encaissement comptant)
+  Et la ligne 5112 D 50.00 est non lettrée (sera lettrée à la remise bancaire)
 
-Scénario: Dépôt remise — 3 chèques splittés par tiers + auto-lettrage
-  Étant donné 3 transactions de recettes comptant chèque :
+Scénario: Recette comptant chèque ventilée 60/40 sur 2 sous-catégories (multi-ventilation, école 411 systématique)
+  Étant donné un tiers "Pierre Dupont"
+  Et les comptes "706A Cotisation adulte" et "706B Cotisation enfant"
+  Quand je saisis une recette de 100€ par chèque de Pierre Dupont le 15/09/2025 ventilée :
+    | compte cible | montant |
+    | 706A         | 60.00   |
+    | 706B         | 40.00   |
+  Alors une transaction T1 est créée le 15/09/2025
+  Et T1 contient 5 lignes :
+    | compte | debit  | credit | tiers          | lettrage |
+    | 411    | 100.00 | 0.00   | Pierre Dupont  | XXX      |
+    | 706A   | 0.00   | 60.00  | NULL           | NULL     |
+    | 706B   | 0.00   | 40.00  | NULL           | NULL     |
+    | 5112   | 100.00 | 0.00   | NULL           | NULL     |
+    | 411    | 0.00   | 100.00 | Pierre Dupont  | XXX      |
+  Et T1 est équilibrée (∑ debit = ∑ credit = 200.00)
+  Et les deux lignes 411 sont lettrées (code XXX)
+  Et le solde ouvert 411 pour Pierre Dupont est 0.00
+  Et la ligne 5112 D 100.00 est non lettrée
+
+Scénario: Dépôt remise — 3 chèques + auto-lettrage par paire (sans tiers sur 5112, amendée 2026-05-22)
+  Étant donné 3 transactions de recettes comptant chèque (générées en école 411 systématique) :
     | tiers          | montant | date       |
     | Pierre Dupont  | 50      | 15/09/2025 |
     | Paul Martin    | 30      | 16/09/2025 |
     | Jeanne Bernard | 20      | 17/09/2025 |
-  Et chaque transaction a une ligne 5112 +X non lettrée
+  Et chaque transaction contient une ligne 5112 D non lettrée (sans tiers, cf. §4.2 invariant 5)
   Quand je crée une remise bancaire le 20/09/2025 incluant ces 3 chèques sur le compte 512BNP
   Alors une transaction T4 est créée le 20/09/2025 avec 4 lignes :
-    | compte | debit  | credit | tiers          | lettrage_code |
-    | 512BNP | 100.00 | 0.00   | NULL           | NULL          |
-    | 5112   | 0.00   | 50.00  | Pierre Dupont  | AAA           |
-    | 5112   | 0.00   | 30.00  | Paul Martin    | AAB           |
-    | 5112   | 0.00   | 20.00  | Jeanne Bernard | AAC           |
-  Et les 3 lignes 5112 entrantes des recettes initiales reçoivent les codes AAA, AAB, AAC respectivement
-  Et le solde ouvert 5112 pour chacun des 3 tiers est de 0.00
-  Et la ligne 512 BNP n'est pas lettrée
+    | compte | debit  | credit | tiers | lettrage_code |
+    | 512BNP | 100.00 | 0.00   | NULL  | NULL          |
+    | 5112   | 0.00   | 50.00  | NULL  | AAA           |
+    | 5112   | 0.00   | 30.00  | NULL  | AAB           |
+    | 5112   | 0.00   | 20.00  | NULL  | AAC           |
+  Et les 3 lignes 5112 D des recettes initiales reçoivent les codes AAA, AAB, AAC respectivement (lettrage par paire ligne source ↔ ligne remise)
+  Et le solde ouvert 5112 = 0.00 (tous les chèques lettrés à leur dépôt correspondant)
+  Et la ligne 512 BNP n'est pas lettrée (sera pointée au rapprochement bancaire)
   Et la remise n°N existe dans la table `remises_bancaires` avec compte_cible = 512BNP
 
 Scénario: Recette à crédit puis encaissement — passage par 411

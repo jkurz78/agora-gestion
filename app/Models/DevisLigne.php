@@ -13,10 +13,6 @@ final class DevisLigne extends Model
 {
     use HasFactory;
 
-    /**
-     * DevisLigne n'a pas de timestamps — c'est une ligne de document,
-     * pas une entité autonome.
-     */
     public $timestamps = false;
 
     protected $fillable = [
@@ -27,7 +23,7 @@ final class DevisLigne extends Model
         'prix_unitaire',
         'quantite',
         'montant',
-        'sous_categorie_id',
+        'compte_id',
     ];
 
     protected function casts(): array
@@ -39,7 +35,7 @@ final class DevisLigne extends Model
             'prix_unitaire' => 'decimal:2',
             'quantite' => 'decimal:3',
             'montant' => 'decimal:2',
-            'sous_categorie_id' => 'integer',
+            'compte_id' => 'integer',
         ];
     }
 
@@ -48,8 +44,8 @@ final class DevisLigne extends Model
         return $this->belongsTo(Devis::class);
     }
 
-    public function sousCategorie(): BelongsTo
+    public function compte(): BelongsTo
     {
-        return $this->belongsTo(SousCategorie::class);
+        return $this->belongsTo(Compte::class, 'compte_id');
     }
 }

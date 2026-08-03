@@ -5,9 +5,9 @@ declare(strict_types=1);
 use App\Enums\StatutFacture;
 use App\Enums\TypeLigneFacture;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\Facture;
 use App\Models\FactureLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\User;
 use App\Services\FactureService;
@@ -26,7 +26,7 @@ beforeEach(function () {
     TenantContext::boot($this->association);
     $this->actingAs($this->user);
     $this->tiers = Tiers::factory()->create();
-    $this->sousCategorie = SousCategorie::factory()->create();
+    $this->compte = Compte::factory()->numero('706A')->create();
     $this->service = app(FactureService::class);
     $this->facture = $this->service->creerManuelleVierge($this->tiers->id);
 });
@@ -39,12 +39,12 @@ afterEach(function () {
 
 describe('ajouterLigneManuelle()', function () {
 
-    it('happy path — crée une ligne MontantManuel avec les bons attributs (PU=800, qty=3, sous_cat fournie)', function () {
+    it('happy path — crée une ligne MontantManuel avec les bons attributs (PU=800, qty=3, compte fourni)', function () {
         $ligne = $this->service->ajouterLigneManuelle($this->facture, [
             'libelle' => 'Mission audit',
             'prix_unitaire' => 800,
             'quantite' => 3,
-            'sous_categorie_id' => $this->sousCategorie->id,
+            'compte_id' => $this->compte->id,
         ]);
 
         expect($ligne)->toBeInstanceOf(FactureLigne::class)
@@ -53,10 +53,47 @@ describe('ajouterLigneManuelle()', function () {
             ->and((float) $ligne->montant)->toBe(2400.0)
             ->and($ligne->ordre)->toBe(1)
             ->and($ligne->transaction_ligne_id)->toBeNull()
-            ->and((int) $ligne->sous_categorie_id)->toBe((int) $this->sousCategorie->id);
+            ->and((int) $ligne->compte_id)->toBe((int) $this->compte->id);
 
         $this->facture->refresh();
         expect((float) $this->facture->montant_total)->toBe(2400.0);
+    });
+
+    it('refuse les comptes externes, supprimés ou hors classe 7 avant toute écriture', function () {
+        $compteClasse6 = Compte::factory()->numero('606')->create();
+        $compteSupprime = Compte::factory()->numero('707')->create();
+        $compteSupprime->delete();
+
+        $autreAssociation = Association::factory()->create();
+        TenantContext::boot($autreAssociation);
+        $compteExterne = Compte::factory()->numero('708')->create();
+        TenantContext::boot($this->association);
+
+        foreach ([$compteClasse6, $compteSupprime, $compteExterne] as $compteInvalide) {
+            expect(fn () => $this->service->ajouterLigneManuelle($this->facture, [
+                'libelle' => 'Ligne invalide',
+                'prix_unitaire' => 100,
+                'quantite' => 1,
+                'compte_id' => $compteInvalide->id,
+            ]))->toThrow(RuntimeException::class, 'compte actif de classe 7');
+        }
+
+        expect(FactureLigne::where('facture_id', $this->facture->id)->count())->toBe(0);
+    });
+
+    it('valide aussi le compte lors de la modification d une ligne manuelle', function () {
+        $ligne = $this->service->ajouterLigneManuelle($this->facture, [
+            'libelle' => 'Ligne valide',
+            'prix_unitaire' => 100,
+            'quantite' => 1,
+            'compte_id' => $this->compte->id,
+        ]);
+        $compteClasse6 = Compte::factory()->numero('606')->create();
+
+        expect(fn () => $this->service->majCompteLigne($this->facture, $ligne->id, $compteClasse6->id))
+            ->toThrow(RuntimeException::class, 'compte actif de classe 7');
+
+        expect((int) $ligne->fresh()->compte_id)->toBe((int) $this->compte->id);
     });
 
     it('happy path partiel — sans operation_id ni seance, ces champs sont null', function () {
@@ -186,7 +223,7 @@ describe('ajouterLigneTexteManuelle()', function () {
             ->and($ligne->montant)->toBeNull()
             ->and($ligne->prix_unitaire)->toBeNull()
             ->and($ligne->quantite)->toBeNull()
-            ->and($ligne->sous_categorie_id)->toBeNull()
+            ->and($ligne->compte_id)->toBeNull()
             ->and($ligne->operation_id)->toBeNull()
             ->and($ligne->seance)->toBeNull()
             ->and($ligne->transaction_ligne_id)->toBeNull()

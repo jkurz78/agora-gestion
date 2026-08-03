@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
-use App\Enums\UsageComptable;
 use App\Models\Association;
-use App\Models\SousCategorie;
+use App\Models\Compte;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -16,8 +15,7 @@ use App\Tenant\TenantContext;
 
 it('groupe les dons par année civile, ordre desc', function (): void {
     $tiers = Tiers::factory()->create();
-    $sousCat = SousCategorie::factory()->create();
-    $sousCat->usages()->create(['usage' => UsageComptable::Don->value]);
+    $compte = Compte::factory()->pourDons()->create();
 
     // Don 2024 : 100€
     $tx2024 = Transaction::factory()->create([
@@ -28,7 +26,8 @@ it('groupe les dons par année civile, ordre desc', function (): void {
     ]);
     TransactionLigne::factory()->create([
         'transaction_id' => $tx2024->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compte->id,
+        'credit' => 100,
         'montant' => 100,
     ]);
 
@@ -41,7 +40,8 @@ it('groupe les dons par année civile, ordre desc', function (): void {
     ]);
     TransactionLigne::factory()->create([
         'transaction_id' => $tx2025a->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compte->id,
+        'credit' => 50,
         'montant' => 50,
     ]);
 
@@ -53,7 +53,8 @@ it('groupe les dons par année civile, ordre desc', function (): void {
     ]);
     TransactionLigne::factory()->create([
         'transaction_id' => $tx2025b->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compte->id,
+        'credit' => 30,
         'montant' => 30,
     ]);
 
@@ -72,8 +73,7 @@ it('groupe les dons par année civile, ordre desc', function (): void {
 
 it('filtre les dons par année civile', function (): void {
     $tiers = Tiers::factory()->create();
-    $sousCat = SousCategorie::factory()->create();
-    $sousCat->usages()->create(['usage' => UsageComptable::Don->value]);
+    $compte = Compte::factory()->pourDons()->create();
 
     $tx2024 = Transaction::factory()->create([
         'tiers_id' => $tiers->id,
@@ -83,7 +83,8 @@ it('filtre les dons par année civile', function (): void {
     ]);
     TransactionLigne::factory()->create([
         'transaction_id' => $tx2024->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compte->id,
+        'credit' => 100,
         'montant' => 100,
     ]);
 
@@ -95,7 +96,8 @@ it('filtre les dons par année civile', function (): void {
     ]);
     TransactionLigne::factory()->create([
         'transaction_id' => $tx2025->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compte->id,
+        'credit' => 50,
         'montant' => 50,
     ]);
 
@@ -107,8 +109,7 @@ it('filtre les dons par année civile', function (): void {
 
 it('détecte l\'alerte helloasso sur un don importé', function (): void {
     $tiers = Tiers::factory()->create();
-    $sousCat = SousCategorie::factory()->create();
-    $sousCat->usages()->create(['usage' => UsageComptable::Don->value]);
+    $compte = Compte::factory()->pourDons()->create();
 
     $tx = Transaction::factory()->create([
         'tiers_id' => $tiers->id,
@@ -119,7 +120,8 @@ it('détecte l\'alerte helloasso sur un don importé', function (): void {
     ]);
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compte->id,
+        'credit' => 50,
         'montant' => 50,
     ]);
 
@@ -145,8 +147,7 @@ it('bloque le téléchargement si l\'adresse du tiers est incomplète', function
         'code_postal' => '69000',
         'ville' => 'Lyon',
     ]);
-    $sousCat = SousCategorie::factory()->create();
-    $sousCat->usages()->create(['usage' => UsageComptable::Don->value]);
+    $compte = Compte::factory()->pourDons()->create();
 
     $tx = Transaction::factory()->create([
         'tiers_id' => $tiers->id,
@@ -156,7 +157,8 @@ it('bloque le téléchargement si l\'adresse du tiers est incomplète', function
     ]);
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compte->id,
+        'credit' => 50,
         'montant' => 50,
     ]);
 
@@ -186,8 +188,7 @@ it('expose un raisonBlocageGlobal si signataire de l\'asso est absent', function
 
 it('ne remonte pas les dons d\'un tiers d\'une autre association', function (): void {
     $tiers = Tiers::factory()->create();
-    $sousCat = SousCategorie::factory()->create();
-    $sousCat->usages()->create(['usage' => UsageComptable::Don->value]);
+    $compte = Compte::factory()->pourDons()->create();
 
     $tx = Transaction::factory()->create([
         'tiers_id' => $tiers->id,
@@ -197,7 +198,8 @@ it('ne remonte pas les dons d\'un tiers d\'une autre association', function (): 
     ]);
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compte->id,
+        'credit' => 50,
         'montant' => 50,
     ]);
 

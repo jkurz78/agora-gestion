@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
-use App\Enums\UsageComptable;
 use App\Models\Adhesion;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\RecuFiscalEmis;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -75,8 +74,7 @@ function makeFakePdfRecu(Association $asso, Tiers $tiers, TransactionLigne $lign
 
 function makeAdhesionAvecRecu(Association $asso, Tiers $tiers): array
 {
-    $sousCat = SousCategorie::factory()->create(['association_id' => $asso->id]);
-    $sousCat->usages()->create(['usage' => UsageComptable::Cotisation->value]);
+    $compte = Compte::factory()->pourCotisations()->create(['association_id' => $asso->id]);
 
     $tx = Transaction::factory()->create([
         'association_id' => $asso->id,
@@ -90,7 +88,8 @@ function makeAdhesionAvecRecu(Association $asso, Tiers $tiers): array
     $tx->lignes()->delete();
     $ligne = TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compte->id,
+        'credit' => 60.0,
         'montant' => 60.0,
     ]);
 
@@ -109,8 +108,7 @@ function makeAdhesionAvecRecu(Association $asso, Tiers $tiers): array
 
 function makeDonLigneAvecRecu(Association $asso, Tiers $tiers): array
 {
-    $sousCat = SousCategorie::factory()->create(['association_id' => $asso->id]);
-    $sousCat->usages()->create(['usage' => UsageComptable::Don->value]);
+    $compte = Compte::factory()->pourDons()->create(['association_id' => $asso->id]);
 
     $tx = Transaction::factory()->create([
         'association_id' => $asso->id,
@@ -122,7 +120,8 @@ function makeDonLigneAvecRecu(Association $asso, Tiers $tiers): array
 
     $ligne = TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compte->id,
+        'credit' => 100.0,
         'montant' => 100.0,
     ]);
 
@@ -262,9 +261,9 @@ it('[intrusion] Alice 403 GET recus.fiscal avec la ligne de Bob', function () {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Test 7 : Cross-tenant don fiscal — ligne asso B invisible depuis asso A → 403
+// Test 7 : Cross-tenant don fiscal — ligne asso B invisible depuis asso A → 404
 // ─────────────────────────────────────────────────────────────────────────────
-it('[intrusion] cross-tenant don fiscal — ligne asso B retourne 403 depuis asso A', function () {
+it('[intrusion] cross-tenant don fiscal — ligne asso B retourne 404 depuis asso A', function () {
     $assoA = makeAssoEligibleCtrl();
     $assoB = makeAssoEligibleCtrl();
 
@@ -278,8 +277,10 @@ it('[intrusion] cross-tenant don fiscal — ligne asso B retourne 403 depuis ass
     session(['portail.last_activity_at' => now()->timestamp]);
 
     $url = route('portail.recus.fiscal', ['association' => $assoA->slug, 'ligne' => $ligneB->id]);
-    // TiersDonsTimelineService ne retourne pas ligneB pour alice/assoA → 403
-    $this->get($url)->assertForbidden();
+    // Scope tenant de TransactionLigne (audit #8) : ligneB est hors tenant A,
+    // donc invisible → résolution de modèle échoue → 404 (blocage plus fort que
+    // le 403 applicatif, la ressource « n'existe pas » pour A).
+    $this->get($url)->assertNotFound();
 });
 
 // Note: Les tests mono (portail.mono.recus.*) sont dans MonoMesAdhesionsEtDonsTest.php

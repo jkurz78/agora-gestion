@@ -5,12 +5,11 @@ declare(strict_types=1);
 use App\Enums\TypeTransaction;
 use App\Livewire\OperationCommunication;
 use App\Models\Association;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\EncadrementPrevision;
 use App\Models\Operation;
 use App\Models\Seance;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -28,8 +27,7 @@ beforeEach(function (): void {
 
     $this->operation = Operation::factory()->create();
     $this->seance = Seance::create(['operation_id' => $this->operation->id, 'numero' => 1, 'date' => now()]);
-    $this->categorie = Categorie::factory()->depense()->create();
-    $this->sc = SousCategorie::factory()->create(['categorie_id' => $this->categorie->id]);
+    $this->compteDepense = Compte::factory()->depense()->create();
 });
 
 it('inclut les encadrants prévisionnels (sans transaction) dans la liste', function (): void {
@@ -38,7 +36,7 @@ it('inclut les encadrants prévisionnels (sans transaction) dans la liste', func
     EncadrementPrevision::create([
         'operation_id' => $this->operation->id,
         'tiers_id' => $tiers->id,
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->compteDepense->id,
         'seance_id' => $this->seance->id,
         'montant_prevu' => 0,
     ]);
@@ -55,7 +53,7 @@ it('dédoublonne un encadrant présent à la fois en prévision et en réalisé'
     EncadrementPrevision::create([
         'operation_id' => $this->operation->id,
         'tiers_id' => $tiers->id,
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->compteDepense->id,
         'seance_id' => $this->seance->id,
         'montant_prevu' => 100,
     ]);
@@ -68,10 +66,12 @@ it('dédoublonne un encadrant présent à la fois en prévision et en réalisé'
     ]);
     TransactionLigne::create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $this->sc->id,
+        'compte_id' => $this->compteDepense->id,
         'operation_id' => $this->operation->id,
         'seance' => 1,
         'montant' => 80,
+        'debit' => 80,
+        'credit' => 0,
     ]);
 
     $comp = Livewire::test(OperationCommunication::class, ['operation' => $this->operation]);

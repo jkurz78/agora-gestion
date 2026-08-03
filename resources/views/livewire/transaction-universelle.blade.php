@@ -33,7 +33,7 @@
     @if($pageTitle)
         {{-- Ligne unique : toggles (gauche) + import & nouveau (droite) --}}
         <div class="mb-3 d-flex align-items-center gap-2 flex-wrap">
-            @if(!$sousCategorieFilter && count($availableTypes) > 1)
+            @if(!$usageFilter && count($availableTypes) > 1)
                 <button type="button" wire:click="$set('filterTypes', [])"
                         class="btn btn-sm {{ empty($filterTypes) ? 'btn-secondary' : 'btn-outline-secondary' }}">
                     Toutes
@@ -66,9 +66,9 @@
                     <livewire:import-csv type="recette" />
                 @endif
                 @if (! $exerciceCloture)
-                    @if($sousCategorieFilter)
+                    @if($usageFilter)
                         @php
-                            $filterLabel = match($sousCategorieFilter) {
+                            $filterLabel = match($usageFilter) {
                                 'pour_dons'          => 'Nouveau don',
                                 'pour_cotisations'   => 'Nouvelle cotisation',
                                 'pour_inscriptions'  => 'Nouvelle inscription',
@@ -76,7 +76,7 @@
                             };
                         @endphp
                         <button type="button"
-                                @click="$dispatch('open-transaction-form', { id: null, type: 'recette', sousCategorieFilter: '{{ $sousCategorieFilter }}' })"
+                                @click="$dispatch('open-transaction-form', { id: null, type: 'recette', usageFilter: '{{ $usageFilter }}' })"
                                 class="btn btn-sm btn-primary">
                             <i class="bi bi-plus-lg"></i> {{ $filterLabel }}
                         </button>
@@ -122,7 +122,7 @@
         {{-- Layout standard : ligne 1 = Nouveau ; ligne 2 = toggles --}}
         @if (! $exerciceCloture)
         <div class="mb-3 d-flex align-items-center gap-2 flex-wrap">
-            @if(!$sousCategorieFilter && count($availableTypes) > 1)
+            @if(!$usageFilter && count($availableTypes) > 1)
                 <button type="button" wire:click="$set('filterTypes', [])"
                         class="btn btn-sm {{ empty($filterTypes) ? 'btn-secondary' : 'btn-outline-secondary' }}">
                     Toutes
@@ -151,9 +151,9 @@
             </div>
 
             <div class="ms-auto">
-                @if($sousCategorieFilter)
+                @if($usageFilter)
                     @php
-                        $filterLabel = match($sousCategorieFilter) {
+                        $filterLabel = match($usageFilter) {
                             'pour_dons'          => 'Nouveau don',
                             'pour_cotisations'   => 'Nouvelle cotisation',
                             'pour_inscriptions'  => 'Nouvelle inscription',
@@ -161,7 +161,7 @@
                         };
                     @endphp
                     <button type="button"
-                            @click="$dispatch('open-transaction-form', { id: null, type: 'recette', sousCategorieFilter: '{{ $sousCategorieFilter }}' })"
+                            @click="$dispatch('open-transaction-form', { id: null, type: 'recette', usageFilter: '{{ $usageFilter }}' })"
                             class="btn btn-sm btn-primary">
                         <i class="bi bi-plus-lg"></i> {{ $filterLabel }}
                     </button>
@@ -280,7 +280,7 @@
                     </th>
 
                     {{-- Type header (only if multi) --}}
-                    @if(count($availableTypes) > 1 && !$sousCategorieFilter)
+                    @if(count($availableTypes) > 1 && !$usageFilter)
                     <th>Type</th>
                     @endif
 
@@ -394,8 +394,8 @@
                         @endif
                     </th>
 
-                    {{-- Catégorie --}}
-                    <th>Catégorie</th>
+                    {{-- Compte --}}
+                    <th>Compte</th>
 
                     {{-- Mode paiement --}}
                     <th style="position:relative">
@@ -443,8 +443,9 @@
                                      style="z-index:200;min-width:140px;top:1.2rem;right:0">
                                     <select wire:model.live="filterStatut" class="form-select form-select-sm">
                                         <option value="">Tous</option>
-                                        <option value="en_attente">En attente / À payer</option>
-                                        <option value="recu">Reçu / Payé</option>
+                                        <option value="en_attente">Dû</option>
+                                        <option value="en_main">À remettre</option>
+                                        <option value="recu">Remis / Réglé</option>
                                         <option value="pointe">Pointé</option>
                                     </select>
                                 </div>
@@ -453,8 +454,9 @@
                         @if($filterStatut !== '')
                             @php
                                 $filterStatutLabel = match($filterStatut) {
-                                    'en_attente' => 'En attente',
-                                    'recu'       => 'Reçu / Payé',
+                                    'en_attente' => 'Dû',
+                                    'en_main'    => 'À remettre',
+                                    'recu'       => 'Remis / Réglé',
                                     'pointe'     => 'Pointé',
                                     default      => $filterStatut,
                                 };
@@ -484,15 +486,17 @@
                     $key = $tx->source_type . ':' . $tx->id;
                     $isExpanded = isset($expandedDetails[$key]);
                     $detail = $expandedDetails[$key] ?? null;
-                    [$badgeClass, $badgeLabel] = match($tx->source_type) {
+                    [$badgeClass, $badgeLabel] = match($tx->sens_tresorerie ?? $tx->source_type) {
                         'depense'              => ['danger',    'DÉP'],
                         'recette'              => ['success',   'REC'],
+                        'virement',
                         'virement_sortant',
                         'virement_entrant'     => ['warning',   'VIR'],
                         default                => ['secondary', '?'],
                     };
                     $isLocked = (bool) $tx->pointe;
                     $statutReglement = $tx->statut_reglement ?? null; // null for virements
+                    $isReportAN = $tx->source_type === 'report_an';
                 @endphp
                 @php
                     // Indicateurs Slice 1 — extourne. extournee_at non null = origine
@@ -508,7 +512,7 @@
                     </td>
                     <td class="small text-muted text-nowrap">{{ $tx->numero_piece ?? '—' }}</td>
                     <td class="small text-nowrap">{{ \Carbon\Carbon::parse($tx->date)->format('d/m') }}</td>
-                    @if(count($availableTypes) > 1 && !$sousCategorieFilter)
+                    @if(count($availableTypes) > 1 && !$usageFilter)
                         <td>
                             <span class="badge text-bg-{{ $badgeClass }}" style="font-size:.65rem">{{ $badgeLabel }}</span>
                         </td>
@@ -546,6 +550,9 @@
                         @else
                             {{ $tx->libelle ?? '—' }}
                         @endif
+                        @if($isReportAN)
+                            <span class="badge text-bg-secondary ms-1" style="font-size:.6rem">Report AN</span>
+                        @endif
                         @if($isExtourneOrigine)
                             <span class="badge text-bg-warning ms-1" style="font-size:.6rem"
                                   title="Cette transaction a été annulée — voir la transaction d'extourne">
@@ -570,19 +577,22 @@
                         @if((int)$tx->nb_lignes > 1)
                             <i class="bi bi-diagram-2 text-secondary me-1" title="{{ $tx->nb_lignes }} lignes"></i>
                         @endif
-                        {{ $tx->categorie_label ?? '' }}
+                        {{ $tx->compte_ventilation_nom ?? '' }}
                     </td>
                     <td class="small text-muted">{{ $tx->mode_paiement ?? '—' }}</td>
                     <td class="text-end fw-semibold small text-nowrap {{ (float)$tx->montant >= 0 ? 'text-success' : 'text-danger' }}">
                         {{ number_format(abs((float)$tx->montant), 2, ',', ' ') }} €
                     </td>
                     <td>
-                        @if($statutReglement !== null)
+                        @if($isExtourneOrigine || ($isExtourneMiroir && $statutReglement === 'pointe'))
+                            {{-- TX annulée ou miroir extourne terminal (pointé) : pas de badge statut --}}
+                        @elseif($statutReglement !== null)
                             @php
-                                $isDepense = $tx->source_type === 'depense';
+                                $isDepense = ($tx->sens_tresorerie ?? $tx->source_type) === 'depense';
                                 [$sBadge, $sLabel] = match($statutReglement) {
-                                    'en_attente' => ['warning text-dark', $isDepense ? 'À payer'     : 'En attente'],
-                                    'recu'       => ['success',           $isDepense ? 'Payé'         : 'Reçu'],
+                                    'en_attente' => ['warning text-dark', 'Dû'],
+                                    'en_main'    => ['warning text-dark', 'À remettre'],
+                                    'recu'       => ['success',           $isDepense ? 'Réglé'        : 'Remis'],
                                     'pointe'     => ['secondary',         'Pointé'],
                                     default      => ['light text-muted',  $statutReglement],
                                 };
@@ -600,24 +610,26 @@
                     @endif
                     <td>
                         <div class="d-flex gap-1 align-items-center" @click.stop>
-                            <button type="button"
-                                    wire:click="openEdit('{{ e($tx->source_type) }}', {{ $tx->id }})"
-                                    class="btn btn-sm btn-outline-primary"
-                                    style="padding:.15rem .3rem;font-size:.7rem"
-                                    title="{{ $exerciceCloture ? 'Visualiser' : 'Modifier' }}">
-                                <i class="bi bi-{{ $exerciceCloture ? 'eye' : 'pencil' }}"></i>
-                            </button>
+                            @if(! $isReportAN)
+                                <button type="button"
+                                        wire:click="openEdit('{{ e($tx->source_type) }}', {{ $tx->id }})"
+                                        class="btn btn-sm btn-outline-primary"
+                                        style="padding:.15rem .3rem;font-size:.7rem"
+                                        title="{{ $isExtourneMiroir || $exerciceCloture ? 'Visualiser' : 'Modifier' }}">
+                                    <i class="bi bi-{{ $isExtourneMiroir || $exerciceCloture ? 'eye' : 'pencil' }}"></i>
+                                </button>
+                            @endif
                             @php
                                 // Mutex poubelle/annuler — Slice 1 amendement :
                                 //   - Tx supprimable « safely » : EnAttente sans aucun attachement banque/règlement/remise/facture
                                 //   - Sinon : annulation comptable (extourne) si éligible
                                 $hasAttachement = $tx->remise_id || $tx->reglement_id || $tx->rapprochement_id || ! empty($tx->is_locked_by_facture);
-                                $estSupprimableSafely = ! $exerciceCloture
+                                $estSupprimableSafely = ! $isReportAN && ! $exerciceCloture
                                     && ($statutReglement === 'en_attente' || $tx->source_type === 'virement_sortant' || $tx->source_type === 'virement_entrant')
                                     && ! $hasAttachement
                                     && empty($tx->extournee_at)
                                     && empty($tx->is_extourne_miroir);
-                                $isExtournableUI = ! $exerciceCloture
+                                $isExtournableUI = ! $isReportAN && ! $exerciceCloture
                                     && in_array($tx->source_type, ['recette', 'depense'], true)
                                     && ! $tx->is_helloasso
                                     && empty($tx->extournee_at)
@@ -635,16 +647,19 @@
                                 </button>
                             @endif
                             {{-- Bouton Marquer reçu / payé (en_attente non verrouillé) --}}
-                            @if(! $exerciceCloture && $statutReglement === 'en_attente' && in_array($tx->source_type, ['recette', 'depense'], true))
+                            @if(! $exerciceCloture && $statutReglement === 'en_attente' && in_array($tx->source_type, ['recette', 'depense', 'report_an'], true))
+                                @php
+                                    $sensTreso = $tx->sens_tresorerie ?? $tx->source_type;
+                                @endphp
                                 <button type="button"
-                                        wire:click="marquerRecu({{ $tx->id }})"
+                                        wire:click="marquerRecu({{ $tx->id }}, '{{ e($tx->source_type) }}', {{ $tx->poste_tiers_ligne_id ?? 'null' }})"
                                         class="btn btn-sm btn-outline-success"
-                                        style="padding:.15rem .3rem;font-size:.7rem"
-                                        title="{{ $tx->source_type === 'depense' ? 'Marquer comme payé' : 'Marquer comme reçu' }}">
+                                        style="padding:.15rem .3rem;font-size:.7rem;white-space:nowrap"
+                                        title="{{ $sensTreso === 'depense' ? 'Marquer comme payé' : ($tx->mode_paiement === null ? 'Enregistrer l\'encaissement (choisir le mode)' : 'Marquer comme reçu') }}">
                                     <i class="bi bi-check-lg"></i>
                                 </button>
                             @endif
-                            @if (! $exerciceCloture)
+                            @if (! $isReportAN && ! $exerciceCloture)
                             @if($estSupprimableSafely || $tx->is_helloasso)
                                 <button type="button"
                                         wire:click="deleteRow('{{ e($tx->source_type) }}', {{ $tx->id }})"
@@ -672,13 +687,13 @@
                 {{-- Expansion row --}}
                 @if($isExpanded && $detail)
                     <tr style="background:#f8f9fa">
-                        <td colspan="{{ 10 + (count($availableTypes) > 1 && !$sousCategorieFilter ? 1 : 0) + ($showTiersCol ? 1 : 0) + ($showCompteCol ? 1 : 0) + ($showSolde ? 1 : 0) }}"
+                        <td colspan="{{ 10 + (count($availableTypes) > 1 && !$usageFilter ? 1 : 0) + ($showTiersCol ? 1 : 0) + ($showCompteCol ? 1 : 0) + ($showSolde ? 1 : 0) }}"
                             style="padding:0;border-top:none">
                             @if(!empty($detail['lignes']))
                                 <table class="table table-sm align-middle mb-0" style="margin-left:1.5rem;width:calc(100% - 1.5rem);--bs-table-bg:#f8f9fa;font-size:.78rem;--bs-table-cell-padding-y:.2rem">
                                     <thead style="background:#8fa8c4;color:#fff;--bs-table-bg:#8fa8c4;--bs-table-border-color:#9fb5cc">
                                         <tr>
-                                            <th>Sous-catégorie</th>
+                                            <th>Compte</th>
                                             <th>Opération</th>
                                             <th class="text-center">Séance</th>
                                             <th class="text-end">Montant</th>
@@ -688,7 +703,7 @@
                                     <tbody>
                                         @foreach($detail['lignes'] as $ligne)
                                             <tr>
-                                                <td>{{ $ligne['sous_categorie'] ?? '—' }}</td>
+                                                <td>{{ $ligne['compte'] ?? '—' }}</td>
                                                 <td class="text-muted">
                                                     @if($ligne['operation_id'] ?? null)
                                                         <a href="{{ route('operations.show', $ligne['operation_id']) }}" class="text-decoration-none" @click.stop>{{ $ligne['operation'] }}</a>
@@ -727,7 +742,7 @@
                 @endif
             @empty
                 <tr>
-                    <td colspan="{{ 9 + (count($availableTypes) > 1 && !$sousCategorieFilter ? 1 : 0) + ($showTiersCol ? 1 : 0) + ($showCompteCol ? 1 : 0) + ($showSolde ? 1 : 0) }}"
+                    <td colspan="{{ 9 + (count($availableTypes) > 1 && !$usageFilter ? 1 : 0) + ($showTiersCol ? 1 : 0) + ($showCompteCol ? 1 : 0) + ($showSolde ? 1 : 0) }}"
                         class="text-center text-muted py-4">
                         Aucune transaction trouvée.
                     </td>
@@ -745,4 +760,6 @@
 
     {{-- Modale d'annulation de transaction (Slice 1 — extourne) --}}
     <livewire:extournes.annuler-transaction-modal />
+
+    <livewire:compta.poste-tiers-reglement-modal />
 </div>

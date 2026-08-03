@@ -3,12 +3,10 @@
 declare(strict_types=1);
 
 use App\Enums\RoleAssociation;
-use App\Enums\TypeCategorie;
 use App\Livewire\BackOffice\NoteDeFrais\Show;
 use App\Models\Association;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\NoteDeFrais;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\User;
 use App\Tenant\TenantContext;
@@ -35,24 +33,20 @@ function abandonBandeauBootTenant(Association $association): void
     session(['current_association_id' => $association->id]);
 }
 
-// ── 1. NDF avec abandon_creance_propose + sous-cat désignée ──────────────────
+// ── 1. NDF avec abandon_creance_propose + compte désigné ─────────────────────
 
-it('affiche bandeau alert-info avec nom de sous-cat si sous-cat désignée', function (): void {
+it('affiche bandeau alert-info avec le compte si compte désigné', function (): void {
     $association = Association::factory()->create();
     abandonBandeauBootTenant($association);
 
     $admin = abandonBandeauMakeAdmin($association);
     $tiers = Tiers::factory()->create(['association_id' => $association->id]);
 
-    $catRecette = Categorie::factory()->create([
+    // DC-10a : compte-first — l'écran affiche désormais le compte désigné
+    // (numero — intitulé) via la ventilation UsageComptable::AbandonCreance.
+    Compte::factory()->pourAbandonCreance()->numero('754')->create([
         'association_id' => $association->id,
-        'type' => TypeCategorie::Recette->value,
-    ]);
-    SousCategorie::factory()->pourAbandonCreance()->create([
-        'association_id' => $association->id,
-        'categorie_id' => $catRecette->id,
-        'nom' => 'Abandon créance test',
-        'code_cerfa' => '9876',
+        'intitule' => 'Abandon créance test',
     ]);
 
     $ndf = NoteDeFrais::factory()->soumise()->create([
@@ -65,16 +59,17 @@ it('affiche bandeau alert-info avec nom de sous-cat si sous-cat désignée', fun
 
     Livewire::test(Show::class, ['noteDeFrais' => $ndf])
         ->assertSee('Proposition de don par abandon de créance')
-        ->assertSee('Sous-catégorie désignée')
+        ->assertSee('Compte désigné')
+        ->assertSee('754')
         ->assertSee('Abandon créance test')
         ->assertDontSeeHtml('wire:click="openAbandonForm"')
         ->assertDontSeeHtml("Valider sans constater l'abandon")
         ->assertOk();
 });
 
-// ── 2. NDF avec abandon_creance_propose + PAS de sous-cat → warning + lien Usages
+// ── 2. NDF avec abandon_creance_propose + PAS de compte → warning + lien Usages
 
-it('affiche bandeau alert-info avec warning si pas de sous-cat désignée', function (): void {
+it('affiche bandeau alert-info avec warning si pas de compte désigné', function (): void {
     $association = Association::factory()->create();
     abandonBandeauBootTenant($association);
 
@@ -91,7 +86,7 @@ it('affiche bandeau alert-info avec warning si pas de sous-cat désignée', func
 
     Livewire::test(Show::class, ['noteDeFrais' => $ndf])
         ->assertSee('Proposition de don par abandon de créance')
-        ->assertSee('Aucune sous-catégorie')
+        ->assertSee('Aucun compte')
         ->assertSeeHtml(route('parametres.comptabilite.usages'))
         ->assertDontSeeHtml("Valider sans constater l'abandon")
         ->assertOk();

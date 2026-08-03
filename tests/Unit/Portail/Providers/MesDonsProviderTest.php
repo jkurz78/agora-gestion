@@ -3,8 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\TypeTransaction;
-use App\Enums\UsageComptable;
-use App\Models\SousCategorie;
+use App\Models\Compte;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -12,8 +11,7 @@ use App\Services\Portail\Providers\MesDonsProvider;
 
 it('returns DTO when tiers has at least 1 don', function (): void {
     $tiers = Tiers::factory()->create();
-    $sousCat = SousCategorie::factory()->create();
-    $sousCat->usages()->create(['usage' => UsageComptable::Don->value]);
+    $compte = Compte::factory()->pourDons()->create();
 
     $tx = Transaction::factory()->create([
         'tiers_id' => $tiers->id,
@@ -21,7 +19,9 @@ it('returns DTO when tiers has at least 1 don', function (): void {
     ]);
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compte->id,
+        'credit' => 50.0,
+        'montant' => 50.0,
     ]);
 
     $provider = new MesDonsProvider;
@@ -47,9 +47,9 @@ it('returns null when tiers has no don', function (): void {
     expect($dto)->toBeNull();
 });
 
-it('returns null when tiers has recette but not in a don sous-categorie', function (): void {
+it('returns null when tiers has recette but not on a don compte', function (): void {
     $tiers = Tiers::factory()->create();
-    $sousCat = SousCategorie::factory()->create(); // no Don usage
+    $compte = Compte::factory()->create(); // no Don usage
 
     $tx = Transaction::factory()->create([
         'tiers_id' => $tiers->id,
@@ -57,7 +57,9 @@ it('returns null when tiers has recette but not in a don sous-categorie', functi
     ]);
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $compte->id,
+        'credit' => 50.0,
+        'montant' => 50.0,
     ]);
 
     $provider = new MesDonsProvider;

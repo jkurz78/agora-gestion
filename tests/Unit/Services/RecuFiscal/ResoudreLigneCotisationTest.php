@@ -5,8 +5,8 @@ declare(strict_types=1);
 use App\Exceptions\RecuFiscalException;
 use App\Models\Adhesion;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\FormuleAdhesion;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -35,9 +35,9 @@ function invokeResoudre(RecuFiscalService $service, Adhesion $adhesion): Transac
 it('résout la ligne cotisation pour une formule HelloAsso via helloasso_tier_id', function () {
     $tierId = 42;
 
-    $sousCat = SousCategorie::factory()->pourCotisations()->create();
+    $sousCat = Compte::factory()->pourCotisations()->create();
     $formule = FormuleAdhesion::factory()->helloasso('mon-form', $tierId)->create([
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $sousCat->id,
     ]);
 
     $tiers = Tiers::factory()->create();
@@ -52,7 +52,9 @@ it('résout la ligne cotisation pour une formule HelloAsso via helloasso_tier_id
     $ligneAttendue = TransactionLigne::factory()->create([
         'transaction_id' => $transaction->id,
         'helloasso_tier_id' => $tierId,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $sousCat->id,
+        'debit' => 0.0,
+        'credit' => 50.0,
     ]);
     TransactionLigne::factory()->create([
         'transaction_id' => $transaction->id,
@@ -73,7 +75,7 @@ it('résout la ligne cotisation pour une formule HelloAsso via helloasso_tier_id
 });
 
 it('résout la ligne cotisation pour adhésion manuelle avec une seule ligne', function () {
-    $sousCat = SousCategorie::factory()->pourCotisations()->create();
+    $sousCat = Compte::factory()->pourCotisations()->create();
 
     $tiers = Tiers::factory()->create();
     $transaction = Transaction::factory()->create(['tiers_id' => $tiers->id]);
@@ -83,7 +85,9 @@ it('résout la ligne cotisation pour adhésion manuelle avec une seule ligne', f
 
     $ligne = TransactionLigne::factory()->create([
         'transaction_id' => $transaction->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $sousCat->id,
+        'debit' => 0.0,
+        'credit' => 50.0,
     ]);
 
     $adhesion = Adhesion::factory()->create([
@@ -99,12 +103,12 @@ it('résout la ligne cotisation pour adhésion manuelle avec une seule ligne', f
     expect($ligneResolue->id)->toBe($ligne->id);
 });
 
-it('résout la ligne cotisation en multi-lignes par sous_categorie_id de la formule', function () {
-    $sousCatCotisation = SousCategorie::factory()->pourCotisations()->create();
-    $sousCatAutre = SousCategorie::factory()->create();
+it('résout la ligne cotisation en multi-lignes par compte_id de la formule', function () {
+    $compteCotisation = Compte::factory()->pourCotisations()->create();
+    $compteAutre = Compte::factory()->create();
 
     $formule = FormuleAdhesion::factory()->create([
-        'sous_categorie_id' => $sousCatCotisation->id,
+        'compte_id' => $compteCotisation->id,
         'est_helloasso' => false,
     ]);
 
@@ -116,11 +120,15 @@ it('résout la ligne cotisation en multi-lignes par sous_categorie_id de la form
 
     $ligneAttendue = TransactionLigne::factory()->create([
         'transaction_id' => $transaction->id,
-        'sous_categorie_id' => $sousCatCotisation->id,
+        'compte_id' => $compteCotisation->id,
+        'debit' => 0.0,
+        'credit' => 50.00,
     ]);
     TransactionLigne::factory()->create([
         'transaction_id' => $transaction->id,
-        'sous_categorie_id' => $sousCatAutre->id,
+        'compte_id' => $compteAutre->id,
+        'debit' => 0.0,
+        'credit' => 30.00,
     ]);
 
     $adhesion = Adhesion::factory()->create([
@@ -151,9 +159,9 @@ it('résout la ligne parent (option_id IS NULL) dans une transaction avec lignes
     // Post-B1 : transaction HA avec 2 lignes (parent 0€ + option 12€)
     // resoudreLigneCotisation doit retourner la ligne parent (option_id IS NULL)
     $tierId = 42;
-    $sousCat = SousCategorie::factory()->pourCotisations()->create();
+    $sousCat = Compte::factory()->pourCotisations()->create();
     $formule = FormuleAdhesion::factory()->helloasso('mon-form', $tierId)->create([
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $sousCat->id,
     ]);
 
     $tiers = Tiers::factory()->create();
@@ -164,21 +172,25 @@ it('résout la ligne parent (option_id IS NULL) dans une transaction avec lignes
 
     TransactionLigne::where('transaction_id', $transaction->id)->delete();
 
-    // Ligne parent (cotisation 0€)
+    // Ligne parent (cotisation 0€ — credit symbolique pour XOR)
     $ligneParent = TransactionLigne::factory()->create([
         'transaction_id' => $transaction->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $sousCat->id,
         'montant' => 0.00,
+        'debit' => 0.0,
+        'credit' => 0.01,
         'helloasso_item_id' => 87070,
         'helloasso_option_id' => null,
         'helloasso_tier_id' => $tierId,
     ]);
 
-    // Ligne option (12€) — même sous-cat
+    // Ligne option (12€) — même compte
     TransactionLigne::factory()->create([
         'transaction_id' => $transaction->id,
-        'sous_categorie_id' => $sousCat->id,
+        'compte_id' => $sousCat->id,
         'montant' => 12.00,
+        'debit' => 0.0,
+        'credit' => 12.00,
         'helloasso_item_id' => 87070,
         'helloasso_option_id' => 18596,
         'helloasso_tier_id' => null,
@@ -199,26 +211,21 @@ it('résout la ligne parent (option_id IS NULL) dans une transaction avec lignes
 });
 
 it('throws générique si aucune ligne ne correspond (cas dégénéré multi-lignes sans formule)', function () {
-    $sousCat1 = SousCategorie::factory()->create();
-    $sousCat2 = SousCategorie::factory()->create();
-
     $tiers = Tiers::factory()->create();
     $transaction = Transaction::factory()->create(['tiers_id' => $tiers->id]);
 
     // Supprimer les lignes auto-créées
     TransactionLigne::where('transaction_id', $transaction->id)->delete();
 
-    // Créer 2 lignes sans correspondance possible (pas de formule)
+    // Créer 2 lignes sans correspondance possible (pas de formule, pas de compte_id)
     TransactionLigne::factory()->create([
         'transaction_id' => $transaction->id,
-        'sous_categorie_id' => $sousCat1->id,
     ]);
     TransactionLigne::factory()->create([
         'transaction_id' => $transaction->id,
-        'sous_categorie_id' => $sousCat2->id,
     ]);
 
-    // Adhésion sans formule : impossible de matcher par sous_categorie_id
+    // Adhésion sans formule : impossible de matcher par compte_id
     $adhesion = Adhesion::factory()->create([
         'transaction_id' => $transaction->id,
         'tiers_id' => $tiers->id,

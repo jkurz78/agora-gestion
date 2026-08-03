@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Enums\JournalComptable;
 use App\Enums\ModePaiement;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
@@ -26,7 +27,8 @@ class TransactionFactory extends Factory
     {
         return [
             'association_id' => TenantContext::currentId() ?? 1,
-            'type' => fake()->randomElement(TypeTransaction::cases()),
+            // v5 : jamais de Virement au hasard (matches exhaustifs PD) ; date exercice-aware (main)
+            'type' => fake()->randomElement([TypeTransaction::Recette, TypeTransaction::Depense]),
             'date' => app(ExerciceService::class)->defaultDate(),
             'libelle' => fake()->sentence(4),
             'montant_total' => fake()->randomFloat(2, 10, 5000),
@@ -47,6 +49,14 @@ class TransactionFactory extends Factory
     public function asRecette(): static
     {
         return $this->state(['type' => TypeTransaction::Recette]);
+    }
+
+    public function asVirement(): static
+    {
+        return $this->state([
+            'type' => TypeTransaction::Virement,
+            'journal' => JournalComptable::Banque,
+        ]);
     }
 
     public function configure(): static

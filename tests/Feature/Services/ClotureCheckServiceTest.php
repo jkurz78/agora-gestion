@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 use App\Enums\StatutExercice;
 use App\Enums\StatutRapprochement;
+use App\Enums\StatutReglement;
+use App\Enums\TypeTransaction;
 use App\Models\Association;
 use App\Models\BudgetLine;
-use App\Models\Categorie;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Exercice;
 use App\Models\RapprochementBancaire;
-use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\ClotureCheckService;
@@ -55,13 +56,13 @@ describe('contrôles bloquants', function () {
         expect($bloquant->ok)->toBeFalse();
     });
 
-    it('lignes sans sous-categorie: passes when all have one', function () {
+    it('lignes sans compte: passes when all have one', function () {
         $result = $this->service->executer(2025);
-        $bloquant = collect($result->bloquants)->firstWhere('nom', 'Lignes sans sous-catégorie');
+        $bloquant = collect($result->bloquants)->firstWhere('nom', 'Lignes sans compte');
         expect($bloquant->ok)->toBeTrue();
     });
 
-    it('lignes sans sous-categorie: fails when some lack it', function () {
+    it('lignes sans compte: fails when some lack it', function () {
         $compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
         $transaction = Transaction::factory()->asDepense()->create([
             'date' => '2025-10-15',
@@ -70,11 +71,11 @@ describe('contrôles bloquants', function () {
         ]);
         $transaction->lignes()->create([
             'montant' => 50,
-            'sous_categorie_id' => null,
+            'compte_id' => null,
         ]);
 
         $result = $this->service->executer(2025);
-        $bloquant = collect($result->bloquants)->firstWhere('nom', 'Lignes sans sous-catégorie');
+        $bloquant = collect($result->bloquants)->firstWhere('nom', 'Lignes sans compte');
         expect($bloquant->ok)->toBeFalse();
     });
 });
@@ -100,6 +101,40 @@ describe('contrôles avertissement', function () {
         expect($avert->ok)->toBeFalse();
     });
 
+    it('transactions non pointées: respecte la date de clôture et exclut les AN', function () {
+        $compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
+        $rapprochementFutur = RapprochementBancaire::factory()->create([
+            'compte_id' => $compte->id,
+            'date_fin' => '2026-09-30',
+            'statut' => StatutRapprochement::Verrouille,
+            'saisi_par' => $this->user->id,
+        ]);
+        Transaction::factory()->asRecette()->create([
+            'date' => '2026-08-31',
+            'compte_id' => $compte->id,
+            'rapprochement_id' => $rapprochementFutur->id,
+            'statut_reglement' => StatutReglement::Pointe,
+        ]);
+        Transaction::factory()->asDepense()->create([
+            'date' => '2026-08-31',
+            'compte_id' => $compte->id,
+            'rapprochement_id' => $rapprochementFutur->id,
+            'statut_reglement' => StatutReglement::Pointe,
+        ]);
+        Transaction::factory()->create([
+            'type' => TypeTransaction::AN,
+            'date' => '2025-09-01',
+            'compte_id' => null,
+            'rapprochement_id' => null,
+        ]);
+
+        $result = $this->service->executer(2025);
+        $avert = collect($result->avertissements)->firstWhere('nom', 'Transactions non pointées');
+
+        expect($avert->ok)->toBeFalse()
+            ->and($avert->message)->toBe('2 transaction(s) non pointée(s)');
+    });
+
     it('budget absent: warns when no budget lines exist', function () {
         $result = $this->service->executer(2025);
         $avert = collect($result->avertissements)->firstWhere('nom', 'Budget absent');
@@ -107,14 +142,10 @@ describe('contrôles avertissement', function () {
     });
 
     it('budget absent: passes when budget lines exist', function () {
-        $categorie = Categorie::factory()->create(['association_id' => $this->association->id]);
-        $sc = SousCategorie::factory()->create([
-            'categorie_id' => $categorie->id,
-            'association_id' => $this->association->id,
-        ]);
+        $compte = Compte::factory()->create(['association_id' => $this->association->id]);
         BudgetLine::create([
             'association_id' => $this->association->id,
-            'sous_categorie_id' => $sc->id,
+            'compte_id' => $compte->id,
             'exercice' => 2025,
             'montant_prevu' => 100,
         ]);

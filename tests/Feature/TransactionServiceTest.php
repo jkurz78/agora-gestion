@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 use App\Enums\TypeTransaction;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
-use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\TransactionService;
@@ -27,8 +27,22 @@ afterEach(function () {
     TenantContext::clear();
 });
 
+function compteVentilationServiceTest(int $associationId, int $classe, string $numeroPcg): Compte
+{
+    return Compte::create([
+        'association_id' => $associationId,
+        'numero_pcg' => $numeroPcg,
+        'intitule' => 'Compte test '.$numeroPcg,
+        'classe' => $classe,
+        'lettrable' => false,
+        'actif' => true,
+        'est_systeme' => false,
+        'pour_inscriptions' => false,
+    ]);
+}
+
 it('crée une dépense avec ses lignes', function () {
-    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id]);
+    $compte606 = compteVentilationServiceTest($this->association->id, 6, '606');
     $data = [
         'type' => TypeTransaction::Depense->value,
         'date' => '2025-10-01',
@@ -38,7 +52,7 @@ it('crée une dépense avec ses lignes', function () {
         'reference' => 'REF-001',
         'compte_id' => $this->compte->id,
     ];
-    $lignes = [['sous_categorie_id' => $sc->id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null]];
+    $lignes = [['compte_id' => $compte606->id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null]];
 
     $transaction = $this->service->create($data, $lignes);
 
@@ -47,7 +61,7 @@ it('crée une dépense avec ses lignes', function () {
 });
 
 it('crée une recette avec ses lignes', function () {
-    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id]);
+    $compte706 = compteVentilationServiceTest($this->association->id, 7, '706');
     $data = [
         'type' => TypeTransaction::Recette->value,
         'date' => '2025-10-01',
@@ -57,7 +71,7 @@ it('crée une recette avec ses lignes', function () {
         'reference' => 'REF-002',
         'compte_id' => $this->compte->id,
     ];
-    $lignes = [['sous_categorie_id' => $sc->id, 'montant' => '200.00', 'operation_id' => null, 'seance' => null, 'notes' => null]];
+    $lignes = [['compte_id' => $compte706->id, 'montant' => '200.00', 'operation_id' => null, 'seance' => null, 'notes' => null]];
 
     $transaction = $this->service->create($data, $lignes);
 
@@ -84,7 +98,7 @@ it('montantSigne est positif pour une recette', function () {
 });
 
 it('create assigne un numero_piece non null', function () {
-    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id]);
+    $compte606 = compteVentilationServiceTest($this->association->id, 6, '606');
     $transaction = $this->service->create([
         'type' => TypeTransaction::Depense->value,
         'date' => '2025-10-01',
@@ -93,7 +107,7 @@ it('create assigne un numero_piece non null', function () {
         'mode_paiement' => 'virement',
         'reference' => 'REF-003',
         'compte_id' => $this->compte->id,
-    ], [['sous_categorie_id' => $sc->id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null]]);
+    ], [['compte_id' => $compte606->id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null]]);
 
     expect($transaction->numero_piece)->not->toBeNull()
         ->and($transaction->numero_piece)->toStartWith('2025-2026:');

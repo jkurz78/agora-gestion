@@ -5,7 +5,6 @@ use App\Http\Controllers\AttestationPresencePdfController;
 use App\Http\Controllers\BackOffice\FacturePartenaireDepotPdfController;
 use App\Http\Controllers\BackOffice\NoteDeFraisPieceJointeController;
 use App\Http\Controllers\BudgetExportController;
-use App\Http\Controllers\CategorieController;
 use App\Http\Controllers\CompteBancaireController;
 use App\Http\Controllers\CsvImportController;
 use App\Http\Controllers\DashboardController;
@@ -25,6 +24,7 @@ use App\Http\Controllers\ParticipantExportController;
 use App\Http\Controllers\ParticipantFichePdfController;
 use App\Http\Controllers\ParticipantImportTemplateController;
 use App\Http\Controllers\ParticipantPdfController;
+use App\Http\Controllers\PlanComptableController;
 use App\Http\Controllers\QuestionnaireApercuController;
 use App\Http\Controllers\QuestionnaireExportController;
 use App\Http\Controllers\QuestionnaireRepondantController;
@@ -38,7 +38,6 @@ use App\Http\Controllers\RemiseBancairePdfController;
 use App\Http\Controllers\SeanceExportController;
 use App\Http\Controllers\SeanceFeuilleController;
 use App\Http\Controllers\SeancePdfController;
-use App\Http\Controllers\SousCategorieController;
 use App\Http\Controllers\SuperAdmin\SupportModeController;
 use App\Http\Controllers\SwitchAssociationController;
 use App\Http\Controllers\TenantAssetController;
@@ -55,6 +54,7 @@ use App\Livewire\Auth\AssociationSelector;
 use App\Livewire\BackOffice\FacturePartenaire\Index as FpIndex;
 use App\Livewire\BackOffice\NoteDeFrais\Index as NdfIndex;
 use App\Livewire\BackOffice\NoteDeFrais\Show as NdfShow;
+use App\Livewire\Compta\PostesTiersOuverts;
 use App\Livewire\DevisManuel\DevisEdit;
 use App\Livewire\DevisManuel\DevisList;
 use App\Livewire\Newsletter\InscriptionsList;
@@ -92,8 +92,11 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class, CheckEspaceAccess
         Route::view('/helloasso', 'parametres.helloasso')->name('helloasso');
         Route::view('/reception-documents', 'parametres.reception-documents')->name('reception-documents');
         Route::view('/smtp', 'parametres.smtp')->name('smtp');
-        Route::resource('categories', CategorieController::class)->except(['show']);
-        Route::get('sous-categories', [SousCategorieController::class, 'index'])->name('sous-categories.index');
+        // DC-10b-3 : route categories supprimée — l'écran Plan comptable prend le relais.
+        // DC-7 : l'écran « Plan comptable » (table comptes) remplace l'écran
+        // « Sous-catégories » — les anciennes URLs redirigent en 301 (voir la
+        // section « Redirections legacy » en fin de fichier).
+        Route::get('plan-comptable', [PlanComptableController::class, 'index'])->name('plan-comptable');
         Route::get('/comptabilite/usages', UsagesComptables::class)
             ->name('comptabilite.usages');
         Route::view('/adhesions/formules', 'parametres.adhesions.formules')
@@ -266,6 +269,7 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
     ->name('comptabilite.')
     ->group(function (): void {
         Route::view('/transactions', 'transactions.index')->name('transactions');
+        Route::get('/postes-tiers-ouverts', PostesTiersOuverts::class)->name('postes-tiers-ouverts');
         Route::view('/cotisations', 'cotisations.index')->name('cotisations');
         Route::view('/dons', 'dons.index')->name('dons');
         Route::get('/transactions/import/template/{type}', [CsvImportController::class, 'template'])
@@ -318,9 +322,6 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
         Route::get('/remises/{remise}/selection', function (RemiseBancaire $remise) {
             return view('gestion.remises-bancaires.selection', compact('remise'));
         })->name('remises.selection');
-        Route::get('/remises/{remise}/validation', function (RemiseBancaire $remise) {
-            return view('gestion.remises-bancaires.validation', compact('remise'));
-        })->name('remises.validation');
         Route::get('/remises/{remise}/pdf', RemiseBancairePdfController::class)
             ->name('remises.pdf');
 
@@ -396,6 +397,9 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
     ->name('rapports.')
     ->group(function (): void {
         Route::view('/compte-resultat', 'rapports.compte-resultat')->name('compte-resultat');
+        Route::view('/balance', 'rapports.balance')->name('balance');
+        Route::view('/grand-livre', 'rapports.grand-livre')->name('grand-livre');
+        Route::view('/journaux', 'rapports.journaux')->name('journaux');
         Route::view('/operations', 'rapports.operations')->name('operations');
         Route::view('/flux-tresorerie', 'rapports.flux-tresorerie')->name('flux-tresorerie');
         Route::view('/analyse', 'rapports.analyse')->name('analyse');
@@ -453,10 +457,13 @@ Route::middleware('auth')->group(function (): void {
     Route::permanentRedirect('/gestion/parametres/helloasso', '/parametres/helloasso');
     Route::permanentRedirect('/compta/parametres/reception-documents', '/parametres/reception-documents');
     Route::permanentRedirect('/gestion/parametres/reception-documents', '/parametres/reception-documents');
-    Route::permanentRedirect('/compta/parametres/categories', '/parametres/categories');
-    Route::permanentRedirect('/gestion/parametres/categories', '/parametres/categories');
-    Route::permanentRedirect('/compta/parametres/sous-categories', '/parametres/sous-categories');
-    Route::permanentRedirect('/gestion/parametres/sous-categories', '/parametres/sous-categories');
+    Route::permanentRedirect('/parametres/categories', '/parametres/plan-comptable');
+    Route::permanentRedirect('/compta/parametres/categories', '/parametres/plan-comptable');
+    Route::permanentRedirect('/gestion/parametres/categories', '/parametres/plan-comptable');
+    Route::permanentRedirect('/compta/parametres/sous-categories', '/parametres/plan-comptable');
+    Route::permanentRedirect('/gestion/parametres/sous-categories', '/parametres/plan-comptable');
+    Route::permanentRedirect('/parametres/sous-categories', '/parametres/plan-comptable');
+    Route::permanentRedirect('/parametres/comptes', '/parametres/plan-comptable');
     Route::permanentRedirect('/compta/parametres/utilisateurs', '/parametres/utilisateurs');
     Route::permanentRedirect('/gestion/parametres/utilisateurs', '/parametres/utilisateurs');
     Route::permanentRedirect('/gestion/operations', '/operations');
