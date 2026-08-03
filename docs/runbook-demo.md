@@ -93,9 +93,15 @@ Le snapshot est construit sur une DB locale dédiée (ne jamais utiliser la prod
 
 4. Ajuster l'association et les utilisateurs :
    - Renommer l'asso `Mon Association` → `Les amis de la démo`
-   - Renommer les emails `*@monasso.fr` → `*@demo.fr`
-   - Vérifier que `admin@demo.fr` a le rôle admin de l'asso (pas super-admin système)
-   - Vérifier que `jean@demo.fr` a le rôle utilisateur standard
+   - **Ne pas renommer les emails.** La démo assume les comptes `*@monasso.fr`
+     de la base de développement, et c'est le bandeau de `/login` qui les
+     annonce. Renommer à la main était l'étape oubliée le 2026-07-13 : la
+     capture est partie avec `*@monasso.fr` alors que le bandeau annonçait
+     encore `*@demo.fr`, et la démo est restée inconnectable jusqu'au
+     2026-08-03. `SnapshotComptesAnnoncesTest` garde désormais l'accord entre
+     les deux — si une capture change les emails, la CI le dit.
+   - Vérifier que `admin@monasso.fr` a le rôle admin de l'asso (pas super-admin système)
+   - Vérifier que `jean@monasso.fr` a le rôle utilisateur standard
 
 5. Peupler les données via l'UI selon la charte ci-dessous.
 
@@ -180,8 +186,8 @@ Effectuer cette checklist après chaque premier déploiement ou mise à jour maj
 
 - [ ] `https://demo.agoragestion.org/login` accessible — certificat SSL valide
 - [ ] Bandeau bleu "Démonstration en ligne" visible avec les deux comptes listés
-- [ ] Connexion `admin@demo.fr / demo` OK — redirection vers le dashboard
-- [ ] Connexion `jean@demo.fr / demo` OK — accès limité au rôle utilisateur
+- [ ] Connexion `admin@monasso.fr / demo` OK — redirection vers le dashboard
+- [ ] Connexion `jean@monasso.fr / demo` OK — accès limité au rôle utilisateur
 - [ ] Navigation dashboard, tiers, factures, devis, opérations : pas d'erreur 500
 - [ ] Création d'un tiers OK (données sauvegardées)
 - [ ] Validation d'une facture manuelle OK

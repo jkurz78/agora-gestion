@@ -6,8 +6,8 @@
             <tr><th>Email</th><th>Mot de passe</th><th>Rôle</th></tr>
         </thead>
         <tbody>
-            <tr><td><code>admin@demo.fr</code></td><td><code>demo</code></td><td>Admin</td></tr>
-            <tr><td><code>jean@demo.fr</code></td><td><code>demo</code></td><td>Utilisateur</td></tr>
+            <tr><td><code>admin@monasso.fr</code></td><td><code>demo</code></td><td>Admin</td></tr>
+            <tr><td><code>jean@monasso.fr</code></td><td><code>demo</code></td><td>Utilisateur</td></tr>
         </tbody>
     </table>
 </div>

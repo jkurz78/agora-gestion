@@ -9,8 +9,8 @@ it('it_shows_demo_banner_on_login_when_demo_is_active', function (): void {
 
     $response->assertOk();
     $response->assertSeeText('Démonstration en ligne');
-    $response->assertSeeText('admin@demo.fr');
-    $response->assertSeeText('jean@demo.fr');
+    $response->assertSeeText('admin@monasso.fr');
+    $response->assertSeeText('jean@monasso.fr');
     $response->assertSeeText('demo');
     $response->assertSee('alert alert-info', false);
 });
