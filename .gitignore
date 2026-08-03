@@ -59,6 +59,10 @@ public/proto-*.html
 /docs/superpowers/
 /docs/adr/
 
+# Runbooks propres à une installation : ils portent des données réelles
+# (soldes, tiers, numéros de pièces) qui n'ont rien à faire dans un dépôt public.
+/docs/runbooks/prive/
+
 # Fichiers locaux
 /tmp/
 /sql/create_admin.php
