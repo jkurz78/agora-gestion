@@ -18,6 +18,7 @@ declare(strict_types=1);
  *   2. le bascule n'est proposé que lorsqu'il peut réellement agir.
  */
 
+use App\Enums\ModePaiement;
 use App\Enums\StatutReglement;
 use App\Livewire\TransactionForm;
 use App\Models\Association;
@@ -98,6 +99,33 @@ it('remet le bascule en cohérence après l’annulation du règlement', functio
     $form->assertSet('isLockedByReglement', false)
         ->assertSet('etatPaiement', 'ouvert')
         ->assertSet('paiementRecu', false);
+});
+
+it('ne ressuscite pas le règlement annulé quand on enregistre la fiche', function (): void {
+    // Recette du 2026-08-03 : après « Annuler le règlement », valider par
+    // « Mettre à jour » recréait le règlement — il fallait fermer par « Annuler »
+    // pour que l'annulation tienne. La mise à jour détruit et régénère les
+    // écritures, et `enrichirPartieDouble` déduit « comptant » de mode_paiement,
+    // resté sur la transaction alors que le paiement n'existait plus.
+    $depense = depenseRegleeToggle($this);
+    $reglement = app(PostesTiersOuvertsService::class)->reglements($depense)->sole();
+
+    // Forme héritée du backfill : la T1 porte son mode de paiement, là où une
+    // transaction créée dans V5 le laisse à la T2. C'est celle de la dépense
+    // 2025-2026:00179, et la seule où le défaut se manifeste.
+    $depense->forceFill(['mode_paiement' => ModePaiement::Virement->value])->save();
+
+    app(PosteTiersReglementService::class)->annuler($reglement->transactionId);
+
+    // Plus de paiement, donc plus de mode de paiement : la dépense est une dette ouverte.
+    expect($depense->fresh()->mode_paiement)->toBeNull();
+
+    Livewire::test(TransactionForm::class)
+        ->dispatch('edit-transaction', id: (int) $depense->id)
+        ->call('save');
+
+    expect(app(PostesTiersOuvertsService::class)->reglements($depense->fresh())->count())->toBe(0)
+        ->and($depense->fresh()->statut_reglement)->toBe(StatutReglement::EnAttente);
 });
 
 it('ne propose pas le bascule quand la mise à jour ne l’honorerait pas', function (): void {

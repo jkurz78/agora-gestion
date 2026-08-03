@@ -233,6 +233,22 @@ final class PosteTiersReglementService
             $transactionRacine = Transaction::query()
                 ->findOrFail($poste->transactionOrigineId);
             $this->etatReglementResolver->syncer($transactionRacine);
+
+            // Le paiement n'existe plus : la transaction ne peut pas continuer
+            // d'en porter le mode. Ce n'était pas qu'un affichage faux —
+            // TransactionService::enrichirPartieDouble() déduit « comptant » de
+            // ce seul champ et recrée le règlement à la première mise à jour de
+            // la fiche. Constaté en recette le 2026-08-03 : l'annulation ne
+            // tenait que si l'on fermait le formulaire au lieu de l'enregistrer.
+            //
+            // Ne concerne que les transactions reprises par le backfill, qui
+            // portent leur mode sur la T1 ; celles créées dans V5 le laissent à
+            // leur T2. Un règlement partiel restant laisse le mode en place.
+            $transactionRacine->refresh();
+            if ($transactionRacine->mode_paiement !== null
+                && $transactionRacine->statut_reglement === StatutReglement::EnAttente) {
+                $transactionRacine->forceFill(['mode_paiement' => null])->save();
+            }
         }, 3);
     }
 
