@@ -104,8 +104,12 @@ fi
 #          bascule sur la mesure locale.
 # ---------------------------------------------------------------------------
 
+# `--message` n'existe plus dans Laravel 11 : la commande échouait, le `|| true`
+# avalait l'erreur, et la bascule se déroulait sans maintenance — le `up` final
+# répondant « Application is already up ». Défaut trouvé par la répétition du
+# 2026-08-03 : une fenêtre de maintenance que personne n'aurait vue manquer.
 echo "[$(date)] Step 2 : php artisan down (fenêtre de maintenance)"
-artisan "down --message='Migration comptable en cours, retour dans quelques minutes' --retry=60 || true"
+artisan "down --retry=60 --refresh=60 || true"
 
 echo "[$(date)] Step 2 : php artisan migrate --force"
 artisan "migrate --force"
