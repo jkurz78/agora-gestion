@@ -40,16 +40,89 @@ Le chiffre V5 est celui du relevé bancaire. Le chiffre V4 mélangeait engagemen
 
 Le rollback documenté par un retour de code est **périmé** : depuis la dissolution des sous-catégories, revenir en arrière suppose de restaurer la base. Cette sauvegarde est la seule sortie de secours.
 
+Elle a deux volets — la base **et** les fichiers — parce que le déploiement écrase le répertoire applicatif (dont `.env` et `vendor/`, qui ne sont pas dans git).
+
+Les deux archives vont dans `~/backups`, **hors de `public_html`** : le répertoire n'est donc pas servi par le web, et un déploiement raté ne peut pas l'effacer.
+
+### 3.1 Base de données
+
 ```bash
 ssh o2switch 'cd ~/public_html/compta.soigner-vivre-sourire.fr \
   && eval $(grep -E "^DB_(HOST|DATABASE|USERNAME|PASSWORD)=" .env | sed "s/^/export /") \
-  && mkdir -p ~/backups \
-  && mysqldump --single-transaction --skip-lock-tables -h "$DB_HOST" -u "$DB_USERNAME" -p"$DB_PASSWORD" "$DB_DATABASE" \
-     | gzip > ~/backups/pre-v5-$(date +%Y%m%d-%H%M).sql.gz \
-  && ls -lh ~/backups/ | tail -3'
+  && mkdir -p ~/backups && chmod 700 ~/backups \
+  && mysqldump --single-transaction --skip-lock-tables --routines --triggers \
+       --default-character-set=utf8mb4 \
+       -h "$DB_HOST" -u "$DB_USERNAME" -p"$DB_PASSWORD" "$DB_DATABASE" \
+     | gzip -9 > ~/backups/pre-v5-$(date +%Y%m%d-%H%M).sql.gz \
+  && ls -lh ~/backups/'
 ```
 
-Vérifier que le fichier fait une taille plausible (non nul, quelques Mo) **avant** de continuer.
+`--single-transaction` évite de verrouiller les tables : l'application reste disponible pendant le dump (~2 s sur les volumes actuels).
+
+### 3.2 Fichiers de l'application
+
+```bash
+ssh o2switch 'cd ~/public_html \
+  && tar --warning=no-file-changed \
+       --exclude="storage/framework/cache/*" \
+       --exclude="storage/framework/sessions/*" \
+       --exclude="storage/framework/views/*" \
+       -czf ~/backups/pre-v5-fichiers-$(date +%Y%m%d-%H%M).tar.gz \
+       compta.soigner-vivre-sourire.fr \
+  && ls -lh ~/backups/'
+```
+
+Les trois exclusions ne portent que sur des caches régénérés seuls ; les restaurer ferait revenir des sessions périmées. Tout le reste est dedans : `.env`, `vendor/`, `.git/`, les documents de `storage/app/private/associations/…` et le lien symbolique `public/storage`.
+
+### 3.3 Vérifier avant d'aller plus loin
+
+Une archive non vérifiée n'est pas une sauvegarde. Les quatre contrôles, tous passés le 2026-08-03 :
+
+```bash
+ssh o2switch 'cd ~/backups
+  gzip -t pre-v5-*.gz && echo "gzip OK"
+  gunzip -c pre-v5-AAAAMMJJ-HHMM.sql.gz | tail -1          # doit finir par "Dump completed"
+  gunzip -c pre-v5-AAAAMMJJ-HHMM.sql.gz | grep -c "^CREATE TABLE"   # doit valoir le nb de tables
+  tar -tzf pre-v5-fichiers-AAAAMMJJ-HHMM.tar.gz "compta.soigner-vivre-sourire.fr/.env"'
+```
+
+Le nombre de `CREATE TABLE` se compare à la base vivante :
+
+```sql
+SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '<DB>';
+```
+
+**La preuve qui compte réellement est une restauration d'essai**, pas une taille de fichier. Le dump se recharge dans une base jetable locale, et les compteurs doivent coïncider avec la prod :
+
+```bash
+docker compose exec -T mysql mysql -uroot -ppassword -e "CREATE DATABASE restore_test_v4 CHARACTER SET utf8mb4;"
+gunzip -c pre-v5-AAAAMMJJ-HHMM.sql.gz | docker compose exec -T mysql mysql -uroot -ppassword restore_test_v4
+```
+
+⚠️ Jamais dans `svs_accounting` — c'est un clone de prod servant à autre chose.
+
+### 3.4 Copie hors-site
+
+Rapatrier les deux archives et comparer les empreintes, pour ne pas dépendre du seul compte O2Switch :
+
+```bash
+mkdir -p ~/Desktop/backup-v5-AAAAMMJJ && cd ~/Desktop/backup-v5-AAAAMMJJ
+scp o2switch:~/backups/pre-v5-*.gz .
+ssh o2switch 'cd ~/backups && sha256sum pre-v5-*.gz'
+shasum -a 256 *.gz          # les empreintes doivent être identiques
+```
+
+### 3.5 Sauvegarde du 2026-08-03 — état vérifié
+
+| Élément | Valeur |
+|---|---|
+| `pre-v5-20260803-1654.sql.gz` | 1,8 Mo — 81 tables, `Dump completed` |
+| `pre-v5-fichiers-20260803-1654.tar.gz` | 82 Mo — 15 190 entrées, 133 fichiers de `storage/app` |
+| Restauration d'essai | ✅ 81 tables ; transactions 192, lignes 323, tiers 78, règlements 88 — identiques à la prod |
+| Copie hors-site | `~/Desktop/backup-v5-20260803/`, SHA-256 identiques |
+| HEAD git prod au moment du dump | `29bb0381` (v4.4.3) |
+
+⚠️ Cette sauvegarde vaut pour l'état du **2026-08-03 à 16 h 54**. Si la bascule est reportée et que des saisies ont lieu entre-temps, **la refaire** : restaurer celle-ci perdrait tout ce qui a été saisi depuis.
 
 ## 4. Déploiement
 
@@ -134,14 +207,33 @@ Ce qui a valeur de preuve :
 
 Il n'existe **pas** de retour arrière par le code. `COMPTA_USE_PARTIE_DOUBLE` a été supprimé, et les tables `sous_categories` / `categories` sont droppées par les migrations : revenir à V4 exige de restaurer la sauvegarde du § 3.
 
+**Tout ce qui a été saisi depuis la sauvegarde est perdu.** C'est la raison d'être de la condition « aucun autre utilisateur connecté » du § 2 : elle borne cette perte à ce que l'exploitant a fait lui-même.
+
+**1. La base d'abord.** Le dump commence par des `DROP TABLE IF EXISTS`, mais seulement pour les 81 tables de V4 : les tables créées par les migrations V5 (`comptes`, `ecritures`…) survivraient. Vider le schéma d'abord évite de mélanger les deux générations.
+
 ```bash
 ssh o2switch 'cd ~/public_html/compta.soigner-vivre-sourire.fr \
   && eval $(grep -E "^DB_(HOST|DATABASE|USERNAME|PASSWORD)=" .env | sed "s/^/export /") \
+  && mysql -h "$DB_HOST" -u "$DB_USERNAME" -p"$DB_PASSWORD" -N -B \
+       -e "SET FOREIGN_KEY_CHECKS=0; SELECT CONCAT(\"DROP TABLE IF EXISTS \`\",table_name,\"\`;\") FROM information_schema.tables WHERE table_schema=\"$DB_DATABASE\";" \
+     | mysql -h "$DB_HOST" -u "$DB_USERNAME" -p"$DB_PASSWORD" "$DB_DATABASE" \
   && gunzip < ~/backups/pre-v5-AAAAMMJJ-HHMM.sql.gz \
      | mysql -h "$DB_HOST" -u "$DB_USERNAME" -p"$DB_PASSWORD" "$DB_DATABASE"'
 ```
 
-Puis remettre le code : `git revert` du commit de merge, ou `git reset --hard` sur le commit précédent suivi d'un push, ce qui redéclenche `deploy.sh`.
+**2. Puis les fichiers.** L'archive du § 3.2 rend `.env` et `vendor/` dans leur état V4, sans dépendre de composer ni du réseau. Déplacer le répertoire V5 plutôt que l'écraser, pour garder de quoi faire l'autopsie.
+
+```bash
+ssh o2switch 'cd ~/public_html \
+  && mv compta.soigner-vivre-sourire.fr compta-v5-echec-$(date +%Y%m%d-%H%M) \
+  && tar -xzf ~/backups/pre-v5-fichiers-AAAAMMJJ-HHMM.tar.gz \
+  && cd compta.soigner-vivre-sourire.fr \
+  && /usr/local/bin/php artisan optimize:clear'
+```
+
+**3. Enfin le dépôt**, pour que le prochain déploiement ne réapplique pas la V5 : `git revert -m 1` du commit de merge sur `main`, puis push — ce qui redéclenche `deploy.sh` sur du code V4. Un `git reset --hard` + `push --force` marche aussi mais réécrit l'historique de `main`.
+
+**4. Vérifier** comme au § 7 : une action authentifiée qui écrit, et le solde du tableau de bord revenu à 1 411,88 €.
 
 ## 9. Ce que la répétition a corrigé avant la bascule
 
