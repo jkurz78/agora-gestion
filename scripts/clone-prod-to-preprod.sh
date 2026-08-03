@@ -4,20 +4,22 @@
 #
 # Reference: docs/specs/2026-05-19-fondations-partie-double-slice1.md §16.4
 #
-# À exécuter depuis l'hôte NAS staging. Récupère un dump MySQL de la prod
-# O2Switch via SSH, le restaure dans la base preprod, lance l'anonymisation,
-# les migrations, et un smoke-check minimal.
+# À exécuter depuis l'hôte NAS staging. Restaure un dump de la prod dans la base
+# preprod, anonymise, neutralise les secrets, migre, et fait un smoke-check.
+#
+# Le NAS n'a aucun accès SSH à la production. Le dump est donc normalement
+# fabriqué depuis le poste de l'opérateur — qui atteint les deux — puis désigné
+# par --dump. La récupération intégrée (PREPROD_SSH_HOST) ne sert qu'à un hôte
+# qui aurait cet accès.
 #
 # Credentials lus depuis des variables d'environnement — jamais hardcodés.
-# Variables requises :
-#   PROD_DB_HOST      PREPROD_DB_HOST
-#   PROD_DB_USER      PREPROD_DB_USER
-#   PROD_DB_PASS      PREPROD_DB_PASS
-#   PROD_DB_NAME      PREPROD_DB_NAME
-#   PREPROD_SSH_HOST
+# Toujours requis :
+#   PREPROD_DB_HOST  PREPROD_DB_USER  PREPROD_DB_PASS  PREPROD_DB_NAME
+# Requis seulement sans --dump :
+#   PROD_DB_HOST  PROD_DB_USER  PROD_DB_PASS  PROD_DB_NAME  PREPROD_SSH_HOST
 #
 # Usage :
-#   ./scripts/clone-prod-to-preprod.sh
+#   ./scripts/clone-prod-to-preprod.sh --dump=/tmp/prod-dump.sql.gz
 #   ./scripts/clone-prod-to-preprod.sh --dry-run   # affiche sans exécuter
 
 set -eo pipefail
@@ -27,10 +29,24 @@ set -eo pipefail
 # ---------------------------------------------------------------------------
 
 DRY_RUN=0
-if [[ "${1:-}" == "--dry-run" ]]; then
-    DRY_RUN=1
-    echo "[dry-run] Mode dry-run activé — aucune commande réelle exécutée."
-fi
+DUMP_FOURNI=""
+
+for arg in "$@"; do
+    case "${arg}" in
+        --dry-run)
+            DRY_RUN=1
+            echo "[dry-run] Mode dry-run activé — aucune commande réelle exécutée."
+            ;;
+        --dump=*)
+            DUMP_FOURNI="${arg#--dump=}"
+            ;;
+        *)
+            echo "ERREUR : option inconnue : ${arg}" >&2
+            echo "Options : --dry-run, --dump=<fichier.sql.gz>" >&2
+            exit 1
+            ;;
+    esac
+done
 
 # ---------------------------------------------------------------------------
 # Garde : vérifier que toutes les variables d'environnement sont définies
@@ -38,16 +54,16 @@ fi
 # ---------------------------------------------------------------------------
 
 required_vars=(
-    PROD_DB_HOST
-    PROD_DB_USER
-    PROD_DB_PASS
-    PROD_DB_NAME
     PREPROD_DB_HOST
     PREPROD_DB_USER
     PREPROD_DB_PASS
     PREPROD_DB_NAME
-    PREPROD_SSH_HOST
 )
+
+# Le dump n'est récupéré par ce script que s'il ne lui est pas fourni.
+if [[ -z "${DUMP_FOURNI}" ]]; then
+    required_vars+=(PROD_DB_HOST PROD_DB_USER PROD_DB_PASS PROD_DB_NAME PREPROD_SSH_HOST)
+fi
 
 if [[ "${DRY_RUN}" -eq 0 ]]; then
     for var in "${required_vars[@]}"; do
@@ -124,8 +140,23 @@ echo "[$(date)] Début clone-prod-to-preprod"
 # Step 1 : Dump de la DB prod via SSH
 # ---------------------------------------------------------------------------
 
-echo "[$(date)] Step 1 : mysqldump prod ${PROD_DB_NAME} via SSH"
-run "ssh ${PREPROD_SSH_HOST} \"mysqldump --single-transaction --skip-lock-tables -h ${PROD_DB_HOST} -u ${PROD_DB_USER} -p'${PROD_DB_PASS}' ${PROD_DB_NAME} | gzip\" > /tmp/prod-dump.sql.gz"
+# Le NAS n'a aucun accès SSH à la prod — ni clé, ni known_hosts : ce Step 1 n'y a
+# jamais pu s'exécuter. Le poste de l'opérateur, lui, atteint les deux ; il peut
+# donc pousser le dump ici et le désigner par --dump, plutôt que d'ouvrir un
+# accès à la production depuis le NAS.
+DUMP="/tmp/prod-dump.sql.gz"
+
+if [[ -n "${DUMP_FOURNI}" ]]; then
+    DUMP="${DUMP_FOURNI}"
+    echo "[$(date)] Step 1 : dump fourni (${DUMP}) — aucune récupération"
+    if [[ "${DRY_RUN}" -eq 0 && ! -s "${DUMP}" ]]; then
+        echo "ERREUR : dump introuvable ou vide : ${DUMP}" >&2
+        exit 1
+    fi
+else
+    echo "[$(date)] Step 1 : mysqldump prod ${PROD_DB_NAME} via SSH"
+    run "ssh ${PREPROD_SSH_HOST} \"mysqldump --single-transaction --skip-lock-tables -h ${PROD_DB_HOST} -u ${PROD_DB_USER} -p'${PROD_DB_PASS}' ${PROD_DB_NAME} | gzip\" > ${DUMP}"
+fi
 
 # ---------------------------------------------------------------------------
 # Step 2 : Restauration dans la base preprod
@@ -133,7 +164,7 @@ run "ssh ${PREPROD_SSH_HOST} \"mysqldump --single-transaction --skip-lock-tables
 
 echo "[$(date)] Step 2 : Restauration dans preprod ${PREPROD_DB_NAME}"
 run "$(preprod_sql) -e \"DROP DATABASE IF EXISTS ${PREPROD_DB_NAME}; CREATE DATABASE ${PREPROD_DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;\""
-run "gunzip < /tmp/prod-dump.sql.gz | $(preprod_sql) '${PREPROD_DB_NAME}'"
+run "gunzip < ${DUMP} | $(preprod_sql) '${PREPROD_DB_NAME}'"
 
 # ---------------------------------------------------------------------------
 # Step 3 : Anonymisation des données tiers
@@ -203,8 +234,12 @@ run "$(preprod_sql) '${PREPROD_DB_NAME}' -e \"SELECT COUNT(*) FROM association;\
 # Nettoyage
 # ---------------------------------------------------------------------------
 
-echo "[$(date)] Nettoyage : suppression du dump temporaire"
-run "rm -f /tmp/prod-dump.sql.gz"
+if [[ -n "${DUMP_FOURNI}" ]]; then
+    echo "[$(date)] Nettoyage : dump fourni par l'opérateur, conservé (${DUMP})"
+else
+    echo "[$(date)] Nettoyage : suppression du dump temporaire"
+    run "rm -f ${DUMP}"
+fi
 
 echo "[$(date)] clone-prod-to-preprod terminé avec succès."
 if [[ "${DRY_RUN}" -eq 0 ]]; then
