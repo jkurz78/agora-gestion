@@ -395,8 +395,20 @@ final class ImmobilisationFactory extends Factory
             'numero' => 'IM'.str_pad((string) $this->faker->unique()->numberBetween(1, 99999), 5, '0', STR_PAD_LEFT),
             'libelle' => $this->faker->words(3, true),
             'quantite' => 1,
-            'compte_id' => fn (): int => (int) Compte::factory()->create(['numero_pcg' => '2188', 'classe' => 2])->id,
-            'compte_amortissement_id' => fn (): int => (int) Compte::factory()->create(['numero_pcg' => '28188', 'classe' => 2])->id,
+            // Numéros tirés au hasard et NON fixes : `comptes` porte un unique
+            // (association_id, numero_pcg) et CompteFactory ne fait pas de
+            // firstOrCreate. Deux `make()` dans le même test rejoueraient ces
+            // closures et violeraient la contrainte avec des numéros en dur.
+            // Les 5 caractères évitent aussi toute collision avec le kit
+            // ImmobilisationComptesSeeder, qui pose des numéros à 4 caractères.
+            'compte_id' => fn (): int => (int) Compte::factory()->create([
+                'numero_pcg' => '21'.str_pad((string) $this->faker->unique()->numberBetween(1, 999), 3, '0', STR_PAD_LEFT),
+                'classe' => 2,
+            ])->id,
+            'compte_amortissement_id' => fn (): int => (int) Compte::factory()->create([
+                'numero_pcg' => '28'.str_pad((string) $this->faker->unique()->numberBetween(1, 999), 3, '0', STR_PAD_LEFT),
+                'classe' => 2,
+            ])->id,
             'montant_acquisition' => '3000.00',
             'date_mise_en_service' => '2026-09-12',
             'duree_mois' => 60,
