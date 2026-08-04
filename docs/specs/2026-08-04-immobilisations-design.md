@@ -226,9 +226,36 @@ la forme exacte de `EcritureGenerator::pourProvisionDotation` :
 | 6811 — Dotations aux amortissements sur immobilisations corporelles | montant | |
 | 281X — Amortissements … | | montant |
 
-Datée du **31/08** (dernier jour de l'exercice).
+Datée du **31/08** (dernier jour de l'exercice cible).
 
 Nouvelle méthode `EcritureGenerator::pourDotationAmortissement(Immobilisation, int $exercice, string $montant)`.
+
+### 5.2.1 Invariants de date
+
+**La date du jour n'intervient jamais**, ni dans le calcul (§ 6, ancré sur le mois
+de clôture) ni dans l'écriture. Générer en octobre N+1 les dotations de l'exercice
+N est le cas normal, pas l'exception : la clôture des comptes est postérieure à la
+fin de la période.
+
+Conséquence vérifiée : `NumeroPieceService::exerciceFromDate(31/08/2027)` retourne
+bien `"2026-2027"` (mois 8, donc branche `else`). En passant la date de clôture,
+la pièce est numérotée sur le bon exercice — à condition de ne jamais passer `now()`.
+
+Trois gardes, **au niveau du service** et non du seul écran. `TransactionForm`
+contraint la date à l'exercice en cours, mais `EcritureGenerator` et
+`TransactionService` ne vérifient rien : le service de dotation doit donc porter
+lui-même ces contrôles, sans quoi une commande artisan ou un futur appelant
+pourrait écrire n'importe où.
+
+1. **Exercice cible terminé.** La génération est refusée tant que la date de fin
+   de l'exercice n'est pas passée — sinon l'écriture serait datée dans le futur.
+   Le plan d'amortissement de la fiche reste consultable à tout moment : voir la
+   projection et la comptabiliser sont deux gestes distincts.
+2. **Exercice cible non clôturé.** Une génération, un recalcul ou une annulation
+   sur un exercice clôturé est refusé.
+3. **Date imposée.** La transaction est datée du dernier jour de l'exercice cible,
+   valeur dérivée de `ExerciceService::dateRange($exercice)`, jamais d'un paramètre
+   appelant ni de `now()`.
 
 ### 5.3 Comment la dotation atteint le compte de résultat
 
@@ -417,6 +444,13 @@ service postérieure à la fin de l'exercice (dotation nulle).
 drapeau, l'accepte avec ; refuse toujours les classes autres que 2 et 6.
 
 **Unitaires — séquence** : numéros consécutifs, cloisonnement par tenant.
+
+**Unitaires — invariants de date** (§ 5.2.1) : générer en octobre N+1 les
+dotations de l'exercice N produit une écriture au 31/08 et une pièce numérotée
+sur l'exercice N, quelle que soit la date du jour ; la génération est refusée sur
+un exercice non terminé ; elle est refusée sur un exercice clôturé, de même que
+le recalcul et l'annulation. Ces tests figent l'horloge (`travelTo`) pour prouver
+que `now()` n'influence pas le résultat.
 
 **Feature — parcours complet** : acquisition → fiche + transaction équilibrée +
 dette 401 ; règlement ; génération de dotation ; idempotence du rejeu ;
