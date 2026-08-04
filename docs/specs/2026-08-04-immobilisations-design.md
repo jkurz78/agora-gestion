@@ -105,7 +105,7 @@ n'existe aujourd'hui en classe 2, le démarrage à blanc ne dégrade rien.
 
 ## 4. Modèle de données
 
-### `immobilisations`
+### 4.1 `immobilisations`
 
 Étend `App\Models\TenantModel`. `final class`, `declare(strict_types=1)`,
 `SoftDeletes` (modèle financier, cf. CLAUDE.md).
@@ -130,6 +130,23 @@ Contraintes : `unique(association_id, numero)`.
 dans la même `DB::transaction()`, il ne peut donc exister ni fiche orpheline ni
 acquisition sans fiche.
 
+**`montant_acquisition` est le coût d'entrée à l'actif**, c'est-à-dire la base
+amortissable — et non « le montant de la transaction ». La distinction paraît
+verbale ; elle ne l'est pas, pour deux évolutions probables :
+
+- une immobilisation constituée de **plusieurs achats** : la base devient la
+  somme, sans que le sens de la colonne change ;
+- l'arrivée de la **TVA** : la base est TTC quand la taxe n'est pas récupérable
+  (association non assujettie, cas actuel), HT quand elle l'est. Là encore, seule
+  change l'alimentation en amont.
+
+**Accès aux transactions d'acquisition.** Le modèle expose
+`transactionsAcquisition(): Collection` — au pluriel, bien qu'adossée à un unique
+FK en lot 1. Tous les consommateurs (fiche, PDF, badge, verrou) sont donc écrits
+contre une collection dès le départ. Le jour où une immobilisation devra porter
+plusieurs achats, le passage 1:1 → 1:N ne touchera que le modèle et sa migration,
+aucun site de lecture. Le coût est nul aujourd'hui ; l'économie est réelle demain.
+
 **Pourquoi `duree_mois` et non `duree_annees`** : le calcul est mensuel. Stocker
 des années reviendrait à stocker l'unité d'affichage plutôt que l'unité du
 modèle, et à multiplier par 12 à chaque usage. Les durées non entières en années
@@ -141,7 +158,7 @@ Saisie : liste des durées usuelles en années (3, 5, 7, 10, 15) plus une option
 « autre durée, en mois ». Affichage : « 5 ans » quand `duree_mois % 12 === 0`,
 « 30 mois » sinon.
 
-### 4.2.1 Les deux dates, et leur contrôle
+### 4.1.1 Les deux dates, et leur contrôle
 
 Le modèle porte bien **deux dates distinctes** : `transactions.date` sur
 l'écriture d'acquisition (date de constatation, c'est-à-dire la date de la
@@ -182,7 +199,7 @@ est résolu à la génération par convention, comme le sont déjà 401 et 411 ;
 absence lève une exception explicite plutôt que de produire une écriture
 incomplète.
 
-### `immobilisation_dotations`
+### 4.2 `immobilisation_dotations`
 
 | Colonne | Type | Rôle |
 |---|---|---|
@@ -365,7 +382,7 @@ Colonnes : numéro, libellé, quantité, compte, mise en service, durée, valeur
 brute, cumul amortissements, VNC. Totaux en pied (brut, cumul, VNC).
 
 État **« pas encore en service »** sur les fiches dont la mise en service est
-postérieure à aujourd'hui (§ 4.2.1) — c'est ce qui rend visible une faute de
+postérieure à aujourd'hui (§ 4.1.1) — c'est ce qui rend visible une faute de
 frappe sur l'année, qui produirait sinon des dotations nulles en silence.
 
 Conventions : en-tête `table-dark` avec
@@ -391,7 +408,7 @@ compte 21X, date de mise en service, durée. Le geste reste « je saisis un
 achat » ; la fiche est le résultat, pas le formulaire.
 
 La date de mise en service est pré-remplie à la date d'achat et validée selon
-le § 4.2.1.
+le § 4.1.1.
 
 Modale Bootstrap, sans fermeture au clic extérieur (cf. commit `57af945a`).
 Confirmations via modale, jamais `confirm()` natif.
@@ -483,7 +500,7 @@ service postérieure à la fin de l'exercice (dotation nulle).
 **Unitaires — garde** : `pourDepenseACredit` refuse toujours la classe 2 sans le
 drapeau, l'accepte avec ; refuse toujours les classes autres que 2 et 6.
 
-**Unitaires — cohérence des dates** (§ 4.2.1) : mise en service antérieure à
+**Unitaires — cohérence des dates** (§ 4.1.1) : mise en service antérieure à
 l'exercice de l'acquisition refusée ; mise en service antérieure à la date
 d'achat mais dans le même exercice acceptée (cas « livré puis facturé ») ; mise
 en service postérieure à l'acquisition acceptée, avec dotation nulle sur
@@ -530,7 +547,35 @@ Le lot 1 est conçu pour que ces ajouts soient additifs :
   annuelle 139 D / 777 C calée sur le rythme de la dotation.
 - **Rattachement d'une dépense existante** à une fiche, pour l'achat arrivé par
   une facture fournisseur ou par l'inbox — sans jamais ouvrir le garde-fou de
-  classe globalement.
+  classe globalement. Deux cas de nature différente :
+  - *facture fournisseur non encore comptabilisée* — purement **additif**. Le
+    circuit `FacturePartenaireDeposee` → `TransactionForm` → `TransactionService`
+    → `pourDepenseACredit` gagne un appelant qui passe `$autoriseImmobilisation:
+    true` et crée la fiche. Le paramètre nommé à défaut `false` est précisément ce
+    qui permet d'ajouter un appelant sans toucher aux six autres.
+  - *dépense déjà comptabilisée* — **hors de portée de ce modèle**. Cela revient à
+    reclasser une ligne de classe 6 vers un 21X sur une transaction existante,
+    éventuellement réglée : c'est la question de doctrine ouverte « reclassement
+    en place *vs* saisie d'écritures OD », qui doit être tranchée avant. Cette
+    spec n'a pas à l'anticiper.
+- **Immobilisation composée de plusieurs achats.** Le passage de `transaction_id`
+  à une table pivot est une migration mécanique, et les sites de lecture sont
+  déjà neutralisés par `transactionsAcquisition()` (§ 4.1). Surtout, le calcul est
+  immunisé par construction : la règle du § 6 absorbe une base qui change en cours
+  de vie exactement comme elle absorbe une durée corrigée — le rattrapage tombe
+  sur la dotation suivante, sans recalcul rétroactif ni écriture de correction.
+  Reste une question sémantique, à trancher le moment venu et sans contrainte du
+  schéma : un second achat re-base-t-il la fiche, ou crée-t-il un « composant »
+  avec sa propre mise en service ? Le PCG admet les deux.
+- **TVA.** Rien à préparer ici : le modèle est déjà neutre (§ 4.1). Le seul point
+  à retenir pour le futur chantier est que les immobilisations ont leur **propre
+  compte de TVA déductible, le 44562**, distinct du 44566 des autres biens et
+  services. L'écriture d'acquisition gagnera une troisième ligne dans
+  `EcritureGenerator` ; la fiche et la dotation ne changent pas.
+
+  Aucun champ « réservé pour usage futur » n'est ajouté. Non validés et non
+  alimentés, ces champs finissent vides indéfiniment ou remplis avec la mauvaise
+  sémantique, et aucun test ne peut porter sur une règle qui n'est pas écrite.
 - **Reprise de l'existant** — fiches historiques plus écriture d'ouverture
   21X D / 281X C, si les comptes de l'expert-comptable portent un jour des
   immobilisations que le registre ignore.
