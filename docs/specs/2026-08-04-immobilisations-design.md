@@ -141,6 +141,39 @@ Saisie : liste des durées usuelles en années (3, 5, 7, 10, 15) plus une option
 « autre durée, en mois ». Affichage : « 5 ans » quand `duree_mois % 12 === 0`,
 « 30 mois » sinon.
 
+### 4.2.1 Les deux dates, et leur contrôle
+
+Le modèle porte bien **deux dates distinctes** : `transactions.date` sur
+l'écriture d'acquisition (date de constatation, c'est-à-dire la date de la
+facture) et `date_mise_en_service` sur la fiche. La fiche ne duplique pas la date
+d'achat — elle la lit sur sa transaction.
+
+Dans le formulaire, la mise en service est **pré-remplie à la date d'achat** ;
+elles seront donc égales dans l'immense majorité des cas.
+
+**Contrôle retenu** : `date_mise_en_service >= premier jour de l'exercice de la
+transaction d'acquisition`.
+
+Pourquoi pas `MES >= date d'achat` en strict : le cas « livré et utilisé en
+septembre, facturé en octobre » est banal, et la date d'une dépense à crédit est
+celle de la facture. Un contrôle strict forcerait à fausser l'une des deux dates.
+
+Pourquoi ce contrôle-là : l'amortissement ne peut pas commencer dans un exercice
+antérieur à celui où le bien entre à l'actif — sinon on doterait un exercice où
+le bien n'existe pas encore au bilan. À l'intérieur d'un même exercice, un léger
+décalage est sans conséquence : seul le cumul au 31/08 compte.
+
+**Pas de borne supérieure.** Une mise en service postérieure à l'acquisition est
+légitime (matériel acheté en août, installé en octobre). La règle du § 6 la gère
+déjà : les mois écoulés ont un plancher à 0, donc la dotation de l'exercice
+d'acquisition vaut zéro.
+
+En contrepartie de cette absence de borne, une faute de frappe sur l'année
+(2036 pour 2026) produirait des dotations nulles indéfiniment, en silence. Le
+livre des immobilisations affiche donc un état **« pas encore en service »** pour
+toute fiche dont la mise en service est à venir : l'anomalie devient visible au
+lieu de rester muette.
+
 **Résolution des comptes.** Le compte 281X est dérivé du 21X à la création par la
 règle PCG (2154 → 28154), pré-rempli dans le formulaire, modifiable, puis **figé
 sur la fiche** — une modification ultérieure du plan comptable ne peut donc pas
@@ -331,6 +364,10 @@ comptabilité.
 Colonnes : numéro, libellé, quantité, compte, mise en service, durée, valeur
 brute, cumul amortissements, VNC. Totaux en pied (brut, cumul, VNC).
 
+État **« pas encore en service »** sur les fiches dont la mise en service est
+postérieure à aujourd'hui (§ 4.2.1) — c'est ce qui rend visible une faute de
+frappe sur l'année, qui produirait sinon des dotations nulles en silence.
+
 Conventions : en-tête `table-dark` avec
 `style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880"`, tri JS côté
 client avec `data-sort` sur les `<td>` (dates en ISO `Y-m-d`, nombres bruts).
@@ -348,10 +385,13 @@ identité de la fiche, plan d'amortissement complet, référence de l'acquisitio
 
 ### 7.3 Nouvelle immobilisation
 
-Formulaire calqué sur celui d'une dépense (fournisseur, date, montant, mode de
-règlement, pièce jointe), plus les champs propres : libellé, quantité, compte
-21X, date de mise en service, durée. Le geste reste « je saisis un achat » ; la
-fiche est le résultat, pas le formulaire.
+Formulaire calqué sur celui d'une dépense (fournisseur, date d'achat, montant,
+mode de règlement, pièce jointe), plus les champs propres : libellé, quantité,
+compte 21X, date de mise en service, durée. Le geste reste « je saisis un
+achat » ; la fiche est le résultat, pas le formulaire.
+
+La date de mise en service est pré-remplie à la date d'achat et validée selon
+le § 4.2.1.
 
 Modale Bootstrap, sans fermeture au clic extérieur (cf. commit `57af945a`).
 Confirmations via modale, jamais `confirm()` natif.
@@ -442,6 +482,12 @@ service postérieure à la fin de l'exercice (dotation nulle).
 
 **Unitaires — garde** : `pourDepenseACredit` refuse toujours la classe 2 sans le
 drapeau, l'accepte avec ; refuse toujours les classes autres que 2 et 6.
+
+**Unitaires — cohérence des dates** (§ 4.2.1) : mise en service antérieure à
+l'exercice de l'acquisition refusée ; mise en service antérieure à la date
+d'achat mais dans le même exercice acceptée (cas « livré puis facturé ») ; mise
+en service postérieure à l'acquisition acceptée, avec dotation nulle sur
+l'exercice d'acquisition.
 
 **Unitaires — séquence** : numéros consécutifs, cloisonnement par tenant.
 
