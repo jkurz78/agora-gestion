@@ -191,7 +191,7 @@ it('règle une transaction ouverte lors de son édition', function (): void {
         ->toBe(dateT2TransactionFormReglement());
 });
 
-it('refuse le contournement Livewire de la ventilation après un règlement tiers', function (): void {
+it('autorise la ventilation analytique après un règlement tiers sans altérer l\'écriture', function (): void {
     Livewire::test(TransactionForm::class)
         ->set('type', 'recette')
         ->set('date', dateT1TransactionFormReglement())
@@ -216,28 +216,61 @@ it('refuse le contournement Livewire de la ventilation après un règlement tier
     $transaction = Transaction::where('libelle', 'Créance ventilée réglée')->sole();
     $ligne = $transaction->lignes()->ventilation()->sole();
 
-    expect(fn () => app(TransactionService::class)->affecterLigne($ligne->fresh(), [[
-        'operation_id' => null,
-        'seance' => null,
-        'montant' => '50.00',
-        'notes' => 'Service interdit',
-    ]]))->toThrow(RuntimeException::class, 'transaction réglée')
-        ->and(fn () => app(TransactionService::class)->supprimerAffectations($ligne->fresh()))
-        ->toThrow(RuntimeException::class, 'transaction réglée');
+    // Photo de l'écriture avant ventilation : c'est elle qui doit rester intacte.
+    $ligne411 = $transaction->lignes()->whereNotNull('lettrage_code')->sole();
+    $lettrageAvant = $ligne411->lettrage_code;
+    $compteAvant = (int) $ligne->compte_id;
+    $montantAvant = (string) $ligne->montant;
+
+    expect($transaction->aUnReglementTiers())->toBeTrue()
+        ->and($lettrageAvant)->not->toBeNull();
+
+    // Cas réel : la transaction est aussi pointée (rapprochement bancaire), état
+    // dans lequel les lignes ne sont plus éditables directement et où « Ventiler »
+    // est justement le seul geste analytique restant. Le règlement le masquait.
+    $transaction->update(['statut_reglement' => StatutReglement::Pointe->value]);
+    expect($transaction->fresh()->isLockedByRapprochement())->toBeTrue();
 
     Livewire::test(TransactionForm::class)
         ->call('edit', $transaction->id)
-        ->set('ventilationLigneId', $ligne->id)
+        ->assertSee('Ventiler');
+
+    // La ventilation analytique découpe le montant par opération/séance SOUS le
+    // compte : elle ne peut toucher ni le compte, ni le débit/crédit, ni le lettrage.
+    app(TransactionService::class)->affecterLigne($ligne->fresh(), [
+        ['operation_id' => null, 'seance' => 1, 'montant' => '30.00', 'notes' => 'Séance 1'],
+        ['operation_id' => null, 'seance' => 2, 'montant' => '20.00', 'notes' => 'Séance 2'],
+    ]);
+
+    expect($ligne->fresh()->affectations)->toHaveCount(2)
+        ->and((int) $ligne->fresh()->compte_id)->toBe($compteAvant)
+        ->and((string) $ligne->fresh()->montant)->toBe($montantAvant)
+        ->and($ligne411->fresh()->lettrage_code)->toBe($lettrageAvant);
+
+    $fresh = $transaction->fresh();
+    expect((bool) $fresh->equilibree)->toBeTrue()
+        ->and(round((float) $fresh->lignes()->sum('debit'), 2))
+        ->toBe(round((float) $fresh->lignes()->sum('credit'), 2));
+
+    // Le même chemin passe par le composant, et la suppression aussi.
+    Livewire::test(TransactionForm::class)
+        ->call('edit', $transaction->id)
+        ->call('ouvrirVentilation', $ligne->id)
         ->set('affectations', [[
             'operation_id' => '',
             'seance' => '',
             'montant' => '50.00',
-            'notes' => 'Contournement interdit',
+            'notes' => 'Regroupé',
         ]])
         ->call('saveVentilation')
-        ->assertForbidden();
+        ->assertHasNoErrors();
 
-    expect($ligne->fresh()->affectations)->toHaveCount(0);
+    expect($ligne->fresh()->affectations)->toHaveCount(1);
+
+    app(TransactionService::class)->supprimerAffectations($ligne->fresh());
+    expect($ligne->fresh()->affectations)->toHaveCount(0)
+        ->and($ligne411->fresh()->lettrage_code)->toBe($lettrageAvant)
+        ->and((bool) $transaction->fresh()->equilibree)->toBeTrue();
 });
 
 it('affiche le reliquat, l’historique et préserve le lettrage lors d’un changement de libellé', function (): void {

@@ -768,7 +768,14 @@ final class TransactionService
         if ($transaction->isLockedByFacture()) {
             throw new \RuntimeException('Cette transaction est liée à une facture validée. La ventilation ne peut pas être modifiée.');
         }
-        $this->assertVentilationModifiable($transaction);
+
+        // Un règlement tiers n'interdit PAS la ventilation analytique : les
+        // affectations sous-découpent le montant par opération/séance sous le compte
+        // de la ligne parente. La table ne porte ni compte_id ni débit/crédit, et la
+        // somme est verrouillée au montant de la ligne — ni l'équilibre, ni le poste
+        // tiers, ni son lettrage ne peuvent bouger. Ce qui reste interdit sur une
+        // transaction réglée (compte, montant, opération portés par la ligne) est
+        // gardé par assertReglementTiersInvariants() dans update().
 
         DB::transaction(function () use ($ligne, $affectations) {
             if (count($affectations) === 0) {
@@ -809,16 +816,8 @@ final class TransactionService
         if ($transaction->isLockedByFacture()) {
             throw new \RuntimeException('Cette transaction est liée à une facture validée. La ventilation ne peut pas être modifiée.');
         }
-        $this->assertVentilationModifiable($transaction);
 
         DB::transaction(fn () => $ligne->affectations()->delete());
-    }
-
-    private function assertVentilationModifiable(Transaction $transaction): void
-    {
-        if ($transaction->fresh()->aUnReglementTiers()) {
-            throw new \RuntimeException('La ventilation ne peut pas être modifiée sur une transaction réglée.');
-        }
     }
 
     public function storePieceJointe(Transaction $transaction, UploadedFile $file): void
@@ -1013,13 +1012,13 @@ final class TransactionService
 
         $lignesExistantes = $transaction->lignes()->ventilation()->get()->keyBy('id');
         if (count($lignes) !== $lignesExistantes->count()) {
-            throw new \RuntimeException('La ventilation ne peut pas être modifiée sur une transaction réglée.');
+            throw new \RuntimeException('Les lignes d\'une transaction réglée ne peuvent pas être modifiées (compte, montant, opération) — annulez le règlement d\'abord. La répartition par opération et séance, elle, reste modifiable.');
         }
 
         foreach ($lignes as $ligneData) {
             $id = $ligneData['id'] ?? null;
             if ($id === null || ! $lignesExistantes->has($id)) {
-                throw new \RuntimeException('La ventilation ne peut pas être modifiée sur une transaction réglée.');
+                throw new \RuntimeException('Les lignes d\'une transaction réglée ne peuvent pas être modifiées (compte, montant, opération) — annulez le règlement d\'abord. La répartition par opération et séance, elle, reste modifiable.');
             }
 
             /** @var TransactionLigne $ligneExistante */
@@ -1028,7 +1027,7 @@ final class TransactionService
                 || (int) round((float) $ligneExistante->montant * 100) !== (int) round((float) $ligneData['montant'] * 100)
                 || ! $this->memeIdentifiantNullable($ligneExistante->operation_id, $ligneData['operation_id'] ?? null)
                 || ! $this->memeIdentifiantNullable($ligneExistante->seance, $ligneData['seance'] ?? null)) {
-                throw new \RuntimeException('La ventilation ne peut pas être modifiée sur une transaction réglée.');
+                throw new \RuntimeException('Les lignes d\'une transaction réglée ne peuvent pas être modifiées (compte, montant, opération) — annulez le règlement d\'abord. La répartition par opération et séance, elle, reste modifiable.');
             }
         }
     }

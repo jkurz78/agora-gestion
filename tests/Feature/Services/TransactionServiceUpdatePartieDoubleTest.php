@@ -87,7 +87,7 @@ it('refuse toute modification du grand livre d’une T1 réglée', function (): 
         $transaction,
         $data,
         [[...$ligne, 'compte_id' => $this->compte708->id]]
-    ))->toThrow(RuntimeException::class, 'ventilation');
+    ))->toThrow(RuntimeException::class, 'transaction réglée ne peuvent pas être modifiées');
 
     expect(Transaction::count())->toBe(2);
 });

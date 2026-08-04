@@ -352,7 +352,6 @@ final class TransactionForm extends Component
         }
 
         $ligne = TransactionLigne::with('affectations', 'compte')->findOrFail($ligneId);
-        $this->assertVentilationModifiable($ligne);
         $this->ventilationLigneId = $ligneId;
         // DC-10a : libellé lu depuis le compte (source unique de la ventilation).
         $this->ventilationLigneCompteLabel = $ligne->compte?->intitule ?? '';
@@ -424,7 +423,6 @@ final class TransactionForm extends Component
         );
 
         $ligne = TransactionLigne::findOrFail($this->ventilationLigneId);
-        $this->assertVentilationModifiable($ligne);
         $ligneMontantCents = (int) round((float) $ligne->montant * 100);
         $affectationCents = (int) round(collect($this->affectations)->sum(fn ($a) => (float) ($a['montant'] ?? 0)) * 100);
         if ($ligneMontantCents !== $affectationCents) {
@@ -459,7 +457,6 @@ final class TransactionForm extends Component
         }
 
         $ligne = TransactionLigne::findOrFail($this->ventilationLigneId);
-        $this->assertVentilationModifiable($ligne);
         app(TransactionService::class)->supprimerAffectations($ligne);
         $this->fermerVentilation();
         $this->dispatch('transaction-saved');
@@ -1251,14 +1248,6 @@ final class TransactionForm extends Component
         $this->etatPaiement = $reglements->isEmpty()
             ? 'ouvert'
             : ($poste === null ? 'solde' : 'partiel');
-    }
-
-    private function assertVentilationModifiable(TransactionLigne $ligne): void
-    {
-        $transaction = Transaction::findOrFail((int) $ligne->transaction_id);
-        if ($transaction->aUnReglementTiers()) {
-            abort(403);
-        }
     }
 
     public function render(): View

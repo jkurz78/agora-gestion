@@ -133,7 +133,7 @@
                     @endif
                     @if ($isLockedByReglement)
                         <div class="alert alert-warning small py-2 mb-3">
-                            <i class="bi bi-lock"></i> Des règlements sont enregistrés : annulez-les avant de modifier la date, le tiers, le compte bancaire, les montants ou la ventilation.
+                            <i class="bi bi-lock"></i> Des règlements sont enregistrés : annulez-les avant de modifier la date, le tiers, le compte bancaire, les montants ou le compte d'une ligne. La répartition par opération et séance reste modifiable.
                         </div>
                     @endif
                     <div class="row g-3 mb-4">
@@ -528,7 +528,7 @@
                                                     <i class="bi bi-trash"></i>
                                                 </button>
                                             @endif
-                                            @if ($isLocked && ! $isLockedByFacture && ! $isLockedByReglement && ! $exerciceCloture && ($ligne['id'] ?? null) !== null)
+                                            @if ($isLocked && ! $isLockedByFacture && ! $exerciceCloture && ($ligne['id'] ?? null) !== null)
                                                 <button type="button"
                                                         wire:click="ouvrirVentilation({{ $ligne['id'] }})"
                                                         class="btn btn-sm btn-outline-warning ms-1">
