@@ -11,6 +11,7 @@ use App\Services\HelloAssoApiClient;
 use App\Services\HelloAssoSyncService;
 use App\Support\Demo;
 use App\Tenant\TenantContext;
+use App\Tenant\TenantScope;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -29,7 +30,12 @@ final class HelloAssoSyncCommand extends Command
             return self::SUCCESS;
         }
 
+        // Inventaire cross-tenant : en CLI aucun TenantContext n'est booté, et le
+        // scope global fail-closed de TenantModel renverrait WHERE 1 = 0 — la
+        // commande ne verrait jamais aucune configuration. Chaque tenant est booté
+        // individuellement plus bas, avant toute lecture de ses données.
         $paramsList = HelloAssoParametres::query()
+            ->withoutGlobalScope(TenantScope::class)
             ->with('association')
             ->get();
 
