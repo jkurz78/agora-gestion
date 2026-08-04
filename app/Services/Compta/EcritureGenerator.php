@@ -942,7 +942,8 @@ final class EcritureGenerator
      * @param  iterable<int, array{compte: Compte, montant: float, operation_id?: ?int, seance?: ?int, notes?: ?string}>  $ventilations
      *
      * @throws \InvalidArgumentException Si total ≤ 0 ou ventilations vides.
-     * @throws CompteIncorrectException Si un compte ventilé ∉ classe 6.
+     * @throws CompteIncorrectException Si un compte ventilé ∉ classe 6
+     *                                  (∉ classes 2 et 6 si $autoriseImmobilisation).
      * @throws TenantBoundaryException Si $tiers n'appartient pas au tenant courant.
      * @throws EcritureNonEquilibreeException Sécurité paranoïaque post-création.
      */
@@ -952,6 +953,7 @@ final class EcritureGenerator
         \DateTimeInterface $dateConstatation,
         ?string $libelle = null,
         ?Transaction $existingTransaction = null,
+        bool $autoriseImmobilisation = false,
     ): Transaction {
         // --- Normalisation ventilations ---
         $ventilationsNorm = collect($ventilations);
@@ -963,15 +965,23 @@ final class EcritureGenerator
         }
 
         // --- Validation : chaque compte ventilé est classe 6 ---
+        //
+        // $autoriseImmobilisation ouvre la classe 2 et n'est passé que par
+        // ImmobilisationService. Les autres appelants (TransactionService,
+        // TransactionConverter, HelloAsso, notes de frais, factures
+        // fournisseurs) conservent le défaut false et restent verrouillés.
         foreach ($ventilationsNorm as $v) {
             /** @var Compte $compteVent */
             $compteVent = $v['compte'];
 
-            if ($compteVent->classe !== 6) {
+            $classeAutorisee = $compteVent->classe === 6
+                || ($autoriseImmobilisation && $compteVent->classe === 2);
+
+            if (! $classeAutorisee) {
                 throw CompteIncorrectException::classeAttendue(
                     $compteVent->numero_pcg,
                     $compteVent->classe,
-                    6
+                    $autoriseImmobilisation ? '2 ou 6' : 6
                 );
             }
         }
