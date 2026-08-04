@@ -384,6 +384,13 @@ final class HelloAssoSyncService
             $formMapping = HelloAssoFormMapping::where('form_slug', $formSlug)->first();
             if ($formMapping?->form_type !== 'Donation') {
                 $compteId = $this->parametres->compte_don_id;
+
+                // Fail-closed : sans compte de fallback, la suite de la résolution
+                // redescendrait sur le compte du formulaire et rangerait le don en
+                // cotisation/inscription — silencieusement (régression HA-82469813).
+                if ($compteId === null) {
+                    throw new \RuntimeException("Formulaire '{$formSlug}' : un don additionnel a été reçu alors qu'aucun compte de fallback « don additionnel » n'est configuré — renseignez-le dans Paramètres → HelloAsso avant de synchroniser.");
+                }
             }
         }
 

@@ -56,6 +56,9 @@ beforeEach(function () {
         'organisation_slug' => 'test',
         'environnement' => 'sandbox',
         'compte_helloasso_id' => $this->compte->id,
+        // Requis dès qu'un order porte un item Donation dans un form non-Donation
+        // (cf. « groups items by beneficiary ») : sans lui la sync refuse l'order.
+        'compte_don_id' => $this->scDon->id,
     ]);
 
     // Form mappings portent maintenant les comptes par formulaire

@@ -200,3 +200,40 @@ it('échoue si fallback Don non configuré et un don additionnel apparaît sans 
     // L'order est skipped car compte_id = null sur le form ET pas de fallback don
     expect(Transaction::count())->toBe(0);
 });
+
+it('refuse le don additionnel quand le fallback Don n\'est pas configuré au lieu de le ranger en cotisation', function (): void {
+    // Régression HA-82469813 : compte_don_id non renseigné + form mapping porteur d'un
+    // compte (Cotisations). La chaîne de résolution redescendait sur le compte du form,
+    // et le don atterrissait en 751 Cotisations sans un mot dans les logs.
+    $this->parametres->update(['compte_don_id' => null]);
+
+    Http::fake([
+        '*api.helloasso-sandbox.com/oauth2/token' => Http::response(['access_token' => 'tok', 'expires_in' => 3600]),
+        '*api.helloasso-sandbox.com/v5/organizations/mon-asso/forms/Membership/cotisation-2025/public' => Http::response([
+            'formSlug' => 'cotisation-2025',
+            'tiers' => [['id' => 1, 'label' => 'Adulte', 'price' => 2500]],
+        ]),
+    ]);
+
+    $order = [
+        'id' => 9003,
+        'date' => '2025-10-15T10:00:00Z',
+        'formSlug' => 'cotisation-2025',
+        'formType' => 'Membership',
+        'payments' => [['id' => 7779, 'paymentMeans' => 'Card']],
+        'user' => null,
+        'payer' => ['firstName' => 'Jean', 'lastName' => 'DUPONT'],
+        'items' => [
+            ['id' => 1236, 'amount' => 2500, 'type' => 'Membership', 'tierId' => 1, 'user' => ['firstName' => 'Jean', 'lastName' => 'DUPONT']],
+            ['id' => 1237, 'amount' => 1000, 'type' => 'Donation', 'user' => ['firstName' => 'Jean', 'lastName' => 'DUPONT']],
+        ],
+    ];
+
+    $service = new HelloAssoSyncService($this->parametres);
+    $result = $service->synchroniser([$order], 2025);
+
+    expect(Transaction::count())->toBe(0)
+        ->and($result->ordersSkipped)->toBe(1)
+        ->and($result->errors)->toHaveCount(1)
+        ->and($result->errors[0])->toContain('don additionnel');
+});
