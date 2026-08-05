@@ -16,6 +16,7 @@ use App\Http\Controllers\EmailOptoutController;
 use App\Http\Controllers\EmailTrackingController;
 use App\Http\Controllers\FacturePdfController;
 use App\Http\Controllers\FormulaireController;
+use App\Http\Controllers\ImmobilisationPdfController;
 use App\Http\Controllers\IncomingDocumentsController;
 use App\Http\Controllers\OnboardingBrandingController;
 use App\Http\Controllers\OnboardingController;
@@ -307,6 +308,8 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
             ->name('immobilisations.index');
         Route::get('/comptabilite/immobilisations/{immobilisation}', ImmobilisationShow::class)
             ->name('immobilisations.show');
+        Route::get('/comptabilite/immobilisations/{immobilisation}/pdf', ImmobilisationPdfController::class)
+            ->name('immobilisations.pdf');
     });
 
 // ── Redirections 301 (anciennes URLs) ──
