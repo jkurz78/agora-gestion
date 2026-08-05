@@ -51,6 +51,10 @@ final class ImmobilisationIndex extends Component
 
     public function ouvrirModal(): void
     {
+        // Créé à la demande (pas au provisionnement du tenant) : idempotent,
+        // donc sans effet de bord si le kit existe déjà.
+        ImmobilisationComptesSeeder::seed();
+
         $this->reset([
             'libelle', 'quantite', 'compte_id', 'compte_amortissement_id',
             'tiers_id', 'montant', 'date_achat', 'date_mise_en_service', 'notes',
