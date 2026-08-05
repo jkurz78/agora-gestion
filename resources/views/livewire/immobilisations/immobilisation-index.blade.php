@@ -5,8 +5,16 @@
 <div>
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h4 class="mb-0">Livre des immobilisations</h4>
-        {{-- Bouton rétabli en tâche 12 --}}
+        <button type="button" class="btn btn-primary btn-sm" wire:click="ouvrirModal">
+            <i class="bi bi-plus-lg me-1"></i> Nouvelle immobilisation
+        </button>
     </div>
+
+    @if ($flashMessage !== '')
+        <div class="alert alert-{{ $flashType === 'success' ? 'success' : 'info' }}">
+            {{ $flashMessage }}
+        </div>
+    @endif
 
     @if ($immobilisations->isEmpty())
         <div class="alert alert-info">
@@ -66,6 +74,105 @@
                     </tr>
                 </tfoot>
             </table>
+        </div>
+    @endif
+
+    @if ($showModal)
+        <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5)"
+             data-bs-backdrop="static" data-bs-keyboard="false" wire:key="modal-immo">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Nouvelle immobilisation</h5>
+                        <button type="button" class="btn-close" wire:click="fermerModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-8">
+                                <label class="form-label">Libellé</label>
+                                <input type="text" class="form-control @error('libelle') is-invalid @enderror"
+                                       wire:model="libelle" placeholder="20 tenues d'escrime">
+                                @error('libelle') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Quantité</label>
+                                <input type="number" min="1" class="form-control @error('quantite') is-invalid @enderror"
+                                       wire:model="quantite">
+                                @error('quantite') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Fournisseur</label>
+                                <livewire:tiers-autocomplete wire:model="tiers_id" :key="'tiers-immo'" />
+                                @error('tiers_id') <div class="text-danger small">{{ $message }}</div> @enderror
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Montant</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control @error('montant') is-invalid @enderror"
+                                           wire:model="montant" inputmode="decimal">
+                                    <span class="input-group-text">€</span>
+                                    @error('montant') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Compte d'immobilisation</label>
+                                <select class="form-select @error('compte_id') is-invalid @enderror" wire:model.live="compte_id">
+                                    <option value="">— choisir —</option>
+                                    @foreach ($comptesImmobilisation as $groupe)
+                                        <optgroup label="{{ $groupe['famille']?->nom ?? 'Autres' }}">
+                                            @foreach ($groupe['comptes'] as $compte)
+                                                <option value="{{ $compte->id }}">
+                                                    {{ $compte->numero_pcg }} — {{ $compte->intitule }}
+                                                </option>
+                                            @endforeach
+                                        </optgroup>
+                                    @endforeach
+                                </select>
+                                @error('compte_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Compte d'amortissement</label>
+                                <input type="text" class="form-control" readonly
+                                       value="{{ $compte_amortissement_id ? \App\Models\Compte::find((int) $compte_amortissement_id)?->numero_pcg.' — '.\App\Models\Compte::find((int) $compte_amortissement_id)?->intitule : '' }}">
+                                @error('compte_amortissement_id') <div class="text-danger small">{{ $message }}</div> @enderror
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label">Date d'achat</label>
+                                <input type="date" class="form-control @error('date_achat') is-invalid @enderror"
+                                       wire:model.live="date_achat">
+                                @error('date_achat') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Mise en service</label>
+                                <input type="date" class="form-control @error('date_mise_en_service') is-invalid @enderror"
+                                       wire:model="date_mise_en_service">
+                                @error('date_mise_en_service') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Durée d'amortissement</label>
+                                <select class="form-select @error('duree_mois') is-invalid @enderror" wire:model="duree_mois">
+                                    @foreach ($dureesUsuelles as $mois => $label)
+                                        <option value="{{ $mois }}">{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                                @error('duree_mois') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            </div>
+
+                            <div class="col-12">
+                                <label class="form-label">Notes</label>
+                                <textarea class="form-control" rows="2" wire:model="notes"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" wire:click="fermerModal">Annuler</button>
+                        <button type="button" class="btn btn-primary" wire:click="enregistrer">Enregistrer</button>
+                    </div>
+                </div>
+            </div>
         </div>
     @endif
 </div>
