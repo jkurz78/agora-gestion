@@ -17,6 +17,7 @@ use App\Models\TransactionLigne;
 use App\Models\VirementInterne;
 use App\Services\Compta\ANouveau\ANouveauPreviewBuilder;
 use App\Services\Compta\EtatComptaResolver;
+use App\Services\Immobilisation\DotationService;
 use Throwable;
 
 final class ClotureCheckService
@@ -47,6 +48,7 @@ final class ClotureCheckService
                 $this->checkTransactionsNonPointees($start, $end),
                 $this->checkBudgetAbsent($annee),
                 $this->checkMouvementsExerciceCible($annee),
+                $this->checkDotationsAmortissements($annee),
             ],
             soldesComptes: $this->calculerSoldesComptes($annee),
         );
@@ -240,6 +242,46 @@ final class ClotureCheckService
             message: $count === 0
                 ? 'Aucun mouvement dans l’exercice suivant'
                 : "{$count} mouvement(s) déjà présent(s) dans l’exercice suivant ; ils seront conservés",
+        );
+    }
+
+    /**
+     * Des dotations aux amortissements restent-elles à générer ?
+     *
+     * Avertissement et non bloquant : une association sans immobilisation n'a
+     * rien à doter, et le trésorier reste maître de l'ordre de ses opérations.
+     * Le contrôle est l'endroit naturel où se rappeler que les dotations doivent
+     * être générées — puis ventilées — avant de clôturer.
+     */
+    private function checkDotationsAmortissements(int $annee): CheckItem
+    {
+        $lignes = app(DotationService::class)->apercu($annee);
+        $aGenerer = $lignes->filter(fn ($ligne): bool => $ligne->aGenerer())->count();
+        $enEcart = $lignes->filter(fn ($ligne): bool => $ligne->enEcart())->count();
+
+        if ($aGenerer === 0 && $enEcart === 0) {
+            return new CheckItem(
+                nom: 'Dotations aux amortissements',
+                ok: true,
+                message: $lignes->isEmpty()
+                    ? 'Aucune immobilisation au registre'
+                    : 'Les dotations de l’exercice sont à jour',
+            );
+        }
+
+        $parts = [];
+        if ($aGenerer > 0) {
+            $parts[] = $aGenerer.' dotation'.($aGenerer > 1 ? 's' : '').' à générer';
+        }
+        if ($enEcart > 0) {
+            $parts[] = $enEcart.' dotation'.($enEcart > 1 ? 's' : '').' à recalculer';
+        }
+
+        return new CheckItem(
+            nom: 'Dotations aux amortissements',
+            ok: false,
+            message: implode(', ', $parts).'. Générez-les puis ventilez-les avant de clôturer : '
+                .'la ventilation n’est plus possible sur un exercice clôturé.',
         );
     }
 
