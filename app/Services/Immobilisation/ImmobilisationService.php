@@ -6,11 +6,13 @@ namespace App\Services\Immobilisation;
 
 use App\Enums\ModePaiement;
 use App\Exceptions\Immobilisation\MiseEnServiceAnterieureException;
+use App\Exceptions\Immobilisation\SuppressionInterditeException;
 use App\Models\Compte;
 use App\Models\Immobilisation;
 use App\Models\Tiers;
 use App\Services\Compta\EcritureGenerator;
 use App\Services\ExerciceService;
+use App\Services\TransactionService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
@@ -31,6 +33,7 @@ final class ImmobilisationService
         private readonly EcritureGenerator $ecritureGenerator,
         private readonly ImmobilisationSequenceService $sequence,
         private readonly ExerciceService $exerciceService,
+        private readonly TransactionService $transactionService,
     ) {}
 
     public function acquerir(
@@ -91,10 +94,85 @@ final class ImmobilisationService
     }
 
     /**
+     * Modifie les champs qui n'engagent pas l'écriture comptable d'acquisition.
+     *
+     * `montant_acquisition` et `compte_id` sont volontairement absents de la
+     * signature : ils portent la transaction d'acquisition, potentiellement
+     * déjà réglée, lettrée ou rapprochée. Les corriger impose de supprimer la
+     * fiche et de la resaisir — voir supprimer().
+     *
+     * Les dotations déjà comptabilisées ne sont pas retouchées ici : c'est le
+     * mécanisme de recalcul existant (DotationService::recalculer(), exposé par
+     * l'écran des dotations) qui absorbe l'écart le moment venu.
+     */
+    public function modifier(
+        Immobilisation $immobilisation,
+        string $libelle,
+        int $quantite,
+        int $dureeMois,
+        \DateTimeInterface $dateMiseEnService,
+        ?string $notes,
+    ): Immobilisation {
+        $transaction = $immobilisation->transaction;
+
+        if ($transaction !== null) {
+            $this->assertMiseEnServiceCoherente($transaction->date, $dateMiseEnService);
+        }
+
+        $immobilisation->update([
+            'libelle' => $libelle,
+            'quantite' => $quantite,
+            'duree_mois' => $dureeMois,
+            'date_mise_en_service' => CarbonImmutable::parse(
+                $dateMiseEnService->format('Y-m-d')
+            )->toDateString(),
+            'notes' => $notes,
+        ]);
+
+        return $immobilisation->fresh();
+    }
+
+    /**
+     * Supprime la fiche et sa transaction d'acquisition (soft-delete des deux,
+     * dans une même transaction DB) : une fiche saisie par erreur ne doit pas
+     * rester au registre pour toujours.
+     *
+     * La fiche est supprimée avant la transaction : Transaction::isLockedByImmobilisation()
+     * ne trouve alors plus rien (le scope SoftDeletes exclut la fiche fraîchement
+     * supprimée) et TransactionService::delete() — qui porte par ailleurs le
+     * contrôle de clôture d'exercice et les autres verrous (rapprochement, remise,
+     * facture) — peut s'exécuter normalement. Le garde reste donc intact pour la
+     * suppression depuis la liste des transactions ; il ne bloque plus ici parce
+     * que la fiche n'existe déjà plus.
+     */
+    public function supprimer(Immobilisation $immobilisation): void
+    {
+        if ($immobilisation->dotations()->exists()) {
+            throw SuppressionInterditeException::dotationsExistantes($immobilisation->numero);
+        }
+
+        $transaction = $immobilisation->transaction;
+
+        if ($transaction === null) {
+            throw new \RuntimeException(
+                "La fiche {$immobilisation->numero} n'a pas de transaction d'acquisition : incohérence de données."
+            );
+        }
+
+        DB::transaction(function () use ($immobilisation, $transaction): void {
+            $immobilisation->delete();
+            $this->transactionService->delete($transaction);
+        });
+    }
+
+    /**
      * La mise en service ne peut pas précéder le début de l'exercice de
      * l'acquisition — sinon on doterait un exercice où le bien n'est pas encore
      * à l'actif. Aucune borne supérieure : la mise en service différée est
      * légitime, et le calculateur la gère par son plancher à 0.
+     *
+     * Réutilisée par modifier() : la modification de date_mise_en_service est
+     * soumise au même contrôle de cohérence que la création.
      */
     private function assertMiseEnServiceCoherente(
         \DateTimeInterface $dateAchat,

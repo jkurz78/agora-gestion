@@ -11,10 +11,25 @@
             </a>
             <h4 class="mb-0 mt-1">{{ $immobilisation->numero }} — {{ $immobilisation->libelle }}</h4>
         </div>
-        <a href="{{ route('immobilisations.pdf', $immobilisation) }}" class="btn btn-outline-secondary btn-sm" target="_blank">
-            <i class="bi bi-file-earmark-pdf me-1"></i> Imprimer la fiche
-        </a>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm" wire:click="ouvrirEdition">
+                <i class="bi bi-pencil me-1"></i> Modifier
+            </button>
+            <button type="button" class="btn btn-outline-danger btn-sm" wire:click="supprimer"
+                    wire:confirm="Supprimer cette fiche ? L'écriture comptable d'acquisition sera supprimée elle aussi.">
+                <i class="bi bi-trash me-1"></i> Supprimer
+            </button>
+            <a href="{{ route('immobilisations.pdf', $immobilisation) }}" class="btn btn-outline-secondary btn-sm" target="_blank">
+                <i class="bi bi-file-earmark-pdf me-1"></i> Imprimer la fiche
+            </a>
+        </div>
     </div>
+
+    @if ($flashMessage !== '')
+        <div class="alert alert-{{ $flashType === 'success' ? 'success' : 'danger' }}">
+            {{ $flashMessage }}
+        </div>
+    @endif
 
     <div class="row g-3 mb-4">
         <div class="col-md-6">
@@ -98,4 +113,80 @@
             </table>
         </div>
     </div>
+
+    @if ($showEditModal)
+        <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5)"
+             data-bs-backdrop="static" data-bs-keyboard="false" wire:key="modal-edit-immo">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Modifier {{ $immobilisation->numero }}</h5>
+                        <button type="button" class="btn-close" wire:click="fermerEdition"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-8">
+                                <label class="form-label">Libellé</label>
+                                <input type="text" class="form-control @error('libelle') is-invalid @enderror"
+                                       wire:model="libelle">
+                                @error('libelle') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Quantité</label>
+                                <input type="number" min="1" class="form-control @error('quantite') is-invalid @enderror"
+                                       wire:model="quantite">
+                                @error('quantite') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Montant</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" readonly
+                                           value="{{ number_format((float) $immobilisation->montant_acquisition, 2, ',', ' ') }}">
+                                    <span class="input-group-text">€</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Compte d'immobilisation</label>
+                                <input type="text" class="form-control" readonly
+                                       value="{{ $immobilisation->compte->numero_pcg }} — {{ $immobilisation->compte->intitule }}">
+                            </div>
+                            <div class="col-12">
+                                <div class="form-text">
+                                    Le montant et le compte ne sont pas modifiables : ils engagent l'écriture
+                                    comptable d'acquisition, potentiellement déjà réglée, lettrée ou rapprochée.
+                                    Pour les corriger, supprimez la fiche puis resaisissez-la.
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Mise en service</label>
+                                <input type="date" class="form-control @error('date_mise_en_service') is-invalid @enderror"
+                                       wire:model="date_mise_en_service">
+                                @error('date_mise_en_service') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Durée d'amortissement</label>
+                                <select class="form-select @error('duree_mois') is-invalid @enderror" wire:model="duree_mois">
+                                    @foreach ($dureesUsuelles as $mois => $label)
+                                        <option value="{{ $mois }}">{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                                @error('duree_mois') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            </div>
+
+                            <div class="col-12">
+                                <label class="form-label">Notes</label>
+                                <textarea class="form-control" rows="2" wire:model="notes"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" wire:click="fermerEdition">Annuler</button>
+                        <button type="button" class="btn btn-primary" wire:click="enregistrerModification">Enregistrer</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
 </div>
