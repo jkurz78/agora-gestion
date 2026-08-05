@@ -8,11 +8,10 @@ use RuntimeException;
 
 final class DotationInterditeException extends RuntimeException
 {
-    public static function exerciceNonTermine(string $finExercice): self
+    public static function exerciceNonCommence(int $exercice): self
     {
         return new self(
-            "Les dotations ne peuvent être générées qu'une fois l'exercice terminé "
-            ."(le {$finExercice}). Le plan d'amortissement reste consultable sur chaque fiche."
+            "L'exercice {$exercice} n'a pas encore commencé : ses dotations ne peuvent pas être générées."
         );
     }
 

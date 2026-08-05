@@ -172,12 +172,20 @@ final class DotationService
         );
     }
 
+    /** Premier jour de l'exercice — jamais now(), jamais une valeur en dur. */
+    private function debutExercice(int $exercice): CarbonImmutable
+    {
+        return CarbonImmutable::parse(
+            $this->exerciceService->dateRange($exercice)['start']->toDateString()
+        );
+    }
+
     private function assertExerciceGenerable(int $exercice): void
     {
-        $fin = $this->finExercice($exercice);
+        $debut = $this->debutExercice($exercice);
 
-        if ($fin->isFuture()) {
-            throw DotationInterditeException::exerciceNonTermine($fin->format('d/m/Y'));
+        if ($debut->isFuture()) {
+            throw DotationInterditeException::exerciceNonCommence($exercice);
         }
 
         $exerciceModel = Exercice::where('annee', $exercice)->first();

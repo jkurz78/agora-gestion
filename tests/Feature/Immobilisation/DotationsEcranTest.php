@@ -45,14 +45,29 @@ it('affiche l’aperçu et génère les dotations', function (): void {
     Carbon::setTestNow();
 });
 
-it('bloque la génération sur un exercice non terminé', function (): void {
+it('autorise la génération avant la fin de l’exercice, dès qu’il a commencé', function (): void {
     Carbon::setTestNow('2027-03-01');
 
     Livewire::test(DotationsExercice::class)
         ->set('exercice', 2026)
+        ->call('genererTout')
+        ->assertHasNoErrors();
+
+    expect(ImmobilisationDotation::count())->toBe(1);
+
+    Carbon::setTestNow();
+});
+
+it('bloque la génération sur un exercice dont la date de début n’est pas encore arrivée', function (): void {
+    Carbon::setTestNow('2027-10-15');
+
+    $component = Livewire::test(DotationsExercice::class)
+        ->set('exercice', 2028)
         ->call('genererTout');
 
-    expect(ImmobilisationDotation::count())->toBe(0);
+    expect(ImmobilisationDotation::count())->toBe(0)
+        ->and($component->get('flashType'))->toBe('warning')
+        ->and($component->get('flashMessage'))->toContain("n'a pas encore commencé");
 
     Carbon::setTestNow();
 });

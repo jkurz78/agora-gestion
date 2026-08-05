@@ -84,11 +84,22 @@ it('est idempotent : un rejeu ne crée pas de doublon', function (): void {
     Carbon::setTestNow();
 });
 
-it('refuse de générer sur un exercice non terminé', function (): void {
+it('autorise la génération avant la fin de l’exercice, dès qu’il a commencé', function (): void {
     ($this->creerImmo)();
-    Carbon::setTestNow('2027-03-01'); // l’exercice 2026 se termine le 31/08/2027
+    Carbon::setTestNow('2027-03-01'); // l’exercice 2026 (débuté le 01/09/2026) est en cours, pas encore terminé
 
-    expect(fn () => app(DotationService::class)->generer(2026))
+    app(DotationService::class)->generer(2026);
+
+    expect(ImmobilisationDotation::where('exercice', 2026)->count())->toBe(1);
+
+    Carbon::setTestNow();
+});
+
+it('refuse de générer sur un exercice dont la date de début est encore à venir', function (): void {
+    ($this->creerImmo)();
+    Carbon::setTestNow('2027-10-15'); // l’exercice 2028 débute le 01/09/2028, encore à venir
+
+    expect(fn () => app(DotationService::class)->generer(2028))
         ->toThrow(DotationInterditeException::class);
 
     Carbon::setTestNow();
