@@ -577,7 +577,13 @@
                         @if((int)$tx->nb_lignes > 1)
                             <i class="bi bi-diagram-2 text-secondary me-1" title="{{ $tx->nb_lignes }} lignes"></i>
                         @endif
-                        {{ $tx->compte_ventilation_nom ?? '' }}
+                        @php $immoTx = $immobilisationsParTransaction[(int) $tx->id] ?? null; @endphp
+                        @if ($immoTx !== null)
+                            {{ $immoTx->compte->numero_pcg }} — {{ $immoTx->compte->intitule }}
+                            <span class="badge bg-info text-dark ms-1">Immobilisation</span>
+                        @else
+                            {{ $tx->compte_ventilation_nom ?? '' }}
+                        @endif
                     </td>
                     <td class="small text-muted">{{ $tx->mode_paiement ?? '—' }}</td>
                     <td class="text-end fw-semibold small text-nowrap {{ (float)$tx->montant >= 0 ? 'text-success' : 'text-danger' }}">

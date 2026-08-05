@@ -9,6 +9,7 @@ use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Livewire\Concerns\WithPerPage;
 use App\Models\ANouveauLigneOrigine;
 use App\Models\CompteBancaire;
+use App\Models\Immobilisation;
 use App\Models\NoteDeFrais;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -479,6 +480,17 @@ final class TransactionUniverselle extends Component
                 });
         }
 
+        // Transactions d'acquisition d'immobilisation : leur unique ligne métier
+        // est en classe 2, donc hors du scope ventilation(). On les résout à part
+        // pour afficher le compte et un badge, sans toucher au scope.
+        $immobilisationsParTransaction = empty($txIds)
+            ? collect()
+            : Immobilisation::query()
+                ->with('compte')
+                ->whereIn('transaction_id', $txIds)
+                ->get()
+                ->keyBy(fn (Immobilisation $i): int => (int) $i->transaction_id);
+
         $comptesBancaires = CompteBancaire::orderBy('nom')->get();
 
         return view('livewire.transaction-universelle', [
@@ -492,6 +504,7 @@ final class TransactionUniverselle extends Component
             'showCompteCol' => $this->compteId === null,
             'showTiersCol' => $this->tiersId === null,
             'ndfByTransactionId' => $ndfByTransactionId,
+            'immobilisationsParTransaction' => $immobilisationsParTransaction,
         ]);
     }
 }

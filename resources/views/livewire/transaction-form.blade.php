@@ -131,6 +131,16 @@
                             </div>
                         </div>
                     @endif
+                    @if ($isLockedByImmobilisation)
+                        <div class="alert alert-info d-flex align-items-center gap-2">
+                            <i class="bi bi-box-seam"></i>
+                            <div>
+                                Cette transaction provient de l’immobilisation
+                                <strong>{{ $immobilisationLibelle }}</strong> — les écritures suivent la fiche.
+                                <a href="{{ route('immobilisations.show', $immobilisationId) }}">Ouvrir la fiche</a>
+                            </div>
+                        </div>
+                    @endif
                     @if ($isLockedByReglement)
                         <div class="alert alert-warning small py-2 mb-3">
                             <i class="bi bi-lock"></i> Des règlements sont enregistrés : annulez-les avant de modifier la date, le tiers, le compte bancaire, les montants ou le compte d'une ligne. La répartition par opération et séance reste modifiable.
