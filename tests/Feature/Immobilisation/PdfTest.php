@@ -32,3 +32,23 @@ it('produit un PDF de la fiche', function (): void {
         ->assertOk()
         ->assertHeader('content-type', 'application/pdf');
 });
+
+it('suit le patron PDF maison : logo/identité association en en-tête et pied de page commun', function (): void {
+    // Conformité statique — un PDF se teste mal au-delà du MIME type (cf. test
+    // ci-dessus) : on vérifie ici que le contrôleur et la vue suivent le même
+    // patron que App\Http\Controllers\RapprochementPdfController, plutôt que
+    // de tenter de parser le binaire PDF généré.
+    $controller = file_get_contents(app_path('Http/Controllers/ImmobilisationPdfController.php'));
+
+    expect($controller)
+        ->toContain('CurrentAssociation::get()')
+        ->and($controller)->toContain('brandingLogoFullPath()')
+        ->and($controller)->toContain('PdfFooterRenderer::render(');
+
+    $view = file_get_contents(resource_path('views/pdf/immobilisation.blade.php'));
+
+    expect($view)
+        ->toContain("@include('pdf.partials.footer-logos')")
+        ->and($view)->toContain('$association->nom')
+        ->and($view)->toContain('logoBase64');
+});
