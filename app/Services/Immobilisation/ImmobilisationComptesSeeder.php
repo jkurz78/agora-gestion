@@ -63,6 +63,10 @@ final class ImmobilisationComptesSeeder
                     'classe' => (int) substr($numero, 0, 1),
                     'actif' => true,
                     'lettrable' => false,
+                    // 6811 est un compte de convention, résolu par son numéro
+                    // exactement comme 401/411 : protégé comme eux. Les 21XX/281XX
+                    // restent ordinaires — choisis par l'utilisateur, renommables.
+                    'est_systeme' => $numero === '6811',
                 ],
             );
         }

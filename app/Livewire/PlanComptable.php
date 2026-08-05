@@ -6,6 +6,7 @@ namespace App\Livewire;
 
 use App\Models\Compte;
 use App\Models\Famille;
+use App\Models\Immobilisation;
 use App\Tenant\TenantContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Validation\Rule;
@@ -223,6 +224,19 @@ final class PlanComptable extends Component
 
         if ($compte->est_systeme) {
             $this->flashMessage = 'Ce compte système ne peut pas être supprimé.';
+            $this->flashType = 'danger';
+
+            return;
+        }
+
+        // Une fiche d'immobilisation peut référencer son compte (compte_id) ou
+        // son compte d'amortissement (compte_amortissement_id) avant même
+        // qu'aucune dotation n'ait été générée — le compte 281X ne porte alors
+        // encore aucune écriture, donc la garde ci-dessous ne suffirait pas.
+        // Vérifiée avant elle pour donner la raison la plus spécifique.
+        $compteId = (int) $compte->id;
+        if (Immobilisation::where('compte_id', $compteId)->orWhere('compte_amortissement_id', $compteId)->exists()) {
+            $this->flashMessage = 'Suppression impossible : ce compte est utilisé par une immobilisation.';
             $this->flashType = 'danger';
 
             return;
