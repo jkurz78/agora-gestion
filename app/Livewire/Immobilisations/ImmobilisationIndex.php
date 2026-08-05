@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Immobilisations;
 
 use App\Exceptions\Immobilisation\MiseEnServiceAnterieureException;
+use App\Livewire\Immobilisations\Concerns\WithDureeSelector;
 use App\Models\Compte;
 use App\Models\Immobilisation;
 use App\Models\Tiers;
@@ -19,6 +20,8 @@ use Livewire\Component;
 
 final class ImmobilisationIndex extends Component
 {
+    use WithDureeSelector;
+
     // ── État de la modale ────────────────────────────────────────
     public bool $showModal = false;
 
@@ -46,9 +49,6 @@ final class ImmobilisationIndex extends Component
 
     public string $flashType = '';
 
-    /** Durées proposées, en mois. La saisie libre reste possible. */
-    public const DUREES_USUELLES = [36 => '3 ans', 60 => '5 ans', 84 => '7 ans', 120 => '10 ans', 180 => '15 ans'];
-
     public function ouvrirModal(): void
     {
         // Créé à la demande (pas au provisionnement du tenant) : idempotent,
@@ -60,7 +60,7 @@ final class ImmobilisationIndex extends Component
             'tiers_id', 'montant', 'date_achat', 'date_mise_en_service', 'notes',
         ]);
         $this->quantite = 1;
-        $this->duree_mois = 60;
+        $this->initDureeChoix(60);
         $this->date_achat = app(ExerciceService::class)->defaultDate();
         $this->date_mise_en_service = $this->date_achat;
         $this->resetValidation();

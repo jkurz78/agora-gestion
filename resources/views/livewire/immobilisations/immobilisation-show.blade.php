@@ -174,13 +174,7 @@
                                 @error('date_mise_en_service') <div class="invalid-feedback">{{ $message }}</div> @enderror
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Durée d'amortissement</label>
-                                <select class="form-select @error('duree_mois') is-invalid @enderror" wire:model="duree_mois">
-                                    @foreach ($dureesUsuelles as $mois => $label)
-                                        <option value="{{ $mois }}">{{ $label }}</option>
-                                    @endforeach
-                                </select>
-                                @error('duree_mois') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                @include('livewire.immobilisations.partials._duree-selector')
                             </div>
 
                             <div class="col-12">

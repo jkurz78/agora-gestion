@@ -7,6 +7,7 @@ namespace App\Livewire\Immobilisations;
 use App\Exceptions\ExerciceCloturedException;
 use App\Exceptions\Immobilisation\MiseEnServiceAnterieureException;
 use App\Exceptions\Immobilisation\SuppressionInterditeException;
+use App\Livewire\Immobilisations\Concerns\WithDureeSelector;
 use App\Models\Immobilisation;
 use App\Services\ExerciceService;
 use App\Services\Immobilisation\ImmobilisationService;
@@ -17,6 +18,8 @@ use Livewire\Component;
 
 final class ImmobilisationShow extends Component
 {
+    use WithDureeSelector;
+
     public Immobilisation $immobilisation;
 
     // ── État du formulaire d'édition ─────────────────────────────
@@ -47,7 +50,7 @@ final class ImmobilisationShow extends Component
 
         return view('livewire.immobilisations.immobilisation-show', [
             'plan' => $this->construirePlan(),
-            'dureesUsuelles' => ImmobilisationIndex::DUREES_USUELLES,
+            'dureesUsuelles' => self::DUREES_USUELLES,
         ])->layout('layouts.app-sidebar', ['title' => $this->immobilisation->numero]);
     }
 
@@ -60,7 +63,7 @@ final class ImmobilisationShow extends Component
     {
         $this->libelle = $this->immobilisation->libelle;
         $this->quantite = (int) $this->immobilisation->quantite;
-        $this->duree_mois = (int) $this->immobilisation->duree_mois;
+        $this->initDureeChoix((int) $this->immobilisation->duree_mois);
         $this->date_mise_en_service = $this->immobilisation->date_mise_en_service->toDateString();
         $this->notes = $this->immobilisation->notes ?? '';
         $this->resetValidation();
