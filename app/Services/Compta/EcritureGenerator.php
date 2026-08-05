@@ -14,6 +14,7 @@ use App\Exceptions\Compta\TenantBoundaryException;
 use App\Exceptions\Compta\TiersInterditException;
 use App\Exceptions\Compta\TiersRequisException;
 use App\Models\Compte;
+use App\Models\Immobilisation;
 use App\Models\Provision;
 use App\Models\RemiseBancaire;
 use App\Models\Tiers;
@@ -1806,6 +1807,80 @@ final class EcritureGenerator
                 'journal' => JournalComptable::Od,
                 'numero_piece' => $numeroPiece,
                 'provision_id' => $provision->id,
+            ]);
+
+            $ligneDebit = TransactionLigne::create([
+                'transaction_id' => $transaction->id,
+                'compte_id' => $compteDebit->id,
+                'debit' => $montant,
+                'credit' => 0,
+                'tiers_id' => null,
+                'libelle' => $libelle,
+                'montant' => 0,
+            ]);
+            $ligneDebit->setRelation('compte', $compteDebit);
+
+            $ligneCredit = TransactionLigne::create([
+                'transaction_id' => $transaction->id,
+                'compte_id' => $compteCredit->id,
+                'debit' => 0,
+                'credit' => $montant,
+                'tiers_id' => null,
+                'libelle' => $libelle,
+                'montant' => 0,
+            ]);
+            $ligneCredit->setRelation('compte', $compteCredit);
+
+            $lignes = collect([$ligneDebit, $ligneCredit]);
+            $this->assertEquilibre($lignes);
+            $this->assertTenantCoherence($lignes);
+
+            return $transaction->load('lignes.compte');
+        });
+    }
+
+    /**
+     * Dotation aux amortissements d'une immobilisation : 6811 D / 281X C.
+     *
+     * type = Depense et journal = Od, comme pourProvisionDotation : c'est une
+     * opération d'inventaire, pas un mouvement de trésorerie.
+     *
+     * La date est imposée par l'appelant (dernier jour de l'exercice cible) et
+     * n'est jamais dérivée de now().
+     */
+    public function pourDotationAmortissement(
+        Immobilisation $immobilisation,
+        \DateTimeInterface $date,
+        string $montant,
+    ): Transaction {
+        $tenantId = (int) TenantContext::currentId();
+        $libelle = 'Dotation '.$immobilisation->numero.' — '.$immobilisation->libelle;
+
+        $compteDebit = Compte::where('association_id', $tenantId)
+            ->where('numero_pcg', '6811')
+            ->firstOrFail();
+
+        $compteCredit = Compte::where('association_id', $tenantId)
+            ->whereKey((int) $immobilisation->compte_amortissement_id)
+            ->firstOrFail();
+
+        return DB::transaction(function () use (
+            $date, $montant, $libelle, $tenantId, $compteDebit, $compteCredit
+        ): Transaction {
+            $numeroPiece = app(NumeroPieceService::class)->assign(Carbon::parse($date->format('Y-m-d')));
+
+            $transaction = Transaction::create([
+                'association_id' => $tenantId,
+                'type' => TypeTransaction::Depense,
+                'date' => $date->format('Y-m-d'),
+                'libelle' => $libelle,
+                'montant_total' => $montant,
+                'mode_paiement' => null,
+                'saisi_par' => Auth::id(),
+                'equilibree' => true,
+                'type_ecriture' => 'normale',
+                'journal' => JournalComptable::Od,
+                'numero_piece' => $numeroPiece,
             ]);
 
             $ligneDebit = TransactionLigne::create([
