@@ -5,9 +5,14 @@
 <div>
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h4 class="mb-0">Livre des immobilisations</h4>
-        <button type="button" class="btn btn-primary btn-sm" wire:click="ouvrirModal">
-            <i class="bi bi-plus-lg me-1"></i> Nouvelle immobilisation
-        </button>
+        <div class="d-flex gap-2">
+            <a href="{{ route('immobilisations.dotations') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-calculator me-1"></i> Dotations de l'exercice
+            </a>
+            <button type="button" class="btn btn-primary btn-sm" wire:click="ouvrirModal">
+                <i class="bi bi-plus-lg me-1"></i> Nouvelle immobilisation
+            </button>
+        </div>
     </div>
 
     @if ($flashMessage !== '')
