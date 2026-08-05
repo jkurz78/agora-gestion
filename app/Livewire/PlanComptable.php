@@ -15,8 +15,8 @@ use Livewire\Component;
 /**
  * Écran « Plan comptable ».
  *
- * Gère les comptes de résultat (classes 6/7), groupés par famille
- * (préfixe à 2 caractères).
+ * Gère les comptes de résultat (classes 6/7) et les comptes d'immobilisation
+ * et d'amortissement (classe 2), groupés par famille
  */
 final class PlanComptable extends Component
 {
@@ -35,7 +35,7 @@ final class PlanComptable extends Component
 
     public function render(): View
     {
-        $comptes = Compte::whereIn('classe', [6, 7])
+        $comptes = Compte::whereIn('classe', [2, 6, 7])
             ->withCount('lignes')
             ->orderBy('numero_pcg')
             ->get();

@@ -23,7 +23,8 @@ final class PlanComptableSelecteur
      * demandé, groupés par famille (préfixe à 2 caractères), triés par code
      * famille puis par numéro PCG.
      *
-     * @param  string  $type  'depense' (classe 6) ou 'recette' (classe 7)
+     * @param  string  $type  'depense' (classe 6), 'recette' (classe 7) ou
+     *                        'immobilisation' (classe 2, hors comptes 28X)
      * @return Collection<string, array{famille: ?Famille, comptes: Collection<int, Compte>}>
      */
     public static function groupesPourType(string $type): Collection
@@ -31,6 +32,7 @@ final class PlanComptableSelecteur
         $classe = match ($type) {
             'depense' => 6,
             'recette' => 7,
+            'immobilisation' => 2,
             default => throw new \InvalidArgumentException("Type de ventilation invalide : {$type}"),
         };
 
@@ -38,6 +40,7 @@ final class PlanComptableSelecteur
         // de filtre association_id explicite ici (doublerait le garde-fou).
         $comptes = Compte::where('classe', $classe)
             ->where('actif', true)
+            ->when($classe === 2, fn ($q) => $q->where('numero_pcg', 'NOT LIKE', '28%'))
             ->orderBy('numero_pcg')
             ->get();
 
