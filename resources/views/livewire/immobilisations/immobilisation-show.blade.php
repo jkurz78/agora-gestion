@@ -134,17 +134,25 @@
                             <div class="col-md-4">
                                 <label class="form-label">Quantité</label>
                                 <input type="number" min="1" class="form-control @error('quantite') is-invalid @enderror"
-                                       wire:model="quantite">
+                                       wire:model.live="quantite">
+                                <div class="form-text">
+                                    Sert au suivi de l’inventaire : n’entre pas dans le calcul de l’amortissement.
+                                </div>
                                 @error('quantite') <div class="invalid-feedback">{{ $message }}</div> @enderror
                             </div>
 
                             <div class="col-md-6">
-                                <label class="form-label">Montant</label>
+                                <label class="form-label">Montant total de l’acquisition</label>
                                 <div class="input-group">
                                     <input type="text" class="form-control" readonly
                                            value="{{ number_format((float) $immobilisation->montant_acquisition, 2, ',', ' ') }}">
                                     <span class="input-group-text">€</span>
                                 </div>
+                                @if ($quantite > 1 && (float) $immobilisation->montant_acquisition > 0)
+                                    <div class="form-text">
+                                        soit {{ number_format((float) $immobilisation->montant_acquisition / $quantite, 2, ',', ' ') }} € l’unité
+                                    </div>
+                                @endif
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Compte d'immobilisation</label>
