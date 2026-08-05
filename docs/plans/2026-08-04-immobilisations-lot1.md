@@ -2910,10 +2910,15 @@ use App\Models\Compte;
 use App\Models\Tiers;
 use App\Services\Immobilisation\ImmobilisationComptesSeeder;
 use App\Services\Immobilisation\ImmobilisationService;
+use App\Models\User;
 use Carbon\Carbon;
-use Tests\Support\TenantTestCase;
 
-uses(TenantTestCase::class);
+// Ne PAS écrire `uses(Tests\Support\TenantTestCase::class)` ici : tests/Pest.php
+// lie déjà tout le répertoire Feature à Tests\TestCase (ligne `->in('Feature',
+// 'Livewire', 'Unit')`), et Pest lève TestCaseAlreadyInUse si un fichier de cet
+// arbre en réclame un second. Le bootstrap global a déjà booté une association ;
+// il suffit donc d'un utilisateur authentifié, comme le fait déjà
+// tests/Feature/RemiseBancairePdfTest.php.
 
 it('produit un PDF de la fiche', function (): void {
     Compte::factory()->create(['numero_pcg' => '401', 'classe' => 4, 'est_systeme' => true]);
@@ -2933,7 +2938,7 @@ it('produit un PDF de la fiche', function (): void {
         compteTresorerie: null,
     );
 
-    $this->actingAsAdmin()
+    $this->actingAs(User::factory()->create())
         ->get(route('immobilisations.pdf', $immo))
         ->assertOk()
         ->assertHeader('content-type', 'application/pdf');
