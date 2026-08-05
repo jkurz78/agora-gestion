@@ -115,7 +115,7 @@ n'existe aujourd'hui en classe 2, le démarrage à blanc ne dégrade rien.
 | `association_id` | FK | tenant |
 | `numero` | string(10) | `IM00001`, séquence par tenant — voir § 4.3 |
 | `libelle` | string(255) | « 20 tenues d'escrime » |
-| `quantite` | unsigned int, défaut 1 | affichage seul en lot 1 ; support de la sortie partielle en lot 2 |
+| `quantite` | unsigned int, défaut 1 | déclarative en lot 1 ; support de la sortie partielle en lot 2 |
 | `compte_id` | FK `comptes` | le compte 21X |
 | `compte_amortissement_id` | FK `comptes` | le compte 281X |
 | `montant_acquisition` | decimal(10,2) | base amortissable |
@@ -297,10 +297,17 @@ contraint la date à l'exercice en cours, mais `EcritureGenerator` et
 lui-même ces contrôles, sans quoi une commande artisan ou un futur appelant
 pourrait écrire n'importe où.
 
-1. **Exercice cible terminé.** La génération est refusée tant que la date de fin
-   de l'exercice n'est pas passée — sinon l'écriture serait datée dans le futur.
-   Le plan d'amortissement de la fiche reste consultable à tout moment : voir la
-   projection et la comptabiliser sont deux gestes distincts.
+1. **Exercice cible commencé.** La génération est refusée tant que la date de
+   *début* de l'exercice n'est pas passée.
+
+   > **Révisé le 2026-08-05, après recette.** La règle initiale exigeait que
+   > l'exercice soit **terminé**, pour éviter une écriture datée dans le futur.
+   > Elle empêchait d'anticiper les travaux de clôture, ce qui est un besoin
+   > réel : les opérations d'inventaire se préparent couramment avant la fin de
+   > la période. Une dotation passée en juin et datée du 31/08 est une écriture
+   > d'inventaire provisoire, et « Recalculer » (§ 7.4) est précisément l'outil
+   > qui la rafraîchit si la fiche bouge d'ici là. La borne haute est donc levée ;
+   > seul un exercice **non commencé** reste refusé.
 2. **Exercice cible non clôturé.** Une génération, un recalcul ou une annulation
    sur un exercice clôturé est refusé.
 3. **Date imposée.** La transaction est datée du dernier jour de l'exercice cible,
@@ -394,11 +401,17 @@ client avec `data-sort` sur les `<td>` (dates en ISO `Y-m-d`, nombres bruts).
 Identité, plan d'amortissement complet (exercice, mois écoulés, dotation, cumul,
 VNC) avec les exercices comptabilisés visuellement distincts des projections,
 lien vers la transaction d'acquisition, lien vers chaque transaction de dotation.
+Boutons **Modifier** et **Supprimer** (§ 7.3.1).
 
 **Export PDF imprimable** : `ImmobilisationPdfController`, via
-`barryvdh/laravel-dompdf` ^3.1 déjà présent, avec `App\Support\PdfFooterRenderer`
-partagé — même patron que la dizaine de contrôleurs PDF existants. Contenu :
-identité de la fiche, plan d'amortissement complet, référence de l'acquisition.
+`barryvdh/laravel-dompdf` ^3.1 déjà présent. Le patron de référence est
+`RapprochementPdfController` et sa vue : association résolue par
+`CurrentAssociation::get()`, logo chargé en base64 depuis `brandingLogoFullPath()`
+avec détection du type MIME, en-tête portant ce logo et l'identité de
+l'association, `@include('pdf.partials.footer-logos')` dans la vue, et
+`App\Support\PdfFooterRenderer::render($pdf)` appelé après le `loadView` pour le
+pied de page et la pagination. Contenu métier : identité de la fiche, référence
+de l'acquisition, plan d'amortissement complet.
 
 ### 7.3 Nouvelle immobilisation
 
@@ -412,6 +425,38 @@ le § 4.1.1.
 
 Modale Bootstrap, sans fermeture au clic extérieur (cf. commit `57af945a`).
 Confirmations via modale, jamais `confirm()` natif.
+
+**Le montant saisi est le total de l'acquisition**, pas un prix unitaire — c'est
+la base amortissable, et elle doit pouvoir absorber le port ou une remise, qui
+feraient qu'un prix unitaire ne tomberait pas juste. Le champ est donc libellé
+« Montant total de l'acquisition », avec un rappel calculé « soit X € l'unité »
+dès que la quantité dépasse 1, et une aide indiquant que la quantité sert au
+suivi d'inventaire sans entrer dans le calcul de l'amortissement.
+
+Le sélecteur de durée propose les cinq durées usuelles en années **plus une
+option « Autre durée… »** qui révèle une saisie libre en mois — sans quoi aucun
+parcours ne pourrait produire les durées non entières que le § 4.1 justifie.
+
+### 7.3.1 Modification et suppression d'une fiche
+
+Ajoutés le 2026-08-05, après recette. Leur absence était une incohérence de
+conception : tout le mécanisme « Recalculer » du § 7.4 existe pour absorber une
+durée ou un montant corrigés en cours de vie, alors qu'aucun écran ne permettait
+cette correction.
+
+**Modifiables** : `libelle`, `quantite`, `duree_mois`, `date_mise_en_service`,
+`notes`. Ils n'engagent pas l'écriture comptable, et les dotations déjà passées
+se rattrapent d'elles-mêmes. La mise en service reste soumise au contrôle du
+§ 4.1.1.
+
+**Non modifiables** : `montant_acquisition` et `compte_id`. Ils engagent une
+transaction potentiellement déjà réglée, lettrée ou rapprochée ; ils s'affichent
+en lecture seule. Pour les corriger, on supprime la fiche et on resaisit.
+
+**Suppression** : soft-delete de la fiche *et* de sa transaction d'acquisition,
+dans une même `DB::transaction()`. Refusée si des dotations existent (il faut les
+annuler d'abord) ou si l'exercice de l'acquisition est clôturé. La confirmation
+dit explicitement que l'écriture comptable part avec la fiche.
 
 ### 7.4 Dotations de l'exercice N
 
