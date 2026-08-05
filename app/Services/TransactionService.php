@@ -658,6 +658,9 @@ final class TransactionService
         if ($transaction->isLockedByFacture()) {
             throw new \RuntimeException('Cette transaction est liée à une facture validée et ne peut pas être supprimée.');
         }
+        if ($transaction->isLockedByImmobilisation()) {
+            throw new \RuntimeException('Cette transaction provient d’une immobilisation et ne peut pas être supprimée : supprimez la fiche.');
+        }
         DB::transaction(function () use ($transaction) {
             // Nettoyage T2 (encaissement/règlement séparé) si elle existe — symétrique
             // avec annuler() : sans ça, supprimer une transaction réglée laisserait une
@@ -700,6 +703,9 @@ final class TransactionService
         }
         if ($transaction->isLockedByFacture()) {
             throw new \RuntimeException('Cette transaction est liée à une facture validée et ne peut pas être annulée.');
+        }
+        if ($transaction->isLockedByImmobilisation()) {
+            throw new \RuntimeException('Cette transaction provient d’une immobilisation et ne peut pas être annulée : supprimez la fiche.');
         }
         if ($transaction->extournee_at !== null) {
             throw new \RuntimeException('Cette transaction a déjà été extournée.');

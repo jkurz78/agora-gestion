@@ -529,8 +529,10 @@ final class TransactionForm extends Component
         $this->isLockedByFacture = $transaction->isLockedByFacture();
         $this->isLockedByHelloAsso = $transaction->helloasso_order_id !== null;
 
-        $immobilisation = Immobilisation::where('transaction_id', (int) $transaction->id)->first();
-        $this->isLockedByImmobilisation = $immobilisation !== null;
+        $this->isLockedByImmobilisation = $transaction->isLockedByImmobilisation();
+        $immobilisation = $this->isLockedByImmobilisation
+            ? Immobilisation::where('transaction_id', (int) $transaction->id)->first()
+            : null;
         $this->immobilisationId = $immobilisation === null ? null : (int) $immobilisation->id;
         $this->immobilisationLibelle = $immobilisation === null
             ? ''
