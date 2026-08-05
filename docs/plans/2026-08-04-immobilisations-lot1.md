@@ -1231,13 +1231,21 @@ it('accepte une mise en service antérieure à l’achat dans le même exercice'
 
 it('n’écrit aucune fiche si l’écriture échoue', function (): void {
     $tiers = Tiers::factory()->create();
-    $compte6 = Compte::factory()->create(['numero_pcg' => '606', 'classe' => 6]);
 
+    // Classe 7 et non 6 : le garde de pourDepenseACredit accepte TOUJOURS la
+    // classe 6, drapeau ou non — seule la classe 2 est conditionnée. Un compte
+    // de classe 6 ne déclencherait donc aucune erreur et le test ne prouverait
+    // rien. La classe 7 est réellement refusée.
+    $compte7 = Compte::factory()->create(['numero_pcg' => '706', 'classe' => 7]);
+
+    // Type concret et non Throwable : Pest teste class_exists() sur l'argument,
+    // qui retourne false pour une interface, puis retombe sur une recherche de
+    // sous-chaîne dans le message — laquelle ne matche jamais un message métier.
     expect(fn () => app(ImmobilisationService::class)->acquerir(
         tiers: $tiers,
         libelle: 'Compte invalide',
         quantite: 1,
-        compte: $compte6,                                  // classe 6 : refusé côté immo
+        compte: $compte7,
         compteAmortissement: Compte::ofNumero('28188'),
         montant: '1000.00',
         dateAchat: Carbon::parse('2026-09-12'),
@@ -1245,7 +1253,7 @@ it('n’écrit aucune fiche si l’écriture échoue', function (): void {
         dureeMois: 36,
         modePaiement: null,
         compteTresorerie: null,
-    ))->toThrow(Throwable::class);
+    ))->toThrow(App\Exceptions\Compta\CompteIncorrectException::class);
 
     expect(Immobilisation::count())->toBe(0);
 });
