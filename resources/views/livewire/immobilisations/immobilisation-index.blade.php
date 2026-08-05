@@ -40,7 +40,9 @@
                 <tbody>
                     @foreach ($immobilisations as $immo)
                         <tr>
-                            <td data-sort="{{ $immo->numero }}">{{ $immo->numero }}</td>
+                            <td data-sort="{{ $immo->numero }}">
+                                <a href="{{ route('immobilisations.show', $immo) }}">{{ $immo->numero }}</a>
+                            </td>
                             <td>
                                 {{ $immo->libelle }}
                                 @unless ($immo->estEnService())

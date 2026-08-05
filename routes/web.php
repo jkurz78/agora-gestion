@@ -58,6 +58,7 @@ use App\Livewire\Compta\PostesTiersOuverts;
 use App\Livewire\DevisManuel\DevisEdit;
 use App\Livewire\DevisManuel\DevisList;
 use App\Livewire\Immobilisations\ImmobilisationIndex;
+use App\Livewire\Immobilisations\ImmobilisationShow;
 use App\Livewire\Newsletter\InscriptionsList;
 use App\Livewire\Parametres\Comptabilite\UsagesComptables;
 use App\Livewire\Parametres\RecusFiscaux;
@@ -296,12 +297,16 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
 
 // ── Comptabilité — Immobilisations ──
 // Attention à l'ordre lors des ajouts ultérieurs : la route littérale
-// /dotations (tâche 12) doit précéder /{immobilisation} (tâche 10), sinon
+// /dotations (tâche 12) doit précéder /{immobilisation}, sinon
 // « dotations » serait capté comme valeur du paramètre de route.
+// → tâche 12 : insérer /comptabilite/immobilisations/dotations ICI, avant
+//   la route /{immobilisation} ci-dessous.
 Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
     ->group(function (): void {
         Route::get('/comptabilite/immobilisations', ImmobilisationIndex::class)
             ->name('immobilisations.index');
+        Route::get('/comptabilite/immobilisations/{immobilisation}', ImmobilisationShow::class)
+            ->name('immobilisations.show');
     });
 
 // ── Redirections 301 (anciennes URLs) ──
