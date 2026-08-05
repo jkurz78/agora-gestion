@@ -1005,6 +1005,10 @@ final class ImmobilisationComptesSeeder
         $associationId = (int) TenantContext::currentId();
 
         foreach (self::FAMILLES as $code => $nom) {
+            // PHP caste les clés de tableau numériques en int ('21' → 21) :
+            // recast en string, sinon Famille::code (varchar) reçoit un int.
+            $code = (string) $code;
+
             Famille::firstOrCreate(
                 ['association_id' => $associationId, 'code' => $code],
                 ['nom' => $nom],
@@ -1012,6 +1016,10 @@ final class ImmobilisationComptesSeeder
         }
 
         foreach (self::COMPTES as $numero => $intitule) {
+            // Même piège : '2154' devient la clé int 2154, et substr() sur un
+            // int lève un TypeError sous strict_types.
+            $numero = (string) $numero;
+
             Compte::firstOrCreate(
                 ['association_id' => $associationId, 'numero_pcg' => $numero],
                 [
