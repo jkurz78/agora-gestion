@@ -41,13 +41,59 @@ it('crée la fiche et son écriture d’acquisition à crédit', function (): vo
     $tx = $immo->transaction;
     expect($tx->type)->toBe(TypeTransaction::Depense)
         ->and($tx->journal)->toBe(JournalComptable::Achat)
-        ->and($tx->equilibree)->toBeTrue();
+        ->and($tx->equilibree)->toBeTrue()
+        ->and((int) $tx->tiers_id)->toBe((int) $tiers->id);
 
     $ligne2188 = $tx->lignes->firstWhere('compte_id', (int) Compte::ofNumero('2188')->id);
-    expect($ligne2188->debit)->toEqual('3000.00');
+    expect($ligne2188->debit)->toEqual('3000.00')
+        ->and($ligne2188->montant)->toEqual('3000.00');
 
     $ligne401 = $tx->lignes->firstWhere('compte_id', (int) Compte::ofNumero('401')->id);
     expect($ligne401->credit)->toEqual('3000.00')
+        ->and((int) $ligne401->tiers_id)->toBe((int) $tiers->id)
+        ->and($ligne401->montant)->toEqual('0.00');
+});
+
+it('produit une transaction de la même forme qu’une dépense fournisseur ordinaire', function (): void {
+    // Régression : ImmobilisationService::acquerir() construisait un en-tête
+    // "nu" (tiers_id NULL) et une ligne de ventilation avec montant=0 en dur —
+    // deux champs métier que TransactionService pose normalement en amont
+    // avant de déléguer à EcritureGenerator. Conséquence visible à l'écran :
+    // le fournisseur n'apparaissait pas et le montant s'affichait à zéro.
+    $tiers = Tiers::factory()->create();
+
+    $immo = app(ImmobilisationService::class)->acquerir(
+        tiers: $tiers,
+        libelle: 'Vidéoprojecteur',
+        quantite: 1,
+        compte: Compte::ofNumero('2188'),
+        compteAmortissement: Compte::ofNumero('28188'),
+        montant: '450.00',
+        dateAchat: Carbon::parse('2026-09-12'),
+        dateMiseEnService: Carbon::parse('2026-09-12'),
+        dureeMois: 60,
+        modePaiement: null,
+        compteTresorerie: null,
+    );
+
+    $tx = $immo->transaction->fresh(['lignes']);
+
+    // --- En-tête : tiers, montant total, journal ---
+    expect((int) $tx->tiers_id)->toBe((int) $tiers->id)
+        ->and($tx->montant_total)->toEqual('450.00')
+        ->and($tx->journal)->toBe(JournalComptable::Achat);
+
+    // --- Ligne de ventilation classe 2 : montant renseigné, pas de tiers ---
+    $ligneClasse2 = $tx->lignes->firstWhere('compte_id', (int) Compte::ofNumero('2188')->id);
+    expect($ligneClasse2->debit)->toEqual('450.00')
+        ->and($ligneClasse2->credit)->toEqual('0.00')
+        ->and($ligneClasse2->montant)->toEqual('450.00')
+        ->and($ligneClasse2->tiers_id)->toBeNull();
+
+    // --- Ligne 401 : montant à zéro (c'est le débit/crédit qui porte le montant réel), tiers présent ---
+    $ligne401 = $tx->lignes->firstWhere('compte_id', (int) Compte::ofNumero('401')->id);
+    expect($ligne401->credit)->toEqual('450.00')
+        ->and($ligne401->montant)->toEqual('0.00')
         ->and((int) $ligne401->tiers_id)->toBe((int) $tiers->id);
 });
 

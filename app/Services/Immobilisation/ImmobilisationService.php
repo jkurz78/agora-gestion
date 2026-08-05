@@ -5,15 +5,22 @@ declare(strict_types=1);
 namespace App\Services\Immobilisation;
 
 use App\Enums\ModePaiement;
+use App\Enums\TypeTransaction;
 use App\Exceptions\Immobilisation\MiseEnServiceAnterieureException;
 use App\Exceptions\Immobilisation\SuppressionInterditeException;
 use App\Models\Compte;
 use App\Models\Immobilisation;
 use App\Models\Tiers;
+use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Services\Compta\EcritureGenerator;
 use App\Services\ExerciceService;
+use App\Services\NumeroPieceService;
 use App\Services\TransactionService;
+use App\Tenant\TenantContext;
+use Carbon\Carbon;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -57,12 +64,48 @@ final class ImmobilisationService
             $dateAchat, $dateMiseEnService, $dureeMois, $modePaiement,
             $compteTresorerie, $notes
         ): Immobilisation {
+            // L'en-tête et la ligne de ventilation sont construits explicitement ici,
+            // avec les champs métier (tiers_id, montant de ventilation) que
+            // TransactionService pose normalement en amont dans son propre flux —
+            // EcritureGenerator::createTransactionHeader() (appelée quand
+            // existingTransaction est null) ne les connaît pas : elle produit un
+            // en-tête "nu" et des lignes de ventilation à montant=0, corrects pour
+            // ses autres appelants mais pas ici. On reproduit donc le flux
+            // TransactionService::create() : en-tête + ligne créés à la main, puis
+            // pourDepenseACredit(existingTransaction: ...) qui saute la création des
+            // lignes de ventilation et se contente d'ajouter la ligne 401 (avec tiers).
+            $transaction = Transaction::create([
+                'association_id' => (int) TenantContext::currentId(),
+                'type' => TypeTransaction::Depense,
+                'date' => $dateAchat->format('Y-m-d'),
+                'libelle' => $libelle,
+                'montant_total' => $montant,
+                'mode_paiement' => null,
+                'tiers_id' => (int) $tiers->id,
+                'saisi_par' => Auth::id(),
+                'equilibree' => true,
+                'type_ecriture' => 'normale',
+                'numero_piece' => app(NumeroPieceService::class)->assign(
+                    Carbon::parse($dateAchat->format('Y-m-d'))
+                ),
+            ]);
+
+            TransactionLigne::create([
+                'transaction_id' => $transaction->id,
+                'compte_id' => (int) $compte->id,
+                'debit' => (float) $montant,
+                'credit' => 0,
+                'tiers_id' => null,
+                'libelle' => $libelle,
+                'montant' => (float) $montant,
+            ]);
+
             $transaction = $this->ecritureGenerator->pourDepenseACredit(
                 tiers: $tiers,
                 ventilations: [['compte' => $compte, 'montant' => (float) $montant]],
                 dateConstatation: $dateAchat,
                 libelle: $libelle,
-                existingTransaction: null,
+                existingTransaction: $transaction,
                 autoriseImmobilisation: true,
             );
 
