@@ -64,7 +64,7 @@
                                     —
                                 @endif
                             </td>
-                            <td>
+                            <td class="d-flex gap-2 align-items-center">
                                 @if ($ligne->enEcart())
                                     <button type="button" class="btn btn-warning btn-sm"
                                             wire:click="recalculer({{ $ligne->immobilisation->id }})"
@@ -73,10 +73,19 @@
                                     </button>
                                 @elseif ($ligne->aGenerer())
                                     <span class="badge bg-primary">À générer</span>
-                                @elseif ($ligne->dejaComptabilisee)
-                                    <span class="badge bg-success">À jour</span>
-                                @else
+                                @elseif (! $ligne->dejaComptabilisee)
                                     <span class="text-muted small">Rien à doter</span>
+                                @endif
+
+                                @if ($ligne->dejaComptabilisee)
+                                    @unless ($ligne->enEcart())
+                                        <span class="badge bg-success">À jour</span>
+                                    @endunless
+                                    <button type="button" class="btn btn-outline-danger btn-sm"
+                                            wire:click="annulerDotation({{ $ligne->immobilisation->id }})"
+                                            wire:confirm="L'écriture comptable de cette dotation sera supprimée. Si elle avait été ventilée sur des opérations, cette ventilation sera perdue et devra être refaite. Continuer ?">
+                                        Annuler
+                                    </button>
                                 @endif
                             </td>
                         </tr>

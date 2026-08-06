@@ -68,4 +68,22 @@ final class DotationsExercice extends Component
             .'. Si elle avait été ventilée, la ventilation est à refaire.';
         $this->flashType = 'success';
     }
+
+    public function annulerDotation(int $immobilisationId): void
+    {
+        $immobilisation = Immobilisation::findOrFail($immobilisationId);
+
+        try {
+            app(DotationService::class)->annuler($immobilisation, $this->exercice);
+        } catch (DotationInterditeException $e) {
+            $this->flashMessage = $e->getMessage();
+            $this->flashType = 'warning';
+
+            return;
+        }
+
+        $this->flashMessage = 'Dotation annulée pour '.$immobilisation->numero
+            .'. Elle peut être regénérée depuis cet écran.';
+        $this->flashType = 'success';
+    }
 }

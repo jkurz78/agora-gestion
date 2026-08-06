@@ -2,10 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Enums\StatutExercice;
 use App\Livewire\Immobilisations\DotationsExercice;
 use App\Models\Compte;
+use App\Models\Exercice;
 use App\Models\ImmobilisationDotation;
 use App\Models\Tiers;
+use App\Models\Transaction;
 use App\Services\Immobilisation\ImmobilisationComptesSeeder;
 use App\Services\Immobilisation\ImmobilisationService;
 use Carbon\Carbon;
@@ -86,6 +89,65 @@ it('signale un écart et le recalcule', function (): void {
         ->assertHasNoErrors();
 
     expect(ImmobilisationDotation::where('exercice', 2026)->firstOrFail()->montant)->toEqual('1200.00');
+
+    Carbon::setTestNow();
+});
+
+it('annule une dotation comptabilisée et supprime sa transaction', function (): void {
+    Carbon::setTestNow('2027-10-15');
+
+    Livewire::test(DotationsExercice::class)->set('exercice', 2026)->call('genererTout');
+
+    $dotation = ImmobilisationDotation::where('exercice', 2026)->firstOrFail();
+    $transactionId = (int) $dotation->transaction_id;
+
+    Livewire::test(DotationsExercice::class)
+        ->set('exercice', 2026)
+        ->call('annulerDotation', (int) $this->immo->id)
+        ->assertHasNoErrors();
+
+    expect(ImmobilisationDotation::where('exercice', 2026)->count())->toBe(0)
+        ->and(Transaction::withTrashed()->findOrFail($transactionId)->trashed())->toBeTrue();
+
+    Carbon::setTestNow();
+});
+
+it('permet de régénérer une dotation après l’avoir annulée', function (): void {
+    Carbon::setTestNow('2027-10-15');
+
+    Livewire::test(DotationsExercice::class)->set('exercice', 2026)->call('genererTout');
+
+    Livewire::test(DotationsExercice::class)
+        ->set('exercice', 2026)
+        ->call('annulerDotation', (int) $this->immo->id)
+        ->assertSee('À générer');
+
+    expect(ImmobilisationDotation::where('exercice', 2026)->count())->toBe(0);
+
+    Livewire::test(DotationsExercice::class)
+        ->set('exercice', 2026)
+        ->call('genererTout')
+        ->assertHasNoErrors();
+
+    expect(ImmobilisationDotation::where('exercice', 2026)->count())->toBe(1);
+
+    Carbon::setTestNow();
+});
+
+it('refuse d’annuler la dotation d’un exercice clôturé', function (): void {
+    Carbon::setTestNow('2027-10-15');
+
+    Livewire::test(DotationsExercice::class)->set('exercice', 2026)->call('genererTout');
+
+    Exercice::create(['annee' => 2026, 'statut' => StatutExercice::Cloture]);
+
+    $component = Livewire::test(DotationsExercice::class)
+        ->set('exercice', 2026)
+        ->call('annulerDotation', (int) $this->immo->id);
+
+    expect(ImmobilisationDotation::where('exercice', 2026)->count())->toBe(1)
+        ->and($component->get('flashType'))->toBe('warning')
+        ->and($component->get('flashMessage'))->toContain('clôturé');
 
     Carbon::setTestNow();
 });
