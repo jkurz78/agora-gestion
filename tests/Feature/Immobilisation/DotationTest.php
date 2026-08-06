@@ -56,7 +56,9 @@ it('génère une écriture 6811 / 28188 datée du dernier jour de l’exercice',
     $debit = $tx->lignes->firstWhere('compte_id', (int) Compte::ofNumero('6811')->id);
     $credit = $tx->lignes->firstWhere('compte_id', (int) Compte::ofNumero('28188')->id);
     expect($debit->debit)->toEqual('600.00')
-        ->and($credit->credit)->toEqual('600.00');
+        ->and($debit->montant)->toEqual('600.00')
+        ->and($credit->credit)->toEqual('600.00')
+        ->and($credit->montant)->toEqual('0.00');
 
     Carbon::setTestNow();
 });

@@ -1890,7 +1890,7 @@ final class EcritureGenerator
                 'credit' => 0,
                 'tiers_id' => null,
                 'libelle' => $libelle,
-                'montant' => 0,
+                'montant' => $montant,
             ]);
             $ligneDebit->setRelation('compte', $compteDebit);
 
