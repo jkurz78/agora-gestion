@@ -78,6 +78,28 @@ Le bouton « Ventiler » apparaît sans une ligne de code supplémentaire, et il
 déjà répartir sur plusieurs opérations et séances via `transaction_ligne_affectations` —
 ce qu'un sélecteur mono-opération n'aurait pas permis.
 
+> ⚠️ **Prémisse invalidée par la recette du 2026-08-06. La ventilation des
+> dotations n'est pas réalisable en l'état.**
+>
+> Le raisonnement ci-dessus vérifiait que la *ligne* était ventilable, sans
+> vérifier que la *transaction* était atteignable. Elle ne l'est pas : la dotation
+> est en `journal = od`, et le journal OD est exclu des deux écrans de travail —
+> `TransactionUniverselleService::brancheDepense()` filtre en dur
+> `whereIn('tx.journal', ['vente', 'achat'])`, et `Transaction::scopeOperationnel()`
+> fait de même pour le dashboard. Une écriture OD n'est donc joignable qu'en
+> lecture, dans `/rapports/journaux` et le grand livre.
+>
+> Les provisions sont dans le même cas depuis plus longtemps, sans que ça se soit vu.
+>
+> Le déblocage relève du chantier **« consultation des journaux + saisie manuelle »**,
+> qui doit fournir un écran d'édition des écritures par journal et période. Voir la
+> note de projet correspondante. Jusque-là, les dotations sont générées correctement
+> mais restent non ventilées, et le compte de résultat par opération ne porte donc
+> pas le coût d'usage des immobilisations.
+>
+> Le bug de la ligne à `montant = 0`, qui aurait de toute façon empêché toute
+> ventilation, a été corrigé au commit `2f9bf64f`.
+
 **Séquencement à documenter** : le panneau de ventilation se ferme sur un
 exercice clôturé. Les dotations étant datées du 31/08, l'ordre est
 générer → ventiler → clôturer.
