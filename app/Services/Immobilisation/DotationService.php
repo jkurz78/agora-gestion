@@ -66,6 +66,7 @@ final class DotationService
                         $cumulAnterieurCentimes,
                     ),
                     dejaComptabilisee: $dotation !== null,
+                    transactionId: $dotation === null ? null : (int) $dotation->transaction_id,
                 );
             });
     }

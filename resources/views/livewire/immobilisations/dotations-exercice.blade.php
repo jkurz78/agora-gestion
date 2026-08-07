@@ -81,6 +81,12 @@
                                     @unless ($ligne->enEcart())
                                         <span class="badge bg-success">À jour</span>
                                     @endunless
+                                    @if ($ligne->transactionId !== null)
+                                        <button type="button" class="btn btn-outline-primary btn-sm"
+                                                wire:click="ventiler({{ $ligne->transactionId }})">
+                                            <i class="bi bi-scissors"></i> Ventiler
+                                        </button>
+                                    @endif
                                     <button type="button" class="btn btn-outline-danger btn-sm"
                                             wire:click="annulerDotation({{ $ligne->immobilisation->id }})"
                                             wire:confirm="L'écriture comptable de cette dotation sera supprimée. Si elle avait été ventilée sur des opérations, cette ventilation sera perdue et devra être refaite. Continuer ?">

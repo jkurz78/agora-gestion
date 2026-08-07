@@ -69,6 +69,16 @@ final class DotationsExercice extends Component
         $this->flashType = 'success';
     }
 
+    /**
+     * Ouvre le formulaire générique de transaction sur la dotation déjà
+     * comptabilisée, par-dessus l'écran de clôture — le comptable ventile
+     * sans quitter des yeux son travail de fin d'exercice.
+     */
+    public function ventiler(int $transactionId): void
+    {
+        $this->dispatch('edit-transaction', id: $transactionId);
+    }
+
     public function annulerDotation(int $immobilisationId): void
     {
         $immobilisation = Immobilisation::findOrFail($immobilisationId);

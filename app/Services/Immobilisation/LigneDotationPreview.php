@@ -21,6 +21,7 @@ final class LigneDotationPreview
         public readonly int $montantComptabiliseCentimes,
         public readonly int $montantRecalculeCentimes,
         public readonly bool $dejaComptabilisee,
+        public readonly ?int $transactionId = null,
     ) {}
 
     public function enEcart(): bool
