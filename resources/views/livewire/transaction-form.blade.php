@@ -135,7 +135,11 @@
                         <div class="alert alert-info d-flex align-items-center gap-2">
                             <i class="bi bi-box-seam"></i>
                             <div>
-                                Cette transaction provient de l’immobilisation
+                                @if ($isImmobilisationDotation)
+                                    Cette transaction est la dotation aux amortissements de l’immobilisation
+                                @else
+                                    Cette transaction provient de l’immobilisation
+                                @endif
                                 <strong>{{ $immobilisationLibelle }}</strong> — les écritures suivent la fiche.
                                 <a href="{{ route('immobilisations.show', $immobilisationId) }}">Ouvrir la fiche</a>
                             </div>

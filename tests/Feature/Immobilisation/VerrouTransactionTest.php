@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Livewire\Immobilisations\DotationsExercice;
 use App\Livewire\TransactionForm;
 use App\Models\Compte;
+use App\Models\ImmobilisationDotation;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -45,6 +47,23 @@ it('verrouille le formulaire d’une transaction d’acquisition', function (): 
         ->call('edit', (int) $this->immo->transaction_id)
         ->assertSet('isLockedByImmobilisation', true)
         ->assertSee('provient de l’immobilisation');
+});
+
+it('verrouille le formulaire d’une transaction de dotation avec le libellé dédié', function (): void {
+    Carbon::setTestNow('2027-10-15');
+    Livewire::test(DotationsExercice::class)->set('exercice', 2026)->call('genererTout');
+    Carbon::setTestNow();
+
+    $dotation = ImmobilisationDotation::where('exercice', 2026)
+        ->where('immobilisation_id', $this->immo->id)
+        ->firstOrFail();
+
+    Livewire::test(TransactionForm::class)
+        ->call('edit', (int) $dotation->transaction_id)
+        ->assertSet('isLockedByImmobilisation', true)
+        ->assertSet('immobilisationId', (int) $this->immo->id)
+        ->assertDontSee('provient de l’immobilisation')
+        ->assertSee('dotation aux amortissements de l’immobilisation');
 });
 
 it('ne verrouille pas une transaction ordinaire', function (): void {

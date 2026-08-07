@@ -21,6 +21,7 @@ use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\FacturePartenaireDeposee;
 use App\Models\Immobilisation;
+use App\Models\ImmobilisationDotation;
 use App\Models\IncomingDocument;
 use App\Models\NoteDeFrais;
 use App\Models\Operation;
@@ -119,8 +120,11 @@ final class TransactionForm extends Component
 
     public bool $isLockedByHelloAsso = false;
 
-    /** Transaction issue d'une acquisition d'immobilisation — la fiche est le maître. */
+    /** Transaction pilotée par une fiche d'immobilisation (acquisition ou dotation) — la fiche est le maître. */
     public bool $isLockedByImmobilisation = false;
+
+    /** True quand la transaction verrouillée est une dotation, false quand c'est l'acquisition elle-même. */
+    public bool $isImmobilisationDotation = false;
 
     public ?int $immobilisationId = null;
 
@@ -209,6 +213,7 @@ final class TransactionForm extends Component
         $this->isLocked = false;
         $this->isLockedByHelloAsso = false;
         $this->isLockedByImmobilisation = false;
+        $this->isImmobilisationDotation = false;
         $this->immobilisationId = null;
         $this->immobilisationLibelle = '';
         $this->resetValidation();
@@ -530,9 +535,18 @@ final class TransactionForm extends Component
         $this->isLockedByHelloAsso = $transaction->helloasso_order_id !== null;
 
         $this->isLockedByImmobilisation = $transaction->isLockedByImmobilisation();
-        $immobilisation = $this->isLockedByImmobilisation
-            ? Immobilisation::where('transaction_id', (int) $transaction->id)->first()
-            : null;
+        $this->isImmobilisationDotation = false;
+        $immobilisation = null;
+        if ($this->isLockedByImmobilisation) {
+            $immobilisation = Immobilisation::where('transaction_id', (int) $transaction->id)->first();
+            if ($immobilisation === null) {
+                // Pas une acquisition : c'est forcément une dotation, seul autre
+                // cas reconnu par isLockedByImmobilisation().
+                $dotation = ImmobilisationDotation::where('transaction_id', (int) $transaction->id)->first();
+                $immobilisation = $dotation?->immobilisation;
+                $this->isImmobilisationDotation = $immobilisation !== null;
+            }
+        }
         $this->immobilisationId = $immobilisation === null ? null : (int) $immobilisation->id;
         $this->immobilisationLibelle = $immobilisation === null
             ? ''
@@ -555,7 +569,7 @@ final class TransactionForm extends Component
     {
         $this->reset([
             'transactionId', 'type', 'date', 'libelle', 'mode_paiement', 'dateReglement', 'paiementRecu', 'paiementModifiable',
-            'tiers_id', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked', 'isLockedByFacture', 'isLockedByHelloAsso', 'isLockedByImmobilisation', 'immobilisationId', 'immobilisationLibelle', 'isLockedByReglement', 'isExtourneMiroir', 'sensTresorerie',
+            'tiers_id', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked', 'isLockedByFacture', 'isLockedByHelloAsso', 'isLockedByImmobilisation', 'isImmobilisationDotation', 'immobilisationId', 'immobilisationLibelle', 'isLockedByReglement', 'isExtourneMiroir', 'sensTresorerie',
             'etatPaiement', 'soldeRestantCentimes', 'reglementsEnregistres', 'posteTiersLigneId',
             'ventilationLigneId', 'ventilationLigneCompteLabel', 'ventilationLigneMontant', 'affectations',
             'ventilationHasAffectations',

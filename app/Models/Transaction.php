@@ -276,16 +276,20 @@ final class Transaction extends TenantModel
     }
 
     /**
-     * True si cette transaction est l'acquisition d'une fiche d'immobilisation
-     * (Immobilisation.transaction_id). La fiche est le maître : cette
-     * transaction ne doit jamais pouvoir être supprimée, annulée ou extournée
-     * indépendamment d'elle — sinon la fiche survit au registre pendant que le
-     * grand livre perd le débit, et les dotations continuent d'être générées
-     * sur un bien qui n'est plus à l'actif.
+     * True si cette transaction est pilotée par le module immobilisations —
+     * soit l'acquisition d'une fiche (Immobilisation.transaction_id), soit
+     * une dotation aux amortissements (ImmobilisationDotation.transaction_id).
+     * Dans les deux cas la fiche (via PlanAmortissementCalculator pour la
+     * dotation) est maîtresse : cette transaction ne doit jamais pouvoir être
+     * supprimée, annulée ou extournée indépendamment d'elle — sinon la fiche
+     * survit au registre pendant que le grand livre diverge (débit perdu pour
+     * l'acquisition, montant ou compte qui ne correspond plus au calcul pour
+     * la dotation).
      */
     public function isLockedByImmobilisation(): bool
     {
-        return Immobilisation::where('transaction_id', (int) $this->id)->exists();
+        return Immobilisation::where('transaction_id', (int) $this->id)->exists()
+            || ImmobilisationDotation::where('transaction_id', (int) $this->id)->exists();
     }
 
     public function hasPieceJointe(): bool
