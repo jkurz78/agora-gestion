@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Immobilisation;
 
+use App\Exceptions\Immobilisation\DotationGenerationException;
 use App\Exceptions\Immobilisation\DotationInterditeException;
 use App\Models\Exercice;
 use App\Models\Immobilisation;
@@ -74,26 +75,60 @@ final class DotationService
             });
     }
 
-    /** Génère les dotations manquantes de l'exercice. Idempotent. */
+    /**
+     * Génère les dotations manquantes de l'exercice. Idempotent.
+     *
+     * Anomalie 4 (audit) — auparavant, une transaction PAR FICHE : une erreur
+     * au milieu du lot laissait un traitement partiel, sans compte rendu de
+     * ce qui était passé. Au moment d'une clôture, un lot à moitié passé est
+     * pire qu'un lot refusé : le lot entier est désormais atomique (une
+     * seule transaction), et toute erreur nomme la fiche fautive.
+     */
     public function generer(int $exercice): int
     {
-        $this->assertExerciceGenerable($exercice);
+        return DB::transaction(function () use ($exercice): int {
+            // Anomalie 3 — appelé ICI, à l'intérieur du DB::transaction() qui porte
+            // tout le lot : c'est le contrôle réel, verrouillé (voir docblock de
+            // assertExerciceGenerable()), pas un simple filet de sécurité. L'appel
+            // équivalent dans comptabiliser() reste nécessaire pour recalculer(),
+            // dont le contrôle en tête n'est lui qu'un filet rapide hors verrou.
+            $this->assertExerciceGenerable($exercice);
 
-        $generees = 0;
+            $generees = 0;
 
-        foreach ($this->apercu($exercice) as $ligne) {
-            if (! $ligne->aGenerer()) {
-                continue;
+            foreach ($this->apercu($exercice) as $ligne) {
+                if (! $ligne->aGenerer()) {
+                    continue;
+                }
+
+                try {
+                    $this->comptabiliser($ligne->immobilisation, $exercice, $ligne->montantRecalculeCentimes);
+                } catch (DotationInterditeException $e) {
+                    // Déjà scopée à la fiche et à l'exercice fautifs (voir
+                    // exerciceAnterieurNonGenere()) : ne pas la masquer sous une
+                    // exception générique — l'appelant (écran) sait la distinguer
+                    // d'un échec technique et l'afficher comme un refus métier.
+                    throw $e;
+                } catch (\Throwable $e) {
+                    throw DotationGenerationException::pourFiche($ligne->immobilisation->numero, $exercice, $e);
+                }
+
+                $generees++;
             }
 
-            $this->comptabiliser($ligne->immobilisation, $exercice, $ligne->montantRecalculeCentimes);
-            $generees++;
-        }
-
-        return $generees;
+            return $generees;
+        });
     }
 
-    /** Annule puis régénère la dotation d'une fiche pour l'exercice donné. */
+    /**
+     * Annule puis régénère la dotation d'une fiche pour l'exercice donné.
+     *
+     * Anomalie 3 — l'appel ci-dessous, avant l'ouverture de la transaction,
+     * n'est qu'un filet de sécurité rapide (échec précoce, hors verrou). Le
+     * contrôle réel, verrouillé, a lieu à l'intérieur de la transaction
+     * ci-dessous, via annuler() puis comptabiliser() — qui l'exécutent
+     * chacun eux-mêmes au bon endroit.
+     */
     public function recalculer(Immobilisation $immobilisation, int $exercice): void
     {
         $this->assertExerciceGenerable($exercice);
@@ -143,6 +178,11 @@ final class DotationService
      * ATTENTION — si la dotation avait été ventilée sur des opérations, ce
      * travail est perdu et doit être refait. L'appelant DOIT en avertir
      * l'utilisateur.
+     *
+     * Anomalie 3 — l'appel ci-dessous, avant l'ouverture de la transaction,
+     * n'est qu'un filet de sécurité rapide (échec précoce, hors verrou). Le
+     * contrôle réel, verrouillé, est répété à l'intérieur de la transaction
+     * plus bas.
      */
     public function annuler(Immobilisation $immobilisation, int $exercice): void
     {
@@ -196,8 +236,10 @@ final class DotationService
         DB::transaction(function () use ($immobilisation, $exercice, $montant, $dateEcriture): void {
             // Anomalie 3 — le contrôle d'ouverture doit se faire ICI, sous verrou et
             // dans la même transaction que l'écriture ci-dessous (voir docblock de
-            // assertExerciceGenerable()). L'appel en tête de generer()/recalculer()
-            // n'est qu'un filet de sécurité rapide, sans verrou persistant.
+            // assertExerciceGenerable()). Pour generer(), c'est redondant avec
+            // l'appel déjà fait dans la transaction englobante — harmless, et
+            // indispensable pour recalculer(), le seul autre appelant, dont le
+            // contrôle en tête n'est qu'un filet de sécurité hors verrou.
             $this->assertExerciceGenerable($exercice);
 
             $exerciceManquant = $this->premierExerciceManquant($immobilisation, $exercice);
