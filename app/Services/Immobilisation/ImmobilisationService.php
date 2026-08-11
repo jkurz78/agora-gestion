@@ -6,6 +6,7 @@ namespace App\Services\Immobilisation;
 
 use App\Enums\ModePaiement;
 use App\Enums\TypeTransaction;
+use App\Exceptions\Immobilisation\CompteImmobilisationInvalideException;
 use App\Exceptions\Immobilisation\MiseEnServiceAnterieureException;
 use App\Exceptions\Immobilisation\SuppressionInterditeException;
 use App\Models\Compte;
@@ -57,6 +58,7 @@ final class ImmobilisationService
         ?Compte $compteTresorerie,
         ?string $notes = null,
     ): Immobilisation {
+        $this->assertComptesValides($compte, $compteAmortissement);
         $this->assertMiseEnServiceCoherente($dateAchat, $dateMiseEnService);
 
         return DB::transaction(function () use (
@@ -206,6 +208,63 @@ final class ImmobilisationService
             $immobilisation->delete();
             $this->transactionService->delete($transaction);
         });
+    }
+
+    /**
+     * Les seules barrières posées côté interface — PlanComptableSelecteur qui
+     * ne propose que la classe 2 hors 28X, et une validation Livewire qui se
+     * contente d'un exists:comptes,id — ne protègent rien côté serveur :
+     * compte_amortissement_id est une propriété Livewire publique, hydratée
+     * depuis le client à chaque requête, falsifiable malgré son champ HTML en
+     * lecture seule. Le service est la frontière qui compte.
+     *
+     * Périmètre volontairement plus large que le « compte 21X » de la
+     * spécification initiale du module : classe 2 hors 28X. Restreindre au
+     * préfixe 21 bloquerait les immobilisations incorporelles (un logiciel en
+     * 205, amorti en 2805) alors que la règle de dérivation PCG — insérer un
+     * « 8 » après le premier chiffre — vaut pour toute la classe 2. Décision
+     * assumée du propriétaire du produit.
+     */
+    private function assertComptesValides(Compte $compte, Compte $compteAmortissement): void
+    {
+        $tenantId = (int) TenantContext::currentId();
+
+        if ((int) $compte->association_id !== $tenantId) {
+            throw CompteImmobilisationInvalideException::horsTenant((string) $compte->numero_pcg);
+        }
+
+        if ((int) $compteAmortissement->association_id !== $tenantId) {
+            throw CompteImmobilisationInvalideException::horsTenant((string) $compteAmortissement->numero_pcg);
+        }
+
+        if (str_starts_with((string) $compte->numero_pcg, '28')) {
+            throw CompteImmobilisationInvalideException::estCompteAmortissement((string) $compte->numero_pcg);
+        }
+
+        if ((int) $compte->classe !== 2) {
+            throw CompteImmobilisationInvalideException::classeInvalide(
+                (string) $compte->numero_pcg,
+                (int) $compte->classe,
+            );
+        }
+
+        if (! $compte->actif) {
+            throw CompteImmobilisationInvalideException::inactif((string) $compte->numero_pcg);
+        }
+
+        if (! $compteAmortissement->actif) {
+            throw CompteImmobilisationInvalideException::inactif((string) $compteAmortissement->numero_pcg);
+        }
+
+        $derive = ImmobilisationComptesSeeder::compteAmortissementPour($compte);
+
+        if ($derive === null || (int) $derive->id !== (int) $compteAmortissement->id) {
+            throw CompteImmobilisationInvalideException::amortissementIncorrect(
+                (string) $compte->numero_pcg,
+                '2'.'8'.substr((string) $compte->numero_pcg, 1),
+                (string) $compteAmortissement->numero_pcg,
+            );
+        }
     }
 
     /**

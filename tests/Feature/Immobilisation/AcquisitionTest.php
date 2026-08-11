@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\JournalComptable;
 use App\Enums\TypeTransaction;
-use App\Exceptions\Compta\CompteIncorrectException;
+use App\Exceptions\Immobilisation\CompteImmobilisationInvalideException;
 use App\Exceptions\Immobilisation\MiseEnServiceAnterieureException;
 use App\Models\Compte;
 use App\Models\Immobilisation;
@@ -135,10 +135,14 @@ it('accepte une mise en service antérieure à l’achat dans le même exercice'
     expect($immo->date_mise_en_service->toDateString())->toBe('2026-09-20');
 });
 
-it('n’écrit aucune fiche si l’écriture échoue', function (): void {
-    // Ni classe 2 ni classe 6 : refusé par pourDepenseACredit même avec le
-    // drapeau autoriseImmobilisation (la classe 6 seule, elle, reste
-    // toujours acceptée par ce garde-fou — voir EcritureGeneratorImmobilisationTest).
+it('n’écrit aucune fiche si le compte est invalide', function (): void {
+    // Classe 7 : refusé par l'invariant de classe posé dans
+    // ImmobilisationService (et non plus par le garde-fou générique de
+    // pourDepenseACredit, désormais hors d'atteinte puisque ce contrôle
+    // intervient avant tout écrit en base — voir ComptesInvariantsTest pour
+    // la couverture complète de cet invariant, et
+    // EcritureGeneratorImmobilisationTest pour le garde-fou classe 2/6
+    // générique d'EcritureGenerator).
     //
     // Note : ->toThrow(Throwable::class) ne convient pas ici — Pest teste
     // class_exists() pour choisir entre comparaison de type et comparaison
@@ -152,7 +156,7 @@ it('n’écrit aucune fiche si l’écriture échoue', function (): void {
         tiers: $tiers,
         libelle: 'Compte invalide',
         quantite: 1,
-        compte: $compteInvalide,                           // classe 7 : refusé par le garde-fou classe
+        compte: $compteInvalide,                           // classe 7 : refusé par l'invariant de classe
         compteAmortissement: Compte::ofNumero('28188'),
         montant: '1000.00',
         dateAchat: Carbon::parse('2026-09-12'),
@@ -160,7 +164,7 @@ it('n’écrit aucune fiche si l’écriture échoue', function (): void {
         dureeMois: 36,
         modePaiement: null,
         compteTresorerie: null,
-    ))->toThrow(CompteIncorrectException::class);
+    ))->toThrow(CompteImmobilisationInvalideException::class);
 
     expect(Immobilisation::count())->toBe(0);
 });

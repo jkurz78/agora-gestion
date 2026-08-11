@@ -6,6 +6,7 @@ namespace App\Services\Compta;
 
 use App\Models\Compte;
 use App\Models\Famille;
+use App\Services\Immobilisation\ImmobilisationComptesSeeder;
 use Illuminate\Support\Collection;
 
 /**
@@ -43,6 +44,17 @@ final class PlanComptableSelecteur
             ->when($classe === 2, fn ($q) => $q->where('numero_pcg', 'NOT LIKE', '28%'))
             ->orderBy('numero_pcg')
             ->get();
+
+        if ($type === 'immobilisation') {
+            // Un compte proposé mais refusé au moment d'enregistrer serait une
+            // mauvaise expérience : ImmobilisationService::acquerir() exige que
+            // le compte d'amortissement dérivé existe et soit actif, donc le
+            // sélecteur ne doit proposer que des comptes qui satisferont ce
+            // contrôle.
+            $comptes = $comptes->filter(
+                fn (Compte $c): bool => ImmobilisationComptesSeeder::compteAmortissementPour($c)?->actif === true
+            )->values();
+        }
 
         $parFamille = $comptes->groupBy(fn (Compte $c): string => $c->code_famille)->sortKeys();
 
