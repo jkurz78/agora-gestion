@@ -6,10 +6,17 @@ use App\Livewire\Immobilisations\ImmobilisationIndex;
 use App\Models\Compte;
 use App\Models\Immobilisation;
 use App\Models\Tiers;
+use App\Models\User;
 use App\Services\Immobilisation\ImmobilisationComptesSeeder;
+use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
 beforeEach(function (): void {
+    $association = TenantContext::current();
+    $user = User::factory()->create();
+    $user->associations()->attach($association->id, ['role' => 'admin', 'joined_at' => now()]);
+    $this->actingAs($user);
+
     Compte::factory()->create(['numero_pcg' => '401', 'classe' => 4, 'est_systeme' => true]);
     ImmobilisationComptesSeeder::seed();
 });

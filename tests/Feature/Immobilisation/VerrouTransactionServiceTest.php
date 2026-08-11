@@ -8,10 +8,12 @@ use App\Models\ImmobilisationDotation;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Models\User;
 use App\Services\Immobilisation\DotationService;
 use App\Services\Immobilisation\ImmobilisationComptesSeeder;
 use App\Services\Immobilisation\ImmobilisationService;
 use App\Services\TransactionService;
+use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Livewire\Livewire;
 
@@ -23,6 +25,11 @@ use Livewire\Livewire;
  * générées sur un bien qui n'est plus à l'actif.
  */
 beforeEach(function (): void {
+    $association = TenantContext::current();
+    $user = User::factory()->create();
+    $user->associations()->attach($association->id, ['role' => 'admin', 'joined_at' => now()]);
+    $this->actingAs($user);
+
     Compte::factory()->create(['numero_pcg' => '401', 'classe' => 4, 'est_systeme' => true]);
     ImmobilisationComptesSeeder::seed();
 

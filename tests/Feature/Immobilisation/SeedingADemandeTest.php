@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 use App\Livewire\Immobilisations\ImmobilisationIndex;
 use App\Models\Compte;
+use App\Models\User;
 use App\Services\Compta\PlanComptableSelecteur;
+use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
 /**
@@ -13,6 +15,13 @@ use Livewire\Livewire;
  * classe 2 n'existe avant l'appel : rien dans ce beforeEach n'invoque
  * ImmobilisationComptesSeeder::seed().
  */
+beforeEach(function (): void {
+    $association = TenantContext::current();
+    $user = User::factory()->create();
+    $user->associations()->attach($association->id, ['role' => 'admin', 'joined_at' => now()]);
+    $this->actingAs($user);
+});
+
 it('crée le kit de comptes à l’ouverture de la modale sur un tenant vierge', function (): void {
     expect(Compte::where('classe', 2)->count())->toBe(0);
 

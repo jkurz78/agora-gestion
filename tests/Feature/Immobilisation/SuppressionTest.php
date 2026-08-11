@@ -11,13 +11,20 @@ use App\Models\Exercice;
 use App\Models\Immobilisation;
 use App\Models\Tiers;
 use App\Models\Transaction;
+use App\Models\User;
 use App\Services\Immobilisation\DotationService;
 use App\Services\Immobilisation\ImmobilisationComptesSeeder;
 use App\Services\Immobilisation\ImmobilisationService;
+use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Livewire\Livewire;
 
 beforeEach(function (): void {
+    $association = TenantContext::current();
+    $user = User::factory()->create();
+    $user->associations()->attach($association->id, ['role' => 'admin', 'joined_at' => now()]);
+    $this->actingAs($user);
+
     Compte::factory()->create(['numero_pcg' => '401', 'classe' => 4, 'est_systeme' => true]);
     ImmobilisationComptesSeeder::seed();
 
