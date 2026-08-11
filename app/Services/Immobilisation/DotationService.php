@@ -12,6 +12,7 @@ use App\Services\Compta\EcritureGenerator;
 use App\Services\ExerciceService;
 use App\Services\TransactionService;
 use App\Support\MontantDecimal;
+use App\Tenant\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -156,21 +157,26 @@ final class DotationService
             return;
         }
 
-        $dotationPosterieure = ImmobilisationDotation::query()
-            ->where('immobilisation_id', (int) $immobilisation->id)
-            ->where('exercice', '>', $exercice)
-            ->orderBy('exercice')
-            ->first();
+        DB::transaction(function () use ($dotation, $immobilisation, $exercice): void {
+            // Anomalie 3 — le contrôle d'ouverture réel (verrouillé) doit avoir lieu
+            // ICI, dans la transaction qui porte la suppression (voir docblock de
+            // assertExerciceGenerable() et comptabiliser()).
+            $this->assertExerciceGenerable($exercice);
 
-        if ($dotationPosterieure !== null) {
-            throw DotationInterditeException::dotationPosterieureExistante(
-                $immobilisation->numero,
-                (int) $dotationPosterieure->exercice,
-                $exercice,
-            );
-        }
+            $dotationPosterieure = ImmobilisationDotation::query()
+                ->where('immobilisation_id', (int) $immobilisation->id)
+                ->where('exercice', '>', $exercice)
+                ->orderBy('exercice')
+                ->first();
 
-        DB::transaction(function () use ($dotation): void {
+            if ($dotationPosterieure !== null) {
+                throw DotationInterditeException::dotationPosterieureExistante(
+                    $immobilisation->numero,
+                    (int) $dotationPosterieure->exercice,
+                    $exercice,
+                );
+            }
+
             $transaction = $dotation->transaction;
 
             if ($transaction !== null) {
@@ -188,6 +194,12 @@ final class DotationService
         $dateEcriture = $this->finExercice($exercice);
 
         DB::transaction(function () use ($immobilisation, $exercice, $montant, $dateEcriture): void {
+            // Anomalie 3 — le contrôle d'ouverture doit se faire ICI, sous verrou et
+            // dans la même transaction que l'écriture ci-dessous (voir docblock de
+            // assertExerciceGenerable()). L'appel en tête de generer()/recalculer()
+            // n'est qu'un filet de sécurité rapide, sans verrou persistant.
+            $this->assertExerciceGenerable($exercice);
+
             $exerciceManquant = $this->premierExerciceManquant($immobilisation, $exercice);
 
             if ($exerciceManquant !== null) {
@@ -269,6 +281,19 @@ final class DotationService
         );
     }
 
+    /**
+     * Anomalie 3 (audit) — auparavant, ce contrôle consultait le statut de
+     * l'exercice AVANT d'ouvrir la transaction d'écriture, et sans verrou :
+     * une clôture concurrente pouvait s'intercaler entre le contrôle et
+     * l'insertion. Le verrou n'a d'effet que si cette méthode s'exécute à
+     * l'intérieur du DB::transaction() qui porte aussi l'écriture — c'est la
+     * responsabilité de l'appelant (comptabiliser(), annuler()).
+     *
+     * Même protocole que ExerciceService::cloturer() : verrouille
+     * l'association puis l'exercice, pour que clôture et génération/
+     * annulation de dotation s'excluent réellement au lieu de courir l'une
+     * contre l'autre.
+     */
     private function assertExerciceGenerable(int $exercice): void
     {
         $debut = $this->debutExercice($exercice);
@@ -277,7 +302,14 @@ final class DotationService
             throw DotationInterditeException::exerciceNonCommence($exercice);
         }
 
-        $exerciceModel = Exercice::where('annee', $exercice)->first();
+        DB::table('association')
+            ->where('id', TenantContext::currentId())
+            ->lockForUpdate()
+            ->first();
+
+        $exerciceModel = Exercice::where('annee', $exercice)
+            ->lockForUpdate()
+            ->first();
 
         if ($exerciceModel !== null && $exerciceModel->isCloture()) {
             throw DotationInterditeException::exerciceCloture($exercice);
