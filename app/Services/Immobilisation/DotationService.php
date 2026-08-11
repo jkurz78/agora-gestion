@@ -120,6 +120,12 @@ final class DotationService
      * Annule la dotation d'une fiche : soft-delete de la transaction et
      * suppression de la ligne.
      *
+     * Anomalie 1 (audit) — refuse si une dotation existe déjà sur un exercice
+     * postérieur pour cette fiche : on annule du plus récent au plus ancien,
+     * jamais l'inverse (sinon le cumul théorique des exercices suivants,
+     * calculé contre un cumul comptabilisé qui vient de perdre un maillon,
+     * diverge silencieusement).
+     *
      * ATTENTION — la transaction supprimée emporte ses affectations
      * analytiques. Si la dotation avait été ventilée sur des opérations, ce
      * travail est perdu et doit être refait. L'appelant DOIT en avertir
@@ -138,6 +144,20 @@ final class DotationService
             return;
         }
 
+        $dotationPosterieure = ImmobilisationDotation::query()
+            ->where('immobilisation_id', (int) $immobilisation->id)
+            ->where('exercice', '>', $exercice)
+            ->orderBy('exercice')
+            ->first();
+
+        if ($dotationPosterieure !== null) {
+            throw DotationInterditeException::dotationPosterieureExistante(
+                $immobilisation->numero,
+                (int) $dotationPosterieure->exercice,
+                $exercice,
+            );
+        }
+
         DB::transaction(function () use ($dotation): void {
             $dotation->transaction?->delete();
             $dotation->delete();
@@ -150,6 +170,16 @@ final class DotationService
         $dateEcriture = $this->finExercice($exercice);
 
         DB::transaction(function () use ($immobilisation, $exercice, $montant, $dateEcriture): void {
+            $exerciceManquant = $this->premierExerciceManquant($immobilisation, $exercice);
+
+            if ($exerciceManquant !== null) {
+                throw DotationInterditeException::exerciceAnterieurNonGenere(
+                    $immobilisation->numero,
+                    $exerciceManquant,
+                    $exercice,
+                );
+            }
+
             $transaction = $this->ecritureGenerator->pourDotationAmortissement(
                 immobilisation: $immobilisation,
                 date: $dateEcriture,
@@ -163,6 +193,46 @@ final class DotationService
                 'transaction_id' => (int) $transaction->id,
             ]);
         });
+    }
+
+    /**
+     * Anomalie 1 (audit) — premier exercice, à partir de la mise en service
+     * du bien, qui aurait dû recevoir une dotation théorique non nulle mais
+     * n'en a aucune enregistrée. Retourne null s'il n'existe aucun trou avant
+     * $exerciceCible : soit tous les exercices dus sont dotés, soit aucun
+     * exercice antérieur n'était dû (bien mis en service après, ou dotation
+     * théorique nulle avant $exerciceCible).
+     *
+     * Ne s'appuie jamais sur le cumul déjà comptabilisé (c'est justement lui
+     * que le désordre fausse) : chaque exercice est jugé sur son incrément
+     * théorique propre, cumulTheorique(X) − cumulTheorique(X − 1), qui ne
+     * dépend que du calculateur — jamais de l'historique de génération.
+     */
+    private function premierExerciceManquant(Immobilisation $immobilisation, int $exerciceCible): ?int
+    {
+        $exerciceMiseEnService = $this->exerciceService->anneeForDate(
+            CarbonImmutable::instance($immobilisation->date_mise_en_service->toDateTime())
+        );
+
+        for ($exercice = $exerciceMiseEnService; $exercice < $exerciceCible; $exercice++) {
+            $incrementTheoriqueCentimes = $this->calculator->cumulTheoriqueCentimes($immobilisation, $exercice)
+                - $this->calculator->cumulTheoriqueCentimes($immobilisation, $exercice - 1);
+
+            if ($incrementTheoriqueCentimes <= 0) {
+                continue;
+            }
+
+            $dotationExiste = ImmobilisationDotation::query()
+                ->where('immobilisation_id', (int) $immobilisation->id)
+                ->where('exercice', $exercice)
+                ->exists();
+
+            if (! $dotationExiste) {
+                return $exercice;
+            }
+        }
+
+        return null;
     }
 
     /** Dernier jour de l'exercice — jamais now(), jamais une valeur en dur. */

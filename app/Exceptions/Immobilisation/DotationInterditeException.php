@@ -22,4 +22,30 @@ final class DotationInterditeException extends RuntimeException
             .'générées, recalculées ni annulées.'
         );
     }
+
+    /**
+     * Anomalie 1 (audit) — génération refusée : un exercice antérieur, dû
+     * pour cette fiche, n'a pas encore été doté. Générer quand même
+     * affecterait la charge au mauvais exercice (cf. docblock DotationService).
+     */
+    public static function exerciceAnterieurNonGenere(string $numeroFiche, int $exerciceManquant, int $exerciceCible): self
+    {
+        return new self(
+            "Impossible de générer la dotation de {$numeroFiche} pour l'exercice {$exerciceCible} : "
+            ."l'exercice {$exerciceManquant} n'a pas encore été doté pour cette fiche. Générez-le d'abord."
+        );
+    }
+
+    /**
+     * Anomalie 1 (audit) — annulation refusée : une dotation existe déjà sur
+     * un exercice postérieur pour cette fiche. On annule du plus récent au
+     * plus ancien.
+     */
+    public static function dotationPosterieureExistante(string $numeroFiche, int $exercicePosterieur, int $exerciceCible): self
+    {
+        return new self(
+            "Impossible d'annuler la dotation de {$numeroFiche} pour l'exercice {$exerciceCible} : "
+            ."la dotation de l'exercice {$exercicePosterieur} existe encore pour cette fiche. Annulez-la d'abord."
+        );
+    }
 }
