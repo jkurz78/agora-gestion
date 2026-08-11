@@ -354,6 +354,10 @@ final class TransactionService
                 throw new \RuntimeException('Cette transaction est liée à une remise bancaire et ne peut pas être modifiée.');
             }
 
+            if ($transaction->isLockedByImmobilisation()) {
+                throw new \RuntimeException('Cette transaction est pilotée par une fiche d’immobilisation et ne peut pas être modifiée : modifiez la fiche.');
+            }
+
             if ($transaction->isLockedByFacture()) {
                 $this->assertLockedByFactureInvariants($transaction, $data, $lignes);
             }

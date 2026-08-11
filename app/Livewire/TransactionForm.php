@@ -43,6 +43,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -120,7 +121,14 @@ final class TransactionForm extends Component
 
     public bool $isLockedByHelloAsso = false;
 
-    /** Transaction pilotée par une fiche d'immobilisation (acquisition ou dotation) — la fiche est le maître. */
+    /**
+     * Transaction pilotée par une fiche d'immobilisation (acquisition ou dotation) — la fiche est le maître.
+     *
+     * #[Locked] empêche l'hydratation de cette propriété depuis le client — un complément défensif,
+     * pas une garde à elle seule : l'invariant réel vit dans TransactionService::update()
+     * (isLockedByImmobilisation()), seule frontière qui compte contre un appelant serveur forgé.
+     */
+    #[Locked]
     public bool $isLockedByImmobilisation = false;
 
     /** True quand la transaction verrouillée est une dotation, false quand c'est l'acquisition elle-même. */

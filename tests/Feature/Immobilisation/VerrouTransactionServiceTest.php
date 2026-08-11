@@ -5,10 +5,12 @@ declare(strict_types=1);
 use App\Livewire\Immobilisations\DotationsExercice;
 use App\Models\Compte;
 use App\Models\ImmobilisationDotation;
+use App\Models\Operation;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Services\Compta\TransactionAvecReglementService;
 use App\Services\Immobilisation\DotationService;
 use App\Services\Immobilisation\ImmobilisationComptesSeeder;
 use App\Services\Immobilisation\ImmobilisationService;
@@ -16,6 +18,41 @@ use App\Services\TransactionService;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Livewire\Livewire;
+
+/**
+ * Construit un jeu de $data/$lignes minimal mais valide pour appeler
+ * TransactionService::update() sur $tx sans en modifier le contenu — sert de
+ * témoin pour prouver que le verrou refuse la modification sans altérer la
+ * transaction (au lieu de laisser passer un update "no-op" par accident).
+ *
+ * @return array{data: array<string, mixed>, lignes: array<int, array<string, mixed>>}
+ */
+function updatePayloadIdentique(Transaction $tx): array
+{
+    $tx->loadMissing('lignes');
+    $ligne = $tx->lignes->first();
+
+    return [
+        'data' => [
+            'type' => $tx->type->value,
+            'date' => $tx->date->format('Y-m-d'),
+            'libelle' => 'Libellé falsifié via update()',
+            'montant_total' => (string) $tx->montant_total,
+            'mode_paiement' => $tx->mode_paiement?->value,
+            'tiers_id' => $tx->tiers_id,
+            'compte_id' => $tx->compte_id,
+            'reference' => $tx->reference,
+        ],
+        'lignes' => [[
+            'id' => $ligne->id,
+            'compte_id' => $ligne->compte_id,
+            'montant' => (string) $ligne->montant,
+            'operation_id' => null,
+            'seance' => null,
+            'notes' => null,
+        ]],
+    ];
+}
 
 /**
  * Bug 2 — la transaction d'acquisition d'une immobilisation ne doit jamais
@@ -72,6 +109,40 @@ it('interdit l’extourne de la transaction d’acquisition', function (): void 
     expect($tx->isExtournable())->toBeFalse();
 });
 
+/**
+ * Bug audit — TransactionService::update() ne contrôlait pas
+ * isLockedByImmobilisation() : seule l'IHM (propriété Livewire falsifiable)
+ * protégeait l'écriture d'acquisition contre une réécriture directe du
+ * service, via TransactionAvecReglementService ou un appel forgé.
+ */
+it('refuse la modification de la transaction d’acquisition via update()', function (): void {
+    $tx = Transaction::findOrFail((int) $this->immo->transaction_id);
+    $libelleOriginal = $tx->libelle;
+    ['data' => $data, 'lignes' => $lignes] = updatePayloadIdentique($tx);
+
+    expect(fn () => app(TransactionService::class)->update($tx, $data, $lignes))
+        ->toThrow(RuntimeException::class, 'immobilisation');
+
+    expect($tx->fresh()->libelle)->toBe($libelleOriginal);
+});
+
+/**
+ * Chemin alternatif signalé par l'audit : TransactionAvecReglementService
+ * délègue à TransactionService::update() en interne — le verrou doit donc
+ * s'appliquer aussi de ce côté, sans dépendre de l'appelant.
+ */
+it('refuse la modification de la transaction d’acquisition via TransactionAvecReglementService', function (): void {
+    $tx = Transaction::findOrFail((int) $this->immo->transaction_id);
+    $libelleOriginal = $tx->libelle;
+    ['data' => $data, 'lignes' => $lignes] = updatePayloadIdentique($tx);
+
+    expect(fn () => app(TransactionAvecReglementService::class)->enregistrer(
+        $tx, $data, $lignes, null, null, null, 2026
+    ))->toThrow(RuntimeException::class, 'immobilisation');
+
+    expect($tx->fresh()->libelle)->toBe($libelleOriginal);
+});
+
 it('expose isLockedByImmobilisation() sur la transaction d’acquisition', function (): void {
     $tx = Transaction::findOrFail((int) $this->immo->transaction_id);
 
@@ -93,6 +164,24 @@ it('laisse une transaction ordinaire supprimable, annulable et extournable', fun
     app(TransactionService::class)->delete($tx->fresh());
 
     expect(Transaction::find($tx->id))->toBeNull();
+});
+
+it('laisse une transaction ordinaire modifiable via update()', function (): void {
+    $compte6 = Compte::factory()->create(['numero_pcg' => '607', 'classe' => 6]);
+    $tx = Transaction::factory()->asDepense()->create(['montant_total' => 100]);
+    TransactionLigne::factory()->create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $compte6->id,
+        'debit' => 100,
+        'montant' => 100,
+    ]);
+    $tx = $tx->fresh();
+
+    ['data' => $data, 'lignes' => $lignes] = updatePayloadIdentique($tx);
+
+    app(TransactionService::class)->update($tx, $data, $lignes);
+
+    expect($tx->fresh()->libelle)->toBe('Libellé falsifié via update()');
 });
 
 /**
@@ -142,6 +231,46 @@ describe('verrou de la transaction de dotation', function (): void {
         $tx = Transaction::findOrFail((int) $this->dotation->transaction_id);
 
         expect($tx->isExtournable())->toBeFalse();
+    });
+
+    it('refuse la modification de la transaction de dotation via update()', function (): void {
+        $tx = Transaction::findOrFail((int) $this->dotation->transaction_id);
+        $libelleOriginal = $tx->libelle;
+        ['data' => $data, 'lignes' => $lignes] = updatePayloadIdentique($tx);
+
+        expect(fn () => app(TransactionService::class)->update($tx, $data, $lignes))
+            ->toThrow(RuntimeException::class, 'immobilisation');
+
+        expect($tx->fresh()->libelle)->toBe($libelleOriginal);
+    });
+
+    /**
+     * Point important de l'anomalie 1 : le verrou d'update() ne doit jamais
+     * bloquer la ventilation analytique (répartition de la dotation sur des
+     * opérations) — un besoin métier réel, couvert côté écran par
+     * DotationVentilerTest / VerrouTransactionChampsTest. Ce test le confirme
+     * directement au niveau service, sans passer par Livewire.
+     */
+    it('laisse la ventilation analytique de la ligne 6811 fonctionner malgré le verrou update()', function (): void {
+        $tx = Transaction::findOrFail((int) $this->dotation->transaction_id);
+        $operation = Operation::factory()->create();
+        $ligne = TransactionLigne::where('transaction_id', $tx->id)
+            ->whereHas('compte', fn ($q) => $q->where('numero_pcg', '6811'))
+            ->firstOrFail();
+
+        app(TransactionService::class)->affecterLigne($ligne, [[
+            'operation_id' => $operation->id,
+            'seance' => null,
+            'montant' => (string) $ligne->montant,
+            'notes' => null,
+        ]]);
+
+        expect($ligne->affectations()->count())->toBe(1)
+            ->and((int) $ligne->affectations()->first()->operation_id)->toBe((int) $operation->id);
+
+        app(TransactionService::class)->supprimerAffectations($ligne);
+
+        expect($ligne->affectations()->count())->toBe(0);
     });
 
     /**
