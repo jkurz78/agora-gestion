@@ -773,6 +773,24 @@ final class TransactionService
      * Pas de délettrage : la T1 est soft-deleted et la T2 force-deleted,
      * les deux disparaissent des rapports. Les lettrage_code orphelins
      * sur les lignes supprimées sont inoffensifs.
+     *
+     * Anomalie 2 (audit) — delete()/annuler() contrôlent les verrous de T1
+     * (rapprochement, remise, facture, immobilisation) mais rien ne
+     * protégeait T2 : une T2 déjà pointée dans un rapprochement bancaire, ou
+     * intégrée à une remise, pouvait être effacée alors que le rapprochement
+     * ou la remise, eux, survivaient — grand livre divergent du rapprochement/
+     * de la remise qui la référence encore. On applique donc à T2 les mêmes
+     * gardes qu'une suppression directe porterait sur elle, et on refuse la
+     * suppression de T1 tant que T2 est protégée : c'est T2 qu'il faut
+     * libérer en premier (dépointer le rapprochement ou en sortir la
+     * transaction, retirer la transaction de la remise), pas une donnée à
+     * effacer discrètement pour la faire disparaître.
+     *
+     * isLockedByImmobilisation() n'est délibérément pas testé ici : T2 est
+     * toujours une transaction de règlement/encaissement générée par
+     * EcritureGenerator, jamais elle-même le transaction_id d'une
+     * Immobilisation ou d'une ImmobilisationDotation (voir docblock de
+     * Transaction::isLockedByImmobilisation()).
      */
     private function supprimerT2SiExiste(Transaction $transaction): void
     {
@@ -782,6 +800,16 @@ final class TransactionService
 
         if ($t2 === null) {
             return;
+        }
+
+        if ($t2->rapprochement_id !== null) {
+            throw new \RuntimeException('Le règlement de cette transaction est pointé dans un rapprochement bancaire : supprimez d’abord le rapprochement (ou dépointez-en cette transaction) avant de pouvoir supprimer ou annuler cette transaction.');
+        }
+        if ($t2->isLockedByRemise()) {
+            throw new \RuntimeException('Le règlement de cette transaction fait partie d’une remise bancaire : retirez-le de la remise avant de pouvoir supprimer ou annuler cette transaction.');
+        }
+        if ($t2->isLockedByFacture()) {
+            throw new \RuntimeException('Le règlement de cette transaction est rattaché à une facture validée et ne peut pas être supprimé.');
         }
 
         TransactionLigne::where('transaction_id', (int) $t2->id)->forceDelete();
