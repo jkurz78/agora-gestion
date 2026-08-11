@@ -643,6 +643,32 @@ final class TransactionService
         });
     }
 
+    /**
+     * Supprime (soft-delete) les lignes d'une transaction ainsi que leurs
+     * affectations analytiques — sans toucher à la transaction elle-même.
+     *
+     * transaction_lignes ne cascade PAS depuis son parent (cf. docblock de
+     * App\Tenant\TransactionLigneTenantScope) : sans cet appel explicite,
+     * supprimer une transaction laisse des lignes actives orphelines, des
+     * ventilations analytiques périmées, et des comptes à tort considérés
+     * « utilisés » (ce qui bloque leur suppression au plan comptable).
+     *
+     * SANS garde métier (exercice ouvert, verrous remise/facture/
+     * immobilisation) : réservée aux appelants qui les ont déjà vérifiées
+     * eux-mêmes. Utilisée par delete()/annuler() ci-dessous, et par
+     * DotationService::annuler() pour les transactions de dotation aux
+     * amortissements — verrouillées ici par isLockedByImmobilisation() et
+     * donc délibérément inatteignables par delete()/annuler() : la fiche est
+     * l'unique point d'entrée pour défaire une dotation.
+     */
+    public function purgerLignesEtAffectations(Transaction $transaction): void
+    {
+        $transaction->lignes()->each(function (TransactionLigne $ligne): void {
+            $ligne->affectations()->delete();
+            $ligne->delete();
+        });
+    }
+
     public function delete(Transaction $transaction): void
     {
         $this->exerciceService->assertOuvert(
@@ -672,10 +698,7 @@ final class TransactionService
                 $this->deletePieceJointe($transaction);
             }
 
-            $transaction->lignes()->each(function (TransactionLigne $ligne) {
-                $ligne->affectations()->delete();
-                $ligne->delete();
-            });
+            $this->purgerLignesEtAffectations($transaction);
             $transaction->delete();
         });
     }
@@ -721,10 +744,7 @@ final class TransactionService
             }
 
             // 3. Soft-delete lignes
-            $transaction->lignes()->each(function (TransactionLigne $ligne) {
-                $ligne->affectations()->delete();
-                $ligne->delete();
-            });
+            $this->purgerLignesEtAffectations($transaction);
 
             // 4. Soft-delete TX avec traçabilité
             $transaction->forceFill([

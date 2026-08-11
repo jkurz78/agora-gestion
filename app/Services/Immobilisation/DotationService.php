@@ -10,6 +10,7 @@ use App\Models\Immobilisation;
 use App\Models\ImmobilisationDotation;
 use App\Services\Compta\EcritureGenerator;
 use App\Services\ExerciceService;
+use App\Services\TransactionService;
 use App\Support\MontantDecimal;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
@@ -31,6 +32,7 @@ final class DotationService
         private readonly EcritureGenerator $ecritureGenerator,
         private readonly PlanAmortissementCalculator $calculator,
         private readonly ExerciceService $exerciceService,
+        private readonly TransactionService $transactionService,
     ) {}
 
     /**
@@ -117,8 +119,19 @@ final class DotationService
     }
 
     /**
-     * Annule la dotation d'une fiche : soft-delete de la transaction et
-     * suppression de la ligne.
+     * Annule la dotation d'une fiche : purge les lignes et affectations de la
+     * transaction (transaction_lignes ne cascade pas depuis son parent, cf.
+     * TransactionService::purgerLignesEtAffectations()), puis soft-delete la
+     * transaction et supprime la ligne ImmobilisationDotation.
+     *
+     * Anomalie 2 (audit) — auparavant, seules la transaction et la ligne
+     * ImmobilisationDotation étaient supprimées : les transaction_lignes et
+     * leurs affectations analytiques restaient actives, d'où des lignes
+     * orphelines et des comptes à tort considérés « utilisés ». On ne peut
+     * pas passer par TransactionService::delete() : sa garde
+     * isLockedByImmobilisation() refuse délibérément toute transaction
+     * pilotée par une immobilisation (protège la suppression depuis la liste
+     * des transactions — la fiche doit rester l'unique point d'entrée).
      *
      * Anomalie 1 (audit) — refuse si une dotation existe déjà sur un exercice
      * postérieur pour cette fiche : on annule du plus récent au plus ancien,
@@ -126,8 +139,7 @@ final class DotationService
      * calculé contre un cumul comptabilisé qui vient de perdre un maillon,
      * diverge silencieusement).
      *
-     * ATTENTION — la transaction supprimée emporte ses affectations
-     * analytiques. Si la dotation avait été ventilée sur des opérations, ce
+     * ATTENTION — si la dotation avait été ventilée sur des opérations, ce
      * travail est perdu et doit être refait. L'appelant DOIT en avertir
      * l'utilisateur.
      */
@@ -159,7 +171,13 @@ final class DotationService
         }
 
         DB::transaction(function () use ($dotation): void {
-            $dotation->transaction?->delete();
+            $transaction = $dotation->transaction;
+
+            if ($transaction !== null) {
+                $this->transactionService->purgerLignesEtAffectations($transaction);
+                $transaction->delete();
+            }
+
             $dotation->delete();
         });
     }
