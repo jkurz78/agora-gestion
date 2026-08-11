@@ -59,6 +59,7 @@ final class ImmobilisationService
         ?string $notes = null,
     ): Immobilisation {
         $this->assertComptesValides($compte, $compteAmortissement);
+        $this->assertExerciceOuvert($dateAchat);
         $this->assertMiseEnServiceCoherente($dateAchat, $dateMiseEnService);
 
         return DB::transaction(function () use (
@@ -161,6 +162,7 @@ final class ImmobilisationService
         $transaction = $immobilisation->transaction;
 
         if ($transaction !== null) {
+            $this->assertExerciceOuvert($transaction->date);
             $this->assertMiseEnServiceCoherente($transaction->date, $dateMiseEnService);
         }
 
@@ -265,6 +267,23 @@ final class ImmobilisationService
                 (string) $compteAmortissement->numero_pcg,
             );
         }
+    }
+
+    /**
+     * L'exercice de la date d'achat doit être ouvert — écrire dans un
+     * exercice clôturé est interdit partout ailleurs dans l'application
+     * (TransactionService::delete()/annuler() portent déjà ce contrôle,
+     * voir leurs premières lignes) ; rien ne l'imposait ici.
+     *
+     * Réutilisée par modifier() avec la date de la transaction d'acquisition :
+     * modifier une fiche dont l'acquisition est clôturée doit être refusé
+     * aussi, pas seulement en créer une nouvelle.
+     */
+    private function assertExerciceOuvert(\DateTimeInterface $date): void
+    {
+        $this->exerciceService->assertOuvert(
+            $this->exerciceService->anneeForDate(CarbonImmutable::parse($date->format('Y-m-d')))
+        );
     }
 
     /**
