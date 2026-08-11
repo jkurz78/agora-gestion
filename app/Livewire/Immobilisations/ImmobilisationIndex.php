@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Immobilisations;
 
+use App\Enums\Espace;
+use App\Enums\RoleAssociation;
 use App\Exceptions\Immobilisation\MiseEnServiceAnterieureException;
 use App\Livewire\Immobilisations\Concerns\WithDureeSelector;
 use App\Models\Compte;
@@ -15,6 +17,7 @@ use App\Services\Immobilisation\ImmobilisationComptesSeeder;
 use App\Services\Immobilisation\ImmobilisationService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use Livewire\Component;
 
@@ -51,6 +54,8 @@ final class ImmobilisationIndex extends Component
 
     public function ouvrirModal(): void
     {
+        $this->authorize('create', Immobilisation::class);
+
         // Créé à la demande (pas au provisionnement du tenant) : idempotent,
         // donc sans effet de bord si le kit existe déjà.
         ImmobilisationComptesSeeder::seed();
@@ -95,6 +100,8 @@ final class ImmobilisationIndex extends Component
 
     public function enregistrer(): void
     {
+        $this->authorize('create', Immobilisation::class);
+
         $this->validate([
             'libelle' => ['required', 'string', 'max:255'],
             'quantite' => ['required', 'integer', 'min:1'],
@@ -140,6 +147,11 @@ final class ImmobilisationIndex extends Component
         $this->showModal = false;
         $this->flashMessage = 'Immobilisation enregistrée.';
         $this->flashType = 'success';
+    }
+
+    public function getCanEditProperty(): bool
+    {
+        return RoleAssociation::tryFrom(Auth::user()->currentRole() ?? '')?->canWrite(Espace::Compta) ?? false;
     }
 
     public function render(): View

@@ -12,6 +12,7 @@
             <h4 class="mb-0 mt-1">{{ $immobilisation->numero }} — {{ $immobilisation->libelle }}</h4>
         </div>
         <div class="d-flex gap-2">
+            @if ($this->canEdit)
             <button type="button" class="btn btn-outline-secondary btn-sm" wire:click="ouvrirEdition">
                 <i class="bi bi-pencil me-1"></i> Modifier
             </button>
@@ -19,6 +20,7 @@
                     wire:confirm="Supprimer cette fiche ? L'écriture comptable d'acquisition sera supprimée elle aussi.">
                 <i class="bi bi-trash me-1"></i> Supprimer
             </button>
+            @endif
             <a href="{{ route('immobilisations.pdf', $immobilisation) }}" class="btn btn-outline-secondary btn-sm" target="_blank">
                 <i class="bi bi-file-earmark-pdf me-1"></i> Imprimer la fiche
             </a>
@@ -184,8 +186,10 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" wire:click="fermerEdition">Annuler</button>
+                        <button type="button" class="btn btn-secondary" wire:click="fermerEdition">{{ $this->canEdit ? 'Annuler' : 'Fermer' }}</button>
+                        @if ($this->canEdit)
                         <button type="button" class="btn btn-primary" wire:click="enregistrerModification">Enregistrer</button>
+                        @endif
                     </div>
                 </div>
             </div>

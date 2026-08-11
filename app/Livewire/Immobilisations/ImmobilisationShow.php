@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Immobilisations;
 
+use App\Enums\Espace;
+use App\Enums\RoleAssociation;
 use App\Exceptions\ExerciceCloturedException;
 use App\Exceptions\Immobilisation\MiseEnServiceAnterieureException;
 use App\Exceptions\Immobilisation\SuppressionInterditeException;
@@ -13,6 +15,7 @@ use App\Services\ExerciceService;
 use App\Services\Immobilisation\ImmobilisationService;
 use App\Services\Immobilisation\PlanAmortissementCalculator;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use Livewire\Component;
 
@@ -44,6 +47,11 @@ final class ImmobilisationShow extends Component
         $this->immobilisation = $immobilisation;
     }
 
+    public function getCanEditProperty(): bool
+    {
+        return RoleAssociation::tryFrom(Auth::user()->currentRole() ?? '')?->canWrite(Espace::Compta) ?? false;
+    }
+
     public function render(): View
     {
         $this->immobilisation->load(['compte', 'compteAmortissement', 'dotations.transaction', 'transaction.tiers']);
@@ -61,6 +69,8 @@ final class ImmobilisationShow extends Component
      */
     public function ouvrirEdition(): void
     {
+        $this->authorize('update', $this->immobilisation);
+
         $this->libelle = $this->immobilisation->libelle;
         $this->quantite = (int) $this->immobilisation->quantite;
         $this->initDureeChoix((int) $this->immobilisation->duree_mois);
@@ -77,6 +87,8 @@ final class ImmobilisationShow extends Component
 
     public function enregistrerModification(): void
     {
+        $this->authorize('update', $this->immobilisation);
+
         $this->validate([
             'libelle' => ['required', 'string', 'max:255'],
             'quantite' => ['required', 'integer', 'min:1'],
@@ -117,6 +129,8 @@ final class ImmobilisationShow extends Component
      */
     public function supprimer(): void
     {
+        $this->authorize('delete', $this->immobilisation);
+
         try {
             app(ImmobilisationService::class)->supprimer($this->immobilisation);
         } catch (SuppressionInterditeException|ExerciceCloturedException $e) {

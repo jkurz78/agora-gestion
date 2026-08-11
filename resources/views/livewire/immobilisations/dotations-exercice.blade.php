@@ -11,9 +11,11 @@
                     <option value="{{ $annee }}">{{ $exerciceService->label($annee) }}</option>
                 @endforeach
             </select>
+            @if ($this->canEdit)
             <button type="button" class="btn btn-primary btn-sm" wire:click="genererTout">
                 <i class="bi bi-play-fill me-1"></i> Générer les dotations manquantes
             </button>
+            @endif
         </div>
     </div>
 
@@ -66,11 +68,13 @@
                             </td>
                             <td class="d-flex gap-2 align-items-center">
                                 @if ($ligne->enEcart())
+                                    @if ($this->canEdit)
                                     <button type="button" class="btn btn-warning btn-sm"
                                             wire:click="recalculer({{ $ligne->immobilisation->id }})"
                                             wire:confirm="La dotation actuelle sera remplacée. Si elle avait été ventilée sur des opérations, cette ventilation sera perdue et devra être refaite. Continuer ?">
                                         Recalculer
                                     </button>
+                                    @endif
                                 @elseif ($ligne->aGenerer())
                                     <span class="badge bg-primary">À générer</span>
                                 @elseif (! $ligne->dejaComptabilisee)
@@ -81,17 +85,19 @@
                                     @unless ($ligne->enEcart())
                                         <span class="badge bg-success">À jour</span>
                                     @endunless
-                                    @if ($ligne->transactionId !== null)
+                                    @if ($ligne->transactionId !== null && $this->canEdit)
                                         <button type="button" class="btn btn-outline-primary btn-sm"
                                                 wire:click="ventiler({{ $ligne->transactionId }})">
                                             <i class="bi bi-scissors"></i> Ventiler
                                         </button>
                                     @endif
+                                    @if ($this->canEdit)
                                     <button type="button" class="btn btn-outline-danger btn-sm"
                                             wire:click="annulerDotation({{ $ligne->immobilisation->id }})"
                                             wire:confirm="L'écriture comptable de cette dotation sera supprimée. Si elle avait été ventilée sur des opérations, cette ventilation sera perdue et devra être refaite. Continuer ?">
                                         Annuler
                                     </button>
+                                    @endif
                                 @endif
                             </td>
                         </tr>

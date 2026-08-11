@@ -9,9 +9,11 @@
             <a href="{{ route('immobilisations.dotations') }}" class="btn btn-outline-secondary btn-sm">
                 <i class="bi bi-calculator me-1"></i> Dotations de l'exercice
             </a>
+            @if ($this->canEdit)
             <button type="button" class="btn btn-primary btn-sm" wire:click="ouvrirModal">
                 <i class="bi bi-plus-lg me-1"></i> Nouvelle immobilisation
             </button>
+            @endif
         </div>
     </div>
 
@@ -177,8 +179,10 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" wire:click="fermerModal">Annuler</button>
+                        <button type="button" class="btn btn-secondary" wire:click="fermerModal">{{ $this->canEdit ? 'Annuler' : 'Fermer' }}</button>
+                        @if ($this->canEdit)
                         <button type="button" class="btn btn-primary" wire:click="enregistrer">Enregistrer</button>
+                        @endif
                     </div>
                 </div>
             </div>

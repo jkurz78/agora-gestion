@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Livewire\Immobilisations;
 
+use App\Enums\Espace;
+use App\Enums\RoleAssociation;
 use App\Exceptions\Immobilisation\DotationInterditeException;
 use App\Models\Immobilisation;
 use App\Services\ExerciceService;
 use App\Services\Immobilisation\DotationService;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use Livewire\Component;
 
@@ -25,6 +28,11 @@ final class DotationsExercice extends Component
         $this->exercice = app(ExerciceService::class)->current() - 1;
     }
 
+    public function getCanEditProperty(): bool
+    {
+        return RoleAssociation::tryFrom(Auth::user()->currentRole() ?? '')?->canWrite(Espace::Compta) ?? false;
+    }
+
     public function render(): View
     {
         return view('livewire.immobilisations.dotations-exercice', [
@@ -36,6 +44,8 @@ final class DotationsExercice extends Component
 
     public function genererTout(): void
     {
+        $this->authorize('create', Immobilisation::class);
+
         try {
             $nombre = app(DotationService::class)->generer($this->exercice);
         } catch (DotationInterditeException $e) {
@@ -54,6 +64,7 @@ final class DotationsExercice extends Component
     public function recalculer(int $immobilisationId): void
     {
         $immobilisation = Immobilisation::findOrFail($immobilisationId);
+        $this->authorize('update', $immobilisation);
 
         try {
             app(DotationService::class)->recalculer($immobilisation, $this->exercice);
@@ -76,12 +87,15 @@ final class DotationsExercice extends Component
      */
     public function ventiler(int $transactionId): void
     {
+        $this->authorize('create', Immobilisation::class);
+
         $this->dispatch('edit-transaction', id: $transactionId);
     }
 
     public function annulerDotation(int $immobilisationId): void
     {
         $immobilisation = Immobilisation::findOrFail($immobilisationId);
+        $this->authorize('update', $immobilisation);
 
         try {
             app(DotationService::class)->annuler($immobilisation, $this->exercice);
