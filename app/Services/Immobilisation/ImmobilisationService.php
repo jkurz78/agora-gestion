@@ -23,6 +23,7 @@ use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Acquisition d'une immobilisation.
@@ -62,7 +63,7 @@ final class ImmobilisationService
         $this->assertExerciceOuvert($dateAchat);
         $this->assertMiseEnServiceCoherente($dateAchat, $dateMiseEnService);
 
-        return DB::transaction(function () use (
+        $immobilisation = DB::transaction(function () use (
             $tiers, $libelle, $quantite, $compte, $compteAmortissement, $montant,
             $dateAchat, $dateMiseEnService, $dureeMois, $modePaiement,
             $compteTresorerie, $notes
@@ -137,6 +138,16 @@ final class ImmobilisationService
                 'notes' => $notes,
             ]);
         });
+
+        // Log après le commit (hors transaction pour éviter le rollback du log —
+        // même pattern que FactureService::valider()/annuler()).
+        Log::info('immobilisation.acquise', [
+            'immobilisation_id' => (int) $immobilisation->id,
+            'numero' => $immobilisation->numero,
+            'transaction_id' => (int) $immobilisation->transaction_id,
+        ]);
+
+        return $immobilisation;
     }
 
     /**
@@ -176,6 +187,11 @@ final class ImmobilisationService
             'notes' => $notes,
         ]);
 
+        Log::info('immobilisation.modifiee', [
+            'immobilisation_id' => (int) $immobilisation->id,
+            'numero' => $immobilisation->numero,
+        ]);
+
         return $immobilisation->fresh();
     }
 
@@ -206,10 +222,20 @@ final class ImmobilisationService
             );
         }
 
+        $immobilisationId = (int) $immobilisation->id;
+        $numero = $immobilisation->numero;
+        $transactionId = (int) $transaction->id;
+
         DB::transaction(function () use ($immobilisation, $transaction): void {
             $immobilisation->delete();
             $this->transactionService->delete($transaction);
         });
+
+        Log::info('immobilisation.supprimee', [
+            'immobilisation_id' => $immobilisationId,
+            'numero' => $numero,
+            'transaction_id' => $transactionId,
+        ]);
     }
 
     /**

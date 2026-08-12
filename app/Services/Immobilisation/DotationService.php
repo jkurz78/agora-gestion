@@ -17,6 +17,7 @@ use App\Tenant\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Génération, recalcul et annulation des dotations aux amortissements.
@@ -218,6 +219,7 @@ final class DotationService
             }
 
             $transaction = $dotation->transaction;
+            $transactionId = $transaction !== null ? (int) $transaction->id : null;
 
             if ($transaction !== null) {
                 $this->transactionService->purgerLignesEtAffectations($transaction);
@@ -225,6 +227,13 @@ final class DotationService
             }
 
             $dotation->delete();
+
+            Log::info('immobilisation.dotation_annulee', [
+                'immobilisation_id' => (int) $immobilisation->id,
+                'numero' => $immobilisation->numero,
+                'exercice' => $exercice,
+                'transaction_id' => $transactionId,
+            ]);
         });
     }
 
@@ -262,6 +271,13 @@ final class DotationService
                 'immobilisation_id' => (int) $immobilisation->id,
                 'exercice' => $exercice,
                 'montant' => $montant,
+                'transaction_id' => (int) $transaction->id,
+            ]);
+
+            Log::info('immobilisation.dotation_generee', [
+                'immobilisation_id' => (int) $immobilisation->id,
+                'numero' => $immobilisation->numero,
+                'exercice' => $exercice,
                 'transaction_id' => (int) $transaction->id,
             ]);
         });
