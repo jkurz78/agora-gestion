@@ -131,12 +131,21 @@ final class ImmobilisationIndex extends Component
         $this->authorize('create', Immobilisation::class);
 
         $this->validate([
+            // Bornes alignées sur les colonnes SQL réelles (migration
+            // 2026_08_04_100001_create_immobilisations_tables) : un
+            // dépassement doit produire un message de validation en
+            // français, pas une erreur SQL brutale.
+            //   - libelle : varchar(255)
+            //   - quantite : unsignedInteger (max MySQL 4294967295)
+            //   - montant : decimal(10,2) (max 99999999.99)
+            //   - duree_mois : unsignedSmallInteger (max 65535) — 600 déjà
+            //     appliqué est une borne métier plus stricte, donc déjà sûre.
             'libelle' => ['required', 'string', 'max:255'],
-            'quantite' => ['required', 'integer', 'min:1'],
+            'quantite' => ['required', 'integer', 'min:1', 'max:4294967295'],
             'compte_id' => ['required', 'exists:comptes,id'],
             'compte_amortissement_id' => ['required', 'exists:comptes,id'],
             'tiers_id' => ['required', 'exists:tiers,id'],
-            'montant' => ['required', 'numeric', 'gt:0'],
+            'montant' => ['required', 'numeric', 'gt:0', 'max:99999999.99'],
             'date_achat' => ['required', 'date'],
             'date_mise_en_service' => ['required', 'date'],
             'duree_mois' => ['required', 'integer', 'min:1', 'max:600'],
@@ -150,6 +159,7 @@ final class ImmobilisationIndex extends Component
             'notes' => ['nullable', 'string'],
         ], [], [
             'libelle' => 'libellé',
+            'quantite' => 'quantité',
             'compte_id' => 'compte d’immobilisation',
             'compte_amortissement_id' => 'compte d’amortissement',
             'tiers_id' => 'fournisseur',

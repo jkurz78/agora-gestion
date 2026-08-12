@@ -103,13 +103,16 @@ final class ImmobilisationShow extends Component
         $this->authorize('update', $this->immobilisation);
 
         $this->validate([
+            // Bornes alignées sur les colonnes SQL réelles — voir le
+            // commentaire équivalent dans ImmobilisationIndex::enregistrer().
             'libelle' => ['required', 'string', 'max:255'],
-            'quantite' => ['required', 'integer', 'min:1'],
+            'quantite' => ['required', 'integer', 'min:1', 'max:4294967295'],
             'date_mise_en_service' => ['required', 'date'],
             'duree_mois' => ['required', 'integer', 'min:1', 'max:600'],
             'notes' => ['nullable', 'string'],
         ], [], [
             'libelle' => 'libellé',
+            'quantite' => 'quantité',
             'date_mise_en_service' => 'date de mise en service',
             'duree_mois' => 'durée',
         ]);
