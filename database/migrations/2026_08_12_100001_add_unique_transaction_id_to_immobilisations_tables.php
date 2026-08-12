@@ -36,29 +36,44 @@ use Illuminate\Support\Facades\Schema;
  */
 return new class extends Migration
 {
+    /**
+     * L'ORDRE DES OPÉRATIONS COMPTE, et SQLite ne le révèle pas.
+     *
+     * `transaction_id` porte une contrainte de clé étrangère, et MySQL exige
+     * qu'un index la serve à tout instant. Supprimer l'index simple AVANT de
+     * créer l'unique échoue donc en production :
+     *   SQLSTATE[HY000] 1553 — Cannot drop index … needed in a foreign key
+     *   constraint.
+     * SQLite n'applique pas cette vérification : la suite de tests reste verte
+     * sur une migration qui ne passe pas sur MySQL.
+     *
+     * On crée donc l'unique d'abord — la clé étrangère peut s'y appuyer — puis
+     * on retire l'index simple devenu redondant. Idem en sens inverse pour le
+     * rollback.
+     */
     public function up(): void
     {
         Schema::table('immobilisations', function (Blueprint $table): void {
-            $table->dropIndex('immobilisations_transaction_id_index');
             $table->unique('transaction_id', 'immobilisations_transaction_id_unique');
+            $table->dropIndex('immobilisations_transaction_id_index');
         });
 
         Schema::table('immobilisation_dotations', function (Blueprint $table): void {
-            $table->dropIndex('immobilisation_dotations_transaction_id_index');
             $table->unique('transaction_id', 'immobilisation_dotations_transaction_id_unique');
+            $table->dropIndex('immobilisation_dotations_transaction_id_index');
         });
     }
 
     public function down(): void
     {
         Schema::table('immobilisations', function (Blueprint $table): void {
-            $table->dropUnique('immobilisations_transaction_id_unique');
             $table->index('transaction_id', 'immobilisations_transaction_id_index');
+            $table->dropUnique('immobilisations_transaction_id_unique');
         });
 
         Schema::table('immobilisation_dotations', function (Blueprint $table): void {
-            $table->dropUnique('immobilisation_dotations_transaction_id_unique');
             $table->index('transaction_id', 'immobilisation_dotations_transaction_id_index');
+            $table->dropUnique('immobilisation_dotations_transaction_id_unique');
         });
     }
 };
