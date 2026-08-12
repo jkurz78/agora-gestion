@@ -172,6 +172,46 @@
                                 @include('livewire.immobilisations.partials._duree-selector')
                             </div>
 
+                            <div class="col-md-3">
+                                <label class="form-label">Paiement effectué ?</label>
+                                <div class="d-flex gap-2 mt-1">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" wire:model.live="regleImmediatement"
+                                               id="immo_regle_oui" value="1">
+                                        <label class="form-check-label" for="immo_regle_oui">Oui</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" wire:model.live="regleImmediatement"
+                                               id="immo_regle_non" value="0">
+                                        <label class="form-check-label" for="immo_regle_non">Non</label>
+                                    </div>
+                                </div>
+                            </div>
+                            @if ($regleImmediatement)
+                                <div class="col-md-4">
+                                    <label for="immo_mode_paiement" class="form-label">Mode paiement <span class="text-danger">*</span></label>
+                                    <select wire:model="mode_paiement" id="immo_mode_paiement"
+                                            class="form-select @error('mode_paiement') is-invalid @enderror">
+                                        <option value="">-- Choisir --</option>
+                                        @foreach ($modesPaiement as $mode)
+                                            <option value="{{ $mode->value }}">{{ $mode->label() }}</option>
+                                        @endforeach
+                                    </select>
+                                    @error('mode_paiement') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                </div>
+                                <div class="col-md-5">
+                                    <label for="immo_compte_reglement_id" class="form-label">Compte bancaire</label>
+                                    <select wire:model="compte_reglement_id" id="immo_compte_reglement_id"
+                                            class="form-select @error('compte_reglement_id') is-invalid @enderror">
+                                        <option value="">-- Aucun --</option>
+                                        @foreach ($comptesBancaires as $compte)
+                                            <option value="{{ $compte->id }}">{{ $compte->nom }}</option>
+                                        @endforeach
+                                    </select>
+                                    @error('compte_reglement_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                </div>
+                            @endif
+
                             <div class="col-12">
                                 <label class="form-label">Notes</label>
                                 <textarea class="form-control" rows="2" wire:model="notes"></textarea>
