@@ -64,7 +64,7 @@ final class PlanComptable extends Component
             [
                 'numero_pcg' => [
                     'required',
-                    'regex:/^[67][0-9A-Z]{2,5}$/',
+                    'regex:/^[267][0-9A-Z]{2,5}$/',
                     // Unicité par association. Rule::unique interroge la table
                     // brute (sans scope tenant ni SoftDeletes) : le filtre
                     // association_id est donc explicite, et les comptes
@@ -76,7 +76,7 @@ final class PlanComptable extends Component
                 'intitule' => 'required|string|max:255',
             ],
             [
-                'numero_pcg.regex' => 'Le numéro doit commencer par 6 ou 7 (3 à 6 caractères alphanumériques majuscules).',
+                'numero_pcg.regex' => 'Le numéro doit commencer par 2, 6 ou 7 (3 à 6 caractères alphanumériques majuscules).',
                 'numero_pcg.unique' => 'Ce numéro de compte existe déjà.',
             ],
         );
@@ -146,8 +146,29 @@ final class PlanComptable extends Component
      * La classe est conservée : les usages (dons, cotisations…), budgets et
      * formules qui pointent ce compte supposent sa polarité 6/7.
      */
+    /**
+     * Un compte référencé par une fiche d'immobilisation (compte_id ou
+     * compte_amortissement_id) ne doit pas pouvoir être renuméroté librement :
+     * la fiche exige que compte_amortissement_id reste exactement le dérivé
+     * PCG de compte_id (insertion d'un « 8 » après le premier chiffre — voir
+     * ImmobilisationService::assertComptesValides()), et renuméroter l'un sans
+     * l'autre casserait cette correspondance.
+     *
+     * Vérifiée avant la garde « porte des écritures » ci-dessous, comme pour
+     * delete() : le compte d'amortissement 281X d'une fiche fraîche ne porte
+     * encore aucune écriture (aucune dotation générée) et échapperait sinon à
+     * toute protection.
+     */
     private function renumeroter(Compte $compte, string $numero): bool
     {
+        $compteId = (int) $compte->id;
+        if (Immobilisation::where('compte_id', $compteId)->orWhere('compte_amortissement_id', $compteId)->exists()) {
+            $this->flashMessage = 'Renumérotation impossible : ce compte est utilisé par une immobilisation.';
+            $this->flashType = 'danger';
+
+            return false;
+        }
+
         if ($compte->lignes()->exists()) {
             $this->flashMessage = 'Renumérotation impossible : ce compte porte des écritures.';
             $this->flashType = 'danger';
@@ -160,14 +181,14 @@ final class PlanComptable extends Component
             [
                 'numero_pcg' => [
                     'required',
-                    'regex:/^[67][0-9A-Z]{2,5}$/',
+                    'regex:/^[267][0-9A-Z]{2,5}$/',
                     Rule::unique('comptes', 'numero_pcg')
                         ->where('association_id', TenantContext::currentId())
                         ->ignore($compte->id),
                 ],
             ],
             [
-                'numero_pcg.regex' => 'Le numéro doit commencer par 6 ou 7 (3 à 6 caractères alphanumériques majuscules).',
+                'numero_pcg.regex' => 'Le numéro doit commencer par 2, 6 ou 7 (3 à 6 caractères alphanumériques majuscules).',
                 'numero_pcg.unique' => 'Ce numéro de compte existe déjà.',
             ],
         );
@@ -204,7 +225,7 @@ final class PlanComptable extends Component
     {
         $nom = trim($nom);
 
-        if (! preg_match('/^[67][0-9A-Z]$/', $code) || $nom === '' || mb_strlen($nom) > 255) {
+        if (! preg_match('/^[267][0-9A-Z]$/', $code) || $nom === '' || mb_strlen($nom) > 255) {
             return;
         }
 

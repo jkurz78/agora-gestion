@@ -81,3 +81,36 @@ it('refuse la suppression de 6811, désormais compte système', function (): voi
 
     expect(Compte::find($compte->id))->not->toBeNull();
 });
+
+/**
+ * Anomalie 1 (audit) — même trou que la suppression, côté renumérotation : le
+ * compte d'amortissement 281X d'une fiche fraîche ne porte encore aucune
+ * écriture (aucune dotation générée), donc la garde "porte des écritures"
+ * ne le protège pas. Le compte d'immobilisation, lui, porte déjà la ligne de
+ * la transaction d'acquisition — la garde immobilisation doit donc être
+ * vérifiée avant celle des écritures pour donner la raison la plus
+ * spécifique, comme le fait déjà delete().
+ */
+it('refuse de renuméroter le compte d’immobilisation référencé par compte_id', function (): void {
+    $compte = Compte::ofNumero('2188');
+
+    Livewire::test(PlanComptable::class)
+        ->call('updateField', $compte->id, 'numero_pcg', '2199')
+        ->assertSet('flashType', 'danger')
+        ->assertSet('flashMessage', 'Renumérotation impossible : ce compte est utilisé par une immobilisation.')
+        ->assertReturned(false);
+
+    expect($compte->fresh()->numero_pcg)->toBe('2188');
+});
+
+it('refuse de renuméroter le compte d’amortissement référencé par compte_amortissement_id', function (): void {
+    $compte = Compte::ofNumero('28188');
+
+    Livewire::test(PlanComptable::class)
+        ->call('updateField', $compte->id, 'numero_pcg', '28199')
+        ->assertSet('flashType', 'danger')
+        ->assertSet('flashMessage', 'Renumérotation impossible : ce compte est utilisé par une immobilisation.')
+        ->assertReturned(false);
+
+    expect($compte->fresh()->numero_pcg)->toBe('28188');
+});
