@@ -9,10 +9,12 @@ use App\Enums\ModePaiement;
 use App\Enums\RoleAssociation;
 use App\Enums\Sens;
 use App\Exceptions\Immobilisation\MiseEnServiceAnterieureException;
+use App\Livewire\Concerns\WithPerPage;
 use App\Livewire\Immobilisations\Concerns\WithDureeSelector;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Immobilisation;
+use App\Models\ImmobilisationDotation;
 use App\Models\Tiers;
 use App\Services\Compta\CompteTresorerieResolver;
 use App\Services\Compta\PlanComptableSelecteur;
@@ -21,18 +23,23 @@ use App\Services\Immobilisation\ImmobilisationComptesSeeder;
 use App\Services\Immobilisation\ImmobilisationService;
 use App\Services\TransactionService;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Collection;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
+use Livewire\WithPagination;
 
 final class ImmobilisationIndex extends Component
 {
     use WithDureeSelector;
     use WithFileUploads;
+    use WithPagination;
+    use WithPerPage;
+
+    protected string $paginationTheme = 'bootstrap';
 
     // ── État de la modale ────────────────────────────────────────
     public bool $showModal = false;
@@ -221,23 +228,27 @@ final class ImmobilisationIndex extends Component
 
     public function render(): View
     {
-        /** @var Collection<int, Immobilisation> $immobilisations */
+        /** @var LengthAwarePaginator<int, Immobilisation> $immobilisations */
         $immobilisations = Immobilisation::query()
             ->with(['compte', 'dotations'])
             ->orderBy('numero')
-            ->get();
+            ->paginate($this->effectivePerPage());
+
+        // Totaux de l'ensemble du registre, jamais seulement de la page
+        // affichée : une agrégation SQL séparée, indépendante de la
+        // pagination — sommer la page courante donnerait un total faux.
+        $totalBrutCentimes = (int) round(
+            ((float) Immobilisation::query()->sum('montant_acquisition')) * 100
+        );
+        $totalCumulCentimes = (int) round(
+            ((float) ImmobilisationDotation::query()->sum('montant')) * 100
+        );
 
         return view('livewire.immobilisations.immobilisation-index', [
             'immobilisations' => $immobilisations,
-            'totalBrutCentimes' => $immobilisations->sum(
-                fn (Immobilisation $i): int => $i->montantAcquisitionCentimes()
-            ),
-            'totalCumulCentimes' => $immobilisations->sum(
-                fn (Immobilisation $i): int => $i->cumulAmortiCentimes()
-            ),
-            'totalNetCentimes' => $immobilisations->sum(
-                fn (Immobilisation $i): int => $i->valeurNetteCentimes()
-            ),
+            'totalBrutCentimes' => $totalBrutCentimes,
+            'totalCumulCentimes' => $totalCumulCentimes,
+            'totalNetCentimes' => $totalBrutCentimes - $totalCumulCentimes,
             'comptesImmobilisation' => PlanComptableSelecteur::groupesPourType('immobilisation'),
             'dureesUsuelles' => self::DUREES_USUELLES,
             'modesPaiement' => ModePaiement::cases(),

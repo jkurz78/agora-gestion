@@ -84,6 +84,9 @@
                 </tfoot>
             </table>
         </div>
+
+        <x-per-page-selector :paginator="$immobilisations" storageKey="immobilisations" wire:model.live="perPage" />
+        {{ $immobilisations->links() }}
     @endif
 
     @if ($showModal)
