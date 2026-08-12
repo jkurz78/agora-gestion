@@ -75,4 +75,60 @@ final class PlanAmortissementCalculator
 
         return max(0, $cumulTheorique - $cumulComptabiliseCentimes);
     }
+
+    /**
+     * Plan complet, de l'exercice de mise en service jusqu'au solde du bien.
+     *
+     * Les exercices déjà comptabilisés portent le montant réellement écrit ;
+     * les suivants sont des projections calculées à la volée — rien n'est
+     * stocké, donc rien ne peut devenir périmé.
+     *
+     * Point de construction unique : la fiche (ImmobilisationShow) et son PDF
+     * (ImmobilisationPdfController) l'appellent tous les deux — le PDF est un
+     * rendu figé de la fiche, il ne doit jamais pouvoir en diverger. Suppose
+     * la relation `dotations` déjà chargée sur $immobilisation (les deux
+     * appelants le font).
+     *
+     * @return list<LignePlanAmortissement>
+     */
+    public function plan(Immobilisation $immobilisation): array
+    {
+        $exercice = $this->exerciceService->anneeForDate(
+            CarbonImmutable::parse($immobilisation->date_mise_en_service->toDateString())
+        );
+
+        $montantCentimes = $immobilisation->montantAcquisitionCentimes();
+        $plan = [];
+        $cumul = 0;
+
+        // Borne dure : la durée en mois ne peut pas s'étaler sur plus d'exercices
+        // que (durée / 12) + 2, ce qui protège d'une boucle infinie si le calcul
+        // venait à stagner.
+        $borne = intdiv((int) $immobilisation->duree_mois, 12) + 2;
+
+        for ($i = 0; $i < $borne && $cumul < $montantCentimes; $i++) {
+            $dotationEnregistree = $immobilisation->dotations->firstWhere('exercice', $exercice);
+            $comptabilisee = $dotationEnregistree !== null;
+
+            $dotation = $comptabilisee
+                ? (int) round(((float) $dotationEnregistree->montant) * 100)
+                : $this->dotationCentimes($immobilisation, $exercice, $cumul);
+
+            $cumul += $dotation;
+
+            $plan[] = new LignePlanAmortissement(
+                exercice: $exercice,
+                moisEcoules: $this->moisEcoules($immobilisation, $exercice),
+                dotationCentimes: $dotation,
+                cumulCentimes: $cumul,
+                valeurNetteCentimes: $montantCentimes - $cumul,
+                comptabilisee: $comptabilisee,
+                transactionId: $comptabilisee ? (int) $dotationEnregistree->transaction_id : null,
+            );
+
+            $exercice++;
+        }
+
+        return $plan;
+    }
 }

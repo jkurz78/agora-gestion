@@ -108,18 +108,18 @@
                 </thead>
                 <tbody>
                     @foreach ($plan as $ligne)
-                        <tr class="{{ $ligne['comptabilisee'] ? '' : 'text-muted fst-italic' }}">
-                            <td>{{ $exerciceService->label($ligne['exercice']) }}</td>
-                            <td class="text-end">{{ $ligne['moisEcoules'] }}</td>
-                            <td class="text-end">{{ $euros($ligne['dotationCentimes']) }} €</td>
-                            <td class="text-end">{{ $euros($ligne['cumulCentimes']) }} €</td>
-                            <td class="text-end">{{ $euros($ligne['valeurNetteCentimes']) }} €</td>
+                        <tr class="{{ $ligne->comptabilisee ? '' : 'text-muted fst-italic' }}">
+                            <td>{{ $exerciceService->label($ligne->exercice) }}</td>
+                            <td class="text-end">{{ $ligne->moisEcoules }}</td>
+                            <td class="text-end">{{ $euros($ligne->dotationCentimes) }} €</td>
+                            <td class="text-end">{{ $euros($ligne->cumulCentimes) }} €</td>
+                            <td class="text-end">{{ $euros($ligne->valeurNetteCentimes) }} €</td>
                             <td>
-                                @if ($ligne['comptabilisee'])
+                                @if ($ligne->comptabilisee)
                                     <span class="badge bg-success">Comptabilisée</span>
-                                    @if ($ligne['transactionId'] !== null)
+                                    @if ($ligne->transactionId !== null)
                                         <button type="button" class="btn btn-link btn-sm p-0 ms-1"
-                                                wire:click="ouvrirTransaction({{ $ligne['transactionId'] }})"
+                                                wire:click="ouvrirTransaction({{ $ligne->transactionId }})"
                                                 title="Voir l’écriture de dotation">
                                             <i class="bi bi-journal-text"></i>
                                         </button>

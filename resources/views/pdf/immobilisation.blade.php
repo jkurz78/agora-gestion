@@ -184,13 +184,13 @@
         </thead>
         <tbody>
             @foreach ($plan as $ligne)
-                <tr class="{{ $ligne['comptabilisee'] ? '' : 'prev' }}">
-                    <td>{{ $exerciceService->label($ligne['exercice']) }}</td>
-                    <td class="num">{{ $ligne['moisEcoules'] }}</td>
-                    <td class="num">{{ $euros($ligne['dotationCentimes']) }} €</td>
-                    <td class="num">{{ $euros($ligne['cumulCentimes']) }} €</td>
-                    <td class="num">{{ $euros($ligne['valeurNetteCentimes']) }} €</td>
-                    <td>{{ $ligne['comptabilisee'] ? 'Comptabilisée' : 'Prévisionnel' }}</td>
+                <tr class="{{ $ligne->comptabilisee ? '' : 'prev' }}">
+                    <td>{{ $exerciceService->label($ligne->exercice) }}</td>
+                    <td class="num">{{ $ligne->moisEcoules }}</td>
+                    <td class="num">{{ $euros($ligne->dotationCentimes) }} €</td>
+                    <td class="num">{{ $euros($ligne->cumulCentimes) }} €</td>
+                    <td class="num">{{ $euros($ligne->valeurNetteCentimes) }} €</td>
+                    <td>{{ $ligne->comptabilisee ? 'Comptabilisée' : 'Prévisionnel' }}</td>
                 </tr>
             @endforeach
         </tbody>

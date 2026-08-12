@@ -43,11 +43,11 @@ it('affiche le plan d’amortissement complet sur toute la durée', function ():
     $plan = $composant->viewData('plan');
 
     expect($plan)->toHaveCount(5)
-        ->and($plan[0]['exercice'])->toBe(2026)
-        ->and($plan[0]['dotationCentimes'])->toBe(60000)
-        ->and($plan[4]['exercice'])->toBe(2030)
-        ->and($plan[4]['cumulCentimes'])->toBe(300000)
-        ->and($plan[4]['valeurNetteCentimes'])->toBe(0);
+        ->and($plan[0]->exercice)->toBe(2026)
+        ->and($plan[0]->dotationCentimes)->toBe(60000)
+        ->and($plan[4]->exercice)->toBe(2030)
+        ->and($plan[4]->cumulCentimes)->toBe(300000)
+        ->and($plan[4]->valeurNetteCentimes)->toBe(0);
 });
 
 it('distingue les exercices comptabilisés des projections', function (): void {
@@ -58,6 +58,6 @@ it('distingue les exercices comptabilisés des projections', function (): void {
     $plan = Livewire::test(ImmobilisationShow::class, ['immobilisation' => $this->immo->fresh()])
         ->viewData('plan');
 
-    expect($plan[0]['comptabilisee'])->toBeTrue()
-        ->and($plan[1]['comptabilisee'])->toBeFalse();
+    expect($plan[0]->comptabilisee)->toBeTrue()
+        ->and($plan[1]->comptabilisee)->toBeFalse();
 });
