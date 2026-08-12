@@ -17,6 +17,14 @@ final class Immobilisation extends TenantModel
 
     protected $table = 'immobilisations';
 
+    /**
+     * Mémoïsation de cumulAmortiCentimes() : ce cumul est sollicité plusieurs
+     * fois par fiche dans le livre (colonnes affichées + attributs data-sort
+     * + totaux de pied de tableau) — un seul calcul par instance suffit,
+     * qu'il vienne de la relation chargée ou d'une requête de repli.
+     */
+    private ?int $cumulAmortiCentimesCache = null;
+
     protected $fillable = [
         'association_id',
         'numero',
@@ -92,10 +100,27 @@ final class Immobilisation extends TenantModel
         return $annees === 1 ? '1 an' : $annees.' ans';
     }
 
-    /** Cumul des dotations réellement comptabilisées, en centimes. */
+    /**
+     * Cumul des dotations réellement comptabilisées, en centimes.
+     *
+     * Utilise la relation `dotations` quand elle est déjà chargée (cas du
+     * livre, qui fait un with(['compte', 'dotations']) en amont) : aucune
+     * requête supplémentaire. Ne retombe sur une requête que si la relation
+     * n'a pas été chargée — et mémoïse le résultat, requête comprise, pour
+     * qu'un appel répété dans le même rendu (colonne + data-sort + totaux)
+     * ne recalcule rien.
+     */
     public function cumulAmortiCentimes(): int
     {
-        return (int) round(((float) $this->dotations()->sum('montant')) * 100);
+        if ($this->cumulAmortiCentimesCache === null) {
+            $sommeDecimal = $this->relationLoaded('dotations')
+                ? $this->dotations->sum('montant')
+                : $this->dotations()->sum('montant');
+
+            $this->cumulAmortiCentimesCache = (int) round(((float) $sommeDecimal) * 100);
+        }
+
+        return $this->cumulAmortiCentimesCache;
     }
 
     public function montantAcquisitionCentimes(): int
