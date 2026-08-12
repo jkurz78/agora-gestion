@@ -9,6 +9,7 @@ use App\Enums\ModePaiement;
 use App\Enums\RoleAssociation;
 use App\Enums\Sens;
 use App\Exceptions\Immobilisation\MiseEnServiceAnterieureException;
+use App\Livewire\Concerns\MontantValidation;
 use App\Livewire\Concerns\WithPerPage;
 use App\Livewire\Immobilisations\Concerns\WithDureeSelector;
 use App\Models\Compte;
@@ -130,6 +131,11 @@ final class ImmobilisationIndex extends Component
     {
         $this->authorize('create', Immobilisation::class);
 
+        // Saisie française : « 3 000,50 » ou « 3000,50 » — même normalisation
+        // que ReglementTable::updateMontant()/AnimateurManager::updateMontantPrevu()
+        // avant validation, plutôt que de réinventer la règle.
+        $this->montant = str_replace(',', '.', $this->montant);
+
         $this->validate([
             // Bornes alignées sur les colonnes SQL réelles (migration
             // 2026_08_04_100001_create_immobilisations_tables) : un
@@ -145,7 +151,7 @@ final class ImmobilisationIndex extends Component
             'compte_id' => ['required', 'exists:comptes,id'],
             'compte_amortissement_id' => ['required', 'exists:comptes,id'],
             'tiers_id' => ['required', 'exists:tiers,id'],
-            'montant' => ['required', 'numeric', 'gt:0', 'max:99999999.99'],
+            'montant' => ['required', 'numeric', MontantValidation::RULE, 'max:99999999.99'],
             'date_achat' => ['required', 'date'],
             'date_mise_en_service' => ['required', 'date'],
             'duree_mois' => ['required', 'integer', 'min:1', 'max:600'],
@@ -157,7 +163,7 @@ final class ImmobilisationIndex extends Component
             'compte_reglement_id' => ['nullable', 'exists:comptes_bancaires,id'],
             'pieceJointeAcquisition' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
             'notes' => ['nullable', 'string'],
-        ], [], [
+        ], MontantValidation::messages(['montant']), [
             'libelle' => 'libellé',
             'quantite' => 'quantité',
             'compte_id' => 'compte d’immobilisation',
