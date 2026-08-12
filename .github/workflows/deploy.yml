@@ -46,7 +46,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: pdo, pdo_sqlite, mbstring, xml, dom, curl, zip, intl, bcmath, imagick
+          extensions: pdo, pdo_sqlite, pdo_mysql, mbstring, xml, dom, curl, zip, intl, bcmath, imagick
           coverage: none
           # La suite tourne dans un seul processus et dépasse 512 Mo : mesuré le
           # 2026-08-03, `php artisan test` y meurt sur « Allowed memory size
@@ -64,6 +64,86 @@ jobs:
 
       - name: Run tests
         run: php artisan test --no-ansi
+
+  # ── Suite sur MySQL — informatif, NE BLOQUE PAS le déploiement ──────────────
+  #
+  # Pourquoi ce job existe
+  # ----------------------
+  # Le job `test` ci-dessus tourne sur SQLite, comme les postes de développement.
+  # Or SQLite ne vérifie pas ce que MySQL vérifie, et une classe entière de
+  # défauts lui est invisible : contraintes de clés étrangères, index qui les
+  # servent, mode strict, longueurs de colonnes, typage des clés.
+  #
+  # Cas réel du 2026-08-12 : une migration supprimait un index avant de créer son
+  # remplaçant. Verte sur SQLite, rejetée par MySQL (« Cannot drop index …
+  # needed in a foreign key constraint »). Elle serait partie en production.
+  #
+  # Pourquoi il ne bloque pas (encore)
+  # ----------------------------------
+  # Mesuré le 2026-08-12 : la suite compte ~149 tests qui échouent sur MySQL
+  # alors qu'ils passent sur SQLite, répartis sur une quarantaine de fichiers.
+  # L'échantillonnage montre des divergences de mode strict — données de test qui
+  # dépassent la longueur d'une colonne, valeurs hors énumération — que SQLite
+  # accepte silencieusement. Rendre ce job bloquant aujourd'hui mettrait chaque
+  # push au rouge.
+  #
+  # Le cliquet : on corrige ces tests par lots, ce job passe au vert, ET ALORS on
+  # le rend bloquant — en retirant `continue-on-error` et en l'ajoutant au
+  # `needs:` du job `deploy`. Tant que ce n'est pas fait, il sert d'indicateur.
+  test-mysql:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: testing
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Ghostscript
+        run: sudo apt-get update && sudo apt-get install -y ghostscript
+
+      - name: Allow ImageMagick to read PDFs
+        run: |
+          sudo sed -i 's|<policy domain="coder" rights="none" pattern="PDF" />|<policy domain="coder" rights="read\|write" pattern="PDF" />|' /etc/ImageMagick-6/policy.xml || true
+
+      - name: Setup PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo, pdo_sqlite, pdo_mysql, mbstring, xml, dom, curl, zip, intl, bcmath, imagick
+          coverage: none
+          ini-values: memory_limit=-1
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Run tests on MySQL
+        # -c phpunit.mysql.xml : phpunit.xml force DB_CONNECTION=sqlite, donc des
+        # variables d'environnement ne suffiraient pas à basculer sur MySQL.
+        run: php artisan test --no-ansi -c phpunit.mysql.xml
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USERNAME: root
+          DB_PASSWORD: root
 
   deploy:
     runs-on: ubuntu-latest
