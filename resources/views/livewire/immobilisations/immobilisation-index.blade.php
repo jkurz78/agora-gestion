@@ -213,6 +213,21 @@
                             @endif
 
                             <div class="col-12">
+                                <label class="form-label"><i class="bi bi-paperclip"></i> Justificatif</label>
+                                <div class="d-flex align-items-center gap-2">
+                                    <label class="btn btn-sm btn-outline-secondary mb-0">
+                                        <i class="bi bi-paperclip"></i> Joindre un justificatif
+                                        <input type="file" wire:model="pieceJointeAcquisition" accept=".pdf,.jpg,.jpeg,.png" class="d-none">
+                                    </label>
+                                    @if ($pieceJointeAcquisition)
+                                        <span class="small text-success"><i class="bi bi-check-circle"></i> {{ $pieceJointeAcquisition->getClientOriginalName() }}</span>
+                                    @endif
+                                    <div wire:loading wire:target="pieceJointeAcquisition" class="spinner-border spinner-border-sm text-primary"></div>
+                                </div>
+                                @error('pieceJointeAcquisition') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
+                            </div>
+
+                            <div class="col-12">
                                 <label class="form-label">Notes</label>
                                 <textarea class="form-control" rows="2" wire:model="notes"></textarea>
                             </div>

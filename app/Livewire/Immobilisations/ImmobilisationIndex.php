@@ -19,16 +19,20 @@ use App\Services\Compta\PlanComptableSelecteur;
 use App\Services\ExerciceService;
 use App\Services\Immobilisation\ImmobilisationComptesSeeder;
 use App\Services\Immobilisation\ImmobilisationService;
+use App\Services\TransactionService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Livewire\Component;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use Livewire\WithFileUploads;
 
 final class ImmobilisationIndex extends Component
 {
     use WithDureeSelector;
+    use WithFileUploads;
 
     // ── État de la modale ────────────────────────────────────────
     public bool $showModal = false;
@@ -59,6 +63,9 @@ final class ImmobilisationIndex extends Component
     /** FK `comptes_bancaires.id` — le compte bancaire portant le règlement, résolu en compte 512X. */
     public ?int $compte_reglement_id = null;
 
+    /** @var TemporaryUploadedFile|null */
+    public $pieceJointeAcquisition = null;
+
     public string $notes = '';
 
     public string $flashMessage = '';
@@ -76,7 +83,7 @@ final class ImmobilisationIndex extends Component
         $this->reset([
             'libelle', 'quantite', 'compte_id', 'compte_amortissement_id',
             'tiers_id', 'montant', 'date_achat', 'date_mise_en_service', 'notes',
-            'regleImmediatement', 'mode_paiement', 'compte_reglement_id',
+            'regleImmediatement', 'mode_paiement', 'compte_reglement_id', 'pieceJointeAcquisition',
         ]);
         $this->quantite = 1;
         $this->initDureeChoix(60);
@@ -132,6 +139,7 @@ final class ImmobilisationIndex extends Component
                 'in:virement,cheque,especes,cb,prelevement',
             ],
             'compte_reglement_id' => ['nullable', 'exists:comptes_bancaires,id'],
+            'pieceJointeAcquisition' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
             'notes' => ['nullable', 'string'],
         ], [], [
             'libelle' => 'libellé',
@@ -143,6 +151,7 @@ final class ImmobilisationIndex extends Component
             'duree_mois' => 'durée',
             'mode_paiement' => 'mode de paiement',
             'compte_reglement_id' => 'compte bancaire',
+            'pieceJointeAcquisition' => 'justificatif',
         ]);
 
         $modePaiement = null;
@@ -170,7 +179,7 @@ final class ImmobilisationIndex extends Component
         }
 
         try {
-            app(ImmobilisationService::class)->acquerir(
+            $immobilisation = app(ImmobilisationService::class)->acquerir(
                 tiers: Tiers::findOrFail((int) $this->tiers_id),
                 libelle: $this->libelle,
                 quantite: $this->quantite,
@@ -188,6 +197,16 @@ final class ImmobilisationIndex extends Component
             $this->addError('date_mise_en_service', $e->getMessage());
 
             return;
+        }
+
+        // Le justificatif n'est écrit sur le disque qu'une fois la fiche et son
+        // écriture comptable actées : si acquerir() avait échoué, on ne serait
+        // jamais arrivé ici, donc aucun fichier orphelin ne peut subsister.
+        if ($this->pieceJointeAcquisition !== null) {
+            app(TransactionService::class)->storePieceJointe(
+                $immobilisation->transaction,
+                $this->pieceJointeAcquisition
+            );
         }
 
         $this->showModal = false;

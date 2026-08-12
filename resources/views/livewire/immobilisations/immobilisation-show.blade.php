@@ -70,6 +70,14 @@
                             <dt class="col-5">Fournisseur</dt><dd class="col-7">{{ $tx->tiers?->nom_complet ?? '—' }}</dd>
                             <dt class="col-5">Pièce</dt><dd class="col-7">{{ $tx->numero_piece ?? '—' }}</dd>
                             <dt class="col-5">Montant</dt><dd class="col-7">{{ number_format((float) $tx->montant_total, 2, ',', ' ') }} €</dd>
+                            @if ($tx->hasPieceJointe())
+                                <dt class="col-5">Justificatif</dt>
+                                <dd class="col-7">
+                                    <a href="{{ $tx->pieceJointeUrl() }}" target="_blank">
+                                        <i class="bi bi-paperclip"></i> {{ $tx->piece_jointe_nom }}
+                                    </a>
+                                </dd>
+                            @endif
                         </dl>
                     @endforeach
                     @if ($immobilisation->notes)
