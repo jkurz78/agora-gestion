@@ -85,6 +85,20 @@ final class ImmobilisationShow extends Component
         $this->showEditModal = false;
     }
 
+    /**
+     * Ouvre le formulaire générique de transaction sur la transaction
+     * d'acquisition ou une transaction de dotation de cette fiche — même
+     * patron que DotationsExercice::ventiler(). TransactionForm affiche
+     * lui-même la transaction en lecture seule (isLockedByImmobilisation) :
+     * il n'y a rien d'autre à faire ici que l'ouvrir.
+     */
+    public function ouvrirTransaction(int $transactionId): void
+    {
+        $this->authorize('view', $this->immobilisation);
+
+        $this->dispatch('edit-transaction', id: $transactionId);
+    }
+
     public function enregistrerModification(): void
     {
         $this->authorize('update', $this->immobilisation);
@@ -151,7 +165,7 @@ final class ImmobilisationShow extends Component
      * les suivants sont des projections calculées à la volée — rien n'est stocké,
      * donc rien ne peut devenir périmé.
      *
-     * @return list<array{exercice: int, moisEcoules: int, dotationCentimes: int, cumulCentimes: int, valeurNetteCentimes: int, comptabilisee: bool}>
+     * @return list<array{exercice: int, moisEcoules: int, dotationCentimes: int, cumulCentimes: int, valeurNetteCentimes: int, comptabilisee: bool, transactionId: ?int}>
      */
     private function construirePlan(): array
     {
@@ -191,6 +205,7 @@ final class ImmobilisationShow extends Component
                 'cumulCentimes' => $cumul,
                 'valeurNetteCentimes' => $montantCentimes - $cumul,
                 'comptabilisee' => $comptabilisee,
+                'transactionId' => $comptabilisee ? (int) $dotationEnregistree->transaction_id : null,
             ];
 
             $exercice++;

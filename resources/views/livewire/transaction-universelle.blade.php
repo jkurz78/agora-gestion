@@ -629,7 +629,11 @@
                                 // Mutex poubelle/annuler — Slice 1 amendement :
                                 //   - Tx supprimable « safely » : EnAttente sans aucun attachement banque/règlement/remise/facture
                                 //   - Sinon : annulation comptable (extourne) si éligible
-                                $hasAttachement = $tx->remise_id || $tx->reglement_id || $tx->rapprochement_id || ! empty($tx->is_locked_by_facture);
+                                // Transaction::isLockedByImmobilisation() refuse delete()/annuler()/isExtournable()
+                                // côté serveur pour l'acquisition et la dotation d'une immobilisation — masquées ici
+                                // via $immobilisationLockedTxIds pour ne jamais proposer une action que le serveur refuse.
+                                $immoLocked = in_array((int) $tx->id, $immobilisationLockedTxIds, true);
+                                $hasAttachement = $tx->remise_id || $tx->reglement_id || $tx->rapprochement_id || ! empty($tx->is_locked_by_facture) || $immoLocked;
                                 $estSupprimableSafely = ! $isReportAN && ! $exerciceCloture
                                     && ($statutReglement === 'en_attente' || $tx->source_type === 'virement_sortant' || $tx->source_type === 'virement_entrant')
                                     && ! $hasAttachement
@@ -638,6 +642,7 @@
                                 $isExtournableUI = ! $isReportAN && ! $exerciceCloture
                                     && in_array($tx->source_type, ['recette', 'depense'], true)
                                     && ! $tx->is_helloasso
+                                    && ! $immoLocked
                                     && empty($tx->extournee_at)
                                     && empty($tx->is_extourne_miroir);
                             @endphp

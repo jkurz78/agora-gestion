@@ -10,6 +10,7 @@ use App\Livewire\Concerns\WithPerPage;
 use App\Models\ANouveauLigneOrigine;
 use App\Models\CompteBancaire;
 use App\Models\Immobilisation;
+use App\Models\ImmobilisationDotation;
 use App\Models\NoteDeFrais;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -491,6 +492,23 @@ final class TransactionUniverselle extends Component
                 ->get()
                 ->keyBy(fn (Immobilisation $i): int => (int) $i->transaction_id);
 
+        // Transaction::isLockedByImmobilisation() refuse la suppression/l'extourne
+        // depuis cette liste, aussi bien pour l'acquisition (ci-dessus) que pour une
+        // dotation aux amortissements (ImmobilisationDotation.transaction_id). Les
+        // dotations sont en journal OD, donc normalement absentes de $rows — vue de
+        // trésorerie, délibéré (cf. DotationVentilerTest) — mais le calcul reste
+        // générique plutôt que de ne couvrir que le cas aujourd'hui atteignable.
+        $immobilisationLockedTxIds = empty($txIds)
+            ? []
+            : $immobilisationsParTransaction->keys()
+                ->merge(
+                    ImmobilisationDotation::query()
+                        ->whereIn('transaction_id', $txIds)
+                        ->pluck('transaction_id')
+                )
+                ->map(fn ($id): int => (int) $id)
+                ->all();
+
         $comptesBancaires = CompteBancaire::orderBy('nom')->get();
 
         return view('livewire.transaction-universelle', [
@@ -505,6 +523,7 @@ final class TransactionUniverselle extends Component
             'showTiersCol' => $this->tiersId === null,
             'ndfByTransactionId' => $ndfByTransactionId,
             'immobilisationsParTransaction' => $immobilisationsParTransaction,
+            'immobilisationLockedTxIds' => $immobilisationLockedTxIds,
         ]);
     }
 }

@@ -79,6 +79,10 @@
                                 </dd>
                             @endif
                         </dl>
+                        <button type="button" class="btn btn-outline-secondary btn-sm mt-2"
+                                wire:click="ouvrirTransaction({{ $tx->id }})">
+                            <i class="bi bi-journal-text me-1"></i> Voir l’écriture d’acquisition
+                        </button>
                     @endforeach
                     @if ($immobilisation->notes)
                         <hr><p class="mb-0 small text-muted">{{ $immobilisation->notes }}</p>
@@ -113,6 +117,13 @@
                             <td>
                                 @if ($ligne['comptabilisee'])
                                     <span class="badge bg-success">Comptabilisée</span>
+                                    @if ($ligne['transactionId'] !== null)
+                                        <button type="button" class="btn btn-link btn-sm p-0 ms-1"
+                                                wire:click="ouvrirTransaction({{ $ligne['transactionId'] }})"
+                                                title="Voir l’écriture de dotation">
+                                            <i class="bi bi-journal-text"></i>
+                                        </button>
+                                    @endif
                                 @else
                                     <span class="badge bg-light text-dark border">Prévisionnel</span>
                                 @endif
