@@ -111,7 +111,7 @@ it('rejette les numéros invalides (512A, 7, 706a)', function () {
             ->set('intitule', 'Intitulé test')
             ->call('save')
             ->assertHasErrors(['numero_pcg' => 'regex'])
-            ->assertSee('Le numéro doit commencer par 6 ou 7');
+            ->assertSee('Le numéro doit commencer par 2, 6 ou 7');
     }
 
     expect(Compte::where('intitule', 'Intitulé test')->exists())->toBeFalse();

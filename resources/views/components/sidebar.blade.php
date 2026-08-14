@@ -263,6 +263,13 @@ $activeGroup = match(true) {
                             </li>
                             @endif
 
+                            <li class="nav-item">
+                                <a href="{{ route('immobilisations.index') }}"
+                                   class="nav-link {{ request()->routeIs('immobilisations.*') ? 'active' : '' }}">
+                                    <i class="bi bi-box-seam me-1"></i> Immobilisations
+                                </a>
+                            </li>
+
                         </ul>
                     </div>
                 </div>

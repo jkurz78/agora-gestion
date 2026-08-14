@@ -11,6 +11,7 @@ use App\Services\ExerciceService;
 use App\Services\Rapports\BalanceComptableBuilder;
 use App\Services\Rapports\GrandLivreBuilder;
 use App\Services\Rapports\JournauxBuilder;
+use App\Services\Rapports\LivreImmobilisationsBuilder;
 use App\Services\Rapports\ProjectionMatrix;
 use App\Services\Rapports\VentilationFinanciereService;
 use App\Services\RapportService;
@@ -45,6 +46,7 @@ final class RapportExportController extends Controller
         'flux-tresorerie' => ['xlsx', 'pdf'],
         'analyse-financier' => ['xlsx'],
         'analyse-participants' => ['xlsx'],
+        'immobilisations' => ['xlsx', 'pdf'],
     ];
 
     /** PDF orientations */
@@ -55,6 +57,8 @@ final class RapportExportController extends Controller
         'journaux' => 'landscape',
         'operations' => 'landscape',
         'flux-tresorerie' => 'portrait',
+        // Neuf colonnes dont quatre montants : le portrait les écraserait.
+        'immobilisations' => 'landscape',
     ];
 
     /** Human-readable rapport names (for filenames and titles) */
@@ -67,6 +71,7 @@ final class RapportExportController extends Controller
         'flux-tresorerie' => 'Flux de tresorerie',
         'analyse-financier' => 'Analyse financiere',
         'analyse-participants' => 'Analyse participants',
+        'immobilisations' => 'Livre des immobilisations',
     ];
 
     public function __invoke(
@@ -127,6 +132,7 @@ final class RapportExportController extends Controller
             'flux-tresorerie' => $this->xlsxFluxTresorerie($rapportService, $exercice),
             'analyse-financier' => $this->xlsxAnalyse('financier', $exercice, $exerciceService),
             'analyse-participants' => $this->xlsxAnalyse('participants', $exercice, $exerciceService),
+            'immobilisations' => $this->xlsxImmobilisations($exercice),
         };
 
         $this->autoSizeColumns($spreadsheet);
@@ -1229,6 +1235,65 @@ final class RapportExportController extends Controller
         return $spreadsheet;
     }
 
+    /**
+     * Livre des immobilisations — une ligne par fiche au registre à la clôture.
+     *
+     * Les montants sont écrits en euros décimaux (les centimes entiers du
+     * builder divisés par 100) : un tableur sert à recalculer, il doit recevoir
+     * des nombres, pas des chaînes formatées.
+     */
+    private function xlsxImmobilisations(int $exercice): Spreadsheet
+    {
+        $livre = app(LivreImmobilisationsBuilder::class)->pourExercice($exercice);
+
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Immobilisations');
+
+        $sheet->fromArray([[
+            'N°', 'Libellé', 'Qté', 'Compte', 'Acquisition', 'Mise en service',
+            'Durée', 'Valeur brute', 'Dotation exercice', 'Cumul amortissements', 'Valeur nette',
+        ]], null, 'A1');
+        $sheet->getStyle('A1:K1')->getFont()->setBold(true);
+
+        $row = 2;
+        foreach ($livre['lignes'] as $ligne) {
+            $sheet->fromArray([[
+                $ligne['numero'],
+                $ligne['libelle'],
+                $ligne['quantite'],
+                $ligne['compte'],
+                $ligne['date_acquisition']->format('d/m/Y'),
+                $ligne['date_mise_en_service']->format('d/m/Y'),
+                $ligne['duree_label'],
+                $ligne['montant_acquisition_centimes'] / 100,
+                $ligne['dotation_centimes'] / 100,
+                $ligne['cumul_centimes'] / 100,
+                $ligne['vnc_centimes'] / 100,
+            ]], null, 'A'.$row);
+            $row++;
+        }
+
+        $sheet->fromArray([[
+            'TOTAL', null, null, null, null, null, null,
+            $livre['totaux']['brut'] / 100,
+            $livre['totaux']['dotation'] / 100,
+            $livre['totaux']['cumul'] / 100,
+            $livre['totaux']['vnc'] / 100,
+        ]], null, 'A'.$row);
+        $sheet->getStyle('A'.$row.':K'.$row)->getFont()->setBold(true);
+
+        $sheet->getStyle('H2:K'.$row)->getNumberFormat()->setFormatCode('#,##0.00');
+
+        return $spreadsheet;
+    }
+
+    /** @return array<string, mixed> */
+    private function pdfImmobilisationsData(int $exercice): array
+    {
+        return ['livre' => app(LivreImmobilisationsBuilder::class)->pourExercice($exercice)];
+    }
+
     private function xlsxAnalyse(string $mode, int $exercice, ExerciceService $exerciceService): Spreadsheet
     {
         if ($mode === 'participants') {
@@ -1302,6 +1367,7 @@ final class RapportExportController extends Controller
             'journaux' => $this->pdfJournauxData($request, $exercice, $exerciceService),
             'operations' => $this->pdfOperationsData($rapportService, $exercice, $request),
             'flux-tresorerie' => $this->pdfFluxTresorerieData($rapportService, $exercice),
+            'immobilisations' => $this->pdfImmobilisationsData($exercice),
         };
 
         if (isset($viewData['subtitle'])) {

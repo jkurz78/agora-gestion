@@ -11,12 +11,14 @@ use App\Models\ANouveauGeneration;
 use App\Models\BudgetLine;
 use App\Models\CompteBancaire;
 use App\Models\Exercice;
+use App\Models\ImmobilisationDotation;
 use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\VirementInterne;
 use App\Services\Compta\ANouveau\ANouveauPreviewBuilder;
 use App\Services\Compta\EtatComptaResolver;
+use App\Services\Immobilisation\DotationService;
 use Throwable;
 
 final class ClotureCheckService
@@ -47,6 +49,8 @@ final class ClotureCheckService
                 $this->checkTransactionsNonPointees($start, $end),
                 $this->checkBudgetAbsent($annee),
                 $this->checkMouvementsExerciceCible($annee),
+                $this->checkDotationsAmortissements($annee),
+                $this->checkVentilationDotations($annee),
             ],
             soldesComptes: $this->calculerSoldesComptes($annee),
         );
@@ -240,6 +244,97 @@ final class ClotureCheckService
             message: $count === 0
                 ? 'Aucun mouvement dans l’exercice suivant'
                 : "{$count} mouvement(s) déjà présent(s) dans l’exercice suivant ; ils seront conservés",
+        );
+    }
+
+    /**
+     * Des dotations aux amortissements restent-elles à générer ?
+     *
+     * Avertissement et non bloquant : une association sans immobilisation n'a
+     * rien à doter, et le trésorier reste maître de l'ordre de ses opérations.
+     * Le contrôle est l'endroit naturel où se rappeler que les dotations doivent
+     * être générées — puis ventilées — avant de clôturer.
+     */
+    private function checkDotationsAmortissements(int $annee): CheckItem
+    {
+        $lignes = app(DotationService::class)->apercu($annee);
+        $aGenerer = $lignes->filter(fn ($ligne): bool => $ligne->aGenerer())->count();
+        $enEcart = $lignes->filter(fn ($ligne): bool => $ligne->enEcart())->count();
+
+        if ($aGenerer === 0 && $enEcart === 0) {
+            return new CheckItem(
+                nom: 'Dotations aux amortissements',
+                ok: true,
+                message: $lignes->isEmpty()
+                    ? 'Aucune immobilisation au registre'
+                    : 'Les dotations de l’exercice sont à jour',
+            );
+        }
+
+        $parts = [];
+        if ($aGenerer > 0) {
+            $parts[] = $aGenerer.' dotation'.($aGenerer > 1 ? 's' : '').' à générer';
+        }
+        if ($enEcart > 0) {
+            $parts[] = $enEcart.' dotation'.($enEcart > 1 ? 's' : '').' à recalculer';
+        }
+
+        return new CheckItem(
+            nom: 'Dotations aux amortissements',
+            ok: false,
+            message: implode(', ', $parts).'. Générez-les puis ventilez-les avant de clôturer : '
+                .'la ventilation n’est plus possible sur un exercice clôturé.',
+        );
+    }
+
+    /**
+     * Les dotations comptabilisées de l'exercice portent-elles une ventilation
+     * analytique sur leur ligne de charge 6811 ?
+     *
+     * Contrôle séparé de checkDotationsAmortissements() ci-dessus, qui a son
+     * propre objet (les dotations sont-elles générées et à jour) : celui-ci
+     * vérifie que le message de checkDotationsAmortissements() — « ventilez-les
+     * avant de clôturer » — est réellement suivi d'effet, ce qui n'était encore
+     * vérifié nulle part.
+     *
+     * Avertissement, jamais bloquant : une association peut légitimement ne pas
+     * ventiler analytiquement ses dotations, le trésorier reste maître de ses
+     * arbitrages. Le rôle de ce contrôle est seulement de le rappeler, avant que
+     * la clôture ne rende la ventilation définitivement impossible.
+     */
+    private function checkVentilationDotations(int $annee): CheckItem
+    {
+        $transactionIds = ImmobilisationDotation::where('exercice', $annee)->pluck('transaction_id');
+        $total = $transactionIds->count();
+
+        if ($total === 0) {
+            return new CheckItem(
+                nom: 'Ventilation des dotations',
+                ok: true,
+                message: 'Aucune dotation à ventiler pour cet exercice',
+            );
+        }
+
+        $ventilees = TransactionLigne::whereIn('transaction_id', $transactionIds)
+            ->whereHas('compte', fn ($q) => $q->where('numero_pcg', '6811'))
+            ->whereHas('affectations')
+            ->count();
+
+        $nonVentilees = $total - $ventilees;
+
+        if ($nonVentilees <= 0) {
+            return new CheckItem(
+                nom: 'Ventilation des dotations',
+                ok: true,
+                message: 'Toutes les dotations de l’exercice sont ventilées',
+            );
+        }
+
+        return new CheckItem(
+            nom: 'Ventilation des dotations',
+            ok: false,
+            message: $nonVentilees.' dotation'.($nonVentilees > 1 ? 's' : '').' non ventilée'.($nonVentilees > 1 ? 's' : '')
+                .' sur une opération. La ventilation n’est plus possible après la clôture de l’exercice.',
         );
     }
 

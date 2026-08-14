@@ -14,6 +14,7 @@ use App\Exceptions\Compta\TenantBoundaryException;
 use App\Exceptions\Compta\TiersInterditException;
 use App\Exceptions\Compta\TiersRequisException;
 use App\Models\Compte;
+use App\Models\Immobilisation;
 use App\Models\Provision;
 use App\Models\RemiseBancaire;
 use App\Models\Tiers;
@@ -942,7 +943,8 @@ final class EcritureGenerator
      * @param  iterable<int, array{compte: Compte, montant: float, operation_id?: ?int, seance?: ?int, notes?: ?string}>  $ventilations
      *
      * @throws \InvalidArgumentException Si total ≤ 0 ou ventilations vides.
-     * @throws CompteIncorrectException Si un compte ventilé ∉ classe 6.
+     * @throws CompteIncorrectException Si un compte ventilé ∉ classe 6
+     *                                  (∉ classes 2 et 6 si $autoriseImmobilisation).
      * @throws TenantBoundaryException Si $tiers n'appartient pas au tenant courant.
      * @throws EcritureNonEquilibreeException Sécurité paranoïaque post-création.
      */
@@ -952,6 +954,7 @@ final class EcritureGenerator
         \DateTimeInterface $dateConstatation,
         ?string $libelle = null,
         ?Transaction $existingTransaction = null,
+        bool $autoriseImmobilisation = false,
     ): Transaction {
         // --- Normalisation ventilations ---
         $ventilationsNorm = collect($ventilations);
@@ -963,15 +966,23 @@ final class EcritureGenerator
         }
 
         // --- Validation : chaque compte ventilé est classe 6 ---
+        //
+        // $autoriseImmobilisation ouvre la classe 2 et n'est passé que par
+        // ImmobilisationService. Les autres appelants (TransactionService,
+        // TransactionConverter, HelloAsso, notes de frais, factures
+        // fournisseurs) conservent le défaut false et restent verrouillés.
         foreach ($ventilationsNorm as $v) {
             /** @var Compte $compteVent */
             $compteVent = $v['compte'];
 
-            if ($compteVent->classe !== 6) {
+            $classeAutorisee = $compteVent->classe === 6
+                || ($autoriseImmobilisation && $compteVent->classe === 2);
+
+            if (! $classeAutorisee) {
                 throw CompteIncorrectException::classeAttendue(
                     $compteVent->numero_pcg,
                     $compteVent->classe,
-                    6
+                    $autoriseImmobilisation ? '2 ou 6' : 6
                 );
             }
         }
@@ -1806,6 +1817,80 @@ final class EcritureGenerator
                 'tiers_id' => null,
                 'libelle' => $libelle,
                 'montant' => 0,
+            ]);
+            $ligneDebit->setRelation('compte', $compteDebit);
+
+            $ligneCredit = TransactionLigne::create([
+                'transaction_id' => $transaction->id,
+                'compte_id' => $compteCredit->id,
+                'debit' => 0,
+                'credit' => $montant,
+                'tiers_id' => null,
+                'libelle' => $libelle,
+                'montant' => 0,
+            ]);
+            $ligneCredit->setRelation('compte', $compteCredit);
+
+            $lignes = collect([$ligneDebit, $ligneCredit]);
+            $this->assertEquilibre($lignes);
+            $this->assertTenantCoherence($lignes);
+
+            return $transaction->load('lignes.compte');
+        });
+    }
+
+    /**
+     * Dotation aux amortissements d'une immobilisation : 6811 D / 281X C.
+     *
+     * type = Depense et journal = Od, comme pourProvisionDotation : c'est une
+     * opération d'inventaire, pas un mouvement de trésorerie.
+     *
+     * La date est imposée par l'appelant (dernier jour de l'exercice cible) et
+     * n'est jamais dérivée de now().
+     */
+    public function pourDotationAmortissement(
+        Immobilisation $immobilisation,
+        \DateTimeInterface $date,
+        string $montant,
+    ): Transaction {
+        $tenantId = (int) TenantContext::currentId();
+        $libelle = 'Dotation '.$immobilisation->numero.' — '.$immobilisation->libelle;
+
+        $compteDebit = Compte::where('association_id', $tenantId)
+            ->where('numero_pcg', '6811')
+            ->firstOrFail();
+
+        $compteCredit = Compte::where('association_id', $tenantId)
+            ->whereKey((int) $immobilisation->compte_amortissement_id)
+            ->firstOrFail();
+
+        return DB::transaction(function () use (
+            $date, $montant, $libelle, $tenantId, $compteDebit, $compteCredit
+        ): Transaction {
+            $numeroPiece = app(NumeroPieceService::class)->assign(Carbon::parse($date->format('Y-m-d')));
+
+            $transaction = Transaction::create([
+                'association_id' => $tenantId,
+                'type' => TypeTransaction::Depense,
+                'date' => $date->format('Y-m-d'),
+                'libelle' => $libelle,
+                'montant_total' => $montant,
+                'mode_paiement' => null,
+                'saisi_par' => Auth::id(),
+                'equilibree' => true,
+                'type_ecriture' => 'normale',
+                'journal' => JournalComptable::Od,
+                'numero_piece' => $numeroPiece,
+            ]);
+
+            $ligneDebit = TransactionLigne::create([
+                'transaction_id' => $transaction->id,
+                'compte_id' => $compteDebit->id,
+                'debit' => $montant,
+                'credit' => 0,
+                'tiers_id' => null,
+                'libelle' => $libelle,
+                'montant' => $montant,
             ]);
             $ligneDebit->setRelation('compte', $compteDebit);
 

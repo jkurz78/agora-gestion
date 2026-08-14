@@ -146,6 +146,49 @@ final class ExerciceService
     }
 
     /**
+     * Protocole canonique de verrou avant toute écriture comptable rattachée à
+     * un exercice : l'association d'abord, l'exercice ensuite — exactement
+     * l'ordre de cloturer() et d'ANouveauService::persister().
+     *
+     * L'ordre importe autant que les verrous eux-mêmes : deux chemins qui
+     * prendraient les mêmes verrous dans l'ordre inverse (exercice puis
+     * association) s'inter-bloqueraient au lieu de s'exclure proprement.
+     * Mutualisé ici pour que chaque service cesse de reconstruire sa propre
+     * moitié de la séquence.
+     *
+     * Les verrous ne valent que si l'appel a lieu à l'intérieur du
+     * DB::transaction() qui porte aussi l'écriture — ils sont tenus jusqu'à son
+     * commit. C'est la responsabilité de l'appelant.
+     *
+     * Retourne l'exercice verrouillé, ou null s'il n'existe pas en base
+     * (installation neuve : l'absence d'exercice n'est pas une clôture).
+     */
+    public function verrouillerPourEcriture(int $annee): ?Exercice
+    {
+        DB::table('association')
+            ->where('id', TenantContext::currentId())
+            ->lockForUpdate()
+            ->first();
+
+        return Exercice::where('annee', $annee)
+            ->lockForUpdate()
+            ->first();
+    }
+
+    /**
+     * verrouillerPourEcriture() suivi du contrôle d'ouverture : la variante à
+     * utiliser quand le refus attendu est l'ExerciceCloturedException standard.
+     *
+     * Les appelants qui doivent lever leur propre exception métier (par exemple
+     * DotationService, avec DotationInterditeException) appellent
+     * verrouillerPourEcriture() et contrôlent le statut eux-mêmes.
+     */
+    public function assertOuvertPourEcriture(int $annee): void
+    {
+        $this->assertModeleOuvert($this->verrouillerPourEcriture($annee), $annee);
+    }
+
+    /**
      * Close an exercice: update status, record action.
      */
     public function cloturer(Exercice $exercice, User $user): void

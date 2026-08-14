@@ -13,6 +13,7 @@ use App\Services\ClotureCheckService;
 use App\Services\Compta\ANouveau\ANouveauPreviewBuilder;
 use App\Services\ExerciceService;
 use App\Services\ProvisionService;
+use App\Services\Rapports\CompteResultatBuilder;
 use App\Services\RapprochementBancaireService;
 use App\Services\SoldeService;
 use Illuminate\View\View;
@@ -167,9 +168,14 @@ final class ClotureWizard extends Component
         $totalMouvements = round($totalMouvements, 2);
         $totalSoldeRapprochement = round($totalSoldeRapprochement, 2);
 
-        // Total recettes / dépenses of the exercice (across all accounts)
-        $totalRecettes = (float) Transaction::where('type', 'recette')->operationnel()->forExercice($this->annee)->sum('montant_total');
-        $totalDepenses = (float) Transaction::where('type', 'depense')->operationnel()->forExercice($this->annee)->sum('montant_total');
+        // Résultat de l'exercice — lu sur le grand livre (classes 6 et 7), pas
+        // sur montant_total filtré par journal : ce dernier comptait comme une
+        // charge l'acquisition d'une immobilisation (ventilée en classe 2, un
+        // actif) et ignorait la dotation aux amortissements qui en est la vraie
+        // charge. Voir CompteResultatBuilder::totauxResultat().
+        $totaux = app(CompteResultatBuilder::class)->totauxResultat($start, $end);
+        $totalRecettes = $totaux['produits'];
+        $totalDepenses = $totaux['charges'];
         $resultat = round($totalRecettes - $totalDepenses, 2);
 
         // Écritures non pointées (transactions)

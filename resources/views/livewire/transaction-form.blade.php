@@ -131,6 +131,20 @@
                             </div>
                         </div>
                     @endif
+                    @if ($isLockedByImmobilisation)
+                        <div class="alert alert-info d-flex align-items-center gap-2">
+                            <i class="bi bi-box-seam"></i>
+                            <div>
+                                @if ($isImmobilisationDotation)
+                                    Cette transaction est la dotation aux amortissements de l’immobilisation
+                                @else
+                                    Cette transaction provient de l’immobilisation
+                                @endif
+                                <strong>{{ $immobilisationLibelle }}</strong> — les écritures suivent la fiche.
+                                <a href="{{ route('immobilisations.show', $immobilisationId) }}">Ouvrir la fiche</a>
+                            </div>
+                        </div>
+                    @endif
                     @if ($isLockedByReglement)
                         <div class="alert alert-warning small py-2 mb-3">
                             <i class="bi bi-lock"></i> Des règlements sont enregistrés : annulez-les avant de modifier la date, le tiers, le compte bancaire, les montants ou le compte d'une ligne. La répartition par opération et séance reste modifiable.
@@ -140,9 +154,9 @@
                         <div class="col-md-2">
                             <label for="date" class="form-label">
                                 Date <span class="text-danger">*</span>
-                                @if ($isLocked || $isLockedByHelloAsso || $isLockedByReglement) <i class="bi bi-lock text-warning" title="Champ verrouillé"></i> @endif
+                                @if ($isLocked || $isLockedByHelloAsso || $isLockedByImmobilisation || $isLockedByReglement) <i class="bi bi-lock text-warning" title="Champ verrouillé"></i> @endif
                             </label>
-                            <x-date-input name="date" wire:model="date" :value="$date" :disabled="$isLocked || $isLockedByHelloAsso || $isLockedByReglement || $exerciceCloture" />
+                            <x-date-input name="date" wire:model="date" :value="$date" :disabled="$isLocked || $isLockedByHelloAsso || $isLockedByImmobilisation || $isLockedByReglement || $exerciceCloture" />
                             @error('date') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
                         <div class="col-md-2">
@@ -162,9 +176,9 @@
                         <div class="col-md-2">
                             <label class="form-label">
                                 Tiers <span class="text-danger">*</span>
-                                @if ($isLockedByHelloAsso || $isExtourneMiroir) <i class="bi bi-lock text-warning" title="Champ verrouillé"></i> @endif
+                                @if ($isLockedByHelloAsso || $isLockedByImmobilisation || $isExtourneMiroir) <i class="bi bi-lock text-warning" title="Champ verrouillé"></i> @endif
                             </label>
-                            @if ($isLockedByHelloAsso || $isExtourneMiroir || $isLockedByReglement)
+                            @if ($isLockedByHelloAsso || $isLockedByImmobilisation || $isExtourneMiroir || $isLockedByReglement)
                                 <input type="text" value="{{ \App\Models\Tiers::find($tiers_id)?->displayName() ?? '—' }}"
                                        class="form-control bg-light" disabled>
                             @else
@@ -240,9 +254,9 @@
                         <div class="col-md-3">
                             <label for="compte_id" class="form-label">
                                 Compte bancaire
-                            @if ($isLocked || $isLockedByFacture || $isLockedByHelloAsso || $isLockedByReglement) <i class="bi bi-lock text-warning" title="Champ verrouillé"></i> @endif
+                            @if ($isLocked || $isLockedByFacture || $isLockedByHelloAsso || $isLockedByImmobilisation || $isLockedByReglement) <i class="bi bi-lock text-warning" title="Champ verrouillé"></i> @endif
                             </label>
-                            @if ($isLocked || $isLockedByFacture || $isLockedByHelloAsso || $isLockedByReglement)
+                            @if ($isLocked || $isLockedByFacture || $isLockedByHelloAsso || $isLockedByImmobilisation || $isLockedByReglement)
                                 <input type="text" value="{{ \App\Models\CompteBancaire::find($compte_id)?->nom ?? '—' }}"
                                        class="form-control bg-light" disabled>
                             @else
@@ -375,7 +389,7 @@
                                 @forelse ($lignes as $index => $ligne)
                                     <tr wire:key="ligne-{{ $index }}">
                                         <td style="min-width:220px">
-                                            @if ($isLockedByFacture || $isExtourneMiroir)
+                                            @if ($isLockedByFacture || $isLockedByImmobilisation || $isExtourneMiroir)
                                                 {{-- Même rendu que le chip CompteAutocomplete : famille + intitulé --}}
                                                 @php
                                                     $compteLigne = \App\Models\Compte::find($ligne['compte_id']);
@@ -407,7 +421,7 @@
                                         <td>
                                             <select wire:model.live="lignes.{{ $index }}.operation_id"
                                                     class="form-select form-select-sm"
-                                                    {{ $exerciceCloture || $isLockedByFacture || $isExtourneMiroir ? 'disabled' : '' }}>
+                                                    {{ $exerciceCloture || $isLockedByFacture || $isLockedByImmobilisation || $isExtourneMiroir ? 'disabled' : '' }}>
                                                 <option value="">-- Aucune --</option>
                                                 @foreach ($operations->groupBy(fn ($op) => $op->typeOperation?->nom ?? 'Sans type') as $typeName => $ops)
                                                     <optgroup label="{{ $typeName }}">
@@ -426,7 +440,7 @@
                                             @if ($nbSeances)
                                                 <select wire:model="lignes.{{ $index }}.seance"
                                                         class="form-select form-select-sm"
-                                                        {{ $exerciceCloture || $isLockedByFacture || $isExtourneMiroir ? 'disabled' : '' }}>
+                                                        {{ $exerciceCloture || $isLockedByFacture || $isLockedByImmobilisation || $isExtourneMiroir ? 'disabled' : '' }}>
                                                     <option value="">--</option>
                                                     @for ($s = 1; $s <= $nbSeances; $s++)
                                                         <option value="{{ $s }}">{{ $s }}</option>
@@ -435,7 +449,7 @@
                                             @endif
                                         </td>
                                         <td>
-                                            @if ($isLocked || $isLockedByFacture || $isLockedByHelloAsso || $isExtourneMiroir)
+                                            @if ($isLocked || $isLockedByFacture || $isLockedByHelloAsso || $isLockedByImmobilisation || $isExtourneMiroir)
                                                 <span class="form-control-plaintext">{{ number_format((float) ($ligne['montant'] ?? 0), 2, ',', ' ') }} €</span>
                                             @else
                                                 <input type="number" wire:model.live="lignes.{{ $index }}.montant"
@@ -476,7 +490,7 @@
                                                                         <i class="bi bi-eye me-2"></i>Consulter
                                                                     </a>
                                                                 </li>
-                                                                @if (! $isLockedByFacture)
+                                                                @if (! $isLockedByFacture && ! $isLockedByImmobilisation)
                                                                 <li>
                                                                     <label class="dropdown-item mb-0" style="cursor:pointer;">
                                                                         <i class="bi bi-arrow-repeat me-2"></i>Remplacer
@@ -522,13 +536,13 @@
                                             @error("lignes.{$index}.piece_jointe_upload") <div class="text-danger small">{{ $message }}</div> @enderror
                                         </td>
                                         <td class="text-center">
-                                            @if (! $isLocked && ! $isLockedByFacture && ! $isLockedByHelloAsso && ! $isExtourneMiroir && ! $exerciceCloture)
+                                            @if (! $isLocked && ! $isLockedByFacture && ! $isLockedByHelloAsso && ! $isLockedByImmobilisation && ! $isExtourneMiroir && ! $exerciceCloture)
                                                 <button type="button" wire:click="removeLigne({{ $index }})"
                                                         class="btn btn-sm btn-outline-danger">
                                                     <i class="bi bi-trash"></i>
                                                 </button>
                                             @endif
-                                            @if ($isLocked && ! $isLockedByFacture && ! $exerciceCloture && ($ligne['id'] ?? null) !== null)
+                                            @if (($isLocked || $isLockedByImmobilisation) && ! $isLockedByFacture && ! $exerciceCloture && ($ligne['id'] ?? null) !== null)
                                                 <button type="button"
                                                         wire:click="ouvrirVentilation({{ $ligne['id'] }})"
                                                         class="btn btn-sm btn-outline-warning ms-1">
@@ -652,7 +666,7 @@
                     @endif
 
                     <div class="d-flex gap-2">
-                        @if (! $isLocked && ! $isLockedByFacture && ! $isLockedByHelloAsso && ! $isExtourneMiroir && ! $exerciceCloture && $this->canEdit)
+                        @if (! $isLocked && ! $isLockedByFacture && ! $isLockedByHelloAsso && ! $isLockedByImmobilisation && ! $isExtourneMiroir && ! $exerciceCloture && $this->canEdit)
                             <button type="button" wire:click="addLigne" class="btn btn-sm btn-outline-secondary">
                                 <i class="bi bi-plus-lg"></i> Ajouter une ligne
                             </button>
@@ -661,7 +675,8 @@
                             <button type="button" wire:click="resetForm" class="btn btn-secondary">{{ $exerciceCloture || ! $this->canEdit ? 'Fermer' : 'Annuler' }}</button>
                             @if (! $exerciceCloture && $this->canEdit)
                             <button type="submit" class="btn btn-success"
-                                    @if ($isLocked || $isLockedByFacture) title="Certains champs sont verrouillés (facture validée ou rapprochement)." @endif>
+                                    {{ $isLockedByImmobilisation ? 'disabled' : '' }}
+                                    @if ($isLockedByImmobilisation) title="Cette transaction est pilotée par la fiche d’immobilisation : ventilez sans modifier la comptabilité." @elseif ($isLocked || $isLockedByFacture) title="Certains champs sont verrouillés (facture validée ou rapprochement)." @endif>
                                 {{ $transactionId ? 'Mettre à jour' : 'Enregistrer' }}
                             </button>
                             @endif

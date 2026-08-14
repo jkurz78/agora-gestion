@@ -16,6 +16,7 @@ use App\Http\Controllers\EmailOptoutController;
 use App\Http\Controllers\EmailTrackingController;
 use App\Http\Controllers\FacturePdfController;
 use App\Http\Controllers\FormulaireController;
+use App\Http\Controllers\ImmobilisationPdfController;
 use App\Http\Controllers\IncomingDocumentsController;
 use App\Http\Controllers\OnboardingBrandingController;
 use App\Http\Controllers\OnboardingController;
@@ -57,6 +58,9 @@ use App\Livewire\BackOffice\NoteDeFrais\Show as NdfShow;
 use App\Livewire\Compta\PostesTiersOuverts;
 use App\Livewire\DevisManuel\DevisEdit;
 use App\Livewire\DevisManuel\DevisList;
+use App\Livewire\Immobilisations\DotationsExercice;
+use App\Livewire\Immobilisations\ImmobilisationIndex;
+use App\Livewire\Immobilisations\ImmobilisationShow;
 use App\Livewire\Newsletter\InscriptionsList;
 use App\Livewire\Parametres\Comptabilite\UsagesComptables;
 use App\Livewire\Parametres\RecusFiscaux;
@@ -291,6 +295,22 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
         Route::get('/comptabilite/factures-fournisseurs/{depot}/pdf', FacturePartenaireDepotPdfController::class)
             ->middleware(['can:treat,depot'])
             ->name('comptabilite.factures-fournisseurs.pdf');
+    });
+
+// ── Comptabilité — Immobilisations ──
+// Attention à l'ordre lors des ajouts ultérieurs : la route littérale
+// /dotations doit précéder /{immobilisation}, sinon « dotations » serait
+// captée comme valeur du paramètre de route.
+Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
+    ->group(function (): void {
+        Route::get('/comptabilite/immobilisations', ImmobilisationIndex::class)
+            ->name('immobilisations.index');
+        Route::get('/comptabilite/immobilisations/dotations', DotationsExercice::class)
+            ->name('immobilisations.dotations');
+        Route::get('/comptabilite/immobilisations/{immobilisation}', ImmobilisationShow::class)
+            ->name('immobilisations.show');
+        Route::get('/comptabilite/immobilisations/{immobilisation}/pdf', ImmobilisationPdfController::class)
+            ->name('immobilisations.pdf');
     });
 
 // ── Redirections 301 (anciennes URLs) ──

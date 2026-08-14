@@ -577,7 +577,13 @@
                         @if((int)$tx->nb_lignes > 1)
                             <i class="bi bi-diagram-2 text-secondary me-1" title="{{ $tx->nb_lignes }} lignes"></i>
                         @endif
-                        {{ $tx->compte_ventilation_nom ?? '' }}
+                        @php $immoTx = $immobilisationsParTransaction[(int) $tx->id] ?? null; @endphp
+                        @if ($immoTx !== null)
+                            {{ $immoTx->compte->numero_pcg }} — {{ $immoTx->compte->intitule }}
+                            <span class="badge bg-info text-dark ms-1">Immobilisation</span>
+                        @else
+                            {{ $tx->compte_ventilation_nom ?? '' }}
+                        @endif
                     </td>
                     <td class="small text-muted">{{ $tx->mode_paiement ?? '—' }}</td>
                     <td class="text-end fw-semibold small text-nowrap {{ (float)$tx->montant >= 0 ? 'text-success' : 'text-danger' }}">
@@ -623,7 +629,11 @@
                                 // Mutex poubelle/annuler — Slice 1 amendement :
                                 //   - Tx supprimable « safely » : EnAttente sans aucun attachement banque/règlement/remise/facture
                                 //   - Sinon : annulation comptable (extourne) si éligible
-                                $hasAttachement = $tx->remise_id || $tx->reglement_id || $tx->rapprochement_id || ! empty($tx->is_locked_by_facture);
+                                // Transaction::isLockedByImmobilisation() refuse delete()/annuler()/isExtournable()
+                                // côté serveur pour l'acquisition et la dotation d'une immobilisation — masquées ici
+                                // via $immobilisationLockedTxIds pour ne jamais proposer une action que le serveur refuse.
+                                $immoLocked = in_array((int) $tx->id, $immobilisationLockedTxIds, true);
+                                $hasAttachement = $tx->remise_id || $tx->reglement_id || $tx->rapprochement_id || ! empty($tx->is_locked_by_facture) || $immoLocked;
                                 $estSupprimableSafely = ! $isReportAN && ! $exerciceCloture
                                     && ($statutReglement === 'en_attente' || $tx->source_type === 'virement_sortant' || $tx->source_type === 'virement_entrant')
                                     && ! $hasAttachement
@@ -632,6 +642,7 @@
                                 $isExtournableUI = ! $isReportAN && ! $exerciceCloture
                                     && in_array($tx->source_type, ['recette', 'depense'], true)
                                     && ! $tx->is_helloasso
+                                    && ! $immoLocked
                                     && empty($tx->extournee_at)
                                     && empty($tx->is_extourne_miroir);
                             @endphp

@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Suite de tests sur MySQL, identique à phpunit.xml à la connexion près.
+
+    Pourquoi ce fichier existe
+    ==========================
+    La suite par défaut tourne sur SQLite en mémoire : c'est rapide, et c'est ce
+    qui rend la boucle de développement supportable sur 6 000 tests. Mais SQLite
+    ne vérifie pas ce que MySQL vérifie, et une classe entière de défauts lui est
+    donc invisible :
+
+      - les contraintes de clés étrangères et les index qui les servent — un cas
+        réel, le 2026-08-12 : une migration supprimait un index avant de créer son
+        remplaçant, verte sur SQLite, rejetée par MySQL avec
+        « SQLSTATE[HY000] 1553 Cannot drop index … needed in a foreign key
+        constraint » ;
+      - le typage des clés — MySQL retourne des chaînes là où SQLite retourne des
+        entiers, ce qui est précisément la raison d'être de la règle « cast (int)
+        des deux côtés » du CLAUDE.md, qu'une suite SQLite ne peut pas faire
+        respecter ;
+      - le mode strict, les collations, les longueurs de colonnes.
+
+    Quand s'en servir
+    =================
+    La CI l'utilise systématiquement — c'est le filet avant tout déploiement.
+    En local, lance-la quand tu touches à une migration, à un index, à une
+    contrainte ou à une requête SQL brute :
+
+        php -d memory_limit=1G ./vendor/bin/pest -c phpunit.mysql.xml
+
+    Aucun prérequis local : Sail provisionne déjà une base `testing` à côté de la
+    base de développement, c'est elle qu'on utilise.
+
+    Garde-fou important
+    ===================
+    `DB_DATABASE` est forcé à `testing`. C'est délibéré et vital : la base locale
+    de développement (`svs_accounting`) est un CLONE DE PRODUCTION, et une suite
+    de tests qui pointerait dessus la détruirait au premier `RefreshDatabase`.
+    Ne retire pas ce `force`. L'hôte, l'utilisateur et le mot de passe, eux,
+    restent lus dans l'environnement, parce qu'ils diffèrent entre Sail
+    (`mysql` / `sail`) et le runner de CI (`127.0.0.1` / `root`).
+-->
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+>
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+        <testsuite name="Livewire">
+            <directory>tests/Livewire</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>app</directory>
+        </include>
+    </source>
+    <php>
+        <env name="APP_ENV" value="testing" force="true"/>
+        <env name="DB_CONNECTION" value="mysql" force="true"/>
+        <env name="DB_DATABASE" value="testing" force="true"/>
+        <env name="APP_MAINTENANCE_DRIVER" value="file" force="true"/>
+        <env name="BCRYPT_ROUNDS" value="4" force="true"/>
+        <env name="CACHE_STORE" value="array" force="true"/>
+        <env name="MAIL_MAILER" value="array" force="true"/>
+        <env name="PULSE_ENABLED" value="false" force="true"/>
+        <env name="QUEUE_CONNECTION" value="sync" force="true"/>
+        <env name="SESSION_DRIVER" value="array" force="true"/>
+        <env name="TELESCOPE_ENABLED" value="false" force="true"/>
+    </php>
+</phpunit>

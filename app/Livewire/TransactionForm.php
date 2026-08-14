@@ -20,6 +20,8 @@ use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\FacturePartenaireDeposee;
+use App\Models\Immobilisation;
+use App\Models\ImmobilisationDotation;
 use App\Models\IncomingDocument;
 use App\Models\NoteDeFrais;
 use App\Models\Operation;
@@ -41,6 +43,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -117,6 +120,23 @@ final class TransactionForm extends Component
     public bool $isLockedByFacture = false;
 
     public bool $isLockedByHelloAsso = false;
+
+    /**
+     * Transaction pilotée par une fiche d'immobilisation (acquisition ou dotation) — la fiche est le maître.
+     *
+     * #[Locked] empêche l'hydratation de cette propriété depuis le client — un complément défensif,
+     * pas une garde à elle seule : l'invariant réel vit dans TransactionService::update()
+     * (isLockedByImmobilisation()), seule frontière qui compte contre un appelant serveur forgé.
+     */
+    #[Locked]
+    public bool $isLockedByImmobilisation = false;
+
+    /** True quand la transaction verrouillée est une dotation, false quand c'est l'acquisition elle-même. */
+    public bool $isImmobilisationDotation = false;
+
+    public ?int $immobilisationId = null;
+
+    public string $immobilisationLibelle = '';
 
     /** Transaction miroir d'extourne — verrouille les champs comptables. */
     public bool $isExtourneMiroir = false;
@@ -200,6 +220,10 @@ final class TransactionForm extends Component
         $this->isExtourneMiroir = false;
         $this->isLocked = false;
         $this->isLockedByHelloAsso = false;
+        $this->isLockedByImmobilisation = false;
+        $this->isImmobilisationDotation = false;
+        $this->immobilisationId = null;
+        $this->immobilisationLibelle = '';
         $this->resetValidation();
         $this->showForm = true;
         $this->date = app(ExerciceService::class)->defaultDate();
@@ -517,6 +541,25 @@ final class TransactionForm extends Component
         $this->isLocked = $transaction->isLockedByRapprochement() || $transaction->isLockedByRemise();
         $this->isLockedByFacture = $transaction->isLockedByFacture();
         $this->isLockedByHelloAsso = $transaction->helloasso_order_id !== null;
+
+        $this->isLockedByImmobilisation = $transaction->isLockedByImmobilisation();
+        $this->isImmobilisationDotation = false;
+        $immobilisation = null;
+        if ($this->isLockedByImmobilisation) {
+            $immobilisation = Immobilisation::where('transaction_id', (int) $transaction->id)->first();
+            if ($immobilisation === null) {
+                // Pas une acquisition : c'est forcément une dotation, seul autre
+                // cas reconnu par isLockedByImmobilisation().
+                $dotation = ImmobilisationDotation::where('transaction_id', (int) $transaction->id)->first();
+                $immobilisation = $dotation?->immobilisation;
+                $this->isImmobilisationDotation = $immobilisation !== null;
+            }
+        }
+        $this->immobilisationId = $immobilisation === null ? null : (int) $immobilisation->id;
+        $this->immobilisationLibelle = $immobilisation === null
+            ? ''
+            : $immobilisation->numero.' — '.$immobilisation->libelle;
+
         $this->chargerEtatReglement($transaction);
 
         // Miroir d'extourne : le sens de trésorerie est inversé par rapport au type comptable.
@@ -534,7 +577,7 @@ final class TransactionForm extends Component
     {
         $this->reset([
             'transactionId', 'type', 'date', 'libelle', 'mode_paiement', 'dateReglement', 'paiementRecu', 'paiementModifiable',
-            'tiers_id', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked', 'isLockedByFacture', 'isLockedByHelloAsso', 'isLockedByReglement', 'isExtourneMiroir', 'sensTresorerie',
+            'tiers_id', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked', 'isLockedByFacture', 'isLockedByHelloAsso', 'isLockedByImmobilisation', 'isImmobilisationDotation', 'immobilisationId', 'immobilisationLibelle', 'isLockedByReglement', 'isExtourneMiroir', 'sensTresorerie',
             'etatPaiement', 'soldeRestantCentimes', 'reglementsEnregistres', 'posteTiersLigneId',
             'ventilationLigneId', 'ventilationLigneCompteLabel', 'ventilationLigneMontant', 'affectations',
             'ventilationHasAffectations',
@@ -548,6 +591,12 @@ final class TransactionForm extends Component
     public function save(): void
     {
         if (! $this->canEdit) {
+            return;
+        }
+
+        if ($this->isLockedByImmobilisation) {
+            $this->addError('lignes', 'Cette transaction est pilotée par une fiche d’immobilisation : modifiez la fiche.');
+
             return;
         }
 

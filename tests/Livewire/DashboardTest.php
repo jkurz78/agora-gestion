@@ -41,25 +41,51 @@ it('renders for authenticated user', function () {
 });
 
 it('displays solde general', function () {
-    Transaction::factory()->asRecette()->create([
+    // Le « Solde général » se lit sur le grand livre (classes 6 et 7) et non
+    // plus sur montant_total : une transaction sans ligne comptable ne pèse
+    // donc rien, ce qui est le comportement voulu — en partie double, toute
+    // transaction réelle porte ses lignes. Voir
+    // tests/Feature/Immobilisation/SoldeGeneralImmobilisationTest.php pour le
+    // défaut qui a motivé le changement (une immobilisation comptée comme une
+    // charge).
+    $compte706 = Compte::factory()->create([
         'association_id' => $this->association->id,
-        'date' => $this->exercice.'-11-01',
-        'montant_total' => 1000.00,
-        'saisi_par' => $this->user->id,
+        'numero_pcg' => '706',
+        'classe' => 7,
     ]);
-    Transaction::factory()->asRecette()->create([
+    $compte606 = Compte::factory()->create([
         'association_id' => $this->association->id,
-        'date' => $this->exercice.'-12-01',
-        'montant_total' => 500.00,
-        'saisi_par' => $this->user->id,
+        'numero_pcg' => '606',
+        'classe' => 6,
     ]);
 
-    Transaction::factory()->asDepense()->create([
+    $ligne = function (Transaction $tx, Compte $compte, float $debit, float $credit): void {
+        TransactionLigne::factory()->create([
+            'transaction_id' => $tx->id,
+            'compte_id' => $compte->id,
+            'debit' => $debit,
+            'credit' => $credit,
+            'montant' => $debit > 0 ? $debit : $credit,
+        ]);
+    };
+
+    foreach ([[1000.00, '-11-01'], [500.00, '-12-01']] as [$montant, $jour]) {
+        $tx = Transaction::factory()->asRecette()->create([
+            'association_id' => $this->association->id,
+            'date' => $this->exercice.$jour,
+            'montant_total' => $montant,
+            'saisi_par' => $this->user->id,
+        ]);
+        $ligne($tx, $compte706, 0.0, $montant);
+    }
+
+    $depense = Transaction::factory()->asDepense()->create([
         'association_id' => $this->association->id,
         'date' => $this->exercice.'-10-15',
         'montant_total' => 300.00,
         'saisi_par' => $this->user->id,
     ]);
+    $ligne($depense, $compte606, 300.00, 0.0);
 
     // Solde = 1000 + 500 - 300 = 1200
     Livewire::test(Dashboard::class)

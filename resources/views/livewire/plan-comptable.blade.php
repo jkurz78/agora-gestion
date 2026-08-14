@@ -157,7 +157,7 @@
 
                 <p class="small text-muted mb-0">
                     Le numéro détermine la famille du compte (deux premiers caractères)
-                    et son sens : 6 pour une dépense, 7 pour une recette.
+                    et son sens : 2 pour une immobilisation ou son amortissement, 6 pour une dépense, 7 pour une recette.
                 </p>
 
                 {{-- Note de renvoi vers l'écran Usages --}}

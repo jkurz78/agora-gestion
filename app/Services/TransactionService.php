@@ -354,6 +354,10 @@ final class TransactionService
                 throw new \RuntimeException('Cette transaction est liée à une remise bancaire et ne peut pas être modifiée.');
             }
 
+            if ($transaction->isLockedByImmobilisation()) {
+                throw new \RuntimeException('Cette transaction est pilotée par une fiche d’immobilisation et ne peut pas être modifiée : modifiez la fiche.');
+            }
+
             if ($transaction->isLockedByFacture()) {
                 $this->assertLockedByFactureInvariants($transaction, $data, $lignes);
             }
@@ -643,6 +647,32 @@ final class TransactionService
         });
     }
 
+    /**
+     * Supprime (soft-delete) les lignes d'une transaction ainsi que leurs
+     * affectations analytiques — sans toucher à la transaction elle-même.
+     *
+     * transaction_lignes ne cascade PAS depuis son parent (cf. docblock de
+     * App\Tenant\TransactionLigneTenantScope) : sans cet appel explicite,
+     * supprimer une transaction laisse des lignes actives orphelines, des
+     * ventilations analytiques périmées, et des comptes à tort considérés
+     * « utilisés » (ce qui bloque leur suppression au plan comptable).
+     *
+     * SANS garde métier (exercice ouvert, verrous remise/facture/
+     * immobilisation) : réservée aux appelants qui les ont déjà vérifiées
+     * eux-mêmes. Utilisée par delete()/annuler() ci-dessous, et par
+     * DotationService::annuler() pour les transactions de dotation aux
+     * amortissements — verrouillées ici par isLockedByImmobilisation() et
+     * donc délibérément inatteignables par delete()/annuler() : la fiche est
+     * l'unique point d'entrée pour défaire une dotation.
+     */
+    public function purgerLignesEtAffectations(Transaction $transaction): void
+    {
+        $transaction->lignes()->each(function (TransactionLigne $ligne): void {
+            $ligne->affectations()->delete();
+            $ligne->delete();
+        });
+    }
+
     public function delete(Transaction $transaction): void
     {
         $this->exerciceService->assertOuvert(
@@ -658,6 +688,9 @@ final class TransactionService
         if ($transaction->isLockedByFacture()) {
             throw new \RuntimeException('Cette transaction est liée à une facture validée et ne peut pas être supprimée.');
         }
+        if ($transaction->isLockedByImmobilisation()) {
+            throw new \RuntimeException('Cette transaction provient d’une immobilisation et ne peut pas être supprimée : supprimez la fiche.');
+        }
         DB::transaction(function () use ($transaction) {
             // Nettoyage T2 (encaissement/règlement séparé) si elle existe — symétrique
             // avec annuler() : sans ça, supprimer une transaction réglée laisserait une
@@ -669,10 +702,7 @@ final class TransactionService
                 $this->deletePieceJointe($transaction);
             }
 
-            $transaction->lignes()->each(function (TransactionLigne $ligne) {
-                $ligne->affectations()->delete();
-                $ligne->delete();
-            });
+            $this->purgerLignesEtAffectations($transaction);
             $transaction->delete();
         });
     }
@@ -701,6 +731,9 @@ final class TransactionService
         if ($transaction->isLockedByFacture()) {
             throw new \RuntimeException('Cette transaction est liée à une facture validée et ne peut pas être annulée.');
         }
+        if ($transaction->isLockedByImmobilisation()) {
+            throw new \RuntimeException('Cette transaction provient d’une immobilisation et ne peut pas être annulée : supprimez la fiche.');
+        }
         if ($transaction->extournee_at !== null) {
             throw new \RuntimeException('Cette transaction a déjà été extournée.');
         }
@@ -715,10 +748,7 @@ final class TransactionService
             }
 
             // 3. Soft-delete lignes
-            $transaction->lignes()->each(function (TransactionLigne $ligne) {
-                $ligne->affectations()->delete();
-                $ligne->delete();
-            });
+            $this->purgerLignesEtAffectations($transaction);
 
             // 4. Soft-delete TX avec traçabilité
             $transaction->forceFill([
@@ -743,6 +773,24 @@ final class TransactionService
      * Pas de délettrage : la T1 est soft-deleted et la T2 force-deleted,
      * les deux disparaissent des rapports. Les lettrage_code orphelins
      * sur les lignes supprimées sont inoffensifs.
+     *
+     * Anomalie 2 (audit) — delete()/annuler() contrôlent les verrous de T1
+     * (rapprochement, remise, facture, immobilisation) mais rien ne
+     * protégeait T2 : une T2 déjà pointée dans un rapprochement bancaire, ou
+     * intégrée à une remise, pouvait être effacée alors que le rapprochement
+     * ou la remise, eux, survivaient — grand livre divergent du rapprochement/
+     * de la remise qui la référence encore. On applique donc à T2 les mêmes
+     * gardes qu'une suppression directe porterait sur elle, et on refuse la
+     * suppression de T1 tant que T2 est protégée : c'est T2 qu'il faut
+     * libérer en premier (dépointer le rapprochement ou en sortir la
+     * transaction, retirer la transaction de la remise), pas une donnée à
+     * effacer discrètement pour la faire disparaître.
+     *
+     * isLockedByImmobilisation() n'est délibérément pas testé ici : T2 est
+     * toujours une transaction de règlement/encaissement générée par
+     * EcritureGenerator, jamais elle-même le transaction_id d'une
+     * Immobilisation ou d'une ImmobilisationDotation (voir docblock de
+     * Transaction::isLockedByImmobilisation()).
      */
     private function supprimerT2SiExiste(Transaction $transaction): void
     {
@@ -752,6 +800,32 @@ final class TransactionService
 
         if ($t2 === null) {
             return;
+        }
+
+        // Contre-audit P1-02 — la T2 est retrouvée par une requête ordinaire :
+        // sans verrou, un pointage de rapprochement ou une mise en remise
+        // concurrents peuvent s'intercaler entre les contrôles ci-dessous et le
+        // forceDelete, et la T2 part quand même. On la recharge donc sous
+        // lockForUpdate() et on contrôle l'état verrouillé, pas l'état lu avant.
+        // Le verrou tient jusqu'au commit de la transaction appelante
+        // (delete()/annuler() enveloppent déjà cet appel).
+        $t2 = Transaction::query()
+            ->whereKey((int) $t2->id)
+            ->lockForUpdate()
+            ->first();
+
+        if ($t2 === null) {
+            return; // Supprimée par une transaction concurrente : plus rien à faire.
+        }
+
+        if ($t2->rapprochement_id !== null) {
+            throw new \RuntimeException('Le règlement de cette transaction est pointé dans un rapprochement bancaire : supprimez d’abord le rapprochement (ou dépointez-en cette transaction) avant de pouvoir supprimer ou annuler cette transaction.');
+        }
+        if ($t2->isLockedByRemise()) {
+            throw new \RuntimeException('Le règlement de cette transaction fait partie d’une remise bancaire : retirez-le de la remise avant de pouvoir supprimer ou annuler cette transaction.');
+        }
+        if ($t2->isLockedByFacture()) {
+            throw new \RuntimeException('Le règlement de cette transaction est rattaché à une facture validée et ne peut pas être supprimé.');
         }
 
         TransactionLigne::where('transaction_id', (int) $t2->id)->forceDelete();
