@@ -25,7 +25,18 @@ final class DotationsExercice extends Component
     public function mount(): void
     {
         // Par défaut, l'exercice précédent : c'est celui qu'on clôture.
-        $this->exercice = app(ExerciceService::class)->current() - 1;
+        $defaut = app(ExerciceService::class)->current() - 1;
+
+        // …sauf s'il n'est pas générable (déjà clôturé, ou pas encore
+        // commencé) : l'écran s'ouvrirait alors sur une année absente de son
+        // propre sélecteur, qui afficherait la première option pendant que le
+        // composant travaille sur une autre. On retombe sur le plus récent des
+        // exercices réellement générables.
+        $generables = app(DotationService::class)->exercicesGenerables();
+
+        $this->exercice = in_array($defaut, $generables, true)
+            ? $defaut
+            : ($generables[0] ?? $defaut);
     }
 
     public function getCanEditProperty(): bool
@@ -38,7 +49,10 @@ final class DotationsExercice extends Component
         return view('livewire.immobilisations.dotations-exercice', [
             'lignes' => app(DotationService::class)->apercu($this->exercice),
             'exerciceService' => app(ExerciceService::class),
-            'exercicesDisponibles' => app(ExerciceService::class)->availableYears(),
+            // Dérivé de la règle du service (voir exercicesGenerables()) et non
+            // d'une plage d'années civiles : chaque choix offert doit pouvoir
+            // aboutir.
+            'exercicesDisponibles' => app(DotationService::class)->exercicesGenerables(),
         ])->layout('layouts.app-sidebar', ['title' => 'Dotations aux amortissements']);
     }
 
@@ -92,7 +106,15 @@ final class DotationsExercice extends Component
         $this->dispatch('edit-transaction', id: $transactionId);
     }
 
-    public function annulerDotation(int $immobilisationId): void
+    /**
+     * L'action est bien une suppression, et l'IHM le dit ainsi : « annuler »
+     * désigne partout ailleurs dans l'application l'extourne d'une écriture —
+     * une opération comptable tracée qui laisse la pièce d'origine en place
+     * (TransactionService::annuler()). Ici la dotation et son écriture
+     * disparaissent. Deux sens opposés sous le même mot, sur un bouton rouge :
+     * le vocabulaire de l'écran suit ce qui se passe réellement.
+     */
+    public function supprimerDotation(int $immobilisationId): void
     {
         $immobilisation = Immobilisation::findOrFail($immobilisationId);
         $this->authorize('update', $immobilisation);
@@ -106,7 +128,7 @@ final class DotationsExercice extends Component
             return;
         }
 
-        $this->flashMessage = 'Dotation annulée pour '.$immobilisation->numero
+        $this->flashMessage = 'Dotation supprimée pour '.$immobilisation->numero
             .'. Elle peut être regénérée depuis cet écran.';
         $this->flashType = 'success';
     }

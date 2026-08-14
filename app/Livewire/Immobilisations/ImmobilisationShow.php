@@ -11,6 +11,7 @@ use App\Exceptions\Immobilisation\MiseEnServiceAnterieureException;
 use App\Exceptions\Immobilisation\SuppressionInterditeException;
 use App\Livewire\Immobilisations\Concerns\WithDureeSelector;
 use App\Models\Immobilisation;
+use App\Models\Transaction;
 use App\Services\Immobilisation\ImmobilisationService;
 use App\Services\Immobilisation\PlanAmortissementCalculator;
 use Carbon\CarbonImmutable;
@@ -41,6 +42,9 @@ final class ImmobilisationShow extends Component
 
     public string $flashType = '';
 
+    /** Transaction dont l'écriture est affichée en lecture seule, si une l'est. */
+    public ?int $ecritureTransactionId = null;
+
     public function mount(Immobilisation $immobilisation): void
     {
         $this->immobilisation = $immobilisation;
@@ -58,6 +62,12 @@ final class ImmobilisationShow extends Component
         return view('livewire.immobilisations.immobilisation-show', [
             'plan' => app(PlanAmortissementCalculator::class)->plan($this->immobilisation),
             'dureesUsuelles' => self::DUREES_USUELLES,
+            // Toutes les lignes, sans le filtre ventilation() : c'est bien
+            // l'écriture complète qu'on montre, contrepartie 401 comprise.
+            'ecriture' => $this->ecritureTransactionId === null
+                ? null
+                : Transaction::with(['lignes.compte', 'lignes.tiers', 'tiers'])
+                    ->find($this->ecritureTransactionId),
         ])->layout('layouts.app-sidebar', ['title' => $this->immobilisation->numero]);
     }
 
@@ -85,17 +95,53 @@ final class ImmobilisationShow extends Component
     }
 
     /**
-     * Ouvre le formulaire générique de transaction sur la transaction
-     * d'acquisition ou une transaction de dotation de cette fiche — même
-     * patron que DotationsExercice::ventiler(). TransactionForm affiche
-     * lui-même la transaction en lecture seule (isLockedByImmobilisation) :
-     * il n'y a rien d'autre à faire ici que l'ouvrir.
+     * Affiche l'écriture d'une transaction de la fiche (acquisition ou
+     * dotation) en lecture seule.
+     *
+     * On n'ouvre plus le formulaire générique de saisie : il charge ses lignes
+     * via TransactionLigne::scopeVentilation(), qui filtre `classe IN (6,7)`.
+     * Une acquisition se ventilant sur un compte de CLASSE 2, sa seule ligne
+     * métier était écartée — d'où un écran sans ligne et un total à 0,00 €. Il
+     * affichait par-dessus un compte bancaire vide (normal : la dette 401 ne
+     * porte pas de banque, c'est la T2 qui la porte) et un bloc de paiement
+     * inopérant, la transaction étant de toute façon refusée à
+     * l'enregistrement parce que pilotée par la fiche.
+     *
+     * Cette vue montre donc l'écriture telle qu'elle est : les lignes réelles
+     * du grand livre, débit et crédit, sans prétendre qu'on peut les saisir.
      */
-    public function ouvrirTransaction(int $transactionId): void
+    public function voirEcriture(int $transactionId): void
     {
         $this->authorize('view', $this->immobilisation);
 
-        $this->dispatch('edit-transaction', id: $transactionId);
+        // Une transaction ne s'affiche depuis cette fiche que si elle lui
+        // appartient : transactionId est une propriété publique Livewire,
+        // hydratée depuis le client à chaque requête et donc falsifiable.
+        if (! $this->appartientALaFiche($transactionId)) {
+            abort(403);
+        }
+
+        $this->ecritureTransactionId = $transactionId;
+    }
+
+    public function fermerEcriture(): void
+    {
+        $this->ecritureTransactionId = null;
+    }
+
+    /**
+     * Vrai si la transaction est celle de l'acquisition de cette fiche, ou
+     * celle d'une de ses dotations.
+     */
+    private function appartientALaFiche(int $transactionId): bool
+    {
+        if ((int) $this->immobilisation->transaction_id === $transactionId) {
+            return true;
+        }
+
+        return $this->immobilisation->dotations()
+            ->where('transaction_id', $transactionId)
+            ->exists();
     }
 
     public function enregistrerModification(): void

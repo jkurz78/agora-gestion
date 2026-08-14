@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\StatutReglement;
 use App\Livewire\Immobilisations\ImmobilisationIndex;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
@@ -12,6 +13,7 @@ use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\Immobilisation\ImmobilisationComptesSeeder;
+use App\Services\ReglementOperationService;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
@@ -146,4 +148,127 @@ it('refuse un règlement immédiat par virement sans compte bancaire fourni', fu
 
     expect(Immobilisation::count())->toBe(0)
         ->and(Transaction::count())->toBe(0);
+});
+
+/**
+ * Recette du 13/08/2026 — une acquisition réglée immédiatement restait au
+ * statut « Dû ». L'écran de la transaction affichait alors deux informations
+ * contradictoires : le bloc règlement, lu sur le grand livre, montrait bien le
+ * paiement ; « Paiement effectué ? », lu sur `statut_reglement`, répondait non.
+ *
+ * Cause : acquerir() était le seul chemin de création à ne jamais appeler
+ * EtatReglementResolver::syncer(). TransactionService::create() et
+ * ReglementOperationService le font tous, ce qui est précisément ce qui aligne
+ * la colonne dérivée sur les écritures réellement produites.
+ */
+it('marque la transaction comme réglée quand l’acquisition est payée immédiatement', function (): void {
+    $tiers = Tiers::factory()->create();
+    $compteBancaire = CompteBancaire::factory()->create();
+
+    Livewire::test(ImmobilisationIndex::class)
+        ->call('ouvrirModal')
+        ->set('libelle', 'Bros machin')
+        ->set('quantite', 1)
+        ->set('compte_id', (string) Compte::ofNumero('2183')->id)
+        ->set('tiers_id', (int) $tiers->id)
+        ->set('montant', '19000.00')
+        ->set('date_achat', '2026-09-12')
+        ->set('date_mise_en_service', '2026-09-12')
+        ->set('duree_mois', 60)
+        ->set('regleImmediatement', true)
+        ->set('mode_paiement', 'virement')
+        ->set('compte_reglement_id', (string) $compteBancaire->id)
+        ->call('enregistrer')
+        ->assertHasNoErrors();
+
+    $immo = Immobilisation::firstOrFail();
+
+    expect($immo->transaction->statut_reglement)
+        ->not->toBe(StatutReglement::EnAttente, 'Une acquisition payée ne doit pas rester « Dû ».');
+});
+
+it('laisse la transaction due quand l’acquisition est à crédit', function (): void {
+    $tiers = Tiers::factory()->create();
+
+    Livewire::test(ImmobilisationIndex::class)
+        ->call('ouvrirModal')
+        ->set('libelle', 'Bros machin')
+        ->set('quantite', 1)
+        ->set('compte_id', (string) Compte::ofNumero('2183')->id)
+        ->set('tiers_id', (int) $tiers->id)
+        ->set('montant', '19000.00')
+        ->set('date_achat', '2026-09-12')
+        ->set('date_mise_en_service', '2026-09-12')
+        ->set('duree_mois', 60)
+        ->call('enregistrer')
+        ->assertHasNoErrors();
+
+    expect(Immobilisation::firstOrFail()->transaction->statut_reglement)
+        ->toBe(StatutReglement::EnAttente);
+});
+
+/**
+ * Recette du 13/08/2026 — le formulaire demandait le mode et le compte, mais
+ * pas la date : le décaissement était forcément daté du jour de l'achat. Une
+ * facture réglée quelques jours plus tard produisait donc un mouvement bancaire
+ * daté du mauvais jour, introuvable au rapprochement.
+ */
+it('date le règlement au jour saisi, pas au jour de l’achat', function (): void {
+    $tiers = Tiers::factory()->create();
+    $compteBancaire = CompteBancaire::factory()->create();
+
+    Livewire::test(ImmobilisationIndex::class)
+        ->call('ouvrirModal')
+        ->set('libelle', 'Bros machin')
+        ->set('quantite', 1)
+        ->set('compte_id', (string) Compte::ofNumero('2183')->id)
+        ->set('tiers_id', (int) $tiers->id)
+        ->set('montant', '19000.00')
+        ->set('date_achat', '2026-09-12')
+        ->set('date_mise_en_service', '2026-09-12')
+        ->set('duree_mois', 60)
+        ->set('regleImmediatement', true)
+        ->set('mode_paiement', 'virement')
+        ->set('compte_reglement_id', (string) $compteBancaire->id)
+        ->set('date_reglement', '2026-10-15')
+        ->call('enregistrer')
+        ->assertHasNoErrors();
+
+    $immo = Immobilisation::firstOrFail();
+    $t2 = app(ReglementOperationService::class)->trouverT2($immo->transaction);
+
+    expect($t2)->not->toBeNull()
+        ->and($t2->date->format('Y-m-d'))->toBe('2026-10-15')
+        ->and($immo->transaction->date->format('Y-m-d'))->toBe('2026-09-12');
+});
+
+it('refuse un règlement antérieur à l’achat', function (): void {
+    $tiers = Tiers::factory()->create();
+    $compteBancaire = CompteBancaire::factory()->create();
+
+    Livewire::test(ImmobilisationIndex::class)
+        ->call('ouvrirModal')
+        ->set('libelle', 'Bros machin')
+        ->set('quantite', 1)
+        ->set('compte_id', (string) Compte::ofNumero('2183')->id)
+        ->set('tiers_id', (int) $tiers->id)
+        ->set('montant', '19000.00')
+        ->set('date_achat', '2026-09-12')
+        ->set('date_mise_en_service', '2026-09-12')
+        ->set('duree_mois', 60)
+        ->set('regleImmediatement', true)
+        ->set('mode_paiement', 'virement')
+        ->set('compte_reglement_id', (string) $compteBancaire->id)
+        ->set('date_reglement', '2026-08-01')
+        ->call('enregistrer')
+        ->assertHasErrors('date_reglement');
+
+    expect(Immobilisation::count())->toBe(0);
+});
+
+it('propose par défaut la date d’achat comme date de règlement', function (): void {
+    Livewire::test(ImmobilisationIndex::class)
+        ->call('ouvrirModal')
+        ->set('date_achat', '2026-11-03')
+        ->assertSet('date_reglement', '2026-11-03');
 });

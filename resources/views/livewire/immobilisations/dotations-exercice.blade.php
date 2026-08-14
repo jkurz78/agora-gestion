@@ -93,9 +93,9 @@
                                     @endif
                                     @if ($this->canEdit)
                                     <button type="button" class="btn btn-outline-danger btn-sm"
-                                            wire:click="annulerDotation({{ $ligne->immobilisation->id }})"
+                                            wire:click="supprimerDotation({{ $ligne->immobilisation->id }})"
                                             wire:confirm="L'écriture comptable de cette dotation sera supprimée. Si elle avait été ventilée sur des opérations, cette ventilation sera perdue et devra être refaite. Continuer ?">
-                                        Annuler
+                                        Supprimer
                                     </button>
                                     @endif
                                 @endif

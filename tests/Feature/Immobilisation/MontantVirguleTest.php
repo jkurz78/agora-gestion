@@ -47,6 +47,38 @@ it('accepte un montant saisi avec une virgule décimale', function (): void {
     expect($immo->montant_acquisition)->toEqual('3000.50');
 });
 
+/**
+ * Contre-audit P3-02 — le séparateur de milliers arrive avec le copier-coller
+ * (tableur, facture PDF, site de fournisseur) et le clavier français. Les trois
+ * caractères ci-dessous sont ceux que produisent réellement les sources
+ * courantes : l'espace ASCII, l'espace insécable et l'espace insécable fine
+ * (celle que pose `number_format` en locale fr et que rendent les navigateurs).
+ * Même normalisation que PosteTiersReglementModal::montantCentimes().
+ */
+it('accepte un montant saisi avec un séparateur de milliers', function (string $saisie): void {
+    $tiers = Tiers::factory()->create();
+
+    Livewire::test(ImmobilisationIndex::class)
+        ->call('ouvrirModal')
+        ->set('libelle', 'Matériel')
+        ->set('quantite', 1)
+        ->set('compte_id', (string) Compte::ofNumero('2188')->id)
+        ->set('tiers_id', (int) $tiers->id)
+        ->set('montant', $saisie)
+        ->set('date_achat', '2026-09-12')
+        ->set('date_mise_en_service', '2026-09-12')
+        ->set('duree_mois', 60)
+        ->call('enregistrer')
+        ->assertHasNoErrors();
+
+    $immo = Immobilisation::firstOrFail();
+    expect($immo->montant_acquisition)->toEqual('3000.50');
+})->with([
+    'espace ASCII' => '3 000,50',
+    'espace insécable (U+00A0)' => "3\u{00A0}000,50",
+    'espace insécable fine (U+202F)' => "3\u{202F}000,50",
+]);
+
 it('continue de refuser un montant négatif ou nul avec le message partagé', function (): void {
     $tiers = Tiers::factory()->create();
 

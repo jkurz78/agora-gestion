@@ -144,7 +144,7 @@
                     @endif
                 </td>
                 <td style="width: 40%;">
-                    <div class="doc-title">FICHE D'IMMOBILISATION</div>
+                    <div class="doc-title">FICHE IMMOBILISATION {{ $immobilisation->numero }}</div>
                     <div class="doc-date">Généré le {{ \Carbon\Carbon::now()->format('d/m/Y') }}</div>
                 </td>
             </tr>
@@ -154,7 +154,7 @@
     {{-- INFO BLOCK --}}
     <div class="info-block">
         <dl>
-            <dt>Bien</dt><dd>{{ $immobilisation->numero }} — {{ $immobilisation->libelle }}</dd>
+            <dt>Bien</dt><dd><strong>{{ $immobilisation->libelle }}</strong></dd>
             <dt>Quantité</dt><dd>{{ $immobilisation->quantite }}</dd>
             <dt>Compte</dt><dd>{{ $immobilisation->compte->numero_pcg }} — {{ $immobilisation->compte->intitule }}</dd>
             <dt>Amortissements</dt><dd>{{ $immobilisation->compteAmortissement->numero_pcg }} — {{ $immobilisation->compteAmortissement->intitule }}</dd>

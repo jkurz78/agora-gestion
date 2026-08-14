@@ -15,6 +15,7 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\Compta\EcritureGenerator;
+use App\Services\Compta\EtatReglementResolver;
 use App\Services\ExerciceService;
 use App\Services\NumeroPieceService;
 use App\Services\TransactionService;
@@ -43,6 +44,7 @@ final class ImmobilisationService
         private readonly ImmobilisationSequenceService $sequence,
         private readonly ExerciceService $exerciceService,
         private readonly TransactionService $transactionService,
+        private readonly EtatReglementResolver $etatReglementResolver,
     ) {}
 
     public function acquerir(
@@ -58,16 +60,35 @@ final class ImmobilisationService
         ?ModePaiement $modePaiement,
         ?Compte $compteTresorerie,
         ?string $notes = null,
+        ?\DateTimeInterface $dateReglement = null,
     ): Immobilisation {
+        $this->assertCoupleReglementCoherent($modePaiement, $compteTresorerie);
         $this->assertComptesValides($compte, $compteAmortissement);
-        $this->assertExerciceOuvert($dateAchat);
         $this->assertMiseEnServiceCoherente($dateAchat, $dateMiseEnService);
+
+        // Filet de sécurité hors verrou : échouer tôt sur un exercice
+        // manifestement clôturé évite d'ouvrir une transaction pour rien. Le
+        // contrôle qui fait foi est celui, verrouillé, à l'intérieur.
+        $this->assertExerciceOuvert($dateAchat);
 
         $immobilisation = DB::transaction(function () use (
             $tiers, $libelle, $quantite, $compte, $compteAmortissement, $montant,
             $dateAchat, $dateMiseEnService, $dureeMois, $modePaiement,
-            $compteTresorerie, $notes
+            $compteTresorerie, $notes, $dateReglement
         ): Immobilisation {
+            // Contre-audit P1-01 — le contrôle réel, verrouillé, a lieu ICI :
+            // une clôture concurrente ne peut plus s'intercaler entre le
+            // contrôle et l'écriture, sans quoi l'application se retrouverait
+            // avec une acquisition postérieure à la clôture de son exercice.
+            $this->assertExerciceOuvertVerrouille($dateAchat);
+
+            // Le règlement peut tomber dans un exercice différent de l'achat
+            // (acheté en août, payé en septembre) : son propre exercice doit
+            // être ouvert lui aussi, sinon on écrirait dans des comptes clos.
+            if ($dateReglement !== null) {
+                $this->assertExerciceOuvertVerrouille($dateReglement);
+            }
+
             // L'en-tête et la ligne de ventilation sont construits explicitement ici,
             // avec les champs métier (tiers_id, montant de ventilation) que
             // TransactionService pose normalement en amont dans son propre flux —
@@ -118,9 +139,19 @@ final class ImmobilisationService
                     transactionDette: $transaction,
                     mode: $modePaiement,
                     compteTresorerie: $compteTresorerie,
-                    datePaiement: $dateAchat,
+                    datePaiement: $dateReglement ?? $dateAchat,
                     libelle: 'Règlement '.$libelle,
                 );
+
+                // `statut_reglement` est une colonne dérivée du grand livre : sans
+                // cette synchronisation elle reste à sa valeur de création, et
+                // l'écran de la transaction se contredit — le bloc règlement, lu
+                // sur les écritures, montre le paiement pendant que « Paiement
+                // effectué ? », lu sur la colonne, répond non. Tous les autres
+                // chemins de création appellent ce resolver (TransactionService::
+                // create(), ReglementOperationService) ; acquerir() était le seul
+                // à ne pas le faire.
+                $this->etatReglementResolver->syncer($transaction->fresh());
             }
 
             return Immobilisation::create([
@@ -173,19 +204,45 @@ final class ImmobilisationService
         $transaction = $immobilisation->transaction;
 
         if ($transaction !== null) {
+            // Filet de sécurité hors verrou, comme dans acquerir() : le
+            // contrôle qui fait foi est répété sous verrou dans la transaction.
             $this->assertExerciceOuvert($transaction->date);
             $this->assertMiseEnServiceCoherente($transaction->date, $dateMiseEnService);
         }
 
-        $immobilisation->update([
-            'libelle' => $libelle,
-            'quantite' => $quantite,
-            'duree_mois' => $dureeMois,
-            'date_mise_en_service' => CarbonImmutable::parse(
-                $dateMiseEnService->format('Y-m-d')
-            )->toDateString(),
-            'notes' => $notes,
-        ]);
+        // Contre-audit P1-01 — la modification n'ouvrait aucune transaction :
+        // le contrôle de clôture et l'update couraient séparément, et la fiche
+        // pouvait être modifiée après la clôture de l'exercice de son
+        // acquisition. La modification est aussi en course avec une génération
+        // de dotation, qui lit duree_mois et date_mise_en_service pour calculer
+        // son montant : verrouiller la fiche les sérialise.
+        $immobilisation = DB::transaction(function () use (
+            $immobilisation, $libelle, $quantite, $dureeMois, $dateMiseEnService, $notes
+        ): Immobilisation {
+            $immobilisation = Immobilisation::query()
+                ->whereKey((int) $immobilisation->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $transaction = $immobilisation->transaction;
+
+            if ($transaction !== null) {
+                $this->assertExerciceOuvertVerrouille($transaction->date);
+                $this->assertMiseEnServiceCoherente($transaction->date, $dateMiseEnService);
+            }
+
+            $immobilisation->update([
+                'libelle' => $libelle,
+                'quantite' => $quantite,
+                'duree_mois' => $dureeMois,
+                'date_mise_en_service' => CarbonImmutable::parse(
+                    $dateMiseEnService->format('Y-m-d')
+                )->toDateString(),
+                'notes' => $notes,
+            ]);
+
+            return $immobilisation;
+        });
 
         Log::info('immobilisation.modifiee', [
             'immobilisation_id' => (int) $immobilisation->id,
@@ -236,6 +293,30 @@ final class ImmobilisationService
             'numero' => $numero,
             'transaction_id' => $transactionId,
         ]);
+    }
+
+    /**
+     * Le règlement immédiat est un couple indivisible : mode de paiement ET
+     * compte de trésorerie, ou aucun des deux (acquisition à crédit).
+     *
+     * Sans ce contrôle, la condition de génération du règlement plus bas
+     * (`$modePaiement !== null && $compteTresorerie !== null`) traite tout
+     * couple incomplet comme une acquisition à crédit : un mode sans compte
+     * produit une dette 401 que l'appelant croit réglée, un compte sans mode
+     * est ignoré en silence. L'écran ne peut pas produire ce couple — il
+     * résout le compte via CompteTresorerieResolver et refuse si null — mais
+     * le service est la frontière métier réutilisable (commande artisan,
+     * import, job), et c'est elle qui doit tenir.
+     */
+    private function assertCoupleReglementCoherent(
+        ?ModePaiement $modePaiement,
+        ?Compte $compteTresorerie,
+    ): void {
+        if (($modePaiement === null) !== ($compteTresorerie === null)) {
+            throw new \InvalidArgumentException(
+                'Un règlement immédiat exige à la fois un mode de paiement et un compte de trésorerie.'
+            );
+        }
     }
 
     /**
@@ -308,6 +389,22 @@ final class ImmobilisationService
     private function assertExerciceOuvert(\DateTimeInterface $date): void
     {
         $this->exerciceService->assertOuvert(
+            $this->exerciceService->anneeForDate(CarbonImmutable::parse($date->format('Y-m-d')))
+        );
+    }
+
+    /**
+     * Même contrôle, sous le protocole de verrou canonique (association puis
+     * exercice) partagé avec ExerciceService::cloturer() et
+     * DotationService::assertExerciceGenerable().
+     *
+     * N'a d'effet qu'appelée à l'intérieur du DB::transaction() qui porte
+     * l'écriture : c'est ce qui empêche une clôture concurrente de s'intercaler
+     * entre le contrôle et l'insertion.
+     */
+    private function assertExerciceOuvertVerrouille(\DateTimeInterface $date): void
+    {
+        $this->exerciceService->assertOuvertPourEcriture(
             $this->exerciceService->anneeForDate(CarbonImmutable::parse($date->format('Y-m-d')))
         );
     }

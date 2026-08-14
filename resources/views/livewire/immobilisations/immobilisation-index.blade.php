@@ -5,7 +5,19 @@
 <div>
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h4 class="mb-0">Livre des immobilisations</h4>
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 align-items-center">
+            {{-- Aucun paramètre `exercice` : le contrôleur d'export retombe sur
+                 ExerciceService::current(), c'est-à-dire l'exercice actif choisi
+                 dans le menu Exercices. Un sélecteur local ici créerait une
+                 seconde notion d'exercice à côté de celle de l'application. --}}
+            <a href="{{ route('rapports.export', ['rapport' => 'immobilisations', 'format' => 'pdf']) }}"
+               class="btn btn-outline-secondary btn-sm" target="_blank">
+                <i class="bi bi-file-earmark-pdf me-1"></i> PDF
+            </a>
+            <a href="{{ route('rapports.export', ['rapport' => 'immobilisations', 'format' => 'xlsx']) }}"
+               class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-file-earmark-spreadsheet me-1"></i> Excel
+            </a>
             <a href="{{ route('immobilisations.dotations') }}" class="btn btn-outline-secondary btn-sm">
                 <i class="bi bi-calculator me-1"></i> Dotations de l'exercice
             </a>
@@ -18,7 +30,7 @@
     </div>
 
     @if ($flashMessage !== '')
-        <div class="alert alert-{{ $flashType === 'success' ? 'success' : 'info' }}">
+        <div class="alert alert-{{ in_array($flashType, ['success', 'warning'], true) ? $flashType : 'info' }}">
             {{ $flashMessage }}
         </div>
     @endif
@@ -46,7 +58,12 @@
                 </thead>
                 <tbody>
                     @foreach ($immobilisations as $immo)
-                        <tr>
+                        {{-- Ligne entière cliquable — même patron que adherent-list :
+                             le garde `event.target.closest(...)` laisse passer les
+                             boutons et liens de la ligne, qui gardent leur action. --}}
+                        <tr style="cursor:pointer"
+                            data-immo-href="{{ route('immobilisations.show', $immo) }}"
+                            onclick="if (!event.target.closest('button,a,input,select,textarea')) { window.location = this.dataset.immoHref; }">
                             <td data-sort="{{ $immo->numero }}">
                                 <a href="{{ route('immobilisations.show', $immo) }}">{{ $immo->numero }}</a>
                             </td>
@@ -103,7 +120,7 @@
                             <div class="col-md-8">
                                 <label class="form-label">Libellé</label>
                                 <input type="text" class="form-control @error('libelle') is-invalid @enderror"
-                                       wire:model="libelle" placeholder="20 tenues d'escrime">
+                                       wire:model="libelle" placeholder="Libellé de l'immobilisation">
                                 @error('libelle') <div class="invalid-feedback">{{ $message }}</div> @enderror
                             </div>
                             <div class="col-md-4">
@@ -191,7 +208,14 @@
                                 </div>
                             </div>
                             @if ($regleImmediatement)
-                                <div class="col-md-4">
+                                <div class="col-md-3">
+                                    <label for="immo_date_reglement" class="form-label">Date de règlement <span class="text-danger">*</span></label>
+                                    <x-date-input name="date_reglement" wire:model="date_reglement"
+                                                  :value="$date_reglement"
+                                                  class="@error('date_reglement') is-invalid @enderror" />
+                                    @error('date_reglement') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
+                                </div>
+                                <div class="col-md-3">
                                     <label for="immo_mode_paiement" class="form-label">Mode paiement <span class="text-danger">*</span></label>
                                     <select wire:model="mode_paiement" id="immo_mode_paiement"
                                             class="form-select @error('mode_paiement') is-invalid @enderror">
@@ -202,7 +226,7 @@
                                     </select>
                                     @error('mode_paiement') <div class="invalid-feedback">{{ $message }}</div> @enderror
                                 </div>
-                                <div class="col-md-5">
+                                <div class="col-md-3">
                                     <label for="immo_compte_reglement_id" class="form-label">Compte bancaire</label>
                                     <select wire:model="compte_reglement_id" id="immo_compte_reglement_id"
                                             class="form-select @error('compte_reglement_id') is-invalid @enderror">

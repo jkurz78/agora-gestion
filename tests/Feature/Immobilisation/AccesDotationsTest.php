@@ -140,9 +140,9 @@ test('recalculer — autorisé pour Administrateur et Comptable, remplace la dot
     Carbon::setTestNow();
 })->with([RoleAssociation::Admin, RoleAssociation::Comptable]);
 
-// ── annulerDotation() : supprime la dotation comptabilisée et sa transaction
+// ── supprimerDotation() : supprime la dotation comptabilisée et sa transaction
 
-test('annulerDotation — refusé pour Gestionnaire et Consultation, rien n’est annulé', function (RoleAssociation $role): void {
+test('supprimerDotation — refusé pour Gestionnaire et Consultation, rien n’est annulé', function (RoleAssociation $role): void {
     $immo = ($this->creerImmo)();
     Carbon::setTestNow('2027-10-15');
     $this->actingAs(($this->userAvecRole)(RoleAssociation::Admin));
@@ -155,7 +155,7 @@ test('annulerDotation — refusé pour Gestionnaire et Consultation, rien n’es
 
     Livewire::test(DotationsExercice::class)
         ->set('exercice', 2026)
-        ->call('annulerDotation', (int) $immo->id)
+        ->call('supprimerDotation', (int) $immo->id)
         ->assertForbidden();
 
     expect(ImmobilisationDotation::count())->toBe(1)
@@ -164,7 +164,7 @@ test('annulerDotation — refusé pour Gestionnaire et Consultation, rien n’es
     Carbon::setTestNow();
 })->with([RoleAssociation::Gestionnaire, RoleAssociation::Consultation]);
 
-test('annulerDotation — autorisé pour Administrateur et Comptable, annule la dotation', function (RoleAssociation $role): void {
+test('supprimerDotation — autorisé pour Administrateur et Comptable, annule la dotation', function (RoleAssociation $role): void {
     $immo = ($this->creerImmo)();
     Carbon::setTestNow('2027-10-15');
     $this->actingAs(($this->userAvecRole)(RoleAssociation::Admin));
@@ -175,7 +175,7 @@ test('annulerDotation — autorisé pour Administrateur et Comptable, annule la 
 
     Livewire::test(DotationsExercice::class)
         ->set('exercice', 2026)
-        ->call('annulerDotation', (int) $immo->id)
+        ->call('supprimerDotation', (int) $immo->id)
         ->assertHasNoErrors();
 
     expect(ImmobilisationDotation::count())->toBe(0)

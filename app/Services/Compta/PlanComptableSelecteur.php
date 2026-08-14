@@ -51,8 +51,28 @@ final class PlanComptableSelecteur
             // le compte d'amortissement dérivé existe et soit actif, donc le
             // sélecteur ne doit proposer que des comptes qui satisferont ce
             // contrôle.
+            //
+            // Les numéros dérivés se calculent en mémoire et se chargent en une
+            // seule requête : compteAmortissementPour() en interrogerait un par
+            // compte de classe 2, et ce sélecteur est reconstruit à chaque rendu
+            // du registre — modale d'acquisition fermée comprise.
+            $numerosAmortissement = $comptes
+                ->map(fn (Compte $c): string => ImmobilisationComptesSeeder::numeroAmortissementPour(
+                    (string) $c->numero_pcg
+                ))
+                ->unique()
+                ->all();
+
+            $amortissementsActifs = Compte::whereIn('numero_pcg', $numerosAmortissement)
+                ->where('actif', true)
+                ->pluck('numero_pcg')
+                ->map(fn ($numero): string => (string) $numero)
+                ->flip();
+
             $comptes = $comptes->filter(
-                fn (Compte $c): bool => ImmobilisationComptesSeeder::compteAmortissementPour($c)?->actif === true
+                fn (Compte $c): bool => $amortissementsActifs->has(
+                    ImmobilisationComptesSeeder::numeroAmortissementPour((string) $c->numero_pcg)
+                )
             )->values();
         }
 

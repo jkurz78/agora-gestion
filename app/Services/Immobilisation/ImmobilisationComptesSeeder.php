@@ -73,15 +73,31 @@ final class ImmobilisationComptesSeeder
     }
 
     /**
-     * Compte d'amortissement dérivé du compte d'immobilisation par la règle PCG :
-     * on insère un « 8 » après le premier chiffre (2154 → 28154).
+     * Numéro du compte d'amortissement dérivé, par la règle PCG : on insère un
+     * « 8 » après le premier chiffre (2154 → 28154).
+     *
+     * Règle de dérivation isolée du chargement : les appelants qui traitent un
+     * lot de comptes (PlanComptableSelecteur) dérivent tous les numéros en
+     * mémoire puis chargent en une requête, au lieu d'une requête par compte.
+     */
+    public static function numeroAmortissementPour(string $numeroImmobilisation): string
+    {
+        return '2'.'8'.substr($numeroImmobilisation, 1);
+    }
+
+    /**
+     * Compte d'amortissement dérivé du compte d'immobilisation.
      *
      * Retourne null si le compte dérivé n'existe pas dans le plan du tenant.
+     *
+     * Une requête par appel : réservée au contrôle unitaire (validation d'une
+     * acquisition dans ImmobilisationService). Pour filtrer une collection de
+     * comptes, passer par numeroAmortissementPour() + un chargement groupé.
      */
     public static function compteAmortissementPour(Compte $compteImmobilisation): ?Compte
     {
-        $numero = (string) $compteImmobilisation->numero_pcg;
-
-        return Compte::ofNumero('2'.'8'.substr($numero, 1));
+        return Compte::ofNumero(
+            self::numeroAmortissementPour((string) $compteImmobilisation->numero_pcg)
+        );
     }
 }

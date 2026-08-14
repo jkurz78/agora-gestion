@@ -26,6 +26,7 @@ use App\Services\TransactionService;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Livewire\Component;
@@ -71,6 +72,14 @@ final class ImmobilisationIndex extends Component
     /** FK `comptes_bancaires.id` — le compte bancaire portant le règlement, résolu en compte 512X. */
     public ?int $compte_reglement_id = null;
 
+    /**
+     * Date du règlement. Suit la date d'achat tant qu'on n'y touche pas — payer
+     * le jour de l'achat est le cas courant — mais reste saisissable : une
+     * facture réglée quelques jours plus tard produit sinon un décaissement
+     * daté du mauvais jour, invisible au rapprochement bancaire.
+     */
+    public string $date_reglement = '';
+
     /** @var TemporaryUploadedFile|null */
     public $pieceJointeAcquisition = null;
 
@@ -92,11 +101,13 @@ final class ImmobilisationIndex extends Component
             'libelle', 'quantite', 'compte_id', 'compte_amortissement_id',
             'tiers_id', 'montant', 'date_achat', 'date_mise_en_service', 'notes',
             'regleImmediatement', 'mode_paiement', 'compte_reglement_id', 'pieceJointeAcquisition',
+            'date_reglement',
         ]);
         $this->quantite = 1;
         $this->initDureeChoix(60);
         $this->date_achat = app(ExerciceService::class)->defaultDate();
         $this->date_mise_en_service = $this->date_achat;
+        $this->date_reglement = $this->date_achat;
         $this->resetValidation();
         $this->showModal = true;
     }
@@ -119,11 +130,21 @@ final class ImmobilisationIndex extends Component
         $this->compte_amortissement_id = $derive === null ? '' : (string) $derive->id;
     }
 
-    /** La date d'achat pilote la mise en service tant que celle-ci n'a pas été touchée. */
+    /**
+     * La date d'achat pilote la mise en service et le règlement tant que
+     * ceux-ci n'ont pas été touchés — payer et mettre en service le jour de
+     * l'achat est le cas courant, et retaper trois fois la même date est une
+     * corvée. Dès que l'utilisateur pose une date postérieure, elle est
+     * respectée.
+     */
     public function updatedDateAchat(string $value): void
     {
         if ($this->date_mise_en_service === '' || $this->date_mise_en_service < $value) {
             $this->date_mise_en_service = $value;
+        }
+
+        if ($this->date_reglement === '' || $this->date_reglement < $value) {
+            $this->date_reglement = $value;
         }
     }
 
@@ -132,9 +153,17 @@ final class ImmobilisationIndex extends Component
         $this->authorize('create', Immobilisation::class);
 
         // Saisie française : « 3 000,50 » ou « 3000,50 » — même normalisation
-        // que ReglementTable::updateMontant()/AnimateurManager::updateMontantPrevu()
-        // avant validation, plutôt que de réinventer la règle.
-        $this->montant = str_replace(',', '.', $this->montant);
+        // que PosteTiersReglementModal::montantCentimes() avant validation,
+        // plutôt que de réinventer la règle. Les trois espaces retirés sont
+        // ceux que produisent réellement les sources courantes : l'espace
+        // ASCII, l'insécable (U+00A0) et l'insécable fine (U+202F), celle que
+        // pose number_format() en locale fr — sans quoi la règle `numeric`
+        // rejette une saisie pourtant valide.
+        $this->montant = str_replace(
+            [' ', "\u{00A0}", "\u{202F}", ','],
+            ['', '', '', '.'],
+            $this->montant
+        );
 
         $this->validate([
             // Bornes alignées sur les colonnes SQL réelles (migration
@@ -161,6 +190,14 @@ final class ImmobilisationIndex extends Component
                 'in:virement,cheque,especes,cb,prelevement',
             ],
             'compte_reglement_id' => ['nullable', 'exists:comptes_bancaires,id'],
+            // Un règlement antérieur à l'achat n'a pas de sens comptable ; il
+            // peut en revanche lui être postérieur (facture réglée à 30 jours).
+            'date_reglement' => [
+                Rule::requiredIf(fn (): bool => $this->regleImmediatement),
+                'nullable',
+                'date',
+                'after_or_equal:date_achat',
+            ],
             'pieceJointeAcquisition' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
             'notes' => ['nullable', 'string'],
         ], MontantValidation::messages(['montant']), [
@@ -174,6 +211,7 @@ final class ImmobilisationIndex extends Component
             'duree_mois' => 'durée',
             'mode_paiement' => 'mode de paiement',
             'compte_reglement_id' => 'compte bancaire',
+            'date_reglement' => 'date de règlement',
             'pieceJointeAcquisition' => 'justificatif',
         ]);
 
@@ -215,6 +253,9 @@ final class ImmobilisationIndex extends Component
                 modePaiement: $modePaiement,
                 compteTresorerie: $compteTresorerie,
                 notes: $this->notes === '' ? null : $this->notes,
+                dateReglement: $this->regleImmediatement && $this->date_reglement !== ''
+                    ? CarbonImmutable::parse($this->date_reglement)
+                    : null,
             );
         } catch (MiseEnServiceAnterieureException $e) {
             $this->addError('date_mise_en_service', $e->getMessage());
@@ -225,16 +266,41 @@ final class ImmobilisationIndex extends Component
         // Le justificatif n'est écrit sur le disque qu'une fois la fiche et son
         // écriture comptable actées : si acquerir() avait échoué, on ne serait
         // jamais arrivé ici, donc aucun fichier orphelin ne peut subsister.
+        //
+        // Contre-audit P2-02 — le contrat est explicite : le justificatif est
+        // une pièce annexe, pas une condition de l'acquisition. Un échec de
+        // stockage (disque plein, permissions) ne doit donc pas remonter en
+        // erreur alors que la fiche et ses écritures sont déjà commitées :
+        // l'utilisateur croirait sa saisie perdue et la referait, créant un
+        // doublon comptable bien plus coûteux qu'un justificatif manquant.
+        $echecJustificatif = false;
+
         if ($this->pieceJointeAcquisition !== null) {
-            app(TransactionService::class)->storePieceJointe(
-                $immobilisation->transaction,
-                $this->pieceJointeAcquisition
-            );
+            try {
+                app(TransactionService::class)->storePieceJointe(
+                    $immobilisation->transaction,
+                    $this->pieceJointeAcquisition
+                );
+            } catch (\Throwable $e) {
+                $echecJustificatif = true;
+
+                Log::error('immobilisation.justificatif_non_stocke', [
+                    'immobilisation_id' => (int) $immobilisation->id,
+                    'numero' => $immobilisation->numero,
+                    'transaction_id' => (int) $immobilisation->transaction_id,
+                    'erreur' => $e->getMessage(),
+                ]);
+            }
         }
 
         $this->showModal = false;
-        $this->flashMessage = 'Immobilisation enregistrée.';
-        $this->flashType = 'success';
+
+        // Message sans jargon, qui dit ce qui s'est passé et quoi faire.
+        $this->flashMessage = $echecJustificatif
+            ? 'Immobilisation enregistrée, mais le justificatif n’a pas pu être joint. '
+                .'Vous pouvez le rattacher depuis la transaction d’acquisition.'
+            : 'Immobilisation enregistrée.';
+        $this->flashType = $echecJustificatif ? 'warning' : 'success';
     }
 
     public function getCanEditProperty(): bool

@@ -117,3 +117,56 @@ it('ne laisse ni fiche, ni transaction, ni fichier si l’écriture comptable é
 
     expect($fichiersJustificatifs)->toBeEmpty();
 });
+
+/**
+ * Contre-audit P2-02 — l'acquisition est validée et commitée avant le dépôt du
+ * fichier. Un échec de stockage remontait donc une exception alors que la fiche
+ * et ses écritures existaient déjà : l'utilisateur voyait une erreur générique
+ * et n'avait aucun moyen de savoir que sa saisie comptable, elle, était passée.
+ *
+ * Contrat retenu : le justificatif est une pièce annexe, pas une condition de
+ * l'acquisition. Elle est conservée, et l'écran le dit — avec la marche à
+ * suivre pour rattacher le fichier après coup. Refaire l'acquisition parce que
+ * le disque a hoqueté produirait un doublon comptable, bien pire.
+ */
+it('conserve l’acquisition et avertit quand le dépôt du justificatif échoue', function (): void {
+    $tiers = Tiers::factory()->create();
+    $file = UploadedFile::fake()->create('facture.pdf', 100, 'application/pdf');
+
+    // Échec du stockage APRÈS la création comptable : c'est la fenêtre décrite
+    // ci-dessus. Pas de mock — TransactionService est `final` (convention du
+    // projet) et le mocker testerait de toute façon le mock. On rend la racine
+    // du disque réellement inécrivable : l'échec vient du vrai code de
+    // stockage, comme un disque plein ou des permissions cassées en prod.
+    config(['filesystems.disks.local.root' => '/dev/null/inecrivable']);
+    Storage::forgetDisk('local');
+
+    $composant = Livewire::test(ImmobilisationIndex::class)
+        ->call('ouvrirModal')
+        ->set('libelle', 'Vidéoprojecteur')
+        ->set('quantite', 1)
+        ->set('compte_id', (string) Compte::ofNumero('2188')->id)
+        ->set('tiers_id', (int) $tiers->id)
+        ->set('montant', '450.00')
+        ->set('date_achat', '2026-09-12')
+        ->set('date_mise_en_service', '2026-09-12')
+        ->set('duree_mois', 60)
+        ->set('pieceJointeAcquisition', $file)
+        ->call('enregistrer')
+        ->assertHasNoErrors();
+
+    // La fiche et son écriture sont bien là.
+    $immo = Immobilisation::firstOrFail();
+    expect($immo->libelle)->toBe('Vidéoprojecteur')
+        ->and(Transaction::find($immo->transaction_id))->not->toBeNull()
+        ->and($immo->transaction->piece_jointe_path)->toBeNull();
+
+    // …et l'écran l'annonce sans jargon, en disant quoi faire — avec le bandeau
+    // d'avertissement, pas un bandeau d'information qui passerait pour un succès.
+    $composant->assertSet('flashType', 'warning')
+        ->assertSee('alert-warning', escape: false);
+
+    expect($composant->get('flashMessage'))
+        ->toContain('Immobilisation enregistrée')
+        ->toContain('justificatif');
+});

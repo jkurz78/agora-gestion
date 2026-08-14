@@ -80,7 +80,7 @@
                             @endif
                         </dl>
                         <button type="button" class="btn btn-outline-secondary btn-sm mt-2"
-                                wire:click="ouvrirTransaction({{ $tx->id }})">
+                                wire:click="voirEcriture({{ $tx->id }})">
                             <i class="bi bi-journal-text me-1"></i> Voir l’écriture d’acquisition
                         </button>
                     @endforeach
@@ -119,7 +119,7 @@
                                     <span class="badge bg-success">Comptabilisée</span>
                                     @if ($ligne->transactionId !== null)
                                         <button type="button" class="btn btn-link btn-sm p-0 ms-1"
-                                                wire:click="ouvrirTransaction({{ $ligne->transactionId }})"
+                                                wire:click="voirEcriture({{ $ligne->transactionId }})"
                                                 title="Voir l’écriture de dotation">
                                             <i class="bi bi-journal-text"></i>
                                         </button>
@@ -209,6 +209,71 @@
                         @if ($this->canEdit)
                         <button type="button" class="btn btn-primary" wire:click="enregistrerModification">Enregistrer</button>
                         @endif
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if ($ecriture !== null)
+        <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5)"
+             data-bs-backdrop="static" data-bs-keyboard="false" wire:key="modal-ecriture-immo">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Écriture du {{ $ecriture->date->format('d/m/Y') }}</h5>
+                        <button type="button" class="btn-close" wire:click="fermerEcriture"></button>
+                    </div>
+                    <div class="modal-body">
+                        <dl class="row small mb-3">
+                            <dt class="col-4">Libellé</dt><dd class="col-8">{{ $ecriture->libelle }}</dd>
+                            <dt class="col-4">Pièce</dt><dd class="col-8">{{ $ecriture->numero_piece ?? '—' }}</dd>
+                            <dt class="col-4">Tiers</dt><dd class="col-8">{{ $ecriture->tiers?->displayName() ?? '—' }}</dd>
+                            @if ($ecriture->hasPieceJointe())
+                                <dt class="col-4">Justificatif</dt>
+                                <dd class="col-8">
+                                    <a href="{{ $ecriture->pieceJointeUrl() }}" target="_blank">
+                                        <i class="bi bi-paperclip"></i> {{ $ecriture->piece_jointe_nom }}
+                                    </a>
+                                </dd>
+                            @endif
+                        </dl>
+
+                        <table class="table table-sm mb-0">
+                            <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
+                                <tr>
+                                    <th>Compte</th>
+                                    <th>Libellé</th>
+                                    <th class="text-end">Débit</th>
+                                    <th class="text-end">Crédit</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($ecriture->lignes as $ligne)
+                                    <tr>
+                                        <td>{{ $ligne->compte?->numero_pcg }} — {{ $ligne->compte?->intitule }}</td>
+                                        <td>{{ $ligne->tiers?->displayName() ?? $ligne->libelle }}</td>
+                                        <td class="text-end">{{ (float) $ligne->debit > 0 ? number_format((float) $ligne->debit, 2, ',', ' ').' €' : '' }}</td>
+                                        <td class="text-end">{{ (float) $ligne->credit > 0 ? number_format((float) $ligne->credit, 2, ',', ' ').' €' : '' }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                            <tfoot>
+                                <tr class="fw-semibold border-top">
+                                    <td colspan="2">Total</td>
+                                    <td class="text-end">{{ number_format((float) $ecriture->lignes->sum('debit'), 2, ',', ' ') }} €</td>
+                                    <td class="text-end">{{ number_format((float) $ecriture->lignes->sum('credit'), 2, ',', ' ') }} €</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+
+                        <p class="small text-muted mt-3 mb-0">
+                            Cette écriture est produite par la fiche d’immobilisation et ne se modifie pas
+                            directement : passez par la fiche.
+                        </p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" wire:click="fermerEcriture">Fermer</button>
                     </div>
                 </div>
             </div>

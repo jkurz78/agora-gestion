@@ -6,14 +6,12 @@ namespace App\Services\Immobilisation;
 
 use App\Exceptions\Immobilisation\DotationGenerationException;
 use App\Exceptions\Immobilisation\DotationInterditeException;
-use App\Models\Exercice;
 use App\Models\Immobilisation;
 use App\Models\ImmobilisationDotation;
 use App\Services\Compta\EcritureGenerator;
 use App\Services\ExerciceService;
 use App\Services\TransactionService;
 use App\Support\MontantDecimal;
-use App\Tenant\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -37,6 +35,28 @@ final class DotationService
         private readonly ExerciceService $exerciceService,
         private readonly TransactionService $transactionService,
     ) {}
+
+    /**
+     * Exercices sur lesquels une génération de dotations peut réellement
+     * aboutir : déjà commencés, et non clôturés.
+     *
+     * Les deux conditions sont exactement celles qu'applique
+     * assertExerciceGenerable() — c'est le point : le sélecteur de l'écran se
+     * dérive de la règle du service au lieu de la deviner. Auparavant il
+     * proposait ExerciceService::availableYears(), cinq années civiles dont
+     * l'année suivante, et l'utilisateur découvrait le refus après coup.
+     *
+     * Ordre décroissant : l'exercice à clôturer arrive en tête.
+     *
+     * @return list<int>
+     */
+    public function exercicesGenerables(): array
+    {
+        return array_values(array_filter(
+            $this->exerciceService->openYears(),
+            fn (int $annee): bool => ! $this->debutExercice($annee)->isFuture(),
+        ));
+    }
 
     /**
      * Aperçu de l'exercice : une ligne par fiche, sans rien écrire.
@@ -228,12 +248,18 @@ final class DotationService
 
             $dotation->delete();
 
-            Log::info('immobilisation.dotation_annulee', [
-                'immobilisation_id' => (int) $immobilisation->id,
-                'numero' => $immobilisation->numero,
-                'exercice' => $exercice,
-                'transaction_id' => $transactionId,
-            ]);
+            // Contre-audit P2-03 — même raison que dans comptabiliser() :
+            // recalculer() annule puis régénère dans une transaction unique,
+            // et un échec de la régénération doit défaire l'annulation sans
+            // laisser derrière lui un log qui l'annonce.
+            DB::afterCommit(function () use ($immobilisation, $exercice, $transactionId): void {
+                Log::info('immobilisation.dotation_annulee', [
+                    'immobilisation_id' => (int) $immobilisation->id,
+                    'numero' => $immobilisation->numero,
+                    'exercice' => $exercice,
+                    'transaction_id' => $transactionId,
+                ]);
+            });
         });
     }
 
@@ -274,12 +300,20 @@ final class DotationService
                 'transaction_id' => (int) $transaction->id,
             ]);
 
-            Log::info('immobilisation.dotation_generee', [
-                'immobilisation_id' => (int) $immobilisation->id,
-                'numero' => $immobilisation->numero,
-                'exercice' => $exercice,
-                'transaction_id' => (int) $transaction->id,
-            ]);
+            // Contre-audit P2-03 — émis après le commit de la transaction la
+            // plus externe, pas ici. generer() enveloppe tout le lot dans une
+            // seule transaction : un log émis en ligne annoncerait la dotation
+            // de la première fiche alors que l'échec de la deuxième vient de
+            // tout rollbacker. DB::afterCommit() s'accroche à la transaction
+            // englobante quand il y en a une, et exécute immédiatement sinon.
+            DB::afterCommit(function () use ($immobilisation, $exercice, $transaction): void {
+                Log::info('immobilisation.dotation_generee', [
+                    'immobilisation_id' => (int) $immobilisation->id,
+                    'numero' => $immobilisation->numero,
+                    'exercice' => $exercice,
+                    'transaction_id' => (int) $transaction->id,
+                ]);
+            });
         });
     }
 
@@ -360,14 +394,12 @@ final class DotationService
             throw DotationInterditeException::exerciceNonCommence($exercice);
         }
 
-        DB::table('association')
-            ->where('id', TenantContext::currentId())
-            ->lockForUpdate()
-            ->first();
-
-        $exerciceModel = Exercice::where('annee', $exercice)
-            ->lockForUpdate()
-            ->first();
+        // Protocole de verrou mutualisé (association puis exercice) : voir
+        // ExerciceService::verrouillerPourEcriture(). Le statut est contrôlé
+        // ici plutôt que par assertOuvertPourEcriture() parce que le refus
+        // attendu est une DotationInterditeException, scopée à l'exercice, et
+        // non l'ExerciceCloturedException générique.
+        $exerciceModel = $this->exerciceService->verrouillerPourEcriture($exercice);
 
         if ($exerciceModel !== null && $exerciceModel->isCloture()) {
             throw DotationInterditeException::exerciceCloture($exercice);

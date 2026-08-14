@@ -110,7 +110,7 @@ it('annule une dotation comptabilisée et supprime sa transaction', function ():
 
     Livewire::test(DotationsExercice::class)
         ->set('exercice', 2026)
-        ->call('annulerDotation', (int) $this->immo->id)
+        ->call('supprimerDotation', (int) $this->immo->id)
         ->assertHasNoErrors();
 
     expect(ImmobilisationDotation::where('exercice', 2026)->count())->toBe(0)
@@ -119,14 +119,14 @@ it('annule une dotation comptabilisée et supprime sa transaction', function ():
     Carbon::setTestNow();
 });
 
-it('permet de régénérer une dotation après l’avoir annulée', function (): void {
+it('permet de régénérer une dotation après l’avoir supprimée', function (): void {
     Carbon::setTestNow('2027-10-15');
 
     Livewire::test(DotationsExercice::class)->set('exercice', 2026)->call('genererTout');
 
     Livewire::test(DotationsExercice::class)
         ->set('exercice', 2026)
-        ->call('annulerDotation', (int) $this->immo->id)
+        ->call('supprimerDotation', (int) $this->immo->id)
         ->assertSee('À générer');
 
     expect(ImmobilisationDotation::where('exercice', 2026)->count())->toBe(0);
@@ -150,7 +150,7 @@ it('refuse d’annuler la dotation d’un exercice clôturé', function (): void
 
     $component = Livewire::test(DotationsExercice::class)
         ->set('exercice', 2026)
-        ->call('annulerDotation', (int) $this->immo->id);
+        ->call('supprimerDotation', (int) $this->immo->id);
 
     expect(ImmobilisationDotation::where('exercice', 2026)->count())->toBe(1)
         ->and($component->get('flashType'))->toBe('warning')

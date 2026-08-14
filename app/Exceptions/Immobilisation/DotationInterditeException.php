@@ -19,7 +19,7 @@ final class DotationInterditeException extends RuntimeException
     {
         return new self(
             "L'exercice {$annee} est clôturé : ses dotations ne peuvent plus être "
-            .'générées, recalculées ni annulées.'
+            .'générées, recalculées ni supprimées.'
         );
     }
 
@@ -37,15 +37,15 @@ final class DotationInterditeException extends RuntimeException
     }
 
     /**
-     * Anomalie 1 (audit) — annulation refusée : une dotation existe déjà sur
-     * un exercice postérieur pour cette fiche. On annule du plus récent au
+     * Anomalie 1 (audit) — suppression refusée : une dotation existe déjà sur
+     * un exercice postérieur pour cette fiche. On supprime du plus récent au
      * plus ancien.
      */
     public static function dotationPosterieureExistante(string $numeroFiche, int $exercicePosterieur, int $exerciceCible): self
     {
         return new self(
-            "Impossible d'annuler la dotation de {$numeroFiche} pour l'exercice {$exerciceCible} : "
-            ."la dotation de l'exercice {$exercicePosterieur} existe encore pour cette fiche. Annulez-la d'abord."
+            "Impossible de supprimer la dotation de {$numeroFiche} pour l'exercice {$exerciceCible} : "
+            ."la dotation de l'exercice {$exercicePosterieur} existe encore pour cette fiche. Supprimez-la d'abord."
         );
     }
 }
