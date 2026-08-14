@@ -42,6 +42,32 @@ final class CompteResultatBuilder
     }
 
     /**
+     * Totaux charges/produits d'une période, lus sur le grand livre (classes 6
+     * et 7) — la définition même du résultat.
+     *
+     * Destiné aux indicateurs de synthèse (tableau de bord, assistant de
+     * clôture) qui sommaient jusqu'ici `transactions.montant_total` filtré sur
+     * le journal. Ce filtre ne sait pas distinguer un achat de fournitures d'un
+     * achat de véhicule — les deux portent le journal `achat` — et comptait
+     * donc une acquisition d'immobilisation (classe 2, actif au bilan) comme
+     * une charge, tout en ignorant la dotation aux amortissements qui en est
+     * la vraie charge, son journal étant `od`.
+     *
+     * La période est fournie par l'appelant, et non recalculée ici : le mois de
+     * début d'exercice est un réglage du tenant (ExerciceService::dateRange()),
+     * alors que exerciceDates() de cette classe le fige au 1er septembre.
+     *
+     * @return array{charges: float, produits: float}
+     */
+    public function totauxResultat(string $start, string $end): array
+    {
+        return [
+            'charges' => round((float) $this->fetchDepenseRows($start, $end)->sum('montant'), 2),
+            'produits' => round((float) $this->fetchClasseRowsPD($start, $end, 7)->sum('montant'), 2),
+        ];
+    }
+
+    /**
      * Compte de résultat filtré par opérations. Pas de N-1 ni budget. Cotisations exclues.
      * Optionnellement ventilé par séances et/ou par tiers.
      *

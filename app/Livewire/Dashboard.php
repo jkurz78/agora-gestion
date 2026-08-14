@@ -16,6 +16,7 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\BudgetService;
 use App\Services\ExerciceService;
+use App\Services\Rapports\CompteResultatBuilder;
 use App\Services\SoldeService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -35,10 +36,16 @@ final class Dashboard extends Component
         $startDate = $range['start']->toDateString();
         $endDate = $range['end']->toDateString();
 
-        // Solde général
-        $totalRecettes = (float) Transaction::where('type', 'recette')->operationnel()->forExercice($exercice)->sum('montant_total');
-        $totalDepenses = (float) Transaction::where('type', 'depense')->operationnel()->forExercice($exercice)->sum('montant_total');
-        $soldeGeneral = $totalRecettes - $totalDepenses;
+        // Solde général — lu sur le grand livre (classes 6 et 7), pas sur
+        // montant_total filtré par journal : ce dernier comptait l'acquisition
+        // d'une immobilisation comme une charge (journal `achat`, alors que la
+        // ventilation est en classe 2, un actif) et ignorait la dotation aux
+        // amortissements qui en est la vraie charge (journal `od`).
+        // Voir CompteResultatBuilder::totauxResultat().
+        $totaux = app(CompteResultatBuilder::class)->totauxResultat($startDate, $endDate);
+        $totalRecettes = $totaux['produits'];
+        $totalDepenses = $totaux['charges'];
+        $soldeGeneral = round($totalRecettes - $totalDepenses, 2);
 
         // Budget résumé — agrégation par famille (lecture compte-first)
         $budgetLines = BudgetLine::forExercice($exercice)
