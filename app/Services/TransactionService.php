@@ -802,6 +802,22 @@ final class TransactionService
             return;
         }
 
+        // Contre-audit P1-02 — la T2 est retrouvée par une requête ordinaire :
+        // sans verrou, un pointage de rapprochement ou une mise en remise
+        // concurrents peuvent s'intercaler entre les contrôles ci-dessous et le
+        // forceDelete, et la T2 part quand même. On la recharge donc sous
+        // lockForUpdate() et on contrôle l'état verrouillé, pas l'état lu avant.
+        // Le verrou tient jusqu'au commit de la transaction appelante
+        // (delete()/annuler() enveloppent déjà cet appel).
+        $t2 = Transaction::query()
+            ->whereKey((int) $t2->id)
+            ->lockForUpdate()
+            ->first();
+
+        if ($t2 === null) {
+            return; // Supprimée par une transaction concurrente : plus rien à faire.
+        }
+
         if ($t2->rapprochement_id !== null) {
             throw new \RuntimeException('Le règlement de cette transaction est pointé dans un rapprochement bancaire : supprimez d’abord le rapprochement (ou dépointez-en cette transaction) avant de pouvoir supprimer ou annuler cette transaction.');
         }

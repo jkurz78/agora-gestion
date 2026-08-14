@@ -32,6 +32,7 @@ use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\ReglementOperationService;
 use App\Services\TransactionService;
 use App\Tenant\TenantContext;
+use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
     $this->association = Association::factory()->create();
@@ -221,4 +222,44 @@ it('annule (soft-delete) la T1 et force-delete la T2 quand le règlement n’est
 
     expect($t1->fresh()->deleted_at)->not->toBeNull();
     expect(Transaction::withTrashed()->find($t2->id))->toBeNull();
+});
+
+// ---------------------------------------------------------------------------
+// Verrou pessimiste sur la T2
+// ---------------------------------------------------------------------------
+
+/**
+ * Contre-audit P1-02 — la garde ci-dessus lisait l'état de la T2 (rapprochement,
+ * remise, facture) sans verrou : un pointage ou une mise en remise concurrents
+ * pouvaient s'intercaler entre le contrôle et le forceDelete, et la T2 partait
+ * quand même. Le contrôle ne vaut que si la ligne est verrouillée pendant qu'on
+ * la lit et jusqu'au commit.
+ *
+ * Test réservé à MySQL : SQLiteGrammar::compileLock() retourne une chaîne vide,
+ * le verrou y est un no-op inobservable. C'est la suite `phpunit.mysql.xml` qui
+ * fait foi ici (`pest -c phpunit.mysql.xml`).
+ */
+it('verrouille la T2 avant de contrôler ses rattachements', function () {
+    if (DB::getDriverName() === 'sqlite') {
+        $this->markTestSkipped('SQLite compile les verrous en no-op : contrôle non observable.');
+    }
+
+    $t1 = depenseRegleeAvecT2($this);
+    $t2 = app(ReglementOperationService::class)->trouverT2($t1);
+    expect($t2)->not->toBeNull();
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+    $this->service->delete($t1->fresh());
+    $requetes = collect(DB::getQueryLog())->pluck('query');
+    DB::disableQueryLog();
+
+    $selectVerrouilleSurT2 = $requetes->first(
+        fn (string $sql): bool => str_contains($sql, 'from `transactions`')
+            && str_contains($sql, 'for update')
+    );
+
+    expect($selectVerrouilleSurT2)->not->toBeNull(
+        'Aucun `select ... from `transactions` ... for update` : la T2 est lue sans verrou.'
+    );
 });
