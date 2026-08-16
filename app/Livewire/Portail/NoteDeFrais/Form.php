@@ -13,7 +13,6 @@ use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
 use App\Models\Operation;
 use App\Models\Tiers;
-use App\Services\ExerciceService;
 use App\Services\NoteDeFrais\LigneTypes\LigneTypeRegistry;
 use App\Services\Portail\NoteDeFrais\JustificatifAnalyser;
 use App\Services\Portail\NoteDeFrais\NoteDeFraisService;
@@ -388,16 +387,13 @@ final class Form extends Component
 
     public function render(): View
     {
-        $exerciceCourant = app(ExerciceService::class)->current();
-
         // DC-10a : comptes de charge (classe 6) — libellé seul côté portail (D1).
         $comptes = Compte::where('classe', 6)
             ->where('actif', true)
             ->orderBy('intitule')
             ->get();
 
-        // IMP-04 : règle de proposition centralisée sur le modèle plutôt que
-        // redite ici.
+        // Operation::scopeProposableALaSaisie().
         $operations = Operation::proposableALaSaisie()->orderBy('nom')->get();
 
         $selectedOperation = ! empty($this->draftLigne['operation_id'])
