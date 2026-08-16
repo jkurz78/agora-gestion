@@ -223,8 +223,8 @@ it('pdf_compte_resultat_compte_negative_visible', function () {
 
 it('pdf_flux_tresorerie_somme_negatifs', function () {
     // +80 € recette, -30 € recette → total_recettes = 50 (algébrique)
-    $this->makeAuditTransaction('recette', 80.0, $this->sc, $this->compte, 2025);
-    $this->makeAuditTransaction('recette', -30.0, $this->sc, $this->compte, 2025);
+    $this->makeAuditTransactionTresorerie('recette', 80.0, $this->sc, $this->compte, 2025);
+    $this->makeAuditTransactionTresorerie('recette', -30.0, $this->sc, $this->compte, 2025);
 
     $rapportService = app(RapportService::class);
     $ftData = $rapportService->fluxTresorerie(2025);
@@ -263,8 +263,8 @@ it('pdf_flux_tresorerie_somme_negatifs', function () {
 
 it('export_excel_flux_tresorerie_somme_negatifs', function () {
     // +60 € recette, -20 € recette → total_recettes = 40 (algébrique)
-    $this->makeAuditTransaction('recette', 60.0, $this->sc, $this->compte, 2025);
-    $this->makeAuditTransaction('recette', -20.0, $this->sc, $this->compte, 2025);
+    $this->makeAuditTransactionTresorerie('recette', 60.0, $this->sc, $this->compte, 2025);
+    $this->makeAuditTransactionTresorerie('recette', -20.0, $this->sc, $this->compte, 2025);
 
     // Vérification builder avant export
     $builder = app(FluxTresorerieBuilder::class);

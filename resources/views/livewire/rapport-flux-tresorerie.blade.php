@@ -22,6 +22,7 @@
     </style>
 
     @php
+        $pont = $synthese['pont_resultat'];
         $fmt = fn(float $v): string => number_format($v, 2, ',', ' ') . ' €';
         $totalR = collect($mensuel)->sum('recettes');
         $totalD = collect($mensuel)->sum('depenses');
@@ -55,6 +56,47 @@
     </div>
 
     {{-- Tableau principal --}}
+    {{-- Pont résultat → trésorerie --}}
+    {{-- Le résultat et la trésorerie répondent à deux questions : une créance
+         est un produit sans encaissement, une immobilisation un décaissement
+         sans charge. Sans ce chemin, l'écart passe pour une erreur. --}}
+    <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body p-0">
+            <table class="table mb-0" style="border-collapse:collapse;width:100%;">
+                <tbody>
+                    <tr class="ft-rapprochement-header">
+                        <td colspan="2">Du résultat à la trésorerie</td>
+                    </tr>
+                    <tr class="ft-rapprochement">
+                        <td>Résultat de l'exercice</td>
+                        <td class="text-end" style="width:180px;">{{ $fmt($pont['resultat']) }}</td>
+                    </tr>
+                    @foreach ([
+                        'dotations' => 'Dotations aux amortissements (charge sans décaissement)',
+                        'immobilisations' => 'Acquisitions d\'immobilisations (décaissement sans charge)',
+                        'creances' => 'Variation des créances clients',
+                        'dettes' => 'Variation des dettes fournisseurs',
+                        'autres' => 'Autres variations de bilan',
+                    ] as $cle => $libelle)
+                        @if ($pont[$cle] != 0.0)
+                            <tr class="ft-rapprochement">
+                                <td style="padding-left:32px;">
+                                    <span class="{{ $pont[$cle] >= 0 ? 'text-success' : 'text-danger' }}">{{ $pont[$cle] >= 0 ? '+' : '−' }}</span>
+                                    {{ $libelle }}
+                                </td>
+                                <td class="text-end">{{ $fmt(abs($pont[$cle])) }}</td>
+                            </tr>
+                        @endif
+                    @endforeach
+                    <tr class="ft-result">
+                        <td>Variation de trésorerie de l'exercice</td>
+                        <td class="text-end">{{ $fmt($synthese['variation']) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
     <div class="card mb-3 border-0 shadow-sm">
         <div class="card-body p-0">
             <table class="table mb-0" style="border-collapse:collapse;width:100%;">
@@ -80,7 +122,7 @@
                     <tr class="ft-row ft-toggle" @click="showMensuel = !showMensuel">
                         <td class="ft-row-label">
                             <span class="ft-chevron" :class="showMensuel && 'open'">&#9654;</span>
-                            Flux de l'exercice
+                            Flux de trésorerie de l'exercice
                         </td>
                         <td class="text-end">{{ $fmt($synthese['total_recettes']) }}</td>
                         <td class="text-end">{{ $fmt($synthese['total_depenses']) }}</td>
@@ -113,6 +155,24 @@
                         </td>
                         <td class="text-end">{{ $fmt($synthese['solde_theorique']) }}</td>
                     </tr>
+
+                    {{-- Où se trouve cette trésorerie : tout n'est pas en banque. --}}
+                    <tr class="ft-detail">
+                        <td colspan="4" style="padding-left:32px;" class="text-muted">dont en banque</td>
+                        <td class="text-end text-muted">{{ $fmt($synthese['decomposition']['banque']) }}</td>
+                    </tr>
+                    @if ($synthese['decomposition']['caisse'] != 0.0)
+                        <tr class="ft-detail">
+                            <td colspan="4" style="padding-left:32px;" class="text-muted">dont en caisse</td>
+                            <td class="text-end text-muted">{{ $fmt($synthese['decomposition']['caisse']) }}</td>
+                        </tr>
+                    @endif
+                    @if ($synthese['decomposition']['a_remettre'] != 0.0)
+                        <tr class="ft-detail">
+                            <td colspan="4" style="padding-left:32px;" class="text-muted">dont chèques à remettre en banque</td>
+                            <td class="text-end text-muted">{{ $fmt($synthese['decomposition']['a_remettre']) }}</td>
+                        </tr>
+                    @endif
                 </tbody>
             </table>
         </div>
@@ -127,9 +187,31 @@
                         <td colspan="2">Rapprochement bancaire</td>
                     </tr>
                     <tr class="ft-rapprochement">
-                        <td>Solde théorique</td>
+                        <td>Solde de trésorerie théorique</td>
                         <td class="text-end" style="width:180px;">{{ $fmt($rapprochement['solde_theorique']) }}</td>
                     </tr>
+                    @if ($synthese['decomposition']['a_remettre'] != 0.0 || $synthese['decomposition']['caisse'] != 0.0)
+                        @if ($synthese['decomposition']['a_remettre'] != 0.0)
+                            <tr class="ft-rapprochement">
+                                <td style="padding-left:32px;">
+                                    <span class="text-danger">−</span> Chèques à remettre en banque
+                                </td>
+                                <td class="text-end">{{ $fmt($synthese['decomposition']['a_remettre']) }}</td>
+                            </tr>
+                        @endif
+                        @if ($synthese['decomposition']['caisse'] != 0.0)
+                            <tr class="ft-rapprochement">
+                                <td style="padding-left:32px;">
+                                    <span class="text-danger">−</span> Espèces en caisse
+                                </td>
+                                <td class="text-end">{{ $fmt($synthese['decomposition']['caisse']) }}</td>
+                            </tr>
+                        @endif
+                        <tr class="ft-rapprochement">
+                            <td>Solde en banque</td>
+                            <td class="text-end fw-semibold">{{ $fmt($rapprochement['solde_banque']) }}</td>
+                        </tr>
+                    @endif
 
                     {{-- Recettes non pointées (dépliable) --}}
                     <tr class="ft-rapprochement ft-rapprochement-toggle" @click="showRecettesNP = !showRecettesNP">

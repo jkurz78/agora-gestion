@@ -3,10 +3,12 @@
 declare(strict_types=1);
 
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Exercice;
 use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Models\VirementInterne;
 use App\Services\RapportService;
@@ -31,6 +33,51 @@ afterEach(function () {
     TenantContext::clear();
 });
 
+/**
+ * Une transaction de trésorerie telle qu'elle existe réellement en partie
+ * double : un en-tête ET sa ligne sur le compte 512X du compte bancaire.
+ *
+ * Le flux de trésorerie se lit désormais sur le grand livre des comptes de
+ * classe 5, et non plus sur `transactions.montant_total` filtré par journal —
+ * ce dernier mesurait des engagements, pas des mouvements d'argent. Une
+ * transaction sans ligne comptable, comme en produisaient ces fixtures, ne
+ * déplace donc rien : c'est le comportement voulu, en v5 toute transaction
+ * réelle porte ses lignes.
+ */
+function transactionTresorerie(object $ctx, string $type, string $date, float $montant, array $extra = []): Transaction
+{
+    $tx = Transaction::factory()->create(array_merge([
+        'type' => $type,
+        'date' => $date,
+        'montant_total' => $montant,
+        'compte_id' => $ctx->compte->id,
+        'rapprochement_id' => null,
+    ], $extra));
+
+    $compte512 = Compte::firstOrCreate(
+        ['association_id' => (int) $ctx->association->id, 'numero_pcg' => '512'.$ctx->compte->id],
+        [
+            'intitule' => 'Banque '.$ctx->compte->id,
+            'classe' => 5,
+            'actif' => true,
+            'lettrable' => false,
+            'est_systeme' => false,
+            'pour_inscriptions' => false,
+            'compte_bancaire_id' => $ctx->compte->id,
+        ]
+    );
+
+    TransactionLigne::factory()->create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $compte512->id,
+        'debit' => $type === 'recette' ? $montant : 0,
+        'credit' => $type === 'depense' ? $montant : 0,
+        'montant' => $montant,
+    ]);
+
+    return $tx;
+}
+
 it('retourne la structure attendue', function () {
     $data = app(RapportService::class)->fluxTresorerie(2025);
 
@@ -43,20 +90,8 @@ it('retourne la structure attendue', function () {
 });
 
 it('calcule la synthèse consolidée correctement', function () {
-    Transaction::factory()->create([
-        'type' => 'recette',
-        'date' => '2025-10-15',
-        'montant_total' => 5000.00,
-        'compte_id' => $this->compte->id,
-        'rapprochement_id' => null,
-    ]);
-    Transaction::factory()->create([
-        'type' => 'depense',
-        'date' => '2025-11-20',
-        'montant_total' => 2000.00,
-        'compte_id' => $this->compte->id,
-        'rapprochement_id' => null,
-    ]);
+    transactionTresorerie($this, 'recette', '2025-10-15', 5000.00);
+    transactionTresorerie($this, 'depense', '2025-11-20', 2000.00);
 
     $data = app(RapportService::class)->fluxTresorerie(2025);
 
@@ -68,18 +103,8 @@ it('calcule la synthèse consolidée correctement', function () {
 });
 
 it('ventile les flux par mois', function () {
-    Transaction::factory()->create([
-        'type' => 'recette',
-        'date' => '2025-10-15',
-        'montant_total' => 3000.00,
-        'compte_id' => $this->compte->id,
-    ]);
-    Transaction::factory()->create([
-        'type' => 'depense',
-        'date' => '2025-10-20',
-        'montant_total' => 1000.00,
-        'compte_id' => $this->compte->id,
-    ]);
+    transactionTresorerie($this, 'recette', '2025-10-15', 3000.00);
+    transactionTresorerie($this, 'depense', '2025-10-20', 1000.00);
 
     $data = app(RapportService::class)->fluxTresorerie(2025);
 
@@ -99,12 +124,7 @@ it('consolide plusieurs comptes et annule les virements internes', function () {
         'date_solde_initial' => '2025-09-01',
     ]);
 
-    Transaction::factory()->create([
-        'type' => 'recette',
-        'date' => '2025-10-01',
-        'montant_total' => 2000.00,
-        'compte_id' => $this->compte->id,
-    ]);
+    transactionTresorerie($this, 'recette', '2025-10-01', 2000.00);
 
     VirementInterne::factory()->create([
         'date' => '2025-10-15',
@@ -125,27 +145,9 @@ it('calcule le rapprochement avec écritures non pointées', function () {
     $rapprochement = RapprochementBancaire::factory()->create([
         'compte_id' => $this->compte->id,
     ]);
-    Transaction::factory()->create([
-        'type' => 'recette',
-        'date' => '2025-10-01',
-        'montant_total' => 3000.00,
-        'compte_id' => $this->compte->id,
-        'rapprochement_id' => $rapprochement->id,
-    ]);
-    Transaction::factory()->create([
-        'type' => 'recette',
-        'date' => '2025-10-15',
-        'montant_total' => 1500.00,
-        'compte_id' => $this->compte->id,
-        'rapprochement_id' => null,
-    ]);
-    Transaction::factory()->create([
-        'type' => 'depense',
-        'date' => '2025-11-01',
-        'montant_total' => 500.00,
-        'compte_id' => $this->compte->id,
-        'rapprochement_id' => null,
-    ]);
+    transactionTresorerie($this, 'recette', '2025-10-01', 3000.00, ['rapprochement_id' => $rapprochement->id]);
+    transactionTresorerie($this, 'recette', '2025-10-15', 1500.00);
+    transactionTresorerie($this, 'depense', '2025-11-01', 500.00);
 
     $data = app(RapportService::class)->fluxTresorerie(2025);
 
@@ -157,12 +159,7 @@ it('calcule le rapprochement avec écritures non pointées', function () {
 });
 
 it('expose la liste des écritures non pointées pour le PDF', function () {
-    Transaction::factory()->create([
-        'type' => 'recette',
-        'date' => '2025-10-15',
-        'montant_total' => 1500.00,
-        'compte_id' => $this->compte->id,
-        'rapprochement_id' => null,
+    transactionTresorerie($this, 'recette', '2025-10-15', 1500.00, [
         'libelle' => 'Cotisation Dupont',
         'numero_piece' => 'R-2025-042',
     ]);

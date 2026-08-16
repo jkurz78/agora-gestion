@@ -1213,8 +1213,58 @@ final class RapportExportController extends Controller
         $sheet2->getStyle('A1:B1')->getFont()->setBold(true);
         $row++;
 
-        $sheet2->setCellValue('A'.$row, 'Solde théorique');
+        // Du résultat à la trésorerie — le même pont qu'à l'écran, en tête :
+        // il part du résultat de l'exercice, celui du tableau de bord, et
+        // justifie chaque euro d'écart avec la trésorerie.
+        $pont = $data['synthese']['pont_resultat'];
+
+        $sheet2->setCellValue('A'.$row, 'Résultat de l\'exercice');
+        $sheet2->setCellValue('B'.$row, $pont['resultat']);
+        $row++;
+
+        foreach ([
+            'dotations' => 'Dotations aux amortissements (charge sans décaissement)',
+            'immobilisations' => 'Acquisitions d\'immobilisations (décaissement sans charge)',
+            'creances' => 'Variation des créances clients',
+            'dettes' => 'Variation des dettes fournisseurs',
+            'autres' => 'Autres variations de bilan',
+        ] as $cle => $libelle) {
+            if ((float) $pont[$cle] === 0.0) {
+                continue;
+            }
+
+            $sheet2->setCellValue('A'.$row, $libelle);
+            $sheet2->setCellValue('B'.$row, $pont[$cle]);
+            $row++;
+        }
+
+        $sheet2->setCellValue('A'.$row, 'Variation de trésorerie de l\'exercice');
+        $sheet2->setCellValue('B'.$row, $data['synthese']['variation']);
+        $sheet2->getStyle('A'.$row.':B'.$row)->getFont()->setBold(true);
+        $row += 2;
+
+        $sheet2->setCellValue('A'.$row, 'Solde de trésorerie théorique');
         $sheet2->setCellValue('B'.$row, $data['rapprochement']['solde_theorique']);
+        $row++;
+
+        // Tout n'est pas en banque : les chèques encore en main et la caisse
+        // ne figurent sur aucun relevé, il faut les retirer avant de comparer.
+        foreach ([
+            'a_remettre' => 'Chèques à remettre en banque',
+            'caisse' => 'Espèces en caisse',
+        ] as $cle => $libelle) {
+            if ((float) $data['synthese']['decomposition'][$cle] === 0.0) {
+                continue;
+            }
+
+            $sheet2->setCellValue('A'.$row, $libelle);
+            $sheet2->setCellValue('B'.$row, -$data['synthese']['decomposition'][$cle]);
+            $row++;
+        }
+
+        $sheet2->setCellValue('A'.$row, 'Solde en banque');
+        $sheet2->setCellValue('B'.$row, $data['rapprochement']['solde_banque']);
+        $sheet2->getStyle('A'.$row.':B'.$row)->getFont()->setBold(true);
         $row++;
 
         $sheet2->setCellValue('A'.$row, 'Recettes non pointées ('.$data['rapprochement']['nb_recettes_non_pointees'].')');

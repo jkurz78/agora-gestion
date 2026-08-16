@@ -28,6 +28,38 @@
     @endif
 
     {{-- Synthèse + Mensuel --}}
+    {{-- Du résultat à la trésorerie --}}
+    @php $pont = $synthese['pont_resultat']; @endphp
+    <table class="data-table">
+        <tbody>
+            <tr class="ft-section">
+                <td colspan="2">Du résultat à la trésorerie</td>
+            </tr>
+            <tr class="ft-rappr">
+                <td>Résultat de l'exercice</td>
+                <td class="text-right" style="width:150px;">{{ $fmt($pont['resultat']) }}</td>
+            </tr>
+            @foreach ([
+                'dotations' => 'Dotations aux amortissements (charge sans décaissement)',
+                'immobilisations' => 'Acquisitions d\'immobilisations (décaissement sans charge)',
+                'creances' => 'Variation des créances clients',
+                'dettes' => 'Variation des dettes fournisseurs',
+                'autres' => 'Autres variations de bilan',
+            ] as $cle => $libelle)
+                @if ($pont[$cle] != 0.0)
+                    <tr class="ft-rappr">
+                        <td style="padding-left:24px;">{{ $pont[$cle] >= 0 ? '+' : '−' }} {{ $libelle }}</td>
+                        <td class="text-right">{{ $fmt(abs($pont[$cle])) }}</td>
+                    </tr>
+                @endif
+            @endforeach
+            <tr class="ft-rappr">
+                <td><strong>Variation de trésorerie de l'exercice</strong></td>
+                <td class="text-right"><strong>{{ $fmt($synthese['variation']) }}</strong></td>
+            </tr>
+        </tbody>
+    </table>
+
     <table class="data-table" style="margin-bottom:14px;">
         <tbody>
             <tr class="ft-section">
@@ -68,6 +100,24 @@
                 <td colspan="4">Solde de trésorerie théorique au {{ \Carbon\Carbon::parse($exercice['date_fin'])->translatedFormat('j F Y') }}</td>
                 <td class="text-right">{{ $fmt($synthese['solde_theorique']) }}</td>
             </tr>
+
+            {{-- Toute la trésorerie n'est pas en banque : on dit où elle est. --}}
+            <tr>
+                <td colspan="4" style="padding-left:24px;color:#6c757d;">dont en banque</td>
+                <td class="text-right" style="color:#6c757d;">{{ $fmt($synthese['decomposition']['banque']) }}</td>
+            </tr>
+            @if ($synthese['decomposition']['caisse'] != 0.0)
+                <tr>
+                    <td colspan="4" style="padding-left:24px;color:#6c757d;">dont en caisse</td>
+                    <td class="text-right" style="color:#6c757d;">{{ $fmt($synthese['decomposition']['caisse']) }}</td>
+                </tr>
+            @endif
+            @if ($synthese['decomposition']['a_remettre'] != 0.0)
+                <tr>
+                    <td colspan="4" style="padding-left:24px;color:#6c757d;">dont chèques à remettre en banque</td>
+                    <td class="text-right" style="color:#6c757d;">{{ $fmt($synthese['decomposition']['a_remettre']) }}</td>
+                </tr>
+            @endif
         </tbody>
     </table>
 
@@ -78,9 +128,27 @@
                 <td colspan="2">Rapprochement bancaire</td>
             </tr>
             <tr class="ft-rappr">
-                <td>Solde théorique</td>
+                <td>Solde de trésorerie théorique</td>
                 <td class="text-right" style="width:150px;">{{ $fmt($rapprochement['solde_theorique']) }}</td>
             </tr>
+            @if ($synthese['decomposition']['a_remettre'] != 0.0)
+                <tr class="ft-rappr">
+                    <td style="padding-left:24px;">− Chèques à remettre en banque</td>
+                    <td class="text-right">{{ $fmt($synthese['decomposition']['a_remettre']) }}</td>
+                </tr>
+            @endif
+            @if ($synthese['decomposition']['caisse'] != 0.0)
+                <tr class="ft-rappr">
+                    <td style="padding-left:24px;">− Espèces en caisse</td>
+                    <td class="text-right">{{ $fmt($synthese['decomposition']['caisse']) }}</td>
+                </tr>
+            @endif
+            @if ($synthese['decomposition']['a_remettre'] != 0.0 || $synthese['decomposition']['caisse'] != 0.0)
+                <tr class="ft-rappr">
+                    <td><strong>Solde en banque</strong></td>
+                    <td class="text-right"><strong>{{ $fmt($rapprochement['solde_banque']) }}</strong></td>
+                </tr>
+            @endif
             <tr class="ft-rappr">
                 <td style="padding-left:24px;">− Recettes non pointées ({{ $rapprochement['nb_recettes_non_pointees'] }})</td>
                 <td class="text-right">{{ $fmt($rapprochement['recettes_non_pointees']) }}</td>
