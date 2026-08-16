@@ -218,8 +218,11 @@ final class BackfillPartieDoubleCommand extends Command
      */
     private function resetExercice(int $annee): void
     {
-        $dateDebut = "{$annee}-09-01";
-        $dateFin = ($annee + 1).'-08-31';
+        // Bornes issues du paramétrage du tenant : le mois de début d'exercice
+        // appartient à l'association, pas au code.
+        $range = app(ExerciceService::class)->dateRange($annee);
+        $dateDebut = $range['start']->toDateString();
+        $dateFin = $range['end']->toDateString();
 
         DB::transaction(function () use ($dateDebut, $dateFin) {
             // Récupérer les IDs des transactions de l'exercice pour ce tenant
@@ -320,8 +323,11 @@ final class BackfillPartieDoubleCommand extends Command
     private function runConversion(int $annee, bool $isForce): void
     {
         $assoId = (int) TenantContext::currentId();
-        $dateDebut = "{$annee}-09-01";
-        $dateFin = ($annee + 1).'-08-31';
+        // Bornes issues du paramétrage du tenant : le mois de début d'exercice
+        // appartient à l'association, pas au code.
+        $range = app(ExerciceService::class)->dateRange($annee);
+        $dateDebut = $range['start']->toDateString();
+        $dateFin = $range['end']->toDateString();
 
         $this->info("Backfill exercice {$annee} — association #{$assoId}");
 
@@ -421,8 +427,11 @@ final class BackfillPartieDoubleCommand extends Command
 
     private function reconstruireVirementsInternes(int $annee, bool $isForce): void
     {
-        $dateDebut = "{$annee}-09-01";
-        $dateFin = ($annee + 1).'-08-31';
+        // Bornes issues du paramétrage du tenant : le mois de début d'exercice
+        // appartient à l'association, pas au code.
+        $range = app(ExerciceService::class)->dateRange($annee);
+        $dateDebut = $range['start']->toDateString();
+        $dateFin = $range['end']->toDateString();
 
         $query = VirementInterne::whereBetween('date', [$dateDebut, $dateFin]);
 

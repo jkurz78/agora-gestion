@@ -90,12 +90,27 @@ final class TiersQuickViewService
     }
 
     /**
+     * Bornes de l'exercice, telles que les définit le paramétrage du tenant.
+     *
+     * Ce service recalculait « septembre-août » en dur dans ses cinq requêtes.
+     * Une association en exercice civil ou décalé y voyait donc des chiffres
+     * hors période. La seule source est ExerciceService.
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function bornes(int $exercice): array
+    {
+        $range = app(ExerciceService::class)->dateRange($exercice);
+
+        return [$range['start']->toDateString(), $range['end']->toDateString()];
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     private function getDepenses(Tiers $tiers, int $exercice): ?array
     {
-        $dateDebut = "{$exercice}-09-01";
-        $dateFin = ($exercice + 1).'-08-31';
+        [$dateDebut, $dateFin] = $this->bornes($exercice);
 
         $row = DB::table('transactions as tx')
             ->join('transaction_lignes as tl', 'tl.transaction_id', '=', 'tx.id')
@@ -151,8 +166,7 @@ final class TiersQuickViewService
      */
     private function getRecettes(Tiers $tiers, int $exercice): ?array
     {
-        $dateDebut = "{$exercice}-09-01";
-        $dateFin = ($exercice + 1).'-08-31';
+        [$dateDebut, $dateFin] = $this->bornes($exercice);
 
         $row = DB::table('transactions as tx')
             ->join('transaction_lignes as tl', 'tl.transaction_id', '=', 'tx.id')
@@ -190,8 +204,7 @@ final class TiersQuickViewService
      */
     private function getDons(Tiers $tiers, int $exercice): ?array
     {
-        $dateDebut = "{$exercice}-09-01";
-        $dateFin = ($exercice + 1).'-08-31';
+        [$dateDebut, $dateFin] = $this->bornes($exercice);
 
         $row = DB::table('transactions as tx')
             ->join('transaction_lignes as tl', 'tl.transaction_id', '=', 'tx.id')
@@ -223,8 +236,7 @@ final class TiersQuickViewService
      */
     private function getCotisations(Tiers $tiers, int $exercice): ?array
     {
-        $dateDebut = "{$exercice}-09-01";
-        $dateFin = ($exercice + 1).'-08-31';
+        [$dateDebut, $dateFin] = $this->bornes($exercice);
 
         $row = DB::table('transactions as tx')
             ->join('transaction_lignes as tl', 'tl.transaction_id', '=', 'tx.id')
@@ -277,8 +289,7 @@ final class TiersQuickViewService
      */
     private function getAnimations(Tiers $tiers, int $exercice): ?array
     {
-        $dateDebut = "{$exercice}-09-01";
-        $dateFin = ($exercice + 1).'-08-31';
+        [$dateDebut, $dateFin] = $this->bornes($exercice);
 
         $animations = DB::table('transactions as tx')
             ->join('transaction_lignes as tl', 'tl.transaction_id', '=', 'tx.id')

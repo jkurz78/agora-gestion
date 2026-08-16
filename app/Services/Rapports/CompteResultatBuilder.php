@@ -7,6 +7,7 @@ namespace App\Services\Rapports;
 use App\Models\Famille;
 use App\Models\Operation;
 use App\Models\Tiers;
+use App\Services\ExerciceService;
 use App\Tenant\TenantContext;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
@@ -14,6 +15,10 @@ use Illuminate\Support\Facades\DB;
 
 final class CompteResultatBuilder
 {
+    public function __construct(
+        private readonly ExerciceService $exerciceService,
+    ) {}
+
     // ── Public API ────────────────────────────────────────────────────────────
 
     /**
@@ -225,10 +230,25 @@ final class CompteResultatBuilder
 
     // ── Private helpers — requêtes SQL ────────────────────────────────────────
 
-    /** @return array{string, string} */
+    /**
+     * Bornes de l'exercice, dérivées du paramétrage du tenant.
+     *
+     * Ce calcul était local et figé sur septembre-août, alors que le mois de
+     * début appartient à l'association (`exercice_mois_debut`). Une
+     * association en exercice civil ou décalé — mars-février dans l'hémisphère
+     * sud — voyait donc ses montants pris sur la mauvaise période, en silence.
+     *
+     * ExerciceService est la seule source : il gère le décalage d'année, le
+     * cas calendaire où l'exercice tient dans une seule année civile, et les
+     * libellés correspondants.
+     *
+     * @return array{string, string}
+     */
     private function exerciceDates(int $exercice): array
     {
-        return ["{$exercice}-09-01", ($exercice + 1).'-08-31'];
+        $range = $this->exerciceService->dateRange($exercice);
+
+        return [$range['start']->toDateString(), $range['end']->toDateString()];
     }
 
     private function scopeToCurrentTenant(Builder $query, string $associationColumn): void
