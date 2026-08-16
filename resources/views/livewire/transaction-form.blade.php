@@ -423,6 +423,10 @@
                                                     class="form-select form-select-sm"
                                                     {{ $exerciceCloture || $isLockedByFacture || $isLockedByImmobilisation || $isExtourneMiroir ? 'disabled' : '' }}>
                                                 <option value="">-- Aucune --</option>
+                                                @php $selectedOp = $ligne['operation_id'] !== '' ? ($operationsAffichees[(int) $ligne['operation_id']] ?? null) : null; @endphp
+                                                @if ($selectedOp !== null && ! $operations->contains('id', (int) $selectedOp->id))
+                                                    <option value="{{ $selectedOp->id }}" selected>{{ $selectedOp->nom }}</option>
+                                                @endif
                                                 @foreach ($operations->groupBy(fn ($op) => $op->typeOperation?->nom ?? 'Sans type') as $typeName => $ops)
                                                     <optgroup label="{{ $typeName }}">
                                                         @foreach ($ops as $op)
@@ -434,7 +438,6 @@
                                         </td>
                                         <td>
                                             @php
-                                                $selectedOp = $ligne['operation_id'] !== '' ? $operations->firstWhere('id', (int) $ligne['operation_id']) : null;
                                                 $nbSeances = $selectedOp?->nombre_seances;
                                             @endphp
                                             @if ($nbSeances)
@@ -593,6 +596,10 @@
                                         <td>
                                             <select wire:model.live="affectations.{{ $ai }}.operation_id" class="form-select form-select-sm">
                                                 <option value="">— Aucune (reste non affecté) —</option>
+                                                @php $selOp = $aff['operation_id'] !== '' ? ($operationsAffichees[(int) $aff['operation_id']] ?? null) : null; @endphp
+                                                @if ($selOp !== null && ! $operations->contains('id', (int) $selOp->id))
+                                                    <option value="{{ $selOp->id }}" selected>{{ $selOp->nom }}</option>
+                                                @endif
                                                 @foreach ($operations->groupBy(fn ($op) => $op->typeOperation?->nom ?? 'Sans type') as $typeName => $ops)
                                                     <optgroup label="{{ $typeName }}">
                                                         @foreach ($ops as $op)
@@ -603,9 +610,6 @@
                                             </select>
                                         </td>
                                         <td>
-                                            @php
-                                                $selOp = $aff['operation_id'] !== '' ? $operations->firstWhere('id', (int) $aff['operation_id']) : null;
-                                            @endphp
                                             @if ($selOp?->nombre_seances)
                                                 <select wire:model="affectations.{{ $ai }}.seance" class="form-select form-select-sm">
                                                     <option value="">--</option>

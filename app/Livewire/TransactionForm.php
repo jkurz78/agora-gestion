@@ -1308,15 +1308,32 @@ final class TransactionForm extends Component
             ? PlanComptableSelecteur::groupesPourType($this->type)
             : collect();
 
+        // IMP-01 : plus de borne de période. La transaction porte sa propre
+        // date ; celle de l'opération ne détermine pas son exercice.
+        $operations = Operation::with('typeOperation')
+            ->proposableALaSaisie()
+            ->orderBy('nom')
+            ->get();
+
+        // IMP-02 : table d'affichage indexée par id — les proposables plus
+        // celles déjà référencées par $this->lignes/$this->affectations (état
+        // Livewire en tableaux, pas une relation Eloquent : pas d'eager load
+        // possible ici, contrairement à FactureEdit::operation()).
+        $operationIdsReferencees = collect($this->lignes)->pluck('operation_id')
+            ->merge(collect($this->affectations)->pluck('operation_id'))
+            ->filter(fn ($id) => $id !== null && $id !== '')
+            ->map(fn ($id) => (int) $id)
+            ->unique();
+
+        $operationsAffichees = $operations->keyBy('id')->union(
+            Operation::whereIn('id', $operationIdsReferencees)->get()->keyBy('id')
+        );
+
         return view('livewire.transaction-form', [
             'comptes' => CompteBancaire::saisieManuelle()->orderBy('nom')->get(),
             'groupesComptesVentilation' => $groupesComptesVentilation,
-            // IMP-01 : plus de borne de période. La transaction porte sa propre
-            // date ; celle de l'opération ne détermine pas son exercice.
-            'operations' => Operation::with('typeOperation')
-                ->proposableALaSaisie()
-                ->orderBy('nom')
-                ->get(),
+            'operations' => $operations,
+            'operationsAffichees' => $operationsAffichees,
             'modesPaiement' => ModePaiement::cases(),
             'transaction_numero_piece' => $this->transactionId
                 ? Transaction::select('id', 'numero_piece')->find($this->transactionId)?->numero_piece
