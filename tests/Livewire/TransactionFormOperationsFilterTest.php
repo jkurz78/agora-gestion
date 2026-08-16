@@ -5,8 +5,12 @@ declare(strict_types=1);
 use App\Enums\StatutOperation;
 use App\Livewire\TransactionForm;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\Operation;
+use App\Models\Tiers;
+use App\Models\Transaction;
 use App\Models\User;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
@@ -106,4 +110,61 @@ it('affiche à nouveau une opération rouverte', function () {
     Livewire::test(TransactionForm::class)
         ->call('showNewForm', 'depense')
         ->assertDontSee('Op rouverte');
+});
+
+it('affiche une opération en cours hors exercice en recette également', function () {
+    Operation::factory()->create([
+        'association_id' => $this->association->id,
+        'nom' => 'Op recette hors exercice',
+        'date_debut' => '2019-09-01',
+        'date_fin' => '2020-08-31',
+        'statut' => StatutOperation::EnCours,
+    ]);
+
+    Livewire::test(TransactionForm::class)
+        ->call('showNewForm', 'recette')
+        ->assertSee('Op recette hors exercice');
+});
+
+it('la modale de ventilation propose la même opération et exclut une opération clôturée', function () {
+    SystemeSeeder::seed();
+
+    $compteVentilation = Compte::factory()->numero('706')->create([
+        'association_id' => $this->association->id,
+    ]);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
+
+    Operation::factory()->create([
+        'association_id' => $this->association->id,
+        'nom' => 'Op ventilation hors exercice',
+        'date_debut' => '2019-09-01',
+        'date_fin' => '2020-08-31',
+        'statut' => StatutOperation::EnCours,
+    ]);
+    Operation::factory()->create([
+        'association_id' => $this->association->id,
+        'nom' => 'Op ventilation clôturée',
+        'statut' => StatutOperation::Cloturee,
+    ]);
+
+    // Créance (paiementRecu=false) : pas besoin de compte bancaire ni de mode
+    // de paiement, seul le grand livre 411/706 doit s'équilibrer.
+    Livewire::test(TransactionForm::class)
+        ->call('showNewForm', 'recette')
+        ->set('paiementRecu', false)
+        ->set('libelle', 'Recette ventilée pour test modale')
+        ->set('tiers_id', $tiers->id)
+        ->set('lignes.0.compte_id', (string) $compteVentilation->id)
+        ->set('lignes.0.montant', '100.00')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $transaction = Transaction::where('libelle', 'Recette ventilée pour test modale')->sole();
+    $ligne = $transaction->lignes()->ventilation()->sole();
+
+    Livewire::test(TransactionForm::class)
+        ->call('edit', $transaction->id)
+        ->call('ouvrirVentilation', $ligne->id)
+        ->assertSee('Op ventilation hors exercice')
+        ->assertDontSee('Op ventilation clôturée');
 });
