@@ -162,9 +162,18 @@ it('la modale de ventilation propose la même opération et exclut une opératio
     $transaction = Transaction::where('libelle', 'Recette ventilée pour test modale')->sole();
     $ligne = $transaction->lignes()->ventilation()->sole();
 
-    Livewire::test(TransactionForm::class)
+    // Positionnel : ancre sur le wire:model du select de la modale
+    // (affectations.0.operation_id, rendu après celui des lignes directes,
+    // lignes.0.operation_id) pour prouver que c'est bien LA MODALE qui
+    // affiche l'opération — un assertSee/assertDontSee simple resterait vert
+    // même si la modale recréait sa propre condition et se vidait, tant que
+    // le select des lignes directes affiche par ailleurs la même opération.
+    $html = Livewire::test(TransactionForm::class)
         ->call('edit', $transaction->id)
         ->call('ouvrirVentilation', $ligne->id)
-        ->assertSee('Op ventilation hors exercice')
-        ->assertDontSee('Op ventilation clôturée');
+        ->assertSeeHtmlInOrder(['affectations.0.operation_id', 'Op ventilation hors exercice'])
+        ->html();
+
+    expect(mb_strpos($html, 'Op ventilation clôturée', mb_strpos($html, 'affectations.0.operation_id')))
+        ->toBeFalse();
 });
