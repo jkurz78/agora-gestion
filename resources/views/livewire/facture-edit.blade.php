@@ -159,7 +159,7 @@
                                                             <select class="form-select form-select-sm"
                                                                     wire:change="updateOperation({{ $ligne->id }}, $event.target.value)">
                                                                 <option value="">— Opération (optionnel) —</option>
-                                                                @php $opLigne = $ligne->operation_id !== null ? ($operationsAffichees[$ligne->operation_id] ?? null) : null; @endphp
+                                                                @php $opLigne = $ligne->operation; @endphp
                                                                 @if ($opLigne !== null && ! $operations->contains('id', (int) $opLigne->id))
                                                                     <option value="{{ $opLigne->id }}" selected>{{ $opLigne->nom }}</option>
                                                                 @endif

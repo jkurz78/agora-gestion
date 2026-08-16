@@ -458,7 +458,7 @@ final class FactureEdit extends Component
             ->orderByDesc('date')
             ->get();
 
-        $lignes = $this->facture->lignes()->get();
+        $lignes = $this->facture->lignes()->with('operation')->get();
 
         $totalLignes = $lignes->whereNotNull('montant')->sum('montant');
 
@@ -469,23 +469,8 @@ final class FactureEdit extends Component
         // DC-8 : sélecteur de ventilation sur comptes (classe 7), groupés par famille.
         $groupesComptesRecette = PlanComptableSelecteur::groupesPourType('recette');
 
-        // IMP-04 : les lignes de facture laissent l'utilisateur choisir une
-        // opération — même source que la saisie de transaction. Liste
-        // PROPOSÉE : uniquement les opérations proposables, jamais une
-        // clôturée, imputée ou non.
+        // Operation::scopeProposableALaSaisie() : liste proposée aux lignes de facture.
         $operations = Operation::proposableALaSaisie()->orderBy('nom')->get();
-
-        // IMP-02 : table d'AFFICHAGE, indexée par id — les proposables plus
-        // celles déjà imputées sur cette facture (même clôturées). Sert
-        // uniquement à afficher une valeur déjà enregistrée (lien métier
-        // préexistant) et son nombre de séances ; jamais à proposer un choix
-        // ailleurs (cf. Portail\NoteDeFrais\Form, même distinction avec son
-        // couple $operations / $selectedOperation).
-        $operationsAffichees = $operations->keyBy('id')->union(
-            Operation::whereIn('id', $lignes->pluck('operation_id')->filter()->unique())
-                ->get()
-                ->keyBy('id')
-        );
 
         $aLignesMontantManuel = $lignes->where('type', TypeLigneFacture::MontantManuel)->isNotEmpty();
 
@@ -497,7 +482,6 @@ final class FactureEdit extends Component
             'comptesBancaires' => $comptesBancaires,
             'groupesComptesRecette' => $groupesComptesRecette,
             'operations' => $operations,
-            'operationsAffichees' => $operationsAffichees,
             'aLignesMontantManuel' => $aLignesMontantManuel,
             'modesPaiement' => ModePaiement::cases(),
         ]);
