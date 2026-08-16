@@ -10,7 +10,6 @@ use App\Enums\ModePaiement;
 use App\Enums\RoleAssociation;
 use App\Enums\Sens;
 use App\Enums\StatutFactureDeposee;
-use App\Enums\StatutOperation;
 use App\Enums\StatutReglement;
 use App\Enums\UsageComptable;
 use App\Exceptions\OcrAnalysisException;
@@ -1312,9 +1311,10 @@ final class TransactionForm extends Component
         return view('livewire.transaction-form', [
             'comptes' => CompteBancaire::saisieManuelle()->orderBy('nom')->get(),
             'groupesComptesVentilation' => $groupesComptesVentilation,
+            // IMP-01 : plus de borne de période. La transaction porte sa propre
+            // date ; celle de l'opération ne détermine pas son exercice.
             'operations' => Operation::with('typeOperation')
-                ->forExercice(app(ExerciceService::class)->current())
-                ->where('statut', StatutOperation::EnCours)
+                ->proposableALaSaisie()
                 ->orderBy('nom')
                 ->get(),
             'modesPaiement' => ModePaiement::cases(),

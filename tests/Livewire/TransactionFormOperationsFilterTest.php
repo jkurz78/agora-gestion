@@ -17,7 +17,7 @@ beforeEach(function () {
     TenantContext::boot($this->association);
     session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
-    // Exercice actif : 2025 (2025-09-01 → 2026-08-31)
+    // Exercice affiché : 2025 (2025-09-01 → 2026-08-31)
     session(['exercice_actif' => 2025]);
 });
 
@@ -26,8 +26,7 @@ afterEach(function () {
     session()->forget('exercice_actif');
 });
 
-it('n\'affiche pas une opération hors exercice dans le formulaire de transaction', function () {
-    // Opération passée (exercice 2024)
+it('affiche une opération en cours datée sur un exercice antérieur', function () {
     Operation::factory()->create([
         'association_id' => $this->association->id,
         'nom' => 'Op passée',
@@ -38,7 +37,21 @@ it('n\'affiche pas une opération hors exercice dans le formulaire de transactio
 
     Livewire::test(TransactionForm::class)
         ->call('showNewForm', 'depense')
-        ->assertDontSee('Op passée');
+        ->assertSee('Op passée');
+});
+
+it('affiche une opération en cours datée dans un exercice futur', function () {
+    Operation::factory()->create([
+        'association_id' => $this->association->id,
+        'nom' => 'Op future',
+        'date_debut' => '2030-09-01',
+        'date_fin' => '2031-08-31',
+        'statut' => StatutOperation::EnCours,
+    ]);
+
+    Livewire::test(TransactionForm::class)
+        ->call('showNewForm', 'depense')
+        ->assertSee('Op future');
 });
 
 it('affiche une opération dans l\'exercice courant', function () {
@@ -67,4 +80,24 @@ it('n\'affiche pas une opération clôturée même dans l\'exercice', function (
     Livewire::test(TransactionForm::class)
         ->call('showNewForm', 'depense')
         ->assertDontSee('Op clôturée');
+});
+
+it('affiche à nouveau une opération rouverte', function () {
+    $operation = Operation::factory()->create([
+        'association_id' => $this->association->id,
+        'nom' => 'Op rouverte',
+        'date_debut' => '2025-10-01',
+        'date_fin' => '2026-03-31',
+        'statut' => StatutOperation::Cloturee,
+    ]);
+
+    Livewire::test(TransactionForm::class)
+        ->call('showNewForm', 'depense')
+        ->assertDontSee('Op rouverte');
+
+    $operation->update(['statut' => StatutOperation::EnCours]);
+
+    Livewire::test(TransactionForm::class)
+        ->call('showNewForm', 'depense')
+        ->assertSee('Op rouverte');
 });
