@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Livewire\Portail\NoteDeFrais;
 
 use App\Enums\NoteDeFraisLigneType;
-use App\Enums\StatutOperation;
 use App\Livewire\Concerns\MontantValidation;
 use App\Livewire\Portail\Concerns\WithPortailTenant;
 use App\Models\Association;
@@ -397,9 +396,9 @@ final class Form extends Component
             ->orderBy('intitule')
             ->get();
 
-        $operations = Operation::where('statut', '!=', StatutOperation::Cloturee->value)
-            ->orderBy('nom')
-            ->get();
+        // IMP-04 : règle de proposition centralisée sur le modèle plutôt que
+        // redite ici.
+        $operations = Operation::proposableALaSaisie()->orderBy('nom')->get();
 
         $selectedOperation = ! empty($this->draftLigne['operation_id'])
             ? Operation::find((int) $this->draftLigne['operation_id'])

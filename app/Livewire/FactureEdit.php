@@ -469,7 +469,9 @@ final class FactureEdit extends Component
         // DC-8 : sélecteur de ventilation sur comptes (classe 7), groupés par famille.
         $groupesComptesRecette = PlanComptableSelecteur::groupesPourType('recette');
 
-        $operations = Operation::orderBy('nom')->get();
+        // IMP-04 : les lignes de facture laissent l'utilisateur choisir une
+        // opération — même source que la saisie de transaction.
+        $operations = Operation::proposableALaSaisie()->orderBy('nom')->get();
 
         $aLignesMontantManuel = $lignes->where('type', TypeLigneFacture::MontantManuel)->isNotEmpty();
 
