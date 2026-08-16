@@ -470,18 +470,22 @@ final class FactureEdit extends Component
         $groupesComptesRecette = PlanComptableSelecteur::groupesPourType('recette');
 
         // IMP-04 : les lignes de facture laissent l'utilisateur choisir une
-        // opération — même source que la saisie de transaction.
-        // IMP-02 : `$operations` sert aussi à retrouver l'opération déjà
-        // enregistrée sur chaque ligne (select + affichage de la séance) —
-        // une opération clôturée mais déjà imputée sur cette facture reste
-        // donc visible, sans être proposée pour autant à une nouvelle ligne.
-        $operationIdsUtilises = $lignes->pluck('operation_id')->filter()->unique()->values();
+        // opération — même source que la saisie de transaction. Liste
+        // PROPOSÉE : uniquement les opérations proposables, jamais une
+        // clôturée, imputée ou non.
+        $operations = Operation::proposableALaSaisie()->orderBy('nom')->get();
 
-        $operations = Operation::where(function ($query) use ($operationIdsUtilises) {
-            $query->proposableALaSaisie()->orWhereIn('id', $operationIdsUtilises);
-        })
-            ->orderBy('nom')
-            ->get();
+        // IMP-02 : table d'AFFICHAGE, indexée par id — les proposables plus
+        // celles déjà imputées sur cette facture (même clôturées). Sert
+        // uniquement à afficher une valeur déjà enregistrée (lien métier
+        // préexistant) et son nombre de séances ; jamais à proposer un choix
+        // ailleurs (cf. Portail\NoteDeFrais\Form, même distinction avec son
+        // couple $operations / $selectedOperation).
+        $operationsAffichees = $operations->keyBy('id')->union(
+            Operation::whereIn('id', $lignes->pluck('operation_id')->filter()->unique())
+                ->get()
+                ->keyBy('id')
+        );
 
         $aLignesMontantManuel = $lignes->where('type', TypeLigneFacture::MontantManuel)->isNotEmpty();
 
@@ -493,6 +497,7 @@ final class FactureEdit extends Component
             'comptesBancaires' => $comptesBancaires,
             'groupesComptesRecette' => $groupesComptesRecette,
             'operations' => $operations,
+            'operationsAffichees' => $operationsAffichees,
             'aLignesMontantManuel' => $aLignesMontantManuel,
             'modesPaiement' => ModePaiement::cases(),
         ]);

@@ -51,7 +51,7 @@ it('la fiche facture ne propose pas une opération clôturée', function () {
         ->and($noms)->not->toContain('Op clôturée facture');
 });
 
-it('la fiche facture garde visible une opération clôturée déjà imputée sur une de ses lignes', function () {
+it('la fiche facture garde affichée une opération clôturée déjà imputée sur sa ligne sans la proposer ailleurs', function () {
     $facture = Facture::factory()->create(['association_id' => $this->association->id]);
 
     $operationImputee = Operation::factory()->create([
@@ -75,11 +75,32 @@ it('la fiche facture garde visible une opération clôturée déjà imputée sur
         'operation_id' => $operationImputee->id,
     ]);
 
-    $noms = Livewire::test(FactureEdit::class, ['facture' => $facture])
-        ->viewData('operations')
-        ->pluck('nom')
-        ->all();
+    // Deuxième ligne vierge sur la même facture : c'est elle qui expose la
+    // fuite IMP-04 si l'opération clôturée réapparaît comme option
+    // choisissable en plus de son propre affichage sur la ligne 1.
+    FactureLigne::create([
+        'facture_id' => $facture->id,
+        'type' => TypeLigneFacture::MontantManuel,
+        'libelle' => 'Ligne vierge',
+        'montant' => 50.00,
+        'ordre' => 2,
+        'operation_id' => null,
+    ]);
 
-    expect($noms)->toContain('Op clôturée déjà imputée')
-        ->and($noms)->not->toContain('Op clôturée non utilisée');
+    $component = Livewire::test(FactureEdit::class, ['facture' => $facture]);
+
+    // IMP-04 à la lettre : la liste PROPOSÉE n'inclut jamais une opération
+    // clôturée, imputée ou non.
+    $nomsProposes = $component->viewData('operations')->pluck('nom')->all();
+    expect($nomsProposes)->not->toContain('Op clôturée déjà imputée')
+        ->and($nomsProposes)->not->toContain('Op clôturée non utilisée');
+
+    // IMP-02 : le lien préexistant (ligne 1) reste affiché malgré la clôture.
+    expect($component->html())->toContain('Op clôturée déjà imputée');
+
+    // La preuve que ce n'est PAS une proposition : une seule occurrence dans
+    // tout le HTML — celle de la ligne 1 — alors que la ligne 2 vierge et le
+    // formulaire de nouvelle ligne partagent tous deux la même source
+    // `$operations`.
+    expect(substr_count($component->html(), 'Op clôturée déjà imputée'))->toBe(1);
 });
