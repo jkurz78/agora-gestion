@@ -9,7 +9,6 @@ use App\Models\Compte;
 use App\Models\Operation;
 use App\Models\Tiers;
 use App\Models\Transaction;
-use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\TransactionService;
@@ -29,32 +28,15 @@ afterEach(function () {
     TenantContext::clear();
 });
 
-it('enregistre une écriture rattachée à une opération clôturée du même tenant', function () {
-    // IMP-02 : le statut clôturé filtre des propositions, il n'interdit rien.
-    // Une écriture qui hérite son opération d'un lien métier préexistant doit
-    // passer — aucune garde serveur ne doit apparaître dans TransactionService.
-    $operation = Operation::factory()->create([
-        'association_id' => $this->association->id,
-        'statut' => StatutOperation::Cloturee,
-    ]);
-
-    $transaction = Transaction::factory()->asRecette()->create([
-        'association_id' => $this->association->id,
-        'date' => '2025-10-01',
-        'saisi_par' => $this->user->id,
-    ]);
-
-    $ligne = TransactionLigne::create([
-        'transaction_id' => $transaction->id,
-        'montant' => 50.0,
-        'operation_id' => $operation->id,
-        'debit' => 0.0,
-        'credit' => 50.0,
-    ]);
-
-    expect((int) $ligne->fresh()->operation_id)->toBe((int) $operation->id);
-});
-
+// IMP-02 — invariant central : le statut clôturé filtre des propositions, il
+// n'interdit aucune écriture. Le filet PRINCIPAL est comportemental et vit dans
+// le test « accepte un operation_id clôturé du bon tenant » plus bas : il
+// traverse la validation, le service et la persistance, et meurt sous une garde
+// de statut plantée n'importe où sur ce trajet.
+//
+// Le test ci-dessous n'est qu'un filet secondaire : il attrape la formulation
+// nommant explicitement l'enum. Une garde écrite `!== StatutOperation::EnCours`
+// lui échapperait — ne pas s'y fier seul.
 it('TransactionService ne refuse pas une opération clôturée', function () {
     $reflection = new ReflectionClass(TransactionService::class);
 

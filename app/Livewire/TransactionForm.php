@@ -438,10 +438,8 @@ final class TransactionForm extends Component
             [
                 'affectations' => ['required', 'array', 'min:1'],
                 'affectations.*.montant' => ['required', 'numeric', MontantValidation::RULE],
-                // IMP-06 : le scope global d'Eloquent ne couvre pas un `exists`
-                // de validation — la colonne association_id est donc explicite.
-                // Seule défense serveur conservée : c'est de la sécurité, pas du
-                // métier. Le statut de l'opération n'entre pas dans la règle.
+                // IMP-06, même règle que 'lignes.*.operation_id' — voir le
+                // commentaire de save().
                 'affectations.*.operation_id' => [
                     'nullable',
                     Rule::exists('operations', 'id')
@@ -1337,15 +1335,24 @@ final class TransactionForm extends Component
         // celles déjà référencées par $this->lignes/$this->affectations (état
         // Livewire en tableaux, pas une relation Eloquent : pas d'eager load
         // possible ici, contrairement à FactureEdit::operation()).
-        $operationIdsReferencees = collect($this->lignes)->pluck('operation_id')
-            ->merge(collect($this->affectations)->pluck('operation_id'))
-            ->filter(fn ($id) => $id !== null && $id !== '')
-            ->map(fn ($id) => (int) $id)
-            ->unique();
+        //
+        // La requête de rattrapage ne porte que sur les ids ABSENTS des
+        // proposables : le cas courant — une opération en cours déjà imputée —
+        // est déjà en mémoire, et cet écran se rend à chaque frappe.
+        $operationsAffichees = $operations->keyBy('id');
 
-        $operationsAffichees = $operations->keyBy('id')->union(
-            Operation::whereIn('id', $operationIdsReferencees)->get()->keyBy('id')
-        );
+        $idsARattraper = collect($this->lignes)->pluck('operation_id')
+            ->merge(collect($this->affectations)->pluck('operation_id'))
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->diff($operations->pluck('id')->map(fn ($id): int => (int) $id));
+
+        if ($idsARattraper->isNotEmpty()) {
+            $operationsAffichees = $operationsAffichees->union(
+                Operation::whereIn('id', $idsARattraper)->get()->keyBy('id')
+            );
+        }
 
         return view('livewire.transaction-form', [
             'comptes' => CompteBancaire::saisieManuelle()->orderBy('nom')->get(),
