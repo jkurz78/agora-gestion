@@ -1,6 +1,7 @@
 # Opérations — imputations et compte de résultat multi-exercices
 
 **Date :** 2026-08-14
+**Révision :** 2026-08-16
 **Statut :** spécification fonctionnelle et technique à relire
 **Périmètre :** saisie manuelle des dépenses/recettes et compte de résultat par opérations
 
@@ -22,9 +23,8 @@ opérations qui possèdent au moins un mouvement de charge ou de produit dans l'
 affiché. Le mode « Tous les exercices » élargit ensuite la période des opérations
 sélectionnées sans élargir cette liste d'opérations.
 
-La période d'un exercice et son libellé doivent toujours provenir d'`ExerciceService`,
-source de vérité tenant-aware. La période septembre-août actuellement codée en dur dans
-`CompteResultatBuilder` est un bug à corriger dans ce chantier.
+Le rattachement des mouvements et des prévisions à un exercice, ainsi que les libellés
+affichés, utilisent `ExerciceService`, source de vérité tenant-aware.
 
 ## 2. Contexte et problème actuel
 
@@ -57,22 +57,6 @@ factures fournisseur.
 Une même opération peut désormais recevoir des transactions sur plusieurs exercices. Le
 rapport doit rendre ces montants visibles sans perdre les axes existants : comptes,
 séances, tiers, opérations en colonnes, réalisé et projection.
-
-### 2.3 Bug préalable sur les dates d'exercice
-
-`CompteResultatBuilder::exerciceDates()` retourne actuellement en dur :
-
-```text
-N-09-01 → (N+1)-08-31
-```
-
-Cette méthode est utilisée par le compte de résultat général, le compte de résultat par
-opérations et le rapport par séances. Elle contredit `ExerciceService`, qui calcule les
-bornes depuis `association.exercice_mois_debut` et gère notamment les exercices civils.
-
-**Décision impérative :** supprimer ce calcul local. Les bornes, le rattachement d'une date
-à un exercice et les libellés d'exercice doivent provenir exclusivement de
-`ExerciceService`.
 
 ## 3. Terminologie normative
 
@@ -332,31 +316,21 @@ La dimension exercice doit fonctionner avec :
 L'exercice est une dimension de **ligne**. Il ne remplace ni ne réordonne les colonnes de
 séances ou d'opérations.
 
-## 7. Source de vérité des exercices
+## 7. Calcul de la dimension exercice
 
-### DATE-01 — API obligatoire
+### CAL-01 — Rattachement et libellés
 
-`CompteResultatBuilder` doit recevoir `ExerciceService` par injection et utiliser :
+La nouvelle dimension multi-exercices réutilise l'`ExerciceService` déjà injecté dans le
+builder :
 
-- `dateRange(int $exercice)` pour toute borne ;
-- `anneeForDate(CarbonImmutable|Carbon $date)` pour tout rattachement ;
-- `label(int $exercice)` pour tout libellé.
+- `dateRange(int $exercice)` pour limiter la portée `current` ;
+- `anneeForDate(CarbonImmutable|Carbon $date)` pour rattacher une transaction ou une
+  séance à son exercice ;
+- `label(int $exercice)` pour les libellés de l'écran et des exports.
 
-Supprimer `CompteResultatBuilder::exerciceDates()` et ne pas créer de fonction équivalente
-ailleurs.
+La vue et le contrôleur d'export ne recalculent pas l'exercice d'une date.
 
-### DATE-02 — Surface de correction
-
-La correction s'applique aux trois méthodes actuellement dépendantes du calcul codé en
-dur :
-
-- `compteDeResultat()` ;
-- `compteDeResultatOperations()` ;
-- `rapportSeances()`.
-
-`totauxResultat()` reçoit déjà des bornes de l'appelant et ne doit pas les recalculer.
-
-### DATE-03 — Aucun changement de schéma
+### CAL-02 — Aucun changement de schéma
 
 La table `exercices` stocke une année et un statut, tandis que le mois de début appartient
 à l'association. Ce chantier n'ajoute pas `date_debut` ou `date_fin` à la base. Les dates
@@ -613,10 +587,9 @@ des appels à `compteDeResultatOperations()` est obligatoire avant modification.
 
 ### Paramétrage des exercices
 
-21. Une association septembre-août conserve ses résultats actuels.
-22. Une association janvier-décembre rattache toutes les dates à l'année civile correcte.
-23. Une association dont l'exercice commence un autre mois, par exemple avril, utilise
-    exactement les bornes calculées par `ExerciceService` dans les trois rapports concernés.
+21. Le rattachement des transactions et séances dans la nouvelle dimension respecte le
+    calendrier du tenant retourné par `ExerciceService`, pour un exercice civil comme pour
+    un exercice décalé.
 
 ## 13. Stratégie de tests attendue
 
@@ -632,8 +605,8 @@ des appels à `compteDeResultatOperations()` est obligatoire avant modification.
   double comptage.
 - Projection : séparation des exercices, exclusion d'un exercice uniquement prévisionnel,
   séance non datée.
-- Dates : jeux de données avec mois de début 1, 4 et 9 pour `compteDeResultat()`,
-  `compteDeResultatOperations()` et `rapportSeances()`.
+- Dimension exercice : jeux de données multi-exercices avec un calendrier civil et un
+  calendrier décalé, afin de vérifier `anneeForDate()` et les libellés.
 
 ### Tests Livewire
 
@@ -690,7 +663,6 @@ Les tests existants des autres combinaisons restent des tests de non-régression
 - Affichage d'opérations sans mouvement de résultat dans le sélecteur du rapport.
 - Ajout d'exercices à zéro ou uniquement prévisionnels en portée `all`.
 - Modification fonctionnelle des flux automatiques déjà rattachés à une opération.
-- Refonte des autres rapports au-delà de la correction commune DATE-02.
 - Migration ou backfill de données : les informations nécessaires existent déjà.
 - Persistance du choix de portée dans le profil utilisateur : l'URL suffit.
 
@@ -705,7 +677,7 @@ Les tests existants des autres combinaisons restent des tests de non-régression
 - Ne pas compter simultanément la ligne parente et ses affectations.
 - Ne pas laisser une matrice de projection globale masquer une valeur d'un autre exercice.
 - Ne pas introduire de SQL spécifique à MySQL sans équivalent SQLite.
-- Ne pas coder à nouveau un mois de début ou une date de fin d'exercice.
+- Utiliser `ExerciceService` pour rattacher les dates à la nouvelle dimension exercice.
 
 ## 16. Définition de terminé
 
@@ -717,6 +689,4 @@ L'évolution est terminée lorsque :
 - les exports ont été vérifiés sur une fixture multi-exercices ;
 - aucun nouveau filtre de dates d'opération ne subsiste dans les parcours d'imputation
   manuelle ciblés ;
-- aucune période comptable septembre-août n'est codée en dur dans
-  `CompteResultatBuilder` ;
 - la documentation fonctionnelle éventuelle du rapport est mise à jour.
