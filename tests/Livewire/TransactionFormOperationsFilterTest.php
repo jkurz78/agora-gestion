@@ -100,4 +100,10 @@ it('affiche à nouveau une opération rouverte', function () {
     Livewire::test(TransactionForm::class)
         ->call('showNewForm', 'depense')
         ->assertSee('Op rouverte');
+
+    $operation->update(['statut' => StatutOperation::Cloturee]);
+
+    Livewire::test(TransactionForm::class)
+        ->call('showNewForm', 'depense')
+        ->assertDontSee('Op rouverte');
 });
