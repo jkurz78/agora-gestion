@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 use App\Livewire\RapportFluxTresorerie;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Exercice;
 use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
@@ -32,14 +34,50 @@ afterEach(function () {
     TenantContext::clear();
 });
 
-it('affiche le composant avec la synthèse', function () {
-    Transaction::factory()->create([
-        'association_id' => $this->association->id,
+/**
+ * Une recette encaissée telle qu'elle existe en partie double : l'en-tête ET
+ * sa ligne de trésorerie. Le rapport de flux se lit sur le grand livre des
+ * comptes de classe 5 — une transaction sans ligne ne déplace rien et n'y
+ * figure pas, ce qui est le comportement voulu.
+ */
+function recetteEncaissee(object $ctx, string $date, float $montant): Transaction
+{
+    $compteBancaire = CompteBancaire::where('association_id', $ctx->association->id)->firstOrFail();
+
+    $tx = Transaction::factory()->create([
+        'association_id' => $ctx->association->id,
         'type' => 'recette',
-        'date' => '2025-10-01',
-        'montant_total' => 5000.00,
-        'compte_id' => CompteBancaire::where('association_id', $this->association->id)->first()->id,
+        'date' => $date,
+        'montant_total' => $montant,
+        'compte_id' => $compteBancaire->id,
     ]);
+
+    $compte512 = Compte::firstOrCreate(
+        ['association_id' => (int) $ctx->association->id, 'numero_pcg' => '512'.$compteBancaire->id],
+        [
+            'intitule' => 'Banque '.$compteBancaire->id,
+            'classe' => 5,
+            'actif' => true,
+            'lettrable' => false,
+            'est_systeme' => false,
+            'pour_inscriptions' => false,
+            'compte_bancaire_id' => $compteBancaire->id,
+        ]
+    );
+
+    TransactionLigne::factory()->create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $compte512->id,
+        'debit' => $montant,
+        'credit' => 0,
+        'montant' => $montant,
+    ]);
+
+    return $tx;
+}
+
+it('affiche le composant avec la synthèse', function () {
+    recetteEncaissee($this, '2025-10-01', 5000.00);
 
     Livewire::test(RapportFluxTresorerie::class)
         ->assertSee('Rapport provisoire')
@@ -48,16 +86,13 @@ it('affiche le composant avec la synthèse', function () {
 });
 
 it('affiche la ligne flux dépliable avec les totaux annuels', function () {
-    Transaction::factory()->create([
-        'association_id' => $this->association->id,
-        'type' => 'recette',
-        'date' => '2025-10-01',
-        'montant_total' => 8000.00,
-        'compte_id' => CompteBancaire::where('association_id', $this->association->id)->first()->id,
-    ]);
+    recetteEncaissee($this, '2025-10-01', 8000.00);
 
     Livewire::test(RapportFluxTresorerie::class)
-        ->assertSeeHtml('Flux de l\'exercice')
+        // Libellé explicite : ce flux est celui de la TRÉSORERIE, distinct du
+        // résultat affiché au tableau de bord. Le rapport montre le chemin de
+        // l'un à l'autre juste au-dessus.
+        ->assertSeeHtml('Flux de trésorerie de l\'exercice')
         ->assertSee('8 000,00');
 });
 
@@ -79,14 +114,7 @@ it('affiche rapport définitif quand exercice clôturé', function () {
 });
 
 it('affiche le bloc rapprochement avec le nombre d\'écritures non pointées', function () {
-    Transaction::factory()->create([
-        'association_id' => $this->association->id,
-        'type' => 'recette',
-        'date' => '2025-10-15',
-        'montant_total' => 1500.00,
-        'compte_id' => CompteBancaire::where('association_id', $this->association->id)->first()->id,
-        'rapprochement_id' => null,
-    ]);
+    recetteEncaissee($this, '2025-10-15', 1500.00);
 
     Livewire::test(RapportFluxTresorerie::class)
         ->assertSee('Rapprochement bancaire')

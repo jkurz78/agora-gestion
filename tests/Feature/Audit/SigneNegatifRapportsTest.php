@@ -137,7 +137,7 @@ it('flux_tresorerie_inclut_negatifs_pointes', function () {
     ]);
 
     // Tx recette -50 € pointée
-    $this->makeAuditTransaction('recette', -50.0, $this->sc, $this->compte, 2025, $rapprochement);
+    $this->makeAuditTransactionTresorerie('recette', -50.0, $this->sc, $this->compte, 2025, $rapprochement);
 
     $builder = app(FluxTresorerieBuilder::class);
     $data = $builder->fluxTresorerie(2025);
@@ -292,7 +292,7 @@ it('rapprochement_service_solde_avec_negatif', function () {
     //
     // Le compte 512X est créé par CompteBancaireObserver avec la fiche bancaire.
     $compte512X = Compte::where('compte_bancaire_id', (int) $this->compte->id)->sole();
-    $tx = $this->makeAuditTransaction('recette', -50.0, $this->sc, $this->compte, 2025, $rapprochement);
+    $tx = $this->makeAuditTransactionTresorerie('recette', -50.0, $this->sc, $this->compte, 2025, $rapprochement);
     completerContrepartieBancaire($tx, $compte512X, 'recette', -50.0);
 
     $service = app(RapprochementBancaireService::class);
