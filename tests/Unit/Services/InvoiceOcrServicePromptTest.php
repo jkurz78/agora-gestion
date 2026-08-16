@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Enums\StatutOperation;
+use App\Models\Operation;
 use App\Services\InvoiceOcrService;
+use App\Tenant\TenantContext;
 
 /**
  * Helper : invoque la méthode privée buildContextBlock() via Reflection.
@@ -84,4 +87,36 @@ it('combine tiers_attendu + reference_attendue + date_attendue dans le même blo
         ->toContain('2026-04-01')
         ->toContain('numéro déposé')
         ->toContain('date déposée');
+});
+
+// ── opérations proposées au modèle ─────────────────────────────────────────────
+
+it('propose au modèle une opération en cours hors exercice affiché', function () {
+    $operation = Operation::factory()->create([
+        'association_id' => TenantContext::currentId(),
+        'nom' => 'Stage 2019 pluriannuel',
+        'date_debut' => '2019-09-01',
+        'date_fin' => '2020-08-31',
+        'statut' => StatutOperation::EnCours,
+    ]);
+
+    $prompt = (new ReflectionMethod(InvoiceOcrService::class, 'buildPrompt'))
+        ->invoke(app(InvoiceOcrService::class), null);
+
+    expect($prompt)->toContain($operation->id.': Stage 2019 pluriannuel');
+});
+
+it('ne propose pas au modèle une opération clôturée', function () {
+    Operation::factory()->create([
+        'association_id' => TenantContext::currentId(),
+        'nom' => 'Stage clos definitivement',
+        'date_debut' => '2025-09-01',
+        'date_fin' => '2026-08-31',
+        'statut' => StatutOperation::Cloturee,
+    ]);
+
+    $prompt = (new ReflectionMethod(InvoiceOcrService::class, 'buildPrompt'))
+        ->invoke(app(InvoiceOcrService::class), null);
+
+    expect($prompt)->not->toContain('Stage clos definitivement');
 });
