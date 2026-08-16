@@ -217,11 +217,7 @@ final class InvoiceOcrService
             ->implode("\n");
 
         $exercice = app(ExerciceService::class)->current();
-        // IMP-04 : le modèle CHOISIT une opération et un humain valide sa
-        // proposition — c'est donc un sélecteur au sens de la spec. Les
-        // opérations clôturées sont retirées (contexte inutilement gonflé, et
-        // imputation possible sans que personne ait décidé de rouvrir) ; les
-        // bornes de période sautent (IMP-01).
+        // Operation::scopeProposableALaSaisie().
         $operations = Operation::with('typeOperation')
             ->proposableALaSaisie()
             ->orderBy('nom')
