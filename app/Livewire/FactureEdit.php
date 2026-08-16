@@ -471,7 +471,17 @@ final class FactureEdit extends Component
 
         // IMP-04 : les lignes de facture laissent l'utilisateur choisir une
         // opération — même source que la saisie de transaction.
-        $operations = Operation::proposableALaSaisie()->orderBy('nom')->get();
+        // IMP-02 : `$operations` sert aussi à retrouver l'opération déjà
+        // enregistrée sur chaque ligne (select + affichage de la séance) —
+        // une opération clôturée mais déjà imputée sur cette facture reste
+        // donc visible, sans être proposée pour autant à une nouvelle ligne.
+        $operationIdsUtilises = $lignes->pluck('operation_id')->filter()->unique()->values();
+
+        $operations = Operation::where(function ($query) use ($operationIdsUtilises) {
+            $query->proposableALaSaisie()->orWhereIn('id', $operationIdsUtilises);
+        })
+            ->orderBy('nom')
+            ->get();
 
         $aLignesMontantManuel = $lignes->where('type', TypeLigneFacture::MontantManuel)->isNotEmpty();
 
