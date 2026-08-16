@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Enums\StatutOperation;
 use App\Enums\TypeLigneFacture;
 use App\Livewire\FactureEdit;
-use App\Models\Association;
 use App\Models\Facture;
 use App\Models\FactureLigne;
 use App\Models\Operation;
@@ -13,17 +12,15 @@ use App\Models\User;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
+// Le bootstrap global de tests/Pest.php (voir CLAUDE.md) crée déjà une
+// Association et boote TenantContext pour tout fichier sous Feature/ —
+// on la réutilise plutôt que d'en créer une seconde.
 beforeEach(function () {
-    $this->association = Association::factory()->create();
+    $this->association = TenantContext::requireCurrent();
     $this->user = User::factory()->create();
     $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
-    TenantContext::boot($this->association);
     session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
-});
-
-afterEach(function () {
-    TenantContext::clear();
 });
 
 it('la fiche facture ne propose pas une opération clôturée', function () {
