@@ -438,7 +438,16 @@ final class TransactionForm extends Component
             [
                 'affectations' => ['required', 'array', 'min:1'],
                 'affectations.*.montant' => ['required', 'numeric', MontantValidation::RULE],
-                'affectations.*.operation_id' => ['nullable'],
+                // IMP-06 : le scope global d'Eloquent ne couvre pas un `exists`
+                // de validation — la colonne association_id est donc explicite.
+                // Seule défense serveur conservée : c'est de la sécurité, pas du
+                // métier. Le statut de l'opération n'entre pas dans la règle.
+                'affectations.*.operation_id' => [
+                    'nullable',
+                    Rule::exists('operations', 'id')
+                        ->where('association_id', TenantContext::currentId())
+                        ->whereNull('deleted_at'),
+                ],
                 'affectations.*.seance' => ['nullable', 'integer', 'min:1'],
                 'affectations.*.notes' => ['nullable', 'string', 'max:255'],
             ],
@@ -682,7 +691,16 @@ final class TransactionForm extends Component
                 // DC-10a : ventilation compte-first (classe 6/7 via le sélecteur).
                 'lignes.*.compte_id' => ['required', 'exists:comptes,id'],
                 'lignes.*.montant' => ['required', 'numeric', MontantValidation::RULE],
-                'lignes.*.operation_id' => ['nullable'],
+                // IMP-06 : le scope global d'Eloquent ne couvre pas un `exists`
+                // de validation — la colonne association_id est donc explicite.
+                // Seule défense serveur conservée : c'est de la sécurité, pas du
+                // métier. Le statut de l'opération n'entre pas dans la règle.
+                'lignes.*.operation_id' => [
+                    'nullable',
+                    Rule::exists('operations', 'id')
+                        ->where('association_id', TenantContext::currentId())
+                        ->whereNull('deleted_at'),
+                ],
                 'lignes.*.seance' => ['nullable', 'integer', 'min:1'],
                 'lignes.*.notes' => ['nullable', 'string', 'max:255'],
             ],
