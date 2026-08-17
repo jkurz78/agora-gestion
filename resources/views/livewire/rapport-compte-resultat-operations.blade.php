@@ -495,6 +495,35 @@
                                         @endif
                                     </tr>
 
+                                    {{-- Une prévision de séance non datée ne peut pas être rattachée
+                                         à l'exercice affiché. Elle a sa propre ligne, et le total du
+                                         compte l'additionne explicitement.
+
+                                         Note : $sc['exercices'] vient de $charges/$produits, fusionnés
+                                         par mergePrevisionsIntoHierarchy() — cette fusion ne recopie que
+                                         les comptes/tiers, pas leur ventilation par exercice. Le montant
+                                         « non déterminé » est donc relu depuis $previsionsCharges /
+                                         $previsionsProduits, qui la portent déjà (buildUnifiedHierarchy
+                                         alimente 'exercices' sur cette hiérarchie séparée). --}}
+                                    @php
+                                        $prevScNonDetermine = collect($isDepenses ? $previsionsCharges : $previsionsProduits)
+                                            ->flatMap(fn ($c) => $c['comptes'])
+                                            ->firstWhere('compte_id', $sc['compte_id']);
+                                        $exNonDetermine = collect($prevScNonDetermine['exercices'] ?? [])->firstWhere('annee', 0);
+                                        $montantNonDetermine = (float) ($exNonDetermine['montant'] ?? 0);
+                                    @endphp
+                                    @if ($mode !== 'realise' && $montantNonDetermine > 0)
+                                        <tr style="background:#fff;">
+                                            <td></td>
+                                            <td style="padding:4px 12px 4px 52px;color:#777;font-size:12px;font-style:italic;">
+                                                Exercice non d&eacute;termin&eacute;
+                                            </td>
+                                            <td class="text-end" colspan="{{ $totalColspan - 2 }}" style="padding:4px 12px;color:#777;font-size:12px;">
+                                                {{ number_format($montantNonDetermine, 2, ',', ' ') }} &euro;
+                                            </td>
+                                        </tr>
+                                    @endif
+
                                     {{-- Lignes tiers --}}
                                     @if ($parTiers && ! empty($sc['tiers']))
                                         @foreach ($sc['tiers'] as $t)

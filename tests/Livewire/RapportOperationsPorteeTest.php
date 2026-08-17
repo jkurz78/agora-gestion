@@ -207,3 +207,21 @@ it('le contrôle de portée est présent dans la barre de filtres', function () 
         ->assertSeeHtml('Tous les exercices');
 });
 
+it('la sous-ligne Exercice non déterminé apparaît en portée courante quand une prévision non datée existe', function () {
+    porteeCrOpsDepense((int) $this->compteCharge->id, (int) $this->operation->id, 100.0, '2025-10-10');
+    porteeCrOpsPrevision((int) $this->compteCharge->id, (int) $this->operation->id, 40.0, null, 9);
+
+    Livewire::test(RapportCompteResultatOperations::class)
+        ->set('selectedOperationIds', [$this->operation->id])
+        ->set('mode', 'projection')
+        ->assertSee('Exercice non d&eacute;termin&eacute;', false);
+});
+
+it('la sous-ligne Exercice non déterminé n\'apparaît pas sans prévision non datée', function () {
+    porteeCrOpsDepense((int) $this->compteCharge->id, (int) $this->operation->id, 100.0, '2025-10-10');
+
+    Livewire::test(RapportCompteResultatOperations::class)
+        ->set('selectedOperationIds', [$this->operation->id])
+        ->set('mode', 'projection')
+        ->assertDontSee('Exercice non d&eacute;termin&eacute;', false);
+});
