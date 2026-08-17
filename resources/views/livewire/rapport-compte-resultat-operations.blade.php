@@ -99,6 +99,13 @@
                     <option value="projection">Projection</option>
                 </select>
 
+                {{-- Portée des exercices — contrôle unique : `all` élargit la
+                     période ET active les lignes d'exercice. --}}
+                <select wire:model.live="porteeExercices" class="form-select form-select-sm" style="width:auto;">
+                    <option value="current">Exercice affich&eacute;</option>
+                    <option value="all">Tous les exercices</option>
+                </select>
+
                 {{-- Toggles --}}
                 @if (count($selectedOperationIds) > 1)
                 <div class="form-check form-switch mb-0">
@@ -189,9 +196,20 @@
             } elseif ($mode === 'projection') {
                 $nbDataCols = 1;
             }
+            if ($porteeExercices === 'all' && ! $combinedMode && ! $parSeances && ! $parOperations) {
+                $nbDataCols = 1;
+            }
             $totalColspan = 2 + $nbDataCols;
         @endphp
 
+        @if ($porteeExercices === 'all')
+            @include('livewire.partials.rapport-operations-tableau-all', [
+                'sections' => [
+                    ['data' => $charges, 'label' => 'DÉPENSES', 'total' => $totalCharges, 'projParExercice' => $projChargesParExercice],
+                    ['data' => $produits, 'label' => 'RECETTES', 'total' => $totalProduits, 'projParExercice' => $projProduitsParExercice],
+                ],
+            ])
+        @else
         @php $projectedSectionTotals = []; $projectedOpSectionTotals = []; @endphp
         @foreach ([
             ['data' => $charges, 'prevDisplay' => $previsionsCharges, 'label' => 'DÉPENSES', 'totalMontant' => $totalCharges, 'proj' => $projCharges],
@@ -792,6 +810,7 @@
             <span>{{ $displayResultat >= 0 ? 'EXCÉDENT' : 'DÉFICIT' }}</span>
             <span>{{ number_format(abs($displayResultat), 2, ',', ' ') }} &euro;</span>
         </div>
+        @endif
         @endif
     @endif
 </div>
