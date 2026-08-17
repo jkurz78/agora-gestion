@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Rapports;
 
+use App\Enums\PorteeExercices;
 use App\Models\Famille;
 use App\Models\Operation;
 use App\Services\ExerciceService;
@@ -74,10 +75,15 @@ final class CompteResultatBuilder
 
     /**
      * Compte de résultat filtré par opérations. Pas de N-1 ni budget. Cotisations exclues.
-     * Optionnellement ventilé par séances et/ou par tiers.
+     * Optionnellement ventilé par séances, tiers, opérations et exercices.
+     *
+     * La portée s'ajoute EN FIN de signature pour ne casser aucun appel
+     * existant. En portée courante, la sortie est strictement celle d'avant,
+     * enrichie des clés `exercices` / `montant_exercices` que les consommateurs
+     * actuels peuvent ignorer.
      *
      * @param  array<int>  $operationIds
-     * @return array{charges: list<array>, produits: list<array>, seances?: list<int>}
+     * @return array{charges: list<array>, produits: list<array>, exercices: list<array{annee: int, label: string}>, seances?: list<int>}
      */
     public function compteDeResultatOperations(
         int $exercice,
@@ -86,8 +92,11 @@ final class CompteResultatBuilder
         bool $parTiers = false,
         bool $previsionnel = false,
         bool $parOperations = false,
+        PorteeExercices $portee = PorteeExercices::Courant,
     ): array {
-        [$start, $end] = $this->exerciceDates($exercice);
+        [$borneStart, $borneEnd] = $this->exerciceDates($exercice);
+        $start = $portee->estBornee() ? $borneStart : null;
+        $end = $portee->estBornee() ? $borneEnd : null;
 
         $projParExercice = $previsionnel ? $this->computeProjections($start, $end, $operationIds) : null;
 
@@ -199,7 +208,70 @@ final class CompteResultatBuilder
             $result['proj_produits_par_exercice'] = $projParExercice['produits'];
         }
 
+        $result['exercices'] = $this->listerExercices(
+            $result['charges'],
+            $result['produits'],
+            $previsionnel ? $result['previsions_charges'] : [],
+            $previsionnel ? $result['previsions_produits'] : [],
+        );
+
         return $result;
+    }
+
+    /**
+     * Liste des exercices affichés, du plus récent au plus ancien,
+     * « Exercice non déterminé » en dernier.
+     *
+     * Elle se construit sur les MONTANTS effectivement présents, jamais sur les
+     * dates des opérations ni sur le contenu de la table `exercices` : un
+     * exercice sans ligne en base peut parfaitement porter des mouvements, et
+     * une opération datée 2019 peut n'avoir de mouvements qu'en 2025.
+     *
+     * En mode projection, les exercices porteurs d'une prévision entrent aussi
+     * dans la liste — c'est tout l'intérêt du mode : une troisième année
+     * planifiée mais pas encore commencée doit être visible. En mode réalisé,
+     * la liste reste strictement celle des mouvements réels.
+     *
+     * @param  list<array<string, mixed>>  $charges
+     * @param  list<array<string, mixed>>  $produits
+     * @param  list<array<string, mixed>>  $previsionsCharges
+     * @param  list<array<string, mixed>>  $previsionsProduits
+     * @return list<array{annee: int, label: string}>
+     */
+    private function listerExercices(
+        array $charges,
+        array $produits,
+        array $previsionsCharges,
+        array $previsionsProduits,
+    ): array {
+        $annees = [];
+
+        foreach ([$charges, $produits, $previsionsCharges, $previsionsProduits] as $hierarchie) {
+            foreach ($hierarchie as $famille) {
+                foreach ($famille['exercices'] ?? [] as $ex) {
+                    if ((float) $ex['montant'] != 0.0) {
+                        $annees[(int) $ex['annee']] = true;
+                    }
+                }
+            }
+        }
+
+        $liste = array_keys($annees);
+        usort($liste, function (int $a, int $b): int {
+            if ($a === 0) {
+                return 1;
+            }
+            if ($b === 0) {
+                return -1;
+            }
+
+            return $b <=> $a;
+        });
+
+        return array_map(
+            fn (int $annee): array => ['annee' => $annee, 'label' => $this->labelExercice($annee)],
+            $liste,
+        );
     }
 
     /**

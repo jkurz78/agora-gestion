@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\PorteeExercices;
 use App\Services\Rapports\CompteResultatBuilder;
 use App\Services\Rapports\FluxTresorerieBuilder;
 use App\Services\Rapports\OperationsEligiblesQuery;
@@ -39,10 +40,10 @@ final class RapportService
 
     /**
      * Compte de résultat filtré par opérations. Pas de N-1 ni budget. Cotisations exclues.
-     * Optionnellement ventilé par séances et/ou par tiers.
+     * Optionnellement ventilé par séances, tiers, opérations et exercices.
      *
      * @param  array<int>  $operationIds
-     * @return array{charges: list<array>, produits: list<array>, seances?: list<int>}
+     * @return array{charges: list<array>, produits: list<array>, exercices: list<array>, seances?: list<int>}
      */
     public function compteDeResultatOperations(
         int $exercice,
@@ -51,8 +52,11 @@ final class RapportService
         bool $parTiers = false,
         bool $previsionnel = false,
         bool $parOperations = false,
+        PorteeExercices $portee = PorteeExercices::Courant,
     ): array {
-        return $this->compteResultat->compteDeResultatOperations($exercice, $operationIds, $parSeances, $parTiers, $previsionnel, $parOperations);
+        return $this->compteResultat->compteDeResultatOperations(
+            $exercice, $operationIds, $parSeances, $parTiers, $previsionnel, $parOperations, $portee,
+        );
     }
 
     /**
