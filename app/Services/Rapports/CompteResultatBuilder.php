@@ -89,7 +89,7 @@ final class CompteResultatBuilder
     ): array {
         [$start, $end] = $this->exerciceDates($exercice);
 
-        $projMatrices = $previsionnel ? $this->computeProjections($start, $end, $operationIds) : null;
+        $projParExercice = $previsionnel ? $this->computeProjections($start, $end, $operationIds) : null;
 
         // ── Un seul fetch, toutes dimensions ─────────────────────────────────
         $chargesMap = $this->fetchOperationRows('depense', $start, $end, $operationIds, $parSeances, $parTiers, $parOperations);
@@ -191,8 +191,12 @@ final class CompteResultatBuilder
             $result['produits'] = $this->mergePrevisionsIntoHierarchy($result['produits'], $prevP);
             $result['previsions_charges'] = $prevC;
             $result['previsions_produits'] = $prevP;
-            $result['proj_charges'] = $projMatrices['charges'];
-            $result['proj_produits'] = $projMatrices['produits'];
+            // Clés historiques : matrice unique, somme des exercices. Le rendu
+            // courant et les exports continuent de les lire sans changement.
+            $result['proj_charges'] = $this->fusionnerMatrices($projParExercice['charges']);
+            $result['proj_produits'] = $this->fusionnerMatrices($projParExercice['produits']);
+            $result['proj_charges_par_exercice'] = $projParExercice['charges'];
+            $result['proj_produits_par_exercice'] = $projParExercice['produits'];
         }
 
         return $result;
@@ -1467,190 +1471,141 @@ final class CompteResultatBuilder
     }
 
     /**
-     * Calcule les montants projetés dans une ProjectionMatrix :
-     * réel > 0 → réel, sinon prévu, au grain (sc, tiers, séance, opération).
+     * Matrices de projection, une par exercice.
+     *
+     * La règle « réel s'il existe, sinon prévu » est appliquée cellule par
+     * cellule au grain (compte, tiers, séance, opération) — mais SÉPARÉMENT PAR
+     * EXERCICE. Une matrice globale masquerait la prévision d'une année dès
+     * qu'une autre année porte du réalisé sur la même cellule, ce qui vide la
+     * projection pluriannuelle de son objet.
      *
      * @param  array<int>  $operationIds
-     * @return array{charges: ProjectionMatrix, produits: ProjectionMatrix}
+     * @return array{charges: array<int, ProjectionMatrix>, produits: array<int, ProjectionMatrix>}
      */
-    private function computeProjections(string $start, string $end, array $operationIds): array
+    private function computeProjections(?string $start, ?string $end, array $operationIds): array
     {
         $result = [];
 
-        foreach (['depense', 'produits'] as $type) {
-            $matrix = new ProjectionMatrix;
-            $dbType = $type === 'produits' ? 'recette' : $type;
+        foreach (['depense' => 'charges', 'recette' => 'produits'] as $dbType => $key) {
+            // Réel au grain (exercice, sc, tiers, séance, op)
+            $reelMap = $this->fetchOperationRows($dbType, $start, $end, $operationIds, true, true, true);
 
-            // Réel au grain (sc, tiers, séance, op)
-            $reelMap = $this->fetchOperationRows(
-                $dbType, $start, $end, $operationIds, true, true, true,
-            );
+            // Prévu au même grain — porte déjà famille_id, plus besoin d'un
+            // lookup séparé pour les comptes prévision-only.
+            $prevMap = $this->fetchPrevisionsFlatEntries($dbType, $operationIds, true, true, true, $start, $end);
 
-            $reelGrid = []; // [sc][tiers][seance][op] = montant
-            $scToCat = [];
+            $reelGrid = []; // [annee][sc][tiers][seance][op] = montant
+            $prevGrid = []; // idem
+            $scToCat = [];  // sc => catId, première occurrence gagne
+
             foreach ($reelMap as $row) {
+                $annee = (int) $row['exercice'];
                 $scId = (int) $row['compte_id'];
                 $tiersId = (int) $row['tiers_id'];
                 $seance = (int) $row['seance'];
                 $opId = (int) $row['operation_id'];
-                $reelGrid[$scId][$tiersId][$seance][$opId] = (float) $row['montant'];
+                $reelGrid[$annee][$scId][$tiersId][$seance][$opId] = (float) $row['montant'];
                 if (! isset($scToCat[$scId])) {
                     $scToCat[$scId] = (int) $row['famille_id'];
                 }
             }
 
-            // Prévu au grain (sc, tiers, séance, op)
-            $prevGrid = $type === 'depense'
-                ? $this->fetchFlatPrevisionsCharges($operationIds)
-                : $this->fetchFlatPrevisionsProduits($operationIds);
-
-            // Collect scToCat from prévisions too
-            foreach ($prevGrid as $scId => $tiersList) {
+            foreach ($prevMap as $row) {
+                $annee = (int) $row['exercice'];
+                $scId = (int) $row['compte_id'];
+                $tiersId = (int) $row['tiers_id'];
+                $seance = (int) $row['seance'];
+                $opId = (int) $row['operation_id'];
+                $prevGrid[$annee][$scId][$tiersId][$seance][$opId] = (float) $row['montant'];
                 if (! isset($scToCat[$scId])) {
-                    $scToCat[$scId] = $this->lookupCategoryForSc($scId);
+                    $scToCat[$scId] = (int) $row['famille_id'];
                 }
             }
 
-            // Register sc→cat mappings
-            foreach ($scToCat as $scId => $catId) {
-                $matrix->setScCategory($scId, $catId);
-            }
+            $annees = array_unique(array_merge(array_keys($reelGrid), array_keys($prevGrid)));
 
-            // Enumerate all (sc, tiers, séance, op) cells from both grids
-            $allScIds = array_unique(array_merge(
-                array_keys($reelGrid),
-                array_keys($prevGrid),
-            ));
+            $matrices = [];
+            foreach ($annees as $annee) {
+                $matrix = new ProjectionMatrix;
+                foreach ($scToCat as $scId => $catId) {
+                    $matrix->setScCategory($scId, $catId);
+                }
 
-            foreach ($allScIds as $scId) {
-                $allTiersIds = array_unique(array_merge(
-                    array_keys($reelGrid[$scId] ?? []),
-                    array_keys($prevGrid[$scId] ?? []),
-                ));
+                $reelAnnee = $reelGrid[$annee] ?? [];
+                $prevAnnee = $prevGrid[$annee] ?? [];
 
-                foreach ($allTiersIds as $tiersId) {
-                    $allSeances = array_unique(array_merge(
-                        array_keys($reelGrid[$scId][$tiersId] ?? []),
-                        array_keys($prevGrid[$scId][$tiersId] ?? []),
+                $allScIds = array_unique(array_merge(array_keys($reelAnnee), array_keys($prevAnnee)));
+
+                foreach ($allScIds as $scId) {
+                    $allTiersIds = array_unique(array_merge(
+                        array_keys($reelAnnee[$scId] ?? []),
+                        array_keys($prevAnnee[$scId] ?? []),
                     ));
 
-                    foreach ($allSeances as $seance) {
-                        $allOps = array_unique(array_merge(
-                            array_keys($reelGrid[$scId][$tiersId][$seance] ?? []),
-                            array_keys($prevGrid[$scId][$tiersId][$seance] ?? []),
+                    foreach ($allTiersIds as $tiersId) {
+                        $allSeances = array_unique(array_merge(
+                            array_keys($reelAnnee[$scId][$tiersId] ?? []),
+                            array_keys($prevAnnee[$scId][$tiersId] ?? []),
                         ));
 
-                        foreach ($allOps as $opId) {
-                            $reel = (float) ($reelGrid[$scId][$tiersId][$seance][$opId] ?? 0);
-                            $prevu = (float) ($prevGrid[$scId][$tiersId][$seance][$opId] ?? 0);
-                            $proj = $reel > 0 ? $reel : $prevu;
-                            if ($proj != 0.0) {
-                                $matrix->set((int) $scId, (int) $tiersId, (int) $seance, (int) $opId, $proj);
+                        foreach ($allSeances as $seance) {
+                            $allOps = array_unique(array_merge(
+                                array_keys($reelAnnee[$scId][$tiersId][$seance] ?? []),
+                                array_keys($prevAnnee[$scId][$tiersId][$seance] ?? []),
+                            ));
+
+                            foreach ($allOps as $opId) {
+                                $reel = (float) ($reelAnnee[$scId][$tiersId][$seance][$opId] ?? 0);
+                                $prevu = (float) ($prevAnnee[$scId][$tiersId][$seance][$opId] ?? 0);
+                                $proj = $reel > 0 ? $reel : $prevu;
+                                if ($proj != 0.0) {
+                                    $matrix->set((int) $scId, (int) $tiersId, (int) $seance, (int) $opId, $proj);
+                                }
                             }
                         }
                     }
                 }
+
+                $matrices[$annee] = $matrix;
             }
 
-            $key = $type === 'depense' ? 'charges' : 'produits';
-            $result[$key] = $matrix;
+            krsort($matrices);
+
+            $result[$key] = $matrices;
         }
 
         return $result;
     }
 
     /**
-     * Prévisions charges (encadrement_previsions) au grain plat : [compte_id][tiers][séance][op] = montant.
+     * Matrice unique, somme des matrices par exercice.
      *
-     * Clé de grain alignée sur {@see fetchOperationRows} (DC-4 : compte_id, résolu depuis
-     * compte_id via code_cerfa = numero_pcg) — indispensable pour que
-     * {@see computeProjections} puisse fusionner réel et prévu sur la même clé.
+     * Elle alimente les clés historiques `proj_charges` / `proj_produits`, dont
+     * dépendent le rendu courant de l'écran et les deux exports. Les garder
+     * intactes est ce qui permet d'ajouter la dimension exercice sans réécrire
+     * les huit combinaisons d'axes existantes.
      *
-     * @param  array<int>  $operationIds
-     * @return array<int, array<int, array<int, array<int, float>>>>
+     * @param  array<int, ProjectionMatrix>  $matrices
      */
-    private function fetchFlatPrevisionsCharges(array $operationIds): array
+    private function fusionnerMatrices(array $matrices): ProjectionMatrix
     {
-        $q = DB::table('encadrement_previsions as ep')
-            ->join('comptes as cpt', 'cpt.id', '=', 'ep.compte_id')
-            ->join('seances as s', 's.id', '=', 'ep.seance_id')
-            ->whereIn('ep.operation_id', $operationIds)
-            ->tap(fn (Builder $query) => $this->scopeToCurrentTenant($query, 'ep.association_id'));
-        $this->joinFamille($q);
-        $rows = $q
-            ->select([
-                DB::raw('cpt.id as compte_id'),
-                DB::raw('COALESCE(ep.tiers_id, 0) as tiers_id'),
-                's.numero as seance',
-                'ep.operation_id',
-                DB::raw('SUM(ep.montant_prevu) as montant'),
-            ])
-            ->groupBy('cpt.id', 'ep.tiers_id', 's.numero', 'ep.operation_id')
-            ->get();
+        $merged = new ProjectionMatrix;
 
-        $grid = [];
-        foreach ($rows as $row) {
-            $grid[(int) $row->compte_id][(int) $row->tiers_id][(int) $row->seance][(int) $row->operation_id]
-                = (float) $row->montant;
+        foreach ($matrices as $matrix) {
+            foreach ($matrix->scCategories() as $scId => $catId) {
+                $merged->setScCategory((int) $scId, (int) $catId);
+            }
+            foreach ($matrix->cells() as $scId => $parTiers) {
+                foreach ($parTiers as $tiersId => $parSeance) {
+                    foreach ($parSeance as $seance => $parOp) {
+                        foreach ($parOp as $opId => $valeur) {
+                            $merged->add((int) $scId, (int) $tiersId, (int) $seance, (int) $opId, (float) $valeur);
+                        }
+                    }
+                }
+            }
         }
 
-        return $grid;
-    }
-
-    /**
-     * Prévisions produits (reglements.montant_prevu) au grain plat : [compte_id][tiers][séance][op] = montant.
-     *
-     * Clé de grain alignée sur {@see fetchOperationRows} (DC-4), même raison que
-     * {@see fetchFlatPrevisionsCharges}.
-     *
-     * @param  array<int>  $operationIds
-     * @return array<int, array<int, array<int, array<int, float>>>>
-     */
-    private function fetchFlatPrevisionsProduits(array $operationIds): array
-    {
-        $q = DB::table('reglements as r')
-            ->join('participants as p', 'p.id', '=', 'r.participant_id')
-            ->join('operations as op', 'op.id', '=', 'p.operation_id')
-            ->join('type_operations as to_', 'to_.id', '=', 'op.type_operation_id')
-            ->join('comptes as cpt', 'cpt.id', '=', 'to_.compte_id')
-            ->join('seances as s', 's.id', '=', 'r.seance_id')
-            ->whereIn('p.operation_id', $operationIds)
-            ->where('r.montant_prevu', '>', 0)
-            ->tap(fn (Builder $query) => $this->scopeToCurrentTenant($query, 'op.association_id'));
-        $this->joinFamille($q);
-        $rows = $q
-            ->select([
-                DB::raw('cpt.id as compte_id'),
-                DB::raw('COALESCE(p.tiers_id, 0) as tiers_id'),
-                's.numero as seance',
-                'p.operation_id',
-                DB::raw('SUM(r.montant_prevu) as montant'),
-            ])
-            ->groupBy('cpt.id', 'p.tiers_id', 's.numero', 'p.operation_id')
-            ->get();
-
-        $grid = [];
-        foreach ($rows as $row) {
-            $grid[(int) $row->compte_id][(int) $row->tiers_id][(int) $row->seance][(int) $row->operation_id]
-                = (float) $row->montant;
-        }
-
-        return $grid;
-    }
-
-    /**
-     * Lookup famille (compte_id retourné par fetchOperationRows/fetchFlatPrevisions*) pour un
-     * compte sans ligne réalisée (fallback pour compte prévision-only).
-     */
-    private function lookupCategoryForSc(int $scId): int
-    {
-        return (int) DB::table('comptes')
-            ->leftJoin('familles', function ($join): void {
-                $join->on('familles.code', '=', DB::raw('SUBSTR(comptes.numero_pcg, 1, 2)'))
-                    ->on('familles.association_id', '=', 'comptes.association_id');
-            })
-            ->tap(fn (Builder $query) => $this->scopeToCurrentTenant($query, 'comptes.association_id'))
-            ->where('comptes.id', $scId)
-            ->value('familles.id');
+        return $merged;
     }
 }
