@@ -1353,11 +1353,51 @@ final class CompteResultatBuilder
                         }
                     }
                 }
+
+                // Un compte qui n'existe qu'en prévision arrivait ici sans
+                // aucune entrée d'exercice : en portée « tous les exercices »,
+                // la vue itère sur `exercices` pour produire ses lignes, il
+                // n'aurait donc affiché aucune ligne — son montant projeté
+                // invisible, alors que son exercice figure bien dans la liste
+                // globale du rapport. On fusionne les années des deux côtés.
+                //
+                // Les montants portés ici ne servent qu'à faire exister la
+                // ligne : en projection, la vue lit la matrice de l'exercice.
+                $byScId[$scId] = $this->fusionnerExercices($byScId[$scId], $prevSc);
             }
             $byCatId[$catId]['comptes'] = array_values($byScId);
+            $byCatId[$catId] = $this->fusionnerExercices($byCatId[$catId], $prevCat);
         }
 
         return array_values($byCatId);
+    }
+
+    /**
+     * Union des entrées d'exercice d'un nœud réalisé et de son homologue
+     * prévisionnel, l'entrée réalisée l'emportant quand l'année existe des
+     * deux côtés.
+     *
+     * @param  array<string, mixed>  $noeud
+     * @param  array<string, mixed>  $prevision
+     * @return array<string, mixed>
+     */
+    private function fusionnerExercices(array $noeud, array $prevision): array
+    {
+        $parAnnee = [];
+        foreach ($noeud['exercices'] ?? [] as $ex) {
+            $parAnnee[(int) $ex['annee']] = $ex;
+        }
+        foreach ($prevision['exercices'] ?? [] as $ex) {
+            $parAnnee[(int) $ex['annee']] ??= $ex;
+        }
+
+        if ($parAnnee === []) {
+            return $noeud;
+        }
+
+        [$noeud['exercices'], $noeud['montant_exercices']] = $this->flattenExercices($parAnnee);
+
+        return $noeud;
     }
 
     /**

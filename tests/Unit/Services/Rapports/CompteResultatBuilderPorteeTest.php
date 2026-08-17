@@ -304,3 +304,32 @@ it('ne compte le réalisé qu\'une fois par exercice, quels que soient les axes'
 
     expect(round(collect($data['charges'])->sum('montant_exercices'), 2))->toBe(150.0);
 })->with('axesPortee');
+
+it('expose les exercices d\'un compte qui n\'existe qu\'en prévision', function () {
+    // Le compte de charge ne porte AUCUN mouvement réel : il n'entre dans la
+    // hiérarchie que par mergePrevisionsIntoHierarchy(). Sans fusion des
+    // entrées d'exercice, il arrivait sans clé `exercices` — la vue en portée
+    // « tous les exercices » itère dessus pour produire ses lignes, le compte
+    // n'aurait donc affiché aucune ligne malgré un montant projeté réel.
+    $compteSansReel = Compte::create([
+        'association_id' => (int) TenantContext::currentId(),
+        'numero_pcg' => '622', 'intitule' => 'Encadrement prévu seulement',
+        'classe' => 6, 'lettrable' => false, 'actif' => true, 'est_systeme' => false, 'pour_inscriptions' => false,
+    ]);
+
+    // Un mouvement réel sur un AUTRE compte, pour que l'opération reste
+    // éligible et que la hiérarchie réalisée ne soit pas vide.
+    porteeDepense((int) $this->compteCharge->id, (int) $this->operation->id, 100.0, '2025-10-10');
+    porteePrevision((int) $compteSansReel->id, (int) $this->operation->id, 300.0, '2027-10-10', 3);
+
+    $data = porteeRapport(['portee' => PorteeExercices::Tous, 'previsionnel' => true]);
+
+    $comptes = collect($data['charges'])->flatMap(fn (array $f): array => $f['comptes'])->keyBy('compte_nom');
+
+    expect($comptes)->toHaveKey('Encadrement prévu seulement');
+
+    $prevu = $comptes['Encadrement prévu seulement'];
+
+    expect($prevu['exercices'] ?? [])->not->toBeEmpty()
+        ->and(collect($prevu['exercices'])->pluck('annee')->all())->toBe([2027]);
+});
