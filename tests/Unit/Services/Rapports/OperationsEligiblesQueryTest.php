@@ -195,3 +195,36 @@ it('normaliser retourne un tableau vide quand tout est écarté', function () {
 
     expect($this->query->normaliser(['999999'], 2025))->toBe([]);
 });
+
+it('ignore une opération supprimée logiquement, même avec un mouvement courant', function () {
+    // Operation utilise SoftDeletes, et une suppression logique ne nullifie pas
+    // la clé étrangère : la ligne continue de pointer dessus. Sans le filtre,
+    // l'id resterait éligible alors que l'arbre du sélecteur — qui passe par
+    // Eloquent — ne la propose plus.
+    $op = operationTest('Supprimée');
+    ligneDirecte((int) $this->compte606->id, (int) $op->id, '2025-10-01');
+
+    expect($this->query->pourExercice(2025))->toBe([(int) $op->id]);
+
+    $op->delete();
+
+    expect($this->query->pourExercice(2025))->toBe([])
+        ->and($this->query->normaliser([(int) $op->id], 2025))->toBe([]);
+});
+
+it('ignore une opération supprimée portée par une affectation ventilée', function () {
+    $op = operationTest('Supprimée ventilée');
+    $ligne = ligneDirecte((int) $this->compte606->id, null, '2025-10-01');
+    TransactionLigneAffectation::create([
+        'transaction_ligne_id' => $ligne->id,
+        'operation_id' => $op->id,
+        'seance' => 1,
+        'montant' => 100.0,
+    ]);
+
+    expect($this->query->pourExercice(2025))->toBe([(int) $op->id]);
+
+    $op->delete();
+
+    expect($this->query->pourExercice(2025))->toBe([]);
+});
