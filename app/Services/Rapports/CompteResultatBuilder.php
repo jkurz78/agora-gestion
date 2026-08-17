@@ -461,6 +461,56 @@ final class CompteResultatBuilder
                 $categories[$catId]['seance_operations'][$seance][$opId]
                     = ($categories[$catId]['seance_operations'][$seance][$opId] ?? 0.0) + $montant;
             }
+
+            // ── Accumulation par exercice ────────────────────────────────────
+            $annee = (int) ($entry['exercice'] ?? 0);
+
+            $this->accumulerExercice(
+                $categories[$catId], $annee, $montant, $entry,
+                $withSeance, $withOperation, $allSeances, $zeroOps,
+            );
+            $this->accumulerExercice(
+                $categories[$catId]['comptes_map'][$scId], $annee, $montant, $entry,
+                $withSeance, $withOperation, $allSeances, $zeroOps,
+            );
+
+            if ($withTiers) {
+                $tiersId = $entry['tiers_id'];
+                $exNode = &$categories[$catId]['comptes_map'][$scId]['exercices_map'][$annee];
+                if (! isset($exNode['tiers_map'][$tiersId])) {
+                    $exNode['tiers_map'][$tiersId] = [
+                        'tiers_id' => $tiersId,
+                        'label' => $this->formatTiersLabel($entry),
+                        'type' => $tiersId === 0 ? null : $entry['tiers_type'],
+                        'montant' => 0.0,
+                    ];
+                    if ($withSeance) {
+                        $exNode['tiers_map'][$tiersId]['seances'] = array_fill_keys($allSeances, 0.0);
+                    }
+                    if ($withOperation) {
+                        $exNode['tiers_map'][$tiersId]['operations'] = $zeroOps;
+                    }
+                    if ($withSeance && $withOperation) {
+                        $exNode['tiers_map'][$tiersId]['seance_operations'] = [];
+                    }
+                }
+
+                $exNode['tiers_map'][$tiersId]['montant'] += $montant;
+                if ($withSeance) {
+                    $exNode['tiers_map'][$tiersId]['seances'][$entry['seance']]
+                        = ($exNode['tiers_map'][$tiersId]['seances'][$entry['seance']] ?? 0.0) + $montant;
+                }
+                if ($withOperation) {
+                    $opId = $entry['operation_id'];
+                    $exNode['tiers_map'][$tiersId]['operations'][$opId]
+                        = ($exNode['tiers_map'][$tiersId]['operations'][$opId] ?? 0.0) + $montant;
+                }
+                if ($withSeance && $withOperation) {
+                    $exNode['tiers_map'][$tiersId]['seance_operations'][$entry['seance']][$entry['operation_id']]
+                        = ($exNode['tiers_map'][$tiersId]['seance_operations'][$entry['seance']][$entry['operation_id']] ?? 0.0) + $montant;
+                }
+                unset($exNode);
+            }
         }
 
         // ── Flatten & sort ───────────────────────────────────────────────────
@@ -474,16 +524,144 @@ final class CompteResultatBuilder
                     $sc['tiers'] = $tiers;
                     unset($sc['tiers_map']);
                 }
+
+                $exercicesSc = $sc['exercices_map'] ?? [];
+                foreach ($exercicesSc as $annee => $ex) {
+                    if (! isset($ex['tiers_map'])) {
+                        continue;
+                    }
+                    $exTiers = array_values($ex['tiers_map']);
+                    usort($exTiers, fn ($a, $b) => strcmp($a['label'], $b['label']));
+                    $exercicesSc[$annee]['tiers'] = $exTiers;
+                    unset($exercicesSc[$annee]['tiers_map']);
+                }
+                [$sc['exercices'], $sc['montant_exercices']] = $this->flattenExercices($exercicesSc);
+                unset($sc['exercices_map']);
+
                 $scs[] = $sc;
             }
             usort($scs, fn ($a, $b) => strcmp($a['compte_nom'], $b['compte_nom']));
             $cat['comptes'] = $scs;
             unset($cat['comptes_map']);
+
+            [$cat['exercices'], $cat['montant_exercices']] = $this->flattenExercices($cat['exercices_map'] ?? []);
+            unset($cat['exercices_map']);
+
             $result[] = $cat;
         }
         usort($result, fn ($a, $b) => strcmp($a['famille_nom'], $b['famille_nom']));
 
         return $result;
+    }
+
+    /**
+     * Libellé d'un exercice.
+     *
+     * Seule exception à « tout passe par ExerciceService » : la clé 0 n'est pas
+     * une année. Elle regroupe les prévisions dont la séance n'a pas de date,
+     * et `label(0)` produirait « 0-1 ». Son intitulé est donc littéral.
+     */
+    private function labelExercice(int $annee): string
+    {
+        return $annee === 0
+            ? 'Exercice non déterminé'
+            : $this->exerciceService->label($annee);
+    }
+
+    /**
+     * Accumule un montant dans la sous-entrée d'exercice d'un nœud de la
+     * hiérarchie (famille ou compte).
+     *
+     * Les mêmes dimensions que le nœud parent sont maintenues à l'intérieur de
+     * chaque exercice : sans cela, activer « Tous les exercices » ferait perdre
+     * les colonnes de séances ou d'opérations. L'exercice est une dimension de
+     * LIGNE, il ne remplace aucune colonne.
+     *
+     * @param  array<string, mixed>  $node
+     * @param  array<string, mixed>  $entry
+     * @param  list<int>  $allSeances
+     * @param  array<int, float>|null  $zeroOps
+     */
+    private function accumulerExercice(
+        array &$node,
+        int $annee,
+        float $montant,
+        array $entry,
+        bool $withSeance,
+        bool $withOperation,
+        array $allSeances,
+        ?array $zeroOps,
+    ): void {
+        if (! isset($node['exercices_map'][$annee])) {
+            $ex = [
+                'annee' => $annee,
+                'label' => $this->labelExercice($annee),
+                'montant' => 0.0,
+            ];
+            if ($withSeance) {
+                $ex['seances'] = array_fill_keys($allSeances, 0.0);
+            }
+            if ($withOperation) {
+                $ex['operations'] = $zeroOps;
+            }
+            if ($withSeance && $withOperation) {
+                $ex['seance_operations'] = [];
+            }
+            $node['exercices_map'][$annee] = $ex;
+        }
+
+        $node['exercices_map'][$annee]['montant'] += $montant;
+
+        if ($withSeance) {
+            $seance = (int) $entry['seance'];
+            $node['exercices_map'][$annee]['seances'][$seance]
+                = ($node['exercices_map'][$annee]['seances'][$seance] ?? 0.0) + $montant;
+        }
+        if ($withOperation) {
+            $opId = (int) $entry['operation_id'];
+            $node['exercices_map'][$annee]['operations'][$opId]
+                = ($node['exercices_map'][$annee]['operations'][$opId] ?? 0.0) + $montant;
+        }
+        if ($withSeance && $withOperation) {
+            $seance = (int) $entry['seance'];
+            $opId = (int) $entry['operation_id'];
+            $node['exercices_map'][$annee]['seance_operations'][$seance][$opId]
+                = ($node['exercices_map'][$annee]['seance_operations'][$seance][$opId] ?? 0.0) + $montant;
+        }
+    }
+
+    /**
+     * Transforme `exercices_map` en liste triée du plus récent au plus ancien,
+     * « Exercice non déterminé » (clé 0) toujours en dernier.
+     *
+     * Retourne aussi la somme des montants retenus : elle devient
+     * `montant_exercices`, le seul total que la vue doit afficher en portée
+     * « tous les exercices ». Faire recalculer cette somme par Blade rouvrirait
+     * la porte à un total qui ne couvre pas exactement les lignes affichées.
+     *
+     * @param  array<int, array<string, mixed>>  $map
+     * @return array{list<array<string, mixed>>, float}
+     */
+    private function flattenExercices(array $map): array
+    {
+        $entries = array_values($map);
+        usort($entries, function (array $a, array $b): int {
+            if ((int) $a['annee'] === 0) {
+                return 1;
+            }
+            if ((int) $b['annee'] === 0) {
+                return -1;
+            }
+
+            return (int) $b['annee'] <=> (int) $a['annee'];
+        });
+
+        $total = 0.0;
+        foreach ($entries as $entry) {
+            $total += (float) $entry['montant'];
+        }
+
+        return [$entries, $total];
     }
 
     /**
