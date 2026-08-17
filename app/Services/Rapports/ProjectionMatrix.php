@@ -26,6 +26,31 @@ final class ProjectionMatrix
         $this->cache = [];
     }
 
+    /**
+     * Cumule au lieu d'écraser. Indispensable pour fusionner les matrices de
+     * plusieurs exercices : la même cellule (compte, tiers, séance, opération)
+     * peut exister dans deux exercices différents, et `set()` ferait alors
+     * disparaître le premier montant en silence.
+     */
+    public function add(int $scId, int $tiersId, int $seance, int $opId, float $value): void
+    {
+        $this->cells[$scId][$tiersId][$seance][$opId]
+            = ($this->cells[$scId][$tiersId][$seance][$opId] ?? 0.0) + $value;
+        $this->cache = [];
+    }
+
+    /** @return array<int, array<int, array<int, array<int, float>>>> */
+    public function cells(): array
+    {
+        return $this->cells;
+    }
+
+    /** @return array<int, int> scId => catId */
+    public function scCategories(): array
+    {
+        return $this->scToCat;
+    }
+
     public function isEmpty(): bool
     {
         return $this->cells === [];
