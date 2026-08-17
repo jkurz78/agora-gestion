@@ -9,6 +9,7 @@ use App\Models\Operation;
 use App\Models\Tiers;
 use App\Services\ExerciceService;
 use App\Tenant\TenantContext;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -323,8 +324,8 @@ final class CompteResultatBuilder
      */
     private function fetchOperationRows(
         string $type,
-        string $start,
-        string $end,
+        ?string $start,
+        ?string $end,
         array $operationIds,
         bool $withSeance,
         bool $withTiers,
@@ -859,13 +860,15 @@ final class CompteResultatBuilder
      * en récupérant le compte de la ligne parente. Le total est cohérent car
      * SUM(affectations.montant) = ligne.montant pour une ligne complètement affectée.
      *
+     * @param  string|null  $start  null en portée « tous les exercices » — aucune borne de date
+     * @param  string|null  $end  null en portée « tous les exercices » — aucune borne de date
      * @param  array<int>  $operationIds
-     * @return array<string, array>
+     * @return array<string, array> clé : exercice_compte[_tiers][_seance][_op]
      */
     private function fetchOperationRowsPD(
         string $type,
-        string $start,
-        string $end,
+        ?string $start,
+        ?string $end,
         array $operationIds,
         bool $withSeance,
         bool $withTiers,
@@ -879,8 +882,14 @@ final class CompteResultatBuilder
             DB::raw("COALESCE(CONCAT(f.code, ' — ', f.nom), '(sans famille)') as famille_nom"),
             DB::raw('c.id as compte_id'),
             DB::raw('c.intitule as compte_nom'),
+            // L'agrégation SQL descend au grain date ; l'année d'exercice est
+            // ensuite calculée en PHP par ExerciceService::anneeForDate().
+            // Aucune expression de date spécifique à un moteur n'est écrite ici
+            // — SQLite (tests) et MySQL (prod) n'ont pas la même, et le
+            // calendrier d'exercice appartient de toute façon au tenant.
+            DB::raw('tx.date as tx_date'),
         ];
-        $baseGroup = ['c.id', 'c.intitule', 'f.id', 'f.code', 'f.nom'];
+        $baseGroup = ['c.id', 'c.intitule', 'f.id', 'f.code', 'f.nom', 'tx.date'];
 
         if ($withTiers) {
             $baseCols = array_merge($baseCols, [
@@ -923,7 +932,13 @@ final class CompteResultatBuilder
             ->whereNull('tx.deleted_at')
             ->whereNull('tla.id')  // Lignes sans affectations
             ->whereIn('tl.operation_id', $operationIds)
-            ->whereBetween('tx.date', [$start, $end])
+            // Portée « tous les exercices » : aucune borne. La date reste
+            // sélectionnée et groupée dans les deux cas — c'est elle qui porte
+            // l'exercice.
+            ->when(
+                $start !== null && $end !== null,
+                fn (Builder $q) => $q->whereBetween('tx.date', [$start, $end]),
+            )
             ->tap(fn (Builder $query) => $this->scopeToCurrentTenant($query, 'c.association_id'))
             ->select($q1Cols)
             ->groupBy($q1Group);
@@ -959,7 +974,13 @@ final class CompteResultatBuilder
             ->whereNull('tl.deleted_at')
             ->whereNull('tx.deleted_at')
             ->whereIn('tla2.operation_id', $operationIds)
-            ->whereBetween('tx.date', [$start, $end])
+            // Portée « tous les exercices » : aucune borne. La date reste
+            // sélectionnée et groupée dans les deux cas — c'est elle qui porte
+            // l'exercice.
+            ->when(
+                $start !== null && $end !== null,
+                fn (Builder $q) => $q->whereBetween('tx.date', [$start, $end]),
+            )
             ->tap(fn (Builder $query) => $this->scopeToCurrentTenant($query, 'c.association_id'))
             ->select($q2Cols)
             ->groupBy($q2Group);
@@ -971,7 +992,11 @@ final class CompteResultatBuilder
         $map = [];
         foreach ([$q1->get(), $q2->get()] as $rows) {
             foreach ($rows as $row) {
-                $key = (string) $row->compte_id;
+                $annee = $this->exerciceService->anneeForDate(
+                    CarbonImmutable::parse((string) $row->tx_date)
+                );
+
+                $key = $annee.'_'.$row->compte_id;
                 if ($withTiers) {
                     $key .= '_'.$row->tiers_id;
                 }
@@ -986,6 +1011,7 @@ final class CompteResultatBuilder
                     $map[$key]['montant'] += (float) $row->montant;
                 } else {
                     $entry = [
+                        'exercice' => $annee,
                         'famille_id' => (int) $row->famille_id,
                         'famille_nom' => $row->famille_nom,
                         'compte_id' => (int) $row->compte_id,
