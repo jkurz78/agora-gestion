@@ -498,9 +498,36 @@ final class RapportExportController extends Controller
         ]);
     }
 
+    /**
+     * SEL-04 — Opérations retenues pour un export : les ids de la requête,
+     * intersectés avec ceux qui portent un mouvement de résultat sur
+     * l'exercice.
+     *
+     * Un export dont aucune opération ne survit échoue en 422 plutôt que de
+     * produire un document vide : une feuille de calcul sans ligne, ou un PDF
+     * réduit à son en-tête, se lit comme un résultat comptable nul, pas comme
+     * une erreur de sélection. L'écran, lui, affiche son invite — la même
+     * situation ne peut pas se solder par un silence côté fichier.
+     *
+     * @return list<int>
+     */
+    private function operationsExport(RapportService $rapportService, int $exercice, Request $request): array
+    {
+        $operationIds = $rapportService->normaliserOperations(
+            (array) $request->query('ops', []),
+            $exercice,
+        );
+
+        if ($operationIds === []) {
+            abort(422, 'Aucune opération sélectionnée ne comporte de mouvement sur l’exercice affiché.');
+        }
+
+        return $operationIds;
+    }
+
     private function xlsxOperations(RapportService $rapportService, int $exercice, Request $request): Spreadsheet
     {
-        $operationIds = array_map('intval', (array) $request->query('ops', []));
+        $operationIds = $this->operationsExport($rapportService, $exercice, $request);
         $parSeances = $request->boolean('seances');
         $parTiers = $request->boolean('tiers');
         $mode = $request->query('mode', 'realise');
@@ -1476,7 +1503,7 @@ final class RapportExportController extends Controller
 
     private function pdfOperationsData(RapportService $rapportService, int $exercice, Request $request): array
     {
-        $operationIds = array_map('intval', (array) $request->query('ops', []));
+        $operationIds = $this->operationsExport($rapportService, $exercice, $request);
         $parSeances = $request->boolean('seances');
         $parTiers = $request->boolean('tiers');
         $mode = (string) $request->query('mode', 'realise');
