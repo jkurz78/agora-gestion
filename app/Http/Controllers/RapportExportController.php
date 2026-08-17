@@ -1820,8 +1820,9 @@ final class RapportExportController extends Controller
         $mode = (string) $request->query('mode', 'realise');
         $previsionnel = $mode !== 'realise';
         $parOperations = $request->boolean('parops');
+        $portee = PorteeExercices::depuisRequete((string) $request->query('exercices', 'current'));
 
-        $data = $rapportService->compteDeResultatOperations($exercice, $operationIds, $parSeances, $parTiers, $previsionnel, $parOperations);
+        $data = $rapportService->compteDeResultatOperations($exercice, $operationIds, $parSeances, $parTiers, $previsionnel, $parOperations, $portee);
         $seances = $data['seances'] ?? [];
         $operationNames = $data['operation_names'] ?? [];
         $seancesParOperation = $data['seances_par_operation'] ?? [];
@@ -1833,6 +1834,13 @@ final class RapportExportController extends Controller
         if ($mode === 'projection' && $projChargesM !== null) {
             $totalCharges = $projChargesM->total();
             $totalProduits = $projProduitsM->total();
+        } elseif ($portee === PorteeExercices::Tous) {
+            // En portée « tous les exercices », le total couvre exactement les
+            // exercices affichés — même règle que l'écran
+            // (RapportCompteResultatOperations::render()), pour que les trois
+            // sorties (écran, PDF, classeur) donnent le même total.
+            $totalCharges = collect($data['charges'])->sum('montant_exercices');
+            $totalProduits = collect($data['produits'])->sum('montant_exercices');
         } else {
             $totalCharges = collect($data['charges'])->sum('montant');
             $totalProduits = collect($data['produits'])->sum('montant');
@@ -1844,7 +1852,9 @@ final class RapportExportController extends Controller
         };
 
         return [
-            'subtitle' => 'Mode : '.$modeLabel,
+            'subtitle' => $portee === PorteeExercices::Tous
+                ? 'Mode : '.$modeLabel.' — Tous les exercices'
+                : 'Mode : '.$modeLabel.' — Exercice affiché : '.app(ExerciceService::class)->label($exercice),
             'charges' => $data['charges'],
             'produits' => $data['produits'],
             'previsionsCharges' => $data['previsions_charges'] ?? [],
@@ -1862,6 +1872,10 @@ final class RapportExportController extends Controller
             'totalCharges' => $totalCharges,
             'totalProduits' => $totalProduits,
             'resultatNet' => $totalProduits - $totalCharges,
+            'exercices' => $data['exercices'] ?? [],
+            'porteeExercices' => $portee->value,
+            'projChargesParExercice' => $data['proj_charges_par_exercice'] ?? [],
+            'projProduitsParExercice' => $data['proj_produits_par_exercice'] ?? [],
         ];
     }
 
