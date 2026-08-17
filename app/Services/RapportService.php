@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Services\Rapports\CompteResultatBuilder;
 use App\Services\Rapports\FluxTresorerieBuilder;
+use App\Services\Rapports\OperationsEligiblesQuery;
 
 final class RapportService
 {
@@ -13,12 +14,16 @@ final class RapportService
 
     private readonly FluxTresorerieBuilder $fluxTresorerie;
 
+    private readonly OperationsEligiblesQuery $eligibles;
+
     public function __construct(
         ?CompteResultatBuilder $compteResultat = null,
         ?FluxTresorerieBuilder $fluxTresorerie = null,
+        ?OperationsEligiblesQuery $operationsEligibles = null,
     ) {
         $this->compteResultat = $compteResultat ?? app(CompteResultatBuilder::class);
         $this->fluxTresorerie = $fluxTresorerie ?? app(FluxTresorerieBuilder::class);
+        $this->eligibles = $operationsEligibles ?? app(OperationsEligiblesQuery::class);
     }
 
     /**
@@ -48,6 +53,30 @@ final class RapportService
         bool $parOperations = false,
     ): array {
         return $this->compteResultat->compteDeResultatOperations($exercice, $operationIds, $parSeances, $parTiers, $previsionnel, $parOperations);
+    }
+
+    /**
+     * SEL-01 — Opérations ayant un mouvement de résultat sur l'exercice.
+     * Source unique du sélecteur de l'écran et de la validation des exports.
+     *
+     * @return list<int>
+     */
+    public function operationsEligibles(int $exercice): array
+    {
+        return $this->eligibles->pourExercice($exercice);
+    }
+
+    /**
+     * SEL-04 — Intersecte une sélection non fiable avec les opérations
+     * éligibles. Un identifiant absent de la liste est écarté en silence :
+     * ni rapport partiel, ni fuite sur une autre opération.
+     *
+     * @param  array<mixed>  $selection
+     * @return list<int>
+     */
+    public function normaliserOperations(array $selection, int $exercice): array
+    {
+        return $this->eligibles->normaliser($selection, $exercice);
     }
 
     /**

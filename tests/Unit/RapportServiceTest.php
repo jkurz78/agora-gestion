@@ -287,3 +287,31 @@ it('compteDeResultatOperations avec parSeances et parTiers combinés', function 
     expect($t['seances'][2])->toBe(75.0);
     expect($t['montant'])->toBe(75.0);
 });
+
+// ── operationsEligibles / normaliserOperations ────────────────────────────────
+
+it('operationsEligibles délègue à OperationsEligiblesQuery pour l\'exercice demandé', function () {
+    $op = Operation::factory()->create();
+    $sc = Compte::factory()->depense()->numero('606')->create(['intitule' => 'Achats']);
+
+    $tx = Transaction::factory()->asDepense()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
+    $tx->lignes()->forceDelete();
+    rapportSvcLigne($tx, $sc, 100.00, (int) $op->id);
+
+    Operation::factory()->create(); // opération sans mouvement, ne doit pas apparaître
+
+    expect($this->service->operationsEligibles(2025))->toBe([(int) $op->id])
+        ->and($this->service->operationsEligibles(2024))->toBe([]);
+});
+
+it('normaliserOperations garde l\'id éligible et écarte un id inexistant', function () {
+    $op = Operation::factory()->create();
+    $sc = Compte::factory()->depense()->numero('606')->create(['intitule' => 'Achats']);
+
+    $tx = Transaction::factory()->asDepense()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
+    $tx->lignes()->forceDelete();
+    rapportSvcLigne($tx, $sc, 100.00, (int) $op->id);
+
+    expect($this->service->normaliserOperations([(string) $op->id, '999999', 'abc', '0'], 2025))
+        ->toBe([(int) $op->id]);
+});
