@@ -509,13 +509,22 @@ final class RapportExportController extends Controller
      * une erreur de sélection. L'écran, lui, affiche son invite — la même
      * situation ne peut pas se solder par un silence côté fichier.
      *
+     * Le mode (EX-03) est lu ici depuis la requête et propagé à
+     * normaliserOperations() : sans ça, un export lancé en projection
+     * validerait la sélection avec le critère du mode réalisé, et refuserait
+     * en 422 une opération que l'écran, lui, propose bien — une divergence
+     * écran/export inacceptable.
+     *
      * @return list<int>
      */
     private function operationsExport(RapportService $rapportService, int $exercice, Request $request): array
     {
+        $previsionnel = $request->query('mode', 'realise') !== 'realise';
+
         $operationIds = $rapportService->normaliserOperations(
             (array) $request->query('ops', []),
             $exercice,
+            $previsionnel,
         );
 
         if ($operationIds === []) {

@@ -56,7 +56,13 @@ final class RapportCompteResultatOperations extends Component
         $exercice = app(ExerciceService::class)->current();
         $rapportService = app(RapportService::class);
 
-        $eligibleIds = $rapportService->operationsEligibles($exercice);
+        // EX-03 : en mode projection, l'arbre et la sélection doivent aussi
+        // admettre les opérations qui n'ont encore que des prévisions —
+        // sinon une activité future planifiée mais non commencée serait
+        // insélectionnable, ce qui viderait la projection de son objet.
+        $previsionnel = $this->mode !== 'realise';
+
+        $eligibleIds = $rapportService->operationsEligibles($exercice, $previsionnel);
         $operationTree = $this->buildOperationTree($eligibleIds);
 
         // SEL-04 : les ids reçus par l'URL ne sont jamais fiables — on les
@@ -83,8 +89,6 @@ final class RapportCompteResultatOperations extends Component
         $totalCharges = 0.0;
         $totalProduits = 0.0;
         $hasSelection = $selection !== [];
-
-        $previsionnel = $this->mode !== 'realise';
 
         if ($hasSelection) {
             $data = $rapportService->compteDeResultatOperations(

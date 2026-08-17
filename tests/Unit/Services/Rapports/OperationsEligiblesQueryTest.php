@@ -5,7 +5,12 @@ declare(strict_types=1);
 use App\Enums\StatutOperation;
 use App\Models\Association;
 use App\Models\Compte;
+use App\Models\EncadrementPrevision;
 use App\Models\Operation;
+use App\Models\Participant;
+use App\Models\Reglement;
+use App\Models\Seance;
+use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\TransactionLigneAffectation;
@@ -227,4 +232,120 @@ it('ignore une opération supprimée portée par une affectation ventilée', fun
     $op->delete();
 
     expect($this->query->pourExercice(2025))->toBe([]);
+});
+
+/**
+ * Crée une prévision de charge (encadrement_previsions) sur une séance de
+ * l'opération donnée, avec ou sans date de séance.
+ */
+function eligPrevisionCharge(int $operationId, int $compteId, ?string $seanceDate): EncadrementPrevision
+{
+    $seance = Seance::create([
+        'operation_id' => $operationId,
+        'numero' => 1,
+        'date' => $seanceDate,
+    ]);
+
+    return EncadrementPrevision::create([
+        'operation_id' => $operationId,
+        'tiers_id' => Tiers::factory()->create()->id,
+        'compte_id' => $compteId,
+        'seance_id' => $seance->id,
+        'montant_prevu' => 100.0,
+    ]);
+}
+
+/**
+ * Crée une prévision de produit (reglements.montant_prevu) sur une séance de
+ * l'opération donnée, avec ou sans date de séance. Le compte de la ventilation
+ * vient du type d'opération de l'opération elle-même (comme dans
+ * CompteResultatBuilder::buildPrevisionsProduits — via type_operations.compte_id).
+ */
+function eligPrevisionProduit(int $operationId, ?string $seanceDate): Reglement
+{
+    $seance = Seance::create([
+        'operation_id' => $operationId,
+        'numero' => 1,
+        'date' => $seanceDate,
+    ]);
+
+    $participant = Participant::factory()->create(['operation_id' => $operationId]);
+
+    return Reglement::create([
+        'participant_id' => $participant->id,
+        'seance_id' => $seance->id,
+        'montant_prevu' => 100.0,
+    ]);
+}
+
+it('ignore une opération n\'ayant qu\'une prévision de charge sans le drapeau, et la retient avec', function () {
+    $op = operationTest('Prévision charge seule');
+    eligPrevisionCharge((int) $op->id, (int) $this->compte606->id, '2025-10-01');
+
+    expect($this->query->pourExercice(2025))->toBe([])
+        ->and($this->query->pourExercice(2025, true))->toBe([(int) $op->id]);
+});
+
+it('ignore une opération n\'ayant qu\'une prévision de produit sans le drapeau, et la retient avec', function () {
+    // L'opération créée par operationTest() porte un type_operation dont le
+    // compte de ventilation par défaut est de classe 7 (TypeOperationFactory) —
+    // exactement la chaîne lue par la branche produits (to_.compte_id).
+    $op = operationTest('Prévision produit seule');
+    eligPrevisionProduit((int) $op->id, '2025-10-01');
+
+    expect($this->query->pourExercice(2025))->toBe([])
+        ->and($this->query->pourExercice(2025, true))->toBe([(int) $op->id]);
+});
+
+it('ignore une prévision de charge datée hors exercice, avec ou sans le drapeau', function () {
+    $op = operationTest('Prévision charge hors exercice');
+    eligPrevisionCharge((int) $op->id, (int) $this->compte606->id, '2024-10-01');
+
+    expect($this->query->pourExercice(2025))->toBe([])
+        ->and($this->query->pourExercice(2025, true))->toBe([]);
+});
+
+it('retient avec le drapeau une opération dont la séance de prévision n\'a pas de date', function () {
+    $op = operationTest('Prévision séance non datée');
+    eligPrevisionCharge((int) $op->id, (int) $this->compte606->id, null);
+
+    expect($this->query->pourExercice(2025))->toBe([])
+        ->and($this->query->pourExercice(2025, true))->toBe([(int) $op->id]);
+});
+
+it('n\'expose pas, même avec le drapeau, une opération d\'un autre tenant portant une prévision', function () {
+    $op = operationTest('Prévision autre tenant');
+    eligPrevisionCharge((int) $op->id, (int) $this->compte606->id, '2025-10-01');
+
+    $autre = Association::factory()->create();
+    TenantContext::boot($autre);
+
+    expect($this->query->pourExercice(2025, true))->toBe([]);
+});
+
+it('ignore, même avec le drapeau, une opération supprimée logiquement portant une prévision', function () {
+    $op = operationTest('Prévision opération supprimée');
+    eligPrevisionCharge((int) $op->id, (int) $this->compte606->id, '2025-10-01');
+
+    expect($this->query->pourExercice(2025, true))->toBe([(int) $op->id]);
+
+    $op->delete();
+
+    expect($this->query->pourExercice(2025, true))->toBe([]);
+});
+
+it('ne retourne pas de doublon quand une opération a un mouvement réel et une prévision', function () {
+    $op = operationTest('Réel et prévision');
+    ligneDirecte((int) $this->compte606->id, (int) $op->id, '2025-10-01');
+    eligPrevisionCharge((int) $op->id, (int) $this->compte606->id, '2025-11-01');
+
+    expect($this->query->pourExercice(2025, true))->toBe([(int) $op->id]);
+});
+
+it('normaliser propage le drapeau prévisions à pourExercice', function () {
+    $op = operationTest('Prévision normaliser');
+    eligPrevisionCharge((int) $op->id, (int) $this->compte606->id, '2025-10-01');
+
+    expect($this->query->normaliser([(string) $op->id], 2025))->toBe([])
+        ->and($this->query->normaliser([(string) $op->id], 2025, true))->toBe([(int) $op->id]);
 });

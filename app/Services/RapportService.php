@@ -59,11 +59,15 @@ final class RapportService
      * SEL-01 — Opérations ayant un mouvement de résultat sur l'exercice.
      * Source unique du sélecteur de l'écran et de la validation des exports.
      *
+     * $avecPrevisions (EX-03) n'élargit le critère aux deux sources de
+     * prévisionnel que lorsque l'écran est en mode projection — voir
+     * OperationsEligiblesQuery pour l'arbitrage complet.
+     *
      * @return list<int>
      */
-    public function operationsEligibles(int $exercice): array
+    public function operationsEligibles(int $exercice, bool $avecPrevisions = false): array
     {
-        return $this->eligibles->pourExercice($exercice);
+        return $this->eligibles->pourExercice($exercice, $avecPrevisions);
     }
 
     /**
@@ -74,9 +78,9 @@ final class RapportService
      * @param  array<mixed>  $selection
      * @return list<int>
      */
-    public function normaliserOperations(array $selection, int $exercice): array
+    public function normaliserOperations(array $selection, int $exercice, bool $avecPrevisions = false): array
     {
-        return $this->eligibles->normaliser($selection, $exercice);
+        return $this->eligibles->normaliser($selection, $exercice, $avecPrevisions);
     }
 
     /**
