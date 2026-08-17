@@ -6,7 +6,6 @@ namespace App\Services\Rapports;
 
 use App\Models\Famille;
 use App\Models\Operation;
-use App\Models\Tiers;
 use App\Services\ExerciceService;
 use App\Tenant\TenantContext;
 use Carbon\CarbonImmutable;
@@ -186,8 +185,8 @@ final class CompteResultatBuilder
         }
 
         if ($previsionnel) {
-            $prevC = $this->buildPrevisionsCharges($operationIds, $parSeances, $parTiers, $parOperations);
-            $prevP = $this->buildPrevisionsProduits($operationIds, $parSeances, $parTiers, $parOperations);
+            $prevC = $this->buildPrevisions('depense', $operationIds, $parSeances, $parTiers, $parOperations, $allSeances, $start, $end);
+            $prevP = $this->buildPrevisions('recette', $operationIds, $parSeances, $parTiers, $parOperations, $allSeances, $start, $end);
             $result['charges'] = $this->mergePrevisionsIntoHierarchy($result['charges'], $prevC);
             $result['produits'] = $this->mergePrevisionsIntoHierarchy($result['produits'], $prevP);
             $result['previsions_charges'] = $prevC;
@@ -1286,194 +1285,185 @@ final class CompteResultatBuilder
     }
 
     /**
-     * Charges prévisionnelles depuis encadrement_previsions.
+     * Prévisions au format plat de fetchOperationRowsPD() — mêmes colonnes,
+     * même clé de map — pour que buildUnifiedHierarchy() les hiérarchise à
+     * l'identique du réalisé, au lieu de l'ancienne implémentation séparée
+     * hiérarchiserPrevisions().
+     *
+     * Jointures calquées jointure pour jointure sur les anciennes
+     * buildPrevisionsCharges()/buildPrevisionsProduits() ; seuls le filtre de
+     * date et la forme de sortie changent.
+     *
+     * Filtre de date : en portée courante ($start/$end non nuls), on ne garde
+     * que les prévisions dont la séance tombe dans l'exercice affiché, plus
+     * celles dont la séance n'a pas de date (groupe « Exercice non
+     * déterminé », clé 0 — jamais fondu dans l'exercice affiché). Le OR
+     * DOIT rester dans sa propre closure : un OR de premier niveau se
+     * détacherait de toute la conjonction qui le précède (opération
+     * sélectionnée ET tenant courant) et ferait fuiter les prévisions
+     * d'autres associations — c'est le piège que
+     * CompteResultatBuilderPrevisionsPlatesTest.php attrape par mutation. En
+     * portée « tous les exercices » ($start/$end nuls), aucun filtre.
      *
      * @param  array<int>  $operationIds
-     * @return list<array{label: string, id: int, comptes: list<array<string, mixed>>, seances?: array<int, float>, operations?: array<int, float>, total?: float, montant?: float}>
+     * @param  string|null  $start  null en portée « tous les exercices »
+     * @param  string|null  $end  null en portée « tous les exercices »
+     * @return array<string, array> clé : exercice_compte[_tiers][_seance][_op]
      */
-    private function buildPrevisionsCharges(array $operationIds, bool $parSeances, bool $parTiers, bool $parOperations = false): array
-    {
-        $q = DB::table('encadrement_previsions as ep')
-            ->join('comptes as cpt', 'cpt.id', '=', 'ep.compte_id')
-            ->join('seances as s', 's.id', '=', 'ep.seance_id')
-            ->leftJoin('tiers as t', 't.id', '=', 'ep.tiers_id')
-            ->whereIn('ep.operation_id', $operationIds)
-            ->tap(fn (Builder $query) => $this->scopeToCurrentTenant($query, 'ep.association_id'));
-        $this->joinFamille($q);
+    private function fetchPrevisionsFlatEntries(
+        string $type,
+        array $operationIds,
+        bool $withSeance,
+        bool $withTiers,
+        bool $withOperation,
+        ?string $start,
+        ?string $end,
+    ): array {
+        if ($type === 'depense') {
+            $q = DB::table('encadrement_previsions as ep')
+                ->join('comptes as cpt', 'cpt.id', '=', 'ep.compte_id')
+                ->join('seances as s', 's.id', '=', 'ep.seance_id')
+                ->leftJoin('tiers as trs', 'trs.id', '=', 'ep.tiers_id')
+                ->whereIn('ep.operation_id', $operationIds)
+                ->tap(fn (Builder $query) => $this->scopeToCurrentTenant($query, 'ep.association_id'));
+            $this->joinFamille($q);
 
-        $selects = [
+            $tiersIdCol = 'ep.tiers_id';
+            $operationIdCol = 'ep.operation_id';
+            $montantExpr = DB::raw('SUM(ep.montant_prevu) as montant');
+        } else {
+            $q = DB::table('reglements as r')
+                ->join('participants as p', 'p.id', '=', 'r.participant_id')
+                ->join('operations as op', 'op.id', '=', 'p.operation_id')
+                ->join('type_operations as to_', 'to_.id', '=', 'op.type_operation_id')
+                ->join('comptes as cpt', 'cpt.id', '=', 'to_.compte_id')
+                ->join('seances as s', 's.id', '=', 'r.seance_id')
+                ->leftJoin('tiers as trs', 'trs.id', '=', 'p.tiers_id')
+                ->whereIn('p.operation_id', $operationIds)
+                ->where('r.montant_prevu', '>', 0)
+                ->tap(fn (Builder $query) => $this->scopeToCurrentTenant($query, 'op.association_id'));
+            $this->joinFamille($q);
+
+            $tiersIdCol = 'p.tiers_id';
+            $operationIdCol = 'p.operation_id';
+            $montantExpr = DB::raw('SUM(r.montant_prevu) as montant');
+        }
+
+        $q->when($start !== null && $end !== null, fn (Builder $query) => $query->where(
+            fn (Builder $w) => $w->whereNull('s.date')->orWhereBetween('s.date', [$start, $end])
+        ));
+
+        $cols = [
             DB::raw('COALESCE(f.id, 0) as famille_id'),
-            DB::raw("COALESCE(CONCAT(f.code, ' — ', f.nom), cpt.numero_pcg) as famille_nom"),
+            DB::raw("COALESCE(CONCAT(f.code, ' — ', f.nom), '(sans famille)') as famille_nom"),
             DB::raw('cpt.id as compte_id'),
             DB::raw('cpt.intitule as compte_nom'),
-            DB::raw('SUM(ep.montant_prevu) as montant'),
+            DB::raw('s.date as seance_date'),
         ];
-        $groupBy = ['f.id', 'f.code', 'f.nom', 'cpt.numero_pcg', 'cpt.id', 'cpt.intitule'];
+        $group = ['cpt.id', 'cpt.intitule', 'f.id', 'f.code', 'f.nom', 's.date'];
 
-        if ($parSeances) {
-            $selects[] = 's.numero as seance';
-            $groupBy[] = 's.numero';
+        if ($withSeance) {
+            $cols[] = DB::raw('COALESCE(s.numero, 0) as seance');
+            $group[] = DB::raw('COALESCE(s.numero, 0)');
         }
-        if ($parTiers) {
-            $selects[] = 't.id as tiers_id';
-            $selects[] = DB::raw('COALESCE(NULLIF('.Tiers::sqlRaisonSociale('t').", ''), '—') as tiers_label");
-            $groupBy[] = 't.id';
-            $groupBy[] = 't.prenom';
-            $groupBy[] = 't.nom';
-            $groupBy[] = 't.type';
-            $groupBy[] = 't.entreprise';
+        if ($withTiers) {
+            $cols[] = DB::raw("COALESCE({$tiersIdCol}, 0) as tiers_id");
+            $cols[] = DB::raw("COALESCE(trs.type, '') as tiers_type");
+            $cols[] = DB::raw("COALESCE(trs.nom, '') as tiers_nom");
+            $cols[] = DB::raw("COALESCE(trs.prenom, '') as tiers_prenom");
+            $cols[] = DB::raw("COALESCE(trs.entreprise, '') as tiers_entreprise");
+            $group[] = $tiersIdCol;
+            $group[] = 'trs.type';
+            $group[] = 'trs.nom';
+            $group[] = 'trs.prenom';
+            $group[] = 'trs.entreprise';
         }
-        if ($parOperations) {
-            $selects[] = 'ep.operation_id';
-            $groupBy[] = 'ep.operation_id';
+        if ($withOperation) {
+            $cols[] = DB::raw("{$operationIdCol} as operation_id");
+            $group[] = $operationIdCol;
+        }
+        $cols[] = $montantExpr;
+
+        $rows = $q->select($cols)->groupBy($group)->get();
+
+        $map = [];
+        foreach ($rows as $row) {
+            // Une séance sans date ne peut pas être rattachée à un exercice :
+            // elle va dans le groupe 0, jamais dans l'exercice affiché.
+            $annee = $row->seance_date === null
+                ? 0
+                : $this->exerciceService->anneeForDate(CarbonImmutable::parse((string) $row->seance_date));
+
+            $key = $annee.'_'.$row->compte_id;
+            if ($withTiers) {
+                $key .= '_'.$row->tiers_id;
+            }
+            if ($withSeance) {
+                $key .= '_'.$row->seance;
+            }
+            if ($withOperation) {
+                $key .= '_op'.$row->operation_id;
+            }
+
+            if (isset($map[$key])) {
+                $map[$key]['montant'] += (float) $row->montant;
+            } else {
+                $entry = [
+                    'exercice' => $annee,
+                    'famille_id' => (int) $row->famille_id,
+                    'famille_nom' => $row->famille_nom,
+                    'compte_id' => (int) $row->compte_id,
+                    'compte_nom' => $row->compte_nom,
+                    'montant' => (float) $row->montant,
+                ];
+                if ($withSeance) {
+                    $entry['seance'] = (int) $row->seance;
+                }
+                if ($withTiers) {
+                    $entry['tiers_id'] = (int) $row->tiers_id;
+                    $entry['tiers_type'] = $row->tiers_type !== '' ? $row->tiers_type : null;
+                    $entry['tiers_nom'] = $row->tiers_nom !== '' ? $row->tiers_nom : null;
+                    $entry['tiers_prenom'] = $row->tiers_prenom !== '' ? $row->tiers_prenom : null;
+                    $entry['tiers_entreprise'] = $row->tiers_entreprise !== '' ? $row->tiers_entreprise : null;
+                }
+                if ($withOperation) {
+                    $entry['operation_id'] = (int) $row->operation_id;
+                }
+                $map[$key] = $entry;
+            }
         }
 
-        $rows = $q->select($selects)->groupBy(...$groupBy)->get();
-
-        return $this->hierarchiserPrevisions($rows, $parSeances, $parTiers, $parOperations, $operationIds);
+        return $map;
     }
 
     /**
-     * Produits prévisionnels depuis reglements.montant_prevu.
+     * Prévisions (charges ou produits) hiérarchisées avec buildUnifiedHierarchy() —
+     * la même méthode que le réalisé, plutôt que l'ancienne implémentation
+     * dupliquée hiérarchiserPrevisions().
      *
      * @param  array<int>  $operationIds
-     * @return list<array{label: string, id: int, comptes: list<array<string, mixed>>, seances?: array<int, float>, operations?: array<int, float>, total?: float, montant?: float}>
-     */
-    private function buildPrevisionsProduits(array $operationIds, bool $parSeances, bool $parTiers, bool $parOperations = false): array
-    {
-        $q = DB::table('reglements as r')
-            ->join('participants as p', 'p.id', '=', 'r.participant_id')
-            ->join('operations as op', 'op.id', '=', 'p.operation_id')
-            ->join('type_operations as to_', 'to_.id', '=', 'op.type_operation_id')
-            ->join('comptes as cpt', 'cpt.id', '=', 'to_.compte_id')
-            ->join('seances as s', 's.id', '=', 'r.seance_id')
-            ->leftJoin('tiers as t', 't.id', '=', 'p.tiers_id')
-            ->whereIn('p.operation_id', $operationIds)
-            ->where('r.montant_prevu', '>', 0)
-            ->tap(fn (Builder $query) => $this->scopeToCurrentTenant($query, 'op.association_id'));
-        $this->joinFamille($q);
-
-        $selects = [
-            DB::raw('COALESCE(f.id, 0) as famille_id'),
-            DB::raw("COALESCE(CONCAT(f.code, ' — ', f.nom), cpt.numero_pcg) as famille_nom"),
-            DB::raw('cpt.id as compte_id'),
-            DB::raw('cpt.intitule as compte_nom'),
-            DB::raw('SUM(r.montant_prevu) as montant'),
-        ];
-        $groupBy = ['f.id', 'f.code', 'f.nom', 'cpt.numero_pcg', 'cpt.id', 'cpt.intitule'];
-
-        if ($parSeances) {
-            $selects[] = 's.numero as seance';
-            $groupBy[] = 's.numero';
-        }
-        if ($parTiers) {
-            $selects[] = 't.id as tiers_id';
-            $selects[] = DB::raw('COALESCE(NULLIF('.Tiers::sqlRaisonSociale('t').", ''), '—') as tiers_label");
-            $groupBy[] = 't.id';
-            $groupBy[] = 't.prenom';
-            $groupBy[] = 't.nom';
-            $groupBy[] = 't.type';
-            $groupBy[] = 't.entreprise';
-        }
-        if ($parOperations) {
-            $selects[] = 'p.operation_id';
-            $groupBy[] = 'p.operation_id';
-        }
-
-        $rows = $q->select($selects)->groupBy(...$groupBy)->get();
-
-        return $this->hierarchiserPrevisions($rows, $parSeances, $parTiers, $parOperations, $operationIds);
-    }
-
-    /**
-     * Hiérarchise des lignes prévisionnelles dans la même forme que buildHierarchyOperations.
-     *
-     * @param  array<int>  $operationIds  Nécessaire pour initialiser les clés quand parOperations=true
+     * @param  list<int>  $allSeances
+     * @param  string|null  $start  null en portée « tous les exercices »
+     * @param  string|null  $end  null en portée « tous les exercices »
      * @return list<array<string, mixed>>
      */
-    private function hierarchiserPrevisions(Collection $rows, bool $parSeances, bool $parTiers, bool $parOperations = false, array $operationIds = []): array
-    {
-        if ($rows->isEmpty()) {
-            return [];
-        }
+    private function buildPrevisions(
+        string $type,
+        array $operationIds,
+        bool $parSeances,
+        bool $parTiers,
+        bool $parOperations,
+        array $allSeances,
+        ?string $start,
+        ?string $end,
+    ): array {
+        $map = $this->fetchPrevisionsFlatEntries(
+            $type, $operationIds, $parSeances, $parTiers, $parOperations, $start, $end,
+        );
 
-        $zeroOps = $parOperations ? array_fill_keys($operationIds, 0.0) : [];
-
-        $tree = [];
-        foreach ($rows as $row) {
-            $catId = (int) $row->famille_id;
-            $scId = (int) $row->compte_id;
-
-            if (! isset($tree[$catId])) {
-                $tree[$catId] = [
-                    'famille_id' => $catId,
-                    'famille_nom' => $row->famille_nom,
-                    'comptes' => [],
-                    'seances' => [],
-                    'montant' => 0.0,
-                ];
-                if ($parOperations) {
-                    $tree[$catId]['operations'] = $zeroOps;
-                }
-            }
-            if (! isset($tree[$catId]['comptes'][$scId])) {
-                $tree[$catId]['comptes'][$scId] = [
-                    'compte_id' => $scId,
-                    'compte_nom' => $row->compte_nom,
-                    'seances' => [],
-                    'montant' => 0.0,
-                    'tiers' => [],
-                ];
-                if ($parOperations) {
-                    $tree[$catId]['comptes'][$scId]['operations'] = $zeroOps;
-                }
-            }
-
-            $montant = (float) $row->montant;
-
-            if ($parSeances) {
-                $seanceNum = (int) ($row->seance ?? 0);
-                $tree[$catId]['seances'][$seanceNum] = ($tree[$catId]['seances'][$seanceNum] ?? 0) + $montant;
-                $tree[$catId]['comptes'][$scId]['seances'][$seanceNum] = ($tree[$catId]['comptes'][$scId]['seances'][$seanceNum] ?? 0) + $montant;
-            }
-            $tree[$catId]['montant'] += $montant;
-            $tree[$catId]['comptes'][$scId]['montant'] += $montant;
-
-            if ($parOperations) {
-                $opId = (int) ($row->operation_id ?? 0);
-                $tree[$catId]['operations'][$opId] = ($tree[$catId]['operations'][$opId] ?? 0.0) + $montant;
-                $tree[$catId]['comptes'][$scId]['operations'][$opId] = ($tree[$catId]['comptes'][$scId]['operations'][$opId] ?? 0.0) + $montant;
-            }
-
-            if ($parTiers) {
-                $tId = (int) ($row->tiers_id ?? 0);
-                $tLabel = $row->tiers_label ?? '—';
-                if (! isset($tree[$catId]['comptes'][$scId]['tiers'][$tId])) {
-                    $tree[$catId]['comptes'][$scId]['tiers'][$tId] = [
-                        'tiers_id' => $tId,
-                        'label' => $tLabel,
-                        'type' => null,
-                        'seances' => [],
-                        'montant' => 0.0,
-                    ];
-                }
-                if ($parSeances) {
-                    $seanceNum = (int) ($row->seance ?? 0);
-                    $tree[$catId]['comptes'][$scId]['tiers'][$tId]['seances'][$seanceNum] = ($tree[$catId]['comptes'][$scId]['tiers'][$tId]['seances'][$seanceNum] ?? 0) + $montant;
-                }
-                $tree[$catId]['comptes'][$scId]['tiers'][$tId]['montant'] += $montant;
-            }
-        }
-
-        foreach ($tree as &$cat) {
-            $cat['comptes'] = array_values(array_map(function (array $sc): array {
-                $sc['tiers'] = array_values($sc['tiers']);
-
-                return $sc;
-            }, $cat['comptes']));
-        }
-
-        return array_values($tree);
+        return $this->buildUnifiedHierarchy(
+            $map, $parSeances, $parTiers, $parOperations, $allSeances, $operationIds,
+        );
     }
 
     /**

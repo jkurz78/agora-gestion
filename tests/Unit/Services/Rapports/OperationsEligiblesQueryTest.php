@@ -259,7 +259,7 @@ function eligPrevisionCharge(int $operationId, int $compteId, ?string $seanceDat
  * Crée une prévision de produit (reglements.montant_prevu) sur une séance de
  * l'opération donnée, avec ou sans date de séance. Le compte de la ventilation
  * vient du type d'opération de l'opération elle-même (comme dans
- * CompteResultatBuilder::buildPrevisionsProduits — via type_operations.compte_id).
+ * CompteResultatBuilder::fetchPrevisionsFlatEntries — via type_operations.compte_id).
  */
 function eligPrevisionProduit(int $operationId, ?string $seanceDate): Reglement
 {

@@ -125,7 +125,7 @@ final class OperationsEligiblesQuery
     /**
      * Branche prévisionnelle « charges » : encadrement_previsions, rattachée à
      * l'exercice par la date de sa séance, pas par les dates de l'opération.
-     * Jointures calquées sur CompteResultatBuilder::buildPrevisionsCharges()
+     * Jointures calquées sur CompteResultatBuilder::fetchPrevisionsFlatEntries()
      * pour ne pas diverger de la lecture faite une fois l'opération retenue.
      *
      * `s.date` est nullable (séance non encore planifiée) : le groupe
@@ -156,7 +156,7 @@ final class OperationsEligiblesQuery
     /**
      * Branche prévisionnelle « produits » : reglements.montant_prevu, même
      * logique de rattachement par la date de séance que previsionsCharges().
-     * Jointures calquées sur CompteResultatBuilder::buildPrevisionsProduits().
+     * Jointures calquées sur CompteResultatBuilder::fetchPrevisionsFlatEntries().
      */
     private function previsionsProduits(int $tenantId, string $start, string $end): Builder
     {
