@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\PorteeExercices;
 use App\Models\Operation;
 use App\Services\ExerciceService;
 use App\Services\RapportService;
@@ -29,6 +30,13 @@ final class RapportCompteResultatOperations extends Component
     public bool $parOperations = false;
 
     /**
+     * `current` (défaut) ou `all`. Toute autre valeur retombe sur `current` :
+     * l'URL est une entrée utilisateur comme une autre.
+     */
+    #[Url(as: 'exercices')]
+    public string $porteeExercices = 'current';
+
+    /**
      * Vrai quand la sélection reçue par l'URL a été entièrement écartée parce
      * qu'aucune de ces opérations n'a de mouvement sur l'exercice affiché.
      * Information non bloquante affichée dans la vue.
@@ -48,6 +56,7 @@ final class RapportCompteResultatOperations extends Component
             'tiers' => $this->parTiers ? '1' : '0',
             'mode' => $this->mode,
             'parops' => $this->parOperations ? '1' : '0',
+            'exercices' => PorteeExercices::depuisRequete($this->porteeExercices)->value,
         ]);
     }
 
@@ -55,6 +64,7 @@ final class RapportCompteResultatOperations extends Component
     {
         $exercice = app(ExerciceService::class)->current();
         $rapportService = app(RapportService::class);
+        $portee = PorteeExercices::depuisRequete($this->porteeExercices);
 
         // EX-03 : en mode projection, l'arbre et la sélection doivent aussi
         // admettre les opérations qui n'ont encore que des prévisions —
@@ -88,6 +98,9 @@ final class RapportCompteResultatOperations extends Component
         $projProduits = null;
         $totalCharges = 0.0;
         $totalProduits = 0.0;
+        $exercices = [];
+        $projChargesParExercice = [];
+        $projProduitsParExercice = [];
         $hasSelection = $selection !== [];
 
         if ($hasSelection) {
@@ -98,6 +111,7 @@ final class RapportCompteResultatOperations extends Component
                 $this->parTiers,
                 $previsionnel,
                 $this->parOperations,
+                $portee,
             );
             $charges = $data['charges'];
             $produits = $data['produits'];
@@ -108,10 +122,19 @@ final class RapportCompteResultatOperations extends Component
             $seancesParOperation = $data['seances_par_operation'] ?? [];
             $projCharges = $data['proj_charges'] ?? null;
             $projProduits = $data['proj_produits'] ?? null;
+            $exercices = $data['exercices'] ?? [];
+            $projChargesParExercice = $data['proj_charges_par_exercice'] ?? [];
+            $projProduitsParExercice = $data['proj_produits_par_exercice'] ?? [];
 
             if ($this->mode === 'projection' && $projCharges !== null) {
                 $totalCharges = $projCharges->total();
                 $totalProduits = $projProduits->total();
+            } elseif ($portee === PorteeExercices::Tous) {
+                // En portée « tous les exercices », le total couvre exactement
+                // les exercices affichés — jamais un montant global qui
+                // inclurait en silence un exercice absent des lignes.
+                $totalCharges = collect($charges)->sum('montant_exercices');
+                $totalProduits = collect($produits)->sum('montant_exercices');
             } else {
                 $totalCharges = collect($charges)->sum('montant');
                 $totalProduits = collect($produits)->sum('montant');
@@ -137,6 +160,10 @@ final class RapportCompteResultatOperations extends Component
             'parOperations' => $this->parOperations,
             'aucuneOperationEligible' => $operationTree === [],
             'selectionIgnoree' => $this->selectionIgnoree,
+            'exercices' => $exercices,
+            'porteeExercices' => $portee->value,
+            'projChargesParExercice' => $projChargesParExercice,
+            'projProduitsParExercice' => $projProduitsParExercice,
         ]);
     }
 
