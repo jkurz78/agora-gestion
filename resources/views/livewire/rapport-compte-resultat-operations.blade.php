@@ -134,7 +134,17 @@
     </div>
 
     {{-- Contenu du rapport --}}
-    @if (! $hasSelection)
+    @if ($selectionIgnoree)
+        <div class="alert alert-info py-2 small">
+            Les op&eacute;rations demand&eacute;es n'ont aucun mouvement sur l'exercice affich&eacute;.
+        </div>
+    @endif
+
+    @if ($aucuneOperationEligible)
+        <p class="text-muted text-center py-4">
+            Aucune op&eacute;ration n'a de d&eacute;pense ni de recette sur l'exercice affich&eacute;.
+        </p>
+    @elseif (! $hasSelection)
         <p class="text-muted text-center py-4">S&eacute;lectionnez au moins une op&eacute;ration pour afficher le rapport.</p>
     @else
         @php
