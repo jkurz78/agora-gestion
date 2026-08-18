@@ -156,7 +156,7 @@
                                 Date <span class="text-danger">*</span>
                                 @if ($isLocked || $isLockedByHelloAsso || $isLockedByImmobilisation || $isLockedByReglement) <i class="bi bi-lock text-warning" title="Champ verrouillé"></i> @endif
                             </label>
-                            <x-date-input name="date" wire:model="date" :value="$date" :disabled="$isLocked || $isLockedByHelloAsso || $isLockedByImmobilisation || $isLockedByReglement || $exerciceCloture" />
+                            <x-date-input name="date" wire:model.live="date" :value="$date" :disabled="$isLocked || $isLockedByHelloAsso || $isLockedByImmobilisation || $isLockedByReglement || $exerciceCloture" />
                             {{-- d-block : Bootstrap masque .invalid-feedback tant qu'un frère
                                  précédent ne porte pas .is-invalid. Le composant x-date-input
                                  enveloppe son champ dans un .input-group wire:ignore et ne pose
@@ -164,6 +164,7 @@
                                  mais invisible à l'écran. La validation refusait la saisie sans
                                  que rien n'explique pourquoi. --}}
                             @error('date') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
+                            <x-exercice-destination :date="$date" />
                         </div>
                         <div class="col-md-2">
                             <label for="reference" class="form-label">Référence</label>
@@ -253,10 +254,11 @@
                         @if (($type === 'recette' || $type === 'depense') && $paiementRecu && ! $isLockedByReglement)
                         <div class="col-md-2">
                             <label for="dateReglement" class="form-label">Date du règlement <span class="text-danger">*</span></label>
-                            <x-date-input name="dateReglement" wire:model="dateReglement" :value="$dateReglement" :disabled="$exerciceCloture" />
+                            <x-date-input name="dateReglement" wire:model.live="dateReglement" :value="$dateReglement" :disabled="$exerciceCloture" />
                             {{-- d-block : même raison que le champ Date — x-date-input ne pose
                                  pas .is-invalid, sans quoi Bootstrap masque le message. --}}
                             @error('dateReglement') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
+                            <x-exercice-destination :date="$dateReglement" />
                         </div>
                         @endif
                         <div class="col-md-3">

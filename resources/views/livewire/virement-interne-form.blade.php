@@ -14,11 +14,12 @@
                     <div class="row g-3 mb-4">
                         <div class="col-md-2">
                             <label for="date" class="form-label">Date <span class="text-danger">*</span></label>
-                            <x-date-input name="date" wire:model="date" :value="$date" :disabled="$exerciceCloture" />
+                            <x-date-input name="date" wire:model.live="date" :value="$date" :disabled="$exerciceCloture" />
                             {{-- d-block : Bootstrap masque .invalid-feedback tant qu'un frère
                                  précédent ne porte pas .is-invalid, ce que x-date-input ne pose
                                  jamais (même raison que sur transaction-form.blade.php). --}}
                             @error('date') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
+                            <x-exercice-destination :date="$date" />
                         </div>
                         <div class="col-md-2">
                             <label for="reference" class="form-label">Référence</label>
