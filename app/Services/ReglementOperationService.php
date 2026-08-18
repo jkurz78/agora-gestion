@@ -64,6 +64,19 @@ final class ReglementOperationService
         int $compteBancaireId,
         Carbon $date,
     ): void {
+        // Un exercice clôturé n'accepte plus aucune écriture, quel que soit
+        // l'écran par lequel on passe. Ce parcours construisait ses
+        // transactions sans jamais interroger le statut de l'exercice : un
+        // règlement daté sur un exercice clos y était enregistré en silence,
+        // alors que la même écriture saisie manuellement était refusée.
+        //
+        // Le contrôle précède volontairement le DB::transaction() : la méthode
+        // comptabilise un LOT de règlements, et il ne doit pas en passer un
+        // seul avant que la garde ne se déclenche.
+        $this->exerciceService->assertOuvert(
+            $this->exerciceService->anneeForDate($date)
+        );
+
         $seance->load('operation.typeOperation');
         $operation = $seance->operation;
         // DC-10a — la ventilation est portée par typeOperation.compte_id (source unique).
