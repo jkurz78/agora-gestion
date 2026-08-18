@@ -211,7 +211,10 @@ it('exercice clôturé : aucune transaction, dépôt reste Soumise, fichier inta
             'piece_jointe_filename' => null,
         ]])
         ->call('save')
-        ->assertHasErrors(['lignes']); // ExerciceCloturedException → addError('lignes', ...)
+        // ExerciceCloturedException est désormais attrapée avant le catch
+        // générique \RuntimeException et posée sur 'date' — c'est ce champ
+        // qui est en cause, pas la ventilation.
+        ->assertHasErrors(['date']);
 
     // Aucune Transaction créée
     expect(Transaction::count())->toBe($txCountBefore);

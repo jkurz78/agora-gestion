@@ -12,6 +12,7 @@ use App\Enums\Sens;
 use App\Enums\StatutFactureDeposee;
 use App\Enums\StatutReglement;
 use App\Enums\UsageComptable;
+use App\Exceptions\ExerciceCloturedException;
 use App\Exceptions\OcrAnalysisException;
 use App\Exceptions\OcrNotConfiguredException;
 use App\Livewire\Concerns\MontantValidation;
@@ -461,15 +462,24 @@ final class TransactionForm extends Component
             return;
         }
 
-        app(TransactionService::class)->affecterLigne(
-            $ligne,
-            collect($this->affectations)->map(fn ($a) => [
-                'operation_id' => $a['operation_id'] !== '' ? (int) $a['operation_id'] : null,
-                'seance' => $a['seance'] !== '' ? (int) $a['seance'] : null,
-                'montant' => $a['montant'],
-                'notes' => $a['notes'] ?: null,
-            ])->toArray()
-        );
+        try {
+            app(TransactionService::class)->affecterLigne(
+                $ligne,
+                collect($this->affectations)->map(fn ($a) => [
+                    'operation_id' => $a['operation_id'] !== '' ? (int) $a['operation_id'] : null,
+                    'seance' => $a['seance'] !== '' ? (int) $a['seance'] : null,
+                    'montant' => $a['montant'],
+                    'notes' => $a['notes'] ?: null,
+                ])->toArray()
+            );
+        } catch (ExerciceCloturedException $e) {
+            // Pas de champ « date » dans ce panneau : la date en cause est celle
+            // de la transaction parente, non éditable ici. Même clé que le
+            // refus « somme des affectations » ci-dessus, pour rester cohérent.
+            $this->addError('affectations', $e->getMessage());
+
+            return;
+        }
 
         $this->fermerVentilation();
         $this->dispatch('transaction-saved');
@@ -645,19 +655,15 @@ final class TransactionForm extends Component
         }
 
         $exerciceService = app(ExerciceService::class);
-        $range = $exerciceService->dateRange($exerciceService->current());
-        $dateDebut = $range['start']->toDateString();
-        $dateFin = $range['end']->toDateString();
-
-        $isLocked = $this->transactionId
-            ? Transaction::findOrFail($this->transactionId)->loadMissing('rapprochement')->isLockedByRapprochement()
-            : false;
 
         $this->validate(
             [
-                'date' => $isLocked
-                    ? ['required', 'date']
-                    : ['required', 'date', 'after_or_equal:'.$dateDebut, 'before_or_equal:'.$dateFin],
+                // Plus de bornes d'exercice affiché — seule la clôture de
+                // l'exercice de la date peut refuser une date
+                // (ExerciceCloturedException, attrapée plus bas). Un exercice
+                // futur sans ligne en base n'est pas non plus un motif de
+                // refus (ExerciceService::assertOuvert()).
+                'date' => ['required', 'date'],
                 'libelle' => ['nullable', 'string', 'max:255'],
                 'reference' => ['nullable', 'string', 'max:100'],
                 'mode_paiement' => [
@@ -676,8 +682,6 @@ final class TransactionForm extends Component
                         && ! $this->isLockedByReglement),
                     'nullable',
                     'date_format:Y-m-d',
-                    'after_or_equal:'.$dateDebut,
-                    'before_or_equal:'.$dateFin,
                 ],
                 // Tiers obligatoire : toute recette/dépense génère sa contrepartie
                 // via le compte de tiers (411 client / 401 fournisseur), qui porte
@@ -704,10 +708,6 @@ final class TransactionForm extends Component
             ],
             array_merge(
                 [
-                    'date.after_or_equal' => 'La date doit être dans l\'exercice en cours (à partir du '.$range['start']->format('d/m/Y').').',
-                    'date.before_or_equal' => 'La date doit être dans l\'exercice en cours (jusqu\'au '.$range['end']->format('d/m/Y').').',
-                    'dateReglement.after_or_equal' => 'La date de règlement doit être dans l\'exercice en cours (à partir du '.$range['start']->format('d/m/Y').').',
-                    'dateReglement.before_or_equal' => 'La date de règlement doit être dans l\'exercice en cours (jusqu\'au '.$range['end']->format('d/m/Y').').',
                     'tiers_id.required' => 'Un tiers est obligatoire : il porte la contrepartie comptable de l\'écriture.',
                 ],
                 MontantValidation::messages(['lignes.*.montant'])
@@ -843,6 +843,25 @@ final class TransactionForm extends Component
                     exercice: $exerciceService->current(),
                 );
             }
+        } catch (ExerciceCloturedException $e) {
+            // Le refus porte sur la DATE saisie — c'est elle qui est en cause,
+            // pas la ventilation. L'ordre des catch compte : ce cas, plus
+            // spécifique, doit être attrapé avant le \RuntimeException générique
+            // ci-dessous (ExerciceCloturedException en hérite).
+            $this->addError('date', $e->getMessage());
+
+            return;
+        } catch (\InvalidArgumentException $e) {
+            // PosteTiersReglementService::regler() impose que la date du
+            // règlement (T2) reste dans l'exercice de traitement — une règle
+            // propre au poste tiers, distincte de la clôture ci-dessus, et
+            // déjà appliquée côté « Régler le reliquat »
+            // (PosteTiersReglementModal). Sans ce catch, retirer les bornes
+            // d'exercice affiché du champ dateReglement laisserait cette
+            // exception remonter non attrapée.
+            $this->addError('dateReglement', $e->getMessage());
+
+            return;
         } catch (\RuntimeException $e) {
             $this->addError('lignes', $e->getMessage());
 

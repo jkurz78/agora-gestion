@@ -120,13 +120,24 @@ it('accepte un operation_id clôturé du bon tenant sans aucune erreur de valida
         ->assertHasNoErrors();
 });
 
-it('affiche visiblement le refus quand la date sort de l\'exercice affiché', function () {
-    // La règle de validation refusait la saisie, mais son message était rendu
-    // dans un .invalid-feedback que Bootstrap masque tant qu'un frère précédent
-    // ne porte pas .is-invalid — ce que x-date-input ne fait jamais. L'écran
-    // bloquait donc sans rien expliquer. Le test verrouille la VISIBILITÉ, pas
-    // seulement la présence du message.
+it('affiche visiblement le refus quand la date tombe sur un exercice clôturé', function () {
+    // À l'origine, la règle de validation refusait toute date sortant de
+    // l'exercice AFFICHÉ, et son message était rendu dans un .invalid-feedback
+    // que Bootstrap masque tant qu'un frère précédent ne porte pas
+    // .is-invalid — ce que x-date-input ne fait jamais. L'écran bloquait donc
+    // sans rien expliquer.
+    //
+    // Cette borne d'exercice affiché a depuis été retirée (deux exercices
+    // ouverts se chevauchent plusieurs mois par an) : seule la clôture de
+    // l'exercice DE LA DATE refuse désormais la saisie. Le test est donc
+    // reconstruit sur un exercice réellement clôturé — il continue de
+    // verrouiller la VISIBILITÉ du refus, pas seulement sa présence.
     SystemeSeeder::seed();
+    Exercice::create([
+        'association_id' => $this->association->id,
+        'annee' => 2024,
+        'statut' => StatutExercice::Cloture,
+    ]);
     $compteDepense = Compte::factory()->depense()->create(['association_id' => $this->association->id]);
     $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
 
@@ -143,7 +154,7 @@ it('affiche visiblement le refus quand la date sort de l\'exercice affiché', fu
         ->html();
 
     expect($html)->toContain('invalid-feedback d-block')
-        ->and($html)->toContain('exercice en cours');
+        ->and($html)->toContain('clôturé');
 
     expect(Transaction::count())->toBe(0);
 });

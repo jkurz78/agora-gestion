@@ -587,6 +587,9 @@
                                 <i class="bi bi-scissors"></i>
                                 Ventilation — {{ $ventilationLigneCompteLabel }} ({{ number_format((float) $ventilationLigneMontant, 2, ',', ' ') }} €)
                             </div>
+                            {{-- d-block : même raison que les champs Date — sans frère .is-invalid,
+                                 Bootstrap masquerait ce message (refus de clôture, ou somme invalide). --}}
+                            @error('affectations') <div class="invalid-feedback d-block mb-2">{{ $message }}</div> @enderror
 
                             <table class="table table-sm mb-2">
                                 <thead class="table-light">

@@ -91,8 +91,17 @@ it('crée une T1 et son règlement T2 à la date de règlement saisie', function
         ->and($t1->statut_reglement)->toBe(StatutReglement::Recu);
 });
 
-it('libelle en français les erreurs de date de règlement hors exercice', function (): void {
+it('remonte proprement le refus quand la date de règlement sort de l\'exercice de traitement', function (): void {
+    // Le retrait des bornes d'exercice affiché sur dateReglement (côté
+    // Livewire) ne supprime PAS cette règle : PosteTiersReglementService
+    // impose toujours que la date du règlement (T2) reste dans l'exercice de
+    // traitement — même contrainte que côté « Régler le reliquat »
+    // (PosteTiersReglementModal, cf. PosteTiersReglementModalTest). Ce qui
+    // change, c'est le mécanisme : ce n'était plus une règle Livewire
+    // bloquant AVANT l'appel au service, mais une InvalidArgumentException
+    // remontée par le service et attrapée par TransactionForm::save().
     $range = app(ExerciceService::class)->dateRange(app(ExerciceService::class)->current());
+    $label = app(ExerciceService::class)->label(app(ExerciceService::class)->current());
 
     $composant = Livewire::test(TransactionForm::class)
         ->set('type', 'recette')
@@ -113,17 +122,17 @@ it('libelle en français les erreurs de date de règlement hors exercice', funct
             'piece_jointe_remove' => false,
         ]])
         ->call('save')
-        ->assertHasErrors(['dateReglement' => 'after_or_equal']);
+        ->assertHasErrors(['dateReglement']);
 
     expect($composant->errors()->first('dateReglement'))
-        ->toBe('La date de règlement doit être dans l\'exercice en cours (à partir du '.$range['start']->format('d/m/Y').').');
+        ->toBe("La date du règlement doit appartenir à l'exercice {$label}.");
 
     $composant->set('dateReglement', $range['end']->addDay()->toDateString())
         ->call('save')
-        ->assertHasErrors(['dateReglement' => 'before_or_equal']);
+        ->assertHasErrors(['dateReglement']);
 
     expect($composant->errors()->first('dateReglement'))
-        ->toBe('La date de règlement doit être dans l\'exercice en cours (jusqu\'au '.$range['end']->format('d/m/Y').').');
+        ->toBe("La date du règlement doit appartenir à l'exercice {$label}.");
 });
 
 it('nomme le champ « date de règlement » en français quand il est manquant', function (): void {
