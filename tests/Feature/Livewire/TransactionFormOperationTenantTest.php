@@ -2,10 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Enums\StatutExercice;
 use App\Enums\StatutOperation;
 use App\Livewire\TransactionForm;
 use App\Models\Association;
 use App\Models\Compte;
+use App\Models\Exercice;
 use App\Models\Operation;
 use App\Models\Tiers;
 use App\Models\Transaction;
@@ -116,4 +118,32 @@ it('accepte un operation_id clôturé du bon tenant sans aucune erreur de valida
         ->set('lignes.0.montant', '50.00')
         ->call('save')
         ->assertHasNoErrors();
+});
+
+it('affiche visiblement le refus quand la date sort de l\'exercice affiché', function () {
+    // La règle de validation refusait la saisie, mais son message était rendu
+    // dans un .invalid-feedback que Bootstrap masque tant qu'un frère précédent
+    // ne porte pas .is-invalid — ce que x-date-input ne fait jamais. L'écran
+    // bloquait donc sans rien expliquer. Le test verrouille la VISIBILITÉ, pas
+    // seulement la présence du message.
+    SystemeSeeder::seed();
+    $compteDepense = Compte::factory()->depense()->create(['association_id' => $this->association->id]);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
+
+    $html = Livewire::test(TransactionForm::class)
+        ->call('showNewForm', 'depense')
+        ->set('paiementRecu', false)
+        ->set('date', '2025-01-15')
+        ->set('libelle', 'Facture datée par erreur')
+        ->set('tiers_id', $tiers->id)
+        ->set('lignes.0.compte_id', (string) $compteDepense->id)
+        ->set('lignes.0.montant', '100.00')
+        ->call('save')
+        ->assertHasErrors('date')
+        ->html();
+
+    expect($html)->toContain('invalid-feedback d-block')
+        ->and($html)->toContain('exercice en cours');
+
+    expect(Transaction::count())->toBe(0);
 });
