@@ -32,6 +32,7 @@ final class TransactionExtourneService
 {
     public function __construct(
         private readonly NumeroPieceService $numeroPiece,
+        private readonly ExerciceService $exerciceService,
     ) {}
 
     /**
@@ -43,6 +44,14 @@ final class TransactionExtourneService
      */
     public function extourner(Transaction $origine, ExtournePayload $payload): Extourne
     {
+        // Une extourne est une écriture comme une autre : sa date est saisie
+        // par l'utilisateur et peut tomber sur un exercice clos. Le service
+        // construit sa transaction miroir sans passer par TransactionService,
+        // il porte donc lui-même la garde.
+        $this->exerciceService->assertOuvert(
+            $this->exerciceService->anneeForDate($payload->date)
+        );
+
         $this->assertSameTenant($origine);
         Gate::authorize('create', [Extourne::class, $origine]);
         $this->assertExtournable($origine);
