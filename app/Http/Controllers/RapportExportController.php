@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Enums\PorteeExercices;
 use App\Http\Controllers\Concerns\ResolvesLogos;
 use App\Livewire\AnalysePivot;
 use App\Models\Association;
@@ -498,16 +499,57 @@ final class RapportExportController extends Controller
         ]);
     }
 
+    /**
+     * SEL-04 — Opérations retenues pour un export : les ids de la requête,
+     * intersectés avec ceux qui portent un mouvement de résultat sur
+     * l'exercice.
+     *
+     * Un export dont aucune opération ne survit échoue en 422 plutôt que de
+     * produire un document vide : une feuille de calcul sans ligne, ou un PDF
+     * réduit à son en-tête, se lit comme un résultat comptable nul, pas comme
+     * une erreur de sélection. L'écran, lui, affiche son invite — la même
+     * situation ne peut pas se solder par un silence côté fichier.
+     *
+     * Le mode (EX-03) est lu ici depuis la requête et propagé à
+     * normaliserOperations() : sans ça, un export lancé en projection
+     * validerait la sélection avec le critère du mode réalisé, et refuserait
+     * en 422 une opération que l'écran, lui, propose bien — une divergence
+     * écran/export inacceptable.
+     *
+     * @return list<int>
+     */
+    private function operationsExport(RapportService $rapportService, int $exercice, Request $request): array
+    {
+        $previsionnel = $request->query('mode', 'realise') !== 'realise';
+
+        $operationIds = $rapportService->normaliserOperations(
+            (array) $request->query('ops', []),
+            $exercice,
+            $previsionnel,
+        );
+
+        if ($operationIds === []) {
+            abort(422, 'Aucune opération sélectionnée ne comporte de mouvement sur l’exercice affiché.');
+        }
+
+        return $operationIds;
+    }
+
     private function xlsxOperations(RapportService $rapportService, int $exercice, Request $request): Spreadsheet
     {
-        $operationIds = array_map('intval', (array) $request->query('ops', []));
+        $operationIds = $this->operationsExport($rapportService, $exercice, $request);
         $parSeances = $request->boolean('seances');
         $parTiers = $request->boolean('tiers');
         $mode = $request->query('mode', 'realise');
         $previsionnel = $mode !== 'realise';
         $parOperations = $request->boolean('parops');
+        $portee = PorteeExercices::depuisRequete((string) $request->query('exercices', 'current'));
 
-        $data = $rapportService->compteDeResultatOperations($exercice, $operationIds, $parSeances, $parTiers, $previsionnel, $parOperations);
+        $data = $rapportService->compteDeResultatOperations($exercice, $operationIds, $parSeances, $parTiers, $previsionnel, $parOperations, $portee);
+
+        if ($portee === PorteeExercices::Tous) {
+            return $this->xlsxOperationsAll($data, $mode, $parSeances, $parTiers, $parOperations);
+        }
 
         $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
@@ -1176,6 +1218,302 @@ final class RapportExportController extends Controller
         return $spreadsheet;
     }
 
+    /**
+     * Classeur du CR par opérations en portée « tous les exercices ».
+     *
+     * Chemin additif dédié : le générateur ci-dessus (portée courante, éprouvé
+     * sur huit combinaisons d'axes) n'est pas touché. Hiérarchie
+     * Famille → Compte → Exercice → [Tiers], une ligne par (compte × exercice)
+     * précédée de ses lignes de tiers, sous-totaux de compte et de section
+     * toujours écrits (jamais laissés à une formule Excel) — c'est ce qui
+     * garantit que ce classeur dit exactement ce que dit l'écran.
+     *
+     * @param  array<string, mixed>  $data  Sortie de RapportService::compteDeResultatOperations()
+     */
+    private function xlsxOperationsAll(
+        array $data,
+        string $mode,
+        bool $parSeances,
+        bool $parTiers,
+        bool $parOperations,
+    ): Spreadsheet {
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+
+        $isProjection = $mode === 'projection';
+        $modeLabel = match ($mode) {
+            'projection' => 'Projection',
+            default => 'Réalisé',
+        };
+        $sheet->setTitle('CR par opérations ('.$modeLabel.')');
+
+        $seances = $data['seances'] ?? [];
+        $operationNames = $data['operation_names'] ?? [];
+        $exercices = $data['exercices'] ?? [];
+        $labelParAnnee = collect($exercices)->pluck('label', 'annee');
+
+        /** @var array<int, ProjectionMatrix> $projChargesParExercice */
+        $projChargesParExercice = $data['proj_charges_par_exercice'] ?? [];
+        /** @var array<int, ProjectionMatrix> $projProduitsParExercice */
+        $projProduitsParExercice = $data['proj_produits_par_exercice'] ?? [];
+        /** @var ProjectionMatrix|null $projChargesFusion */
+        $projChargesFusion = $data['proj_charges'] ?? null;
+        /** @var ProjectionMatrix|null $projProduitsFusion */
+        $projProduitsFusion = $data['proj_produits'] ?? null;
+
+        // ── Résolution des montants — écrite une fois, comme le partial Blade
+        //    rapport-operations-tableau-all.blade.php de l'écran. ────────────
+        $resoudreCompte = function (array $compte, array $projParExercice) use ($isProjection): array {
+            $scId = (int) ($compte['compte_id'] ?? 0);
+            if (! $isProjection) {
+                return [
+                    (float) ($compte['montant_exercices'] ?? $compte['montant'] ?? 0.0),
+                    $compte['seances'] ?? [],
+                    $compte['operations'] ?? [],
+                ];
+            }
+
+            $montant = 0.0;
+            $seancesVal = [];
+            $operationsVal = [];
+            foreach ($projParExercice as $matrix) {
+                $montant += (float) ($matrix->bySc()[$scId] ?? 0.0);
+                foreach ($matrix->byScSeance()[$scId] ?? [] as $s => $v) {
+                    $seancesVal[$s] = ($seancesVal[$s] ?? 0.0) + $v;
+                }
+                foreach ($matrix->byScOp()[$scId] ?? [] as $opId => $v) {
+                    $operationsVal[$opId] = ($operationsVal[$opId] ?? 0.0) + $v;
+                }
+            }
+
+            return [$montant, $seancesVal, $operationsVal];
+        };
+
+        $resoudreExercice = function (array $exEntry, int $scId, ?ProjectionMatrix $matrix): array {
+            if ($matrix === null) {
+                return [
+                    (float) ($exEntry['montant'] ?? 0.0),
+                    $exEntry['seances'] ?? [],
+                    $exEntry['operations'] ?? [],
+                ];
+            }
+
+            return [
+                (float) ($matrix->bySc()[$scId] ?? 0.0),
+                $matrix->byScSeance()[$scId] ?? [],
+                $matrix->byScOp()[$scId] ?? [],
+            ];
+        };
+
+        $resoudreTiers = function (array $tEntry, int $scId, int $tiersId, ?ProjectionMatrix $matrix): array {
+            if ($matrix === null) {
+                return [
+                    (float) ($tEntry['montant'] ?? 0.0),
+                    $tEntry['seances'] ?? [],
+                    $tEntry['operations'] ?? [],
+                ];
+            }
+
+            return [
+                (float) ($matrix->byScTiers($scId)[$tiersId] ?? 0.0),
+                $matrix->byScTiersSeance($scId)[$tiersId] ?? [],
+                $matrix->byScTiersOp($scId)[$tiersId] ?? [],
+            ];
+        };
+
+        /** Ajoute les colonnes de séances et/ou d'opérations d'une ligne. */
+        $appendAxis = function (array &$values, array $seancesVal, array $operationsVal) use ($seances, $operationNames, $parSeances, $parOperations): void {
+            if ($parSeances) {
+                foreach ($seances as $s) {
+                    $values[] = (float) ($seancesVal[$s] ?? 0.0);
+                }
+            }
+            if ($parOperations) {
+                foreach ($operationNames as $opId => $opNom) {
+                    $values[] = (float) ($operationsVal[$opId] ?? 0.0);
+                }
+            }
+        };
+
+        // ── En-têtes libres ──────────────────────────────────────────────
+        $sheet->setCellValue('A1', 'Mode : '.$modeLabel);
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setItalic(true)->setSize(10);
+        $sheet->setCellValue('A2', 'Portée : Tous les exercices');
+        $sheet->getStyle('A2')->getFont()->setBold(true)->setItalic(true)->setSize(10);
+
+        // ── En-tête colonnes : Type, Famille, Compte, Exercice, [Tiers],
+        //    [séances], [opérations], Total ────────────────────────────────
+        $headers = ['Type', 'Famille', 'Compte', 'Exercice'];
+        if ($parTiers) {
+            $headers[] = 'Tiers';
+        }
+        if ($parSeances) {
+            foreach ($seances as $s) {
+                $headers[] = $s === 0 ? 'Hors séances' : 'S'.$s;
+            }
+        }
+        if ($parOperations) {
+            foreach ($operationNames as $opNom) {
+                $headers[] = $opNom;
+            }
+        }
+        $headers[] = 'Total';
+        $lastCol = Coordinate::stringFromColumnIndex(count($headers));
+
+        $headerRow = 3;
+        $sheet->fromArray([$headers], null, 'A'.$headerRow);
+        $this->styleEnteteXlsx($sheet, 'A'.$headerRow.':'.$lastCol.$headerRow);
+
+        $row = $headerRow + 1;
+        $firstDataRow = $row;
+        $sectionTotals = [];
+
+        foreach ([
+            ['Charge', $data['charges'], 'DÉPENSES', $projChargesParExercice, $projChargesFusion],
+            ['Produit', $data['produits'], 'RECETTES', $projProduitsParExercice, $projProduitsFusion],
+        ] as [$type, $familles, $sectionLabel, $projParExercice, $projFusion]) {
+            $sectionSeanceTotals = array_fill_keys($seances, 0.0);
+            $sectionOpTotals = [];
+            foreach ($operationNames as $opId => $opNom) {
+                $sectionOpTotals[$opId] = 0.0;
+            }
+
+            foreach ($familles as $famille) {
+                foreach ($famille['comptes'] as $compte) {
+                    $scId = (int) ($compte['compte_id'] ?? 0);
+                    $exercicesRealise = collect($compte['exercices'] ?? [])->keyBy('annee');
+                    $anneesDuCompte = $isProjection
+                        ? collect($exercices)->pluck('annee')->all()
+                        : $exercicesRealise->keys()->all();
+                    $tiersCompteLabel = collect($compte['tiers'] ?? [])->keyBy('tiers_id');
+
+                    foreach ($anneesDuCompte as $annee) {
+                        $matrixEx = $isProjection ? ($projParExercice[$annee] ?? null) : null;
+                        $exEntry = $exercicesRealise->get($annee, ['montant' => 0.0, 'tiers' => []]);
+                        [$vMontantEx, $vSeancesEx, $vOperationsEx] = $resoudreExercice($exEntry, $scId, $matrixEx);
+
+                        if ($vMontantEx <= 0.0) {
+                            continue;
+                        }
+
+                        $labelAnnee = $labelParAnnee[$annee] ?? $exEntry['label'] ?? '';
+
+                        if ($parTiers) {
+                            $tiersIdsRealise = collect($exEntry['tiers'] ?? [])->pluck('tiers_id')->map(fn ($id) => (int) $id)->all();
+                            $tiersIdsProjection = ($isProjection && $matrixEx !== null)
+                                ? array_map('intval', array_keys($matrixEx->byScTiers($scId)))
+                                : [];
+                            $tousTiersIds = collect(array_merge($tiersIdsRealise, $tiersIdsProjection))->unique()->all();
+                            $tiersRealiseParId = collect($exEntry['tiers'] ?? [])->keyBy('tiers_id');
+
+                            foreach ($tousTiersIds as $tiersId) {
+                                $tEntry = $tiersRealiseParId->get($tiersId, ['montant' => 0.0, 'tiers_id' => $tiersId]);
+                                [$vMontantT, $vSeancesT, $vOperationsT] = $resoudreTiers($tEntry, $scId, (int) $tiersId, $matrixEx);
+
+                                if ($vMontantT <= 0.0) {
+                                    continue;
+                                }
+
+                                $labelT = $tEntry['label'] ?? ($tiersCompteLabel[$tiersId]['label'] ?? '(sans tiers)');
+
+                                $values = [$type, $famille['famille_nom'], $compte['compte_nom'], $labelAnnee, $labelT];
+                                $appendAxis($values, $vSeancesT, $vOperationsT);
+                                $values[] = $vMontantT;
+                                $sheet->fromArray([$values], null, 'A'.$row);
+                                $row++;
+                            }
+                        }
+
+                        $values = [$type, $famille['famille_nom'], $compte['compte_nom'], $labelAnnee];
+                        if ($parTiers) {
+                            $values[] = 'TOTAL';
+                        }
+                        $appendAxis($values, $vSeancesEx, $vOperationsEx);
+                        $values[] = $vMontantEx;
+                        $sheet->fromArray([$values], null, 'A'.$row);
+                        if ($parTiers) {
+                            $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFont()->setBold(true);
+                        }
+                        $row++;
+                    }
+
+                    // Sous-total du compte, à travers tous les exercices — écrit,
+                    // jamais laissé à une formule du tableur.
+                    [$vMontantSc, $vSeancesSc, $vOperationsSc] = $resoudreCompte($compte, $projParExercice);
+                    $values = [$type, $famille['famille_nom'], $compte['compte_nom'], 'TOTAL'];
+                    if ($parTiers) {
+                        $values[] = '';
+                    }
+                    $appendAxis($values, $vSeancesSc, $vOperationsSc);
+                    $values[] = $vMontantSc;
+                    $sheet->fromArray([$values], null, 'A'.$row);
+                    $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFont()->setBold(true);
+                    $row++;
+
+                    if ($parSeances) {
+                        foreach ($vSeancesSc as $s => $v) {
+                            $sectionSeanceTotals[$s] = ($sectionSeanceTotals[$s] ?? 0.0) + $v;
+                        }
+                    }
+                    if ($parOperations) {
+                        foreach ($vOperationsSc as $opId => $v) {
+                            $sectionOpTotals[$opId] = ($sectionOpTotals[$opId] ?? 0.0) + $v;
+                        }
+                    }
+                }
+            }
+
+            // Ligne de total de section — même calcul que l'écran
+            // (RapportCompteResultatOperations::render()) : montant_exercices en
+            // réalisé, matrice fusionnée en projection. Jamais un total qui
+            // diffèrerait de celui affiché à l'écran.
+            $grandTotal = ($isProjection && $projFusion !== null)
+                ? $projFusion->total()
+                : (float) collect($familles)->sum('montant_exercices');
+
+            $values = ['', '', 'TOTAL '.$sectionLabel, ''];
+            if ($parTiers) {
+                $values[] = '';
+            }
+            $appendAxis($values, $sectionSeanceTotals, $sectionOpTotals);
+            $values[] = $grandTotal;
+            $sheet->fromArray([$values], null, 'A'.$row);
+            $this->styleTotalXlsx($sheet, 'A'.$row.':'.$lastCol.$row);
+            $row++;
+            $row++; // ligne vide entre sections
+
+            $sectionTotals[$sectionLabel] = $grandTotal;
+        }
+
+        // Ligne RÉSULTAT, cohérente avec le bandeau de l'écran.
+        $recTotal = (float) ($sectionTotals['RECETTES'] ?? 0.0);
+        $depTotal = (float) ($sectionTotals['DÉPENSES'] ?? 0.0);
+        $values = ['', '', 'RÉSULTAT', ''];
+        if ($parTiers) {
+            $values[] = '';
+        }
+        // $seances/$operationNames ne sont peuplés que si l'axe correspondant
+        // est actif : pas besoin de reconditionner sur $parSeances/$parOperations.
+        foreach ($seances as $__s) {
+            $values[] = '';
+        }
+        foreach ($operationNames as $__opNom) {
+            $values[] = '';
+        }
+        $values[] = $recTotal - $depTotal;
+        $sheet->fromArray([$values], null, 'A'.$row);
+        $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFont()->setBold(true);
+        $row++;
+
+        // Format numérique des colonnes de montants.
+        $firstNumCol = Coordinate::stringFromColumnIndex(4 + ($parTiers ? 1 : 0) + 1);
+        if ($row > $firstDataRow) {
+            $sheet->getStyle($firstNumCol.$firstDataRow.':'.$lastCol.($row - 1))->getNumberFormat()->setFormatCode('#,##0.00');
+        }
+
+        return $spreadsheet;
+    }
+
     private function xlsxFluxTresorerie(RapportService $rapportService, int $exercice): Spreadsheet
     {
         $data = $rapportService->fluxTresorerie($exercice);
@@ -1476,14 +1814,15 @@ final class RapportExportController extends Controller
 
     private function pdfOperationsData(RapportService $rapportService, int $exercice, Request $request): array
     {
-        $operationIds = array_map('intval', (array) $request->query('ops', []));
+        $operationIds = $this->operationsExport($rapportService, $exercice, $request);
         $parSeances = $request->boolean('seances');
         $parTiers = $request->boolean('tiers');
         $mode = (string) $request->query('mode', 'realise');
         $previsionnel = $mode !== 'realise';
         $parOperations = $request->boolean('parops');
+        $portee = PorteeExercices::depuisRequete((string) $request->query('exercices', 'current'));
 
-        $data = $rapportService->compteDeResultatOperations($exercice, $operationIds, $parSeances, $parTiers, $previsionnel, $parOperations);
+        $data = $rapportService->compteDeResultatOperations($exercice, $operationIds, $parSeances, $parTiers, $previsionnel, $parOperations, $portee);
         $seances = $data['seances'] ?? [];
         $operationNames = $data['operation_names'] ?? [];
         $seancesParOperation = $data['seances_par_operation'] ?? [];
@@ -1495,6 +1834,13 @@ final class RapportExportController extends Controller
         if ($mode === 'projection' && $projChargesM !== null) {
             $totalCharges = $projChargesM->total();
             $totalProduits = $projProduitsM->total();
+        } elseif ($portee === PorteeExercices::Tous) {
+            // En portée « tous les exercices », le total couvre exactement les
+            // exercices affichés — même règle que l'écran
+            // (RapportCompteResultatOperations::render()), pour que les trois
+            // sorties (écran, PDF, classeur) donnent le même total.
+            $totalCharges = collect($data['charges'])->sum('montant_exercices');
+            $totalProduits = collect($data['produits'])->sum('montant_exercices');
         } else {
             $totalCharges = collect($data['charges'])->sum('montant');
             $totalProduits = collect($data['produits'])->sum('montant');
@@ -1506,7 +1852,9 @@ final class RapportExportController extends Controller
         };
 
         return [
-            'subtitle' => 'Mode : '.$modeLabel,
+            'subtitle' => $portee === PorteeExercices::Tous
+                ? 'Mode : '.$modeLabel.' — Tous les exercices'
+                : 'Mode : '.$modeLabel.' — Exercice affiché : '.app(ExerciceService::class)->label($exercice),
             'charges' => $data['charges'],
             'produits' => $data['produits'],
             'previsionsCharges' => $data['previsions_charges'] ?? [],
@@ -1524,6 +1872,10 @@ final class RapportExportController extends Controller
             'totalCharges' => $totalCharges,
             'totalProduits' => $totalProduits,
             'resultatNet' => $totalProduits - $totalCharges,
+            'exercices' => $data['exercices'] ?? [],
+            'porteeExercices' => $portee->value,
+            'projChargesParExercice' => $data['proj_charges_par_exercice'] ?? [],
+            'projProduitsParExercice' => $data['proj_produits_par_exercice'] ?? [],
         ];
     }
 

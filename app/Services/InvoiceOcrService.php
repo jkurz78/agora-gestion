@@ -217,8 +217,9 @@ final class InvoiceOcrService
             ->implode("\n");
 
         $exercice = app(ExerciceService::class)->current();
+        // Operation::scopeProposableALaSaisie().
         $operations = Operation::with('typeOperation')
-            ->forExercice($exercice)
+            ->proposableALaSaisie()
             ->orderBy('nom')
             ->get()
             ->map(fn (Operation $o) => $o->id.': '.$o->nom.' (type: '.($o->typeOperation?->nom ?? '-').', séances: '.$o->nombre_seances.')')

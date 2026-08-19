@@ -19,8 +19,12 @@ final class BudgetService
     {
         $compte = Compte::findOrFail($compteId);
 
-        $startDate = "{$exercice}-09-01";
-        $endDate = ($exercice + 1).'-08-31';
+        // Les bornes viennent du paramétrage du tenant, jamais d'un calcul
+        // local : une association en exercice civil ou décalé n'a pas les
+        // mêmes dates, et les figer ici rendait son réalisé faux.
+        $range = app(ExerciceService::class)->dateRange($exercice);
+        $startDate = $range['start']->toDateString();
+        $endDate = $range['end']->toDateString();
 
         $typeValue = (int) $compte->classe === 6 ? 'depense' : 'recette';
 

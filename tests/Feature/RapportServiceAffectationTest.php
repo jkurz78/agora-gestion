@@ -94,10 +94,20 @@ it('échoue fermé sur toutes les requêtes brutes quand le tenant est absent', 
     $rapport = $this->service->compteDeResultat(2025);
     $source = file_get_contents(app_path('Services/Rapports/CompteResultatBuilder.php'));
 
+    // Chaque requête brute du builder doit porter son filtre tenant. On l'a
+    // longtemps vérifié par un nombre en dur, qu'il fallait rebomber à chaque
+    // refactor — au risque de l'ajuster machinalement sans contrôler ce qu'il
+    // protège. La relation entre les deux compteurs dit la même chose et se
+    // maintient seule : autant d'appels au scope que de DB::table(), plus un
+    // pour la définition de la méthode.
+    $requetesBrutes = substr_count((string) $source, 'DB::table(');
+    $appelsScope = substr_count((string) $source, 'scopeToCurrentTenant(') - 1;
+
     expect($rapport['charges'])->toBeEmpty()
         ->and($rapport['produits'])->toBeEmpty()
         ->and($source)->not->toContain('->when(TenantContext::hasBooted()')
-        ->and(substr_count((string) $source, 'scopeToCurrentTenant('))->toBe(14);
+        ->and($requetesBrutes)->toBeGreaterThan(0)
+        ->and($appelsScope)->toBe($requetesBrutes);
 });
 
 it('le rapport onglet 2 prend en compte les affectations au lieu de operation_id ligne', function () {

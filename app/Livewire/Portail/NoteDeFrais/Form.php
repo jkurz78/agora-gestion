@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Livewire\Portail\NoteDeFrais;
 
 use App\Enums\NoteDeFraisLigneType;
-use App\Enums\StatutOperation;
 use App\Livewire\Concerns\MontantValidation;
 use App\Livewire\Portail\Concerns\WithPortailTenant;
 use App\Models\Association;
@@ -14,7 +13,6 @@ use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
 use App\Models\Operation;
 use App\Models\Tiers;
-use App\Services\ExerciceService;
 use App\Services\NoteDeFrais\LigneTypes\LigneTypeRegistry;
 use App\Services\Portail\NoteDeFrais\JustificatifAnalyser;
 use App\Services\Portail\NoteDeFrais\NoteDeFraisService;
@@ -389,17 +387,14 @@ final class Form extends Component
 
     public function render(): View
     {
-        $exerciceCourant = app(ExerciceService::class)->current();
-
         // DC-10a : comptes de charge (classe 6) — libellé seul côté portail (D1).
         $comptes = Compte::where('classe', 6)
             ->where('actif', true)
             ->orderBy('intitule')
             ->get();
 
-        $operations = Operation::where('statut', '!=', StatutOperation::Cloturee->value)
-            ->orderBy('nom')
-            ->get();
+        // Operation::scopeProposableALaSaisie().
+        $operations = Operation::proposableALaSaisie()->orderBy('nom')->get();
 
         $selectedOperation = ! empty($this->draftLigne['operation_id'])
             ? Operation::find((int) $this->draftLigne['operation_id'])

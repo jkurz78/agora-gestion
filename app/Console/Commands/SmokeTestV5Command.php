@@ -186,8 +186,11 @@ final class SmokeTestV5Command extends Command
      */
     private function listerTransactionsSansPd(int $annee): Collection
     {
-        $dateDebut = "{$annee}-09-01";
-        $dateFin = ($annee + 1).'-08-31';
+        // Bornes issues du paramétrage du tenant : le mois de début d'exercice
+        // appartient à l'association, pas au code.
+        $range = app(ExerciceService::class)->dateRange($annee);
+        $dateDebut = $range['start']->toDateString();
+        $dateFin = $range['end']->toDateString();
 
         // Toutes les transactions de l'exercice qui ont au moins une ventilation 6/7…
         // Les transactions à 0 € sont exemptées par design (miroir de
@@ -311,8 +314,11 @@ final class SmokeTestV5Command extends Command
 
     private function compterTxDesEquilibrees(int $annee): int
     {
-        $dateDebut = "{$annee}-09-01";
-        $dateFin = ($annee + 1).'-08-31';
+        // Bornes issues du paramétrage du tenant : le mois de début d'exercice
+        // appartient à l'association, pas au code.
+        $range = app(ExerciceService::class)->dateRange($annee);
+        $dateDebut = $range['start']->toDateString();
+        $dateFin = $range['end']->toDateString();
 
         // Pour chaque transaction de l'exercice, vérifier SUM(debit) = SUM(credit)
         // sur les lignes non supprimées.

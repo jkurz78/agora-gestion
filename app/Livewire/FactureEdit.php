@@ -458,7 +458,7 @@ final class FactureEdit extends Component
             ->orderByDesc('date')
             ->get();
 
-        $lignes = $this->facture->lignes()->get();
+        $lignes = $this->facture->lignes()->with('operation')->get();
 
         $totalLignes = $lignes->whereNotNull('montant')->sum('montant');
 
@@ -469,7 +469,8 @@ final class FactureEdit extends Component
         // DC-8 : sélecteur de ventilation sur comptes (classe 7), groupés par famille.
         $groupesComptesRecette = PlanComptableSelecteur::groupesPourType('recette');
 
-        $operations = Operation::orderBy('nom')->get();
+        // Operation::scopeProposableALaSaisie() : liste proposée aux lignes de facture.
+        $operations = Operation::proposableALaSaisie()->orderBy('nom')->get();
 
         $aLignesMontantManuel = $lignes->where('type', TypeLigneFacture::MontantManuel)->isNotEmpty();
 

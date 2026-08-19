@@ -159,12 +159,15 @@
                                                             <select class="form-select form-select-sm"
                                                                     wire:change="updateOperation({{ $ligne->id }}, $event.target.value)">
                                                                 <option value="">— Opération (optionnel) —</option>
+                                                                @php $opLigne = $ligne->operation; @endphp
+                                                                @if ($opLigne !== null && ! $operations->contains('id', (int) $opLigne->id))
+                                                                    <option value="{{ $opLigne->id }}" selected>{{ $opLigne->nom }}</option>
+                                                                @endif
                                                                 @foreach ($operations as $op)
                                                                     <option value="{{ $op->id }}" @selected((int) $ligne->operation_id === (int) $op->id)>{{ $op->nom }}</option>
                                                                 @endforeach
                                                             </select>
                                                         </div>
-                                                        @php $opLigne = $ligne->operation_id !== null ? $operations->firstWhere('id', $ligne->operation_id) : null; @endphp
                                                         @if ($opLigne !== null && (int) $opLigne->nombre_seances > 0)
                                                             <div class="col-md-2">
                                                                 <select class="form-select form-select-sm"

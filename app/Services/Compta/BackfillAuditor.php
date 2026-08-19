@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Compta;
 
+use App\Services\ExerciceService;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -31,8 +32,11 @@ final class BackfillAuditor
      */
     public function auditer(int $associationId, int $annee): array
     {
-        $dateDebut = "{$annee}-09-01";
-        $dateFin = ($annee + 1).'-08-31';
+        // Bornes issues du paramétrage du tenant : le mois de début d'exercice
+        // appartient à l'association, pas au code.
+        $range = app(ExerciceService::class)->dateRange($annee);
+        $dateDebut = $range['start']->toDateString();
+        $dateFin = $range['end']->toDateString();
 
         // -- Nb transactions à convertir (equilibree=FALSE ou NULL) --
         // Les transactions à 0 € ne sont jamais convertibles (skip par design

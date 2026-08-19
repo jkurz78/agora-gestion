@@ -1,6 +1,7 @@
 # Opérations — imputations et compte de résultat multi-exercices
 
 **Date :** 2026-08-14
+**Révision :** 2026-08-16
 **Statut :** spécification fonctionnelle et technique à relire
 **Périmètre :** saisie manuelle des dépenses/recettes et compte de résultat par opérations
 
@@ -8,8 +9,9 @@
 
 AgoraGestion doit permettre d'imputer manuellement une dépense ou une recette sur toute
 opération au statut **En cours**, même si les dates de l'opération ne chevauchent pas
-l'exercice comptable affiché. Une opération **Clôturée** reste indisponible pour toute
-nouvelle imputation manuelle.
+l'exercice comptable affiché. Une opération **Clôturée** n'est plus proposée dans les
+sélecteurs de saisie, mais son statut n'interdit aucune imputation : c'est un filtre
+d'ergonomie, pas une règle métier.
 
 Le compte de résultat par opérations doit pouvoir afficher :
 
@@ -22,9 +24,8 @@ opérations qui possèdent au moins un mouvement de charge ou de produit dans l'
 affiché. Le mode « Tous les exercices » élargit ensuite la période des opérations
 sélectionnées sans élargir cette liste d'opérations.
 
-La période d'un exercice et son libellé doivent toujours provenir d'`ExerciceService`,
-source de vérité tenant-aware. La période septembre-août actuellement codée en dur dans
-`CompteResultatBuilder` est un bug à corriger dans ce chantier.
+Le rattachement des mouvements et des prévisions à un exercice, ainsi que les libellés
+affichés, utilisent `ExerciceService`, source de vérité tenant-aware.
 
 ## 2. Contexte et problème actuel
 
@@ -57,22 +58,6 @@ factures fournisseur.
 Une même opération peut désormais recevoir des transactions sur plusieurs exercices. Le
 rapport doit rendre ces montants visibles sans perdre les axes existants : comptes,
 séances, tiers, opérations en colonnes, réalisé et projection.
-
-### 2.3 Bug préalable sur les dates d'exercice
-
-`CompteResultatBuilder::exerciceDates()` retourne actuellement en dur :
-
-```text
-N-09-01 → (N+1)-08-31
-```
-
-Cette méthode est utilisée par le compte de résultat général, le compte de résultat par
-opérations et le rapport par séances. Elle contredit `ExerciceService`, qui calcule les
-bornes depuis `association.exercice_mois_debut` et gère notamment les exercices civils.
-
-**Décision impérative :** supprimer ce calcul local. Les bornes, le rattachement d'une date
-à un exercice et les libellés d'exercice doivent provenir exclusivement de
-`ExerciceService`.
 
 ## 3. Terminologie normative
 
@@ -109,60 +94,45 @@ sans `forExercice()` et sans comparaison de `date_debut` ou `date_fin`.
 Une opération passée, présente ou future peut donc être choisie tant qu'elle est au statut
 `En cours`.
 
-### IMP-02 — Interdiction des opérations clôturées
+### IMP-02 — Le statut clôturé filtre les propositions, il n'interdit rien
 
-Une opération `Clôturée` :
+Le statut `Clôturée` retire une opération des **listes proposées**. Il ne constitue pas une
+règle serveur et ne fait échouer aucune écriture.
 
-- n'apparaît pas dans un sélecteur de nouvelle imputation ;
-- ne peut pas être soumise manuellement par modification du DOM, requête Livewire ou appel
-  direct au service métier ;
-- ne peut pas recevoir une nouvelle affectation détaillée ;
-- n'est pas proposée au moteur OCR.
+La ligne de partage n'est pas « manuel contre automatique » — l'OCR est les deux — mais
+**qui choisit l'opération** :
 
-Le contrôle est une règle serveur. Le masquage dans l'interface ne suffit pas.
+- **l'opération est choisie** (un humain, ou un modèle dont un humain valide la
+  proposition) : les opérations clôturées ne sont pas proposées ;
+- **l'opération est héritée d'un lien métier préexistant** : le rattachement s'applique
+  sans condition, quel que soit le statut.
 
-### IMP-03 — Conservation des imputations historiques
+La réalité comptable est têtue : une écriture qui arrive déjà rattachée à une opération —
+synchronisation HelloAsso, règlement tardif d'un participant, écriture issue d'un règlement
+d'opération — ne peut pas être refusée. Personne n'a choisi cette opération, elle était
+déjà là.
 
-Si une transaction a été imputée quand l'opération était ouverte, puis que l'opération a
-été clôturée :
+Pour imputer délibérément sur une opération clôturée, le comptable la rouvre, impute, puis
+la reclôture. Cette bascule existe déjà (`OperationDetail`) et ce chantier n'y touche pas ;
+elle est en revanche une **dépendance** de ce parcours et ne doit pas être retirée.
 
-- l'imputation existante reste affichée ;
-- une modification sans changement d'imputation peut la conserver ;
-- sa suppression est autorisée ;
-- son ajout, son remplacement ou l'augmentation du montant qui lui est affecté sont
-  interdits.
+### IMP-04 — Parcours où l'opération est choisie
 
-Pour déterminer qu'une imputation clôturée est inchangée, comparer avant/après le
-multiensemble normalisé des tuples :
-
-```text
-(operation_id, seance, montant_en_centimes)
-```
-
-Les identifiants techniques de ligne/affectation et les notes ne participent pas à cette
-comparaison. Cette règle couvre les lignes directes et les affectations détaillées.
-
-### IMP-04 — Périmètre des parcours manuels
-
-La règle s'applique au minimum à :
+Le filtrage des opérations clôturées s'applique au minimum à :
 
 - `TransactionForm`, pour les lignes directes ;
 - la modale de ventilation de `TransactionForm` ;
-- `InvoiceOcrService`, pour la liste fournie au prompt et la validation du résultat ;
+- `InvoiceOcrService`, pour la liste fournie au prompt ;
 - les lignes de facture où l'utilisateur choisit une opération ;
 - les lignes de note de frais où l'utilisateur choisit une opération.
 
-Tout autre sélecteur manuel découvert pendant l'implémentation doit utiliser la même
-source. Il ne doit pas recréer sa propre condition sur le statut ou les dates.
+L'OCR figure dans cette liste : le modèle **choisit** une opération, un humain valide. Lui
+fournir l'historique complet des opérations clôturées gonflerait son contexte et
+permettrait d'imputer sur une opération clôturée sans que personne ait décidé de la
+rouvrir.
 
-### IMP-05 — Flux automatiques inchangés
-
-Les écritures générées automatiquement depuis un lien métier préexistant restent hors de
-la règle d'interdiction manuelle. Exemples : règlement tardif d'un participant,
-synchronisation HelloAsso déjà rattachée, écriture issue d'un règlement d'opération.
-
-Ces flux ne constituent pas un nouveau choix d'opération par l'utilisateur et continuent
-à matérialiser leur rattachement métier, même si l'opération a depuis été clôturée.
+Tout autre sélecteur découvert pendant l'implémentation utilise la même source et ne
+recrée pas sa propre condition sur le statut ou les dates.
 
 ### IMP-06 — Isolation tenant
 
@@ -270,23 +240,31 @@ Pour les opérations sélectionnées :
 1. lire tous les mouvements réels de résultat, sans borne de date ;
 2. calculer leur exercice depuis `transactions.date` avec
    `ExerciceService::anneeForDate()` ;
-3. construire la liste des exercices à partir de ces seuls mouvements réels ;
-4. trier les exercices du plus récent au plus ancien.
+3. construire la liste des exercices à partir de ces mouvements réels ;
+4. en mode projection, y ajouter les exercices portant une prévision, datée par
+   `seances.date` ;
+5. trier les exercices du plus récent au plus ancien.
+
+Le point 4 est le cœur du mode projection : une opération pluriannuelle dont la troisième
+année est planifiée mais non commencée doit montrer cette troisième année. Construire la
+liste sur les seuls mouvements réels la rendrait invisible, c'est-à-dire viderait la
+projection de son objet.
+
+En mode réalisé, la liste reste strictement celle des mouvements réels.
 
 Il ne faut pas :
 
 - utiliser les dates de l'opération pour déduire les exercices ;
 - limiter la liste aux enregistrements présents dans la table `exercices` ;
-- créer des lignes d'exercice à zéro ;
-- ajouter un exercice uniquement parce qu'il contient une prévision.
+- créer des lignes d'exercice sans montant réel ni prévisionnel.
 
 ### EX-04 — Prévisions et projections multi-exercices
 
 Le prévisionnel est affecté à l'exercice de `seances.date` via
 `ExerciceService::anneeForDate()`.
 
-- Une prévision datée n'est incluse que si son exercice figure dans la liste réelle
-  construite par EX-03.
+- Une prévision datée est incluse, et son exercice entre dans la liste même s'il ne porte
+  aucun mouvement réel (EX-03 point 4).
 - Une prévision non datée est incluse dans « Exercice non déterminé ».
 - « Exercice non déterminé » vient après tous les exercices datés et n'apparaît que si un
   montant prévisionnel/projeté non daté existe.
@@ -332,31 +310,24 @@ La dimension exercice doit fonctionner avec :
 L'exercice est une dimension de **ligne**. Il ne remplace ni ne réordonne les colonnes de
 séances ou d'opérations.
 
-## 7. Source de vérité des exercices
+## 7. Calcul de la dimension exercice
 
-### DATE-01 — API obligatoire
+### CAL-01 — Rattachement et libellés
 
-`CompteResultatBuilder` doit recevoir `ExerciceService` par injection et utiliser :
+La nouvelle dimension multi-exercices réutilise l'`ExerciceService` déjà injecté dans le
+builder :
 
-- `dateRange(int $exercice)` pour toute borne ;
-- `anneeForDate(CarbonImmutable|Carbon $date)` pour tout rattachement ;
-- `label(int $exercice)` pour tout libellé.
+- `dateRange(int $exercice)` pour limiter la portée `current` ;
+- `anneeForDate(CarbonImmutable|Carbon $date)` pour rattacher une transaction ou une
+  séance à son exercice ;
+- `label(int $exercice)` pour les libellés de l'écran et des exports.
 
-Supprimer `CompteResultatBuilder::exerciceDates()` et ne pas créer de fonction équivalente
-ailleurs.
+Seule exception : la clé `0` de l'« Exercice non déterminé » n'est pas une année et ne
+passe jamais par `label()`, qui produirait un libellé absurde. Son intitulé est littéral.
 
-### DATE-02 — Surface de correction
+La vue et le contrôleur d'export ne recalculent pas l'exercice d'une date.
 
-La correction s'applique aux trois méthodes actuellement dépendantes du calcul codé en
-dur :
-
-- `compteDeResultat()` ;
-- `compteDeResultatOperations()` ;
-- `rapportSeances()`.
-
-`totauxResultat()` reçoit déjà des bornes de l'appelant et ne doit pas les recalculer.
-
-### DATE-03 — Aucun changement de schéma
+### CAL-02 — Aucun changement de schéma
 
 La table `exercices` stocke une année et un statut, tandis que le mois de début appartient
 à l'association. Ce chantier n'ajoute pas `date_debut` ou `date_fin` à la base. Les dates
@@ -367,30 +338,19 @@ restent calculées par `ExerciceService` à partir du paramétrage du tenant.
 ### 8.1 Règle d'imputation réutilisable
 
 Ajouter sur `Operation` un scope nommé explicitement, par exemple
-`scopeImputableManuellement(Builder $query)`, qui applique uniquement le statut `En cours`.
+`scopeProposableALaSaisie(Builder $query)`, qui applique uniquement le statut `En cours`.
 Le scope global de `TenantModel` fournit le fail-closed tenant pour les requêtes Eloquent.
 
-Les formulaires utilisent ce scope pour leurs options. La défense métier reste dans les
-services de création/mise à jour : le scope d'affichage n'est pas une autorisation.
+Tous les parcours où l'opération est choisie utilisent ce scope pour leurs options — y
+compris la liste fournie au prompt OCR.
 
-Créer une garde métier réutilisable qui valide les imputations manuelles et la conservation
-IMP-03. Les points d'entrée manuels doivent l'appeler côté serveur avant toute écriture.
-Pour éviter d'appliquer accidentellement cette règle aux flux automatiques, ne pas ajouter
-une garde inconditionnelle dans les méthodes génériques `TransactionService::create()` ou
-`update()`, qui sont aussi utilisées par des services automatiques.
+**Aucune garde métier n'est ajoutée sur le statut.** Le statut clôturé filtre des
+propositions ; il n'autorise ni ne refuse une écriture. `TransactionService::create()`,
+`update()` et `affecterLigne()` restent donc inchangés sur ce point, ce qui évite au
+passage de casser les flux qui héritent leur opération d'un lien métier préexistant.
 
-Deux formes d'API sont acceptables :
-
-- des méthodes explicites `createManuelle()` / `updateManuelle()` qui valident puis
-  délèguent à l'implémentation générique ;
-- un service dédié d'imputation manuelle appelé par chaque parcours interactif ou import
-  utilisateur avant `TransactionService`.
-
-`affecterLigne()` n'étant utilisé par l'interface de ventilation manuelle, il peut porter
-la garde directement. L'implémentation doit auditer tous les appelants de
-`TransactionService` : formulaire comptable, notes de frais, factures, import CSV et
-gestion des animateurs sont des candidats manuels ; règlements, adhésions et autres
-générations issues d'un lien métier existant conservent leur chemin automatique.
+La seule défense serveur qui demeure est l'isolation tenant (IMP-06) : elle n'a jamais
+relevé du métier, c'est de la sécurité.
 
 ### 8.2 Éligibilité du rapport
 
@@ -551,8 +511,8 @@ des appels à `compteDeResultatOperations()` est obligatoire avant modification.
 - Opérations éligibles mais aucune sélection : conserver l'invite de sélection.
 - Sélection URL devenue inéligible : ignorer les identifiants et afficher une information
   non bloquante.
-- Identifiant cross-tenant ou clôturé soumis à une imputation manuelle : erreur de
-  validation, sans révéler l'existence de l'opération.
+- Identifiant cross-tenant soumis à une imputation : erreur de validation, sans révéler
+  l'existence de l'opération. Le statut clôturé, lui, ne produit aucune erreur.
 - Portée URL inconnue : repli sur `current`.
 - Export sans opération valide : HTTP 422 avec message français.
 - Prévision sans date : groupe explicite « Exercice non déterminé », jamais rattachement
@@ -579,10 +539,12 @@ des appels à `compteDeResultatOperations()` est obligatoire avant modification.
    utilisateur saisit une dépense dans l'exercice affiché, alors l'opération est proposée
    et l'imputation est enregistrée.
 2. Le même comportement vaut pour une recette et une affectation détaillée.
-3. Une opération `Clôturée` n'est pas proposée et une soumission forgée est refusée.
-4. Une imputation historique vers une opération devenue clôturée est conservable à
-   l'identique, mais ne peut pas être augmentée ou remplacée.
-5. Les flux automatiques déjà rattachés continuent de fonctionner.
+3. Une opération `Clôturée` n'est proposée dans aucun sélecteur de saisie, ni dans la
+   liste fournie au moteur OCR.
+4. Une écriture arrivant déjà rattachée à une opération clôturée — synchronisation, ou
+   règlement issu d'un lien métier — est enregistrée sans être refusée.
+5. Une opération rouverte redevient proposée, et le redevient à nouveau indisponible après
+   reclôture.
 
 ### Sélecteur du rapport
 
@@ -599,7 +561,8 @@ des appels à `compteDeResultatOperations()` est obligatoire avant modification.
 11. Par défaut, seuls les montants de l'exercice affiché sont calculés.
 12. En portée `all`, tous les exercices comportant un mouvement réel des opérations
     sélectionnées sont affichés, du plus récent au plus ancien.
-13. Aucun exercice à zéro ou uniquement prévisionnel n'est ajouté.
+13. Aucun exercice sans montant réel ni prévisionnel n'est ajouté. En mode projection,
+    un exercice portant uniquement une prévision est présent ; en mode réalisé, non.
 14. Les montants réels sont rattachés selon la date de transaction, pas selon les dates de
     l'opération.
 15. Les prévisions sont rattachées selon la date de séance ; les séances non datées sont
@@ -613,27 +576,26 @@ des appels à `compteDeResultatOperations()` est obligatoire avant modification.
 
 ### Paramétrage des exercices
 
-21. Une association septembre-août conserve ses résultats actuels.
-22. Une association janvier-décembre rattache toutes les dates à l'année civile correcte.
-23. Une association dont l'exercice commence un autre mois, par exemple avril, utilise
-    exactement les bornes calculées par `ExerciceService` dans les trois rapports concernés.
+21. Le rattachement des transactions et séances dans la nouvelle dimension respecte le
+    calendrier du tenant retourné par `ExerciceService`, pour un exercice civil comme pour
+    un exercice décalé.
 
 ## 13. Stratégie de tests attendue
 
 ### Tests unitaires et service
 
-- `Operation::imputableManuellement()` : en cours inclus, clôturée exclue, dates sans effet,
-  tenant isolé.
-- Validation de l'imputation : création, modification, affectation, conservation du
-  multiensemble historique, rejet cross-tenant.
+- Scope de proposition : en cours inclus, clôturée exclue, dates sans effet, tenant isolé.
+- Écriture héritant d'un lien métier vers une opération clôturée : enregistrée sans erreur.
+- Isolation tenant : une opération d'une autre association reste refusée quel que soit le
+  parcours.
 - Éligibilité du sélecteur : Q1 direct, Q2 affectation, classes 6/7, classes 4/5,
   soft-deletes, tenant et bornes.
 - `CompteResultatBuilder` : agrégation par exercice, tiers, séance, opération et absence de
   double comptage.
-- Projection : séparation des exercices, exclusion d'un exercice uniquement prévisionnel,
+- Projection : séparation des exercices, inclusion d'un exercice uniquement prévisionnel,
   séance non datée.
-- Dates : jeux de données avec mois de début 1, 4 et 9 pour `compteDeResultat()`,
-  `compteDeResultatOperations()` et `rapportSeances()`.
+- Dimension exercice : jeux de données multi-exercices avec un calendrier civil et un
+  calendrier décalé, afin de vérifier `anneeForDate()` et les libellés.
 
 ### Tests Livewire
 
@@ -684,13 +646,13 @@ Les tests existants des autres combinaisons restent des tests de non-régression
 
 ## 14. Hors périmètre
 
-- Modification du statut ou des dates d'une opération.
+- Modification du statut ou des dates d'une opération. La bascule ouverte/clôturée
+  existante (`OperationDetail`) reste toutefois une **dépendance** du parcours manuel
+  décrit en IMP-02 : elle ne doit pas être retirée.
 - Ajout d'une liste permettant de choisir individuellement plusieurs exercices : le choix
   reste `current|all`.
 - Affichage d'opérations sans mouvement de résultat dans le sélecteur du rapport.
-- Ajout d'exercices à zéro ou uniquement prévisionnels en portée `all`.
 - Modification fonctionnelle des flux automatiques déjà rattachés à une opération.
-- Refonte des autres rapports au-delà de la correction commune DATE-02.
 - Migration ou backfill de données : les informations nécessaires existent déjà.
 - Persistance du choix de portée dans le profil utilisateur : l'URL suffit.
 
@@ -699,13 +661,15 @@ Les tests existants des autres combinaisons restent des tests de non-régression
 - Ne pas confondre l'exercice **affiché** avec l'exercice de la date du jour.
 - Ne pas confondre les dates de l'opération avec l'exercice d'une transaction.
 - Ne pas réutiliser `Operation::forExercice()` pour l'imputation ou le sélecteur du rapport.
+- Ne pas transformer le filtre de statut en garde serveur : une écriture héritant d'un
+  lien métier doit passer même sur une opération clôturée.
 - Ne pas filtrer le rapport sur `TypeOperation::actif()`.
 - Ne pas autoriser un identifiant d'opération uniquement parce qu'il est présent dans le
   DOM ou l'URL.
 - Ne pas compter simultanément la ligne parente et ses affectations.
 - Ne pas laisser une matrice de projection globale masquer une valeur d'un autre exercice.
 - Ne pas introduire de SQL spécifique à MySQL sans équivalent SQLite.
-- Ne pas coder à nouveau un mois de début ou une date de fin d'exercice.
+- Utiliser `ExerciceService` pour rattacher les dates à la nouvelle dimension exercice.
 
 ## 16. Définition de terminé
 
@@ -717,6 +681,4 @@ L'évolution est terminée lorsque :
 - les exports ont été vérifiés sur une fixture multi-exercices ;
 - aucun nouveau filtre de dates d'opération ne subsiste dans les parcours d'imputation
   manuelle ciblés ;
-- aucune période comptable septembre-août n'est codée en dur dans
-  `CompteResultatBuilder` ;
 - la documentation fonctionnelle éventuelle du rapport est mise à jour.

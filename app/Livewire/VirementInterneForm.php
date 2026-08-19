@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Exceptions\ExerciceCloturedException;
 use App\Livewire\Concerns\MontantValidation;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\CompteBancaire;
@@ -64,13 +65,11 @@ final class VirementInterneForm extends Component
 
     public function save(): void
     {
-        $exerciceService = app(ExerciceService::class);
-        $range = $exerciceService->dateRange($exerciceService->current());
-        $dateDebut = $range['start']->toDateString();
-        $dateFin = $range['end']->toDateString();
-
+        // Plus de bornes d'exercice affiché — seul l'exercice de la date
+        // saisie compte, et seule sa clôture peut refuser la saisie
+        // (ExerciceCloturedException, attrapée plus bas).
         $this->validate([
-            'date' => ['required', 'date', 'after_or_equal:'.$dateDebut, 'before_or_equal:'.$dateFin],
+            'date' => ['required', 'date'],
             'montant' => ['required', 'numeric', MontantValidation::RULE],
             'compte_source_id' => ['required', 'exists:comptes_bancaires,id'],
             'compte_destination_id' => [
@@ -80,13 +79,7 @@ final class VirementInterneForm extends Component
             ],
             'reference' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string', 'max:255'],
-        ], array_merge(
-            MontantValidation::messages(['montant']),
-            [
-                'date.after_or_equal' => 'La date doit être dans l\'exercice en cours (à partir du '.$range['start']->format('d/m/Y').').',
-                'date.before_or_equal' => 'La date doit être dans l\'exercice en cours (jusqu\'au '.$range['end']->format('d/m/Y').').',
-            ]
-        ));
+        ], MontantValidation::messages(['montant']));
 
         $data = [
             'date' => $this->date,
@@ -99,11 +92,18 @@ final class VirementInterneForm extends Component
 
         $service = app(VirementInterneService::class);
 
-        if ($this->virementId) {
-            $virement = VirementInterne::findOrFail($this->virementId);
-            $service->update($virement, $data);
-        } else {
-            $service->create($data);
+        try {
+            if ($this->virementId) {
+                $virement = VirementInterne::findOrFail($this->virementId);
+                $service->update($virement, $data);
+            } else {
+                $service->create($data);
+            }
+        } catch (ExerciceCloturedException $e) {
+            // Le refus porte sur la DATE saisie — c'est elle qui est en cause.
+            $this->addError('date', $e->getMessage());
+
+            return;
         }
 
         $this->dispatch('virement-saved');

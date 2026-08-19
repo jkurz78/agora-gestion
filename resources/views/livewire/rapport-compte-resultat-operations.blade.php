@@ -99,6 +99,13 @@
                     <option value="projection">Projection</option>
                 </select>
 
+                {{-- Portée des exercices — contrôle unique : `all` élargit la
+                     période ET active les lignes d'exercice. --}}
+                <select wire:model.live="porteeExercices" class="form-select form-select-sm" style="width:auto;">
+                    <option value="current">Exercice affich&eacute;</option>
+                    <option value="all">Tous les exercices</option>
+                </select>
+
                 {{-- Toggles --}}
                 @if (count($selectedOperationIds) > 1)
                 <div class="form-check form-switch mb-0">
@@ -134,7 +141,17 @@
     </div>
 
     {{-- Contenu du rapport --}}
-    @if (! $hasSelection)
+    @if ($selectionIgnoree)
+        <div class="alert alert-info py-2 small">
+            Les op&eacute;rations demand&eacute;es n'ont aucun mouvement sur l'exercice affich&eacute;.
+        </div>
+    @endif
+
+    @if ($aucuneOperationEligible)
+        <p class="text-muted text-center py-4">
+            Aucune op&eacute;ration n'a de d&eacute;pense ni de recette sur l'exercice affich&eacute;.
+        </p>
+    @elseif (! $hasSelection)
         <p class="text-muted text-center py-4">S&eacute;lectionnez au moins une op&eacute;ration pour afficher le rapport.</p>
     @else
         @php
@@ -179,9 +196,20 @@
             } elseif ($mode === 'projection') {
                 $nbDataCols = 1;
             }
+            if ($porteeExercices === 'all' && ! $combinedMode && ! $parSeances && ! $parOperations) {
+                $nbDataCols = 1;
+            }
             $totalColspan = 2 + $nbDataCols;
         @endphp
 
+        @if ($porteeExercices === 'all')
+            @include('livewire.partials.rapport-operations-tableau-all', [
+                'sections' => [
+                    ['data' => $charges, 'label' => 'DÉPENSES', 'total' => $totalCharges, 'projParExercice' => $projChargesParExercice],
+                    ['data' => $produits, 'label' => 'RECETTES', 'total' => $totalProduits, 'projParExercice' => $projProduitsParExercice],
+                ],
+            ])
+        @else
         @php $projectedSectionTotals = []; $projectedOpSectionTotals = []; @endphp
         @foreach ([
             ['data' => $charges, 'prevDisplay' => $previsionsCharges, 'label' => 'DÉPENSES', 'totalMontant' => $totalCharges, 'proj' => $projCharges],
@@ -466,6 +494,35 @@
                                             @endif
                                         @endif
                                     </tr>
+
+                                    {{-- Une prévision de séance non datée ne peut pas être rattachée
+                                         à l'exercice affiché. Elle a sa propre ligne, et le total du
+                                         compte l'additionne explicitement.
+
+                                         Note : $sc['exercices'] vient de $charges/$produits, fusionnés
+                                         par mergePrevisionsIntoHierarchy() — cette fusion ne recopie que
+                                         les comptes/tiers, pas leur ventilation par exercice. Le montant
+                                         « non déterminé » est donc relu depuis $previsionsCharges /
+                                         $previsionsProduits, qui la portent déjà (buildUnifiedHierarchy
+                                         alimente 'exercices' sur cette hiérarchie séparée). --}}
+                                    @php
+                                        $prevScNonDetermine = collect($isDepenses ? $previsionsCharges : $previsionsProduits)
+                                            ->flatMap(fn ($c) => $c['comptes'])
+                                            ->firstWhere('compte_id', $sc['compte_id']);
+                                        $exNonDetermine = collect($prevScNonDetermine['exercices'] ?? [])->firstWhere('annee', 0);
+                                        $montantNonDetermine = (float) ($exNonDetermine['montant'] ?? 0);
+                                    @endphp
+                                    @if ($mode !== 'realise' && $montantNonDetermine > 0)
+                                        <tr style="background:#fff;">
+                                            <td></td>
+                                            <td style="padding:4px 12px 4px 52px;color:#777;font-size:12px;font-style:italic;">
+                                                Exercice non d&eacute;termin&eacute;
+                                            </td>
+                                            <td class="text-end" colspan="{{ $totalColspan - 2 }}" style="padding:4px 12px;color:#777;font-size:12px;">
+                                                {{ number_format($montantNonDetermine, 2, ',', ' ') }} &euro;
+                                            </td>
+                                        </tr>
+                                    @endif
 
                                     {{-- Lignes tiers --}}
                                     @if ($parTiers && ! empty($sc['tiers']))
@@ -782,6 +839,7 @@
             <span>{{ $displayResultat >= 0 ? 'EXCÉDENT' : 'DÉFICIT' }}</span>
             <span>{{ number_format(abs($displayResultat), 2, ',', ' ') }} &euro;</span>
         </div>
+        @endif
         @endif
     @endif
 </div>

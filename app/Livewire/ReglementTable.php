@@ -9,6 +9,7 @@ use App\Enums\Espace;
 use App\Enums\ModePaiement;
 use App\Enums\RoleAssociation;
 use App\Enums\TypeDocumentPrevisionnel;
+use App\Exceptions\ExerciceCloturedException;
 use App\Livewire\Concerns\MontantValidation;
 use App\Mail\DocumentMail;
 use App\Models\CompteBancaire;
@@ -328,11 +329,19 @@ final class ReglementTable extends Component
         $date = Carbon::parse($this->comptabiliserDate);
 
         // Délègue au service métier (Step 26) : crée les Transactions + enrichit partie double
-        app(ReglementOperationService::class)->comptabiliserSeance(
-            seance: $seance,
-            compteBancaireId: (int) $this->comptabiliserCompteId,
-            date: $date,
-        );
+        try {
+            app(ReglementOperationService::class)->comptabiliserSeance(
+                seance: $seance,
+                compteBancaireId: (int) $this->comptabiliserCompteId,
+                date: $date,
+            );
+        } catch (ExerciceCloturedException $e) {
+            // L'erreur porte sur la DATE saisie, pas sur le compte : la poser
+            // ici désigne le champ à corriger et laisse la modale ouverte.
+            $this->addError('comptabiliserDate', $e->getMessage());
+
+            return;
+        }
 
         $this->showComptabiliserModal = false;
         $this->dispatch('comptabiliser-modal-close');

@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
-use App\Models\TypeOperation;
+use App\Enums\PorteeExercices;
+use App\Models\Operation;
 use App\Services\ExerciceService;
 use App\Services\RapportService;
 use Livewire\Attributes\Url;
@@ -28,6 +29,20 @@ final class RapportCompteResultatOperations extends Component
     #[Url(as: 'parops')]
     public bool $parOperations = false;
 
+    /**
+     * `current` (défaut) ou `all`. Toute autre valeur retombe sur `current` :
+     * l'URL est une entrée utilisateur comme une autre.
+     */
+    #[Url(as: 'exercices')]
+    public string $porteeExercices = 'current';
+
+    /**
+     * Vrai quand la sélection reçue par l'URL a été entièrement écartée parce
+     * qu'aucune de ces opérations n'a de mouvement sur l'exercice affiché.
+     * Information non bloquante affichée dans la vue.
+     */
+    public bool $selectionIgnoree = false;
+
     public function exportUrl(string $format): string
     {
         $exercice = app(ExerciceService::class)->current();
@@ -41,14 +56,36 @@ final class RapportCompteResultatOperations extends Component
             'tiers' => $this->parTiers ? '1' : '0',
             'mode' => $this->mode,
             'parops' => $this->parOperations ? '1' : '0',
+            'exercices' => PorteeExercices::depuisRequete($this->porteeExercices)->value,
         ]);
     }
 
     public function render(): mixed
     {
         $exercice = app(ExerciceService::class)->current();
+        $rapportService = app(RapportService::class);
+        $portee = PorteeExercices::depuisRequete($this->porteeExercices);
 
-        $operationTree = $this->buildOperationTree($exercice);
+        // EX-03 : en mode projection, l'arbre et la sélection doivent aussi
+        // admettre les opérations qui n'ont encore que des prévisions —
+        // sinon une activité future planifiée mais non commencée serait
+        // insélectionnable, ce qui viderait la projection de son objet.
+        $previsionnel = $this->mode !== 'realise';
+
+        $eligibleIds = $rapportService->operationsEligibles($exercice, $previsionnel);
+        $operationTree = $this->buildOperationTree($eligibleIds);
+
+        // SEL-04 : les ids reçus par l'URL ne sont jamais fiables — on les
+        // intersecte avec les éligibles avant tout calcul.
+        $demandes = collect($this->selectedOperationIds)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+        $selection = array_values(array_intersect($demandes, $eligibleIds));
+
+        $this->selectionIgnoree = $demandes !== [] && $selection === [];
 
         $charges = [];
         $produits = [];
@@ -61,18 +98,20 @@ final class RapportCompteResultatOperations extends Component
         $projProduits = null;
         $totalCharges = 0.0;
         $totalProduits = 0.0;
-        $hasSelection = ! empty($this->selectedOperationIds);
-
-        $previsionnel = $this->mode !== 'realise';
+        $exercices = [];
+        $projChargesParExercice = [];
+        $projProduitsParExercice = [];
+        $hasSelection = $selection !== [];
 
         if ($hasSelection) {
-            $data = app(RapportService::class)->compteDeResultatOperations(
+            $data = $rapportService->compteDeResultatOperations(
                 $exercice,
-                $this->selectedOperationIds,
+                $selection,
                 $this->parSeances,
                 $this->parTiers,
                 $previsionnel,
                 $this->parOperations,
+                $portee,
             );
             $charges = $data['charges'];
             $produits = $data['produits'];
@@ -83,10 +122,19 @@ final class RapportCompteResultatOperations extends Component
             $seancesParOperation = $data['seances_par_operation'] ?? [];
             $projCharges = $data['proj_charges'] ?? null;
             $projProduits = $data['proj_produits'] ?? null;
+            $exercices = $data['exercices'] ?? [];
+            $projChargesParExercice = $data['proj_charges_par_exercice'] ?? [];
+            $projProduitsParExercice = $data['proj_produits_par_exercice'] ?? [];
 
             if ($this->mode === 'projection' && $projCharges !== null) {
                 $totalCharges = $projCharges->total();
                 $totalProduits = $projProduits->total();
+            } elseif ($portee === PorteeExercices::Tous) {
+                // En portée « tous les exercices », le total couvre exactement
+                // les exercices affichés — jamais un montant global qui
+                // inclurait en silence un exercice absent des lignes.
+                $totalCharges = collect($charges)->sum('montant_exercices');
+                $totalProduits = collect($produits)->sum('montant_exercices');
             } else {
                 $totalCharges = collect($charges)->sum('montant');
                 $totalProduits = collect($produits)->sum('montant');
@@ -110,46 +158,81 @@ final class RapportCompteResultatOperations extends Component
             'hasSelection' => $hasSelection,
             'mode' => $this->mode,
             'parOperations' => $this->parOperations,
+            'aucuneOperationEligible' => $operationTree === [],
+            'selectionIgnoree' => $this->selectionIgnoree,
+            'exercices' => $exercices,
+            'porteeExercices' => $portee->value,
+            'projChargesParExercice' => $projChargesParExercice,
+            'projProduitsParExercice' => $projProduitsParExercice,
         ]);
     }
 
     /**
-     * Arbre de regroupement pour le sélecteur d'opérations (groupe par compte).
-     * L'id n'est qu'une clé de groupement locale à ce widget JS — jamais
-     * renvoyée au serveur (seuls les op.id le sont via selectedOperationIds).
+     * Arbre de regroupement pour le sélecteur d'opérations (groupe par compte,
+     * puis par type d'opération).
      *
+     * SEL-03 : l'arbre part des opérations ÉLIGIBLES, pas de
+     * TypeOperation::actif()->operations()->forExercice(). Un type désactivé
+     * après coup ou une opération datée sur une autre période ne doivent pas
+     * faire disparaître des montants bien réels de l'exercice affiché.
+     *
+     * L'id de premier niveau n'est qu'une clé de groupement locale à ce widget
+     * JS — jamais renvoyée au serveur (seuls les op.id le sont via
+     * selectedOperationIds, revalidés en SEL-04).
+     *
+     * @param  list<int>  $eligibleIds
      * @return list<array{id: int, nom: string, types: list<array>}>
      */
-    private function buildOperationTree(int $exercice): array
+    private function buildOperationTree(array $eligibleIds): array
     {
-        $typeOperations = TypeOperation::actif()
-            ->with(['compte', 'operations' => fn ($q) => $q->forExercice($exercice)->orderBy('nom')])
+        if ($eligibleIds === []) {
+            return [];
+        }
+
+        $operations = Operation::whereIn('id', $eligibleIds)
+            ->with('typeOperation.compte')
             ->orderBy('nom')
             ->get();
 
         $tree = [];
-        foreach ($typeOperations as $type) {
-            if ($type->operations->isEmpty()) {
-                continue;
-            }
-            $cId = (int) $type->compte_id;
+        foreach ($operations as $op) {
+            $type = $op->typeOperation;
+            $compte = $type?->compte;
+
+            $cId = (int) ($compte?->id ?? 0);
+            $tId = (int) ($type?->id ?? 0);
+
             if (! isset($tree[$cId])) {
                 $tree[$cId] = [
                     'id' => $cId,
-                    'nom' => $type->compte?->intitule ?? '—',
-                    'types' => [],
+                    'nom' => $compte?->intitule ?? '—',
+                    'types_map' => [],
                 ];
             }
-            $tree[$cId]['types'][] = [
-                'id' => $type->id,
-                'nom' => $type->nom,
-                'operations' => $type->operations
-                    ->map(fn ($op) => ['id' => $op->id, 'nom' => $op->nom])
-                    ->values()
-                    ->all(),
+            if (! isset($tree[$cId]['types_map'][$tId])) {
+                $tree[$cId]['types_map'][$tId] = [
+                    'id' => $tId,
+                    'nom' => $type?->nom ?? 'Sans type',
+                    'operations' => [],
+                ];
+            }
+
+            $tree[$cId]['types_map'][$tId]['operations'][] = [
+                'id' => (int) $op->id,
+                'nom' => $op->nom,
             ];
         }
 
-        return collect($tree)->sortBy('nom')->values()->all();
+        $result = [];
+        foreach ($tree as $groupe) {
+            $types = array_values($groupe['types_map']);
+            usort($types, fn (array $a, array $b): int => strcmp($a['nom'], $b['nom']));
+            unset($groupe['types_map']);
+            $groupe['types'] = $types;
+            $result[] = $groupe;
+        }
+        usort($result, fn (array $a, array $b): int => strcmp($a['nom'], $b['nom']));
+
+        return $result;
     }
 }

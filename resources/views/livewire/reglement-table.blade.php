@@ -344,12 +344,13 @@
                     <div class="mb-3">
                         <label class="form-label small mb-1">Date des transactions</label>
                         <div class="input-group input-group-sm">
-                            <input type="date" wire:model="comptabiliserDate" class="form-control form-control-sm @error('comptabiliserDate') is-invalid @enderror">
+                            <input type="date" wire:model.live="comptabiliserDate" class="form-control form-control-sm @error('comptabiliserDate') is-invalid @enderror">
                             <button type="button" class="btn btn-outline-secondary" wire:click="setComptabiliserDateAujourdhui" title="Utiliser la date du jour">
                                 Aujourd'hui
                             </button>
                         </div>
                         <div class="form-text small">Par défaut : la date de la séance.</div>
+                        <x-exercice-destination :date="$comptabiliserDate" />
                     </div>
                 </div>
                 <div class="modal-footer py-2">

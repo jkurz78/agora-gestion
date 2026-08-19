@@ -10,9 +10,9 @@ use App\Enums\ModePaiement;
 use App\Enums\RoleAssociation;
 use App\Enums\Sens;
 use App\Enums\StatutFactureDeposee;
-use App\Enums\StatutOperation;
 use App\Enums\StatutReglement;
 use App\Enums\UsageComptable;
+use App\Exceptions\ExerciceCloturedException;
 use App\Exceptions\OcrAnalysisException;
 use App\Exceptions\OcrNotConfiguredException;
 use App\Livewire\Concerns\MontantValidation;
@@ -439,7 +439,14 @@ final class TransactionForm extends Component
             [
                 'affectations' => ['required', 'array', 'min:1'],
                 'affectations.*.montant' => ['required', 'numeric', MontantValidation::RULE],
-                'affectations.*.operation_id' => ['nullable'],
+                // IMP-06, même règle que 'lignes.*.operation_id' — voir le
+                // commentaire de save().
+                'affectations.*.operation_id' => [
+                    'nullable',
+                    Rule::exists('operations', 'id')
+                        ->where('association_id', TenantContext::currentId())
+                        ->whereNull('deleted_at'),
+                ],
                 'affectations.*.seance' => ['nullable', 'integer', 'min:1'],
                 'affectations.*.notes' => ['nullable', 'string', 'max:255'],
             ],
@@ -455,15 +462,24 @@ final class TransactionForm extends Component
             return;
         }
 
-        app(TransactionService::class)->affecterLigne(
-            $ligne,
-            collect($this->affectations)->map(fn ($a) => [
-                'operation_id' => $a['operation_id'] !== '' ? (int) $a['operation_id'] : null,
-                'seance' => $a['seance'] !== '' ? (int) $a['seance'] : null,
-                'montant' => $a['montant'],
-                'notes' => $a['notes'] ?: null,
-            ])->toArray()
-        );
+        try {
+            app(TransactionService::class)->affecterLigne(
+                $ligne,
+                collect($this->affectations)->map(fn ($a) => [
+                    'operation_id' => $a['operation_id'] !== '' ? (int) $a['operation_id'] : null,
+                    'seance' => $a['seance'] !== '' ? (int) $a['seance'] : null,
+                    'montant' => $a['montant'],
+                    'notes' => $a['notes'] ?: null,
+                ])->toArray()
+            );
+        } catch (ExerciceCloturedException $e) {
+            // Pas de champ « date » dans ce panneau : la date en cause est celle
+            // de la transaction parente, non éditable ici. Même clé que le
+            // refus « somme des affectations » ci-dessus, pour rester cohérent.
+            $this->addError('affectations', $e->getMessage());
+
+            return;
+        }
 
         $this->fermerVentilation();
         $this->dispatch('transaction-saved');
@@ -639,19 +655,15 @@ final class TransactionForm extends Component
         }
 
         $exerciceService = app(ExerciceService::class);
-        $range = $exerciceService->dateRange($exerciceService->current());
-        $dateDebut = $range['start']->toDateString();
-        $dateFin = $range['end']->toDateString();
-
-        $isLocked = $this->transactionId
-            ? Transaction::findOrFail($this->transactionId)->loadMissing('rapprochement')->isLockedByRapprochement()
-            : false;
 
         $this->validate(
             [
-                'date' => $isLocked
-                    ? ['required', 'date']
-                    : ['required', 'date', 'after_or_equal:'.$dateDebut, 'before_or_equal:'.$dateFin],
+                // Plus de bornes d'exercice affiché — seule la clôture de
+                // l'exercice de la date peut refuser une date
+                // (ExerciceCloturedException, attrapée plus bas). Un exercice
+                // futur sans ligne en base n'est pas non plus un motif de
+                // refus (ExerciceService::assertOuvert()).
+                'date' => ['required', 'date'],
                 'libelle' => ['nullable', 'string', 'max:255'],
                 'reference' => ['nullable', 'string', 'max:100'],
                 'mode_paiement' => [
@@ -670,8 +682,6 @@ final class TransactionForm extends Component
                         && ! $this->isLockedByReglement),
                     'nullable',
                     'date_format:Y-m-d',
-                    'after_or_equal:'.$dateDebut,
-                    'before_or_equal:'.$dateFin,
                 ],
                 // Tiers obligatoire : toute recette/dépense génère sa contrepartie
                 // via le compte de tiers (411 client / 401 fournisseur), qui porte
@@ -683,16 +693,21 @@ final class TransactionForm extends Component
                 // DC-10a : ventilation compte-first (classe 6/7 via le sélecteur).
                 'lignes.*.compte_id' => ['required', 'exists:comptes,id'],
                 'lignes.*.montant' => ['required', 'numeric', MontantValidation::RULE],
-                'lignes.*.operation_id' => ['nullable'],
+                // IMP-06 : le scope global d'Eloquent ne couvre pas un `exists`
+                // de validation — la colonne association_id est donc explicite.
+                // Seule défense serveur conservée : c'est de la sécurité, pas du
+                // métier. Le statut de l'opération n'entre pas dans la règle.
+                'lignes.*.operation_id' => [
+                    'nullable',
+                    Rule::exists('operations', 'id')
+                        ->where('association_id', TenantContext::currentId())
+                        ->whereNull('deleted_at'),
+                ],
                 'lignes.*.seance' => ['nullable', 'integer', 'min:1'],
                 'lignes.*.notes' => ['nullable', 'string', 'max:255'],
             ],
             array_merge(
                 [
-                    'date.after_or_equal' => 'La date doit être dans l\'exercice en cours (à partir du '.$range['start']->format('d/m/Y').').',
-                    'date.before_or_equal' => 'La date doit être dans l\'exercice en cours (jusqu\'au '.$range['end']->format('d/m/Y').').',
-                    'dateReglement.after_or_equal' => 'La date de règlement doit être dans l\'exercice en cours (à partir du '.$range['start']->format('d/m/Y').').',
-                    'dateReglement.before_or_equal' => 'La date de règlement doit être dans l\'exercice en cours (jusqu\'au '.$range['end']->format('d/m/Y').').',
                     'tiers_id.required' => 'Un tiers est obligatoire : il porte la contrepartie comptable de l\'écriture.',
                 ],
                 MontantValidation::messages(['lignes.*.montant'])
@@ -828,6 +843,25 @@ final class TransactionForm extends Component
                     exercice: $exerciceService->current(),
                 );
             }
+        } catch (ExerciceCloturedException $e) {
+            // Le refus porte sur la DATE saisie — c'est elle qui est en cause,
+            // pas la ventilation. L'ordre des catch compte : ce cas, plus
+            // spécifique, doit être attrapé avant le \RuntimeException générique
+            // ci-dessous (ExerciceCloturedException en hérite).
+            $this->addError('date', $e->getMessage());
+
+            return;
+        } catch (\InvalidArgumentException $e) {
+            // PosteTiersReglementService::regler() impose que la date du
+            // règlement (T2) reste dans l'exercice de traitement — une règle
+            // propre au poste tiers, distincte de la clôture ci-dessus, et
+            // déjà appliquée côté « Régler le reliquat »
+            // (PosteTiersReglementModal). Sans ce catch, retirer les bornes
+            // d'exercice affiché du champ dateReglement laisserait cette
+            // exception remonter non attrapée.
+            $this->addError('dateReglement', $e->getMessage());
+
+            return;
         } catch (\RuntimeException $e) {
             $this->addError('lignes', $e->getMessage());
 
@@ -1309,14 +1343,41 @@ final class TransactionForm extends Component
             ? PlanComptableSelecteur::groupesPourType($this->type)
             : collect();
 
+        // IMP-01 : plus de borne de période. La transaction porte sa propre
+        // date ; celle de l'opération ne détermine pas son exercice.
+        $operations = Operation::with('typeOperation')
+            ->proposableALaSaisie()
+            ->orderBy('nom')
+            ->get();
+
+        // IMP-02 : table d'affichage indexée par id — les proposables plus
+        // celles déjà référencées par $this->lignes/$this->affectations (état
+        // Livewire en tableaux, pas une relation Eloquent : pas d'eager load
+        // possible ici, contrairement à FactureEdit::operation()).
+        //
+        // La requête de rattrapage ne porte que sur les ids ABSENTS des
+        // proposables : le cas courant — une opération en cours déjà imputée —
+        // est déjà en mémoire, et cet écran se rend à chaque frappe.
+        $operationsAffichees = $operations->keyBy('id');
+
+        $idsARattraper = collect($this->lignes)->pluck('operation_id')
+            ->merge(collect($this->affectations)->pluck('operation_id'))
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->diff($operations->pluck('id')->map(fn ($id): int => (int) $id));
+
+        if ($idsARattraper->isNotEmpty()) {
+            $operationsAffichees = $operationsAffichees->union(
+                Operation::whereIn('id', $idsARattraper)->get()->keyBy('id')
+            );
+        }
+
         return view('livewire.transaction-form', [
             'comptes' => CompteBancaire::saisieManuelle()->orderBy('nom')->get(),
             'groupesComptesVentilation' => $groupesComptesVentilation,
-            'operations' => Operation::with('typeOperation')
-                ->forExercice(app(ExerciceService::class)->current())
-                ->where('statut', StatutOperation::EnCours)
-                ->orderBy('nom')
-                ->get(),
+            'operations' => $operations,
+            'operationsAffichees' => $operationsAffichees,
             'modesPaiement' => ModePaiement::cases(),
             'transaction_numero_piece' => $this->transactionId
                 ? Transaction::select('id', 'numero_piece')->find($this->transactionId)?->numero_piece

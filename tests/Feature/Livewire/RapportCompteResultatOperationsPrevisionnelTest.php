@@ -9,6 +9,8 @@ use App\Models\EncadrementPrevision;
 use App\Models\Operation;
 use App\Models\Seance;
 use App\Models\Tiers;
+use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Models\TypeOperation;
 use App\Models\User;
 use App\Services\ExerciceService;
@@ -16,6 +18,27 @@ use App\Tenant\TenantContext;
 use Illuminate\Support\Carbon;
 use Livewire\Livewire;
 
+/**
+ * ⚠️ Horloge de test gelée globalement (tests/Pest.php, Carbon::setTestNow) sur
+ * 2026-01-15 10:00:00 : l'exercice affiché par défaut est donc 2025, borné du
+ * 2025-09-01 au 2026-08-31 (ExerciceService::dateRange). Depuis
+ * OperationsEligiblesQuery (SEL-01/EX-03), une opération n'est éligible en
+ * mode projection via une prévision que si la date de la séance de cette
+ * prévision tombe DANS cette fenêtre — date-la franchement à l'intérieur,
+ * jamais sur une borne (SQLite exclut le dernier jour d'un whereBetween
+ * date-only, cf. feedback_sqlite_date_boundary).
+ *
+ * Les dates de séance de ce fichier étaient auparavant arbitraires
+ * (2026-09-xx) : écrites avant qu'aucune notion d'éligibilité par exercice
+ * n'existe, elles sont tombées hors fenêtre le jour où ce critère a été
+ * introduit, rendant silencieusement insélectionnables toutes les opérations
+ * prévision-only de ce fichier. Ne pas réintroduire ce piège en ajoutant une
+ * séance datée sans vérifier qu'elle tombe dans l'exercice 2025 ci-dessus.
+ *
+ * Les `date_debut` d'opération, elles, n'ont plus aucun effet sur
+ * l'éligibilité depuis SEL-01 (qui ignore délibérément les dates de
+ * l'opération) : elles ont été retirées plutôt que redatées.
+ */
 beforeEach(function (): void {
     $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
@@ -67,11 +90,8 @@ it('affiche les montants projetés quand mode projection ON', function (): void 
 
     $scRec = Compte::factory()->numero('722')->create();
     $typeOp = TypeOperation::factory()->create(['compte_id' => $scRec->id]);
-    $op = Operation::factory()->create([
-        'type_operation_id' => $typeOp->id,
-        'date_debut' => Carbon::create(2026, 9, 5),
-    ]);
-    $seance = Seance::create(['operation_id' => $op->id, 'numero' => 1, 'date' => Carbon::create(2026, 9, 10)]);
+    $op = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+    $seance = Seance::create(['operation_id' => $op->id, 'numero' => 1, 'date' => Carbon::create(2025, 10, 10)]);
     $tiers = Tiers::factory()->pourDepenses()->create();
 
     EncadrementPrevision::create([
@@ -93,11 +113,8 @@ it('affiche un tiers prévision-only avec son montant projeté (mode simple)', f
 
     $scRec = Compte::factory()->numero('722')->create();
     $typeOp = TypeOperation::factory()->create(['compte_id' => $scRec->id]);
-    $op = Operation::factory()->create([
-        'type_operation_id' => $typeOp->id,
-        'date_debut' => Carbon::create(2026, 9, 5),
-    ]);
-    $seance = Seance::create(['operation_id' => $op->id, 'numero' => 1, 'date' => Carbon::create(2026, 9, 10)]);
+    $op = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+    $seance = Seance::create(['operation_id' => $op->id, 'numero' => 1, 'date' => Carbon::create(2025, 10, 10)]);
     $tiers = Tiers::factory()->pourDepenses()->create(['nom' => 'FORMATEUR INVISIBLE']);
 
     EncadrementPrevision::create([
@@ -123,16 +140,10 @@ it('affiche un tiers prévision-only avec ses opérations projetées', function 
 
     $scRec = Compte::factory()->numero('722')->create();
     $typeOp = TypeOperation::factory()->create(['compte_id' => $scRec->id]);
-    $op1 = Operation::factory()->create([
-        'type_operation_id' => $typeOp->id,
-        'date_debut' => Carbon::create(2026, 9, 5),
-    ]);
-    $op2 = Operation::factory()->create([
-        'type_operation_id' => $typeOp->id,
-        'date_debut' => Carbon::create(2026, 9, 12),
-    ]);
-    $seance1 = Seance::create(['operation_id' => $op1->id, 'numero' => 1, 'date' => Carbon::create(2026, 9, 10)]);
-    $seance2 = Seance::create(['operation_id' => $op2->id, 'numero' => 1, 'date' => Carbon::create(2026, 9, 15)]);
+    $op1 = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+    $op2 = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+    $seance1 = Seance::create(['operation_id' => $op1->id, 'numero' => 1, 'date' => Carbon::create(2025, 10, 10)]);
+    $seance2 = Seance::create(['operation_id' => $op2->id, 'numero' => 1, 'date' => Carbon::create(2025, 10, 15)]);
     $tiers = Tiers::factory()->pourDepenses()->create(['nom' => 'FORMATEUR OPS']);
 
     EncadrementPrevision::create([
@@ -165,11 +176,8 @@ it('affiche un tiers prévision-only avec ses séances projetées', function ():
 
     $scRec = Compte::factory()->numero('722')->create();
     $typeOp = TypeOperation::factory()->create(['compte_id' => $scRec->id]);
-    $op = Operation::factory()->create([
-        'type_operation_id' => $typeOp->id,
-        'date_debut' => Carbon::create(2026, 9, 5),
-    ]);
-    $seance = Seance::create(['operation_id' => $op->id, 'numero' => 1, 'date' => Carbon::create(2026, 9, 10)]);
+    $op = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+    $seance = Seance::create(['operation_id' => $op->id, 'numero' => 1, 'date' => Carbon::create(2025, 10, 10)]);
     $tiers = Tiers::factory()->pourDepenses()->create(['nom' => 'FORMATEUR SEANCES']);
 
     EncadrementPrevision::create([
@@ -195,11 +203,8 @@ it('exporte le PDF avec tiers prévision-only sans erreur', function (): void {
 
     $scRec = Compte::factory()->numero('722')->create();
     $typeOp = TypeOperation::factory()->create(['compte_id' => $scRec->id]);
-    $op = Operation::factory()->create([
-        'type_operation_id' => $typeOp->id,
-        'date_debut' => Carbon::create(2026, 9, 5),
-    ]);
-    $seance = Seance::create(['operation_id' => $op->id, 'numero' => 1, 'date' => Carbon::create(2026, 9, 10)]);
+    $op = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+    $seance = Seance::create(['operation_id' => $op->id, 'numero' => 1, 'date' => Carbon::create(2025, 10, 10)]);
     $tiers = Tiers::factory()->pourDepenses()->create();
 
     EncadrementPrevision::create([
@@ -237,16 +242,10 @@ it('affiche le mode combiné séances × opérations avec projection', function 
 
     $scRec = Compte::factory()->numero('722')->create();
     $typeOp = TypeOperation::factory()->create(['compte_id' => $scRec->id]);
-    $op1 = Operation::factory()->create([
-        'type_operation_id' => $typeOp->id,
-        'date_debut' => Carbon::create(2026, 9, 5),
-    ]);
-    $op2 = Operation::factory()->create([
-        'type_operation_id' => $typeOp->id,
-        'date_debut' => Carbon::create(2026, 9, 12),
-    ]);
-    $seance1 = Seance::create(['operation_id' => $op1->id, 'numero' => 1, 'date' => Carbon::create(2026, 9, 10)]);
-    $seance2 = Seance::create(['operation_id' => $op2->id, 'numero' => 1, 'date' => Carbon::create(2026, 9, 15)]);
+    $op1 = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+    $op2 = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+    $seance1 = Seance::create(['operation_id' => $op1->id, 'numero' => 1, 'date' => Carbon::create(2025, 10, 10)]);
+    $seance2 = Seance::create(['operation_id' => $op2->id, 'numero' => 1, 'date' => Carbon::create(2025, 10, 15)]);
     $tiers = Tiers::factory()->pourDepenses()->create(['nom' => 'FORMATEUR COMBINÉ']);
 
     EncadrementPrevision::create([
@@ -281,10 +280,10 @@ it('exporte PDF et Excel en mode combiné séances × opérations', function ():
 
     $scRec = Compte::factory()->numero('722')->create();
     $typeOp = TypeOperation::factory()->create(['compte_id' => $scRec->id]);
-    $op1 = Operation::factory()->create(['type_operation_id' => $typeOp->id, 'date_debut' => Carbon::create(2026, 9, 5)]);
-    $op2 = Operation::factory()->create(['type_operation_id' => $typeOp->id, 'date_debut' => Carbon::create(2026, 9, 12)]);
-    Seance::create(['operation_id' => $op1->id, 'numero' => 1, 'date' => Carbon::create(2026, 9, 10)]);
-    Seance::create(['operation_id' => $op2->id, 'numero' => 1, 'date' => Carbon::create(2026, 9, 15)]);
+    $op1 = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+    $op2 = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+    Seance::create(['operation_id' => $op1->id, 'numero' => 1, 'date' => Carbon::create(2025, 10, 10)]);
+    Seance::create(['operation_id' => $op2->id, 'numero' => 1, 'date' => Carbon::create(2025, 10, 15)]);
     $tiers = Tiers::factory()->pourDepenses()->create();
 
     EncadrementPrevision::create([
@@ -293,6 +292,27 @@ it('exporte PDF et Excel en mode combiné séances × opérations', function ():
         'compte_id' => $sc->id,
         'seance_id' => Seance::where('operation_id', $op1->id)->first()->id,
         'montant_prevu' => 150,
+    ]);
+
+    // Le mode 'realise' de la boucle ci-dessous ignore les prévisions
+    // (SEL-01 inchangé) : sans mouvement réel, aucune des deux opérations
+    // ne serait éligible et l'export échouerait en 422 avant même d'avoir
+    // pu exercer le mode combiné qu'il s'agit de tester. Un mouvement réel
+    // sur op1 suffit à rendre la sélection non vide dans les deux modes —
+    // c'est plus léger que d'inventer un deuxième scénario par mode.
+    $tx = Transaction::factory()->asDepense()->create([
+        'association_id' => (int) TenantContext::currentId(),
+        'date' => '2025-10-05',
+        'saisi_par' => $this->user->id,
+    ]);
+    $tx->lignes()->forceDelete();
+    TransactionLigne::create([
+        'transaction_id' => $tx->id,
+        'montant' => 80.0,
+        'compte_id' => $sc->id,
+        'operation_id' => $op1->id,
+        'debit' => 80.0,
+        'credit' => 0.0,
     ]);
 
     $exercice = app(ExerciceService::class)->current();
@@ -314,7 +334,21 @@ it('exporte PDF et Excel en mode combiné séances × opérations', function ():
 });
 
 it('exporte le PDF rapport opérations en mode projection', function (): void {
-    $op = Operation::factory()->create();
+    $sc = Compte::factory()->depense()->numero('622')->create();
+    $scRec = Compte::factory()->numero('722')->create();
+    $typeOp = TypeOperation::factory()->create(['compte_id' => $scRec->id]);
+    $op = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+    $seance = Seance::create(['operation_id' => $op->id, 'numero' => 1, 'date' => Carbon::create(2025, 10, 10)]);
+    $tiers = Tiers::factory()->pourDepenses()->create();
+
+    EncadrementPrevision::create([
+        'operation_id' => $op->id,
+        'tiers_id' => $tiers->id,
+        'compte_id' => $sc->id,
+        'seance_id' => $seance->id,
+        'montant_prevu' => 100,
+    ]);
+
     $exercice = app(ExerciceService::class)->current();
 
     $response = $this->get(route('rapports.export', [
@@ -332,7 +366,21 @@ it('exporte le PDF rapport opérations en mode projection', function (): void {
 });
 
 it('exporte le Excel rapport opérations en mode projection', function (): void {
-    $op = Operation::factory()->create();
+    $sc = Compte::factory()->depense()->numero('622')->create();
+    $scRec = Compte::factory()->numero('722')->create();
+    $typeOp = TypeOperation::factory()->create(['compte_id' => $scRec->id]);
+    $op = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+    $seance = Seance::create(['operation_id' => $op->id, 'numero' => 1, 'date' => Carbon::create(2025, 10, 10)]);
+    $tiers = Tiers::factory()->pourDepenses()->create();
+
+    EncadrementPrevision::create([
+        'operation_id' => $op->id,
+        'tiers_id' => $tiers->id,
+        'compte_id' => $sc->id,
+        'seance_id' => $seance->id,
+        'montant_prevu' => 100,
+    ]);
+
     $exercice = app(ExerciceService::class)->current();
 
     $response = $this->get(route('rapports.export', [

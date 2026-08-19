@@ -40,8 +40,11 @@ final class TransactionCompteList extends Component
     {
         $exerciceService = app(ExerciceService::class);
         $exercice = $exerciceService->current();
-        $this->dateDebut = "{$exercice}-09-01";
-        $this->dateFin = ($exercice + 1).'-08-31';
+        // Bornes issues du paramétrage du tenant (ExerciceService), pas d'un
+        // septembre-août supposé.
+        $range = app(ExerciceService::class)->dateRange($exercice);
+        $this->dateDebut = $range['start']->toDateString();
+        $this->dateFin = $range['end']->toDateString();
     }
 
     public function updatedCompteId(): void

@@ -5,6 +5,14 @@
 @endsection
 
 @section('content')
+    @if (($porteeExercices ?? 'current') === 'all')
+        @include('pdf.partials.rapport-operations-all', [
+            'sections' => [
+                ['data' => $charges, 'label' => 'DÉPENSES', 'total' => $totalCharges, 'projParExercice' => $projChargesParExercice ?? []],
+                ['data' => $produits, 'label' => 'RECETTES', 'total' => $totalProduits, 'projParExercice' => $projProduitsParExercice ?? []],
+            ],
+        ])
+    @else
     @php
         $previsionnel = $previsionnel ?? false;
         $mode = $mode ?? ($previsionnel ? 'projection' : 'realise');
@@ -553,5 +561,6 @@
                 {{ $resultatNet >= 0 ? 'EXCÉDENT' : 'DÉFICIT' }} : {{ number_format(abs($resultatNet), 2, ',', ' ') }} €
             @endif
         </div>
+    @endif
     @endif
 @endsection

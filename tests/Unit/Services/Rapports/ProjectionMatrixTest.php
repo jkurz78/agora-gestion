@@ -211,3 +211,61 @@ it('handles tiers 0 (sans tiers)', function (): void {
     expect($byTiers[0])->toBe(15.0);
     expect($byTiers[10])->toBe(10.0);
 });
+
+// ---------------------------------------------------------------------------
+// add() — cumule au lieu d'écraser (indispensable pour fusionnerMatrices())
+// ---------------------------------------------------------------------------
+
+it('add() cumule deux appels sur la même cellule, là où set() écrase', function (): void {
+    $add = new ProjectionMatrix;
+    $add->add(1, 10, 1, 100, 50.0);
+    $add->add(1, 10, 1, 100, 30.0);
+    expect($add->total())->toBe(80.0);
+
+    $set = new ProjectionMatrix;
+    $set->set(1, 10, 1, 100, 50.0);
+    $set->set(1, 10, 1, 100, 30.0);
+    expect($set->total())->toBe(30.0);
+});
+
+it('add() initialise une cellule absente comme set()', function (): void {
+    $m = new ProjectionMatrix;
+    $m->add(1, 10, 1, 100, 42.0);
+
+    expect($m->total())->toBe(42.0);
+    expect($m->cells()[1][10][1][100])->toBe(42.0);
+});
+
+it('add() invalide le cache — agréger, add(), puis ré-agréger reflète le nouveau montant', function (): void {
+    $m = new ProjectionMatrix;
+    $m->set(1, 10, 1, 100, 10.0);
+
+    expect($m->total())->toBe(10.0); // met le cache en place
+
+    $m->add(1, 10, 1, 100, 5.0);
+
+    expect($m->total())->toBe(15.0); // si $this->cache n'était pas vidé, on lirait encore 10.0
+});
+
+// ---------------------------------------------------------------------------
+// cells() / scCategories() — exposent l'état brut pour la fusion
+// ---------------------------------------------------------------------------
+
+it('cells() expose la structure interne complète', function (): void {
+    $m = new ProjectionMatrix;
+    $m->set(1, 10, 2, 100, 25.0);
+    $m->set(2, 20, 0, 200, 5.0);
+
+    expect($m->cells())->toBe([
+        1 => [10 => [2 => [100 => 25.0]]],
+        2 => [20 => [0 => [200 => 5.0]]],
+    ]);
+});
+
+it('scCategories() expose la correspondance compte => famille', function (): void {
+    $m = new ProjectionMatrix;
+    $m->setScCategory(1, 100);
+    $m->setScCategory(2, 200);
+
+    expect($m->scCategories())->toBe([1 => 100, 2 => 200]);
+});
