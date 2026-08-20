@@ -42,6 +42,8 @@ final class TransactionLigne extends Model
         'helloasso_item_id',
         'helloasso_option_id',
         'helloasso_tier_id',
+        'helloasso_line_key',
+        'helloasso_discount_code',
         // Partie double — ajoutés Step 10
         'compte_id',
         'debit',
