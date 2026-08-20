@@ -442,7 +442,16 @@ final class TransactionService
                             continue;
                         }
                         if ($existingLigne->helloasso_item_id !== null) {
-                            $helloAssoItemIds[$oldId] = $existingLigne->helloasso_item_id;
+                            // Les trois colonnes voyagent ENSEMBLE. helloasso_line_key
+                            // est le discriminant d'idempotence de la synchro : la perdre
+                            // fait qu'un re-sync ne retrouve plus la ligne et la duplique.
+                            // Une contrainte CHECK l'exige d'ailleurs dès qu'un item_id
+                            // est posé.
+                            $helloAssoItemIds[$oldId] = [
+                                'helloasso_item_id' => $existingLigne->helloasso_item_id,
+                                'helloasso_option_id' => $existingLigne->helloasso_option_id,
+                                'helloasso_line_key' => $existingLigne->helloasso_line_key,
+                            ];
                         }
                         $oldCents = (int) round((float) $existingLigne->montant * 100);
                         $newCents = (int) round((float) $ligneData['montant'] * 100);
@@ -479,7 +488,7 @@ final class TransactionService
                 foreach ($lignes as $ligneData) {
                     $oldId = isset($ligneData['id']) && $ligneData['id'] !== null ? (int) $ligneData['id'] : null;
                     if ($oldId !== null && isset($helloAssoItemIds[$oldId])) {
-                        $ligneData['helloasso_item_id'] = $helloAssoItemIds[$oldId];
+                        $ligneData = array_merge($ligneData, $helloAssoItemIds[$oldId]);
                     }
                     // DC-10a — compte_id connu à la création : debit/credit calculés ici même
                     // (voir avecDebitCredit / design decision), plutôt qu'enrichis a posteriori.
