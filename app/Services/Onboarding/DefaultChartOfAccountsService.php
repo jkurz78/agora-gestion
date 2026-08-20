@@ -118,6 +118,10 @@ final class DefaultChartOfAccountsService
                     ['intitule' => 'Formations',              'numero_pcg' => '706A', 'usages' => [UsageComptable::Inscription]],
                     ['intitule' => 'Parcours thérapeutiques', 'numero_pcg' => '706B', 'usages' => [UsageComptable::Inscription]],
                     ['intitule' => 'Ventes de produits',      'numero_pcg' => '707'],
+                    // Contra-produit : porte au DÉBIT les remises et gratuités accordées.
+                    // Classe 7 volontairement — TransactionConverter refuse une ligne de
+                    // ventilation de classe ≠ 7 sur une recette.
+                    ['intitule' => 'Gratuités accordées',     'numero_pcg' => '709A', 'usages' => [UsageComptable::Gratuite]],
                 ],
             ],
             [
