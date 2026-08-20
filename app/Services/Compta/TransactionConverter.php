@@ -6,6 +6,7 @@ namespace App\Services\Compta;
 
 use App\Enums\ModePaiement;
 use App\Enums\Sens;
+use App\Enums\SensVentilation;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Models\Compte;
@@ -120,6 +121,7 @@ final class TransactionConverter
             $ventilations[] = [
                 'compte' => $compte,
                 'montant' => $montant,
+                'sens' => SensVentilation::Credit,
                 'operation_id' => $ligne->operation_id,
                 'seance' => $ligne->seance,
                 'notes' => $ligne->notes,

@@ -6,6 +6,7 @@ namespace App\Services\Compta;
 
 use App\Enums\JournalComptable;
 use App\Enums\ModePaiement;
+use App\Enums\SensVentilation;
 use App\Enums\TypeTransaction;
 use App\Exceptions\Compta\CompteIncorrectException;
 use App\Exceptions\Compta\EcritureNonEquilibreeException;
@@ -471,9 +472,17 @@ final class EcritureGenerator
      *
      * mode_paiement est null : aucun paiement n'a encore eu lieu.
      *
-     * @param  iterable<int, array{compte: Compte, montant: float, operation_id?: ?int, seance?: ?int, notes?: ?string}>  $ventilations
+     * Contrat numérique (Tâche 6) : chaque ventilation porte un `sens` explicite
+     * (SensVentilation::Credit ou ::Debit) — le sens n'est JAMAIS déduit du signe
+     * du montant, qui doit toujours être strictement positif. Une ventilation au
+     * débit est un contra-produit (ex : gratuité 709A) qui réduit le produit
+     * qu'elle accompagne, jusqu'à un net (Σcrédit − Σdébit) qui ne peut être négatif.
+     * Tous les invariants sont vérifiés avant toute écriture en base.
      *
-     * @throws \InvalidArgumentException Si total ≤ 0 ou ventilations vides.
+     * @param  iterable<int, array{compte: Compte, montant: float|string, sens: SensVentilation, operation_id?: ?int, seance?: ?int, notes?: ?string}>  $ventilations
+     *
+     * @throws \InvalidArgumentException Si ventilations vides, sens absent/invalide,
+     *                                   montant d'une ventilation ≤ 0, Σcrédit ≤ 0, ou Σdébit > Σcrédit.
      * @throws CompteIncorrectException Si un compte ventilé ∉ classe 7.
      * @throws TenantBoundaryException Si $tiers n'appartient pas au tenant courant.
      * @throws EcritureNonEquilibreeException Sécurité paranoïaque post-création.
@@ -508,14 +517,72 @@ final class EcritureGenerator
             }
         }
 
-        // --- Calcul du total ---
-        $total = (float) $ventilationsNorm->sum(fn (array $v): float => (float) $v['montant']);
+        // --- Validation du sens + calcul du total en centimes (jamais de flottants) ---
+        // Le sens est porté explicitement par chaque ventilation, jamais déduit du signe
+        // du montant (toujours strictement positif). Une ventilation au débit est un
+        // contra-produit (ex : gratuité 709A) qui réduit le produit qu'elle accompagne.
+        $creditCentimes = 0;
+        $debitCentimes = 0;
 
-        if ($total <= 0) {
+        foreach ($ventilationsNorm as $v) {
+            $sens = $v['sens'] ?? null;
+
+            if (! $sens instanceof SensVentilation) {
+                throw new \InvalidArgumentException(
+                    "Chaque ventilation d'une recette à crédit doit porter un sens explicite ".
+                    "(SensVentilation::Credit ou SensVentilation::Debit) : sens absent ou invalide pour le compte {$v['compte']->numero_pcg}."
+                );
+            }
+
+            $montantVent = (float) $v['montant'];
+
+            if ($montantVent <= 0) {
+                throw new \InvalidArgumentException(
+                    "Le montant d'une ventilation doit être strictement positif — le sens (".
+                    "{$sens->value}) est porté séparément, jamais par le signe (reçu : {$montantVent})."
+                );
+            }
+
+            $montantCentimes = MontantDecimal::versCentimes(number_format($montantVent, 2, '.', ''));
+
+            if ($sens === SensVentilation::Credit) {
+                $creditCentimes += $montantCentimes;
+            } else {
+                $debitCentimes += $montantCentimes;
+            }
+        }
+
+        if ($creditCentimes <= 0) {
             throw new \InvalidArgumentException(
-                "Le montant total d'une recette à crédit doit être strictement positif (reçu : {$total})."
+                'Une recette à crédit doit comporter au moins un produit au crédit '.
+                '(Σcrédit reçu : '.MontantDecimal::depuisCentimes($creditCentimes).').'
             );
         }
+
+        if ($debitCentimes > $creditCentimes) {
+            throw new \InvalidArgumentException(
+                'La somme des ventilations au débit (remises/gratuités, Σdébit = '.
+                MontantDecimal::depuisCentimes($debitCentimes).
+                ') ne peut pas excéder la somme des ventilations au crédit (Σcrédit = '.
+                MontantDecimal::depuisCentimes($creditCentimes).').'
+            );
+        }
+
+        $netCentimes = $creditCentimes - $debitCentimes;
+
+        if ($netCentimes < 0) {
+            // Filet de sécurité : mathématiquement inatteignable puisque Σdébit ≤ Σcrédit
+            // est déjà garanti ci-dessus, mais gardé explicite car c'est l'invariant
+            // métier central de ce contrat (rejet explicite d'un net négatif).
+            throw new \InvalidArgumentException(
+                'Le net (Σcrédit − Σdébit) d\'une recette à crédit ne peut pas être négatif.'
+            );
+        }
+
+        // Le header (quand ce générateur crée lui-même la Transaction) et la ligne 411
+        // portent le NET, jamais le brut — un appelant direct créerait sinon un header
+        // au brut alors que les écritures portent un net.
+        $total = MontantDecimal::depuisCentimes($netCentimes);
 
         // --- Résolution compte 411 (tenant-scopé automatiquement) ---
         $compte411 = Compte::ofNumeroSysteme('411');

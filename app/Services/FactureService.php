@@ -7,6 +7,7 @@ namespace App\Services;
 use App\DataTransferObjects\ExtournePayload;
 use App\Enums\ModePaiement;
 use App\Enums\Sens;
+use App\Enums\SensVentilation;
 use App\Enums\StatutFacture;
 use App\Enums\StatutReglement;
 use App\Enums\TypeLigneFacture;
@@ -1084,6 +1085,7 @@ XML;
                     $ventilations[] = [
                         'compte' => $compte,
                         'montant' => (float) $factureLigne->montant,
+                        'sens' => SensVentilation::Credit,
                         'operation_id' => $factureLigne->operation_id,
                         'seance' => $factureLigne->seance,
                         'notes' => $factureLigne->libelle,
