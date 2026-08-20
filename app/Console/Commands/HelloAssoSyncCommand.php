@@ -106,5 +106,21 @@ final class HelloAssoSyncCommand extends Command
             'orders_skipped' => $result->ordersSkipped,
             'errors' => $result->errors,
         ]);
+
+        // Remonter chaque erreur jusqu'au code de sortie : un résumé « 0 erreurs »
+        // alors qu'une transaction est restée legacy (échec de conversion partie
+        // double avalé en simple warning) rendrait la reprise de production
+        // invérifiable — voir HelloAssoSyncService::processOrder (Tâche 12).
+        if ($result->hasErrors()) {
+            foreach ($result->errors as $error) {
+                $this->error("  {$error}");
+            }
+
+            throw new \RuntimeException(sprintf(
+                'Synchronisation HelloAsso pour %s : %d erreur(s) — voir le détail ci-dessus.',
+                $association->nom,
+                count($result->errors),
+            ));
+        }
     }
 }

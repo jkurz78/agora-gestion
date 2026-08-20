@@ -82,6 +82,7 @@ final class HelloAssoSyncService
                 $lignesUpdated += $result['lignes_updated'];
                 $participantsCreated += $result['participants_created'];
                 $skipped += $result['skipped'];
+                $errors = array_merge($errors, $result['errors']);
             } catch (\Throwable $e) {
                 $errors[] = "Commande #{$order['id']} : {$e->getMessage()}";
                 $skipped++;
@@ -100,11 +101,11 @@ final class HelloAssoSyncService
     }
 
     /**
-     * @return array{tx_created: int, tx_updated: int, lignes_created: int, lignes_updated: int, participants_created: int, skipped: int}
+     * @return array{tx_created: int, tx_updated: int, lignes_created: int, lignes_updated: int, participants_created: int, skipped: int, errors: list<string>}
      */
     private function processOrder(array $order, int $exercice): array
     {
-        $result = ['tx_created' => 0, 'tx_updated' => 0, 'lignes_created' => 0, 'lignes_updated' => 0, 'participants_created' => 0, 'skipped' => 0];
+        $result = ['tx_created' => 0, 'tx_updated' => 0, 'lignes_created' => 0, 'lignes_updated' => 0, 'participants_created' => 0, 'skipped' => 0, 'errors' => []];
 
         $formSlug = $order['formSlug'] ?? '';
 
@@ -394,6 +395,12 @@ final class HelloAssoSyncService
                         $tx->refresh();
                         app(TransactionConverter::class)->convertir($tx);
                     } catch (\Throwable $e) {
+                        $orderId = $order['id'] ?? '?';
+                        // Remonter l'échec dans $result['errors'] — un simple
+                        // Log::warning laissait la commande afficher "0 erreurs" alors
+                        // que la transaction restait legacy, rendant la reprise de
+                        // production invérifiable (Tâche 12).
+                        $result['errors'][] = "Transaction #{$tx->id} (commande HelloAsso #{$orderId}) : conversion partie double échouée — {$e->getMessage()}";
                         Log::warning('[HelloAsso] Enrichissement PD échoué — la transaction reste legacy', [
                             'transaction_id' => $tx->id,
                             'error' => $e->getMessage(),
@@ -655,7 +662,7 @@ final class HelloAssoSyncService
      * précisément la collision que l'ancien lookup sur (item_id, option_id IS NULL)
      * ne pouvait pas lever — d'où le nouveau discriminant explicite.
      *
-     * @param  array{tx_created: int, tx_updated: int, lignes_created: int, lignes_updated: int, participants_created: int, skipped: int}  $result
+     * @param  array{tx_created: int, tx_updated: int, lignes_created: int, lignes_updated: int, participants_created: int, skipped: int, errors: list<string>}  $result
      */
     private function upsertLigne(
         Transaction $tx,
