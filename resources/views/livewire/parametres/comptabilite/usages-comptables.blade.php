@@ -109,6 +109,37 @@
         </div>
     </div>
 
+    {{-- Card : Gratuités accordées (mono) --}}
+    <div class="card mb-3">
+        <div class="card-header text-white" style="background:#3d5473;">
+            <strong>Gratuités accordées</strong>
+            <small class="ms-2">Compte de contrepartie des places et cotisations offertes.</small>
+        </div>
+        <div class="card-body">
+            <p class="text-muted small mb-2">
+                Quand une inscription est offerte — par exemple via un code de remise HelloAsso —
+                le montant normal est enregistré en produit, puis annulé sur ce compte.
+                Le résultat n'est pas affecté, et la gratuité reste visible dans les comptes.
+            </p>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="gratuite" value="" id="gratuite_none"
+                    wire:model.live="gratuiteSelectedId" wire:change="saveGratuite">
+                <label class="form-check-label" for="gratuite_none">— Aucun —</label>
+            </div>
+            @foreach($comptesRecette as $compte)
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="gratuite" value="{{ $compte->id }}"
+                        id="gratuite_{{ $compte->id }}"
+                        wire:model.live="gratuiteSelectedId" wire:change="saveGratuite">
+                    <label class="form-check-label" for="gratuite_{{ $compte->id }}">
+                        {{ $compte->numero_pcg }} — {{ $compte->intitule }}
+                    </label>
+                </div>
+            @endforeach
+            @error('gratuite') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
+        </div>
+    </div>
+
     {{-- Modale création inline --}}
     @if($inlineOpen)
         <div class="modal d-block" style="background:rgba(0,0,0,.5)" tabindex="-1">
