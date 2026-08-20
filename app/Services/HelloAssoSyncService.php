@@ -622,6 +622,10 @@ final class HelloAssoSyncService
                 'credit' => $compteId !== null ? $montantEuros : 0,
                 'helloasso_item_id' => (int) $item['id'],
                 'helloasso_option_id' => $optionId,
+                // Discriminant de ligne (migration 2026_08_20_100001). Obligatoire dès
+                // qu'une ligne porte un helloasso_item_id — la contrainte CHECK
+                // chk_tl_helloasso_line_key_presence le refuse autrement sous MySQL.
+                'helloasso_line_key' => $optionId === null ? 'parent' : 'option:'.$optionId,
                 'helloasso_tier_id' => $resolved['helloasso_tier_id'],
                 'notes' => $notes,
             ]);
