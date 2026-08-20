@@ -142,10 +142,16 @@ final class ComptaCheckIntegrityCommand extends Command
                 ->get(['id', 'montant_total']);
 
             foreach ($txSources as $tx) {
+                // Net débit/crédit, pas somme des montants : depuis le chantier 709A,
+                // une transaction remisée porte deux lignes de ventilation — le produit
+                // au crédit et la gratuité au débit — qui ont toutes deux un `montant`
+                // positif. Les sommer donnerait le brut et ferait diverger ce contrôle.
+                // Le scope ventilation() restreint déjà aux classes 6 et 7.
                 $sumLignes = (float) TransactionLigne::query()
                     ->where('transaction_id', $tx->id)
                     ->ventilation()
-                    ->sum('montant');
+                    ->selectRaw('COALESCE(SUM(credit) - SUM(debit), 0) as net')
+                    ->value('net');
 
                 $diff = (int) round(((float) $tx->montant_total - $sumLignes) * 100);
                 if ($diff !== 0) {
