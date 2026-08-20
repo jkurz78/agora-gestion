@@ -41,20 +41,32 @@ final class AdhesionService
 
         // DC-10a : la détection cotisation lit l'usage porté par le compte de la
         // ligne (compte_id, source unique) — plus de traversée comptes.
+        // Prédicat ligne parente compatible manuel + HelloAsso (709A, T5) : une
+        // ligne manuelle n'a pas de helloasso_item_id ; une ligne HelloAsso porte
+        // toujours helloasso_line_key, et seule 'parent' désigne la ligne cotisation
+        // (exclut 'discount' et 'option:{id}', qui partagent option_id NULL avec elle).
         $ligneCotisation = $tx->lignes()
-            ->whereNull('helloasso_option_id')  // exclure les lignes options HA (B1)
+            ->where(function ($query): void {
+                $query->whereNull('helloasso_item_id')
+                    ->orWhere('helloasso_line_key', 'parent');
+            })
             ->whereHas('compte.usages', function ($q): void {
                 $q->where('usage', UsageComptable::Cotisation->value);
             })
             ->first();
 
-        // Palier HelloAsso à 0 € (cotisation offerte par code promo) : la ligne ne
-        // porte pas de compte (l'invariant XOR interdit compte_id sans debit/credit,
-        // et une écriture nulle n'a pas de valeur comptable) — détection via la
-        // formule HelloAsso auto-créée (paire form_slug + tier_id).
+        // LEGACY — repli conservé pour les données historiques uniquement.
+        // Il existait parce qu'un palier HelloAsso à 0 € laissait sa ligne SANS
+        // compte : la détection passait alors par la formule (form_slug + tier_id).
+        // Depuis le chantier 709A, la ligne parente porte toujours son compte et
+        // son montant brut — le chemin principal ci-dessus reprend la main.
+        // Ne sert plus qu'aux transactions synchronisées avant ce chantier.
         if ($ligneCotisation === null && $tx->helloasso_form_slug !== null) {
             $ligneCotisation = $tx->lignes()
-                ->whereNull('helloasso_option_id')
+                ->where(function ($query): void {
+                    $query->whereNull('helloasso_item_id')
+                        ->orWhere('helloasso_line_key', 'parent');
+                })
                 ->whereNotNull('helloasso_tier_id')
                 ->get()
                 ->first(fn (TransactionLigne $l) => FormuleAdhesion::query()

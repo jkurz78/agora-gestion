@@ -19,9 +19,13 @@ final class AdhesionRecuFiscalObserver
         try {
             $service = app(RecuFiscalService::class);
 
+            // Prédicat ligne parente compatible manuel + HelloAsso (709A, T5).
             $ligne = $adhesion->transaction->lignes()
                 ->whereNull('deleted_at')
-                ->whereNull('helloasso_option_id')  // cherche la ligne parent HA (B1)
+                ->where(function ($query): void {
+                    $query->whereNull('helloasso_item_id')
+                        ->orWhere('helloasso_line_key', 'parent');
+                })
                 ->first();
 
             if ($ligne === null) {
