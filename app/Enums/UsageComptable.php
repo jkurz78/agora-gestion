@@ -11,6 +11,7 @@ enum UsageComptable: string
     case Inscription = 'inscription';
     case FraisKilometriques = 'frais_kilometriques';
     case AbandonCreance = 'abandon_creance';
+    case Gratuite = 'gratuite';
 
     public function label(): string
     {
@@ -20,6 +21,7 @@ enum UsageComptable: string
             self::Inscription => 'Inscriptions',
             self::FraisKilometriques => 'Indemnités kilométriques',
             self::AbandonCreance => 'Abandon de créance',
+            self::Gratuite => 'Gratuités accordées',
         };
     }
 
@@ -27,14 +29,15 @@ enum UsageComptable: string
     {
         return match ($this) {
             self::FraisKilometriques => TypeCategorie::Depense,
-            self::Don, self::Cotisation, self::Inscription, self::AbandonCreance => TypeCategorie::Recette,
+            self::Don, self::Cotisation, self::Inscription,
+            self::AbandonCreance, self::Gratuite => TypeCategorie::Recette,
         };
     }
 
     public function cardinalite(): string
     {
         return match ($this) {
-            self::FraisKilometriques, self::AbandonCreance => 'mono',
+            self::FraisKilometriques, self::AbandonCreance, self::Gratuite => 'mono',
             self::Don, self::Cotisation, self::Inscription => 'multi',
         };
     }

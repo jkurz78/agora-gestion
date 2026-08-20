@@ -30,6 +30,17 @@ final class UsagesComptablesService
         $this->setMono(UsageComptable::AbandonCreance, $compteId);
     }
 
+    /**
+     * Compte de contrepartie des gratuités accordées (709A par défaut).
+     *
+     * Contrairement à setAbandonCreance, aucun pré-requis d'usage n'est exigé :
+     * une gratuité est une contrepartie de produit, pas un sous-cas de don.
+     */
+    public function setGratuite(?int $compteId): void
+    {
+        $this->setMono(UsageComptable::Gratuite, $compteId);
+    }
+
     public function toggleDon(int $compteId, bool $active): void
     {
         $this->toggle(UsageComptable::Don, $compteId, $active);
