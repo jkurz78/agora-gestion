@@ -407,9 +407,41 @@ final class RecuFiscalService
     /**
      * Montant du reçu fiscal : privilégie credit PD (colonne pérenne) ;
      * fallback sur montant legacy tant que le backfill n'a pas enrichi toutes les lignes.
+     *
+     * Net de remise (709A) : avant ce chantier, la ligne parente d'une adhésion
+     * HelloAsso portait déjà le montant NET (une adhésion entièrement offerte
+     * avait credit = 0), et la garde "montant > 0" de validerEligibilite()
+     * bloquait l'émission d'un reçu par accident — c'est la ligne parente
+     * elle-même qui portait 0€, pas une protection voulue (cas Georges SAND,
+     * commit 2dada27d). Le chantier 709A fait désormais porter le montant
+     * BRUT à la ligne parente (credit = plein tarif), pour que le compte de
+     * cotisation reflète le produit réel plutôt qu'un montant déjà écrêté.
+     * Sans la déduction ci-dessous, cette même garde ne se déclencherait
+     * plus : un reçu fiscal serait émis pour de l'argent jamais versé — un
+     * document fiscal faux. Retrancher le débit de la ligne technique
+     * 'discount' rattachée au même helloasso_item_id restaure la protection
+     * PAR CONSTRUCTION (le net retombe à 0 sur une gratuité totale) plutôt
+     * que par le hasard de l'ancien schéma de données.
+     *
+     * Une ligne sans helloasso_item_id (adhésion/don saisi à la main) n'a pas
+     * de ligne de remise à chercher : comportement inchangé.
      */
     private function montantRecu(TransactionLigne $ligne): float
     {
-        return (float) $ligne->credit > 0 ? (float) $ligne->credit : (float) $ligne->montant;
+        $montant = (float) $ligne->credit > 0 ? (float) $ligne->credit : (float) $ligne->montant;
+
+        if ($ligne->helloasso_item_id !== null) {
+            $remise = TransactionLigne::query()
+                ->where('transaction_id', $ligne->transaction_id)
+                ->where('helloasso_item_id', $ligne->helloasso_item_id)
+                ->where('helloasso_line_key', 'discount')
+                ->first();
+
+            if ($remise !== null) {
+                $montant -= (float) $remise->debit;
+            }
+        }
+
+        return $montant;
     }
 }
