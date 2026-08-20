@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\ModePaiement;
 use App\Enums\OrigineANouveau;
+use App\Enums\SensVentilation;
 use App\Enums\StatutExercice;
 use App\Models\Association;
 use App\Models\Compte;
@@ -55,7 +56,7 @@ function creerCreancePostesTiers(
 ): Transaction {
     return app(EcritureGenerator::class)->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [[
+        ventilations: [['sens' => SensVentilation::Credit,
             'compte' => compteMetierPostesTiers('706-'.str_replace('.', '', (string) $montant), 7),
             'montant' => $montant,
         ]],

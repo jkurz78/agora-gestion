@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\DTOs\Compta\PosteTiersReglementData;
 use App\Enums\ModePaiement;
 use App\Enums\OrigineANouveau;
+use App\Enums\SensVentilation;
 use App\Enums\StatutExercice;
 use App\Enums\StatutReglement;
 use App\Models\Association;
@@ -44,7 +45,7 @@ test('reglerOuEncaisser — recette normale crée T2 encaissement via pourReglem
 
     $t1 = $this->ecritureGen->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => 150.0]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => 150.0]],
         dateConstatation: new DateTimeImmutable('2025-10-01'),
         libelle: 'Créance test',
     );
@@ -92,7 +93,7 @@ test('reglerOuEncaisser — no-op si mode_paiement null', function () {
 
     $t1 = $this->ecritureGen->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => 100.0]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => 100.0]],
         dateConstatation: new DateTimeImmutable('2025-10-01'),
     );
     // mode_paiement stays null (not set)
@@ -111,7 +112,7 @@ test('reglerOuEncaisser — no-op si ligne tiers déjà lettrée (idempotence)',
 
     $t1 = $this->ecritureGen->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => 120.0]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => 120.0]],
         dateConstatation: new DateTimeImmutable('2025-10-01'),
     );
     $t1->update(['mode_paiement' => ModePaiement::Virement->value, 'compte_id' => $this->compteBancaire->id]);
@@ -133,7 +134,7 @@ test('reglerOuEncaisser relit la transaction en base et verrouille l exercice av
     $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $t1 = $this->ecritureGen->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => '42.00']],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => '42.00']],
         dateConstatation: new DateTimeImmutable('2025-10-01'),
         libelle: 'Créance wrapper avec modèle périmé',
     );
@@ -179,7 +180,7 @@ test('marquerRegle — recette EnAttente → statut dérivé + T2', function () 
 
     $t1 = $this->ecritureGen->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => 180.0]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => 180.0]],
         dateConstatation: new DateTimeImmutable('2025-10-01'),
     );
     // Ensure it's EnAttente (default from pourRecetteACredit is factory-dependent)
@@ -226,7 +227,7 @@ test('marquerRecu — wrapper historique délègue le solde agrégé à la date 
     $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $t1 = $this->ecritureGen->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => 100.0]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => 100.0]],
         dateConstatation: new DateTimeImmutable('2025-10-03'),
         libelle: 'Créance fractionnée avant wrapper',
     );
@@ -263,7 +264,7 @@ test('marquerRecu — wrapper historique date un règlement AN au jour de la pi�
     $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $t1 = $this->ecritureGen->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => 80.0]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => 80.0]],
         dateConstatation: new DateTimeImmutable('2026-08-20'),
         libelle: 'Créance reportée avant wrapper',
     );
@@ -301,7 +302,7 @@ test('les wrappers refusent un compte bancaire étranger avant de créer ou modi
     $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $t1 = $this->ecritureGen->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => '25.00']],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => '25.00']],
         dateConstatation: new DateTimeImmutable('2025-10-03'),
         libelle: 'Créance compte étranger',
     );
@@ -340,13 +341,13 @@ test('le service wrapper refuse une transaction source étrangère au poste tier
     $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $t1A = $this->ecritureGen->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => '50.00']],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => '50.00']],
         dateConstatation: new DateTimeImmutable('2025-10-03'),
         libelle: 'Créance A',
     );
     $t1B = $this->ecritureGen->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => '60.00']],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => '60.00']],
         dateConstatation: new DateTimeImmutable('2025-10-03'),
         libelle: 'Créance B',
     );
@@ -381,7 +382,7 @@ test('marquerRecu relit le reliquat courant après un règlement partiel concurr
     $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $t1 = $this->ecritureGen->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => '100.00']],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => '100.00']],
         dateConstatation: new DateTimeImmutable('2025-10-03'),
         libelle: 'Créance reliquat frais',
     );
@@ -417,7 +418,7 @@ test('marquerRecu annule T2 et le lettrage si la mise à jour du mode de T1 éch
     $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $t1 = $this->ecritureGen->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => '73.00']],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => '73.00']],
         dateConstatation: new DateTimeImmutable('2025-10-03'),
         libelle: 'Créance rollback wrapper',
     );

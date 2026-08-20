@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\ModePaiement;
+use App\Enums\SensVentilation;
 use App\Enums\TypeTransaction;
 use App\Exceptions\Compta\LettrageDejaPresentException;
 use App\Exceptions\Compta\TenantBoundaryException;
@@ -77,7 +78,7 @@ function creerCreance(float $montant = 150.00, ?string $suffix = null): Transact
 
     return $generator->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $compteProduit, 'montant' => $montant]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $compteProduit, 'montant' => $montant]],
         dateConstatation: new DateTimeImmutable('2026-05-20'),
         libelle: 'Facture test '.($suffix ?? uniqid()),
     );

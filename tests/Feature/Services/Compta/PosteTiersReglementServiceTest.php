@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\DTOs\Compta\PosteTiersReglementData;
 use App\Enums\ModePaiement;
 use App\Enums\OrigineANouveau;
+use App\Enums\SensVentilation;
 use App\Enums\StatutExercice;
 use App\Enums\StatutReglement;
 use App\Exceptions\ExerciceCloturedException;
@@ -51,7 +52,7 @@ function creerPostePourReglementTask4(object $contexte, string $numeroCompte, in
     $transaction = $numeroCompte === '411'
         ? $contexte->generatorReglementPoste->pourRecetteACredit(
             tiers: $tiers,
-            ventilations: [['compte' => $contexte->compte706, 'montant' => $montant]],
+            ventilations: [['sens' => SensVentilation::Credit, 'compte' => $contexte->compte706, 'montant' => $montant]],
             dateConstatation: new DateTimeImmutable('2025-10-01'),
             libelle: 'Créance à régler partiellement',
         )
@@ -367,7 +368,7 @@ it('refuse un poste appartenant à une autre association sans fuite ni mutation'
     ]);
     $transactionEtrangere = $this->generatorReglementPoste->pourRecetteACredit(
         tiers: $tiersEtranger,
-        ventilations: [['compte' => $produitEtranger, 'montant' => 100.00]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $produitEtranger, 'montant' => 100.00]],
         dateConstatation: new DateTimeImmutable('2025-10-01'),
     );
     $ligneEtrangere = $transactionEtrangere->lignes->first(

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\SensVentilation;
 use App\Livewire\RapportGrandLivre;
 use App\Models\Tiers;
 use App\Services\Compta\EcritureGenerator;
@@ -32,7 +33,7 @@ function creerCreancePourGrandLivreEcran(object $contexte): Tiers
 
     app(EcritureGenerator::class)->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [[
+        ventilations: [['sens' => SensVentilation::Credit,
             'compte' => $contexte->compte706,
             'montant' => MontantDecimal::depuisCentimes(12000),
         ]],

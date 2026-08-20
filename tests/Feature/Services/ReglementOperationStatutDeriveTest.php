@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\DTOs\Compta\PosteTiersReglementData;
 use App\Enums\ModePaiement;
+use App\Enums\SensVentilation;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Models\RapprochementBancaire;
@@ -96,7 +97,7 @@ it('marquerPaye virement sur dette → statut dérivé Recu (réglé)', function
 it('agrège plusieurs T2 bancaires en Recu puis Pointe seulement quand toutes sont rapprochées', function () {
     $t1 = app(EcritureGenerator::class)->pourRecetteACredit(
         tiers: $this->tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => 100.0]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => 100.0]],
         dateConstatation: new DateTimeImmutable('2025-10-15'),
     );
     $t1->update(['statut_reglement' => StatutReglement::EnAttente]);
@@ -143,7 +144,7 @@ it('agrège plusieurs T2 bancaires en Recu puis Pointe seulement quand toutes so
 it('agrège plusieurs T2 en EnMain si au moins un portage reste non remis', function () {
     $t1 = app(EcritureGenerator::class)->pourRecetteACredit(
         tiers: $this->tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => 100.0]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => 100.0]],
         dateConstatation: new DateTimeImmutable('2025-10-15'),
     );
     $t1->update(['statut_reglement' => StatutReglement::EnAttente]);
@@ -175,7 +176,7 @@ it('agrège plusieurs T2 en EnMain si au moins un portage reste non remis', func
 it('agrège une branche lumped en main avec une T2 séparée pointée', function (?ModePaiement $modeSource) {
     $t1 = app(EcritureGenerator::class)->pourRecetteACredit(
         tiers: $this->tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => 100.0]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => 100.0]],
         dateConstatation: new DateTimeImmutable('2025-10-15'),
     );
     $t1->update([

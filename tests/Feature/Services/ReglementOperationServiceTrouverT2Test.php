@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\ModePaiement;
+use App\Enums\SensVentilation;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Models\Tiers;
@@ -43,7 +44,7 @@ it('[1] trouverT2 finds T2 for recette via 411 lettrage', function () {
     // T1 : créance recette avec 411 D
     $t1 = $this->ecritureGen->pourRecetteACredit(
         tiers: $this->tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => 150.0]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => 150.0]],
         dateConstatation: new DateTimeImmutable('2025-10-01'),
         libelle: 'Facture test T1',
     );
@@ -99,7 +100,7 @@ it('[3] trouverT2 returns null if no lettrée tiers line', function () {
     // T1 : créance recette avec 411 D — non lettrée (pas de T2)
     $t1 = $this->ecritureGen->pourRecetteACredit(
         tiers: $this->tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => 100.0]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => 100.0]],
         dateConstatation: new DateTimeImmutable('2025-10-01'),
         libelle: 'Créance ouverte',
     );
@@ -152,7 +153,7 @@ it('[5] trouverT2 works on extourne mirror recette (411 C lettrée)', function (
     // T1 : créance recette avec 411 D
     $t1 = $this->ecritureGen->pourRecetteACredit(
         tiers: $this->tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => 180.0]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => 180.0]],
         dateConstatation: new DateTimeImmutable('2025-10-01'),
         libelle: 'Créance extourne test',
     );

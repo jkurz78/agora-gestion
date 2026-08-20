@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\OrigineANouveau;
+use App\Enums\SensVentilation;
 use App\Enums\StatutExercice;
 use App\Livewire\TransactionUniverselle;
 use App\Models\Association;
@@ -125,7 +126,7 @@ it('affiche un report AN immuable et ouvre son règlement daté', function (): v
     ]);
     $t1 = app(EcritureGenerator::class)->pourRecetteACredit(
         tiers: Tiers::factory()->create(['association_id' => $this->association->id]),
-        ventilations: [['compte' => $produit, 'montant' => 42.00]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $produit, 'montant' => 42.00]],
         dateConstatation: new DateTimeImmutable('2026-08-20'),
         libelle: 'Créance report écran',
     );
@@ -174,7 +175,7 @@ it('développe le détail exploitable d un report AN', function (): void {
     ]);
     app(EcritureGenerator::class)->pourRecetteACredit(
         tiers: Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Client détail']),
-        ventilations: [['compte' => $produit, 'montant' => 42.00]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $produit, 'montant' => 42.00]],
         dateConstatation: new DateTimeImmutable('2026-08-20'),
         libelle: 'Créance report détaillée',
     );
@@ -217,7 +218,7 @@ it('affiche les reports AN de l exercice fixé même si la session vise un autre
     ]);
     app(EcritureGenerator::class)->pourRecetteACredit(
         tiers: Tiers::factory()->create(['association_id' => $this->association->id]),
-        ventilations: [['compte' => $produit, 'montant' => 25.00]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $produit, 'montant' => 25.00]],
         dateConstatation: new DateTimeImmutable('2025-08-20'),
         libelle: 'Créance exercice fixé composant',
     );

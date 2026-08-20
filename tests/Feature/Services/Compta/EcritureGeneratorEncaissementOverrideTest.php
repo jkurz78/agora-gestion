@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\ModePaiement;
+use App\Enums\SensVentilation;
 use App\Models\Compte;
 use App\Models\Tiers;
 use App\Models\Transaction;
@@ -35,7 +36,7 @@ function creerCreanceOverride(EcritureGenerator $generator, Tiers $tiers, Compte
 {
     return $generator->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $compte706, 'montant' => $montant]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $compte706, 'montant' => $montant]],
         dateConstatation: new DateTimeImmutable('2026-05-20'),
         libelle: 'Facture test override',
     );

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\DataTransferObjects\ExtournePayload;
 use App\Enums\ModePaiement;
+use App\Enums\SensVentilation;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Models\Association;
@@ -167,7 +168,7 @@ it('[B] extourne encaissement créance (T2) — lettrage T1↔T2 préservé, mir
     // T1 : créance (411 D ouverte)
     $t1 = $this->ecritureGen->pourRecetteACredit(
         tiers: $this->tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => 200.0]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => 200.0]],
         dateConstatation: new DateTimeImmutable('2025-10-01'),
         libelle: 'Facture #001',
     );
@@ -254,7 +255,7 @@ it('[C] extourne Tx legacy (sans lignes PD) — miroir créé normalement, aucun
 it('[D] extourne créance ouverte (411 non lettrée) — miroir créé, 411 reste ouverte', function () {
     $t1 = $this->ecritureGen->pourRecetteACredit(
         tiers: $this->tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => 300.0]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => 300.0]],
         dateConstatation: new DateTimeImmutable('2025-10-01'),
         libelle: 'Facture ouverte',
     );
@@ -337,7 +338,7 @@ it('[E] extourne Tx lettrée — aucun audit delettre (les lettrages existants s
 it('[F] miroir porte equilibree=true, type_ecriture=extourne, journal=origine', function () {
     $t1 = $this->ecritureGen->pourRecetteACredit(
         tiers: $this->tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => 100.0]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => 100.0]],
         dateConstatation: new DateTimeImmutable('2025-10-01'),
         libelle: 'Test header PD',
     );
@@ -362,7 +363,7 @@ it('[F] miroir porte equilibree=true, type_ecriture=extourne, journal=origine', 
 it('[G] miroir d\'une recette à crédit porte les lignes PD avec D↔C inversé', function () {
     $t1 = $this->ecritureGen->pourRecetteACredit(
         tiers: $this->tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => 120.0]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => 120.0]],
         dateConstatation: new DateTimeImmutable('2025-10-01'),
         libelle: 'Test inversion D/C',
     );
@@ -400,7 +401,7 @@ it('[G] miroir d\'une recette à crédit porte les lignes PD avec D↔C inversé
 it('[G2] lignes PD du miroir sont équilibrées (sum D = sum C)', function () {
     $t1 = $this->ecritureGen->pourRecetteACredit(
         tiers: $this->tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => 250.0]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => 250.0]],
         dateConstatation: new DateTimeImmutable('2025-10-01'),
         libelle: 'Test équilibre miroir',
     );
@@ -430,7 +431,7 @@ it('[G2] lignes PD du miroir sont équilibrées (sum D = sum C)', function () {
 it('[H] extourne recette à crédit — pas de cross-lettrage, grand livre 411 soldé', function () {
     $t1 = $this->ecritureGen->pourRecetteACredit(
         tiers: $this->tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => 200.0]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => 200.0]],
         dateConstatation: new DateTimeImmutable('2025-10-01'),
         libelle: 'Créance ouverte',
     );
@@ -469,7 +470,7 @@ it('[H2] extourne T1 quand T2 existe non remisée — pas de cascade, T2 intacte
     // T1 : créance → 411 D=200 + 706 C=200
     $t1 = $this->ecritureGen->pourRecetteACredit(
         tiers: $this->tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => 200.0]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => 200.0]],
         dateConstatation: new DateTimeImmutable('2025-10-01'),
         libelle: 'Facture T1',
     );
@@ -520,7 +521,7 @@ it('[H2] extourne T1 quand T2 existe non remisée — pas de cascade, T2 intacte
 it('[H2b] extourne T1 quand T2 est remisée — pas de cascade, T2 intacte', function () {
     $t1 = $this->ecritureGen->pourRecetteACredit(
         tiers: $this->tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => 200.0]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => 200.0]],
         dateConstatation: new DateTimeImmutable('2025-10-01'),
         libelle: 'Facture T1 remisée',
     );
@@ -676,7 +677,7 @@ it('[I] extourne dépense à crédit — lignes PD inversées, lettrages préser
 it('[J] miroir PD est vérifié équilibré (assertEquilibre appelé)', function () {
     $t1 = $this->ecritureGen->pourRecetteACredit(
         tiers: $this->tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => 100.0]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => 100.0]],
         dateConstatation: new DateTimeImmutable('2025-10-01'),
         libelle: 'Test paranoïa',
     );
@@ -720,8 +721,8 @@ it('[L] extourne recette multi-ventilation — N lignes PD inversées correcteme
     $t1 = $this->ecritureGen->pourRecetteACredit(
         tiers: $this->tiers,
         ventilations: [
-            ['compte' => $this->compte706, 'montant' => 200.0],
-            ['compte' => $compte707, 'montant' => 150.0],
+            ['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => 200.0],
+            ['sens' => SensVentilation::Credit, 'compte' => $compte707, 'montant' => 150.0],
         ],
         dateConstatation: new DateTimeImmutable('2025-10-01'),
         libelle: 'Multi-ventilation',

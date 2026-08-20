@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\SensVentilation;
 use App\Enums\TypeTransaction;
 use App\Exceptions\Compta\CompteIncorrectException;
 use App\Exceptions\Compta\TenantBoundaryException;
@@ -66,7 +67,7 @@ test('pourRecetteACredit crée T1 ligne 411 débit avec tiers / 706 crédit sans
 
     $transaction = $generator->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $compteProduit, 'montant' => 120.00]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $compteProduit, 'montant' => 120.00]],
         dateConstatation: new DateTimeImmutable('2026-05-20'),
         libelle: 'Facture adhésion annuelle',
     );
@@ -105,7 +106,7 @@ test('pourRecetteACredit produit transaction equilibree=TRUE, ∑D=∑C, type_ec
 
     $transaction = $generator->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $compteProduit, 'montant' => 250.00]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $compteProduit, 'montant' => 250.00]],
         dateConstatation: new DateTimeImmutable('2026-05-20'),
     );
 
@@ -133,7 +134,7 @@ test('pourRecetteACredit crée exactement N+1 lignes (2 pour N=1), 1 transaction
 
     $transaction = $generator->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $compteProduit, 'montant' => 80.00]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $compteProduit, 'montant' => 80.00]],
         dateConstatation: new DateTimeImmutable('2026-05-20'),
     );
 
@@ -153,7 +154,7 @@ test('pourRecetteACredit laisse un solde ouvert 411 du tiers égal au montant', 
 
     $generator->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $compteProduit, 'montant' => 175.00]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $compteProduit, 'montant' => 175.00]],
         dateConstatation: new DateTimeImmutable('2026-05-20'),
     );
 
@@ -187,7 +188,7 @@ test('pourRecetteACredit lève TenantBoundaryException et rollback si tiers autr
 
     expect(fn () => $generator->pourRecetteACredit(
         tiers: $tiersBBypassed,
-        ventilations: [['compte' => $compteProduit, 'montant' => 100.00]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $compteProduit, 'montant' => 100.00]],
         dateConstatation: new DateTimeImmutable('2026-05-20'),
     ))->toThrow(TenantBoundaryException::class);
 
@@ -217,7 +218,7 @@ test('pourRecetteACredit lève CompteIncorrectException si compte ventilation cl
 
     expect(fn () => $generator->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $compteClasse6, 'montant' => 100.00]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $compteClasse6, 'montant' => 100.00]],
         dateConstatation: new DateTimeImmutable('2026-05-20'),
     ))->toThrow(CompteIncorrectException::class);
 
@@ -237,13 +238,13 @@ test('pourRecetteACredit lève InvalidArgumentException si montant ≤ 0', funct
 
     expect(fn () => $generator->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $compteProduit, 'montant' => 0.00]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $compteProduit, 'montant' => 0.00]],
         dateConstatation: new DateTimeImmutable('2026-05-20'),
     ))->toThrow(InvalidArgumentException::class);
 
     expect(fn () => $generator->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $compteProduit, 'montant' => -50.00]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $compteProduit, 'montant' => -50.00]],
         dateConstatation: new DateTimeImmutable('2026-05-20'),
     ))->toThrow(InvalidArgumentException::class);
 
@@ -263,7 +264,7 @@ test('pourRecetteACredit applique dateConstatation sur transaction.date', functi
 
     $transaction = $generator->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $compteProduit, 'montant' => 60.00]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $compteProduit, 'montant' => 60.00]],
         dateConstatation: $date,
         libelle: 'Constatation mars',
     );
@@ -282,7 +283,7 @@ test('pourRecetteACredit laisse mode_paiement null (créance pas encore payée)'
 
     $transaction = $generator->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $compteProduit, 'montant' => 45.00]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $compteProduit, 'montant' => 45.00]],
         dateConstatation: new DateTimeImmutable('2026-05-20'),
     );
 
@@ -304,8 +305,8 @@ test('pourRecetteACredit multi-ventilation crée T1 à 3 lignes (N=2, schéma N+
     $transaction = $generator->pourRecetteACredit(
         tiers: $tiers,
         ventilations: [
-            ['compte' => $compte706A, 'montant' => 80.00],
-            ['compte' => $compte706B, 'montant' => 20.00],
+            ['sens' => SensVentilation::Credit, 'compte' => $compte706A, 'montant' => 80.00],
+            ['sens' => SensVentilation::Credit, 'compte' => $compte706B, 'montant' => 20.00],
         ],
         dateConstatation: new DateTimeImmutable('2026-05-21'),
         libelle: 'Facture multi-produits',

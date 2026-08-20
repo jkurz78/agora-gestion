@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\DTOs\Compta\PosteTiersReglementData;
 use App\Enums\ModePaiement;
+use App\Enums\SensVentilation;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Livewire\Compta\AnnulationReglementTiersModal;
@@ -41,7 +42,7 @@ function creerPosteOuvertPourModaleReglement(object $contexte, int $montantCenti
     $tiers = Tiers::factory()->create(['association_id' => $contexte->association->id]);
     $transaction = $contexte->ecritures->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [[
+        ventilations: [['sens' => SensVentilation::Credit,
             'compte' => $contexte->compte706,
             'montant' => MontantDecimal::depuisCentimes($montantCentimes),
         ]],

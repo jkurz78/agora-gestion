@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\DTOs\Compta\PosteTiersReglementData;
 use App\Enums\ModePaiement;
+use App\Enums\SensVentilation;
 use App\Enums\TypeTransaction;
 use App\Models\Compte;
 use App\Models\Tiers;
@@ -570,6 +571,7 @@ it('Fix #4-B — notes propagées sur la ligne de ventilation dans une recette �
     $ventilations = [[
         'compte' => $this->compte706,
         'montant' => 80.0,
+        'sens' => SensVentilation::Credit,
         'operation_id' => null,
         'seance' => null,
         'notes' => 'Remboursement frais déplacement participant',

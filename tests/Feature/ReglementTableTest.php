@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\ModePaiement;
+use App\Enums\SensVentilation;
 use App\Livewire\ReglementTable;
 use App\Models\Association;
 use App\Models\Compte;
@@ -151,7 +152,7 @@ it('ouvre la modale de règlement daté sans créer de T2', function (): void {
     ]);
     $t1 = app(EcritureGenerator::class)->pourRecetteACredit(
         tiers: Tiers::factory()->create(),
-        ventilations: [['compte' => $produit, 'montant' => 30.00]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $produit, 'montant' => 30.00]],
         dateConstatation: new DateTimeImmutable('2025-12-01'),
         libelle: 'Créance depuis règlements',
     );

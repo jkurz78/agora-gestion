@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Enums\ModePaiement;
+use App\Enums\SensVentilation;
 use App\Enums\StatutDevis;
 use App\Enums\StatutFacture;
 use App\Enums\StatutReglement;
@@ -157,8 +158,8 @@ final class FactureManuelSeeder extends Seeder
         $transaction = $ecritureGenerator->pourRecetteACredit(
             tiers: $tiers,
             ventilations: [
-                ['compte' => $compteProduit, 'montant' => 1200.00, 'notes' => 'Formation initiale (2 jours)'],
-                ['compte' => $compteProduit, 'montant' => 200.00, 'notes' => 'Supports pédagogiques'],
+                ['sens' => SensVentilation::Credit, 'compte' => $compteProduit, 'montant' => 1200.00, 'notes' => 'Formation initiale (2 jours)'],
+                ['sens' => SensVentilation::Credit, 'compte' => $compteProduit, 'montant' => 200.00, 'notes' => 'Supports pédagogiques'],
             ],
             dateConstatation: Carbon::today()->subDay(),
             libelle: "Facture {$factureCas2->numero}",
@@ -211,7 +212,7 @@ final class FactureManuelSeeder extends Seeder
         $txRefCas3 = $ecritureGenerator->pourRecetteACredit(
             tiers: $tiers,
             ventilations: [
-                ['compte' => $compteProduit, 'montant' => 300.00, 'notes' => 'Recette à refacturer — ligne démo'],
+                ['sens' => SensVentilation::Credit, 'compte' => $compteProduit, 'montant' => 300.00, 'notes' => 'Recette à refacturer — ligne démo'],
             ],
             dateConstatation: Carbon::today()->subDays(3),
             libelle: '[Démo] Recette à refacturer (mix)',

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\ModePaiement;
+use App\Enums\SensVentilation;
 use App\Enums\StatutReglement;
 use App\Livewire\TransactionUniverselle;
 use App\Models\Operation;
@@ -91,7 +92,7 @@ it('affiche un bouton de règlement compact sans icône carte bancaire parasite'
     $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     app(EcritureGenerator::class)->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [[
+        ventilations: [['sens' => SensVentilation::Credit,
             'compte' => $this->compte706,
             'montant' => '80.00',
         ]],

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\ModePaiement;
+use App\Enums\SensVentilation;
 use App\Enums\StatutReglement;
 use App\Models\Compte;
 use App\Models\RemiseBancaire;
@@ -678,7 +679,7 @@ function t25creerT1EnAttente(object $ctx, float $montant = 60.00): Transaction
 
     return $ctx->generator->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $compteProduit, 'montant' => $montant]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $compteProduit, 'montant' => $montant]],
         dateConstatation: new DateTimeImmutable('2026-05-20'),
         libelle: 'Créance chèque en attente',
     );
