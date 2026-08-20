@@ -81,6 +81,9 @@ it('can store helloasso_item_id on a transaction ligne', function () {
         'montant' => 50.00,
         'credit' => 50.00,
         'helloasso_item_id' => 123456789,
+        // Discriminant obligatoire dès qu'un item est posé (contrainte CHECK
+        // chk_tl_helloasso_line_key_presence, migration 2026_08_20_100001).
+        'helloasso_line_key' => 'parent',
     ]);
 
     $ligne->refresh();
@@ -113,6 +116,7 @@ it('helloasso_item_id allows multiple rows for same item (options split — B1)'
         'montant' => 0.00,
         'helloasso_item_id' => 999888777,
         'helloasso_option_id' => null,
+        'helloasso_line_key' => 'parent',
     ]));
 
     // Ligne option
@@ -123,6 +127,7 @@ it('helloasso_item_id allows multiple rows for same item (options split — B1)'
         'credit' => 100.00,
         'helloasso_item_id' => 999888777,
         'helloasso_option_id' => 11111,
+        'helloasso_line_key' => 'option:11111',
     ]);
 
     expect(TransactionLigne::where('helloasso_item_id', 999888777)->count())->toBe(2);
