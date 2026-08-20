@@ -782,10 +782,17 @@ test('[N] --all convertit l\'exercice courant ET l\'exercice précédent', funct
     expect((bool) $txExercice2024->fresh()->equilibree)->toBeTrue();
 })->group('backfill');
 
-test('[J] skip montant_total = 0 — transaction gratuite non convertie, aucune ligne PD créée', function () {
+test('[J] skip transaction à 0€ sans ligne de ventilation valide (ligne à 0€ sans compte)', function () {
     setupBackfillFixtureStep32($this);
 
-    // Transaction à 0€ (inscription gratuite HelloAsso)
+    // Transaction à 0€ (inscription gratuite HelloAsso) dont la ligne de
+    // ventilation est elle-même à 0€ et SANS compte : ce n'est pas une
+    // gratuité (ventilations qui se compensent), c'est l'absence totale de
+    // ligne de ventilation valide — le seul cas que TransactionConverter
+    // skippe encore depuis la Tâche 8 (montant_total = 0 n'est plus, à lui
+    // seul, un motif de skip : voir ConverterGratuiteTest.php pour le cas
+    // désormais converti d'une gratuité intégrale à ventilations compensées,
+    // ex. 706 crédit / 709A débit).
     $txZero = Transaction::create([
         'association_id' => $this->association->id,
         'type' => TypeTransaction::Recette,
@@ -800,7 +807,7 @@ test('[J] skip montant_total = 0 — transaction gratuite non convertie, aucune 
 
     DB::table('transaction_lignes')->insert([
         'transaction_id' => $txZero->id,
-        'compte_id' => $this->compte706->id,
+        'compte_id' => null,
         'montant' => '0.00',
         'debit' => '0.00',
         'credit' => '0.00',
@@ -811,7 +818,7 @@ test('[J] skip montant_total = 0 — transaction gratuite non convertie, aucune 
     $this->artisan('compta:backfill-partie-double', ['--asso' => $this->association->id])
         ->assertSuccessful();
 
-    // Tx à 0€ reste non-équilibrée (non convertie)
+    // Tx sans ligne de ventilation valide reste non-équilibrée (non convertie)
     expect($txZero->fresh()->equilibree)->toBeFalsy();
 
     // Aucune ligne PD supplémentaire créée
@@ -819,7 +826,7 @@ test('[J] skip montant_total = 0 — transaction gratuite non convertie, aucune 
         ->where('transaction_id', $txZero->id)
         ->count();
 
-    expect($nbLignesApres)->toBe($nbLignesAvant, 'Aucune ligne PD ne doit être créée pour une transaction à 0€.');
+    expect($nbLignesApres)->toBe($nbLignesAvant, 'Aucune ligne PD ne doit être créée sans ligne de ventilation valide.');
 })->group('backfill');
 
 // ---------------------------------------------------------------------------
