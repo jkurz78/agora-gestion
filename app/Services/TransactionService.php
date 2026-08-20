@@ -21,6 +21,7 @@ use App\Services\Compta\PartieDoubleGuard;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -174,10 +175,20 @@ final class TransactionService
                 ])->save();
             }
 
+            // Le sens se lit sur la ligne elle-même, jamais déduit du type de la
+            // transaction : une ligne au débit (709A gratuité HelloAsso, arrivée
+            // déjà enrichie compte-first par le chemin d'update dédié — Tâche 14)
+            // doit rester au débit. Avant ce correctif, ce champ valait toujours
+            // Credit — silencieusement faux dès qu'une ligne de remise traverse ce
+            // ré-enrichissement (update() sur une transaction HelloAsso remisée),
+            // ce qui aurait compté la remise comme un produit supplémentaire au
+            // lieu de le réduire. Même logique que TransactionConverter::convertir().
+            $sensLigne = (float) $ligne->debit > 0.0 ? SensVentilation::Debit : SensVentilation::Credit;
+
             $ventilations[] = [
                 'compte' => $compte,
                 'montant' => (float) $ligne->montant,
-                'sens' => SensVentilation::Credit,
+                'sens' => $sensLigne,
                 'operation_id' => $ligne->operation_id,
                 'seance' => $ligne->seance,
                 'notes' => $ligne->notes,
@@ -483,6 +494,20 @@ final class TransactionService
                 // delettrerParLigne() délettre le GROUPE ENTIER portant le même code.
                 $this->autoDelettrerLignesAvantUpdate($transaction);
 
+                // Lignes de remise HelloAsso (helloasso_line_key = 'discount') : le
+                // formulaire ne les soumet JAMAIS dans $lignes (item a, Tâche 14 —
+                // TransactionForm les exclut de l'édition, un formulaire à montants
+                // positifs sans notion de sens débit/crédit ne peut pas les porter
+                // sans les corrompre). Le forceDelete() ci-dessous les détruit comme
+                // toute autre ligne : on les snapshotte ici pour les recréer à
+                // l'identique juste après — ni éditables, ni supprimables, ni
+                // recréées par l'utilisateur, mais PAS figées non plus : leur
+                // operation_id/seance suivent la ligne parente correspondante
+                // (voir plus bas).
+                $lignesRemiseHelloAsso = $transaction->lignes()
+                    ->where('helloasso_line_key', 'discount')
+                    ->get();
+
                 $transaction->lignes()->forceDelete();
                 $lignesCreees = [];
                 foreach ($lignes as $ligneData) {
@@ -501,6 +526,46 @@ final class TransactionService
                             $newLigne->affectations()->create($affData);
                         }
                     }
+                }
+
+                // Recréation des lignes de remise HelloAsso snapshotées ci-dessus —
+                // jamais depuis $lignes (le formulaire ne les porte pas). Tous les
+                // attributs sont repris à l'identique (compte, montant, debit/credit,
+                // métadonnées HelloAsso) SAUF operation_id/seance, réalignés sur la
+                // ligne parente correspondante (même helloasso_item_id, line_key
+                // 'parent') qui vient d'être recréée ci-dessus.
+                //
+                // Pourquoi propager plutôt que garder l'ancien operation_id/seance :
+                // HelloAssoSyncService::upsertLigne pose déjà l'operation_id de la
+                // ligne parente sur la ligne de remise à la synchro — la remise n'a pas
+                // d'existence comptable propre, elle n'est que le contrepoids de sa
+                // parente. Ne pas maintenir cet invariant ici créerait une asymétrie
+                // entre la synchro et l'édition manuelle : déplacer la ligne parente
+                // vers une autre opération y porterait le produit net (+50 €) pendant
+                // que le 709A resterait rattaché à l'ancienne opération, qui afficherait
+                // à tort -50 €. Les deux opérations seraient fausses, alors qu'aucune
+                // des deux n'a réellement bougé de gratuité.
+                foreach ($lignesRemiseHelloAsso as $ligneRemise) {
+                    $parentCorrespondante = collect($lignesCreees)->first(
+                        fn (TransactionLigne $l): bool => $l->helloasso_item_id === $ligneRemise->helloasso_item_id
+                            && $l->helloasso_line_key === 'parent'
+                    );
+
+                    $lignesCreees[] = $transaction->lignes()->create([
+                        'compte_id' => $ligneRemise->compte_id,
+                        'operation_id' => $parentCorrespondante?->operation_id ?? $ligneRemise->operation_id,
+                        'seance' => $parentCorrespondante?->seance ?? $ligneRemise->seance,
+                        'montant' => $ligneRemise->montant,
+                        'debit' => $ligneRemise->debit,
+                        'credit' => $ligneRemise->credit,
+                        'notes' => $ligneRemise->notes,
+                        'tiers_id' => $ligneRemise->tiers_id,
+                        'helloasso_item_id' => $ligneRemise->helloasso_item_id,
+                        'helloasso_option_id' => $ligneRemise->helloasso_option_id,
+                        'helloasso_tier_id' => $ligneRemise->helloasso_tier_id,
+                        'helloasso_line_key' => $ligneRemise->helloasso_line_key,
+                        'helloasso_discount_code' => $ligneRemise->helloasso_discount_code,
+                    ]);
                 }
 
                 // Step 31 — Re-enrichissement partie double après recréation des lignes legacy.
@@ -1091,11 +1156,23 @@ final class TransactionService
         if ($transaction->mode_paiement?->value !== ($data['mode_paiement'] ?? null)) {
             throw new \RuntimeException('Le mode de paiement ne peut pas être modifié sur une transaction réglée.');
         }
+        // Aucune exclusion de la remise à faire ici : $data['montant_total'] est déjà
+        // le net (TransactionForm::getMontantTotalProperty() le lit directement en
+        // base pour une transaction HelloAsso — item b, Tâche 14), donc homogène
+        // avec $transaction->montant_total, qui porte lui aussi le net.
         if ((int) round((float) $transaction->montant_total * 100) !== (int) round((float) $data['montant_total'] * 100)) {
             throw new \RuntimeException('Le montant total ne peut pas être modifié sur une transaction réglée.');
         }
 
-        $lignesExistantes = $transaction->lignes()->ventilation()->get()->keyBy('id');
+        // Exclut la ligne de remise HelloAsso (helloasso_line_key = 'discount') du
+        // comptage : TransactionForm ne la soumet jamais (item a, Tâche 14 — un
+        // formulaire sans notion de sens débit/crédit ne peut pas l'éditer sans la
+        // corrompre). Sans cette exclusion, $lignes (soumis, sans la remise) et
+        // $lignesExistantes (toutes les lignes classe 6/7 en base, remise comprise)
+        // ne pourraient jamais avoir le même compte sur une transaction remisée.
+        $lignesExistantes = $transaction->lignes()->ventilation()
+            ->where(fn (Builder $q) => $q->whereNull('helloasso_line_key')->orWhere('helloasso_line_key', '!=', 'discount'))
+            ->get()->keyBy('id');
         if (count($lignes) !== $lignesExistantes->count()) {
             throw new \RuntimeException('Les lignes d\'une transaction réglée ne peuvent pas être modifiées (compte, montant, opération) — annulez le règlement d\'abord. La répartition par opération et séance, elle, reste modifiable.');
         }
