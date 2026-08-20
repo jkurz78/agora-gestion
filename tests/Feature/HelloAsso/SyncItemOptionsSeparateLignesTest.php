@@ -13,6 +13,7 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\HelloAssoSyncService;
+use App\Services\UsagesComptablesService;
 use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -35,6 +36,23 @@ beforeEach(function (): void {
         'actif' => true,
     ]);
     $this->scCotisation->usages()->create(['usage' => UsageComptable::Cotisation->value]);
+
+    // Tâche 9 — compte de contrepartie des gratuités (709A), requis dès qu'un
+    // item porte un discount.amount > 0 (upsertLigne échoue bruyamment sinon).
+    // firstOrCreate : la migration 2026_08_20_100000 crée déjà 709A pour toute
+    // association, y compris celle du bootstrap de tests.
+    $this->scGratuite = Compte::firstOrCreate(
+        [
+            'association_id' => TenantContext::currentId(),
+            'numero_pcg' => '709A',
+        ],
+        [
+            'intitule' => 'Gratuités accordées',
+            'classe' => 7,
+            'actif' => true,
+        ],
+    );
+    app(UsagesComptablesService::class)->setGratuite($this->scGratuite->id);
 
     $this->parametres = HelloAssoParametres::factory()->create([
         'association_id' => 1,
@@ -109,17 +127,27 @@ it('split HA-55698 : 1 item + 1 option → 2 lignes (cotisation 0€ + option 12
 
     $tx = Transaction::first();
     expect($tx)->not->toBeNull();
+    // Net (Tâche 9) : parent brut 35,00 € − remise 35,00 € + option 12,00 € = 12,00 €.
     expect((float) $tx->montant_total)->toBe(12.00);
-    expect($tx->lignes()->whereNotNull('helloasso_item_id')->count())->toBe(2);
+    expect($tx->lignes()->whereNotNull('helloasso_item_id')->count())->toBe(3);
 
-    $lignParent = $tx->lignes()->whereNotNull('helloasso_item_id')->whereNull('helloasso_option_id')->first();
+    $lignParent = $tx->lignes()->where('helloasso_line_key', 'parent')->first();
     expect($lignParent)->not->toBeNull();
     expect((int) $lignParent->helloasso_item_id)->toBe(87070);
-    expect((float) $lignParent->montant)->toBe(0.00);
+    expect((float) $lignParent->montant)->toBe(35.00); // brut (initialAmount)
     expect($lignParent->helloasso_option_id)->toBeNull();
     expect((int) $lignParent->helloasso_tier_id)->toBe(18595);
-    expect($lignParent->notes)->toContain('offerte');
-    expect($lignParent->notes)->toContain('2026 : -35,00€');
+    expect($lignParent->notes)->toBeNull();
+
+    $ligneRemise = $tx->lignes()->where('helloasso_line_key', 'discount')->first();
+    expect($ligneRemise)->not->toBeNull();
+    expect((int) $ligneRemise->helloasso_item_id)->toBe(87070);
+    expect((float) $ligneRemise->montant)->toBe(35.00);
+    expect((float) $ligneRemise->debit)->toBe(35.00);
+    expect((int) $ligneRemise->compte_id)->toBe((int) $this->scGratuite->id);
+    expect($ligneRemise->helloasso_discount_code)->toBe('2026 : -35,00€');
+    expect($ligneRemise->notes)->toContain('offerte');
+    expect($ligneRemise->notes)->toContain('2026 : -35,00€');
 
     $ligneOption = $tx->lignes()->whereNotNull('helloasso_item_id')->whereNotNull('helloasso_option_id')->first();
     expect($ligneOption)->not->toBeNull();
@@ -261,5 +289,5 @@ it('idempotence re-sync : counts inchangés après deuxième synchronisation', f
 
     expect(Transaction::count())->toBe($transactionsApresPremiereSync)
         ->and(TransactionLigne::count())->toBe($lignesApresPremiereSync)
-        ->and(TransactionLigne::whereNotNull('helloasso_item_id')->count())->toBe(2);
+        ->and(TransactionLigne::whereNotNull('helloasso_item_id')->count())->toBe(3);
 });
