@@ -595,7 +595,7 @@ final class EcritureGenerator
 
         // --- Création dans une transaction DB ---
         return DB::transaction(function () use (
-            $tiers, $ventilationsNorm, $compte411, $total,
+            $tiers, $ventilationsNorm, $compte411, $total, $creditCentimes, $debitCentimes, $netCentimes,
             $dateConstatation, $libelle, $existingTransaction
         ): Transaction {
             $libelleEffectif = $libelle ?? 'Recette à crédit';
@@ -610,32 +610,111 @@ final class EcritureGenerator
 
             $lignes = [];
 
-            // Ligne 411 D total — tiers (créance ouverte)
-            $ligne411 = TransactionLigne::create([
-                'transaction_id' => $transaction->id,
-                'compte_id' => $compte411->id,
-                'debit' => $total,
-                'credit' => 0,
-                'tiers_id' => $tiers->id,
-                'libelle' => $libelleEffectif,
-                'montant' => 0,
-            ]);
-            $ligne411->setRelation('compte', $compte411);
-            $lignes[] = $ligne411;
+            // Ligne(s) 411 — tiers. Le 411 porte le NET de la créance (Tâche 7) :
+            //
+            //   net > 0 : une seule ligne 411 D au net, exactement comme avant
+            //             qu'une ventilation au débit (gratuité) ne soit possible.
+            //             La créance reste ouverte (pas de lettrage) : le tiers doit
+            //             encore ce net.
+            //
+            //   net = 0 : la créance est intégralement absorbée par la gratuité —
+            //             il n'y a plus rien à devoir. Mais une ligne 411 D seule à
+            //             zéro violerait l'invariant partie double (ni débit ni
+            //             crédit) et une absence totale de ligne 411 effacerait toute
+            //             trace, sur le compte du tiers, de la place qui lui a été
+            //             offerte. On matérialise donc un mouvement CLOS : une paire
+            //             411 D Σcrédit / 411 C Σdébit, lettrée dans la foulée.
+            //
+            // La paire naît lettrée pour ne jamais apparaître comme un poste ouvert :
+            // ANouveauPreviewBuilder saute les lignes lettrées, PostesTiersOuvertsService
+            // filtre sur lettrage_code IS NULL dans ses trois projections, et
+            // PosteTiersReglementService n'est appelé que sur un poste ouvert. C'est ce
+            // choix — jamais un assouplissement des invariants du grand livre partagé
+            // (assertFractionsCoherentes, montantCentimes, le count() !== 2 de
+            // l'annulation) — qui garde la paire invisible à ces services.
+            if ($netCentimes > 0) {
+                $ligne411 = TransactionLigne::create([
+                    'transaction_id' => $transaction->id,
+                    'compte_id' => $compte411->id,
+                    'debit' => $total,
+                    'credit' => 0,
+                    'tiers_id' => $tiers->id,
+                    'libelle' => $libelleEffectif,
+                    'montant' => 0,
+                ]);
+                $ligne411->setRelation('compte', $compte411);
+                $lignes[] = $ligne411;
+            } else {
+                $montantDebitrice = MontantDecimal::depuisCentimes($creditCentimes);
+                $montantCreditrice = MontantDecimal::depuisCentimes($debitCentimes);
 
-            // N lignes [7x C × N] — sans tiers
-            // Skippées si existingTransaction fourni : les ventilations sont déjà en base (enrichies).
+                $ligne411Debitrice = TransactionLigne::create([
+                    'transaction_id' => $transaction->id,
+                    'compte_id' => $compte411->id,
+                    'debit' => $montantDebitrice,
+                    'credit' => 0,
+                    'tiers_id' => $tiers->id,
+                    'libelle' => $libelleEffectif,
+                    'montant' => 0,
+                ]);
+                $ligne411Debitrice->setRelation('compte', $compte411);
+                $lignes[] = $ligne411Debitrice;
+
+                // Rattachement — pas décoratif. PostesTiersOuvertsService::reglements()
+                // part de la ligne racine (la plus ancienne 411/401 avec tiers_id de la
+                // transaction, donc la débitrice ici), collecte ses codes de lettrage,
+                // puis retourne toute ligne 411 hors du poste partageant ce code. Sans ce
+                // poste_tiers_parent_id, la créditrice serait retrouvée par son code de
+                // lettrage et affichée comme un règlement de la T1 elle-même — un paiement
+                // fantôme, alors qu'aucun argent n'a été versé : c'est une gratuité, pas
+                // un encaissement. Avec le rattachement, elle entre dans le poste et le
+                // whereNotIn final l'exclut.
+                //
+                // Asymétrie avec pourDepenseComptant : sa paire 401 (D/C, même montant,
+                // auto-soldée) ne porte PAS ce rattachement, et c'est correct — là-bas la
+                // ligne débitrice EST le règlement de la dette (dépense comptant réglée
+                // immédiatement), l'afficher comme tel est juste. Ici la contrepartie est
+                // une gratuité, jamais un paiement.
+                $ligne411Creditrice = TransactionLigne::create([
+                    'transaction_id' => $transaction->id,
+                    'compte_id' => $compte411->id,
+                    'debit' => 0,
+                    'credit' => $montantCreditrice,
+                    'tiers_id' => $tiers->id,
+                    'libelle' => $libelleEffectif,
+                    'poste_tiers_parent_id' => $ligne411Debitrice->id,
+                    'montant' => 0,
+                ]);
+                $ligne411Creditrice->setRelation('compte', $compte411);
+                $lignes[] = $ligne411Creditrice;
+
+                // Auto-lettrage de la paire : mouvement clos dès la création, jamais un
+                // poste ouvert à venir apparier plus tard.
+                $this->lettrageService->lettrer(
+                    collect([$ligne411Debitrice, $ligne411Creditrice]),
+                    null,
+                    "Auto-lettrage paire 411 net nul (gratuité totale) T#{$transaction->id} tiers #{$tiers->id}"
+                );
+            }
+
+            // N lignes [7x × N] — sans tiers, chacune au sens qu'elle porte.
+            // Une ventilation Credit crédite (produit) ; une ventilation Debit débite
+            // (contra-produit — ex : gratuité 709A). Skippées si existingTransaction
+            // fourni : les ventilations sont déjà en base (enrichies).
             if ($existingTransaction === null) {
                 foreach ($ventilationsNorm as $v) {
                     /** @var Compte $compteVent */
                     $compteVent = $v['compte'];
                     $montantVent = (float) $v['montant'];
+                    /** @var SensVentilation $sensVent */
+                    $sensVent = $v['sens'];
+                    $estDebit = $sensVent === SensVentilation::Debit;
 
                     $ligneVent = TransactionLigne::create([
                         'transaction_id' => $transaction->id,
                         'compte_id' => $compteVent->id,
-                        'debit' => 0,
-                        'credit' => $montantVent,
+                        'debit' => $estDebit ? $montantVent : 0,
+                        'credit' => $estDebit ? 0 : $montantVent,
                         'tiers_id' => null,
                         'libelle' => $libelleEffectif,
                         'operation_id' => $v['operation_id'] ?? null,
