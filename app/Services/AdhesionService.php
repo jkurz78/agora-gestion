@@ -119,6 +119,29 @@ final class AdhesionService
                 return $adhesion; // idempotence : ne pas écraser transaction_id ni formule_adhesion_id
             }
 
+            // SNAPSHOT — net débit/crédit des lignes de ventilation (classes 6/7),
+            // exactement la formule de ComptaCheckIntegrityCommand::checkAdhesionMontants
+            // (CHECK 4) : ce contrôle d'intégrité définit la vérité de montant_facial,
+            // pas l'inverse — toute autre définition ferait remonter chaque adhésion
+            // remisée comme incohérente. Un simple sum('montant') des lignes fige le
+            // BRUT d'une adhésion remisée (Tâche 11, régression HA-55698 : brut
+            // 35,00 € au lieu du net 12,00 €) — seul le net (ligne parent au crédit +
+            // ligne de remise au débit qui se compensent) survit à une remise
+            // partielle ou totale. No-op strict sur les données existantes : mesuré
+            // sur le clone de production svs_accounting, les 26 adhésions actuelles
+            // (dont 4 multi-lignes) valident déjà cette définition — CHECK 4 n'a
+            // aucune modification à subir.
+            $montantFacial = (float) (DB::table('transaction_lignes as tl')
+                ->join('comptes as c', 'c.id', '=', 'tl.compte_id')
+                ->join('transactions as t', 't.id', '=', 'tl.transaction_id')
+                ->where('tl.transaction_id', (int) $tx->id)
+                ->where('t.association_id', TenantContext::currentId())
+                ->where('c.association_id', TenantContext::currentId())
+                ->whereNull('tl.deleted_at')
+                ->whereIn('c.classe', [6, 7])
+                ->selectRaw('SUM(CASE WHEN c.classe = 6 THEN tl.debit - tl.credit ELSE tl.credit - tl.debit END) as net')
+                ->value('net') ?? 0);
+
             return Adhesion::create([
                 'association_id' => TenantContext::currentId(),
                 'tiers_id' => (int) $tx->tiers_id,
@@ -128,9 +151,7 @@ final class AdhesionService
                 'date_debut' => $datesEtExercice['date_debut'],
                 'date_fin' => $datesEtExercice['date_fin'],
                 'saisi_par' => $tx->saisi_par !== null ? (int) $tx->saisi_par : null,
-                // SNAPSHOT — utilise la somme réelle des lignes (montant_total
-                // peut ne pas encore être à jour si appelé depuis un observer TransactionLigne)
-                'montant_facial' => round((float) $tx->lignes()->sum('montant'), 2),
+                'montant_facial' => round($montantFacial, 2),
                 'deductible_fiscal' => $formule?->deductible_fiscal ?? false,
                 'mode' => $formule?->mode ?? 'exercice',
                 'duree_mois' => $formule?->duree_mois,
