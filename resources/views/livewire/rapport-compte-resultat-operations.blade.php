@@ -296,15 +296,21 @@
 
                         @foreach ($section['data'] as $cat)
                             @php
+                                // Un compte est visible dès qu'il porte un mouvement, quel que
+                                // soit son SIGNE. Le test était « > 0 », écrit quand tout compte
+                                // de classe 7 était nécessairement créditeur. Un contra-produit
+                                // — 709A Gratuités accordées — porte un montant négatif : le
+                                // masquer laissait la famille afficher le net (200 €) au-dessus
+                                // d'un détail au brut (250 €), sans la ligne qui explique l'écart.
                                 $scVisibles = collect($cat['comptes'])->filter(function ($sc) use ($mode, $sectionIdx) {
                                     $realise = (float) ($sc['montant'] ?? 0);
-                                    if ($realise > 0) {
+                                    if (abs($realise) > 0.001) {
                                         return true;
                                     }
                                     if ($mode === 'realise') {
                                         return false;
                                     }
-                                    return ((float) ($sectionIdx['sc'][$sc['compte_id']] ?? 0)) > 0;
+                                    return abs((float) ($sectionIdx['sc'][$sc['compte_id']] ?? 0)) > 0.001;
                                 });
                             @endphp
                             @if (! $scVisibles->isEmpty())
