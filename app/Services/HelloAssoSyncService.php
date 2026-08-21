@@ -273,18 +273,29 @@ final class HelloAssoSyncService
                         $item = $resolved['item'];
 
                         // Ligne parent (cotisation/inscription/don) — montant BRUT, avant
-                        // remise. `initialAmount` n'est absent que sur les items sans remise
-                        // (fallback sur `amount`, alors identique au brut) — jamais l'inverse.
-                        // Sur une commande entièrement remisée, item.amount vaut 0 et ne peut
-                        // pas porter le produit : c'est le bug qui laissait la transaction 120
-                        // sans écriture. La ligne de remise ci-dessous restaure le net.
+                        // remise. Sur une commande entièrement remisée, item.amount vaut 0 et
+                        // ne peut pas porter le produit : c'est le bug qui laissait la
+                        // transaction 120 sans écriture. La ligne de remise ci-dessous
+                        // restaure le net.
+                        //
+                        // Le brut se RECONSTITUE (amount + discount), il ne se lit pas dans
+                        // initialAmount. Une version antérieure faisait
+                        // `initialAmount ?? amount` en supposant qu'initialAmount n'est absent
+                        // que sur les items sans remise. Les DONS démentent cette hypothèse :
+                        // n'ayant pas de tarif de palier, ils portent `initialAmount: 0` avec
+                        // la clé PRÉSENTE — et `??` ne se déclenche que sur null, jamais sur 0.
+                        // Résultat mesuré sur le clone de production : deux dons (25 € et
+                        // 200 €) vidés de leur ventilation, leur ligne 411 laissée orpheline.
+                        // L'addition est vraie pour tous les types d'items, sans hypothèse.
+                        $brutCentimes = (int) $item['amount'] + (int) ($item['discount']['amount'] ?? 0);
+
                         $this->upsertLigne(
                             tx: $tx,
                             resolved: $resolved,
                             lineKey: 'parent',
                             optionId: null,
                             compteId: $resolved['compte_id'],
-                            montantCentimes: (int) ($item['initialAmount'] ?? $item['amount']),
+                            montantCentimes: $brutCentimes,
                             sens: SensVentilation::Credit,
                             notes: null,
                             result: $result,

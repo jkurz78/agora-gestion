@@ -269,7 +269,7 @@ it('commande sans remise : pas de ligne discount, montant_total = amount (fallba
 
     $parent = TransactionLigne::where('helloasso_item_id', 178679101)
         ->where('helloasso_line_key', 'parent')->first();
-    expect((float) $parent->credit)->toBe(35.00); // pas d'initialAmount → fallback sur amount
+    expect((float) $parent->credit)->toBe(35.00); // amount + 0 remise = brut
 
     expect(TransactionLigne::where('helloasso_item_id', 178679101)
         ->where('helloasso_line_key', 'discount')->exists())->toBeFalse();
@@ -358,4 +358,61 @@ it('idempotence : deux synchronisations consécutives ne créent qu\'une seule l
     expect(TransactionLigne::where('helloasso_item_id', 178679301)
         ->where('helloasso_line_key', 'discount')->count())->toBe(1);
     expect(Transaction::where('helloasso_order_id', 178679300)->count())->toBe(1);
+});
+
+it('don : initialAmount à 0 avec la clé présente ne doit pas vider la ligne', function (): void {
+    // RÉGRESSION — mesurée sur le clone de production le 2026-08-20.
+    //
+    // Une version antérieure calculait le brut par `initialAmount ?? amount`, en
+    // supposant qu'initialAmount n'est absent que sur les items sans remise. Les DONS
+    // démentent cette hypothèse : n'ayant pas de tarif de palier, ils portent
+    // `initialAmount: 0` avec la clé PRÉSENTE — et l'opérateur `??` ne se déclenche
+    // que sur null, jamais sur 0.
+    //
+    // Conséquence observée : deux dons (25 € et 200 €) ont vu leur ligne de
+    // ventilation ramenée à 0 et privée de son compte, laissant leur ligne 411
+    // orpheline et la transaction déséquilibrée.
+    $order = [
+        'id' => 178679400,
+        'date' => '2026-04-08T10:00:00Z',
+        'formSlug' => 'journee-sensibilisation',
+        'formType' => 'Event',
+        'payments' => [['id' => 900940, 'amount' => 2500, 'paymentMeans' => 'Card']],
+        'amount' => ['total' => 2500, 'discount' => 0, 'vat' => 0],
+        'user' => null,
+        'payer' => ['firstName' => 'Charles', 'lastName' => 'SURPIN'],
+        'items' => [
+            [
+                'id' => 178679401,
+                'amount' => 2500,
+                'initialAmount' => 0,   // ← la clé EST présente, à zéro
+                'type' => 'Registration',
+                'tierId' => 19069055,
+                'name' => 'Don de soutien',
+                'user' => ['firstName' => 'Charles', 'lastName' => 'SURPIN'],
+            ],
+        ],
+    ];
+
+    $service = new HelloAssoSyncService($this->parametres);
+    $service->synchroniser([$order], 2025);
+
+    $parent = TransactionLigne::where('helloasso_item_id', 178679401)
+        ->where('helloasso_line_key', 'parent')->first();
+
+    expect($parent)->not->toBeNull()
+        ->and((float) $parent->credit)->toBe(25.00)
+        ->and($parent->compte_id)->not->toBeNull('La ligne ne doit pas perdre son compte.');
+
+    // Le montant métier aussi, pas seulement le crédit : c'est lui que lisent les
+    // écrans opérationnels, et c'est lui qui était tombé à 0.
+    expect((float) $parent->montant)->toBe(25.00);
+
+    $tx = Transaction::where('helloasso_order_id', 178679400)->first();
+    expect((float) $tx->montant_total)->toBe(25.00);
+
+    // Aucune ligne de remise : l'item n'en porte pas. Un initialAmount à 0 ne doit
+    // jamais être confondu avec une gratuité.
+    expect(TransactionLigne::where('helloasso_item_id', 178679401)
+        ->where('helloasso_line_key', 'discount')->exists())->toBeFalse();
 });
