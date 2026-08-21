@@ -284,3 +284,60 @@ it('déplacer la ligne parente vers une autre opération déplace aussi la ligne
 
     expect((float) $tx->fresh()->montant_total)->toBe(30.00);
 });
+
+it('déplacer l\'opération propage aussi sur une remise TOTALE, chemin règlement tiers', function (): void {
+    // Le test de propagation voisin porte sur une remise PARTIELLE en attente :
+    // une seule ligne 411, non lettrée, donc aUnReglementTiers() faux et chemin
+    // libre de TransactionService::update().
+    //
+    // Une gratuité INTÉGRALE est un autre chemin : sa paire 411 naît lettrée, donc
+    // aUnReglementTiers() est vrai et l'update passe par
+    // assertReglementTiersInvariants(). Rien ne garantissait jusqu'ici que la
+    // propagation vers la ligne 709A y survive — les deux tests de gratuité totale
+    // ne modifient que les notes. Écart relevé en revue de code.
+    $tx = synchroniserCommandeRemiseTotale($this->parametres);
+
+    expect($tx->aUnReglementTiers())->toBeTrue('Fixture : la paire 411 doit être lettrée.');
+
+    $parentAvant = TransactionLigne::where('helloasso_item_id', 178678765)
+        ->where('helloasso_line_key', 'parent')->firstOrFail();
+    expect((int) $parentAvant->operation_id)->toBe((int) $this->operation->id);
+
+    Livewire::test(TransactionForm::class)
+        ->call('edit', $tx->id)
+        ->set('lignes.0.operation_id', (string) $this->autreOperation->id)
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $parentApres = TransactionLigne::where('helloasso_item_id', 178678765)
+        ->where('helloasso_line_key', 'parent')->firstOrFail();
+    expect((int) $parentApres->operation_id)->toBe((int) $this->autreOperation->id);
+
+    $remiseApres = TransactionLigne::where('helloasso_item_id', 178678765)
+        ->where('helloasso_line_key', 'discount')->firstOrFail();
+    expect((int) $remiseApres->operation_id)->toBe((int) $this->autreOperation->id,
+        'Sans propagation, le produit part sur la nouvelle opération et la gratuité reste sur l\'ancienne : les deux sont fausses.');
+
+    // La remise garde son sens et son montant — seule l'imputation bouge.
+    expect((float) $remiseApres->debit)->toBe(50.00);
+    expect((float) $remiseApres->credit)->toBe(0.00);
+    expect((float) $tx->fresh()->montant_total)->toBe(0.00);
+})->todo('ÉCART CONNU — relevé en revue de code, non corrigé.
+
+TransactionService::assertReglementTiersInvariants (l. 1188-1191) interdit de
+changer operation_id et seance, alors que son propre message d\'erreur affirme
+l\'inverse : « La répartition par opération et séance, elle, reste modifiable. »
+La contradiction préexiste au chantier 709A.
+
+Le chantier ne l\'a pas créée mais y fait ENTRER les gratuités HelloAsso : leur
+paire 411 naît lettrée, donc aUnReglementTiers() est vrai et l\'update emprunte
+ce chemin. Avant, ces transactions n\'étaient pas converties du tout.
+
+Deux correctifs possibles :
+  1. router les transactions HelloAsso vers leur chemin dédié AVANT le test
+     aUnReglementTiers() dans update() — contenu, ne touche qu\'HelloAsso ;
+  2. aligner la garde sur son message en autorisant opération/séance —
+     plus juste sur le fond, mais modifie le cœur de règlement PARTAGÉ.
+
+L\'option 1 est recommandée : ce chantier a montré qu\'assouplir une garde
+partagée pour un cas local se paie plus tard.');
