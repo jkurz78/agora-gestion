@@ -254,6 +254,35 @@ it('sauvegarde sans blocage l\'édition d\'une remise partielle encore en attent
     expect((float) $tx->fresh()->montant_total)->toBe(30.00);
 });
 
+it('préserve helloasso_tier_id sur la ligne parente reconstruite', function (): void {
+    // Le chemin libre de update() détruit puis recrée toutes les lignes. Le
+    // formulaire ne transporte AUCUNE métadonnée HelloAsso : elles sont
+    // réinjectées depuis un snapshot pris juste avant le forceDelete().
+    //
+    // helloasso_tier_id n'y figurait pas. Sa perte n'est pas cosmétique : c'est
+    // le discriminant qui identifie le PALIER souscrit. RecuFiscalService
+    // ::resoudreLigneCotisation et AdhesionService::resolveFormule s'en servent
+    // en priorité 1 ; sans lui, sur une commande à plusieurs paliers routés vers
+    // le même compte de cotisation, le repli prend la PREMIÈRE ligne du compte —
+    // et le reçu fiscal sort au montant d'un autre palier.
+    $tx = synchroniserCommandeRemisePartielleCheque($this->parametres);
+
+    $avant = TransactionLigne::where('helloasso_item_id', 178678801)
+        ->where('helloasso_line_key', 'parent')->firstOrFail();
+    expect((int) $avant->helloasso_tier_id)->toBe(19069055, 'Fixture : la synchro pose bien le palier.');
+
+    Livewire::test(TransactionForm::class)
+        ->call('edit', $tx->id)
+        ->set('notes', 'Chèque reçu, en cours de dépôt')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $apres = TransactionLigne::where('helloasso_item_id', 178678801)
+        ->where('helloasso_line_key', 'parent')->firstOrFail();
+
+    expect((int) $apres->helloasso_tier_id)->toBe(19069055);
+});
+
 it('déplacer la ligne parente vers une autre opération déplace aussi la ligne 709A', function (): void {
     $tx = synchroniserCommandeRemisePartielleCheque($this->parametres);
 

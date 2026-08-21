@@ -453,15 +453,30 @@ final class TransactionService
                             continue;
                         }
                         if ($existingLigne->helloasso_item_id !== null) {
-                            // Les trois colonnes voyagent ENSEMBLE. helloasso_line_key
-                            // est le discriminant d'idempotence de la synchro : la perdre
-                            // fait qu'un re-sync ne retrouve plus la ligne et la duplique.
-                            // Une contrainte CHECK l'exige d'ailleurs dès qu'un item_id
-                            // est posé.
+                            // TOUTES les colonnes HelloAsso voyagent ENSEMBLE : le
+                            // formulaire n'en transporte aucune, elles ne peuvent donc
+                            // revenir que d'ici. Chacune a un rôle propre.
+                            //
+                            // helloasso_line_key est le discriminant d'idempotence de la
+                            // synchro : la perdre fait qu'un re-sync ne retrouve plus la
+                            // ligne et la duplique. Une contrainte CHECK l'exige d'ailleurs
+                            // dès qu'un item_id est posé.
+                            //
+                            // helloasso_tier_id identifie le PALIER souscrit.
+                            // RecuFiscalService::resoudreLigneCotisation et
+                            // AdhesionService::resolveFormule s'en servent en priorité 1.
+                            // Sans lui, sur une commande à plusieurs paliers routés vers un
+                            // même compte de cotisation — le cas normal, le compte vient du
+                            // mapping de formulaire — le repli prend la PREMIÈRE ligne du
+                            // compte : le reçu fiscal sort alors au montant d'un autre
+                            // palier. Éditer les notes d'une transaction suffisait à
+                            // déclencher cet écart.
                             $helloAssoItemIds[$oldId] = [
                                 'helloasso_item_id' => $existingLigne->helloasso_item_id,
                                 'helloasso_option_id' => $existingLigne->helloasso_option_id,
                                 'helloasso_line_key' => $existingLigne->helloasso_line_key,
+                                'helloasso_tier_id' => $existingLigne->helloasso_tier_id,
+                                'helloasso_discount_code' => $existingLigne->helloasso_discount_code,
                             ];
                         }
                         $oldCents = (int) round((float) $existingLigne->montant * 100);
