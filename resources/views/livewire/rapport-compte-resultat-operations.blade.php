@@ -596,12 +596,25 @@
                                                     @endphp
                                                     @foreach ($operationNames as $opId => $opNom)
                                                         @php
-                                                            $tOpVal = ($mode === 'projection' && $section['proj'])
+                                                            $estProjection = $mode === 'projection' && $section['proj'];
+                                                            $tOpVal = $estProjection
                                                                 ? (float) ($projTiersOps[$opId] ?? 0)
                                                                 : (float) ($t['operations'][$opId] ?? 0);
+                                                            // Seule cellule de la vue à mêler projection et réalisé dans
+                                                            // un ternaire unique — partout ailleurs les deux modes ont
+                                                            // leur propre branche @if. C'est ce qui lui a fait garder
+                                                            // « > 0 » sur le réalisé : un tiers au débit d'un
+                                                            // contra-produit (709A Gratuités accordées) affichait « — »
+                                                            // dans la colonne de l'opération, alors que son total
+                                                            // affichait bien -50,00 €.
+                                                            // La projection, elle, garde « > 0 » : un budget
+                                                            // prévisionnel est positif par nature.
+                                                            $tOpAffichable = $estProjection
+                                                                ? $tOpVal > 0
+                                                                : abs($tOpVal) > 0.001;
                                                         @endphp
                                                         <td class="text-end" style="padding:4px 8px;color:#888;font-size:11px;">
-                                                            {{ $tOpVal > 0 ? number_format($tOpVal, 2, ',', ' ').' €' : '—' }}
+                                                            {{ $tOpAffichable ? number_format($tOpVal, 2, ',', ' ').' €' : '—' }}
                                                         </td>
                                                     @endforeach
                                                     {{-- Total tiers opérations --}}
