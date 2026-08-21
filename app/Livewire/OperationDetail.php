@@ -10,6 +10,7 @@ use App\Models\EncadrementPrevision;
 use App\Models\Operation;
 use App\Models\Reglement;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
@@ -51,13 +52,28 @@ final class OperationDetail extends Component
         $operation = $this->operation;
 
         // Financial summary (same logic as old GestionOperations)
+        //
+        // IMPORTANT — ne pas toucher $totalDepenses (tâche 13, chantier 709A).
+        // Une gratuité (709A) n'apparaît QUE côté recette : la synchro HelloAsso
+        // ne pose jamais de contre-ligne de gratuité sur une dépense. Appliquer
+        // Σcredit − Σdebit ici rendrait les dépenses négatives (une dépense est
+        // portée au débit d'un compte de classe 6, donc credit − debit < 0).
         $totalDepenses = (float) $operation->transactionLignes()
             ->whereHas('transaction', fn ($q) => $q->where('type', 'depense'))
             ->sum('montant');
+        // Depuis le chantier 709A, une commande remisée pose DEUX lignes de
+        // classe 7 : le produit brut au crédit (706A/751) et la gratuité au
+        // débit (709A). `montant` porte la même valeur absolue sur les deux —
+        // les sommer naïvement double-compte (100 € au lieu de 0 pour une
+        // inscription à 50 € entièrement offerte). Pour toute ligne rattachée
+        // à un compte de classe 6/7, on prend donc le net crédit − débit ; les
+        // lignes sans compte lié (legacy, pas encore compte-first) gardent
+        // `montant` pour ne rien changer à leur comportement historique.
         $totalRecettes = (float) $operation->transactionLignes()
             ->whereHas('transaction', fn ($q) => $q->where('type', 'recette'))
             ->whereDoesntHave('compte.usages', fn ($q) => $q->where('usage', UsageComptable::Don->value))
-            ->sum('montant');
+            ->leftJoin('comptes as tl_cpt', 'tl_cpt.id', '=', 'transaction_lignes.compte_id')
+            ->sum(DB::raw('CASE WHEN tl_cpt.classe IN (6, 7) THEN (transaction_lignes.credit - transaction_lignes.debit) ELSE transaction_lignes.montant END'));
         $totalDons = (float) $operation->transactionLignes()
             ->whereHas('transaction', fn ($q) => $q->where('type', 'recette'))
             ->whereHas('compte.usages', fn ($q) => $q->where('usage', UsageComptable::Don->value))

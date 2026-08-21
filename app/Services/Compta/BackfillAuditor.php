@@ -39,13 +39,20 @@ final class BackfillAuditor
         $dateFin = $range['end']->toDateString();
 
         // -- Nb transactions à convertir (equilibree=FALSE ou NULL) --
-        // Les transactions à 0 € ne sont jamais convertibles (skip par design
-        // dans TransactionConverter::convertir()) : on ne les compte pas.
+        // Pas de filtre sur montant_total : une transaction à 0 € N'EST PLUS
+        // systématiquement inconvertible depuis que TransactionConverter::convertir()
+        // ne skip plus sur ce critère (une gratuité intégrale — ventilations qui se
+        // compensent, ex. 706 crédit / 709A débit — est désormais convertie). Le vrai
+        // critère de convertibilité est « au moins une ligne de ventilation valide »,
+        // trop coûteux à répliquer exactement ici en SQL (il faudrait rejouer la
+        // validation de classe de compte ligne par ligne comme le fait le converter) :
+        // on préfère sur-compter légèrement ce rapport de dry-run plutôt que de
+        // sous-compter et laisser l'opérateur croire qu'il y a moins de transactions
+        // à traiter qu'il n'y en a réellement.
         $nbAConvertir = DB::table('transactions')
             ->where('association_id', $associationId)
             ->whereNull('deleted_at')
             ->whereBetween('date', [$dateDebut, $dateFin])
-            ->where('montant_total', '!=', 0)
             ->where(function ($q) {
                 $q->where('equilibree', false)
                     ->orWhereNull('equilibree');

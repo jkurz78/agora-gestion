@@ -6,12 +6,14 @@ namespace App\Services\Compta;
 
 use App\Enums\ModePaiement;
 use App\Enums\Sens;
+use App\Enums\SensVentilation;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Models\Compte;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Support\MontantDecimal;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -27,11 +29,15 @@ use Illuminate\Support\Facades\Log;
  *   5. Marquer la transaction equilibree=TRUE (via l'observer XOR).
  *
  * Skip silencieux si :
- *   - montant_total = 0 (inscription gratuite HelloAsso)
  *   - tiers_id null (OD-like)
  *   - aucune ligne de ventilation
  *   - compte de classe inattendue
  *   - CompteTresorerieResolver retourne null (compte bancaire introuvable)
+ *
+ * Note : montant_total = 0 n'est PAS un motif de skip. Une gratuité intégrale
+ * (ex. commande HelloAsso couverte à 100 % par un code promo) porte des
+ * ventilations qui se compensent (ex. 706 crédit / 709A débit, même montant)
+ * et DOIT être convertie — voir convertir() pour le détail du raisonnement.
  *
  * Le caller (BackfillPartieDoubleCommand) enveloppe chaque conversion dans DB::transaction.
  */
@@ -52,16 +58,25 @@ final class TransactionConverter
      */
     public function convertir(Transaction $tx): bool
     {
-        // Guard : montant_total = 0 → skip (inscription gratuite HelloAsso ou équivalent).
-        // Une transaction à 0€ n'a aucun effet comptable — générer des écritures PD nulles
-        // polluerait le grand livre sans valeur. L'adhésion associée reste valide.
-        if (bccomp((string) $tx->montant_total, '0.00', 2) === 0) {
-            Log::info('[Backfill] Skip : montant_total = 0, aucune écriture PD générée', [
-                'transaction_id' => $tx->id,
-            ]);
-
-            return false;
-        }
+        // PAS de guard sur montant_total = 0 ici — volontairement.
+        //
+        // Un commit antérieur (12cf366b) skippait toute transaction à montant_total
+        // = 0 pour éviter de polluer le grand livre d'écritures nulles. L'intention
+        // était juste mais la formulation trop large : elle confondait deux cas très
+        // différents que seul le nombre de LIGNES DE VENTILATION distingue —
+        //
+        //   - aucune ligne de ventilation : un vrai artefact (rien à comptabiliser),
+        //     déjà intercepté plus bas par $lignesVentilation->isEmpty().
+        //   - des lignes de ventilation qui se COMPENSENT (ex. 706 crédit 50 / 709A
+        //     débit 50, une gratuité intégrale HelloAsso) : montant_total vaut 0 mais
+        //     c'est le cas normal d'une place offerte, avec un vrai effet comptable —
+        //     EcritureGenerator::pourRecetteACredit pose une paire 411 D/C lettrée
+        //     (Tâche 7) pour en garder la trace sur le compte du tiers. Le skipper
+        //     revient à laisser une commande HelloAsso enregistrée sans écriture,
+        //     ce qui a bloqué la clôture d'exercice (transaction #120 en production).
+        //
+        // Ne réintroduis pas cette garde sur montant_total : le vrai discriminant est
+        // $lignesVentilation->isEmpty(), pas le montant net.
 
         // Guard : tiers_id null → skip (OD-like, pas de lettrage)
         if ($tx->tiers_id === null) {
@@ -117,9 +132,18 @@ final class TransactionConverter
                 ])->save();
             }
 
+            // Le sens se lit sur la ligne elle-même, jamais déduit du type de la
+            // transaction : une ligne au débit (ex. 709A gratuité, contra-produit
+            // arrivée déjà enrichie compte-first) doit rester au débit. Le montant
+            // passé à EcritureGenerator est toujours la valeur absolue — les
+            // montants de ventilation sont strictement positifs, le sens est porté
+            // à part (SensVentilation).
+            $sensLigne = (float) $ligne->debit > 0.0 ? SensVentilation::Debit : SensVentilation::Credit;
+
             $ventilations[] = [
                 'compte' => $compte,
-                'montant' => $montant,
+                'montant' => abs($montant),
+                'sens' => $sensLigne,
                 'operation_id' => $ligne->operation_id,
                 'seance' => $ligne->seance,
                 'notes' => $ligne->notes,
@@ -219,22 +243,34 @@ final class TransactionConverter
                     existingTransaction: $tx,
                 );
 
-                // Step 2 : T2 encaissement séparée (portage D / 411 C, journal=Banque)
-                $libelleEncaissement = 'Encaissement '.$tx->libelle;
-                $t2 = $this->ecritureGenerator->pourEncaissementCreance(
-                    transactionCreance: $tx,
-                    mode: $modePaiement,
-                    compteTresorerie: $compteTresorerie,
-                    datePaiement: $date,
-                    libelle: $libelleEncaissement,
-                    comptePortageOverride: $comptePortageOverride,
-                );
+                // Saut de la T2 quand le net encaissable est nul (gratuité intégrale,
+                // ex. commande HelloAsso couverte à 100 % par un code promo) : le 411
+                // est déjà soldé par la paire lettrée que pourRecetteACredit vient de
+                // poser (Tâche 7) — il n'y a rien à encaisser. Appeler
+                // pourEncaissementCreance() dans ce cas lèverait
+                // LettrageDejaPresentException (la ligne 411 source est déjà lettrée),
+                // que le catch (\Throwable) de la synchro HelloAsso avalerait en simple
+                // warning : la transaction resterait legacy sans qu'aucun signal
+                // d'échec ne remonte. On marque directement la transaction équilibrée
+                // (fait en fin de méthode, commun à tous les chemins) et on s'arrête là.
+                if ($this->netEncaissableCentimes($ventilations) !== 0) {
+                    // Step 2 : T2 encaissement séparée (portage D / 411 C, journal=Banque)
+                    $libelleEncaissement = 'Encaissement '.$tx->libelle;
+                    $t2 = $this->ecritureGenerator->pourEncaissementCreance(
+                        transactionCreance: $tx,
+                        mode: $modePaiement,
+                        compteTresorerie: $compteTresorerie,
+                        datePaiement: $date,
+                        libelle: $libelleEncaissement,
+                        comptePortageOverride: $comptePortageOverride,
+                    );
 
-                // Propager rapprochement_id sur la T2 pour rapprochement direct
-                // (virement/CB/chèque pointé : c'est la T2 qui porte le mouvement 512X).
-                // Si remise_id est présent, le rapprochement va sur la T4 (Phase 2 du backfill).
-                if ($tx->rapprochement_id !== null && $tx->remise_id === null) {
-                    $t2->forceFill(['rapprochement_id' => $tx->rapprochement_id])->save();
+                    // Propager rapprochement_id sur la T2 pour rapprochement direct
+                    // (virement/CB/chèque pointé : c'est la T2 qui porte le mouvement 512X).
+                    // Si remise_id est présent, le rapprochement va sur la T4 (Phase 2 du backfill).
+                    if ($tx->rapprochement_id !== null && $tx->remise_id === null) {
+                        $t2->forceFill(['rapprochement_id' => $tx->rapprochement_id])->save();
+                    }
                 }
             } else {
                 // Step 1 : T1 dette (6xx D / 401 C, journal=Achat)
@@ -269,5 +305,28 @@ final class TransactionConverter
         $tx->forceFill(['equilibree' => true])->save();
 
         return true;
+    }
+
+    /**
+     * Net encaissable (Σcrédit − Σdébit) en centimes depuis les $ventilations
+     * construites par convertir(), jamais une somme de flottants (MontantDecimal).
+     *
+     * @param  list<array{compte: Compte, montant: float, sens: SensVentilation, operation_id: mixed, seance: mixed, notes: mixed}>  $ventilations
+     */
+    private function netEncaissableCentimes(array $ventilations): int
+    {
+        $netCentimes = 0;
+
+        foreach ($ventilations as $ventilation) {
+            $montantCentimes = MontantDecimal::versCentimes(
+                number_format((float) $ventilation['montant'], 2, '.', '')
+            );
+
+            $netCentimes += $ventilation['sens'] === SensVentilation::Credit
+                ? $montantCentimes
+                : -$montantCentimes;
+        }
+
+        return $netCentimes;
     }
 }

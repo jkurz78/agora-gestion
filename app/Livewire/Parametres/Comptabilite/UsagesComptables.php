@@ -19,6 +19,8 @@ final class UsagesComptables extends Component
 
     public ?int $abandonCreanceSelectedId = null;
 
+    public ?int $gratuiteSelectedId = null;
+
     public bool $inlineOpen = false;
 
     public ?string $inlineUsage = null;
@@ -35,6 +37,8 @@ final class UsagesComptables extends Component
         $this->fraisKmSelectedId = $fraisKm?->id;
         $abandon = Compte::forUsage(UsageComptable::AbandonCreance)->first();
         $this->abandonCreanceSelectedId = $abandon?->id;
+        $gratuite = Compte::forUsage(UsageComptable::Gratuite)->first();
+        $this->gratuiteSelectedId = $gratuite?->id;
     }
 
     private function requireAdmin(): void
@@ -76,6 +80,16 @@ final class UsagesComptables extends Component
             app(UsagesComptablesService::class)->setAbandonCreance($this->abandonCreanceSelectedId);
         } catch (DomainException $e) {
             $this->addError('abandonCreance', $e->getMessage());
+        }
+    }
+
+    public function saveGratuite(): void
+    {
+        $this->requireAdmin();
+        try {
+            app(UsagesComptablesService::class)->setGratuite($this->gratuiteSelectedId);
+        } catch (DomainException $e) {
+            $this->addError('gratuite', $e->getMessage());
         }
     }
 

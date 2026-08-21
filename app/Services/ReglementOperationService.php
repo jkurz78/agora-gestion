@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\ModePaiement;
+use App\Enums\SensVentilation;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Models\Compte;
@@ -529,6 +530,7 @@ final class ReglementOperationService
             [
                 'compte' => $compte,
                 'montant' => (float) $ligne->montant,
+                'sens' => SensVentilation::Credit,
                 'operation_id' => (int) $operation->id,
                 'seance' => $seance->numero,
                 'notes' => null,

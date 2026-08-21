@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\DTOs\Compta\PosteTiersReglementData;
 use App\Enums\ModePaiement;
+use App\Enums\SensVentilation;
 use App\Enums\StatutReglement;
 use App\Models\RapprochementBancaire;
 use App\Models\RemiseBancaire;
@@ -37,7 +38,7 @@ function creerPosteAnnulableTask5(object $contexte, int $montantCentimes = 10000
     $tiers = Tiers::factory()->create(['association_id' => $contexte->association->id]);
     $transaction = $contexte->ecritures->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [[
+        ventilations: [['sens' => SensVentilation::Credit,
             'compte' => $contexte->compte706,
             'montant' => MontantDecimal::depuisCentimes($montantCentimes),
         ]],

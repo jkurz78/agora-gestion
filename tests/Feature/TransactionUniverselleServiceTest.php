@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\OrigineANouveau;
+use App\Enums\SensVentilation;
 use App\Enums\StatutExercice;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
@@ -192,7 +193,7 @@ it('expose une seule ligne report AN avec les informations de la transaction d o
 
     $t1 = app(EcritureGenerator::class)->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $produit, 'montant' => 42.00]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $produit, 'montant' => 42.00]],
         dateConstatation: new DateTimeImmutable('2026-08-20'),
         libelle: 'Créance à reporter',
     );
@@ -261,7 +262,7 @@ it('utilise l exercice demandé pour les reports AN plutôt que celui de la sess
     ]);
     $transaction = app(EcritureGenerator::class)->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $produit, 'montant' => 25.00]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $produit, 'montant' => 25.00]],
         dateConstatation: new DateTimeImmutable('2025-08-20'),
         libelle: 'Créance exercice affiché',
     );
@@ -311,7 +312,7 @@ it('filtre les reports AN par bornes, tiers, référence, pièce et sens', funct
     ]);
     app(EcritureGenerator::class)->pourRecetteACredit(
         tiers: $client,
-        ventilations: [['compte' => $produit, 'montant' => 20.00]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $produit, 'montant' => 20.00]],
         dateConstatation: new DateTimeImmutable('2026-08-20'),
         libelle: 'Créance filtrée',
     );

@@ -59,6 +59,7 @@ it('creerDepuisTransaction : adhésion créée depuis ligne parent (option_id IS
         'montant' => 0.00,
         'helloasso_item_id' => 87070,
         'helloasso_option_id' => null,
+        'helloasso_line_key' => 'parent',
         'helloasso_tier_id' => 18595,
     ]));
 
@@ -71,6 +72,7 @@ it('creerDepuisTransaction : adhésion créée depuis ligne parent (option_id IS
         'credit' => 12.00,
         'helloasso_item_id' => 87070,
         'helloasso_option_id' => 18596,
+        'helloasso_line_key' => 'option:18596',
         'helloasso_tier_id' => null,
     ]);
 
@@ -107,6 +109,7 @@ it('creerDepuisTransaction : pas d\'adhésion si seule une ligne option cotisati
         'credit' => 12.00,
         'helloasso_item_id' => 87070,
         'helloasso_option_id' => 18596,
+        'helloasso_line_key' => 'option:18596',
     ]);
 
     $adhesion = $this->service->creerDepuisTransaction($tx);

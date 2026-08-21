@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\DTOs\Compta\PosteTiersReglementData;
 use App\Enums\ModePaiement;
 use App\Enums\OrigineANouveau;
+use App\Enums\SensVentilation;
 use App\Enums\StatutExercice;
 use App\Enums\StatutReglement;
 use App\Models\ANouveauGeneration;
@@ -67,7 +68,7 @@ it('lettre le descendant AN d une creance 411 encaissee en N plus 1', function (
 
     $t1 = $generator->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $produit, 'montant' => 80.00]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $produit, 'montant' => 80.00]],
         dateConstatation: new DateTimeImmutable('2026-08-20'),
         libelle: 'Créance à reporter',
     );
@@ -147,7 +148,7 @@ it('ne reprend plus en N plus 2 un reliquat AN réglé en N plus 1', function ()
 
     $t1 = $generator->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $produit, 'montant' => 100.00]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $produit, 'montant' => 100.00]],
         dateConstatation: new DateTimeImmutable('2026-08-20'),
         libelle: 'Créance avec reliquat à reporter',
     );

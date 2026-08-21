@@ -67,8 +67,18 @@ final class TiersOperationsTimelineService
         $montantsPayes = [];
 
         if (! empty($operationIds)) {
+            // Depuis le chantier 709A, une commande remisée pose deux lignes de
+            // classe 7 : le produit brut au crédit (706A/751) et la gratuité au
+            // débit (709A). `montant` porte la même valeur absolue sur les deux
+            // — les sommer double-compte le montant payé (100 € au lieu de 0
+            // pour une inscription à 50 € entièrement offerte). Pour toute
+            // ligne rattachée à un compte de classe 6/7, on prend donc le net
+            // crédit − débit ; les lignes sans compte lié (fixtures legacy,
+            // pas encore compte-first) gardent `montant` pour ne rien changer
+            // à leur comportement historique.
             $montantsPayes = TransactionLigne::query()
                 ->join('transactions', 'transactions.id', '=', 'transaction_lignes.transaction_id')
+                ->leftJoin('comptes', 'comptes.id', '=', 'transaction_lignes.compte_id')
                 ->where('transactions.tiers_id', $tiers->id)
                 ->whereIn('transaction_lignes.operation_id', $operationIds)
                 ->whereIn('transactions.statut_reglement', [
@@ -76,7 +86,7 @@ final class TiersOperationsTimelineService
                     StatutReglement::Pointe->value,
                 ])
                 ->groupBy('transaction_lignes.operation_id')
-                ->select('transaction_lignes.operation_id', DB::raw('SUM(transaction_lignes.montant) as total'))
+                ->select('transaction_lignes.operation_id', DB::raw('SUM(CASE WHEN comptes.classe IN (6, 7) THEN transaction_lignes.credit - transaction_lignes.debit ELSE transaction_lignes.montant END) as total'))
                 ->pluck('total', 'transaction_lignes.operation_id')
                 ->map(fn ($v) => (float) $v)
                 ->all();

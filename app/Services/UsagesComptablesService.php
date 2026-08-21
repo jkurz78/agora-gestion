@@ -30,6 +30,39 @@ final class UsagesComptablesService
         $this->setMono(UsageComptable::AbandonCreance, $compteId);
     }
 
+    /**
+     * Compte de contrepartie des gratuités accordées (709A par défaut).
+     *
+     * Contrairement à setAbandonCreance, aucun pré-requis d'USAGE n'est exigé :
+     * une gratuité est une contrepartie de produit, pas un sous-cas de don. La
+     * classe, elle, est contrainte — voir la garde ci-dessous.
+     *
+     * @throws DomainException Si le compte n'est pas de classe 7.
+     */
+    public function setGratuite(?int $compteId): void
+    {
+        if ($compteId !== null) {
+            $compte = Compte::findOrFail($compteId);
+
+            // Classe 7 obligatoire. Le 709A est un CONTRA-produit : il vit au débit
+            // mais reste un compte de produits. EcritureGenerator::pourRecetteACredit
+            // rejette toute ventilation de classe ≠ 7 sur une recette — un compte de
+            // charge configuré ici ferait échouer la conversion de CHAQUE commande
+            // remisée, longtemps après la configuration et loin d'elle.
+            //
+            // L'écran ne propose que des comptes de produits, mais une requête
+            // Livewire forgée contournerait ce filtre : la garde est ici, au service.
+            if ((int) $compte->classe !== 7) {
+                throw new DomainException(
+                    'Le compte de gratuité doit être un compte de produits (classe 7) : '
+                    ."« {$compte->numero_pcg} — {$compte->intitule} » est de classe {$compte->classe}."
+                );
+            }
+        }
+
+        $this->setMono(UsageComptable::Gratuite, $compteId);
+    }
+
     public function toggleDon(int $compteId, bool $active): void
     {
         $this->toggle(UsageComptable::Don, $compteId, $active);

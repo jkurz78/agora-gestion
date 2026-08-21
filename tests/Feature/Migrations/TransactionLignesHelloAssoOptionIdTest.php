@@ -51,6 +51,7 @@ it('accepte deux lignes avec le même helloasso_item_id et deux helloasso_option
         'credit' => 12.00,
         'helloasso_item_id' => 87070,
         'helloasso_option_id' => 18596,
+        'helloasso_line_key' => 'option:18596',
     ]);
 
     TransactionLigne::create([
@@ -60,6 +61,7 @@ it('accepte deux lignes avec le même helloasso_item_id et deux helloasso_option
         'credit' => 12.00,
         'helloasso_item_id' => 87070,
         'helloasso_option_id' => 18597,
+        'helloasso_line_key' => 'option:18597',
     ]);
 
     expect(TransactionLigne::where('helloasso_item_id', 87070)->count())->toBe(2);
@@ -86,6 +88,7 @@ it('rejette deux lignes avec le même helloasso_item_id et le même helloasso_op
         'credit' => 12.00,
         'helloasso_item_id' => 87070,
         'helloasso_option_id' => 18596,
+        'helloasso_line_key' => 'option:18596',
     ]);
 
     TransactionLigne::create([
@@ -95,5 +98,6 @@ it('rejette deux lignes avec le même helloasso_item_id et le même helloasso_op
         'credit' => 12.00,
         'helloasso_item_id' => 87070,
         'helloasso_option_id' => 18596,
+        'helloasso_line_key' => 'option:18596',
     ]);
 })->throws(QueryException::class);

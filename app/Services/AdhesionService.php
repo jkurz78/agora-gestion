@@ -41,20 +41,26 @@ final class AdhesionService
 
         // DC-10a : la détection cotisation lit l'usage porté par le compte de la
         // ligne (compte_id, source unique) — plus de traversée comptes.
+        // Prédicat ligne parente compatible manuel + HelloAsso (709A, T5) : une
+        // ligne manuelle n'a pas de helloasso_item_id ; une ligne HelloAsso porte
+        // toujours helloasso_line_key, et seule 'parent' désigne la ligne cotisation
+        // (exclut 'discount' et 'option:{id}', qui partagent option_id NULL avec elle).
         $ligneCotisation = $tx->lignes()
-            ->whereNull('helloasso_option_id')  // exclure les lignes options HA (B1)
+            ->ligneParenteOuManuelle()
             ->whereHas('compte.usages', function ($q): void {
                 $q->where('usage', UsageComptable::Cotisation->value);
             })
             ->first();
 
-        // Palier HelloAsso à 0 € (cotisation offerte par code promo) : la ligne ne
-        // porte pas de compte (l'invariant XOR interdit compte_id sans debit/credit,
-        // et une écriture nulle n'a pas de valeur comptable) — détection via la
-        // formule HelloAsso auto-créée (paire form_slug + tier_id).
+        // LEGACY — repli conservé pour les données historiques uniquement.
+        // Il existait parce qu'un palier HelloAsso à 0 € laissait sa ligne SANS
+        // compte : la détection passait alors par la formule (form_slug + tier_id).
+        // Depuis le chantier 709A, la ligne parente porte toujours son compte et
+        // son montant brut — le chemin principal ci-dessus reprend la main.
+        // Ne sert plus qu'aux transactions synchronisées avant ce chantier.
         if ($ligneCotisation === null && $tx->helloasso_form_slug !== null) {
             $ligneCotisation = $tx->lignes()
-                ->whereNull('helloasso_option_id')
+                ->ligneParenteOuManuelle()
                 ->whereNotNull('helloasso_tier_id')
                 ->get()
                 ->first(fn (TransactionLigne $l) => FormuleAdhesion::query()
@@ -107,6 +113,29 @@ final class AdhesionService
                 return $adhesion; // idempotence : ne pas écraser transaction_id ni formule_adhesion_id
             }
 
+            // SNAPSHOT — net débit/crédit des lignes de ventilation (classes 6/7),
+            // exactement la formule de ComptaCheckIntegrityCommand::checkAdhesionMontants
+            // (CHECK 4) : ce contrôle d'intégrité définit la vérité de montant_facial,
+            // pas l'inverse — toute autre définition ferait remonter chaque adhésion
+            // remisée comme incohérente. Un simple sum('montant') des lignes fige le
+            // BRUT d'une adhésion remisée (Tâche 11, régression HA-55698 : brut
+            // 35,00 € au lieu du net 12,00 €) — seul le net (ligne parent au crédit +
+            // ligne de remise au débit qui se compensent) survit à une remise
+            // partielle ou totale. No-op strict sur les données existantes : mesuré
+            // sur le clone de production svs_accounting, les 26 adhésions actuelles
+            // (dont 4 multi-lignes) valident déjà cette définition — CHECK 4 n'a
+            // aucune modification à subir.
+            $montantFacial = (float) (DB::table('transaction_lignes as tl')
+                ->join('comptes as c', 'c.id', '=', 'tl.compte_id')
+                ->join('transactions as t', 't.id', '=', 'tl.transaction_id')
+                ->where('tl.transaction_id', (int) $tx->id)
+                ->where('t.association_id', TenantContext::currentId())
+                ->where('c.association_id', TenantContext::currentId())
+                ->whereNull('tl.deleted_at')
+                ->whereIn('c.classe', [6, 7])
+                ->selectRaw('SUM(CASE WHEN c.classe = 6 THEN tl.debit - tl.credit ELSE tl.credit - tl.debit END) as net')
+                ->value('net') ?? 0);
+
             return Adhesion::create([
                 'association_id' => TenantContext::currentId(),
                 'tiers_id' => (int) $tx->tiers_id,
@@ -116,9 +145,7 @@ final class AdhesionService
                 'date_debut' => $datesEtExercice['date_debut'],
                 'date_fin' => $datesEtExercice['date_fin'],
                 'saisi_par' => $tx->saisi_par !== null ? (int) $tx->saisi_par : null,
-                // SNAPSHOT — utilise la somme réelle des lignes (montant_total
-                // peut ne pas encore être à jour si appelé depuis un observer TransactionLigne)
-                'montant_facial' => round((float) $tx->lignes()->sum('montant'), 2),
+                'montant_facial' => round($montantFacial, 2),
                 'deductible_fiscal' => $formule?->deductible_fiscal ?? false,
                 'mode' => $formule?->mode ?? 'exercice',
                 'duree_mois' => $formule?->duree_mois,

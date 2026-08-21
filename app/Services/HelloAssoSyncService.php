@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\ModePaiement;
+use App\Enums\SensVentilation;
 use App\Enums\StatutReglement;
+use App\Enums\UsageComptable;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\FormuleAdhesion;
 use App\Models\HelloAssoFormMapping;
@@ -16,6 +19,7 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\VirementInterne;
+use App\Observers\AdhesionTransactionLigneObserver;
 use App\Services\Compta\TransactionConverter;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
@@ -32,6 +36,16 @@ final class HelloAssoSyncService
 
     /** @var array<string, ?array<string, mixed>> Cache form_slug → fetchFormDetail result */
     private array $formDetailsCache = [];
+
+    /**
+     * Compte de contrepartie des gratuités (usage Gratuite, ex. 709A).
+     * Résolu au plus une fois pour toute la synchro — mémoïsé avec un flag
+     * distinct pour ne pas re-résoudre à chaque commande une fois établi qu'il
+     * vaut null (association sans compte de gratuité configuré).
+     */
+    private ?int $compteGratuiteId = null;
+
+    private bool $compteGratuiteResolved = false;
 
     public function __construct(
         private readonly HelloAssoParametres $parametres,
@@ -68,6 +82,7 @@ final class HelloAssoSyncService
                 $lignesUpdated += $result['lignes_updated'];
                 $participantsCreated += $result['participants_created'];
                 $skipped += $result['skipped'];
+                $errors = array_merge($errors, $result['errors']);
             } catch (\Throwable $e) {
                 $errors[] = "Commande #{$order['id']} : {$e->getMessage()}";
                 $skipped++;
@@ -86,11 +101,11 @@ final class HelloAssoSyncService
     }
 
     /**
-     * @return array{tx_created: int, tx_updated: int, lignes_created: int, lignes_updated: int, participants_created: int, skipped: int}
+     * @return array{tx_created: int, tx_updated: int, lignes_created: int, lignes_updated: int, participants_created: int, skipped: int, errors: list<string>}
      */
     private function processOrder(array $order, int $exercice): array
     {
-        $result = ['tx_created' => 0, 'tx_updated' => 0, 'lignes_created' => 0, 'lignes_updated' => 0, 'participants_created' => 0, 'skipped' => 0];
+        $result = ['tx_created' => 0, 'tx_updated' => 0, 'lignes_created' => 0, 'lignes_updated' => 0, 'participants_created' => 0, 'skipped' => 0, 'errors' => []];
 
         $formSlug = $order['formSlug'] ?? '';
 
@@ -240,62 +255,149 @@ final class HelloAssoSyncService
                     $result['tx_created']++;
                 }
 
-                // Upsert TransactionLignes — 1 ligne parent par item + 1 ligne par option
-                foreach ($resolvedItems as $resolved) {
-                    $item = $resolved['item'];
+                // Suspendre l'observer adhésion pendant tout le lot d'upserts de la
+                // commande (lignes ET recalcul de montant_total). L'observer se
+                // déclenche à CHAQUE TransactionLigne sauvée et fige l'adhésion sur le
+                // premier état qu'il voit : à l'upsert de la ligne parente, elle porte
+                // déjà son compte de cotisation et son crédit BRUT, alors que la ligne
+                // de remise et les options n'existent pas encore. `montant_facial`
+                // figeait alors la valeur brute et n'était plus jamais corrigé (Tâche
+                // 11, régression HA-55698 : brut 35,00 € au lieu du net 12,00 €).
+                // Motif copié de AdhesionService::creerTransactionPaiement.
+                AdhesionTransactionLigneObserver::$suppress = true;
 
-                    // Ligne parent (cotisation/inscription/don) — montant = item.amount
-                    // (peut être 0 si discount total, ex. HA-55698)
-                    $this->upsertLigne(
-                        tx: $tx,
-                        resolved: $resolved,
-                        optionId: null,
-                        montantCentimes: (int) $item['amount'],
-                        notes: $this->buildParentNotes($item),
-                        result: $result,
-                    );
+                try {
+                    // Upsert TransactionLignes — 1 ligne parent (brut) par item, +1 ligne de
+                    // remise si l'item porte un discount, + 1 ligne par option imbriquée.
+                    foreach ($resolvedItems as $resolved) {
+                        $item = $resolved['item'];
 
-                    // Lignes options — 1 ligne par option imbriquée
-                    foreach ($item['options'] ?? [] as $opt) {
+                        // Ligne parent (cotisation/inscription/don) — montant BRUT, avant
+                        // remise. Sur une commande entièrement remisée, item.amount vaut 0 et
+                        // ne peut pas porter le produit : c'est le bug qui laissait la
+                        // transaction 120 sans écriture. La ligne de remise ci-dessous
+                        // restaure le net.
+                        //
+                        // Le brut se RECONSTITUE (amount + discount), il ne se lit pas dans
+                        // initialAmount. Une version antérieure faisait
+                        // `initialAmount ?? amount` en supposant qu'initialAmount n'est absent
+                        // que sur les items sans remise. Les DONS démentent cette hypothèse :
+                        // n'ayant pas de tarif de palier, ils portent `initialAmount: 0` avec
+                        // la clé PRÉSENTE — et `??` ne se déclenche que sur null, jamais sur 0.
+                        // Résultat mesuré sur le clone de production : deux dons (25 € et
+                        // 200 €) vidés de leur ventilation, leur ligne 411 laissée orpheline.
+                        // L'addition est vraie pour tous les types d'items, sans hypothèse.
+                        $brutCentimes = (int) $item['amount'] + (int) ($item['discount']['amount'] ?? 0);
+
                         $this->upsertLigne(
                             tx: $tx,
                             resolved: $resolved,
-                            optionId: (int) $opt['optionId'],
-                            montantCentimes: (int) ($opt['amount'] ?? 0),
-                            notes: 'Option : '.($opt['name'] ?? '?'),
+                            lineKey: 'parent',
+                            optionId: null,
+                            compteId: $resolved['compte_id'],
+                            montantCentimes: $brutCentimes,
+                            sens: SensVentilation::Credit,
+                            notes: null,
                             result: $result,
                         );
-                    }
-                }
 
-                // Create Participant for Registration items
-                foreach ($resolvedItems as $resolved) {
-                    $item = $resolved['item'];
-                    $type = $item['type'] ?? 'Donation';
+                        // Ligne de remise — au débit, sur le compte de gratuité (709A), avec
+                        // le même operation_id que la ligne parente (même item).
+                        $discountCentimes = (int) ($item['discount']['amount'] ?? 0);
+                        if ($discountCentimes > 0) {
+                            $compteGratuiteId = $this->resolveCompteGratuiteId();
 
-                    if ($type === 'Registration' && $resolved['operation_id'] !== null) {
-                        $created = Participant::firstOrCreate(
-                            [
-                                'tiers_id' => $tiers->id,
-                                'operation_id' => $resolved['operation_id'],
-                            ],
-                            [
-                                'date_inscription' => $orderDate,
-                                'est_helloasso' => true,
-                                'helloasso_item_id' => $item['id'],
-                                'helloasso_order_id' => $order['id'],
-                            ],
-                        );
-                        if ($created->wasRecentlyCreated) {
-                            $result['participants_created']++;
+                            if ($compteGratuiteId === null) {
+                                $code = $item['discount']['code'] ?? '?';
+
+                                throw new \RuntimeException(
+                                    "Une remise (code {$code}) a été appliquée sur l'item '{$item['name']}' ".
+                                    "mais aucun compte de gratuité n'est configuré — sans lui, cette remise ne ".
+                                    'serait comptabilisée nulle part. Configurez-le dans Paramètres → '.
+                                    'Comptabilité → Usages comptables (usage « Gratuités accordées »).'
+                                );
+                            }
+
+                            $this->upsertLigne(
+                                tx: $tx,
+                                resolved: $resolved,
+                                lineKey: 'discount',
+                                optionId: null,
+                                compteId: $compteGratuiteId,
+                                montantCentimes: $discountCentimes,
+                                sens: SensVentilation::Debit,
+                                notes: $this->buildDiscountNotes($item),
+                                result: $result,
+                                discountCode: $item['discount']['code'] ?? null,
+                            );
+                        }
+
+                        // Lignes options — 1 ligne par option imbriquée
+                        foreach ($item['options'] ?? [] as $opt) {
+                            $optionId = (int) $opt['optionId'];
+                            $this->upsertLigne(
+                                tx: $tx,
+                                resolved: $resolved,
+                                lineKey: 'option:'.$optionId,
+                                optionId: $optionId,
+                                compteId: $resolved['compte_id'],
+                                montantCentimes: (int) ($opt['amount'] ?? 0),
+                                sens: SensVentilation::Credit,
+                                notes: 'Option : '.($opt['name'] ?? '?'),
+                                result: $result,
+                            );
                         }
                     }
+
+                    // Create Participant for Registration items
+                    foreach ($resolvedItems as $resolved) {
+                        $item = $resolved['item'];
+                        $type = $item['type'] ?? 'Donation';
+
+                        if ($type === 'Registration' && $resolved['operation_id'] !== null) {
+                            $created = Participant::firstOrCreate(
+                                [
+                                    'tiers_id' => $tiers->id,
+                                    'operation_id' => $resolved['operation_id'],
+                                ],
+                                [
+                                    'date_inscription' => $orderDate,
+                                    'est_helloasso' => true,
+                                    'helloasso_item_id' => $item['id'],
+                                    'helloasso_order_id' => $order['id'],
+                                ],
+                            );
+                            if ($created->wasRecentlyCreated) {
+                                $result['participants_created']++;
+                            }
+                        }
+                    }
+
+                    // Recalculate montant_total from actual lignes (handles split groups).
+                    // Net (Σcrédit − Σdébit), restreint aux lignes de ventilation HelloAsso
+                    // (helloasso_item_id non null) : sur un re-sync, la transaction porte déjà
+                    // les lignes PD-only (411/401/5xxx) posées par le converter au tour
+                    // précédent, dont le débit/crédit ne doit pas entrer dans ce total. La
+                    // brute seule (montant de la ligne parent) ne convient plus non plus
+                    // depuis l'introduction de la ligne de remise : une remise totale porte
+                    // désormais un parent au brut ET une remise au débit qui doivent se
+                    // compenser (ex. HA-55698 : 35,00 € parent − 35,00 € remise + 12,00 €
+                    // option = 12,00 €, pas 47,00 €).
+                    $totalCredit = (float) $tx->lignes()->whereNotNull('helloasso_item_id')->sum('credit');
+                    $totalDebit = (float) $tx->lignes()->whereNotNull('helloasso_item_id')->sum('debit');
+                    $tx->update([
+                        'montant_total' => round($totalCredit - $totalDebit, 2),
+                    ]);
+                } finally {
+                    AdhesionTransactionLigneObserver::$suppress = false;
                 }
 
-                // Recalculate montant_total from actual lignes (handles split groups)
-                $tx->update([
-                    'montant_total' => round((float) $tx->lignes()->sum('montant'), 2),
-                ]);
+                // Créer/actualiser l'adhésion une fois le snapshot final connu — toutes
+                // les lignes (parent, remise, options) écrites et montant_total
+                // recalculé (Tâche 11). AdhesionService::creerDepuisTransaction est
+                // idempotent (lookup par transaction_id) : sans effet sur un re-sync
+                // ou une commande sans ligne de cotisation.
+                app(AdhesionService::class)->creerDepuisTransaction($tx->fresh());
 
                 // Enrichissement partie double via le converter (même chemin que le backfill).
                 // Idempotent : skip si déjà equilibree=true (re-sync HA).
@@ -304,6 +406,12 @@ final class HelloAssoSyncService
                         $tx->refresh();
                         app(TransactionConverter::class)->convertir($tx);
                     } catch (\Throwable $e) {
+                        $orderId = $order['id'] ?? '?';
+                        // Remonter l'échec dans $result['errors'] — un simple
+                        // Log::warning laissait la commande afficher "0 erreurs" alors
+                        // que la transaction restait legacy, rendant la reprise de
+                        // production invérifiable (Tâche 12).
+                        $result['errors'][] = "Transaction #{$tx->id} (commande HelloAsso #{$orderId}) : conversion partie double échouée — {$e->getMessage()}";
                         Log::warning('[HelloAsso] Enrichissement PD échoué — la transaction reste legacy', [
                             'transaction_id' => $tx->id,
                             'error' => $e->getMessage(),
@@ -558,90 +666,107 @@ final class HelloAssoSyncService
     /**
      * Upsert une ligne de transaction HelloAsso.
      *
-     * La clé d'idempotence est le couple (helloasso_item_id, helloasso_option_id) :
-     *  - option_id = null  → ligne parent (item)
-     *  - option_id = X     → ligne option X
+     * La clé d'idempotence est le couple (helloasso_item_id, helloasso_line_key) —
+     * $lineKey vaut 'parent', 'discount' ou 'option:{id}' (Tâche 9, généralise le
+     * correctif d'ordonnancement du commit 1db787b7). Un item et sa remise ne
+     * portent jamais d'option (helloasso_option_id NULL pour les deux) : c'est
+     * précisément la collision que l'ancien lookup sur (item_id, option_id IS NULL)
+     * ne pouvait pas lever — d'où le nouveau discriminant explicite.
      *
-     * NB : MySQL traite NULL comme distinct dans les uniques, donc la garde
-     * "1 seule ligne parent par item" est faite ici via le lookup explicite
-     * WHERE item_id = X AND option_id IS NULL.
-     *
-     * @param  array{tx_created: int, tx_updated: int, lignes_created: int, lignes_updated: int, participants_created: int, skipped: int}  $result
+     * @param  array{tx_created: int, tx_updated: int, lignes_created: int, lignes_updated: int, participants_created: int, skipped: int, errors: list<string>}  $result
      */
     private function upsertLigne(
         Transaction $tx,
         array $resolved,
+        string $lineKey,
         ?int $optionId,
+        int $compteId,
         int $montantCentimes,
+        SensVentilation $sens,
         ?string $notes,
         array &$result,
+        ?string $discountCode = null,
     ): void {
         $item = $resolved['item'];
         $montantEuros = round($montantCentimes / 100, 2);
 
-        $query = TransactionLigne::withTrashed()
-            ->where('helloasso_item_id', $item['id']);
-
-        if ($optionId === null) {
-            $query->whereNull('helloasso_option_id');
-        } else {
-            $query->where('helloasso_option_id', $optionId);
-        }
-
-        $existingLigne = $query->first();
+        $existingLigne = TransactionLigne::withTrashed()
+            ->where('helloasso_item_id', $item['id'])
+            ->where('helloasso_line_key', $lineKey)
+            ->first();
 
         if ($existingLigne?->trashed()) {
             $existingLigne->restore();
         }
 
-        // DC-10a — ligne compte-first : compte_id + credit posés dès la création
-        // (recette HelloAsso → crédit). Une ligne à 0 € (cotisation offerte par code
-        // promo) reste sans compte : l'invariant XOR interdit compte_id avec
-        // debit = credit = 0, et une écriture nulle n'a pas de valeur comptable.
-        $compteId = $montantEuros != 0.0 ? (int) $resolved['compte_id'] : null;
+        // DC-10a — ligne compte-first : compte_id + debit/credit posés dès la
+        // création. Une ligne à 0 € reste sans compte : l'invariant XOR interdit
+        // compte_id avec debit = credit = 0, et une écriture nulle n'a pas de
+        // valeur comptable.
+        $compteIdEffectif = $montantEuros != 0.0 ? $compteId : null;
+        $estDebit = $compteIdEffectif !== null && $sens === SensVentilation::Debit;
+        $estCredit = $compteIdEffectif !== null && $sens === SensVentilation::Credit;
+
+        $data = [
+            'transaction_id' => $tx->id,
+            'compte_id' => $compteIdEffectif,
+            'operation_id' => $resolved['operation_id'],
+            'montant' => $montantEuros,
+            'debit' => $estDebit ? $montantEuros : 0,
+            'credit' => $estCredit ? $montantEuros : 0,
+            'helloasso_tier_id' => $resolved['helloasso_tier_id'],
+            'helloasso_discount_code' => $discountCode,
+            'notes' => $notes,
+        ];
 
         if ($existingLigne) {
-            $existingLigne->update([
-                'transaction_id' => $tx->id,
-                'compte_id' => $compteId,
-                'operation_id' => $resolved['operation_id'],
-                'montant' => $montantEuros,
-                'debit' => 0,
-                'credit' => $compteId !== null ? $montantEuros : 0,
-                'helloasso_tier_id' => $resolved['helloasso_tier_id'],
-                'notes' => $notes,
-            ]);
+            $existingLigne->update($data);
             $result['lignes_updated']++;
         } else {
-            TransactionLigne::create([
-                'transaction_id' => $tx->id,
-                'compte_id' => $compteId,
-                'operation_id' => $resolved['operation_id'],
-                'montant' => $montantEuros,
-                'debit' => 0,
-                'credit' => $compteId !== null ? $montantEuros : 0,
+            TransactionLigne::create($data + [
                 'helloasso_item_id' => (int) $item['id'],
                 'helloasso_option_id' => $optionId,
-                'helloasso_tier_id' => $resolved['helloasso_tier_id'],
-                'notes' => $notes,
+                // Discriminant de ligne (migration 2026_08_20_100001). Obligatoire dès
+                // qu'une ligne porte un helloasso_item_id — la contrainte CHECK
+                // chk_tl_helloasso_line_key_presence le refuse autrement sous MySQL.
+                'helloasso_line_key' => $lineKey,
             ]);
             $result['lignes_created']++;
         }
     }
 
     /**
-     * Construit les notes de la ligne parent d'un item HelloAsso.
-     * Retourne null si aucun discount (pas de note nécessaire).
+     * Résout, une seule fois pour toute la synchro, le compte de contrepartie
+     * des gratuités (usage Gratuite, ex. 709A). Null si non configuré — c'est au
+     * caller de décider si c'est bloquant (ça ne l'est que si une remise existe).
      */
-    private function buildParentNotes(array $item): ?string
+    private function resolveCompteGratuiteId(): ?int
     {
-        if ((int) $item['amount'] === 0 && isset($item['discount']['code'])) {
-            $code = $item['discount']['code'];
-
-            return "Cotisation offerte par code promo : {$code}";
+        if (! $this->compteGratuiteResolved) {
+            $this->compteGratuiteResolved = true;
+            $this->compteGratuiteId = Compte::forUsage(UsageComptable::Gratuite)->first()?->id;
         }
 
-        return null;
+        return $this->compteGratuiteId;
+    }
+
+    /**
+     * Construit la note de la ligne de remise d'un item HelloAsso.
+     *
+     * Le libellé suit le type réel de l'item — jamais « Cotisation » en dur :
+     * la transaction 120 en production est un item Registration (form Event) et
+     * affichait pourtant « Cotisation offerte », un bug de ce libellé figé.
+     */
+    private function buildDiscountNotes(array $item): string
+    {
+        $label = match ($item['type'] ?? null) {
+            'Membership' => 'Cotisation',
+            'Registration' => 'Inscription',
+            default => 'Participation',
+        };
+        $code = $item['discount']['code'] ?? '?';
+
+        return "{$label} offerte par code promo : {$code}";
     }
 
     /**

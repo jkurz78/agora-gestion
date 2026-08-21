@@ -89,11 +89,16 @@
 
                     @foreach ($section['data'] as $cat)
                         @php
-                            // Règle d'affichage : compte visible si N, N-1 ou budget est positif
+                            // Règle d'affichage : compte visible dès qu'il porte un mouvement
+                            // sur N, N-1 ou le budget — quel que soit son SIGNE. Le test était
+                            // « > 0 », écrit quand tout compte de classe 7 était nécessairement
+                            // créditeur. Un contra-produit — 709A Gratuités accordées — porte un
+                            // montant négatif et disparaissait du détail, laissant la famille
+                            // afficher un net inexpliqué.
                             $scVisibles = collect($cat['comptes'])->filter(function($sc) {
-                                return $sc['montant_n'] > 0
-                                    || ($sc['montant_n1'] !== null && $sc['montant_n1'] > 0)
-                                    || ($sc['budget'] !== null && $sc['budget'] > 0);
+                                return abs((float) $sc['montant_n']) > 0.001
+                                    || ($sc['montant_n1'] !== null && abs((float) $sc['montant_n1']) > 0.001)
+                                    || ($sc['budget'] !== null && abs((float) $sc['budget']) > 0.001);
                             });
                         @endphp
                         @if (! $scVisibles->isEmpty())

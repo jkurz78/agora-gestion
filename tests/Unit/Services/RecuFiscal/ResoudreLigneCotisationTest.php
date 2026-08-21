@@ -181,6 +181,7 @@ it('résout la ligne parent (option_id IS NULL) dans une transaction avec lignes
         'credit' => 0.01,
         'helloasso_item_id' => 87070,
         'helloasso_option_id' => null,
+        'helloasso_line_key' => 'parent',
         'helloasso_tier_id' => $tierId,
     ]);
 
@@ -193,6 +194,7 @@ it('résout la ligne parent (option_id IS NULL) dans une transaction avec lignes
         'credit' => 12.00,
         'helloasso_item_id' => 87070,
         'helloasso_option_id' => 18596,
+        'helloasso_line_key' => 'option:18596',
         'helloasso_tier_id' => null,
     ]);
 

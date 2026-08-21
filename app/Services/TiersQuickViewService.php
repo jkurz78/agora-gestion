@@ -168,6 +168,14 @@ final class TiersQuickViewService
     {
         [$dateDebut, $dateFin] = $this->bornes($exercice);
 
+        // Depuis le chantier 709A, une commande remisée pose deux lignes de
+        // classe 7 : le produit brut au crédit (706A/751) et la gratuité au
+        // débit (709A). `tl.montant` porte la même valeur absolue sur les deux
+        // — les sommer double-compte. La jointure sur `comptes` ci-dessous
+        // restreint déjà aux comptes de classe 6/7 : le net Σcredit − Σdebit
+        // s'y calcule donc directement, sans repli nécessaire (toute ligne
+        // comptée ici est déjà rattachée à un compte de classe 6/7 par
+        // construction de la jointure).
         $row = DB::table('transactions as tx')
             ->join('transaction_lignes as tl', 'tl.transaction_id', '=', 'tx.id')
             ->join('comptes as cpt', function ($join): void {
@@ -186,7 +194,7 @@ final class TiersQuickViewService
                         UsageComptable::Cotisation->value,
                     ]);
             })
-            ->selectRaw('COUNT(DISTINCT tx.id) as count, SUM(tl.montant) as total')
+            ->selectRaw('COUNT(DISTINCT tx.id) as count, SUM(tl.credit) - SUM(tl.debit) as total')
             ->first();
 
         if ($row === null || (int) $row->count === 0) {

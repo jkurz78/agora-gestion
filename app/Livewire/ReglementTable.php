@@ -447,8 +447,17 @@ final class ReglementTable extends Component
         $tiersIds = $participants->pluck('tiers_id')->unique()->values();
         $seanceNumeros = $seances->pluck('numero', 'id'); // id => numero
 
+        // Depuis le chantier 709A, une commande remisée pose deux lignes de
+        // classe 7 : le produit brut au crédit (706A/751) et la gratuité au
+        // débit (709A). `montant` porte la même valeur absolue sur les deux —
+        // les sommer double-compte le réalisé (100 € au lieu de 0 pour une
+        // séance entièrement offerte). Pour toute ligne rattachée à un compte
+        // de classe 6/7, on prend donc le net crédit − débit ; les lignes sans
+        // compte lié (fixtures legacy, pas encore compte-first) gardent
+        // `montant` pour ne rien changer à leur comportement historique.
         $rows = DB::table('transaction_lignes')
             ->join('transactions', 'transactions.id', '=', 'transaction_lignes.transaction_id')
+            ->leftJoin('comptes', 'comptes.id', '=', 'transaction_lignes.compte_id')
             ->where('transactions.type', 'recette')
             ->whereIn('transactions.tiers_id', $tiersIds)
             ->where('transaction_lignes.operation_id', $this->operation->id)
@@ -458,7 +467,7 @@ final class ReglementTable extends Component
             ->select(
                 'transactions.tiers_id',
                 'transaction_lignes.seance as seance_numero',
-                DB::raw('SUM(transaction_lignes.montant) as total')
+                DB::raw('SUM(CASE WHEN comptes.classe IN (6, 7) THEN transaction_lignes.credit - transaction_lignes.debit ELSE transaction_lignes.montant END) as total')
             )
             ->groupBy('transactions.tiers_id', 'transaction_lignes.seance')
             ->get();

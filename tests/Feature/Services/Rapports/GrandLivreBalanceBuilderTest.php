@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\DTOs\Compta\PosteTiersReglementData;
 use App\Enums\JournalComptable;
 use App\Enums\ModePaiement;
+use App\Enums\SensVentilation;
 use App\Enums\TypeTransaction;
 use App\Models\Compte;
 use App\Models\Tiers;
@@ -41,7 +42,7 @@ function creerScenarioGrandLivreBalance(object $contexte): Tiers
 
     $contexte->ecritures->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [[
+        ventilations: [['sens' => SensVentilation::Credit,
             'compte' => $contexte->compte706,
             'montant' => MontantDecimal::depuisCentimes(10000),
         ]],
@@ -51,7 +52,7 @@ function creerScenarioGrandLivreBalance(object $contexte): Tiers
 
     $t1Periode = $contexte->ecritures->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [[
+        ventilations: [['sens' => SensVentilation::Credit,
             'compte' => $contexte->compte706,
             'montant' => MontantDecimal::depuisCentimes(8000),
         ]],
@@ -417,7 +418,7 @@ it('sépare le grand livre du 411 par tiers', function (): void {
 
         $this->ecritures->pourRecetteACredit(
             tiers: $tiers,
-            ventilations: [[
+            ventilations: [['sens' => SensVentilation::Credit,
                 'compte' => $this->compte706,
                 'montant' => MontantDecimal::depuisCentimes(10000 * ($index + 1)),
             ]],
@@ -482,14 +483,14 @@ it('masque les comptes soldés quand le filtre est actif', function (): void {
 
     $t1Regle = $this->ecritures->pourRecetteACredit(
         tiers: $regle,
-        ventilations: [['compte' => $this->compte706, 'montant' => MontantDecimal::depuisCentimes(5000)]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => MontantDecimal::depuisCentimes(5000)]],
         dateConstatation: new DateTimeImmutable('2025-10-01'),
         libelle: 'Créance réglée',
     );
 
     $this->ecritures->pourRecetteACredit(
         tiers: $ouvert,
-        ventilations: [['compte' => $this->compte706, 'montant' => MontantDecimal::depuisCentimes(7000)]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => MontantDecimal::depuisCentimes(7000)]],
         dateConstatation: new DateTimeImmutable('2025-10-02'),
         libelle: 'Créance ouverte',
     );
@@ -543,7 +544,7 @@ it('présente le compte collectif en une seule ligne par défaut', function (): 
 
         $this->ecritures->pourRecetteACredit(
             tiers: $tiers,
-            ventilations: [[
+            ventilations: [['sens' => SensVentilation::Credit,
                 'compte' => $this->compte706,
                 'montant' => MontantDecimal::depuisCentimes(10000 * ($index + 1)),
             ]],
@@ -582,7 +583,7 @@ it('détaille toujours le grand livre par tiers, quel que soit le mode de la bal
 
         $this->ecritures->pourRecetteACredit(
             tiers: $tiers,
-            ventilations: [['compte' => $this->compte706, 'montant' => MontantDecimal::depuisCentimes(10000)]],
+            ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => MontantDecimal::depuisCentimes(10000)]],
             dateConstatation: new DateTimeImmutable('2025-10-05'),
             libelle: 'Créance '.$nom,
         );
@@ -609,7 +610,7 @@ it('n affiche que les écritures non lettrées et en déduit la position ouverte
     // Créance réglée → les deux lignes 411 seront lettrées entre elles.
     $t1Reglee = $this->ecritures->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => MontantDecimal::depuisCentimes(5000)]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => MontantDecimal::depuisCentimes(5000)]],
         dateConstatation: new DateTimeImmutable('2025-10-01'),
         libelle: 'Créance réglée',
     );
@@ -617,7 +618,7 @@ it('n affiche que les écritures non lettrées et en déduit la position ouverte
     // Créance laissée ouverte.
     $this->ecritures->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => MontantDecimal::depuisCentimes(7000)]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => MontantDecimal::depuisCentimes(7000)]],
         dateConstatation: new DateTimeImmutable('2025-10-02'),
         libelle: 'Créance ouverte',
     );

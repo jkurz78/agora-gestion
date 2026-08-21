@@ -296,15 +296,21 @@
 
                         @foreach ($section['data'] as $cat)
                             @php
+                                // Un compte est visible dès qu'il porte un mouvement, quel que
+                                // soit son SIGNE. Le test était « > 0 », écrit quand tout compte
+                                // de classe 7 était nécessairement créditeur. Un contra-produit
+                                // — 709A Gratuités accordées — porte un montant négatif : le
+                                // masquer laissait la famille afficher le net (200 €) au-dessus
+                                // d'un détail au brut (250 €), sans la ligne qui explique l'écart.
                                 $scVisibles = collect($cat['comptes'])->filter(function ($sc) use ($mode, $sectionIdx) {
                                     $realise = (float) ($sc['montant'] ?? 0);
-                                    if ($realise > 0) {
+                                    if (abs($realise) > 0.001) {
                                         return true;
                                     }
                                     if ($mode === 'realise') {
                                         return false;
                                     }
-                                    return ((float) ($sectionIdx['sc'][$sc['compte_id']] ?? 0)) > 0;
+                                    return abs((float) ($sectionIdx['sc'][$sc['compte_id']] ?? 0)) > 0.001;
                                 });
                             @endphp
                             @if (! $scVisibles->isEmpty())
@@ -321,14 +327,14 @@
                                                         ? collect($cat['comptes'])->sum(fn ($__sc) => (float) ($section['proj']->byScSeanceOp()[(int) ($__sc['compte_id'] ?? 0)][$s][$opId] ?? 0))
                                                         : (float) ($cat['seance_operations'][$s][$opId] ?? 0);
                                                 @endphp
-                                                <td class="text-end fw-bold" style="padding:5px 4px;font-size:11px;">{{ $val > 0 ? number_format($val, 2, ',', ' ').' €' : '—' }}</td>
+                                                <td class="text-end fw-bold" style="padding:5px 4px;font-size:11px;">{{ abs($val) > 0.001 ? number_format($val, 2, ',', ' ').' €' : '—' }}</td>
                                             @endforeach
                                             @php
                                                 $opTot = ($mode === 'projection' && $section['proj'])
                                                     ? (float) ($section['proj']->byCatOp()[$catId][$opId] ?? 0)
                                                     : (float) ($cat['operations'][$opId] ?? 0);
                                             @endphp
-                                            <td class="text-end fw-bold" style="padding:5px 4px;font-size:11px;border-left:1px solid #c0cfe0;">{{ $opTot > 0 ? number_format($opTot, 2, ',', ' ').' €' : '—' }}</td>
+                                            <td class="text-end fw-bold" style="padding:5px 4px;font-size:11px;border-left:1px solid #c0cfe0;">{{ abs($opTot) > 0.001 ? number_format($opTot, 2, ',', ' ').' €' : '—' }}</td>
                                         @endforeach
                                         @php
                                             $grandTot = ($mode === 'projection' && $section['proj'])
@@ -355,7 +361,7 @@
                                                 </td>
                                             @else
                                                 <td class="text-end fw-bold" style="padding:7px 8px;">
-                                                    @if (($cat['seances'][$s] ?? 0) > 0)
+                                                    @if (abs((float) ($cat['seances'][$s] ?? 0)) > 0.001)
                                                         {{ number_format($cat['seances'][$s], 2, ',', ' ') }} &euro;
                                                     @else
                                                         &mdash;
@@ -382,7 +388,7 @@
                                             @else
                                                 @php $opRealise = (float) ($cat['operations'][$opId] ?? 0); @endphp
                                                 <td class="text-end fw-bold" style="padding:7px 8px;font-size:12px;">
-                                                    {{ $opRealise > 0 ? number_format($opRealise, 2, ',', ' ').' €' : '—' }}
+                                                    {{ abs($opRealise) > 0.001 ? number_format($opRealise, 2, ',', ' ').' €' : '—' }}
                                                 </td>
                                             @endif
                                         @endforeach
@@ -417,14 +423,14 @@
                                                             ? (float) ($section['proj']->byScSeanceOp()[$__scIdC][$s][$opId] ?? 0)
                                                             : (float) ($sc['seance_operations'][$s][$opId] ?? 0);
                                                     @endphp
-                                                    <td class="text-end" style="padding:4px 4px;font-size:11px;color:#444;">{{ $val > 0 ? number_format($val, 2, ',', ' ').' €' : '—' }}</td>
+                                                    <td class="text-end" style="padding:4px 4px;font-size:11px;color:#444;">{{ abs($val) > 0.001 ? number_format($val, 2, ',', ' ').' €' : '—' }}</td>
                                                 @endforeach
                                                 @php
                                                     $scOpTot = ($mode === 'projection' && $section['proj'])
                                                         ? (float) ($section['proj']->byScOp()[$__scIdC][$opId] ?? 0)
                                                         : (float) ($sc['operations'][$opId] ?? 0);
                                                 @endphp
-                                                <td class="text-end" style="padding:4px 4px;font-size:11px;color:#444;border-left:1px solid #e5e5e5;">{{ $scOpTot > 0 ? number_format($scOpTot, 2, ',', ' ').' €' : '—' }}</td>
+                                                <td class="text-end" style="padding:4px 4px;font-size:11px;color:#444;border-left:1px solid #e5e5e5;">{{ abs($scOpTot) > 0.001 ? number_format($scOpTot, 2, ',', ' ').' €' : '—' }}</td>
                                             @endforeach
                                             @php
                                                 $scGrand = ($mode === 'projection' && $section['proj'])
@@ -449,7 +455,7 @@
                                                     </td>
                                                 @else
                                                     <td class="text-end" style="padding:5px 8px;color:#444;">
-                                                        @if (($sc['seances'][$s] ?? 0) > 0)
+                                                        @if (abs((float) ($sc['seances'][$s] ?? 0)) > 0.001)
                                                             {{ number_format($sc['seances'][$s], 2, ',', ' ') }} &euro;
                                                         @else
                                                             &mdash;
@@ -474,7 +480,7 @@
                                                 @else
                                                     @php $opRealise = (float) ($sc['operations'][$opId] ?? 0); @endphp
                                                     <td class="text-end" style="padding:5px 8px;font-size:12px;color:#444;">
-                                                        {{ $opRealise > 0 ? number_format($opRealise, 2, ',', ' ').' €' : '—' }}
+                                                        {{ abs($opRealise) > 0.001 ? number_format($opRealise, 2, ',', ' ').' €' : '—' }}
                                                     </td>
                                                 @endif
                                             @endforeach
@@ -530,7 +536,10 @@
                                             @php
                                                 $tRealise = (float) ($t['montant'] ?? 0);
                                                 $tPrev = (float) ($sectionIdx['tiers'][$sc['compte_id']][$t['tiers_id'] ?? -1] ?? 0);
-                                                $tVisible = $tRealise > 0 || ($mode !== 'realise' && $tPrev > 0);
+                                                // Visible dès qu'il porte un mouvement, quel que soit
+                                                // son SIGNE — un tiers peut apparaître au débit sur un
+                                                // contra-produit (709A Gratuités accordées).
+                                                $tVisible = abs($tRealise) > 0.001 || ($mode !== 'realise' && abs($tPrev) > 0.001);
                                             @endphp
                                             @if ($tVisible)
                                             <tr style="background:#fff;">
@@ -562,21 +571,21 @@
                                                                     ? (float) ($projTSO[$s][$opId] ?? 0)
                                                                     : (float) ($t['seance_operations'][$s][$opId] ?? 0);
                                                             @endphp
-                                                            <td class="text-end" style="padding:3px 4px;color:#888;font-size:10px;">{{ $tSOVal > 0 ? number_format($tSOVal, 2, ',', ' ').' €' : '—' }}</td>
+                                                            <td class="text-end" style="padding:3px 4px;color:#888;font-size:10px;">{{ abs($tSOVal) > 0.001 ? number_format($tSOVal, 2, ',', ' ').' €' : '—' }}</td>
                                                         @endforeach
                                                         @php
                                                             $tOpTot = ($mode === 'projection' && $section['proj'])
                                                                 ? (float) ($section['proj']->byScTiersOp($__scIdTC)[$__tIdTC][$opId] ?? 0)
                                                                 : (float) ($t['operations'][$opId] ?? 0);
                                                         @endphp
-                                                        <td class="text-end" style="padding:3px 4px;color:#888;font-size:10px;border-left:1px solid #f0f0f0;">{{ $tOpTot > 0 ? number_format($tOpTot, 2, ',', ' ').' €' : '—' }}</td>
+                                                        <td class="text-end" style="padding:3px 4px;color:#888;font-size:10px;border-left:1px solid #f0f0f0;">{{ abs($tOpTot) > 0.001 ? number_format($tOpTot, 2, ',', ' ').' €' : '—' }}</td>
                                                     @endforeach
                                                     @php
                                                         $tGrand = ($mode === 'projection' && $section['proj'])
                                                             ? (float) ($section['proj']->byScTiers($__scIdTC)[$__tIdTC] ?? 0)
                                                             : $tRealise;
                                                     @endphp
-                                                    <td class="text-end" style="padding:3px 8px;color:{{ $tRealise > 0 ? '#666' : '#1565C0' }};font-size:10px;">{{ $tGrand > 0 ? number_format($tGrand, 2, ',', ' ').' €' : '—' }}</td>
+                                                    <td class="text-end" style="padding:3px 8px;color:{{ abs($tRealise) > 0.001 ? '#666' : '#1565C0' }};font-size:10px;">{{ abs($tGrand) > 0.001 ? number_format($tGrand, 2, ',', ' ').' €' : '—' }}</td>
                                                 @elseif ($parOperations)
                                                     @php
                                                         $__scIdTOp = (int) ($sc['compte_id'] ?? 0);
@@ -587,12 +596,25 @@
                                                     @endphp
                                                     @foreach ($operationNames as $opId => $opNom)
                                                         @php
-                                                            $tOpVal = ($mode === 'projection' && $section['proj'])
+                                                            $estProjection = $mode === 'projection' && $section['proj'];
+                                                            $tOpVal = $estProjection
                                                                 ? (float) ($projTiersOps[$opId] ?? 0)
                                                                 : (float) ($t['operations'][$opId] ?? 0);
+                                                            // Seule cellule de la vue à mêler projection et réalisé dans
+                                                            // un ternaire unique — partout ailleurs les deux modes ont
+                                                            // leur propre branche @if. C'est ce qui lui a fait garder
+                                                            // « > 0 » sur le réalisé : un tiers au débit d'un
+                                                            // contra-produit (709A Gratuités accordées) affichait « — »
+                                                            // dans la colonne de l'opération, alors que son total
+                                                            // affichait bien -50,00 €.
+                                                            // La projection, elle, garde « > 0 » : un budget
+                                                            // prévisionnel est positif par nature.
+                                                            $tOpAffichable = $estProjection
+                                                                ? $tOpVal > 0
+                                                                : abs($tOpVal) > 0.001;
                                                         @endphp
                                                         <td class="text-end" style="padding:4px 8px;color:#888;font-size:11px;">
-                                                            {{ $tOpVal > 0 ? number_format($tOpVal, 2, ',', ' ').' €' : '—' }}
+                                                            {{ $tOpAffichable ? number_format($tOpVal, 2, ',', ' ').' €' : '—' }}
                                                         </td>
                                                     @endforeach
                                                     {{-- Total tiers opérations --}}
@@ -602,11 +624,11 @@
                                                             $tIdT = (int) ($t['tiers_id'] ?? 0);
                                                             $tProjGrand = (float) ($section['proj']->byScTiers($scIdT)[$tIdT] ?? 0);
                                                         @endphp
-                                                        <td class="text-end" style="padding:4px 8px;color:{{ $tRealise > 0 ? '#666' : '#1565C0' }};font-size:11px;">
+                                                        <td class="text-end" style="padding:4px 8px;color:{{ abs($tRealise) > 0.001 ? '#666' : '#1565C0' }};font-size:11px;">
                                                             {{ $tProjGrand > 0 ? number_format($tProjGrand, 2, ',', ' ').' €' : '—' }}
                                                         </td>
                                                     @else
-                                                        <td class="text-end" style="padding:4px 8px;color:#666;font-size:11px;">{{ $tRealise > 0 ? number_format($tRealise, 2, ',', ' ').' €' : '—' }}</td>
+                                                        <td class="text-end" style="padding:4px 8px;color:#666;font-size:11px;">{{ abs($tRealise) > 0.001 ? number_format($tRealise, 2, ',', ' ').' €' : '—' }}</td>
                                                     @endif
                                                 @elseif ($parSeances)
                                                     @foreach ($seances as $s)
@@ -627,7 +649,7 @@
                                                             </td>
                                                         @else
                                                             <td class="text-end" style="padding:4px 8px;color:#888;font-size:12px;">
-                                                                @if (($t['seances'][$s] ?? 0) > 0)
+                                                                @if (abs((float) ($t['seances'][$s] ?? 0)) > 0.001)
                                                                     {{ number_format($t['seances'][$s], 2, ',', ' ') }} &euro;
                                                                 @else
                                                                     &mdash;
@@ -707,7 +729,7 @@
                                                 ? (float) ($section['proj']->bySeanceOp()[$s][$opId] ?? 0)
                                                 : (float) ($totalSectionSeanceOps[$s][$opId] ?? 0);
                                         @endphp
-                                        <td class="text-end" style="padding:7px 4px;font-size:10px;">{{ $totSO > 0 ? number_format($totSO, 2, ',', ' ').' €' : '—' }}</td>
+                                        <td class="text-end" style="padding:7px 4px;font-size:10px;">{{ abs($totSO) > 0.001 ? number_format($totSO, 2, ',', ' ').' €' : '—' }}</td>
                                     @endforeach
                                     @php
                                         $totOp = ($mode === 'projection' && $section['proj'])

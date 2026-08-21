@@ -42,6 +42,8 @@ final class TransactionLigne extends Model
         'helloasso_item_id',
         'helloasso_option_id',
         'helloasso_tier_id',
+        'helloasso_line_key',
+        'helloasso_discount_code',
         // Partie double — ajoutés Step 10
         'compte_id',
         'debit',
@@ -90,6 +92,42 @@ final class TransactionLigne extends Model
     public function scopeVentilation(Builder $q): Builder
     {
         return $q->whereHas('compte', fn (Builder $q) => $q->whereIn('classe', [6, 7]));
+    }
+
+    /**
+     * Ligne parente d'un item HelloAsso, OU ligne d'une transaction manuelle.
+     *
+     * Le prédicat doit couvrir les deux mondes : `helloasso_line_key` vaut 'parent'
+     * sur une ligne HelloAsso, mais NULL sur une saisie manuelle. Filtrer sur la
+     * seule valeur 'parent' ferait disparaître toutes les adhésions et tous les
+     * reçus fiscaux saisis à la main.
+     *
+     * Le groupement en closure n'est pas cosmétique : un `orWhere` à plat
+     * s'échapperait de la contrainte de transaction courante par précédence SQL,
+     * et ramasserait les lignes parentes de TOUTES les transactions.
+     */
+    public function scopeLigneParenteOuManuelle(Builder $q): Builder
+    {
+        return $q->where(function (Builder $q): void {
+            $q->whereNull('helloasso_item_id')
+                ->orWhere('helloasso_line_key', 'parent');
+        });
+    }
+
+    /**
+     * Toutes les lignes sauf les lignes de remise HelloAsso.
+     *
+     * Une ligne de remise est une donnée de la plateforme, jamais une saisie : elle
+     * est masquée du formulaire de transaction et exclue de ses contrôles de
+     * cardinalité, sans quoi le nombre de lignes soumises ne pourrait jamais
+     * égaler le nombre de lignes en base sur une transaction remisée.
+     */
+    public function scopeHorsRemiseHelloAsso(Builder $q): Builder
+    {
+        return $q->where(function (Builder $q): void {
+            $q->whereNull('helloasso_line_key')
+                ->orWhere('helloasso_line_key', '!=', 'discount');
+        });
     }
 
     // -------------------------------------------------------------------------

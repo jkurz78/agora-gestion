@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\ModePaiement;
+use App\Enums\SensVentilation;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Exceptions\Compta\TenantBoundaryException;
@@ -33,7 +34,7 @@ test('pourReglement — recette normale (411 D) → portage D / 411 C + lettrage
     $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $t1 = $this->ecritureGen->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => 150.0]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => 150.0]],
         dateConstatation: new DateTimeImmutable('2025-10-01'),
         libelle: 'Facture test',
     );
@@ -256,7 +257,7 @@ test('pourReglement — cible explicitement une fraction ouverte de la meme raci
     $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $t1 = $this->ecritureGen->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => 150.0]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => 150.0]],
         dateConstatation: new DateTimeImmutable('2025-10-01'),
         libelle: 'Facture fractionnée',
     );
@@ -292,12 +293,12 @@ test('pourReglement — refuse une ligne explicite issue d une autre racine meti
     $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $t1 = $this->ecritureGen->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => 150.0]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => 150.0]],
         dateConstatation: new DateTimeImmutable('2025-10-01'),
     );
     $autreT1 = $this->ecritureGen->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => 35.0]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => 35.0]],
         dateConstatation: new DateTimeImmutable('2025-10-02'),
     );
     $ligneAutreRacine = $autreT1->lignes->first(
@@ -317,7 +318,7 @@ test('pourReglement — refuse une ligne explicite dont la transaction appartien
     $tiersLocal = Tiers::factory()->create(['association_id' => $this->association->id]);
     $t1 = $this->ecritureGen->pourRecetteACredit(
         tiers: $tiersLocal,
-        ventilations: [['compte' => $this->compte706, 'montant' => 150.0]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => 150.0]],
         dateConstatation: new DateTimeImmutable('2025-10-01'),
     );
     $ligneRacineLocale = $t1->lignes->first(
@@ -376,7 +377,7 @@ test('pourReglement — refuse une ligne explicite deja lettree', function () {
     $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $t1 = $this->ecritureGen->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => 150.0]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => 150.0]],
         dateConstatation: new DateTimeImmutable('2025-10-01'),
     );
     $ligneLettree = $t1->lignes->first(
@@ -397,7 +398,7 @@ test('pourReglement — refuse une ligne explicite sans tiers', function () {
     $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $t1 = $this->ecritureGen->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => 150.0]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => 150.0]],
         dateConstatation: new DateTimeImmutable('2025-10-01'),
     );
     $ligneRacine = $t1->lignes->first(
@@ -427,7 +428,7 @@ test('pourReglement — refuse une ligne explicite hors compte 401 ou 411', func
     $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $t1 = $this->ecritureGen->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $this->compte706, 'montant' => 150.0]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $this->compte706, 'montant' => 150.0]],
         dateConstatation: new DateTimeImmutable('2025-10-01'),
     );
     $ligneRacine = $t1->lignes->first(

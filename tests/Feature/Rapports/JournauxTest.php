@@ -10,6 +10,7 @@ declare(strict_types=1);
  */
 
 use App\Enums\JournalComptable;
+use App\Enums\SensVentilation;
 use App\Enums\TypeTransaction;
 use App\Livewire\RapportJournaux;
 use App\Models\Tiers;
@@ -43,7 +44,7 @@ function creerCreanceJournal(object $contexte, string $nom = 'Client Journal'): 
 
     $contexte->ecritures->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [[
+        ventilations: [['sens' => SensVentilation::Credit,
             'compte' => $contexte->compte706,
             'montant' => MontantDecimal::depuisCentimes(12000),
         ]],

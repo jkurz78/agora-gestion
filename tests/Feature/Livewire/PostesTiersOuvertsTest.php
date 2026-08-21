@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\OrigineANouveau;
+use App\Enums\SensVentilation;
 use App\Enums\StatutExercice;
 use App\Livewire\Compta\PostesTiersOuverts;
 use App\Models\Compte;
@@ -49,7 +50,7 @@ function creerCreancePostesTiersOuverts(
 ): Transaction {
     $transaction = app(EcritureGenerator::class)->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [[
+        ventilations: [['sens' => SensVentilation::Credit,
             'compte' => comptePostesTiersOuverts('706-'.str_replace('-', '', $reference), 7),
             'montant' => 100.00,
         ]],

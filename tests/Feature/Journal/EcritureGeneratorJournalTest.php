@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\JournalComptable;
 use App\Enums\ModePaiement;
+use App\Enums\SensVentilation;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\RemiseBancaire;
@@ -75,7 +76,7 @@ function creerCreanceJrn(float $montant = 150.00): Transaction
 
     return $generator->pourRecetteACredit(
         tiers: $tiers,
-        ventilations: [['compte' => $compteProduit, 'montant' => $montant]],
+        ventilations: [['sens' => SensVentilation::Credit, 'compte' => $compteProduit, 'montant' => $montant]],
         dateConstatation: new DateTimeImmutable('2026-05-20'),
         libelle: 'Facture test journal',
     );
