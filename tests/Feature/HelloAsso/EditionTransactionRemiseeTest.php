@@ -283,6 +283,49 @@ it('préserve helloasso_tier_id sur la ligne parente reconstruite', function ():
     expect((int) $apres->helloasso_tier_id)->toBe(19069055);
 });
 
+it('patche les lignes HelloAsso en place, sans les détruire ni les recréer', function (): void {
+    $tx = synchroniserCommandeRemisePartielleCheque($this->parametres);
+
+    $idsAvant = TransactionLigne::where('transaction_id', $tx->id)->orderBy('id')->pluck('id')->all();
+
+    Livewire::test(TransactionForm::class)
+        ->call('edit', $tx->id)
+        ->set('notes', 'Chèque reçu, en cours de dépôt')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $idsApres = TransactionLigne::where('transaction_id', $tx->id)->orderBy('id')->pluck('id')->all();
+
+    expect($idsApres)->toBe($idsAvant);
+})->todo('ÉCART DE SPEC CONNU — relevé en revue de code, non corrigé.
+
+Le lot 5 de la spec impose « aucune suppression/recréation des lignes HelloAsso
+— pas de forceDelete() » et un « patch en place des seuls champs réellement
+modifiables : notes, opération, séance, pièce jointe ».
+
+Ce n\'est pas ce que fait le code. Une remise TOTALE naît lettrée, prend le
+chemin aUnReglementTiers() et est bien patchée en place. Une remise PARTIELLE
+reste EnAttente, tombe dans la branche libre de TransactionService::update() et
+voit TOUTES ses lignes détruites au forceDelete() puis recréées : mesuré, les
+identifiants changent intégralement (1,2,3 → 4,5,6, intersection vide).
+
+Le chemin dédié promis par la spec est en réalité un rattrapage : les lignes de
+remise sont snapshotées avant le forceDelete() et recréées à l\'identique, les
+métadonnées HelloAsso réinjectées, les pièces jointes rattachées par index dans
+TransactionForm::save(). Rien ne se perd aujourd\'hui — mais chaque colonne
+ajoutée à transaction_lignes devra penser à ce rattrapage, sans quoi elle
+disparaîtra à la première édition. C\'est exactement ce qui est arrivé à
+helloasso_tier_id.
+
+Deuxième écart du même lot : le sélecteur de compte de la ligne n\'est PAS
+verrouillé pour une transaction HelloAsso (transaction-form.blade.php, la liste
+disabled ne cite que isLockedByFacture / isLockedByImmobilisation /
+isExtourneMiroir). L\'utilisateur peut donc reclasser le produit brut, ce que la
+spec n\'autorise pas. Laissé tel quel volontairement : c\'est le seul recours
+en IHM si un mapping de formulaire route une commande vers le mauvais compte,
+et la question de fond — reclasser en place ou passer une OD — est ouverte par
+ailleurs. À trancher avec elle, pas ici.');
+
 it('déplacer la ligne parente vers une autre opération déplace aussi la ligne 709A', function (): void {
     $tx = synchroniserCommandeRemisePartielleCheque($this->parametres);
 
