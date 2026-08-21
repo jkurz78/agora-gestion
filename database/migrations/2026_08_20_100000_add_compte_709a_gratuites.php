@@ -15,7 +15,8 @@ use Illuminate\Support\Facades\DB;
  * Compte::ofNumeroSysteme().
  *
  * Réutilisation : si une association possède déjà un 709A (saisi à la main), on
- * ne le duplique pas — on se contente de lui rattacher l'usage.
+ * ne le duplique pas — on se contente de lui rattacher l'usage. S'il est
+ * soft-deleted, on le restaure : l'index unique interdit d'en créer un second.
  *
  * Aucune configuration manuelle n'est requise après cette migration.
  */
@@ -25,6 +26,27 @@ return new class extends Migration
     {
         $isSqlite = DB::getDriverName() === 'sqlite';
         $insertIgnore = $isSqlite ? 'INSERT OR IGNORE' : 'INSERT IGNORE';
+
+        // 0. Restaurer un 709A soft-deleted AVANT toute insertion.
+        //
+        // `comptes_asso_numero_pcg_unique` porte sur (association_id, numero_pcg)
+        // seuls — il ne connaît pas deleted_at. Un 709A supprimé occupe donc la
+        // place : l'étape 1 ne le voyait pas (elle ne regarde que les lignes
+        // actives), son INSERT partait, l'index le refusait, et INSERT IGNORE
+        // avalait le refus. L'association restait sans compte de gratuité, sans
+        // qu'aucune erreur ne le signale — puis la synchro HelloAsso échouait
+        // faute de contrepartie pour ses remises.
+        //
+        // Ce même index garantit qu'il existe au plus UNE ligne 709A par
+        // association : si elle est supprimée, il n'y a pas d'actif à côté, et
+        // la restauration est sans ambiguïté. `actif` repasse à 1 pour rendre le
+        // compte utilisable — exactement ce que l'INSERT de l'étape 1 aurait créé.
+        DB::statement(<<<'SQL'
+            UPDATE comptes
+            SET deleted_at = NULL, actif = 1, updated_at = CURRENT_TIMESTAMP
+            WHERE numero_pcg = '709A'
+              AND deleted_at IS NOT NULL
+            SQL);
 
         // 1. Créer le compte pour chaque association qui n'en a pas.
         DB::statement(<<<SQL
