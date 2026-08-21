@@ -536,7 +536,10 @@
                                             @php
                                                 $tRealise = (float) ($t['montant'] ?? 0);
                                                 $tPrev = (float) ($sectionIdx['tiers'][$sc['compte_id']][$t['tiers_id'] ?? -1] ?? 0);
-                                                $tVisible = $tRealise > 0 || ($mode !== 'realise' && $tPrev > 0);
+                                                // Visible dès qu'il porte un mouvement, quel que soit
+                                                // son SIGNE — un tiers peut apparaître au débit sur un
+                                                // contra-produit (709A Gratuités accordées).
+                                                $tVisible = abs($tRealise) > 0.001 || ($mode !== 'realise' && abs($tPrev) > 0.001);
                                             @endphp
                                             @if ($tVisible)
                                             <tr style="background:#fff;">
