@@ -38,7 +38,6 @@ use App\Services\TransactionService;
 use App\Tenant\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -211,21 +210,6 @@ final class TransactionForm extends Component
         }
 
         return round(collect($this->lignes)->sum(fn ($l) => (float) ($l['montant'] ?? 0)), 2);
-    }
-
-    /**
-     * Contrainte « visible dans le formulaire » appliquée à une requête de
-     * lignes de ventilation : exclut les lignes de remise HelloAsso
-     * (helloasso_line_key = 'discount'), protégées de l'édition (item a,
-     * Tâche 14). Le formulaire ne transporte que des montants positifs, sans
-     * sens débit/crédit — il ne peut pas représenter fidèlement cette ligne
-     * technique posée au débit par la synchro. Centralisé ici pour que
-     * $this->lignes (edit()) et les requêtes de rattrapage des pièces
-     * jointes de ligne (save()) restent alignées index à index.
-     */
-    private static function excluantRemiseHelloAsso(Builder|Relation $q): Builder|Relation
-    {
-        return $q->where(fn (Builder $qq) => $qq->whereNull('helloasso_line_key')->orWhere('helloasso_line_key', '!=', 'discount'));
     }
 
     public function mount(): void
@@ -543,14 +527,14 @@ final class TransactionForm extends Component
         // générées par EcritureGenerator. L'utilisateur ne saisit/n'édite que
         // les lignes de ventilation métier (classe 6/7).
         //
-        // excluantRemiseHelloAsso() exclut en plus la ligne de remise
+        // horsRemiseHelloAsso() exclut en plus la ligne de remise
         // HelloAsso (helloasso_line_key = 'discount', item a de la Tâche 14) :
         // ce formulaire manipule des montants positifs sans notion de sens
         // débit/crédit, il ne peut pas éditer cette ligne technique (709A,
         // posée au débit par la synchro) sans la corrompre. Elle reste en
         // base, gérée exclusivement par TransactionService::update().
         $transaction = Transaction::with([
-            'lignes' => fn ($q) => self::excluantRemiseHelloAsso($q->ventilation()),
+            'lignes' => fn ($q) => $q->ventilation()->horsRemiseHelloAsso(),
             'noteDeFrais',
         ])->findOrFail($id);
 
@@ -675,7 +659,7 @@ final class TransactionForm extends Component
             // $sourceTotal porterait la remise (montant strictement positif quel que
             // soit son sens) alors que $currentTotal ne la contient plus jamais —
             // fausse détection de dérive sur toute transaction remisée.
-            $sourceTotal = round((float) self::excluantRemiseHelloAsso($source->lignes()->ventilation())->sum('montant'), 2);
+            $sourceTotal = round((float) $source->lignes()->ventilation()->horsRemiseHelloAsso()->sum('montant'), 2);
             $currentTotal = round(collect($this->lignes)->sum(fn ($l) => (float) ($l['montant'] ?? 0)), 2);
             if (abs($sourceTotal - $currentTotal) > 0.001) {
                 $this->addError('lignes', 'Montant verrouillé pour les transactions HelloAsso.');
@@ -848,16 +832,16 @@ final class TransactionForm extends Component
         $service = app(TransactionService::class);
 
         // Capturer les anciens paths PJ par index AVANT l'update (le service forceDelete les lignes).
-        // Filtre ventilation() + excluantRemiseHelloAsso() : aligne les indices avec
+        // Filtre ventilation() + horsRemiseHelloAsso() : aligne les indices avec
         // $this->lignes (qui n'a que les ventilations visibles — item a, Tâche 14).
         // Sans cette seconde exclusion, une transaction HelloAsso remisée à plusieurs
         // lignes désalignerait les indices (la remise s'intercale en base mais jamais
         // dans $this->lignes) et ce rattrapage récupérerait le PJ de la mauvaise ligne.
         $anciensPieceJointePaths = [];
         if ($this->transactionId) {
-            $existingLignes = self::excluantRemiseHelloAsso(
-                Transaction::findOrFail($this->transactionId)->lignes()->ventilation()
-            )->get()->values();
+            $existingLignes = Transaction::findOrFail($this->transactionId)
+                ->lignes()->ventilation()->horsRemiseHelloAsso()
+                ->get()->values();
             foreach ($this->lignes as $index => $ligneData) {
                 $existingLigne = $existingLignes->get($index);
                 if ($existingLigne !== null) {
@@ -959,11 +943,11 @@ final class TransactionForm extends Component
         }
 
         // Sauvegarder les PJ de lignes.
-        // Filtre ventilation() + excluantRemiseHelloAsso() : aligne les indices avec
+        // Filtre ventilation() + horsRemiseHelloAsso() : aligne les indices avec
         // $this->lignes (qui n'a que les ventilations visibles — item a, Tâche 14).
-        $tx = $createdTransaction ?? Transaction::with(['lignes' => fn ($q) => self::excluantRemiseHelloAsso($q->ventilation())])->find($this->transactionId);
+        $tx = $createdTransaction ?? Transaction::with(['lignes' => fn ($q) => $q->ventilation()->horsRemiseHelloAsso()])->find($this->transactionId);
         if ($tx !== null) {
-            $tx->load(['lignes' => fn ($q) => self::excluantRemiseHelloAsso($q->ventilation())]);
+            $tx->load(['lignes' => fn ($q) => $q->ventilation()->horsRemiseHelloAsso()]);
             $lignesModels = $tx->lignes->values();
             foreach ($this->lignes as $index => $ligneData) {
                 $ligneModel = $lignesModels->get($index);

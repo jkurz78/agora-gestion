@@ -1171,7 +1171,7 @@ final class TransactionService
         // $lignesExistantes (toutes les lignes classe 6/7 en base, remise comprise)
         // ne pourraient jamais avoir le même compte sur une transaction remisée.
         $lignesExistantes = $transaction->lignes()->ventilation()
-            ->where(fn (Builder $q) => $q->whereNull('helloasso_line_key')->orWhere('helloasso_line_key', '!=', 'discount'))
+            ->horsRemiseHelloAsso()
             ->get()->keyBy('id');
         if (count($lignes) !== $lignesExistantes->count()) {
             throw new \RuntimeException('Les lignes d\'une transaction réglée ne peuvent pas être modifiées (compte, montant, opération) — annulez le règlement d\'abord. La répartition par opération et séance, elle, reste modifiable.');

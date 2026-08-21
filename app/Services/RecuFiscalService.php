@@ -218,10 +218,7 @@ final class RecuFiscalService
         // Prédicat ligne parente compatible manuel + HelloAsso (709A, T5) : exclut
         // les lignes options HelloAsso (B1) ainsi que la ligne de remise (T9).
         $lignes = $adhesion->transaction->lignes()
-            ->where(function ($query): void {
-                $query->whereNull('helloasso_item_id')
-                    ->orWhere('helloasso_line_key', 'parent');
-            })
+            ->ligneParenteOuManuelle()
             ->get();
 
         if ($adhesion->formuleAdhesion?->est_helloasso) {

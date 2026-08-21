@@ -46,10 +46,7 @@ final class AdhesionService
         // toujours helloasso_line_key, et seule 'parent' désigne la ligne cotisation
         // (exclut 'discount' et 'option:{id}', qui partagent option_id NULL avec elle).
         $ligneCotisation = $tx->lignes()
-            ->where(function ($query): void {
-                $query->whereNull('helloasso_item_id')
-                    ->orWhere('helloasso_line_key', 'parent');
-            })
+            ->ligneParenteOuManuelle()
             ->whereHas('compte.usages', function ($q): void {
                 $q->where('usage', UsageComptable::Cotisation->value);
             })
@@ -63,10 +60,7 @@ final class AdhesionService
         // Ne sert plus qu'aux transactions synchronisées avant ce chantier.
         if ($ligneCotisation === null && $tx->helloasso_form_slug !== null) {
             $ligneCotisation = $tx->lignes()
-                ->where(function ($query): void {
-                    $query->whereNull('helloasso_item_id')
-                        ->orWhere('helloasso_line_key', 'parent');
-                })
+                ->ligneParenteOuManuelle()
                 ->whereNotNull('helloasso_tier_id')
                 ->get()
                 ->first(fn (TransactionLigne $l) => FormuleAdhesion::query()

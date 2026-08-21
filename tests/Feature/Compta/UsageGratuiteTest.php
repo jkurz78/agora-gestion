@@ -7,6 +7,7 @@ use App\Enums\UsageComptable;
 use App\Models\Compte;
 use App\Services\UsagesComptablesService;
 use App\Tenant\TenantContext;
+use DomainException;
 
 it('expose un usage Gratuite mono, de polarité recette', function (): void {
     $usage = UsageComptable::Gratuite;
@@ -59,5 +60,27 @@ it('setGratuite(null) détache le compte sans en désigner d’autre', function 
     $service->setGratuite($compte->id);
     $service->setGratuite(null);
 
+    expect(Compte::forUsage(UsageComptable::Gratuite)->count())->toBe(0);
+});
+
+it('refuse un compte qui n’est pas de classe 7', function (): void {
+    // Le 709A est un contra-produit : il vit au débit mais reste un compte de
+    // PRODUITS. EcritureGenerator::pourRecetteACredit rejette toute ventilation de
+    // classe ≠ 7 sur une recette — un compte de charge configuré ici ferait échouer
+    // la conversion de chaque commande remisée, loin de la configuration fautive.
+    //
+    // L'écran ne propose que des comptes de produits, mais une requête Livewire
+    // forgée contournerait ce filtre : la garde doit être au service.
+    $compteCharge = Compte::factory()->create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '628C',
+        'intitule' => 'Développement logiciel',
+        'classe' => 6,
+    ]);
+
+    expect(fn () => app(UsagesComptablesService::class)->setGratuite($compteCharge->id))
+        ->toThrow(DomainException::class, 'classe 7');
+
+    // Et surtout : aucun usage ne doit avoir été posé malgré le rejet.
     expect(Compte::forUsage(UsageComptable::Gratuite)->count())->toBe(0);
 });

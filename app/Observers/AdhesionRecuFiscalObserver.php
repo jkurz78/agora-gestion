@@ -22,10 +22,7 @@ final class AdhesionRecuFiscalObserver
             // Prédicat ligne parente compatible manuel + HelloAsso (709A, T5).
             $ligne = $adhesion->transaction->lignes()
                 ->whereNull('deleted_at')
-                ->where(function ($query): void {
-                    $query->whereNull('helloasso_item_id')
-                        ->orWhere('helloasso_line_key', 'parent');
-                })
+                ->ligneParenteOuManuelle()
                 ->first();
 
             if ($ligne === null) {
