@@ -92,6 +92,7 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class, CheckEspaceAccess
     ->prefix('parametres')
     ->name('parametres.')
     ->group(function (): void {
+        Route::view('/', 'parametres.index')->name('index');
         Route::view('/association', 'parametres.association')->name('association');
         Route::view('/helloasso', 'parametres.helloasso')->name('helloasso');
         Route::view('/reception-documents', 'parametres.reception-documents')->name('reception-documents');
