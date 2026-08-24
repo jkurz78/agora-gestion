@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Parametres;
 
 use App\Exceptions\DemoOperationBlockedException;
+use App\Livewire\Parametres\Concerns\AutoriseEcranParametre;
 use App\Models\SmtpParametres;
 use App\Services\SmtpService;
 use App\Support\Demo;
@@ -14,6 +15,8 @@ use Livewire\Component;
 
 final class SmtpForm extends Component
 {
+    use AutoriseEcranParametre;
+
     public bool $enabled = false;
 
     public string $smtpHost = '';
@@ -32,6 +35,11 @@ final class SmtpForm extends Component
 
     /** @var array{success: bool, error: ?string, banner: ?string}|null */
     public ?array $testResult = null;
+
+    protected function cleEcranParametre(): string
+    {
+        return 'envoi-emails';
+    }
 
     public function mount(): void
     {

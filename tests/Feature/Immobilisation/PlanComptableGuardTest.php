@@ -5,8 +5,10 @@ declare(strict_types=1);
 use App\Livewire\PlanComptable;
 use App\Models\Compte;
 use App\Models\Tiers;
+use App\Models\User;
 use App\Services\Immobilisation\ImmobilisationComptesSeeder;
 use App\Services\Immobilisation\ImmobilisationService;
+use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Livewire\Livewire;
 
@@ -17,6 +19,10 @@ use Livewire\Livewire;
  * n'empêchait sa suppression, ni celle du compte d'immobilisation lui-même.
  */
 beforeEach(function (): void {
+    $user = User::factory()->create();
+    $user->associations()->attach(TenantContext::currentId(), ['role' => 'admin', 'joined_at' => now()]);
+    $this->actingAs($user);
+
     Compte::factory()->create(['numero_pcg' => '401', 'classe' => 4, 'est_systeme' => true]);
     ImmobilisationComptesSeeder::seed();
 

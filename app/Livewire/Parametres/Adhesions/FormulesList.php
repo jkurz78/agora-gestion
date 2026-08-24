@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Parametres\Adhesions;
 
 use App\Enums\UsageComptable;
+use App\Livewire\Parametres\Concerns\AutoriseEcranParametre;
 use App\Models\Compte;
 use App\Models\FormuleAdhesion;
 use App\Models\UsageCompte;
@@ -14,6 +15,8 @@ use Livewire\Component;
 
 final class FormulesList extends Component
 {
+    use AutoriseEcranParametre;
+
     public bool $showModal = false;
 
     public ?int $editingId = null;
@@ -49,6 +52,11 @@ final class FormulesList extends Component
     public ?string $newSousCatCodeCerfa = null;
 
     public ?string $newSousCatErreur = null;
+
+    protected function cleEcranParametre(): string
+    {
+        return 'formules-adhesion';
+    }
 
     public function openCreate(): void
     {

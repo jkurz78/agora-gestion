@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Parametres;
 
 use App\Enums\UsageComptable;
+use App\Livewire\Parametres\Concerns\AutoriseEcranParametre;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\HelloAssoParametres;
@@ -15,6 +16,8 @@ use Livewire\Component;
 
 final class HelloassoSyncConfig extends Component
 {
+    use AutoriseEcranParametre;
+
     public ?int $compteHelloassoId = null;
 
     public ?int $compteVersementId = null;
@@ -24,6 +27,11 @@ final class HelloassoSyncConfig extends Component
     public ?string $message = null;
 
     public ?string $erreur = null;
+
+    protected function cleEcranParametre(): string
+    {
+        return 'helloasso';
+    }
 
     public function mount(): void
     {

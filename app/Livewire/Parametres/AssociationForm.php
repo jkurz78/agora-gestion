@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Parametres;
 
 use App\Exceptions\OcrAnalysisException;
+use App\Livewire\Parametres\Concerns\AutoriseEcranParametre;
 use App\Mail\TestEmail;
 use App\Models\CompteBancaire;
 use App\Services\InvoiceOcrService;
@@ -18,6 +19,7 @@ use Livewire\WithFileUploads;
 
 final class AssociationForm extends Component
 {
+    use AutoriseEcranParametre;
     use WithFileUploads;
 
     /** Onglet actif — entangle Alpine pour survivre aux re-renders Livewire. */
@@ -83,6 +85,11 @@ final class AssociationForm extends Component
     public string $testFlashMessage = '';
 
     public string $testFlashType = '';
+
+    protected function cleEcranParametre(): string
+    {
+        return 'informations';
+    }
 
     public function mount(): void
     {
