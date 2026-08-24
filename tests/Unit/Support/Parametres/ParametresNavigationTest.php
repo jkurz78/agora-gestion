@@ -33,7 +33,7 @@ it('chaque écran pointe une route déclarée', function (): void {
             );
         }
     }
-})->todo('Routes créées en Task 6 à 8');
+});
 
 it('applique la matrice de droits de la spec', function (string $cle, array $attendus): void {
     $correspondances = [];

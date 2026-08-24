@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Parametres;
 
-use App\Exceptions\OcrAnalysisException;
 use App\Livewire\Parametres\Concerns\AutoriseEcranParametre;
 use App\Mail\TestEmail;
-use App\Services\InvoiceOcrService;
 use App\Support\CurrentAssociation;
 use App\Support\TenantAsset;
 use Illuminate\Support\Facades\Mail;
@@ -48,17 +46,6 @@ final class AssociationForm extends Component
 
     public ?string $forme_juridique = null;
 
-    public ?string $anthropic_api_key = null;
-
-    public ?string $invoice_ocr_model = null;
-
-    /** @var array<string, string> [id => libellé] des modèles disponibles pour la clé */
-    public array $availableOcrModels = [];
-
-    public string $ocrModelsFlash = '';
-
-    public string $ocrModelsFlashType = '';
-
     public ?string $email_from = null;
 
     public ?string $email_from_name = null;
@@ -90,58 +77,9 @@ final class AssociationForm extends Component
             $this->cachet_signature_path = $association->cachet_signature_path;
             $this->siret = $association->siret;
             $this->forme_juridique = $association->forme_juridique;
-            $this->anthropic_api_key = $association->anthropic_api_key;
-            $this->invoice_ocr_model = $association->invoice_ocr_model;
             $this->email_from = $association->email_from;
             $this->email_from_name = $association->email_from_name;
         }
-
-        // Le sélecteur contient au moins le modèle déjà choisi, pour ne jamais
-        // être vide avant un chargement de la liste vivante.
-        if ($this->invoice_ocr_model !== null && $this->invoice_ocr_model !== '') {
-            $this->availableOcrModels = [$this->invoice_ocr_model => $this->invoice_ocr_model];
-        }
-    }
-
-    /**
-     * Charge la liste des modèles réellement disponibles pour la clé API saisie,
-     * via GET /v1/models. L'utilisateur sélectionne ensuite dans le combo —
-     * aucun ID à deviner ni à saisir à la main.
-     */
-    public function chargerModelesOcr(): void
-    {
-        $this->ocrModelsFlash = '';
-        $this->ocrModelsFlashType = '';
-
-        $cle = $this->anthropic_api_key !== null && $this->anthropic_api_key !== ''
-            ? $this->anthropic_api_key
-            : CurrentAssociation::tryGet()?->anthropic_api_key;
-
-        if ($cle === null || $cle === '') {
-            $this->ocrModelsFlash = 'Renseignez d\'abord la clé API Anthropic, puis enregistrez ou rechargez la liste.';
-            $this->ocrModelsFlashType = 'warning';
-
-            return;
-        }
-
-        try {
-            $modeles = InvoiceOcrService::fetchAvailableModels($cle);
-        } catch (OcrAnalysisException $e) {
-            $this->ocrModelsFlash = 'Impossible de récupérer la liste des modèles (clé invalide ou API injoignable).';
-            $this->ocrModelsFlashType = 'danger';
-
-            return;
-        }
-
-        // On conserve le modèle déjà choisi même s'il n'est plus listé (retiré),
-        // pour ne pas effacer silencieusement la configuration.
-        if ($this->invoice_ocr_model !== null && $this->invoice_ocr_model !== '' && ! isset($modeles[$this->invoice_ocr_model])) {
-            $modeles[$this->invoice_ocr_model] = $this->invoice_ocr_model.' (retiré ?)';
-        }
-
-        $this->availableOcrModels = $modeles;
-        $this->ocrModelsFlash = count($modeles).' modèle(s) disponible(s) chargé(s).';
-        $this->ocrModelsFlashType = 'success';
     }
 
     public function save(): void
@@ -157,8 +95,6 @@ final class AssociationForm extends Component
             'cachet' => ['nullable', 'image', 'mimes:png,jpg,jpeg', 'max:2048'],
             'siret' => ['nullable', 'string', 'max:14'],
             'forme_juridique' => ['nullable', 'string', 'max:255'],
-            'anthropic_api_key' => ['nullable', 'string', 'max:255'],
-            'invoice_ocr_model' => ['nullable', 'string', 'max:255'],
             'email_from' => ['nullable', 'email', 'max:255'],
             'email_from_name' => ['nullable', 'string', 'max:255'],
         ]);
@@ -172,8 +108,6 @@ final class AssociationForm extends Component
             'telephone' => $this->telephone,
             'siret' => $this->siret,
             'forme_juridique' => $this->forme_juridique,
-            'anthropic_api_key' => $this->anthropic_api_key ?: null,
-            'invoice_ocr_model' => $this->invoice_ocr_model ?: null,
             'email_from' => $this->email_from ?: null,
             'email_from_name' => $this->email_from_name ?: null,
         ];

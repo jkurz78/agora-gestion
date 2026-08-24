@@ -2,7 +2,19 @@
 
 declare(strict_types=1);
 
-use App\Livewire\Parametres\AssociationForm;
+// Migré vers OcrIaForm (Task 8 de la découpe d'AssociationForm) : la clé API
+// Anthropic et le modèle OCR ont quitté l'onglet OCR / IA pour l'écran dédié
+// « OCR / IA », dans les services connectés. Voir
+// tests/Feature/Parametres/DecoupeAssociationFormTest.php et
+// tests/Livewire/Parametres/OcrIaFormTest.php pour la couverture TDD complète
+// du nouveau composant, notamment le motif anti-fuite de la clé API
+// (`cleDejaEnregistree`, jamais chargée en clair) — ce fichier est conservé
+// pour ne pas perdre son historique de régression, adapté à sa nouvelle
+// destination. Le test « ne fait pas perdre l'onglet actif » n'a pas de sens
+// ici : OcrIaForm n'a pas d'onglets, contrairement à l'AssociationForm
+// d'origine.
+
+use App\Livewire\Parametres\OcrIaForm;
 use App\Models\Association;
 use App\Models\User;
 use App\Tenant\TenantContext;
@@ -23,7 +35,7 @@ afterEach(function () {
 });
 
 it('affiche le sélecteur de modèle OCR', function () {
-    Livewire::test(AssociationForm::class)
+    Livewire::test(OcrIaForm::class)
         ->assertSeeHtml('Modèle d\'analyse')
         ->assertSeeHtml('Charger les modèles disponibles');
 });
@@ -38,7 +50,7 @@ it('chargerModelesOcr peuple le combo depuis GET /v1/models', function () {
         ]),
     ]);
 
-    Livewire::test(AssociationForm::class)
+    Livewire::test(OcrIaForm::class)
         ->set('anthropic_api_key', 'sk-test-key')
         ->call('chargerModelesOcr')
         ->assertSet('availableOcrModels', [
@@ -49,7 +61,7 @@ it('chargerModelesOcr peuple le combo depuis GET /v1/models', function () {
 });
 
 it('chargerModelesOcr avertit sans clé API', function () {
-    Livewire::test(AssociationForm::class)
+    Livewire::test(OcrIaForm::class)
         ->set('anthropic_api_key', '')
         ->call('chargerModelesOcr')
         ->assertSet('ocrModelsFlashType', 'warning')
@@ -57,26 +69,11 @@ it('chargerModelesOcr avertit sans clé API', function () {
 });
 
 it('save persiste le modèle OCR choisi', function () {
-    Livewire::test(AssociationForm::class)
-        ->set('nom', 'Asso')
+    Livewire::test(OcrIaForm::class)
         ->set('invoice_ocr_model', 'claude-opus-4-8')
         ->call('save');
 
     expect($this->association->fresh()->invoice_ocr_model)->toBe('claude-opus-4-8');
-});
-
-it('chargerModelesOcr ne fait pas perdre l\'onglet actif', function () {
-    Http::fake([
-        'api.anthropic.com/v1/models*' => Http::response([
-            'data' => [['id' => 'claude-sonnet-4-6', 'display_name' => 'Claude Sonnet 4.6']],
-        ]),
-    ]);
-
-    Livewire::test(AssociationForm::class)
-        ->set('activeTab', 'ocr')
-        ->set('anthropic_api_key', 'sk-test-key')
-        ->call('chargerModelesOcr')
-        ->assertSet('activeTab', 'ocr');
 });
 
 it('le modèle déjà choisi reste sélectionnable même retiré de la liste', function () {
@@ -86,7 +83,7 @@ it('le modèle déjà choisi reste sélectionnable même retiré de la liste', f
         ]),
     ]);
 
-    Livewire::test(AssociationForm::class)
+    Livewire::test(OcrIaForm::class)
         ->set('anthropic_api_key', 'sk-test-key')
         ->set('invoice_ocr_model', 'claude-vieux-retire')
         ->call('chargerModelesOcr')
