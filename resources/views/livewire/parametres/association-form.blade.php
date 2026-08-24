@@ -34,12 +34,6 @@
             </button>
         </li>
         <li class="nav-item" role="presentation">
-            <button class="nav-link" :class="{ active: tab === 'facturation' }" id="tab-facturation" @click="tab = 'facturation'"
-                    type="button" role="tab" aria-controls="pane-facturation" :aria-selected="tab === 'facturation'">
-                <i class="bi bi-receipt"></i> Facturation
-            </button>
-        </li>
-        <li class="nav-item" role="presentation">
             <button class="nav-link" :class="{ active: tab === 'ocr' }" id="tab-ocr" @click="tab = 'ocr'"
                     type="button" role="tab" aria-controls="pane-ocr" :aria-selected="tab === 'ocr'">
                 <i class="bi bi-robot"></i> OCR / IA
@@ -62,11 +56,25 @@
                     <div class="card mb-3">
                         <div class="card-header py-2"><span class="small fw-semibold">Identité</span></div>
                         <div class="card-body">
-                            <div class="mb-0">
+                            <div class="mb-3">
                                 <label class="form-label small">Nom de l'association <span class="text-danger">*</span></label>
                                 <input type="text" class="form-control form-control-sm @error('nom') is-invalid @enderror"
                                        wire:model="nom">
                                 @error('nom') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label small">SIRET</label>
+                                <input type="text" class="form-control form-control-sm @error('siret') is-invalid @enderror"
+                                       wire:model="siret" maxlength="14" placeholder="14 chiffres">
+                                @error('siret') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            </div>
+
+                            <div class="mb-0">
+                                <label class="form-label small">Forme juridique</label>
+                                <input type="text" class="form-control form-control-sm @error('forme_juridique') is-invalid @enderror"
+                                       wire:model="forme_juridique" placeholder="Ex : Association loi 1901">
+                                @error('forme_juridique') <div class="invalid-feedback">{{ $message }}</div> @enderror
                             </div>
                         </div>
                     </div>
@@ -146,71 +154,6 @@
                 <span wire:loading.remove><i class="bi bi-floppy"></i> Enregistrer</span>
                 <span wire:loading>Enregistrement…</span>
             </button>
-        </div>
-
-        {{-- Onglet Facturation --}}
-        <div class="tab-pane fade" :class="{ 'show active': tab === 'facturation' }" id="pane-facturation" role="tabpanel" aria-labelledby="tab-facturation">
-            <div class="mt-3">
-                    <p class="text-muted small mb-4">
-                        Ces informations apparaissent sur les <strong>factures</strong> émises par l'application (pied de page, mentions légales, coordonnées bancaires).
-                    </p>
-
-                    <div class="mb-3">
-                        <label class="form-label">SIRET</label>
-                        <input type="text" class="form-control @error('siret') is-invalid @enderror"
-                               wire:model="siret" maxlength="14" placeholder="14 chiffres">
-                        @error('siret') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Forme juridique</label>
-                        <input type="text" class="form-control @error('forme_juridique') is-invalid @enderror"
-                               wire:model="forme_juridique" placeholder="Ex : Association loi 1901">
-                        @error('forme_juridique') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Conditions de règlement</label>
-                        <textarea class="form-control @error('facture_conditions_reglement') is-invalid @enderror"
-                                  wire:model="facture_conditions_reglement" rows="2"
-                                  placeholder="Ex : Payable à réception"></textarea>
-                        @error('facture_conditions_reglement') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Mentions légales</label>
-                        <textarea class="form-control @error('facture_mentions_legales') is-invalid @enderror"
-                                  wire:model="facture_mentions_legales" rows="3"
-                                  placeholder="Ex : TVA non applicable, art. 261-7-1° du CGI"></textarea>
-                        @error('facture_mentions_legales') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Mentions pénalités B2B</label>
-                        <textarea class="form-control @error('facture_mentions_penalites') is-invalid @enderror"
-                                  wire:model="facture_mentions_penalites" rows="3"
-                                  placeholder="Pénalités de retard, indemnité forfaitaire de recouvrement…"></textarea>
-                        @error('facture_mentions_penalites') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                    </div>
-
-                    <div class="mb-4">
-                        <label class="form-label">Compte bancaire par défaut</label>
-                        <select class="form-select @error('facture_compte_bancaire_id') is-invalid @enderror"
-                                wire:model="facture_compte_bancaire_id">
-                            <option value="">— Aucun —</option>
-                            @foreach($comptesBancaires as $compte)
-                                <option value="{{ $compte->id }}">{{ $compte->nom }}@if($compte->iban) — {{ $compte->iban }}@endif</option>
-                            @endforeach
-                        </select>
-                        @error('facture_compte_bancaire_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                    </div>
-
-                    <button type="button" class="btn btn-primary" wire:click="save" wire:loading.attr="disabled">
-                        <span wire:loading.remove><i class="bi bi-floppy"></i> Enregistrer</span>
-                        <span wire:loading>Enregistrement…</span>
-                    </button>
-
-            </div>
         </div>
 
         {{-- Onglet OCR / IA --}}

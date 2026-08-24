@@ -7,7 +7,6 @@ namespace App\Livewire\Parametres;
 use App\Exceptions\OcrAnalysisException;
 use App\Livewire\Parametres\Concerns\AutoriseEcranParametre;
 use App\Mail\TestEmail;
-use App\Models\CompteBancaire;
 use App\Services\InvoiceOcrService;
 use App\Support\CurrentAssociation;
 use App\Support\TenantAsset;
@@ -48,14 +47,6 @@ final class AssociationForm extends Component
     public ?string $siret = null;
 
     public ?string $forme_juridique = null;
-
-    public ?string $facture_conditions_reglement = null;
-
-    public ?string $facture_mentions_legales = null;
-
-    public ?string $facture_mentions_penalites = null;
-
-    public ?int $facture_compte_bancaire_id = null;
 
     public ?string $anthropic_api_key = null;
 
@@ -99,10 +90,6 @@ final class AssociationForm extends Component
             $this->cachet_signature_path = $association->cachet_signature_path;
             $this->siret = $association->siret;
             $this->forme_juridique = $association->forme_juridique;
-            $this->facture_conditions_reglement = $association->facture_conditions_reglement;
-            $this->facture_mentions_legales = $association->facture_mentions_legales;
-            $this->facture_mentions_penalites = $association->facture_mentions_penalites;
-            $this->facture_compte_bancaire_id = $association->facture_compte_bancaire_id;
             $this->anthropic_api_key = $association->anthropic_api_key;
             $this->invoice_ocr_model = $association->invoice_ocr_model;
             $this->email_from = $association->email_from;
@@ -170,10 +157,6 @@ final class AssociationForm extends Component
             'cachet' => ['nullable', 'image', 'mimes:png,jpg,jpeg', 'max:2048'],
             'siret' => ['nullable', 'string', 'max:14'],
             'forme_juridique' => ['nullable', 'string', 'max:255'],
-            'facture_conditions_reglement' => ['nullable', 'string', 'max:1000'],
-            'facture_mentions_legales' => ['nullable', 'string', 'max:2000'],
-            'facture_mentions_penalites' => ['nullable', 'string', 'max:2000'],
-            'facture_compte_bancaire_id' => ['nullable', 'integer', 'exists:comptes_bancaires,id'],
             'anthropic_api_key' => ['nullable', 'string', 'max:255'],
             'invoice_ocr_model' => ['nullable', 'string', 'max:255'],
             'email_from' => ['nullable', 'email', 'max:255'],
@@ -189,10 +172,6 @@ final class AssociationForm extends Component
             'telephone' => $this->telephone,
             'siret' => $this->siret,
             'forme_juridique' => $this->forme_juridique,
-            'facture_conditions_reglement' => $this->facture_conditions_reglement,
-            'facture_mentions_legales' => $this->facture_mentions_legales,
-            'facture_mentions_penalites' => $this->facture_mentions_penalites,
-            'facture_compte_bancaire_id' => $this->facture_compte_bancaire_id,
             'anthropic_api_key' => $this->anthropic_api_key ?: null,
             'invoice_ocr_model' => $this->invoice_ocr_model ?: null,
             'email_from' => $this->email_from ?: null,
@@ -313,12 +292,9 @@ final class AssociationForm extends Component
             }
         }
 
-        $comptesBancaires = CompteBancaire::saisieManuelle()->orderBy('nom')->get();
-
         return view('livewire.parametres.association-form', [
             'logoUrl' => $logoUrl,
             'cachetUrl' => $cachetUrl,
-            'comptesBancaires' => $comptesBancaires,
         ]);
     }
 }

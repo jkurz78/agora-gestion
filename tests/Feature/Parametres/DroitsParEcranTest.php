@@ -42,11 +42,10 @@ it('applique la matrice rôle × écran sur la ROUTE, pas sur l’affichage', fu
 
         foreach (ParametresNavigation::sections() as $section) {
             foreach ($section->ecrans as $ecran) {
-                // Trois écrans (liens-publics, facturation, ocr-ia) n'ont pas
-                // encore de route : ils arrivent aux Tasks 6 à 8. On les saute
-                // au lieu de mettre TOUT le test en attente — la matrice des
-                // neuf autres est vérifiée dès maintenant, et les trois
-                // derniers entreront d'eux-mêmes dès que leur route existera.
+                // ocr-ia n'a pas encore de route : il arrive à la Task 8. On le
+                // saute au lieu de mettre TOUT le test en attente — la matrice
+                // des dix autres écrans est vérifiée dès maintenant, et le
+                // dernier entrera de lui-même dès que sa route existera.
                 if (! Route::has($ecran->route)) {
                     continue;
                 }
@@ -64,8 +63,8 @@ it('applique la matrice rôle × écran sur la ROUTE, pas sur l’affichage', fu
     }
 
     // Sans cette garde, le test passerait en ne vérifiant RIEN le jour où les
-    // noms de route changeraient : 4 rôles × 9 écrans existants = 36 contrôles.
-    expect($ecransVerifies)->toBeGreaterThanOrEqual(36);
+    // noms de route changeraient : 4 rôles × 10 écrans existants = 40 contrôles.
+    expect($ecransVerifies)->toBeGreaterThanOrEqual(40);
 });
 
 it('aucun écran porteur d’un secret n’est atteignable par un non-admin', function (): void {
