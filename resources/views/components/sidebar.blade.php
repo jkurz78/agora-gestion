@@ -110,12 +110,10 @@
    La section s'ouvre alors d'elle-même, puisque c'est la position courante qui
    pilote le dépliement. */
 .sidebar .nav-item .param-section-link {
-    padding: .3rem 1rem .3rem 1rem;
-    font-size: .72rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .06em;
-    color: #999;
+    padding: .35rem 1rem;
+    font-size: .82rem;
+    font-weight: 600;
+    color: #666;
 }
 .sidebar .nav-item .param-section-link:hover {
     color: #722281;

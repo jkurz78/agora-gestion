@@ -164,12 +164,48 @@
                         default => null,
                     };
                     $breadcrumbPage = trim(str_replace(['—', '|'], '', $title ?? ''));
+
+                    // Niveau intermédiaire pour la section Paramètres : le fil
+                    // générique ne connaît que « groupe / page », or Paramètres a
+                    // désormais quatre sections entre les deux. La position vient de
+                    // la taxonomie — la même source que la sidebar et les droits,
+                    // donc les trois ne peuvent pas se contredire.
+                    $breadcrumbSectionParam = null;
+                    $breadcrumbSectionUrlParam = null;
+                    if (request()->routeIs('parametres.*')) {
+                        $positionFil = \App\Support\Parametres\ParametresNavigation::localiser(
+                            (string) request()->route()?->getName()
+                        );
+                        if ($positionFil !== null) {
+                            $roleFil = auth()->user()?->currentRoleEnum();
+                            $breadcrumbSectionParam = $positionFil['section']->libelle;
+                            $premierFil = $roleFil === null
+                                ? null
+                                : \App\Support\Parametres\ParametresNavigation::premierEcran($positionFil['section'], $roleFil);
+                            $breadcrumbSectionUrlParam = $premierFil === null ? null : route($premierFil->route);
+                        }
+                    }
                 @endphp
                 <nav aria-label="breadcrumb" class="mb-0 d-none d-md-block">
                     <ol class="breadcrumb mb-0" style="font-size:.8rem; --bs-breadcrumb-divider-color: rgba(255,255,255,.5); --bs-breadcrumb-item-active-color: rgba(255,255,255,.9);">
                         @if($breadcrumbGroup)
                             <li class="breadcrumb-item">
-                                <span style="color: rgba(255,255,255,.6);">{{ $breadcrumbGroup }}</span>
+                                {{-- Paramètres est le seul groupe à disposer d'une page
+                                     d'accueil : il est donc le seul à être cliquable ici. --}}
+                                @if($breadcrumbGroup === 'Paramètres')
+                                    <a href="{{ route('parametres.index') }}" style="color: rgba(255,255,255,.6); text-decoration:none;">{{ $breadcrumbGroup }}</a>
+                                @else
+                                    <span style="color: rgba(255,255,255,.6);">{{ $breadcrumbGroup }}</span>
+                                @endif
+                            </li>
+                        @endif
+                        @if($breadcrumbSectionParam)
+                            <li class="breadcrumb-item">
+                                @if($breadcrumbSectionUrlParam)
+                                    <a href="{{ $breadcrumbSectionUrlParam }}" style="color: rgba(255,255,255,.6); text-decoration:none;">{{ $breadcrumbSectionParam }}</a>
+                                @else
+                                    <span style="color: rgba(255,255,255,.6);">{{ $breadcrumbSectionParam }}</span>
+                                @endif
                             </li>
                         @endif
                         @if(isset($breadcrumbGreatGrandParent))
