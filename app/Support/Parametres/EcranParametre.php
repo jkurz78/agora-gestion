@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Parametres;
 
 use App\Enums\RoleAssociation;
+use InvalidArgumentException;
 
 /**
  * Un écran de la section Paramètres.
@@ -22,7 +23,23 @@ final readonly class EcranParametre
         public string $route,
         public string $icone,
         public array $roles,
-    ) {}
+    ) {
+        foreach ($this->roles as $role) {
+            if (! $role instanceof RoleAssociation) {
+                throw new InvalidArgumentException(sprintf(
+                    'L\'écran « %s » déclare un rôle invalide : une instance de %s est attendue, %s reçu.',
+                    $this->cle,
+                    RoleAssociation::class,
+                    self::decrireValeur($role),
+                ));
+            }
+        }
+    }
+
+    private static function decrireValeur(mixed $valeur): string
+    {
+        return is_scalar($valeur) ? var_export($valeur, true) : get_debug_type($valeur);
+    }
 
     public function accessiblePar(RoleAssociation $role): bool
     {
