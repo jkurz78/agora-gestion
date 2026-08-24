@@ -4,17 +4,18 @@ declare(strict_types=1);
 
 namespace App\Livewire\Parametres\Comptabilite;
 
-use App\Enums\RoleAssociation;
 use App\Enums\UsageComptable;
+use App\Livewire\Parametres\Concerns\AutoriseEcranParametre;
 use App\Models\Compte;
 use App\Services\UsagesComptablesService;
 use DomainException;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
 final class UsagesComptables extends Component
 {
+    use AutoriseEcranParametre;
+
     public ?int $fraisKmSelectedId = null;
 
     public ?int $abandonCreanceSelectedId = null;
@@ -29,9 +30,13 @@ final class UsagesComptables extends Component
 
     public ?string $inlineNumeroPcg = null;
 
+    protected function cleEcranParametre(): string
+    {
+        return 'affectations-comptables';
+    }
+
     public function mount(): void
     {
-        $this->requireAdmin();
         // DC-8 : les sélections portent des ids de comptes (classe 6/7).
         $fraisKm = Compte::forUsage(UsageComptable::FraisKilometriques)->first();
         $this->fraisKmSelectedId = $fraisKm?->id;
@@ -41,41 +46,28 @@ final class UsagesComptables extends Component
         $this->gratuiteSelectedId = $gratuite?->id;
     }
 
-    private function requireAdmin(): void
-    {
-        abort_unless(
-            Auth::check() && Auth::user()->currentRole() === RoleAssociation::Admin->value,
-            403,
-        );
-    }
-
     public function toggleDon(int $id, bool $active): void
     {
-        $this->requireAdmin();
         app(UsagesComptablesService::class)->toggleDon($id, $active);
     }
 
     public function toggleCotisation(int $id, bool $active): void
     {
-        $this->requireAdmin();
         app(UsagesComptablesService::class)->toggleCotisation($id, $active);
     }
 
     public function toggleInscription(int $id, bool $active): void
     {
-        $this->requireAdmin();
         app(UsagesComptablesService::class)->toggleInscription($id, $active);
     }
 
     public function saveFraisKilometriques(): void
     {
-        $this->requireAdmin();
         app(UsagesComptablesService::class)->setFraisKilometriques($this->fraisKmSelectedId);
     }
 
     public function saveAbandonCreance(): void
     {
-        $this->requireAdmin();
         try {
             app(UsagesComptablesService::class)->setAbandonCreance($this->abandonCreanceSelectedId);
         } catch (DomainException $e) {
@@ -85,7 +77,6 @@ final class UsagesComptables extends Component
 
     public function saveGratuite(): void
     {
-        $this->requireAdmin();
         try {
             app(UsagesComptablesService::class)->setGratuite($this->gratuiteSelectedId);
         } catch (DomainException $e) {
@@ -95,7 +86,6 @@ final class UsagesComptables extends Component
 
     public function openInline(string $usage): void
     {
-        $this->requireAdmin();
         $this->reset(['inlineNom', 'inlineNumeroPcg']);
         $this->inlineUsage = $usage;
         $this->inlineOpen = true;
@@ -103,7 +93,6 @@ final class UsagesComptables extends Component
 
     public function submitInline(): void
     {
-        $this->requireAdmin();
         // Numéro de compte requis — sans lui, pas de Compte, donc la nouvelle
         // entrée serait invisible sur cet écran (liste de comptes).
         $this->validate([

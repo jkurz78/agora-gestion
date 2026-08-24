@@ -79,6 +79,26 @@ final class ParametresNavigation
     }
 
     /**
+     * Ce rôle a-t-il accès à au moins un écran de paramètres ?
+     *
+     * Décide de l'affichage du groupe Paramètres dans la sidebar. Volontairement
+     * porté ici plutôt que sur RoleAssociation : `canAccessParametres()` y est
+     * déjà consommé par UserPolicy avec le sens « est administrateur », et en
+     * élargir la portée donnerait silencieusement la gestion des utilisateurs
+     * au Comptable et au Gestionnaire.
+     */
+    public static function auMoinsUnEcran(RoleAssociation $role): bool
+    {
+        foreach (self::sections() as $section) {
+            if ($section->ecransVisibles($role) !== []) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Où se trouve une route dans l'arbre.
      *
      * @return array{section: SectionParametres, ecran: EcranParametre}|null

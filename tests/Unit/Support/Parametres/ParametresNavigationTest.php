@@ -69,6 +69,13 @@ it('applique la matrice de droits de la spec', function (string $cle, array $att
     ['ocr-ia', ['admin']],
 ]);
 
+it('auMoinsUnEcran est vrai pour Admin, Comptable et Gestionnaire, faux pour Consultation', function (): void {
+    expect(ParametresNavigation::auMoinsUnEcran(RoleAssociation::Admin))->toBeTrue();
+    expect(ParametresNavigation::auMoinsUnEcran(RoleAssociation::Comptable))->toBeTrue();
+    expect(ParametresNavigation::auMoinsUnEcran(RoleAssociation::Gestionnaire))->toBeTrue();
+    expect(ParametresNavigation::auMoinsUnEcran(RoleAssociation::Consultation))->toBeFalse();
+});
+
 it('lève une exception si deux écrans partagent la même clé', function (): void {
     $sections = [
         new SectionParametres('section-test', 'Section test', 'Description', 'bi-test', [
