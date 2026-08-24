@@ -33,12 +33,6 @@
                 <i class="bi bi-building"></i> Informations
             </button>
         </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" :class="{ active: tab === 'communication' }" id="tab-communication" @click="tab = 'communication'"
-                    type="button" role="tab" aria-controls="pane-communication" :aria-selected="tab === 'communication'">
-                <i class="bi bi-envelope"></i> Communication
-            </button>
-        </li>
     </ul>
 
     <div class="tab-content">
@@ -148,78 +142,6 @@
                 <span wire:loading.remove><i class="bi bi-floppy"></i> Enregistrer</span>
                 <span wire:loading>Enregistrement…</span>
             </button>
-        </div>
-
-        {{-- Onglet Communication --}}
-        <div class="tab-pane fade" :class="{ 'show active': tab === 'communication' }" id="pane-communication" role="tabpanel" aria-labelledby="tab-communication">
-            <div class="mt-3">
-                <p class="text-muted small mb-3">
-                    Adresse d'expédition utilisée pour les communications de masse aux tiers,
-                    et en repli pour les types d'opération qui n'ont pas d'adresse configurée.
-                </p>
-
-                <div class="mb-4 p-3 bg-light rounded border">
-                    <label class="form-label small fw-semibold">Adresse d'expédition</label>
-                    <div class="row g-2">
-                        <div class="col-md-3">
-                            <input type="text" class="form-control form-control-sm @error('email_from_name') is-invalid @enderror"
-                                   wire:model="email_from_name" placeholder="Nom expéditeur">
-                            @error('email_from_name') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                        </div>
-                        <div class="col-md-6">
-                            <input type="email" class="form-control form-control-sm @error('email_from') is-invalid @enderror"
-                                   wire:model="email_from" placeholder="noreply@monasso.fr">
-                            @error('email_from') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                        </div>
-                        <div class="col-md-3">
-                            <button type="button" class="btn btn-sm btn-outline-secondary w-100"
-                                    {{ $email_from ? '' : 'disabled' }}
-                                    wire:click="openTestEmailModal">
-                                <i class="bi bi-envelope"></i> Tester
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <button type="button" class="btn btn-primary" wire:click="save" wire:loading.attr="disabled">
-                    <span wire:loading.remove><i class="bi bi-floppy"></i> Enregistrer</span>
-                    <span wire:loading>Enregistrement…</span>
-                </button>
-            </div>
-
-            {{-- Mini-modale test email --}}
-            @if($showTestEmailModal)
-            <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
-                 style="background:rgba(0,0,0,.3);z-index:2100"
-                 wire:click.self="$set('showTestEmailModal', false)">
-                <div class="bg-white rounded-3 shadow p-4" style="max-width:400px;width:100%">
-                    <h6 class="mb-3"><i class="bi bi-envelope me-1"></i> Envoyer un email de test</h6>
-                    <p class="small text-muted mb-2">Expéditeur : {{ $email_from_name ? $email_from_name . ' <' . $email_from . '>' : $email_from }}</p>
-                    <div class="mb-3">
-                        <label class="form-label small">Adresse destinataire</label>
-                        <input type="email" wire:model="testEmailTo"
-                               class="form-control form-control-sm @error('testEmailTo') is-invalid @enderror"
-                               placeholder="votre@email.fr">
-                        @error('testEmailTo')
-                            <div class="invalid-feedback">{{ $message }}</div>
-                        @enderror
-                    </div>
-                    @if($testFlashMessage)
-                        <div class="alert alert-{{ $testFlashType }} py-1 small">{{ $testFlashMessage }}</div>
-                    @endif
-                    <div class="d-flex gap-2 justify-content-end">
-                        <button type="button" class="btn btn-sm btn-outline-secondary"
-                                wire:click="$set('showTestEmailModal', false)">
-                            Fermer
-                        </button>
-                        <button type="button" class="btn btn-sm btn-primary" wire:click="sendTestEmail">
-                            <span wire:loading.remove wire:target="sendTestEmail">Envoyer</span>
-                            <span wire:loading wire:target="sendTestEmail">Envoi...</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-            @endif
         </div>
     </div>
 

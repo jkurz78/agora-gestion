@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace App\Livewire\Parametres;
 
 use App\Livewire\Parametres\Concerns\AutoriseEcranParametre;
-use App\Mail\TestEmail;
 use App\Support\CurrentAssociation;
 use App\Support\TenantAsset;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Livewire\Component;
@@ -46,18 +44,6 @@ final class AssociationForm extends Component
 
     public ?string $forme_juridique = null;
 
-    public ?string $email_from = null;
-
-    public ?string $email_from_name = null;
-
-    public string $testEmailTo = '';
-
-    public bool $showTestEmailModal = false;
-
-    public string $testFlashMessage = '';
-
-    public string $testFlashType = '';
-
     protected function cleEcranParametre(): string
     {
         return 'informations';
@@ -77,8 +63,6 @@ final class AssociationForm extends Component
             $this->cachet_signature_path = $association->cachet_signature_path;
             $this->siret = $association->siret;
             $this->forme_juridique = $association->forme_juridique;
-            $this->email_from = $association->email_from;
-            $this->email_from_name = $association->email_from_name;
         }
     }
 
@@ -95,8 +79,6 @@ final class AssociationForm extends Component
             'cachet' => ['nullable', 'image', 'mimes:png,jpg,jpeg', 'max:2048'],
             'siret' => ['nullable', 'string', 'max:14'],
             'forme_juridique' => ['nullable', 'string', 'max:255'],
-            'email_from' => ['nullable', 'email', 'max:255'],
-            'email_from_name' => ['nullable', 'string', 'max:255'],
         ]);
 
         $data = [
@@ -108,8 +90,6 @@ final class AssociationForm extends Component
             'telephone' => $this->telephone,
             'siret' => $this->siret,
             'forme_juridique' => $this->forme_juridique,
-            'email_from' => $this->email_from ?: null,
-            'email_from_name' => $this->email_from_name ?: null,
         ];
 
         if ($this->logo !== null) {
@@ -173,38 +153,6 @@ final class AssociationForm extends Component
 
         $this->dispatch('form-saved');
         session()->flash('success', 'Informations de l\'association mises à jour.');
-    }
-
-    public function openTestEmailModal(): void
-    {
-        $this->testEmailTo = '';
-        $this->testFlashMessage = '';
-        $this->testFlashType = '';
-        $this->showTestEmailModal = true;
-    }
-
-    public function sendTestEmail(): void
-    {
-        $this->validate([
-            'email_from' => 'required|email',
-            'testEmailTo' => 'required|email',
-        ], [
-            'email_from.required' => "L'adresse d'expédition est requise.",
-            'testEmailTo.required' => 'Veuillez saisir une adresse destinataire.',
-            'testEmailTo.email' => "L'adresse destinataire n'est pas valide.",
-        ]);
-
-        try {
-            Mail::mailer()
-                ->to($this->testEmailTo)
-                ->send((new TestEmail($this->nom ?: 'Association'))->from($this->email_from, $this->email_from_name ?: null));
-
-            $this->testFlashMessage = "Email de test envoyé à {$this->testEmailTo}.";
-            $this->testFlashType = 'success';
-        } catch (\Throwable $e) {
-            $this->testFlashMessage = 'Erreur lors de l\'envoi : '.$e->getMessage();
-            $this->testFlashType = 'danger';
-        }
     }
 
     public function render(): View
