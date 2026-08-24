@@ -105,9 +105,10 @@
     padding-left: 3.25rem;
 }
 
-/* Intertitres de section dans le groupe Paramètres : mènent à leur ancre sur
-   la page d'accueil des paramètres, ne se déplient jamais au clic — c'est la
-   position courante qui ouvre la section, jamais un geste utilisateur. */
+/* Intertitres de section dans le groupe Paramètres : mènent au premier écran de
+   leur section, comme les huit autres groupes mènent à leur écran principal.
+   La section s'ouvre alors d'elle-même, puisque c'est la position courante qui
+   pilote le dépliement. */
 .sidebar .nav-item .param-section-link {
     padding: .3rem 1rem .3rem 1rem;
     font-size: .72rem;
@@ -626,13 +627,6 @@ $activeGroup = match(true) {
             @php
                 $roleParametres = auth()->user()->currentRoleEnum();
                 $positionParametres = ParametresNavigation::localiser((string) request()->route()?->getName());
-                // Un fragment d'URL (#section) n'est JAMAIS envoyé au serveur : la page
-                // d'accueil ne pouvait donc pas savoir quelle section déplier, et cliquer
-                // un intertitre semblait ne rien faire. La section demandée voyage donc
-                // en paramètre de requête, lisible côté serveur.
-                $sectionDemandeeParametres = request()->routeIs('parametres.index')
-                    ? (string) request()->query('section', '')
-                    : '';
             @endphp
             @if($roleParametres !== null && ParametresNavigation::auMoinsUnEcran($roleParametres))
             <div class="accordion-item border-0">
@@ -662,14 +656,13 @@ $activeGroup = match(true) {
                                 @continue(count($ecransSectionParametres) === 0)
 
                                 <li class="nav-item">
-                                    <a href="{{ route('parametres.index', ['section' => $sectionParametres->cle]) }}#{{ $sectionParametres->cle }}"
+                                    <a href="{{ route(ParametresNavigation::premierEcran($sectionParametres, $roleParametres)->route) }}"
                                        class="nav-link param-section-link">
                                         <i class="bi {{ $sectionParametres->icone }} me-1"></i> {{ $sectionParametres->libelle }}
                                     </a>
                                 </li>
 
-                                @if (($positionParametres !== null && $positionParametres['section']->cle === $sectionParametres->cle)
-                                     || $sectionDemandeeParametres === $sectionParametres->cle)
+                                @if ($positionParametres !== null && $positionParametres['section']->cle === $sectionParametres->cle)
                                     @foreach ($ecransSectionParametres as $ecranParametres)
                                     <li class="nav-item">
                                         <a href="{{ route($ecranParametres->route) }}"

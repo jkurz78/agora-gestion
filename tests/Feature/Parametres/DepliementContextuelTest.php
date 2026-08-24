@@ -75,7 +75,8 @@ it('hors de Paramètres, les intertitres sont là mais aucun écran n’est dép
     expect(ecransDepliesDansLaSidebar($html))->toBeEmpty();
 
     foreach (ParametresNavigation::sections() as $section) {
-        expect($html)->toContain(route('parametres.index', ['section' => $section->cle]));
+        $premier = ParametresNavigation::premierEcran($section, RoleAssociation::Admin);
+        expect($html)->toContain(route($premier->route));
     }
 });
 
@@ -95,17 +96,21 @@ it('l’en-tête « Paramètres » mène à la page d’accueil', function (): v
     expect($html)->toContain('href="'.route('parametres.index').'"');
 });
 
-it('cliquer un intertitre déplie sa section', function (): void {
-    // Un fragment d'URL n'est jamais envoyé au serveur : la section demandée
-    // voyage en paramètre de requête, sans quoi la page d'accueil ne peut pas
-    // savoir quoi déplier et le clic semble sans effet.
+it('un intertitre mène au premier écran de sa section', function (): void {
+    // Comme les huit autres groupes de la sidebar mènent à leur écran principal.
+    // Maintenir la page d'accueil affichée pendant qu'on navigue dans les menus
+    // désoriente — retour d'usage réel.
     $user = connecterRoleSidebar($this->association, RoleAssociation::Admin);
 
-    $html = $this->actingAs($user)
-        ->get(route('parametres.index', ['section' => 'comptabilite']))
-        ->getContent();
+    $premier = ParametresNavigation::premierEcran(sectionParCle('comptabilite'), RoleAssociation::Admin);
 
-    $deplies = ecransDepliesDansLaSidebar($html);
+    $html = $this->actingAs($user)->get('/dashboard')->getContent();
+    expect($html)->toContain('href="'.route($premier->route).'"');
+
+    // Et y arriver déplie la section, sans mécanisme supplémentaire : c'est la
+    // position qui ouvre, la même que pour n'importe quel autre écran.
+    $htmlEcran = $this->actingAs($user)->get(route($premier->route))->getContent();
+    $deplies = ecransDepliesDansLaSidebar($htmlEcran);
 
     foreach (sectionParCle('comptabilite')->ecrans as $ecran) {
         expect($deplies)->toContain(route($ecran->route));
@@ -114,6 +119,18 @@ it('cliquer un intertitre déplie sa section', function (): void {
     foreach (sectionParCle('services-connectes')->ecrans as $ecran) {
         expect($deplies)->not->toContain(route($ecran->route));
     }
+});
+
+it('le premier écran d’une section dépend du rôle', function (): void {
+    // Un Gestionnaire n'a qu'un écran dans « Association et accès » : c'est
+    // celui-là qui doit l'accueillir, pas celui réservé aux administrateurs.
+    $section = sectionParCle('association-acces');
+
+    $pourAdmin = ParametresNavigation::premierEcran($section, RoleAssociation::Admin);
+    $pourGestionnaire = ParametresNavigation::premierEcran($section, RoleAssociation::Gestionnaire);
+
+    expect($pourAdmin->cle)->toBe('informations');
+    expect($pourGestionnaire->cle)->toBe('liens-publics');
 });
 
 it('sans section demandée, la page d’accueil ne déplie rien', function (): void {
@@ -130,12 +147,13 @@ it('un comptable ne voit que les sections qui lui sont ouvertes', function (): v
     $html = $this->actingAs($user)->get('/dashboard')->getContent();
 
     foreach (ParametresNavigation::sections() as $section) {
-        $ancre = route('parametres.index', ['section' => $section->cle]);
+        $premier = ParametresNavigation::premierEcran($section, RoleAssociation::Comptable);
 
-        if ($section->ecransVisibles(RoleAssociation::Comptable) === []) {
-            expect($html)->not->toContain($ancre);
+        if ($premier === null) {
+            // Section sans aucun écran visible : pas d'intertitre du tout.
+            expect($html)->not->toContain('#'.$section->cle);
         } else {
-            expect($html)->toContain($ancre);
+            expect($html)->toContain('href="'.route($premier->route).'"');
         }
     }
 });

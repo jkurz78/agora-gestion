@@ -30,7 +30,7 @@ final class ParametresNavigation
             new SectionParametres(
                 cle: 'association-acces',
                 libelle: 'Association et accès',
-                description: 'Qui vous êtes, et qui accède à l’application.',
+                description: 'Paramétrer les informations légales, gérer les comptes utilisateurs et les droits d’accès. Renseigner les URL de votre présence sur internet, pour le portail et les envois d’e-mails.',
                 icone: 'bi-building',
                 ecrans: [
                     new EcranParametre('informations', 'Informations de l’association', 'parametres.association', 'bi-info-circle', $admin),
@@ -41,7 +41,7 @@ final class ParametresNavigation
             new SectionParametres(
                 cle: 'adhesions-dons',
                 libelle: 'Adhésions et dons',
-                description: 'Ce que les adhérents et donateurs voient et reçoivent.',
+                description: 'Définir vos formules d’adhésion, en correspondance de vos formulaires HelloAsso. Paramétrer l’envoi de reçus fiscaux.',
                 icone: 'bi-heart',
                 ecrans: [
                     new EcranParametre('formules-adhesion', 'Formules d’adhésion', 'parametres.adhesions.formules', 'bi-card-checklist', $adminGestionnaire),
@@ -51,7 +51,7 @@ final class ParametresNavigation
             new SectionParametres(
                 cle: 'comptabilite',
                 libelle: 'Comptabilité',
-                description: 'Comment les écritures sont ventilées et facturées.',
+                description: 'Gérer la comptabilisation et la facturation de vos transactions. Personnaliser votre plan comptable.',
                 icone: 'bi-calculator',
                 ecrans: [
                     new EcranParametre('plan-comptable', 'Plan comptable', 'parametres.plan-comptable', 'bi-list-columns', $adminComptable),
@@ -62,7 +62,7 @@ final class ParametresNavigation
             new SectionParametres(
                 cle: 'services-connectes',
                 libelle: 'Services connectés',
-                description: 'Ce à quoi l’application est branchée.',
+                description: 'Paramétrer les flux d’e-mails, l’OCR et la synchronisation avec HelloAsso.',
                 icone: 'bi-plug',
                 ecrans: [
                     new EcranParametre('helloasso', 'HelloAsso', 'parametres.helloasso', 'bi-box-arrow-in-down', $admin),
@@ -96,6 +96,19 @@ final class ParametresNavigation
         }
 
         return false;
+    }
+
+    /**
+     * Le premier écran d'une section accessible à ce rôle.
+     *
+     * C'est là que mène l'intertitre de la sidebar — comme les huit autres
+     * groupes mènent à leur écran principal. Dépend du rôle : un Gestionnaire
+     * n'a qu'un seul écran dans « Association et accès », c'est celui-là qui
+     * l'accueille.
+     */
+    public static function premierEcran(SectionParametres $section, RoleAssociation $role): ?EcranParametre
+    {
+        return $section->ecransVisibles($role)[0] ?? null;
     }
 
     /**
