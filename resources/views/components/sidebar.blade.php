@@ -120,6 +120,11 @@
     color: #722281;
     background: rgba(114,34,129,.04);
 }
+/* Les écrans d'une section dépliée sont indentés sous leur intertitre : sans ce
+   décalage ils apparaissent au même niveau et la hiérarchie ne se lit pas. */
+.sidebar .nav-item .param-ecran-link {
+    padding-left: 2rem;
+}
 </style>
 
 @props(['logoAsset', 'nomAsso', 'exerciceCloture', 'exerciceLabel', 'canSeeNdf' => false, 'ndfPendingCount' => 0, 'canSeeFacturesPartenaires' => false, 'facturesPartenairesPendingCount' => 0])
@@ -621,18 +626,25 @@ $activeGroup = match(true) {
             @php
                 $roleParametres = auth()->user()->currentRoleEnum();
                 $positionParametres = ParametresNavigation::localiser((string) request()->route()?->getName());
+                // Un fragment d'URL (#section) n'est JAMAIS envoyé au serveur : la page
+                // d'accueil ne pouvait donc pas savoir quelle section déplier, et cliquer
+                // un intertitre semblait ne rien faire. La section demandée voyage donc
+                // en paramètre de requête, lisible côté serveur.
+                $sectionDemandeeParametres = request()->routeIs('parametres.index')
+                    ? (string) request()->query('section', '')
+                    : '';
             @endphp
             @if($roleParametres !== null && ParametresNavigation::auMoinsUnEcran($roleParametres))
             <div class="accordion-item border-0">
                 <h2 class="accordion-header">
-                    <button class="accordion-button {{ $activeGroup === 'parametres' ? '' : 'collapsed' }}"
-                            type="button"
-                            data-bs-toggle="collapse"
-                            data-bs-target="#grpParametres"
-                            aria-expanded="{{ $activeGroup === 'parametres' ? 'true' : 'false' }}"
-                            aria-controls="grpParametres">
+                    {{-- Navigue vers la page d'accueil des paramètres, comme les huit
+                         autres groupes naviguent vers leur écran principal. C'était le
+                         seul en-tête à n'être qu'un bouton de repli : cliquer « Paramètres »
+                         ne menait alors nulle part. --}}
+                    <a href="{{ route('parametres.index') }}"
+                       class="accordion-button {{ $activeGroup === 'parametres' ? '' : 'collapsed' }}">
                         <i class="bi bi-gear me-2"></i> Paramètres
-                    </button>
+                    </a>
                 </h2>
                 <div id="grpParametres"
                      class="accordion-collapse collapse {{ $activeGroup === 'parametres' ? 'show' : '' }}"
@@ -650,17 +662,18 @@ $activeGroup = match(true) {
                                 @continue(count($ecransSectionParametres) === 0)
 
                                 <li class="nav-item">
-                                    <a href="{{ route('parametres.index') }}#{{ $sectionParametres->cle }}"
+                                    <a href="{{ route('parametres.index', ['section' => $sectionParametres->cle]) }}#{{ $sectionParametres->cle }}"
                                        class="nav-link param-section-link">
                                         <i class="bi {{ $sectionParametres->icone }} me-1"></i> {{ $sectionParametres->libelle }}
                                     </a>
                                 </li>
 
-                                @if ($positionParametres !== null && $positionParametres['section']->cle === $sectionParametres->cle)
+                                @if (($positionParametres !== null && $positionParametres['section']->cle === $sectionParametres->cle)
+                                     || $sectionDemandeeParametres === $sectionParametres->cle)
                                     @foreach ($ecransSectionParametres as $ecranParametres)
                                     <li class="nav-item">
                                         <a href="{{ route($ecranParametres->route) }}"
-                                           class="nav-link {{ request()->routeIs($ecranParametres->route) ? 'active' : '' }}">
+                                           class="nav-link param-ecran-link {{ request()->routeIs($ecranParametres->route) ? 'active' : '' }}">
                                             <i class="bi {{ $ecranParametres->icone }} me-1"></i> {{ $ecranParametres->libelle }}
                                         </a>
                                     </li>

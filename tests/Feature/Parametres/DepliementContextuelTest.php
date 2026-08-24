@@ -5,43 +5,24 @@ declare(strict_types=1);
 use App\Enums\RoleAssociation;
 use App\Models\Association;
 use App\Models\User;
-use App\Support\Parametres\EcranParametre;
 use App\Support\Parametres\ParametresNavigation;
-use App\Support\Parametres\SectionParametres;
 use App\Tenant\TenantContext;
 
 /**
- * Sidebar : intertitres de section + dépliement contextuel (Task 12).
+ * Sidebar : intertitres de section et dépliement contextuel.
  *
- * Le groupe Paramètres de la sidebar montre les QUATRE sections de
- * ParametresNavigation, jamais les douze écrans à plat. Seule la section de
- * l'écran courant se déplie — aucun repli à piloter, c'est la position qui
- * ouvre. Chaque intertitre mène à son ancre sur la page d'accueil.
+ * Le groupe Paramètres montre les QUATRE sections de ParametresNavigation,
+ * jamais les douze écrans à plat. Seule la section de l'écran courant se
+ * déplie — aucun repli à piloter, c'est la position qui ouvre.
  *
- * 🪤 Piège des assertions d'absence — QUATRIÈME collision, nouvelle celle-ci :
- * `resources/views/layouts/app.blade.php` (lignes ~523-578) porte un vieux
- * dropdown de navbar "Paramètres", totalement indépendant de la sidebar et
- * NON gardé par rôle, qui pointe en dur vers cinq routes :
- * parametres.association, parametres.helloasso, parametres.reception-documents,
- * parametres.plan-comptable, parametres.utilisateurs.index. Ces cinq URLs sont
- * donc présentes sur CHAQUE page authentifiée, quels que soient le rôle et la
- * position — un assertDontSee(route(...)) dessus échouerait à tort. On limite
- * donc les assertions d'ABSENCE d'écran aux sept écrans non touchés par ce
- * dropdown ; les trois collisions de libellé déjà connues (Comptabilité,
- * Facturation, HelloAsso) restent hors de portée des assertSee, comme
- * toujours. La présence, elle, n'est jamais affectée par cette pollution et
- * peut viser n'importe quel écran ou libellé.
+ * ⚠️ Ces tests visent la SIDEBAR, pas la page entière. La page d'accueil des
+ * paramètres liste les douze écrans en cartes : asserter l'absence d'une URL
+ * sur tout le HTML y serait impossible, le hub lie tout. D'où le marqueur de
+ * classe `param-ecran-link`, porté uniquement par les écrans dépliés dans la
+ * sidebar — il rend les assertions précises sans dépendre des libellés, dont
+ * plusieurs entrent en collision avec d'autres menus (« Comptabilité »,
+ * « Facturation », « HelloAsso » nomment aussi des groupes de premier niveau).
  */
-const ECRANS_NON_POLLUES_PAR_NAVBAR = [
-    'liens-publics',
-    'formules-adhesion',
-    'recus-fiscaux',
-    'affectations-comptables',
-    'facturation',
-    'envoi-emails',
-    'ocr-ia',
-];
-
 beforeEach(function (): void {
     $this->association = Association::factory()->create();
     TenantContext::boot($this->association);
@@ -50,7 +31,7 @@ beforeEach(function (): void {
 
 afterEach(fn () => TenantContext::clear());
 
-function connecterAvecRolePourDepliement(Association $association, RoleAssociation $role): User
+function connecterRoleSidebar(Association $association, RoleAssociation $role): User
 {
     $user = User::factory()->create();
     $user->associations()->attach($association->id, ['role' => $role->value, 'joined_at' => now()]);
@@ -58,130 +39,111 @@ function connecterAvecRolePourDepliement(Association $association, RoleAssociati
     return $user;
 }
 
-/** @return array{section: SectionParametres, ecran: EcranParametre} */
-function trouverEcranNonPollue(string $sectionCle): array
+/** Les URL des écrans dépliés dans la sidebar, et elles seules. */
+function ecransDepliesDansLaSidebar(string $html): array
 {
-    foreach (ParametresNavigation::sections() as $section) {
-        if ($section->cle !== $sectionCle) {
-            continue;
-        }
-        foreach ($section->ecrans as $ecran) {
-            if (in_array($ecran->cle, ECRANS_NON_POLLUES_PAR_NAVBAR, true)) {
-                return ['section' => $section, 'ecran' => $ecran];
-            }
-        }
-    }
+    preg_match_all('#<a href="([^"]+)"\s+class="nav-link param-ecran-link#', $html, $liens);
 
-    throw new RuntimeException("Aucun écran non pollué trouvé pour la section {$sectionCle}.");
+    return $liens[1];
 }
 
-it('sur un écran de Paramètres, sa section est dépliée et elle seule', function (): void {
-    $user = connecterAvecRolePourDepliement($this->association, RoleAssociation::Admin);
+function sectionParCle(string $cle)
+{
+    return collect(ParametresNavigation::sections())->firstWhere('cle', $cle);
+}
 
-    // Position : comptabilite, via un écran non pollué par le dropdown navbar.
-    $courant = trouverEcranNonPollue('comptabilite');
+it('sur un écran, sa section est dépliée et elle seule', function (): void {
+    $user = connecterRoleSidebar($this->association, RoleAssociation::Admin);
 
-    $reponse = $this->actingAs($user)->get(route($courant['ecran']->route));
-    $reponse->assertOk();
+    $html = $this->actingAs($user)->get(route('parametres.plan-comptable'))->getContent();
+    $deplies = ecransDepliesDansLaSidebar($html);
+
+    $comptabilite = sectionParCle('comptabilite');
+
+    expect($deplies)->toHaveCount(count($comptabilite->ecrans));
+
+    foreach ($comptabilite->ecrans as $ecran) {
+        expect($deplies)->toContain(route($ecran->route));
+    }
+});
+
+it('hors de Paramètres, les intertitres sont là mais aucun écran n’est déplié', function (): void {
+    $user = connecterRoleSidebar($this->association, RoleAssociation::Admin);
+
+    $html = $this->actingAs($user)->get('/dashboard')->getContent();
+
+    expect(ecransDepliesDansLaSidebar($html))->toBeEmpty();
 
     foreach (ParametresNavigation::sections() as $section) {
-        // Les quatre intertitres restent visibles quelle que soit la position.
-        $reponse->assertSee(route('parametres.index').'#'.$section->cle, false);
+        expect($html)->toContain(route('parametres.index', ['section' => $section->cle]));
+    }
+});
 
-        if ($section->cle === $courant['section']->cle) {
-            // Section courante : tous ses écrans (voisins compris) sont dépliés.
-            foreach ($section->ecransVisibles(RoleAssociation::Admin) as $ecran) {
-                $reponse->assertSee(route($ecran->route), false);
-            }
+/*
+ * Les deux défauts remontés par l'exploitant à la première utilisation réelle.
+ * Aucun test ne les attrapait : ils portaient tous sur ce que la sidebar
+ * AFFICHE, jamais sur ce qui se passe quand on CLIQUE.
+ */
 
-            continue;
-        }
+it('l’en-tête « Paramètres » mène à la page d’accueil', function (): void {
+    // C'était le seul en-tête de groupe à n'être qu'un bouton de repli Bootstrap :
+    // cliquer « Paramètres » dépliait les intertitres sans jamais naviguer.
+    $user = connecterRoleSidebar($this->association, RoleAssociation::Admin);
 
-        // Section voisine, non courante : ses écrans ne sont PAS dépliés — on
-        // ne vérifie que les écrans non pollués par le dropdown navbar legacy.
-        foreach ($section->ecrans as $ecran) {
-            if (! in_array($ecran->cle, ECRANS_NON_POLLUES_PAR_NAVBAR, true)) {
-                continue;
-            }
-            $reponse->assertDontSee(route($ecran->route));
+    $html = $this->actingAs($user)->get('/dashboard')->getContent();
+
+    expect($html)->toContain('href="'.route('parametres.index').'"');
+});
+
+it('cliquer un intertitre déplie sa section', function (): void {
+    // Un fragment d'URL n'est jamais envoyé au serveur : la section demandée
+    // voyage en paramètre de requête, sans quoi la page d'accueil ne peut pas
+    // savoir quoi déplier et le clic semble sans effet.
+    $user = connecterRoleSidebar($this->association, RoleAssociation::Admin);
+
+    $html = $this->actingAs($user)
+        ->get(route('parametres.index', ['section' => 'comptabilite']))
+        ->getContent();
+
+    $deplies = ecransDepliesDansLaSidebar($html);
+
+    foreach (sectionParCle('comptabilite')->ecrans as $ecran) {
+        expect($deplies)->toContain(route($ecran->route));
+    }
+
+    foreach (sectionParCle('services-connectes')->ecrans as $ecran) {
+        expect($deplies)->not->toContain(route($ecran->route));
+    }
+});
+
+it('sans section demandée, la page d’accueil ne déplie rien', function (): void {
+    $user = connecterRoleSidebar($this->association, RoleAssociation::Admin);
+
+    $html = $this->actingAs($user)->get(route('parametres.index'))->getContent();
+
+    expect(ecransDepliesDansLaSidebar($html))->toBeEmpty();
+});
+
+it('un comptable ne voit que les sections qui lui sont ouvertes', function (): void {
+    $user = connecterRoleSidebar($this->association, RoleAssociation::Comptable);
+
+    $html = $this->actingAs($user)->get('/dashboard')->getContent();
+
+    foreach (ParametresNavigation::sections() as $section) {
+        $ancre = route('parametres.index', ['section' => $section->cle]);
+
+        if ($section->ecransVisibles(RoleAssociation::Comptable) === []) {
+            expect($html)->not->toContain($ancre);
+        } else {
+            expect($html)->toContain($ancre);
         }
     }
 });
 
-it('hors de Paramètres, les quatre intertitres sont là mais aucun écran n’est déplié', function (): void {
-    $user = connecterAvecRolePourDepliement($this->association, RoleAssociation::Admin);
+it('un rôle Consultation ne voit pas le groupe Paramètres', function (): void {
+    $user = connecterRoleSidebar($this->association, RoleAssociation::Consultation);
 
-    $reponse = $this->actingAs($user)->get(route('dashboard'));
-    $reponse->assertOk();
+    $html = $this->actingAs($user)->get('/dashboard')->getContent();
 
-    foreach (ParametresNavigation::sections() as $section) {
-        $reponse->assertSee(route('parametres.index').'#'.$section->cle, false);
-
-        foreach ($section->ecrans as $ecran) {
-            if (! in_array($ecran->cle, ECRANS_NON_POLLUES_PAR_NAVBAR, true)) {
-                continue;
-            }
-            $reponse->assertDontSee(route($ecran->route));
-        }
-    }
-});
-
-it('un comptable voit le groupe Paramètres et seulement les sections qui lui sont ouvertes', function (): void {
-    $user = connecterAvecRolePourDepliement($this->association, RoleAssociation::Comptable);
-
-    // recus-fiscaux (adhesions-dons) : seul écran de sa section accessible à
-    // un comptable, et non pollué par le dropdown navbar.
-    $courant = ParametresNavigation::localiser('parametres.recus-fiscaux');
-    expect($courant)->not->toBeNull();
-    expect($courant['ecran']->accessiblePar(RoleAssociation::Comptable))->toBeTrue();
-
-    $reponse = $this->actingAs($user)->get(route($courant['ecran']->route));
-    $reponse->assertOk();
-
-    foreach (ParametresNavigation::sections() as $section) {
-        $ancre = route('parametres.index').'#'.$section->cle;
-        $ecransComptable = $section->ecransVisibles(RoleAssociation::Comptable);
-
-        if ($ecransComptable === []) {
-            // association-acces et services-connectes : entièrement fermés au
-            // comptable (aucun de leurs écrans ne lui est ouvert) → l'intertitre
-            // lui-même disparaît, comme sur la page d'accueil (Task 11).
-            $reponse->assertDontSee($ancre, false);
-
-            continue;
-        }
-
-        $reponse->assertSee($ancre, false);
-
-        if ($section->cle === $courant['section']->cle) {
-            $reponse->assertSee(route($courant['ecran']->route), false);
-
-            continue;
-        }
-
-        // comptabilite : ouverte au comptable mais pas la section courante —
-        // son intertitre est là, ses écrans ne sont pas dépliés.
-        foreach ($ecransComptable as $ecran) {
-            if (! in_array($ecran->cle, ECRANS_NON_POLLUES_PAR_NAVBAR, true)) {
-                continue;
-            }
-            $reponse->assertDontSee(route($ecran->route));
-        }
-    }
-});
-
-it('un rôle Consultation ne voit pas le groupe Paramètres du tout', function (): void {
-    $user = connecterAvecRolePourDepliement($this->association, RoleAssociation::Consultation);
-
-    $reponse = $this->actingAs($user)->get(route('dashboard'));
-    $reponse->assertOk();
-
-    // Marqueur structurel de l'accordéon Paramètres — unique par construction,
-    // indépendant de tout libellé.
-    $reponse->assertDontSee('id="grpParametres"', false);
-
-    // Confirmation indépendante : aucune ancre de section n'est atteignable.
-    foreach (ParametresNavigation::sections() as $section) {
-        $reponse->assertDontSee(route('parametres.index').'#'.$section->cle, false);
-    }
+    expect($html)->not->toContain('grpParametres');
 });
