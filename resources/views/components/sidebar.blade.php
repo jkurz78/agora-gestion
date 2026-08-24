@@ -104,11 +104,29 @@
 .sidebar .inbox-nav .nav-link {
     padding-left: 3.25rem;
 }
+
+/* Intertitres de section dans le groupe Paramètres : mènent à leur ancre sur
+   la page d'accueil des paramètres, ne se déplient jamais au clic — c'est la
+   position courante qui ouvre la section, jamais un geste utilisateur. */
+.sidebar .nav-item .param-section-link {
+    padding: .3rem 1rem .3rem 1rem;
+    font-size: .72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: #999;
+}
+.sidebar .nav-item .param-section-link:hover {
+    color: #722281;
+    background: rgba(114,34,129,.04);
+}
 </style>
 
 @props(['logoAsset', 'nomAsso', 'exerciceCloture', 'exerciceLabel', 'canSeeNdf' => false, 'ndfPendingCount' => 0, 'canSeeFacturesPartenaires' => false, 'facturesPartenairesPendingCount' => 0])
 
 @php
+use App\Support\Parametres\ParametresNavigation;
+
 $activeGroup = match(true) {
     request()->routeIs('comptabilite.transactions*', 'comptabilite.postes-tiers-ouverts', 'comptabilite.budget*', 'comptabilite.ndf.*', 'comptabilite.dons', 'comptabilite.cotisations') => 'comptabilite',
     request()->routeIs('banques.rapprochement.*', 'banques.virements.*', 'banques.helloasso-sync',
@@ -600,7 +618,11 @@ $activeGroup = match(true) {
 
             {{-- ─── PARAMÈTRES ─── --}}
             @auth
-            @if(auth()->user()->currentRoleEnum()?->canAccessParametres())
+            @php
+                $roleParametres = auth()->user()->currentRoleEnum();
+                $positionParametres = ParametresNavigation::localiser((string) request()->route()?->getName());
+            @endphp
+            @if($roleParametres !== null && ParametresNavigation::auMoinsUnEcran($roleParametres))
             <div class="accordion-item border-0">
                 <h2 class="accordion-header">
                     <button class="accordion-button {{ $activeGroup === 'parametres' ? '' : 'collapsed' }}"
@@ -618,86 +640,33 @@ $activeGroup = match(true) {
                     <div class="accordion-body p-0">
                         <ul class="nav flex-column">
 
-                            @if (Route::has('parametres.association'))
-                            <li class="nav-item">
-                                <a href="{{ route('parametres.association') }}"
-                                   class="nav-link {{ request()->routeIs('parametres.association') ? 'active' : '' }}">
-                                    <i class="bi bi-building me-1"></i> Association
-                                </a>
-                            </li>
-                            @endif
+                            {{-- Intertitres = les quatre sections de ParametresNavigation, jamais
+                                 les douze écrans à plat. Chacun mène à son ancre sur la page
+                                 d'accueil des paramètres. Seule la section de l'écran courant se
+                                 déplie — c'est la position qui ouvre, jamais un clic sur
+                                 l'intertitre : aucun repli à piloter. --}}
+                            @foreach (ParametresNavigation::sections() as $sectionParametres)
+                                @php $ecransSectionParametres = $sectionParametres->ecransVisibles($roleParametres); @endphp
+                                @continue(count($ecransSectionParametres) === 0)
 
-                            @if (Route::has('parametres.reception-documents'))
-                            <li class="nav-item">
-                                <a href="{{ route('parametres.reception-documents') }}"
-                                   class="nav-link {{ request()->routeIs('parametres.reception-documents') ? 'active' : '' }}">
-                                    <i class="bi bi-envelope-arrow-down me-1"></i> Réception documents
-                                </a>
-                            </li>
-                            @endif
+                                <li class="nav-item">
+                                    <a href="{{ route('parametres.index') }}#{{ $sectionParametres->cle }}"
+                                       class="nav-link param-section-link">
+                                        <i class="bi {{ $sectionParametres->icone }} me-1"></i> {{ $sectionParametres->libelle }}
+                                    </a>
+                                </li>
 
-                            @if (Route::has('parametres.smtp'))
-                            <li class="nav-item">
-                                <a href="{{ route('parametres.smtp') }}"
-                                   class="nav-link {{ request()->routeIs('parametres.smtp') ? 'active' : '' }}">
-                                    <i class="bi bi-send me-1"></i> Serveur d'envoi
-                                </a>
-                            </li>
-                            @endif
-
-                            @if (Route::has('parametres.helloasso'))
-                            <li class="nav-item">
-                                <a href="{{ route('parametres.helloasso') }}"
-                                   class="nav-link {{ request()->routeIs('parametres.helloasso') ? 'active' : '' }}">
-                                    <i class="bi bi-plug me-1"></i> Connexion HelloAsso
-                                </a>
-                            </li>
-                            @endif
-
-                            @if (Route::has('parametres.plan-comptable'))
-                            <li class="nav-item">
-                                <a href="{{ route('parametres.plan-comptable') }}"
-                                   class="nav-link {{ request()->routeIs('parametres.plan-comptable') ? 'active' : '' }}">
-                                    <i class="bi bi-tag me-1"></i> Plan comptable
-                                </a>
-                            </li>
-                            @endif
-
-                            @if (Route::has('parametres.comptabilite.usages'))
-                            <li class="nav-item">
-                                <a href="{{ route('parametres.comptabilite.usages') }}"
-                                   class="nav-link {{ request()->routeIs('parametres.comptabilite.usages') ? 'active' : '' }}">
-                                    <i class="bi bi-sliders me-2"></i> Comptabilité
-                                </a>
-                            </li>
-                            @endif
-
-                            @if (Route::has('parametres.adhesions.formules'))
-                            <li class="nav-item">
-                                <a href="{{ route('parametres.adhesions.formules') }}"
-                                   class="nav-link {{ request()->routeIs('parametres.adhesions.*') ? 'active' : '' }}">
-                                    <i class="bi bi-card-checklist me-1"></i> Adhésions
-                                </a>
-                            </li>
-                            @endif
-
-                            @if (Route::has('parametres.recus-fiscaux'))
-                            <li class="nav-item">
-                                <a href="{{ route('parametres.recus-fiscaux') }}"
-                                   class="nav-link {{ request()->routeIs('parametres.recus-fiscaux') ? 'active' : '' }}">
-                                    <i class="bi bi-receipt me-2"></i> Reçus fiscaux
-                                </a>
-                            </li>
-                            @endif
-
-                            @if (Route::has('parametres.utilisateurs.index'))
-                            <li class="nav-item">
-                                <a href="{{ route('parametres.utilisateurs.index') }}"
-                                   class="nav-link {{ request()->routeIs('parametres.utilisateurs.*') ? 'active' : '' }}">
-                                    <i class="bi bi-people me-1"></i> Utilisateurs
-                                </a>
-                            </li>
-                            @endif
+                                @if ($positionParametres !== null && $positionParametres['section']->cle === $sectionParametres->cle)
+                                    @foreach ($ecransSectionParametres as $ecranParametres)
+                                    <li class="nav-item">
+                                        <a href="{{ route($ecranParametres->route) }}"
+                                           class="nav-link {{ request()->routeIs($ecranParametres->route) ? 'active' : '' }}">
+                                            <i class="bi {{ $ecranParametres->icone }} me-1"></i> {{ $ecranParametres->libelle }}
+                                        </a>
+                                    </li>
+                                    @endforeach
+                                @endif
+                            @endforeach
 
                         </ul>
                     </div>
