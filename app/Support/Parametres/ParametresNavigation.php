@@ -79,6 +79,24 @@ final class ParametresNavigation
     }
 
     /**
+     * Où se trouve une route dans l'arbre.
+     *
+     * @return array{section: SectionParametres, ecran: EcranParametre}|null
+     */
+    public static function localiser(string $routeName): ?array
+    {
+        foreach (self::sections() as $section) {
+            foreach ($section->ecrans as $ecran) {
+                if ($ecran->route === $routeName) {
+                    return ['section' => $section, 'ecran' => $ecran];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Garantit l'unicité des clés d'écran et de section sur tout l'arbre.
      *
      * Une garde serveur d'autorisation résout un écran par sa clé : une
