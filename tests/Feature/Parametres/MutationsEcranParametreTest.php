@@ -67,7 +67,7 @@ it('un comptable peut réellement enregistrer les affectations comptables', func
     )->toBeTrue();
 });
 
-it('un gestionnaire reçoit 403 en appelant une méthode sur les reçus fiscaux', function (): void {
+it('un gestionnaire est refusé dès le montage du composant (reçus fiscaux)', function (): void {
     // booted() s'exécute à CHAQUE requête Livewire, y compris le montage
     // initial que déclenche test() — chaîner ->call() après un montage déjà
     // refusé casserait sur un snapshot invalide plutôt que de re-vérifier le
@@ -81,7 +81,7 @@ it('un gestionnaire reçoit 403 en appelant une méthode sur les reçus fiscaux'
     expect($this->association->eligible_recu_fiscal)->toBeFalse();
 });
 
-it('un gestionnaire reçoit 403 en appelant une méthode sur les affectations comptables', function (): void {
+it('un gestionnaire est refusé dès le montage du composant (affectations comptables)', function (): void {
     $user = connecterAvecRolePourMutation($this->association, RoleAssociation::Gestionnaire);
     $compte = Compte::factory()->depense()->create();
 
@@ -92,4 +92,41 @@ it('un gestionnaire reçoit 403 en appelant une méthode sur les affectations co
             ->where('usage', 'frais_kilometriques')
             ->exists()
     )->toBeFalse();
+});
+
+it('une rétrogradation de rôle coupe les mutations d’un composant déjà monté', function (): void {
+    // Le vrai motif de booted() plutôt que mount() : un composant LÉGITIMEMENT
+    // monté (Comptable, autorisé sur recus-fiscaux) dont l'autorisation tombe
+    // ensuite — rétrogradation de rôle en cours de session, ou requête
+    // /livewire/update rejouée. Si booted() était un jour remplacé par
+    // mount(), ce test resterait seul à casser : mount() ne se rejoue pas sur
+    // un composant déjà hydraté, donc la mutation ci-dessous passerait à tort.
+    $user = connecterAvecRolePourMutation($this->association, RoleAssociation::Comptable);
+
+    $composant = Livewire::actingAs($user)->test(RecusFiscaux::class);
+    $composant->assertOk();
+
+    // Encore Comptable ici : ce set() est un aller-retour Livewire à part
+    // entière, autorisé à ce stade — il pose l'état que la mutation bloquée
+    // plus bas ne doit PAS persister.
+    $composant->set('eligibleRecuFiscal', true)
+        ->set('signataireNom', 'Marie Curie')
+        ->assertOk();
+
+    // Rétrogradation en base — currentRole() (App\Models\User::currentRole())
+    // ne met rien en cache : il réinterroge le pivot association_user à chaque
+    // appel via $this->associations()->where(...)->first(), donc la requête
+    // Livewire suivante voit le nouveau rôle sans artifice de test. Un seul
+    // appel après la rétrogradation : enchaîner derrière un 403 casserait sur
+    // un snapshot invalide plutôt que de revérifier le même garde (cf. les
+    // deux tests de refus au montage, ci-dessus).
+    $user->associations()->updateExistingPivot($this->association->id, [
+        'role' => RoleAssociation::Gestionnaire->value,
+    ]);
+
+    $composant->call('enregistrer')->assertForbidden();
+
+    $this->association->refresh();
+    expect($this->association->eligible_recu_fiscal)->toBeFalse();
+    expect($this->association->signataire_nom)->not->toBe('Marie Curie');
 });
