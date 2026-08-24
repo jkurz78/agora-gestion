@@ -5,13 +5,17 @@ declare(strict_types=1);
 namespace App\Support\Parametres;
 
 use App\Enums\RoleAssociation;
+use InvalidArgumentException;
 
 /**
  * Source unique de l'arbre de la section Paramètres.
  *
  * Quatre surfaces la lisent — sidebar, page d'accueil, fil d'Ariane et garde
  * serveur. Aucune ne redéclare un libellé ni un droit : c'est ce qui les empêche
- * structurellement de diverger.
+ * structurellement de diverger. Les clés d'écran et de section sont garanties
+ * uniques sur tout l'arbre (cf. garantirClesUniques) : une garde serveur qui
+ * résout un écran par sa clé ne peut donc jamais tomber sur le mauvais jeu de
+ * rôles autorisés.
  */
 final class ParametresNavigation
 {
@@ -22,7 +26,7 @@ final class ParametresNavigation
         $adminComptable = [RoleAssociation::Admin, RoleAssociation::Comptable];
         $adminGestionnaire = [RoleAssociation::Admin, RoleAssociation::Gestionnaire];
 
-        return [
+        $sections = [
             new SectionParametres(
                 cle: 'association-acces',
                 libelle: 'Association et accès',
@@ -68,5 +72,45 @@ final class ParametresNavigation
                 ],
             ),
         ];
+
+        self::garantirClesUniques($sections);
+
+        return $sections;
+    }
+
+    /**
+     * Garantit l'unicité des clés d'écran et de section sur tout l'arbre.
+     *
+     * Une garde serveur d'autorisation résout un écran par sa clé : une
+     * collision y résoudrait silencieusement vers le mauvais jeu de rôles
+     * autorisés, sans lever la moindre erreur. On préfère lever ici, tôt,
+     * plutôt que de laisser cette classe mentir sur l'unicité qu'elle promet.
+     *
+     * @param  list<SectionParametres>  $sections
+     */
+    private static function garantirClesUniques(array $sections): void
+    {
+        $clesSections = [];
+        $clesEcrans = [];
+
+        foreach ($sections as $section) {
+            if (isset($clesSections[$section->cle])) {
+                throw new InvalidArgumentException(sprintf(
+                    'La section « %s » est déclarée plusieurs fois dans l\'arbre des paramètres : chaque clé de section doit être unique.',
+                    $section->cle,
+                ));
+            }
+            $clesSections[$section->cle] = true;
+
+            foreach ($section->ecrans as $ecran) {
+                if (isset($clesEcrans[$ecran->cle])) {
+                    throw new InvalidArgumentException(sprintf(
+                        'L\'écran « %s » est déclaré plusieurs fois dans l\'arbre des paramètres : chaque clé d\'écran doit être unique.',
+                        $ecran->cle,
+                    ));
+                }
+                $clesEcrans[$ecran->cle] = true;
+            }
+        }
     }
 }
