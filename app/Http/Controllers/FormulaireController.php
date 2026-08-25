@@ -5,14 +5,12 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Enums\ModePaiement;
-use App\Models\Exercice;
 use App\Models\Participant;
 use App\Models\ParticipantDonneesMedicales;
 use App\Models\Reglement;
 use App\Models\Seance;
-use App\Services\ExerciceService;
 use App\Services\FormulaireTokenService;
-use Carbon\CarbonImmutable;
+use App\Support\CurrentAssociation;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -242,13 +240,15 @@ final class FormulaireController extends Controller
         });
 
         // Resolve HelloAsso URL via flash session (not query param — avoids URL guessing)
+        // URL d'adhésion unique, portée par l'association. Elle était auparavant
+        // rattachée à l'exercice courant — inutilement complexe (on ne revient
+        // jamais en arrière sur une URL d'adhésion) et cela INTERDISAIT le cas
+        // utile : pointer dès août vers la saison suivante, pour offrir un mois
+        // plutôt que vendre une adhésion presque périmée.
         $helloassoUrl = null;
         $typeOperation = $participant->operation->typeOperation;
         if ($typeOperation?->reserve_adherents) {
-            $now = now();
-            $annee = app(ExerciceService::class)->anneeForDate(CarbonImmutable::instance($now));
-            $exercice = Exercice::where('annee', $annee)->first();
-            $helloassoUrl = $exercice?->helloasso_url;
+            $helloassoUrl = CurrentAssociation::tryGet()?->urlRenouvellementAdhesion();
         }
 
         return redirect()->route('formulaire.merci')
