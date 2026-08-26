@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Livewire\PlanComptable;
 use App\Models\Compte;
 use App\Models\Famille;
+use App\Models\User;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
@@ -34,6 +35,12 @@ function b1CreerCompteClasse2(string $numero, string $intitule): Compte
         'pour_inscriptions' => false,
     ]);
 }
+
+beforeEach(function (): void {
+    $user = User::factory()->create();
+    $user->associations()->attach(TenantContext::currentId(), ['role' => 'admin', 'joined_at' => now()]);
+    $this->actingAs($user);
+});
 
 // ── Création ──────────────────────────────────────────────────────
 

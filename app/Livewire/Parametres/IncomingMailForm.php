@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Parametres;
 
+use App\Livewire\Parametres\Concerns\AutoriseEcranParametre;
 use App\Models\IncomingMailAllowedSender;
 use App\Models\IncomingMailParametres;
 use App\Services\IncomingDocuments\IncomingMailService;
@@ -13,6 +14,8 @@ use Livewire\Component;
 
 final class IncomingMailForm extends Component
 {
+    use AutoriseEcranParametre;
+
     public string $tab = 'configuration';
 
     public bool $enabled = false;
@@ -41,6 +44,11 @@ final class IncomingMailForm extends Component
     public string $nouveauEmail = '';
 
     public string $nouveauLabel = '';
+
+    protected function cleEcranParametre(): string
+    {
+        return 'reception-documents';
+    }
 
     public function mount(): void
     {

@@ -92,10 +92,14 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class, CheckEspaceAccess
     ->prefix('parametres')
     ->name('parametres.')
     ->group(function (): void {
+        Route::view('/', 'parametres.index')->name('index');
         Route::view('/association', 'parametres.association')->name('association');
         Route::view('/helloasso', 'parametres.helloasso')->name('helloasso');
         Route::view('/reception-documents', 'parametres.reception-documents')->name('reception-documents');
         Route::view('/smtp', 'parametres.smtp')->name('smtp');
+        Route::view('/liens-publics', 'parametres.liens-publics')->name('liens-publics');
+        Route::view('/facturation', 'parametres.facturation')->name('facturation');
+        Route::view('/ocr-ia', 'parametres.ocr-ia')->name('ocr-ia');
         // DC-10b-3 : route categories supprimée — l'écran Plan comptable prend le relais.
         // DC-7 : l'écran « Plan comptable » (table comptes) remplace l'écran
         // « Sous-catégories » — les anciennes URLs redirigent en 301 (voir la

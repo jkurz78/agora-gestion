@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Livewire\Parametres\Concerns\AutoriseEcranParametre;
 use App\Models\Compte;
 use App\Models\Famille;
 use App\Models\Immobilisation;
@@ -21,6 +22,8 @@ use Livewire\Component;
  */
 final class PlanComptable extends Component
 {
+    use AutoriseEcranParametre;
+
     // ── Modal state ──────────────────────────────────────────────
     public bool $showModal = false;
 
@@ -33,6 +36,11 @@ final class PlanComptable extends Component
     public string $flashMessage = '';
 
     public string $flashType = '';
+
+    protected function cleEcranParametre(): string
+    {
+        return 'plan-comptable';
+    }
 
     public function render(): View
     {

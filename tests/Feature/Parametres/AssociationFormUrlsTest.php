@@ -2,7 +2,14 @@
 
 declare(strict_types=1);
 
-use App\Livewire\Parametres\AssociationForm;
+// Migré vers LiensPublicsForm (Task 6 de la découpe d'AssociationForm) : les 3
+// URL publiques ont quitté l'onglet Informations pour l'écran dédié « Liens
+// publics ». Voir tests/Feature/Parametres/DecoupeAssociationFormTest.php et
+// tests/Livewire/Parametres/LiensPublicsFormTest.php pour la couverture TDD
+// complète du nouveau composant — ce fichier est conservé pour ne pas perdre
+// son historique de régression, adapté à sa nouvelle destination.
+
+use App\Livewire\Parametres\LiensPublicsForm;
 use App\Models\Association;
 use App\Models\User;
 use App\Tenant\TenantContext;
@@ -29,7 +36,7 @@ afterEach(function () {
 // Test 1 : Affichage formulaire — les 3 champs URL sont présents
 // ─────────────────────────────────────────────────────────────────────────────
 it('affiche les 3 champs URL avec les valeurs actuelles de l\'association', function () {
-    Livewire::test(AssociationForm::class)
+    Livewire::test(LiensPublicsForm::class)
         ->assertSet('url_site_web', 'https://monasso.fr')
         ->assertSet('url_renouvellement_adhesion', 'https://helloasso.com/adhesion')
         ->assertSet('url_nouveau_don', 'https://helloasso.com/don')
@@ -48,7 +55,7 @@ it('persiste les 3 URLs après save', function () {
         'url_nouveau_don' => null,
     ]);
 
-    Livewire::test(AssociationForm::class)
+    Livewire::test(LiensPublicsForm::class)
         ->set('url_site_web', 'https://monasso.fr')
         ->set('url_renouvellement_adhesion', 'https://helloasso.com/adhesion-2026')
         ->set('url_nouveau_don', 'https://helloasso.com/don-2026')
@@ -64,7 +71,7 @@ it('persiste les 3 URLs après save', function () {
 // Test 3 : Validation — URL malformée déclenche une erreur
 // ─────────────────────────────────────────────────────────────────────────────
 it('valide que url_site_web doit être une URL valide', function () {
-    Livewire::test(AssociationForm::class)
+    Livewire::test(LiensPublicsForm::class)
         ->set('url_site_web', 'pas-une-url')
         ->call('save')
         ->assertHasErrors(['url_site_web' => 'url']);
@@ -74,7 +81,7 @@ it('valide que url_site_web doit être une URL valide', function () {
 // Test 4 : Nullable — null accepté sans erreur
 // ─────────────────────────────────────────────────────────────────────────────
 it('accepte des valeurs null pour les 3 champs URL', function () {
-    Livewire::test(AssociationForm::class)
+    Livewire::test(LiensPublicsForm::class)
         ->set('url_site_web', null)
         ->set('url_renouvellement_adhesion', null)
         ->set('url_nouveau_don', null)

@@ -108,6 +108,25 @@ it('rejects logo with invalid mime type', function () {
         ->assertHasErrors(['logo']);
 });
 
+it('saves siret and forme_juridique via AssociationForm', function () {
+    // Découpe de l'onglet Facturation (Task 7) : SIRET et forme juridique
+    // sont de l'identité légale, ils restent sur AssociationForm — déplacés
+    // seulement visuellement vers l'onglet Informations. Voir
+    // tests/Feature/Parametres/DecoupeAssociationFormTest.php et
+    // tests/Livewire/Parametres/FacturationFormTest.php pour le reste de
+    // l'onglet Facturation, parti vers FacturationForm.
+    Livewire::test(AssociationForm::class)
+        ->set('nom', 'Mon Asso')
+        ->set('siret', '12345678900012')
+        ->set('forme_juridique', 'Association loi 1901')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $this->association->refresh();
+    expect($this->association->siret)->toBe('12345678900012');
+    expect($this->association->forme_juridique)->toBe('Association loi 1901');
+});
+
 it('saves valid logo and persists logo_path', function () {
     Storage::fake('local');
     $file = UploadedFile::fake()->image('logo.png', 200, 200);

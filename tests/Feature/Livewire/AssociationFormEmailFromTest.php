@@ -2,7 +2,15 @@
 
 declare(strict_types=1);
 
-use App\Livewire\Parametres\AssociationForm;
+// Migré vers SmtpForm (Task 9 de la découpe d'AssociationForm) : l'adresse
+// d'expédition (email_from, email_from_name) a quitté l'onglet Communication
+// pour rejoindre l'écran dédié « Envoi d'e-mails », aux côtés du transport
+// SMTP. Voir tests/Feature/Parametres/DecoupeAssociationFormTest.php et
+// tests/Livewire/Parametres/SmtpExpediteurTest.php pour la couverture TDD
+// complète du composant étendu — ce fichier est conservé pour ne pas perdre
+// son historique de régression, adapté à sa nouvelle destination.
+
+use App\Livewire\Parametres\SmtpForm;
 use App\Models\Association;
 use App\Models\User;
 use App\Tenant\TenantContext;
@@ -22,18 +30,17 @@ afterEach(function () {
 });
 
 it('displays email_from fields', function () {
-    Livewire::test(AssociationForm::class)
-        ->assertSeeHtml('Adresse d\'expédition')
+    Livewire::test(SmtpForm::class)
+        ->assertSeeHtml('Expéditeur des e-mails')
         ->assertSeeHtml('placeholder="Nom expéditeur"')
         ->assertSeeHtml('placeholder="noreply@monasso.fr"');
 });
 
 it('saves email_from and email_from_name', function () {
-    Livewire::test(AssociationForm::class)
-        ->set('nom', 'Test Association')
+    Livewire::test(SmtpForm::class)
         ->set('email_from', 'noreply@asso.fr')
         ->set('email_from_name', 'Mon Association')
-        ->call('save');
+        ->call('sauvegarder');
 
     $assoc = $this->association->fresh();
     expect($assoc->email_from)->toBe('noreply@asso.fr')
@@ -41,17 +48,16 @@ it('saves email_from and email_from_name', function () {
 });
 
 it('validates email_from is a valid email', function () {
-    Livewire::test(AssociationForm::class)
-        ->set('nom', 'Test')
+    Livewire::test(SmtpForm::class)
         ->set('email_from', 'not-an-email')
-        ->call('save')
+        ->call('sauvegarder')
         ->assertHasErrors(['email_from']);
 });
 
 it('loads existing email_from on mount', function () {
     $this->association->update(['email_from' => 'existing@asso.fr', 'email_from_name' => 'Existing']);
 
-    Livewire::test(AssociationForm::class)
+    Livewire::test(SmtpForm::class)
         ->assertSet('email_from', 'existing@asso.fr')
         ->assertSet('email_from_name', 'Existing');
 });

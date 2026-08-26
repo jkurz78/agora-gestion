@@ -107,6 +107,36 @@
         </div>
     </div>
 
+    <hr class="my-4" style="max-width: 680px;">
+
+    <h6 class="mb-2"><i class="bi bi-envelope-paper"></i> Expéditeur des e-mails</h6>
+    <p class="text-muted small mb-3" style="max-width: 680px;">
+        Adresse d'expédition utilisée pour les communications de masse aux tiers,
+        et en repli pour les types d'opération qui n'ont pas d'adresse configurée.
+    </p>
+
+    <div class="row g-2" style="max-width: 680px;">
+        <div class="col-md-3">
+            <input type="text" class="form-control form-control-sm @error('email_from_name') is-invalid @enderror"
+                   wire:model="email_from_name" placeholder="Nom expéditeur" @disabled(\App\Support\Demo::isActive())>
+            @error('email_from_name') <div class="invalid-feedback">{{ $message }}</div> @enderror
+        </div>
+        <div class="col-md-6">
+            <input type="email" class="form-control form-control-sm @error('email_from') is-invalid @enderror"
+                   wire:model="email_from" placeholder="noreply@monasso.fr" @disabled(\App\Support\Demo::isActive())>
+            @error('email_from') <div class="invalid-feedback">{{ $message }}</div> @enderror
+        </div>
+        <div class="col-md-3">
+            @unless(\App\Support\Demo::isActive())
+            <button type="button" class="btn btn-sm btn-outline-secondary w-100"
+                    {{ $email_from ? '' : 'disabled' }}
+                    wire:click="openTestEmailModal">
+                <i class="bi bi-envelope"></i> Tester
+            </button>
+            @endunless
+        </div>
+    </div>
+
     @unless(\App\Support\Demo::isActive())
     <div class="d-flex gap-2 mt-4">
         <button type="button" class="btn btn-primary"
@@ -146,6 +176,40 @@
                 Échec : {{ $testResult['error'] }}
             @endif
         </div>
+    @endif
+
+    {{-- Mini-modale test email --}}
+    @if($showTestEmailModal)
+    <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+         style="background:rgba(0,0,0,.3);z-index:2100"
+         wire:click.self="$set('showTestEmailModal', false)">
+        <div class="bg-white rounded-3 shadow p-4" style="max-width:400px;width:100%">
+            <h6 class="mb-3"><i class="bi bi-envelope me-1"></i> Envoyer un email de test</h6>
+            <p class="small text-muted mb-2">Expéditeur : {{ $email_from_name ? $email_from_name . ' <' . $email_from . '>' : $email_from }}</p>
+            <div class="mb-3">
+                <label class="form-label small">Adresse destinataire</label>
+                <input type="email" wire:model="testEmailTo"
+                       class="form-control form-control-sm @error('testEmailTo') is-invalid @enderror"
+                       placeholder="votre@email.fr">
+                @error('testEmailTo')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
+            </div>
+            @if($testFlashMessage)
+                <div class="alert alert-{{ $testFlashType }} py-1 small">{{ $testFlashMessage }}</div>
+            @endif
+            <div class="d-flex gap-2 justify-content-end">
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                        wire:click="$set('showTestEmailModal', false)">
+                    Fermer
+                </button>
+                <button type="button" class="btn btn-sm btn-primary" wire:click="sendTestEmail">
+                    <span wire:loading.remove wire:target="sendTestEmail">Envoyer</span>
+                    <span wire:loading wire:target="sendTestEmail">Envoi...</span>
+                </button>
+            </div>
+        </div>
+    </div>
     @endif
 
     @unless(\App\Support\Demo::isActive())

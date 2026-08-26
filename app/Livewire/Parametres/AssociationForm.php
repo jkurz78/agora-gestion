@@ -4,13 +4,9 @@ declare(strict_types=1);
 
 namespace App\Livewire\Parametres;
 
-use App\Exceptions\OcrAnalysisException;
-use App\Mail\TestEmail;
-use App\Models\CompteBancaire;
-use App\Services\InvoiceOcrService;
+use App\Livewire\Parametres\Concerns\AutoriseEcranParametre;
 use App\Support\CurrentAssociation;
 use App\Support\TenantAsset;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Livewire\Component;
@@ -18,10 +14,8 @@ use Livewire\WithFileUploads;
 
 final class AssociationForm extends Component
 {
+    use AutoriseEcranParametre;
     use WithFileUploads;
-
-    /** Onglet actif — entangle Alpine pour survivre aux re-renders Livewire. */
-    public string $activeTab = 'infos';
 
     public string $nom = '';
 
@@ -47,42 +41,10 @@ final class AssociationForm extends Component
 
     public ?string $forme_juridique = null;
 
-    public ?string $facture_conditions_reglement = null;
-
-    public ?string $facture_mentions_legales = null;
-
-    public ?string $facture_mentions_penalites = null;
-
-    public ?int $facture_compte_bancaire_id = null;
-
-    public ?string $url_site_web = null;
-
-    public ?string $url_renouvellement_adhesion = null;
-
-    public ?string $url_nouveau_don = null;
-
-    public ?string $anthropic_api_key = null;
-
-    public ?string $invoice_ocr_model = null;
-
-    /** @var array<string, string> [id => libellé] des modèles disponibles pour la clé */
-    public array $availableOcrModels = [];
-
-    public string $ocrModelsFlash = '';
-
-    public string $ocrModelsFlashType = '';
-
-    public ?string $email_from = null;
-
-    public ?string $email_from_name = null;
-
-    public string $testEmailTo = '';
-
-    public bool $showTestEmailModal = false;
-
-    public string $testFlashMessage = '';
-
-    public string $testFlashType = '';
+    protected function cleEcranParametre(): string
+    {
+        return 'informations';
+    }
 
     public function mount(): void
     {
@@ -98,65 +60,7 @@ final class AssociationForm extends Component
             $this->cachet_signature_path = $association->cachet_signature_path;
             $this->siret = $association->siret;
             $this->forme_juridique = $association->forme_juridique;
-            $this->facture_conditions_reglement = $association->facture_conditions_reglement;
-            $this->facture_mentions_legales = $association->facture_mentions_legales;
-            $this->facture_mentions_penalites = $association->facture_mentions_penalites;
-            $this->facture_compte_bancaire_id = $association->facture_compte_bancaire_id;
-            $this->url_site_web = $association->url_site_web;
-            $this->url_renouvellement_adhesion = $association->url_renouvellement_adhesion;
-            $this->url_nouveau_don = $association->url_nouveau_don;
-            $this->anthropic_api_key = $association->anthropic_api_key;
-            $this->invoice_ocr_model = $association->invoice_ocr_model;
-            $this->email_from = $association->email_from;
-            $this->email_from_name = $association->email_from_name;
         }
-
-        // Le sélecteur contient au moins le modèle déjà choisi, pour ne jamais
-        // être vide avant un chargement de la liste vivante.
-        if ($this->invoice_ocr_model !== null && $this->invoice_ocr_model !== '') {
-            $this->availableOcrModels = [$this->invoice_ocr_model => $this->invoice_ocr_model];
-        }
-    }
-
-    /**
-     * Charge la liste des modèles réellement disponibles pour la clé API saisie,
-     * via GET /v1/models. L'utilisateur sélectionne ensuite dans le combo —
-     * aucun ID à deviner ni à saisir à la main.
-     */
-    public function chargerModelesOcr(): void
-    {
-        $this->ocrModelsFlash = '';
-        $this->ocrModelsFlashType = '';
-
-        $cle = $this->anthropic_api_key !== null && $this->anthropic_api_key !== ''
-            ? $this->anthropic_api_key
-            : CurrentAssociation::tryGet()?->anthropic_api_key;
-
-        if ($cle === null || $cle === '') {
-            $this->ocrModelsFlash = 'Renseignez d\'abord la clé API Anthropic, puis enregistrez ou rechargez la liste.';
-            $this->ocrModelsFlashType = 'warning';
-
-            return;
-        }
-
-        try {
-            $modeles = InvoiceOcrService::fetchAvailableModels($cle);
-        } catch (OcrAnalysisException $e) {
-            $this->ocrModelsFlash = 'Impossible de récupérer la liste des modèles (clé invalide ou API injoignable).';
-            $this->ocrModelsFlashType = 'danger';
-
-            return;
-        }
-
-        // On conserve le modèle déjà choisi même s'il n'est plus listé (retiré),
-        // pour ne pas effacer silencieusement la configuration.
-        if ($this->invoice_ocr_model !== null && $this->invoice_ocr_model !== '' && ! isset($modeles[$this->invoice_ocr_model])) {
-            $modeles[$this->invoice_ocr_model] = $this->invoice_ocr_model.' (retiré ?)';
-        }
-
-        $this->availableOcrModels = $modeles;
-        $this->ocrModelsFlash = count($modeles).' modèle(s) disponible(s) chargé(s).';
-        $this->ocrModelsFlashType = 'success';
     }
 
     public function save(): void
@@ -172,17 +76,6 @@ final class AssociationForm extends Component
             'cachet' => ['nullable', 'image', 'mimes:png,jpg,jpeg', 'max:2048'],
             'siret' => ['nullable', 'string', 'max:14'],
             'forme_juridique' => ['nullable', 'string', 'max:255'],
-            'facture_conditions_reglement' => ['nullable', 'string', 'max:1000'],
-            'facture_mentions_legales' => ['nullable', 'string', 'max:2000'],
-            'facture_mentions_penalites' => ['nullable', 'string', 'max:2000'],
-            'facture_compte_bancaire_id' => ['nullable', 'integer', 'exists:comptes_bancaires,id'],
-            'url_site_web' => ['nullable', 'string', 'url', 'max:255'],
-            'url_renouvellement_adhesion' => ['nullable', 'string', 'url', 'max:255'],
-            'url_nouveau_don' => ['nullable', 'string', 'url', 'max:255'],
-            'anthropic_api_key' => ['nullable', 'string', 'max:255'],
-            'invoice_ocr_model' => ['nullable', 'string', 'max:255'],
-            'email_from' => ['nullable', 'email', 'max:255'],
-            'email_from_name' => ['nullable', 'string', 'max:255'],
         ]);
 
         $data = [
@@ -194,17 +87,6 @@ final class AssociationForm extends Component
             'telephone' => $this->telephone,
             'siret' => $this->siret,
             'forme_juridique' => $this->forme_juridique,
-            'facture_conditions_reglement' => $this->facture_conditions_reglement,
-            'facture_mentions_legales' => $this->facture_mentions_legales,
-            'facture_mentions_penalites' => $this->facture_mentions_penalites,
-            'facture_compte_bancaire_id' => $this->facture_compte_bancaire_id,
-            'url_site_web' => $this->url_site_web ?: null,
-            'url_renouvellement_adhesion' => $this->url_renouvellement_adhesion ?: null,
-            'url_nouveau_don' => $this->url_nouveau_don ?: null,
-            'anthropic_api_key' => $this->anthropic_api_key ?: null,
-            'invoice_ocr_model' => $this->invoice_ocr_model ?: null,
-            'email_from' => $this->email_from ?: null,
-            'email_from_name' => $this->email_from_name ?: null,
         ];
 
         if ($this->logo !== null) {
@@ -270,38 +152,6 @@ final class AssociationForm extends Component
         session()->flash('success', 'Informations de l\'association mises à jour.');
     }
 
-    public function openTestEmailModal(): void
-    {
-        $this->testEmailTo = '';
-        $this->testFlashMessage = '';
-        $this->testFlashType = '';
-        $this->showTestEmailModal = true;
-    }
-
-    public function sendTestEmail(): void
-    {
-        $this->validate([
-            'email_from' => 'required|email',
-            'testEmailTo' => 'required|email',
-        ], [
-            'email_from.required' => "L'adresse d'expédition est requise.",
-            'testEmailTo.required' => 'Veuillez saisir une adresse destinataire.',
-            'testEmailTo.email' => "L'adresse destinataire n'est pas valide.",
-        ]);
-
-        try {
-            Mail::mailer()
-                ->to($this->testEmailTo)
-                ->send((new TestEmail($this->nom ?: 'Association'))->from($this->email_from, $this->email_from_name ?: null));
-
-            $this->testFlashMessage = "Email de test envoyé à {$this->testEmailTo}.";
-            $this->testFlashType = 'success';
-        } catch (\Throwable $e) {
-            $this->testFlashMessage = 'Erreur lors de l\'envoi : '.$e->getMessage();
-            $this->testFlashType = 'danger';
-        }
-    }
-
     public function render(): View
     {
         $logoUrl = null;
@@ -321,12 +171,9 @@ final class AssociationForm extends Component
             }
         }
 
-        $comptesBancaires = CompteBancaire::saisieManuelle()->orderBy('nom')->get();
-
         return view('livewire.parametres.association-form', [
             'logoUrl' => $logoUrl,
             'cachetUrl' => $cachetUrl,
-            'comptesBancaires' => $comptesBancaires,
         ]);
     }
 }

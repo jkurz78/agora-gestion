@@ -7,6 +7,7 @@ use App\Models\Association;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\HelloAssoParametres;
+use App\Models\User;
 use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -50,6 +51,10 @@ beforeEach(function (): void {
         'environnement' => 'sandbox',
         'compte_helloasso_id' => (int) $this->compteB->id,
     ]);
+
+    $this->user = User::factory()->create();
+    $this->user->associations()->attach((int) $this->associationB->id, ['role' => 'admin', 'joined_at' => now()]);
+    $this->actingAs($this->user);
 });
 
 afterEach(function (): void {

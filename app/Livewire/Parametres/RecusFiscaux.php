@@ -5,16 +5,17 @@ declare(strict_types=1);
 namespace App\Livewire\Parametres;
 
 use App\Enums\RegimeFiscalDon;
-use App\Enums\RoleAssociation;
+use App\Livewire\Parametres\Concerns\AutoriseEcranParametre;
 use App\Models\Association;
 use App\Tenant\TenantContext;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Component;
 
 final class RecusFiscaux extends Component
 {
+    use AutoriseEcranParametre;
+
     public bool $eligibleRecuFiscal = false;
 
     public string $regimeFiscalDon = '';
@@ -33,9 +34,13 @@ final class RecusFiscaux extends Component
 
     public bool $ifiEligible = false;
 
+    protected function cleEcranParametre(): string
+    {
+        return 'recus-fiscaux';
+    }
+
     public function mount(): void
     {
-        $this->requireAdmin();
         $asso = Association::findOrFail(TenantContext::currentId());
         $this->eligibleRecuFiscal = (bool) $asso->eligible_recu_fiscal;
         $this->regimeFiscalDon = $asso->regime_fiscal_don instanceof RegimeFiscalDon
@@ -48,14 +53,6 @@ final class RecusFiscaux extends Component
         $this->signataireQualite = (string) $asso->signataire_qualite;
         $this->loiColucheEligible = (bool) $asso->loi_coluche_eligible;
         $this->ifiEligible = (bool) $asso->ifi_eligible;
-    }
-
-    private function requireAdmin(): void
-    {
-        abort_unless(
-            Auth::check() && Auth::user()->currentRole() === RoleAssociation::Admin->value,
-            403,
-        );
     }
 
     protected function rules(): array
@@ -75,7 +72,6 @@ final class RecusFiscaux extends Component
 
     public function enregistrer(): void
     {
-        $this->requireAdmin();
         $this->validate();
 
         $asso = Association::findOrFail(TenantContext::currentId());

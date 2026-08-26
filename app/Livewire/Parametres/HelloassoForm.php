@@ -6,6 +6,7 @@ namespace App\Livewire\Parametres;
 
 use App\Enums\HelloAssoEnvironnement;
 use App\Exceptions\DemoOperationBlockedException;
+use App\Livewire\Parametres\Concerns\AutoriseEcranParametre;
 use App\Models\HelloAssoParametres;
 use App\Services\HelloAssoService;
 use App\Support\Demo;
@@ -15,6 +16,8 @@ use Livewire\Component;
 // Nom en minuscules intentionnel : Livewire résout <livewire:parametres.helloasso-form /> en HelloassoForm, pas HelloAssoForm.
 final class HelloassoForm extends Component
 {
+    use AutoriseEcranParametre;
+
     public string $clientId = '';
 
     public string $clientSecret = '';
@@ -29,6 +32,11 @@ final class HelloassoForm extends Component
     public bool $secretDejaEnregistre = false;
 
     public ?string $callbackToken = null;
+
+    protected function cleEcranParametre(): string
+    {
+        return 'helloasso';
+    }
 
     public function mount(): void
     {
