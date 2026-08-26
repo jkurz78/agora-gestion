@@ -148,7 +148,9 @@ final class BilanComptableBuilder
     private function rubriquesActifVides(): array
     {
         return [
+            'immobilisations_incorporelles' => $this->rubriqueActif('immobilisations_incorporelles', 'Immobilisations incorporelles'),
             'immobilisations_corporelles' => $this->rubriqueActif('immobilisations_corporelles', 'Immobilisations corporelles'),
+            'immobilisations_financieres' => $this->rubriqueActif('immobilisations_financieres', 'Immobilisations financières'),
             'stocks' => $this->rubriqueActif('stocks', 'Stocks'),
             'creances_clients' => $this->rubriqueActif('creances_clients', 'Créances clients'),
             'autres_creances' => $this->rubriqueActif('autres_creances', 'Autres créances'),
@@ -212,29 +214,31 @@ final class BilanComptableBuilder
         foreach ($balance as $numero => $ligne) {
             $numero = (string) $numero;
             $solde = (int) $ligne['solde_fin_centimes'];
+            $rubriqueImmobilisation = $this->rubriqueImmobilisation($numero);
+            $rubriqueContreImmobilisation = $this->rubriqueContreImmobilisation($numero);
 
-            if (str_starts_with($numero, '21')) {
-                $this->ajouterActif($rubriques, 'immobilisations_corporelles', $periode, max($solde, 0));
-            } elseif (str_starts_with($numero, '28') || str_starts_with($numero, '29')) {
-                $this->ajouterActif($rubriques, 'immobilisations_corporelles', $periode, max(-$solde, 0), true);
+            if ($rubriqueImmobilisation !== null) {
+                $this->ajouterActif($rubriques, $rubriqueImmobilisation, $periode, $solde);
+            } elseif ($rubriqueContreImmobilisation !== null) {
+                $this->ajouterActif($rubriques, $rubriqueContreImmobilisation, $periode, -$solde, true);
             } elseif (str_starts_with($numero, '39')) {
-                $this->ajouterActif($rubriques, 'stocks', $periode, max(-$solde, 0), true);
+                $this->ajouterActif($rubriques, 'stocks', $periode, -$solde, true);
             } elseif (str_starts_with($numero, '3')) {
-                $this->ajouterActif($rubriques, 'stocks', $periode, max($solde, 0));
+                $this->ajouterActif($rubriques, 'stocks', $periode, $solde);
             } elseif (str_starts_with($numero, '491')) {
-                $this->ajouterActif($rubriques, 'creances_clients', $periode, max(-$solde, 0), true);
-            } elseif ($numero === '411' && $solde > 0) {
+                $this->ajouterActif($rubriques, 'creances_clients', $periode, -$solde, true);
+            } elseif (str_starts_with($numero, '411')) {
                 $this->ajouterActif($rubriques, 'creances_clients', $periode, $solde);
             } elseif ($numero === '486') {
-                $this->ajouterActif($rubriques, 'charges_constatees_avance', $periode, max($solde, 0));
+                $this->ajouterActif($rubriques, 'charges_constatees_avance', $periode, $solde);
             } elseif (str_starts_with($numero, '49')) {
-                $this->ajouterActif($rubriques, 'autres_creances', $periode, max(-$solde, 0), true);
-            } elseif (str_starts_with($numero, '4') && $solde > 0) {
+                $this->ajouterActif($rubriques, 'autres_creances', $periode, -$solde, true);
+            } elseif ($this->estAutreCompteTiers($numero) && $solde > 0) {
                 $this->ajouterActif($rubriques, 'autres_creances', $periode, $solde);
             } elseif (str_starts_with($numero, '59')) {
-                $this->ajouterActif($rubriques, 'valeurs_mobilieres_placement', $periode, max(-$solde, 0), true);
+                $this->ajouterActif($rubriques, 'valeurs_mobilieres_placement', $periode, -$solde, true);
             } elseif (str_starts_with($numero, '50')) {
-                $this->ajouterActif($rubriques, 'valeurs_mobilieres_placement', $periode, max($solde, 0));
+                $this->ajouterActif($rubriques, 'valeurs_mobilieres_placement', $periode, $solde);
             } elseif ((str_starts_with($numero, '51') || str_starts_with($numero, '53')) && $solde > 0) {
                 $this->ajouterActif($rubriques, 'disponibilites', $periode, $solde);
             }
@@ -261,20 +265,20 @@ final class BilanComptableBuilder
         foreach ($balance as $numero => $ligne) {
             $numero = (string) $numero;
             $solde = (int) $ligne['solde_fin_centimes'];
-            $montant = max(-$solde, 0);
+            $montant = -$solde;
 
             if (str_starts_with($numero, '15')) {
                 $this->ajouterPassif($rubriques, 'provisions_risques_charges', $periode, $montant);
             } elseif (str_starts_with($numero, '10') || str_starts_with($numero, '11')
                 || str_starts_with($numero, '13') || str_starts_with($numero, '14')) {
                 $this->ajouterPassif($rubriques, 'fonds_propres', $periode, $montant);
-            } elseif ($numero === '401' && $montant > 0) {
+            } elseif (str_starts_with($numero, '401')) {
                 $this->ajouterPassif($rubriques, 'dettes_fournisseurs', $periode, $montant);
             } elseif ($numero === '487') {
                 $this->ajouterPassif($rubriques, 'produits_constates_avance', $periode, $montant);
-            } elseif (str_starts_with($numero, '4') && $montant > 0) {
+            } elseif ($this->estAutreCompteTiers($numero) && $solde < 0) {
                 $this->ajouterPassif($rubriques, 'autres_dettes', $periode, $montant);
-            } elseif ((str_starts_with($numero, '51') || str_starts_with($numero, '53')) && $montant > 0) {
+            } elseif ((str_starts_with($numero, '51') || str_starts_with($numero, '53')) && $solde < 0) {
                 $this->ajouterPassif($rubriques, 'decouverts_bancaires', $periode, $montant);
             }
         }
@@ -286,6 +290,47 @@ final class BilanComptableBuilder
     private function ajouterPassif(array &$rubriques, string $code, string $periode, int $montant): void
     {
         $rubriques[$code]['montant_'.$periode.'_centimes'] += $montant;
+    }
+
+    private function rubriqueImmobilisation(string $numero): ?string
+    {
+        if (str_starts_with($numero, '20')) {
+            return 'immobilisations_incorporelles';
+        }
+
+        if (str_starts_with($numero, '21') || str_starts_with($numero, '22') || str_starts_with($numero, '23')) {
+            return 'immobilisations_corporelles';
+        }
+
+        if (str_starts_with($numero, '24') || str_starts_with($numero, '25')
+            || str_starts_with($numero, '26') || str_starts_with($numero, '27')) {
+            return 'immobilisations_financieres';
+        }
+
+        return null;
+    }
+
+    private function rubriqueContreImmobilisation(string $numero): ?string
+    {
+        if (! str_starts_with($numero, '28') && ! str_starts_with($numero, '29')) {
+            return null;
+        }
+
+        return match ($numero[2] ?? '') {
+            '0' => 'immobilisations_incorporelles',
+            '1', '2', '3' => 'immobilisations_corporelles',
+            default => 'immobilisations_financieres',
+        };
+    }
+
+    private function estAutreCompteTiers(string $numero): bool
+    {
+        return str_starts_with($numero, '4')
+            && ! str_starts_with($numero, '401')
+            && ! str_starts_with($numero, '411')
+            && ! str_starts_with($numero, '49')
+            && $numero !== '486'
+            && $numero !== '487';
     }
 
     /**
