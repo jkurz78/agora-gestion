@@ -294,6 +294,12 @@
                                 </a>
                             </li>
                             <li>
+                                <a class="dropdown-item {{ request()->routeIs('rapports.bilan') ? 'active' : '' }}"
+                                   href="{{ route('rapports.bilan') }}">
+                                    <i class="bi bi-clipboard-data me-1"></i>Bilan comptable
+                                </a>
+                            </li>
+                            <li>
                                 <a class="dropdown-item {{ request()->routeIs('rapports.balance') ? 'active' : '' }}"
                                    href="{{ route('rapports.balance') }}">
                                     <i class="bi bi-list-columns-reverse me-1"></i>Balance comptable

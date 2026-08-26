@@ -511,6 +511,13 @@ $activeGroup = match(true) {
                             </li>
 
                             <li class="nav-item">
+                                <a href="{{ route('rapports.bilan') }}"
+                                   class="nav-link {{ request()->routeIs('rapports.bilan') ? 'active' : '' }}">
+                                    <i class="bi bi-clipboard-data me-1"></i> Bilan comptable
+                                </a>
+                            </li>
+
+                            <li class="nav-item">
                                 <a href="{{ route('rapports.balance') }}"
                                    class="nav-link {{ request()->routeIs('rapports.balance') ? 'active' : '' }}">
                                     <i class="bi bi-list-columns-reverse me-1"></i> Balance comptable

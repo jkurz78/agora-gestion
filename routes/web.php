@@ -421,6 +421,7 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
     ->name('rapports.')
     ->group(function (): void {
         Route::view('/compte-resultat', 'rapports.compte-resultat')->name('compte-resultat');
+        Route::view('/bilan', 'rapports.bilan')->name('bilan');
         Route::view('/balance', 'rapports.balance')->name('balance');
         Route::view('/grand-livre', 'rapports.grand-livre')->name('grand-livre');
         Route::view('/journaux', 'rapports.journaux')->name('journaux');
