@@ -10,6 +10,7 @@ use App\Livewire\AnalysePivot;
 use App\Models\Association;
 use App\Services\ExerciceService;
 use App\Services\Rapports\BalanceComptableBuilder;
+use App\Services\Rapports\BilanComptableBuilder;
 use App\Services\Rapports\GrandLivreBuilder;
 use App\Services\Rapports\JournauxBuilder;
 use App\Services\Rapports\LivreImmobilisationsBuilder;
@@ -39,6 +40,7 @@ final class RapportExportController extends Controller
 
     /** Rapports and their allowed formats */
     private const RAPPORTS = [
+        'bilan' => ['pdf'],
         'compte-resultat' => ['xlsx', 'pdf'],
         'balance' => ['xlsx', 'pdf'],
         'grand-livre' => ['xlsx', 'pdf'],
@@ -52,6 +54,7 @@ final class RapportExportController extends Controller
 
     /** PDF orientations */
     private const PDF_ORIENTATION = [
+        'bilan' => 'landscape',
         'compte-resultat' => 'portrait',
         'balance' => 'landscape',
         'grand-livre' => 'landscape',
@@ -64,6 +67,7 @@ final class RapportExportController extends Controller
 
     /** Human-readable rapport names (for filenames and titles) */
     private const TITLES = [
+        'bilan' => 'Bilan comptable',
         'compte-resultat' => 'Compte de resultat',
         'balance' => 'Balance comptable',
         'grand-livre' => 'Grand livre',
@@ -1749,6 +1753,7 @@ final class RapportExportController extends Controller
         $subtitle = 'Exercice '.$label;
 
         $viewData = match ($rapport) {
+            'bilan' => $this->pdfBilanData($request, $exercice),
             'compte-resultat' => $this->pdfCompteResultatData($rapportService, $exercice, $label, $request),
             'balance' => $this->pdfBalanceData($request, $exercice, $exerciceService),
             'grand-livre' => $this->pdfGrandLivreData($request, $exercice, $exerciceService),
@@ -1809,6 +1814,17 @@ final class RapportExportController extends Controller
             'resultatCourantN1' => $resultatCourantN1,
             'compareN1' => $request->boolean('n1', true),
             'compareBudget' => $request->boolean('budget', true),
+        ];
+    }
+
+    /**
+     * @return array{bilan: array<string, mixed>, compareN1: bool}
+     */
+    private function pdfBilanData(Request $request, int $exercice): array
+    {
+        return [
+            'bilan' => app(BilanComptableBuilder::class)->build($exercice),
+            'compareN1' => $request->boolean('n1', true),
         ];
     }
 
