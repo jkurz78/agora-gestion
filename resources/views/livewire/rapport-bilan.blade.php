@@ -18,8 +18,10 @@
 
     @php
         $ecartN = (int) $bilan['ecart_actif_passif']['n_centimes'];
+        $ecartN1 = (int) $bilan['ecart_actif_passif']['n_1_centimes'];
+        $bilanEquilibre = $ecartN === 0 && (! $compareN1 || $ecartN1 === 0);
     @endphp
-    @if ($ecartN === 0)
+    @if ($bilanEquilibre)
         <div class="alert alert-success d-flex align-items-center gap-2" role="status">
             <i class="bi bi-check-circle-fill"></i>
             <span>Bilan équilibré</span>
@@ -27,7 +29,15 @@
     @else
         <div class="alert alert-danger d-flex align-items-center gap-2" role="alert">
             <i class="bi bi-exclamation-octagon-fill"></i>
-            <span>Bilan déséquilibré — Écart actif/passif : {{ $this->formatCentimes($ecartN) }}</span>
+            <span>Bilan déséquilibré —
+                @if ($ecartN !== 0)
+                    Écart actif/passif {{ $bilan['label_n'] }} : {{ $this->formatCentimes($ecartN) }}
+                @endif
+                @if ($compareN1 && $ecartN1 !== 0)
+                    @if ($ecartN !== 0) · @endif
+                    Écart actif/passif {{ $bilan['label_n_1'] }} : {{ $this->formatCentimes($ecartN1) }}
+                @endif
+            </span>
         </div>
     @endif
 

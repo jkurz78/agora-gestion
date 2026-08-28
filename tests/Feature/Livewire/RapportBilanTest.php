@@ -26,6 +26,7 @@ function ajouterLigneBilanEcran(
     int $debitCentimes,
     int $creditCentimes,
     string $date = '2025-10-15',
+    TypeTransaction $type = TypeTransaction::Virement,
 ): void {
     $compte = Compte::query()->firstOrCreate(['numero_pcg' => $numero], [
         'association_id' => TenantContext::currentId(),
@@ -39,7 +40,7 @@ function ajouterLigneBilanEcran(
 
     $transaction = Transaction::query()->create([
         'association_id' => TenantContext::currentId(),
-        'type' => TypeTransaction::Virement,
+        'type' => $type,
         'date' => $date,
         'libelle' => 'Fixture écran bilan',
         'montant_total' => '0.00',
@@ -110,6 +111,19 @@ it('signale un écart entre actif et passif', function (): void {
     Livewire::test(RapportBilan::class)
         ->assertSee('Bilan déséquilibré')
         ->assertSee('Écart actif/passif');
+});
+
+it('inclut l écart N moins 1 dans le statut d équilibre quand la comparaison est affichée', function (): void {
+    ajouterLigneBilanEcran('512', 'Banque N-1', 5000, 0, '2024-10-15');
+    ajouterLigneBilanEcran('512', 'Banque N', 10000, 0, '2025-09-01', TypeTransaction::AN);
+    ajouterLigneBilanEcran('102', 'Fonds associatifs N', 0, 10000, '2025-09-01', TypeTransaction::AN);
+
+    Livewire::test(RapportBilan::class)
+        ->assertSee('Bilan déséquilibré')
+        ->assertSee('Écart actif/passif 2024-2025 : 50,00 €')
+        ->set('compareN1', false)
+        ->assertSee('Bilan équilibré')
+        ->assertDontSee('50,00 €');
 });
 
 it('propage l exercice et N moins 1 dans l URL de l export PDF', function (): void {

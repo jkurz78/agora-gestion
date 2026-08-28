@@ -37,7 +37,10 @@ final class RapportBilan extends Component
     public function render(BilanComptableBuilder $builder): View
     {
         return view('livewire.rapport-bilan', [
-            'bilan' => $builder->build(app(ExerciceService::class)->current()),
+            'bilan' => $builder->build(
+                app(ExerciceService::class)->current(),
+                $this->compareN1,
+            ),
         ]);
     }
 }

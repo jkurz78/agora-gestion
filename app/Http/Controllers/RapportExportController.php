@@ -1822,9 +1822,11 @@ final class RapportExportController extends Controller
      */
     private function pdfBilanData(Request $request, int $exercice): array
     {
+        $compareN1 = $request->boolean('n1', true);
+
         return [
-            'bilan' => app(BilanComptableBuilder::class)->build($exercice),
-            'compareN1' => $request->boolean('n1', true),
+            'bilan' => app(BilanComptableBuilder::class)->build($exercice, $compareN1),
+            'compareN1' => $compareN1,
         ];
     }
 

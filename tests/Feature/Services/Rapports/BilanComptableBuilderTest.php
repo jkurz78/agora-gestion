@@ -12,6 +12,7 @@ use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Services\Rapports\BilanComptableBuilder;
 use App\Tenant\TenantContext;
+use Illuminate\Support\Facades\DB;
 
 beforeEach(function (): void {
     $this->utilisateurBilan = User::factory()->create();
@@ -64,6 +65,33 @@ function enregistrerLigneBilan(
         'montant' => '0.00',
         'libelle' => 'Fixture bilan '.$compte->numero_pcg,
     ]);
+}
+
+/**
+ * @param  list<array{compte: Compte, debit_centimes: int, credit_centimes: int}>  $lignes
+ */
+function enregistrerEcritureDoubleBilan(object $contexte, string $date, array $lignes): void
+{
+    $transaction = Transaction::query()->create([
+        'association_id' => TenantContext::currentId(),
+        'type' => TypeTransaction::Virement,
+        'date' => $date,
+        'libelle' => 'Fixture bilan équilibrée',
+        'montant_total' => '0.00',
+        'saisi_par' => (int) $contexte->utilisateurBilan->id,
+        'equilibree' => true,
+    ]);
+
+    foreach ($lignes as $ligne) {
+        TransactionLigne::query()->create([
+            'transaction_id' => (int) $transaction->id,
+            'compte_id' => (int) $ligne['compte']->id,
+            'debit' => decimalBilan($ligne['debit_centimes']),
+            'credit' => decimalBilan($ligne['credit_centimes']),
+            'montant' => '0.00',
+            'libelle' => 'Fixture bilan équilibrée',
+        ]);
+    }
 }
 
 it('retourne le contrat vide et le statut provisoire quand l exercice est absent', function (): void {
@@ -420,32 +448,119 @@ it('classe fonds propres provisions dettes produits constatés avance et découv
     ]);
 });
 
-it('conserve les soldes inverses des sous-comptes 401x et 411x dans leurs rubriques naturelles', function (): void {
+it('classe les emprunts 16 à 18 et les comptes financiers 5 restants selon leur sens', function (): void {
+    $compte164 = creerCompteBilan('164', 'Emprunt bancaire');
+    $compte171 = creerCompteBilan('171', 'Dette rattachée à des participations');
+    $compte181 = creerCompteBilan('181', 'Compte de liaison');
+    $compte580 = creerCompteBilan('580', 'Virements internes');
+    $compte521 = creerCompteBilan('521', 'Compte financier 52');
+    $compte541 = creerCompteBilan('541', 'Compte financier 54');
+    $compte581 = creerCompteBilan('581', 'Virement interne créditeur');
+    $compte512 = creerCompteBilan('512', 'Banque');
+
+    enregistrerEcritureDoubleBilan($this, '2025-10-01', [
+        ['compte' => $compte580, 'debit_centimes' => 10000, 'credit_centimes' => 0],
+        ['compte' => $compte164, 'debit_centimes' => 0, 'credit_centimes' => 10000],
+    ]);
+    enregistrerEcritureDoubleBilan($this, '2025-10-02', [
+        ['compte' => $compte521, 'debit_centimes' => 2000, 'credit_centimes' => 0],
+        ['compte' => $compte171, 'debit_centimes' => 0, 'credit_centimes' => 2000],
+    ]);
+    enregistrerEcritureDoubleBilan($this, '2025-10-03', [
+        ['compte' => $compte541, 'debit_centimes' => 3000, 'credit_centimes' => 0],
+        ['compte' => $compte181, 'debit_centimes' => 0, 'credit_centimes' => 3000],
+    ]);
+    enregistrerEcritureDoubleBilan($this, '2025-10-04', [
+        ['compte' => $compte512, 'debit_centimes' => 4000, 'credit_centimes' => 0],
+        ['compte' => $compte581, 'debit_centimes' => 0, 'credit_centimes' => 4000],
+    ]);
+
+    $bilan = app(BilanComptableBuilder::class)->build(2025);
+
+    expect(collect($bilan['actif'])->firstWhere('code', 'disponibilites'))
+        ->toMatchArray(['net_n_centimes' => 19000])
+        ->and(collect($bilan['passif'])->firstWhere('code', 'emprunts_dettes_assimilees'))
+        ->toMatchArray(['montant_n_centimes' => 15000])
+        ->and(collect($bilan['passif'])->firstWhere('code', 'decouverts_bancaires'))
+        ->toMatchArray(['montant_n_centimes' => 4000])
+        ->and($bilan['ecart_actif_passif']['n_centimes'])->toBe(0);
+});
+
+it('reclasse les soldes inverses 401 411 486 487 et 50 dans les rubriques opposées', function (): void {
     $fournisseurDebiteur = creerCompteBilan('4011', 'Fournisseurs débiteurs');
     $clientCrediteur = creerCompteBilan('4111', 'Clients créditeurs');
+    $chargeAvanceCrediteur = creerCompteBilan('486', 'Charges constatées avance créditrices');
+    $produitAvanceDebiteur = creerCompteBilan('487', 'Produits constatés avance débiteurs');
+    $vmpCrediteur = creerCompteBilan('503', 'VMP créditrices');
+    $banque = creerCompteBilan('512', 'Banque');
 
-    enregistrerLigneBilan($this, $fournisseurDebiteur, '2025-10-01', 4000, 0);
-    enregistrerLigneBilan($this, $clientCrediteur, '2025-10-01', 0, 4000);
+    enregistrerEcritureDoubleBilan($this, '2025-10-01', [
+        ['compte' => $fournisseurDebiteur, 'debit_centimes' => 1000, 'credit_centimes' => 0],
+        ['compte' => $clientCrediteur, 'debit_centimes' => 0, 'credit_centimes' => 1000],
+    ]);
+    enregistrerEcritureDoubleBilan($this, '2025-10-02', [
+        ['compte' => $produitAvanceDebiteur, 'debit_centimes' => 2000, 'credit_centimes' => 0],
+        ['compte' => $chargeAvanceCrediteur, 'debit_centimes' => 0, 'credit_centimes' => 2000],
+    ]);
+    enregistrerEcritureDoubleBilan($this, '2025-10-03', [
+        ['compte' => $banque, 'debit_centimes' => 3000, 'credit_centimes' => 0],
+        ['compte' => $vmpCrediteur, 'debit_centimes' => 0, 'credit_centimes' => 3000],
+    ]);
 
     $bilan = app(BilanComptableBuilder::class)->build(2025);
 
     expect($bilan['actif'])->toBe([
         [
-            'code' => 'creances_clients',
-            'libelle' => 'Créances clients',
-            'brut_n_centimes' => -4000,
+            'code' => 'autres_creances',
+            'libelle' => 'Autres créances',
+            'brut_n_centimes' => 3000,
             'amortissements_provisions_n_centimes' => 0,
-            'net_n_centimes' => -4000,
+            'net_n_centimes' => 3000,
+            'net_n_1_centimes' => 0,
+        ],
+        [
+            'code' => 'disponibilites',
+            'libelle' => 'Disponibilités',
+            'brut_n_centimes' => 3000,
+            'amortissements_provisions_n_centimes' => 0,
+            'net_n_centimes' => 3000,
             'net_n_1_centimes' => 0,
         ],
     ])->and($bilan['passif'])->toBe([
         [
-            'code' => 'dettes_fournisseurs',
-            'libelle' => 'Dettes fournisseurs',
-            'montant_n_centimes' => -4000,
+            'code' => 'autres_dettes',
+            'libelle' => 'Autres dettes',
+            'montant_n_centimes' => 6000,
             'montant_n_1_centimes' => 0,
         ],
     ])->and($bilan['ecart_actif_passif']['n_centimes'])->toBe(0);
+});
+
+it('ne charge pas les données N moins 1 quand la comparaison est masquée', function (): void {
+    $banque = creerCompteBilan('5121', 'Banque N-1 uniquement');
+    $fonds = creerCompteBilan('102', 'Fonds associatifs N-1 uniquement');
+
+    enregistrerEcritureDoubleBilan($this, '2024-10-01', [
+        ['compte' => $banque, 'debit_centimes' => 5000, 'credit_centimes' => 0],
+        ['compte' => $fonds, 'debit_centimes' => 0, 'credit_centimes' => 5000],
+    ]);
+    enregistrerLigneBilan($this, $banque, '2025-09-01', 7000, 0, TypeTransaction::AN);
+    enregistrerLigneBilan($this, $fonds, '2025-09-01', 0, 7000, TypeTransaction::AN);
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+    $bilan = app(BilanComptableBuilder::class)->build(2025, false);
+    $liaisons = collect(DB::getQueryLog())->flatMap(
+        fn (array $requete): array => array_map('strval', $requete['bindings']),
+    );
+    DB::disableQueryLog();
+
+    expect($bilan['totaux']['actif_n_net_centimes'])->toBe(7000)
+        ->and($bilan['totaux']['passif_n_centimes'])->toBe(7000)
+        ->and($bilan['resultat_courant']['n_1_centimes'])->toBe(0)
+        ->and($bilan['totaux']['actif_n_1_net_centimes'])->toBe(0)
+        ->and($bilan['totaux']['passif_n_1_centimes'])->toBe(0)
+        ->and($liaisons)->not->toContain('2025-08-31');
 });
 
 it('totalise les deux colonnes et expose l écart actif moins passif en centimes', function (): void {

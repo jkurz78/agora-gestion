@@ -22,14 +22,14 @@ final class BilanComptableBuilder
     /**
      * @return array<string, mixed>
      */
-    public function build(int $exercice): array
+    public function build(int $exercice, bool $compareN1 = true): array
     {
         $balanceN = $this->balanceExercice($exercice);
-        $balanceN1 = $this->balanceExercice($exercice - 1);
+        $balanceN1 = $compareN1 ? $this->balanceExercice($exercice - 1) : [];
         $actifs = $this->actifs($balanceN, $balanceN1);
         $resultatCourant = [
             'n_centimes' => $this->resultatCourant($exercice),
-            'n_1_centimes' => $this->resultatCourant($exercice - 1),
+            'n_1_centimes' => $compareN1 ? $this->resultatCourant($exercice - 1) : 0,
         ];
         $passifs = $this->passifs($balanceN, $balanceN1, $resultatCourant);
 
@@ -170,6 +170,7 @@ final class BilanComptableBuilder
             'resultats_anterieurs' => $this->rubriquePassif('resultats_anterieurs', 'Résultats antérieurs'),
             'resultat_courant' => $this->rubriquePassif('resultat_courant', 'Résultat de l’exercice'),
             'provisions_risques_charges' => $this->rubriquePassif('provisions_risques_charges', 'Provisions pour risques et charges'),
+            'emprunts_dettes_assimilees' => $this->rubriquePassif('emprunts_dettes_assimilees', 'Emprunts et dettes assimilées'),
             'dettes_fournisseurs' => $this->rubriquePassif('dettes_fournisseurs', 'Dettes fournisseurs'),
             'autres_dettes' => $this->rubriquePassif('autres_dettes', 'Autres dettes'),
             'produits_constates_avance' => $this->rubriquePassif('produits_constates_avance', 'Produits constatés d’avance'),
@@ -227,19 +228,22 @@ final class BilanComptableBuilder
                 $this->ajouterActif($rubriques, 'stocks', $periode, $solde);
             } elseif (str_starts_with($numero, '491')) {
                 $this->ajouterActif($rubriques, 'creances_clients', $periode, -$solde, true);
-            } elseif (str_starts_with($numero, '411')) {
+            } elseif (str_starts_with($numero, '411') && $solde > 0) {
                 $this->ajouterActif($rubriques, 'creances_clients', $periode, $solde);
-            } elseif ($numero === '486') {
+            } elseif ($numero === '486' && $solde > 0) {
                 $this->ajouterActif($rubriques, 'charges_constatees_avance', $periode, $solde);
             } elseif (str_starts_with($numero, '49')) {
                 $this->ajouterActif($rubriques, 'autres_creances', $periode, -$solde, true);
+            } elseif ((str_starts_with($numero, '401') || $numero === '487'
+                || $this->estCompteEmprunt($numero)) && $solde > 0) {
+                $this->ajouterActif($rubriques, 'autres_creances', $periode, $solde);
             } elseif ($this->estAutreCompteTiers($numero) && $solde > 0) {
                 $this->ajouterActif($rubriques, 'autres_creances', $periode, $solde);
             } elseif (str_starts_with($numero, '59')) {
                 $this->ajouterActif($rubriques, 'valeurs_mobilieres_placement', $periode, -$solde, true);
-            } elseif (str_starts_with($numero, '50')) {
+            } elseif (str_starts_with($numero, '50') && $solde > 0) {
                 $this->ajouterActif($rubriques, 'valeurs_mobilieres_placement', $periode, $solde);
-            } elseif ((str_starts_with($numero, '51') || str_starts_with($numero, '53')) && $solde > 0) {
+            } elseif (str_starts_with($numero, '5') && $solde > 0) {
                 $this->ajouterActif($rubriques, 'disponibilites', $periode, $solde);
             }
         }
@@ -272,13 +276,18 @@ final class BilanComptableBuilder
             } elseif (str_starts_with($numero, '10') || str_starts_with($numero, '11')
                 || str_starts_with($numero, '13') || str_starts_with($numero, '14')) {
                 $this->ajouterPassif($rubriques, 'fonds_propres', $periode, $montant);
-            } elseif (str_starts_with($numero, '401')) {
+            } elseif ($this->estCompteEmprunt($numero) && $solde < 0) {
+                $this->ajouterPassif($rubriques, 'emprunts_dettes_assimilees', $periode, $montant);
+            } elseif (str_starts_with($numero, '401') && $solde < 0) {
                 $this->ajouterPassif($rubriques, 'dettes_fournisseurs', $periode, $montant);
-            } elseif ($numero === '487') {
+            } elseif ($numero === '487' && $solde < 0) {
                 $this->ajouterPassif($rubriques, 'produits_constates_avance', $periode, $montant);
+            } elseif ((str_starts_with($numero, '411') || $numero === '486'
+                || str_starts_with($numero, '50')) && $solde < 0) {
+                $this->ajouterPassif($rubriques, 'autres_dettes', $periode, $montant);
             } elseif ($this->estAutreCompteTiers($numero) && $solde < 0) {
                 $this->ajouterPassif($rubriques, 'autres_dettes', $periode, $montant);
-            } elseif ((str_starts_with($numero, '51') || str_starts_with($numero, '53')) && $solde < 0) {
+            } elseif (str_starts_with($numero, '5') && $solde < 0) {
                 $this->ajouterPassif($rubriques, 'decouverts_bancaires', $periode, $montant);
             }
         }
@@ -331,6 +340,13 @@ final class BilanComptableBuilder
             && ! str_starts_with($numero, '49')
             && $numero !== '486'
             && $numero !== '487';
+    }
+
+    private function estCompteEmprunt(string $numero): bool
+    {
+        return str_starts_with($numero, '16')
+            || str_starts_with($numero, '17')
+            || str_starts_with($numero, '18');
     }
 
     /**
