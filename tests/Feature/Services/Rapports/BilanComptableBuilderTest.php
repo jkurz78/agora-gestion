@@ -339,7 +339,7 @@ it('classe stocks créances charges constatées avance et disponibilités avec l
             'net_n_centimes' => 34000,
             'net_n_1_centimes' => 0,
         ],
-    ]);
+    ])->and($bilan['passif'])->toBe([]);
 });
 
 it('calcule le résultat courant N et N moins 1 exclusivement depuis les classes 6 et 7', function (): void {
@@ -484,6 +484,63 @@ it('classe les emprunts 16 à 18 et les comptes financiers 5 restants selon leur
         ->and(collect($bilan['passif'])->firstWhere('code', 'decouverts_bancaires'))
         ->toMatchArray(['montant_n_centimes' => 4000])
         ->and($bilan['ecart_actif_passif']['n_centimes'])->toBe(0);
+});
+
+it('déduit la dépréciation 59 de l actif sans la reporter en découvert bancaire', function (): void {
+    $fondsPropres = creerCompteBilan('102', 'Fonds associatif');
+    $banque = creerCompteBilan('512', 'Banque');
+    $vmp = creerCompteBilan('503', 'Valeurs mobilières de placement');
+    $depreciationVmp = creerCompteBilan('590', 'Dépréciation des valeurs mobilières');
+    $dotation = creerCompteBilan('686', 'Dotations aux dépréciations financières');
+
+    enregistrerEcritureDoubleBilan($this, '2025-10-01', [
+        ['compte' => $banque, 'debit_centimes' => 20000, 'credit_centimes' => 0],
+        ['compte' => $fondsPropres, 'debit_centimes' => 0, 'credit_centimes' => 20000],
+    ]);
+    enregistrerEcritureDoubleBilan($this, '2025-10-02', [
+        ['compte' => $vmp, 'debit_centimes' => 8000, 'credit_centimes' => 0],
+        ['compte' => $banque, 'debit_centimes' => 0, 'credit_centimes' => 8000],
+    ]);
+    enregistrerEcritureDoubleBilan($this, '2025-10-03', [
+        ['compte' => $dotation, 'debit_centimes' => 1000, 'credit_centimes' => 0],
+        ['compte' => $depreciationVmp, 'debit_centimes' => 0, 'credit_centimes' => 1000],
+    ]);
+
+    $bilan = app(BilanComptableBuilder::class)->build(2025);
+
+    // La dépréciation ne vit qu'une fois, en déduction de l'actif : la reporter
+    // aussi au passif la compterait deux fois et déséquilibrerait le bilan.
+    expect($bilan['actif'])->toBe([
+        [
+            'code' => 'valeurs_mobilieres_placement',
+            'libelle' => 'Valeurs mobilières de placement',
+            'brut_n_centimes' => 8000,
+            'amortissements_provisions_n_centimes' => 1000,
+            'net_n_centimes' => 7000,
+            'net_n_1_centimes' => 0,
+        ],
+        [
+            'code' => 'disponibilites',
+            'libelle' => 'Disponibilités',
+            'brut_n_centimes' => 12000,
+            'amortissements_provisions_n_centimes' => 0,
+            'net_n_centimes' => 12000,
+            'net_n_1_centimes' => 0,
+        ],
+    ])->and($bilan['passif'])->toBe([
+        [
+            'code' => 'fonds_propres',
+            'libelle' => 'Fonds propres',
+            'montant_n_centimes' => 20000,
+            'montant_n_1_centimes' => 0,
+        ],
+        [
+            'code' => 'resultat_courant',
+            'libelle' => 'Résultat de l’exercice',
+            'montant_n_centimes' => -1000,
+            'montant_n_1_centimes' => 0,
+        ],
+    ])->and($bilan['ecart_actif_passif']['n_centimes'])->toBe(0);
 });
 
 it('reclasse les soldes inverses 401 411 486 487 et 50 dans les rubriques opposées', function (): void {

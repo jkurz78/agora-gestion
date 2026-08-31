@@ -287,7 +287,10 @@ final class BilanComptableBuilder
                 $this->ajouterPassif($rubriques, 'autres_dettes', $periode, $montant);
             } elseif ($this->estAutreCompteTiers($numero) && $solde < 0) {
                 $this->ajouterPassif($rubriques, 'autres_dettes', $periode, $montant);
-            } elseif (str_starts_with($numero, '5') && $solde < 0) {
+            } elseif (str_starts_with($numero, '5') && ! str_starts_with($numero, '59') && $solde < 0) {
+                // Les 59 sont des dépréciations : elles vivent déjà en déduction
+                // de l'actif. Les reporter ici les compterait deux fois — même
+                // exclusion que celle des 49 dans estAutreCompteTiers().
                 $this->ajouterPassif($rubriques, 'decouverts_bancaires', $periode, $montant);
             }
         }
