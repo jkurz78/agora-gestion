@@ -543,6 +543,38 @@ it('déduit la dépréciation 59 de l actif sans la reporter en découvert banca
     ])->and($bilan['ecart_actif_passif']['n_centimes'])->toBe(0);
 });
 
+it('classe les subdivisions de 486 et 487 comme leurs comptes racines', function (): void {
+    $chargeAvanceSubdivisee = creerCompteBilan('4861', 'Charges constatées d avance — assurances');
+    $produitAvanceSubdivise = creerCompteBilan('4871', 'Produits constatés d avance — cotisations');
+
+    enregistrerEcritureDoubleBilan($this, '2025-10-01', [
+        ['compte' => $chargeAvanceSubdivisee, 'debit_centimes' => 5000, 'credit_centimes' => 0],
+        ['compte' => $produitAvanceSubdivise, 'debit_centimes' => 0, 'credit_centimes' => 5000],
+    ]);
+
+    $bilan = app(BilanComptableBuilder::class)->build(2025);
+
+    // Le plan comptable subdivise 486 et 487 : une subdivision doit rejoindre la
+    // rubrique de sa racine, pas le fourre-tout des autres créances et dettes.
+    expect($bilan['actif'])->toBe([
+        [
+            'code' => 'charges_constatees_avance',
+            'libelle' => 'Charges constatées d’avance',
+            'brut_n_centimes' => 5000,
+            'amortissements_provisions_n_centimes' => 0,
+            'net_n_centimes' => 5000,
+            'net_n_1_centimes' => 0,
+        ],
+    ])->and($bilan['passif'])->toBe([
+        [
+            'code' => 'produits_constates_avance',
+            'libelle' => 'Produits constatés d’avance',
+            'montant_n_centimes' => 5000,
+            'montant_n_1_centimes' => 0,
+        ],
+    ])->and($bilan['ecart_actif_passif']['n_centimes'])->toBe(0);
+});
+
 it('reclasse les soldes inverses 401 411 486 487 et 50 dans les rubriques opposées', function (): void {
     $fournisseurDebiteur = creerCompteBilan('4011', 'Fournisseurs débiteurs');
     $clientCrediteur = creerCompteBilan('4111', 'Clients créditeurs');

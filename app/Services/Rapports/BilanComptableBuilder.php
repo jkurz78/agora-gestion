@@ -230,11 +230,11 @@ final class BilanComptableBuilder
                 $this->ajouterActif($rubriques, 'creances_clients', $periode, -$solde, true);
             } elseif (str_starts_with($numero, '411') && $solde > 0) {
                 $this->ajouterActif($rubriques, 'creances_clients', $periode, $solde);
-            } elseif ($numero === '486' && $solde > 0) {
+            } elseif (str_starts_with($numero, '486') && $solde > 0) {
                 $this->ajouterActif($rubriques, 'charges_constatees_avance', $periode, $solde);
             } elseif (str_starts_with($numero, '49')) {
                 $this->ajouterActif($rubriques, 'autres_creances', $periode, -$solde, true);
-            } elseif ((str_starts_with($numero, '401') || $numero === '487'
+            } elseif ((str_starts_with($numero, '401') || str_starts_with($numero, '487')
                 || $this->estCompteEmprunt($numero)) && $solde > 0) {
                 $this->ajouterActif($rubriques, 'autres_creances', $periode, $solde);
             } elseif ($this->estAutreCompteTiers($numero) && $solde > 0) {
@@ -280,9 +280,9 @@ final class BilanComptableBuilder
                 $this->ajouterPassif($rubriques, 'emprunts_dettes_assimilees', $periode, $montant);
             } elseif (str_starts_with($numero, '401') && $solde < 0) {
                 $this->ajouterPassif($rubriques, 'dettes_fournisseurs', $periode, $montant);
-            } elseif ($numero === '487' && $solde < 0) {
+            } elseif (str_starts_with($numero, '487') && $solde < 0) {
                 $this->ajouterPassif($rubriques, 'produits_constates_avance', $periode, $montant);
-            } elseif ((str_starts_with($numero, '411') || $numero === '486'
+            } elseif ((str_starts_with($numero, '411') || str_starts_with($numero, '486')
                 || str_starts_with($numero, '50')) && $solde < 0) {
                 $this->ajouterPassif($rubriques, 'autres_dettes', $periode, $montant);
             } elseif ($this->estAutreCompteTiers($numero) && $solde < 0) {
@@ -341,8 +341,8 @@ final class BilanComptableBuilder
             && ! str_starts_with($numero, '401')
             && ! str_starts_with($numero, '411')
             && ! str_starts_with($numero, '49')
-            && $numero !== '486'
-            && $numero !== '487';
+            && ! str_starts_with($numero, '486')
+            && ! str_starts_with($numero, '487');
     }
 
     private function estCompteEmprunt(string $numero): bool
