@@ -57,6 +57,10 @@
         <button wire:click="toggleImportPanel" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-upload"></i> Importer
         </button>
+        <button wire:click="$dispatch('ouvrir-affectation', { operationId: 0 })"
+                class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-diagram-3"></i> Affecter un budget à une opération
+        </button>
         @endif
     </div>
 
@@ -483,4 +487,6 @@
         </div>
     </div>
     @endif
+
+    <livewire:budget-affectation-modal />
 </div>

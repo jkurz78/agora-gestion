@@ -17,6 +17,7 @@ use App\Services\ExerciceService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -249,6 +250,12 @@ final class BudgetTable extends Component
             $this->importErrors = $result->errors;
             $this->importSuccess = null;
         }
+    }
+
+    #[On('budget-affecte')]
+    public function rafraichir(): void
+    {
+        // Le render() suivant relit tout : rien à faire ici.
     }
 
     // ── Render ────────────────────────────────────────────────────────────────
