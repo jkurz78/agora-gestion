@@ -1,0 +1,92 @@
+#!/bin/bash
+#
+# deploy-prod.sh.example — modèle du script de déploiement de production.
+#
+# Le script réel vit SUR LE SERVEUR, dans ~/bin/deploy.sh, et n'est pas versionné :
+# il porte le chemin d'installation et l'adresse de notification, deux informations
+# qui n'ont rien à faire dans un dépôt public. Ce modèle en conserve la logique,
+# qui est ce qui mérite d'être relu et diffé.
+#
+# Installation :
+#   1. cp scripts/deploy-prod.sh.example ~/bin/deploy.sh   (sur le serveur)
+#   2. renseigner APPDIR et MAILTO ci-dessous
+#   3. chmod +x ~/bin/deploy.sh
+#
+# Appelé par GitHub Actions après chaque push sur main (cf. .github/workflows/deploy.yml,
+# étape « Deploy prod »).
+
+HOMEDIR="/home/<compte>"
+APPDIR="${HOMEDIR}/public_html/<domaine-de-production>"
+MAILTO="<adresse-de-notification>"
+
+LOGFILE="${APPDIR}/deploy.log"
+PHP="/usr/local/bin/php"
+# HOME explicite : composer refuse de tourner sans, dans un shell non interactif.
+COMPOSER="HOME=${HOMEDIR} /usr/local/bin/composer"
+
+cd "$APPDIR" || exit 1
+DEPLOY_START=$(date '+%Y-%m-%d %H:%M:%S')
+SECTION_START=$(wc -l < "$LOGFILE")
+
+echo "" >> "$LOGFILE"
+echo "============================================================" >> "$LOGFILE"
+echo "[${DEPLOY_START}] Déploiement démarré (${LOCAL:0:7} → ${REMOTE:0:7})" >> "$LOGFILE"
+
+run_cmd() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] \$ $1" >> "$LOGFILE"
+    eval "$1" >> "$LOGFILE" 2>&1
+    local code=$?
+    echo "Exit code: $code" >> "$LOGFILE"
+    if [ $code -ne 0 ]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ÉCHEC — déploiement interrompu" >> "$LOGFILE"
+        tail -n +"$SECTION_START" "$LOGFILE" | mail \
+            -s "[AgoraGestion] ❌ Déploiement ÉCHOUÉ — $(date '+%d/%m/%Y %H:%M')" \
+            "$MAILTO"
+        exit 1
+    fi
+}
+
+run_cmd "git checkout -- ."
+run_cmd "git pull origin main"
+run_cmd "git fetch --tags --force"
+
+# ── L'ordre de ces trois étapes n'est pas indifférent ────────────────────────
+#
+# À ce point, git a déjà amené le NOUVEAU code alors que vendor/ porte encore le
+# PRÉCÉDENT socle. Sur une montée de version majeure, démarrer PHP dans cet
+# entre-deux peut échouer — et comme run_cmd interrompt le déploiement au premier
+# code retour non nul, le site resterait avec du code neuf sur un vendor ancien.
+#
+# D'où une purge par `rm`, qui ne démarre rien et ne peut pas échouer, AVANT le
+# composer install. Elle couvre bootstrap/cache : config, routes et manifestes.
+#
+# Le `optimize:clear` vient APRÈS, une fois vendor/ aligné sur le code : il balaie
+# en plus les vues Blade compilées dans storage/framework/views, dont le format
+# peut changer d'une version majeure à l'autre.
+run_cmd "rm -f bootstrap/cache/*.php"
+run_cmd "$COMPOSER install --no-dev --optimize-autoloader --no-interaction"
+run_cmd "$PHP artisan optimize:clear"
+
+run_cmd "$PHP artisan migrate --force"
+run_cmd "$PHP artisan storage:link --force"
+run_cmd "$PHP artisan app:version-stamp"
+run_cmd "$PHP artisan config:cache"
+run_cmd "$PHP artisan route:cache"
+run_cmd "$PHP artisan view:cache"
+
+# Vérification d'intégrité comptable (non bloquante — alerte par mail)
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Vérification d'intégrité comptable..." >> "$LOGFILE"
+$PHP artisan compta:check-integrity --quiet-ok >> "$LOGFILE" 2>&1
+INTEGRITY_EXIT=$?
+if [ $INTEGRITY_EXIT -ne 0 ]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ⚠️  Anomalies comptables détectées (voir ci-dessus)" >> "$LOGFILE"
+    tail -n +"$SECTION_START" "$LOGFILE" | mail \
+        -s "[AgoraGestion] ⚠️ ALERTE intégrité comptable — $(date '+%d/%m/%Y %H:%M')" \
+        "$MAILTO"
+fi
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Déploiement terminé avec succès" >> "$LOGFILE"
+
+tail -n +"$SECTION_START" "$LOGFILE" | mail \
+    -s "[AgoraGestion] ✅ Déploiement réussi — $(date '+%d/%m/%Y %H:%M')" \
+    "$MAILTO"

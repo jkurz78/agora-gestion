@@ -33,7 +33,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install Ghostscript
         run: sudo apt-get update && sudo apt-get install -y ghostscript
@@ -110,7 +110,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install Ghostscript
         run: sudo apt-get update && sudo apt-get install -y ghostscript
@@ -246,6 +246,18 @@ jobs:
              echo "[deploy-demo] git fetch + reset to origin/main"
              git fetch origin main
              git reset --hard origin/main
+             echo "[deploy-demo] purge des caches compilés"
+             # Indispensable sur une montée de version majeure : composer install
+             # déclenche package:discover, qui démarre le NOUVEAU framework alors
+             # que bootstrap/cache/ porte encore la config, les routes et les
+             # manifestes compilés par le PRÉCÉDENT.
+             # Purge par rm et non par artisan optimize:clear : à cet instant le
+             # code est déjà le nouveau mais vendor/ reste le précédent, et
+             # démarrer PHP dans cet entre-deux serait exactement le mélange que
+             # la purge cherche à écarter. Le rm ne démarre rien.
+             # Pas d apostrophe dans ce bloc : il vit dans une chaîne shell
+             # entre quotes simples.
+             rm -f bootstrap/cache/*.php
              echo "[deploy-demo] composer install"
              composer install --no-dev --optimize-autoloader --no-interaction
              echo "[deploy-demo] artisan cache"
