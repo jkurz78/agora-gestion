@@ -17,6 +17,7 @@ final class BudgetLine extends TenantModel
     protected $fillable = [
         'association_id',
         'compte_id',
+        'operation_id',
         'exercice',
         'montant_prevu',
         'notes',
@@ -28,12 +29,18 @@ final class BudgetLine extends TenantModel
             'montant_prevu' => 'decimal:2',
             'exercice' => 'integer',
             'compte_id' => 'integer',
+            'operation_id' => 'integer',
         ];
     }
 
     public function compte(): BelongsTo
     {
         return $this->belongsTo(Compte::class, 'compte_id');
+    }
+
+    public function operation(): BelongsTo
+    {
+        return $this->belongsTo(Operation::class, 'operation_id');
     }
 
     /**

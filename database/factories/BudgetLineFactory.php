@@ -22,6 +22,7 @@ class BudgetLineFactory extends Factory
         return [
             'association_id' => TenantContext::currentId() ?? 1,
             'compte_id' => Compte::factory(),
+            'operation_id' => null,
             'exercice' => app(ExerciceService::class)->current(),
             'montant_prevu' => fake()->randomFloat(2, 100, 10000),
             'notes' => fake()->optional()->sentence(),
