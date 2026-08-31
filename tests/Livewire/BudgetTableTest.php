@@ -1,10 +1,14 @@
 <?php
 
+use App\Enums\StatutExercice;
 use App\Livewire\BudgetTable;
 use App\Models\Association;
 use App\Models\BudgetLine;
 use App\Models\Compte;
+use App\Models\Exercice;
+use App\Models\Operation;
 use App\Models\User;
+use App\Services\Budget\BudgetGelService;
 use App\Services\ExerciceService;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
@@ -108,4 +112,126 @@ it('shows prevu vs realise', function () {
     Livewire::test(BudgetTable::class)
         ->assertOk()
         ->assertSee('1 000,00');
+});
+
+it('affiche les ventilations en sous-lignes du compte', function () {
+    $exercice = app(ExerciceService::class)->current();
+    $op = Operation::factory()->create([
+        'association_id' => $this->association->id, 'nom' => 'Stage été 2026',
+    ]);
+
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id, 'compte_id' => $this->depenseCompte->id,
+        'exercice' => $exercice, 'operation_id' => null, 'montant_prevu' => 3500.00,
+    ]);
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id, 'compte_id' => $this->depenseCompte->id,
+        'exercice' => $exercice, 'operation_id' => $op->id, 'montant_prevu' => 2000.00,
+    ]);
+
+    Livewire::test(BudgetTable::class)
+        ->assertOk()
+        ->assertSee('Stage été 2026')
+        ->assertSee('3 500,00')
+        ->assertSee('2 000,00')
+        ->assertSee('Non affecté')
+        ->assertSee('1 500,00');
+});
+
+it('signale un depassement engage avant tout realise', function () {
+    $exercice = app(ExerciceService::class)->current();
+    $op = Operation::factory()->create([
+        'association_id' => $this->association->id, 'nom' => 'Stage coûteux',
+    ]);
+
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id, 'compte_id' => $this->depenseCompte->id,
+        'exercice' => $exercice, 'operation_id' => null, 'montant_prevu' => 1500.00,
+    ]);
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id, 'compte_id' => $this->depenseCompte->id,
+        'exercice' => $exercice, 'operation_id' => $op->id, 'montant_prevu' => 1800.00,
+    ]);
+
+    Livewire::test(BudgetTable::class)
+        ->assertOk()
+        ->assertSee('Dépassement engagé')
+        ->assertSee('-300,00');
+});
+
+it('remonte les operations ouvertes sans budget affecte', function () {
+    Operation::factory()->create([
+        'association_id' => $this->association->id, 'nom' => 'Atelier orphelin',
+    ]);
+
+    Livewire::test(BudgetTable::class)
+        ->assertOk()
+        ->assertSee('sans budget affecté')
+        ->assertSee('Atelier orphelin');
+});
+
+it('ne remonte pas une operation deja budgetee', function () {
+    $exercice = app(ExerciceService::class)->current();
+    $op = Operation::factory()->create([
+        'association_id' => $this->association->id, 'nom' => 'Atelier budgété',
+    ]);
+
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id, 'compte_id' => $this->depenseCompte->id,
+        'exercice' => $exercice, 'operation_id' => $op->id, 'montant_prevu' => 500.00,
+    ]);
+
+    Livewire::test(BudgetTable::class)
+        ->assertOk()
+        ->assertDontSee('Atelier budgété n\'a aucun budget');
+});
+
+it('affiche aussi les ventilations en sous-lignes sur un compte de produits', function () {
+    // Le blade a deux blocs symétriques (Charges / Produits) : ce test protège
+    // spécifiquement le bloc Produits, qui n'est couvert par aucun autre test
+    // du plan — un oubli de recopie y passerait inaperçu.
+    $exercice = app(ExerciceService::class)->current();
+    $op = Operation::factory()->create([
+        'association_id' => $this->association->id, 'nom' => 'Gala annuel',
+    ]);
+
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id, 'compte_id' => $this->recetteCompte->id,
+        'exercice' => $exercice, 'operation_id' => null, 'montant_prevu' => 4000.00,
+    ]);
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id, 'compte_id' => $this->recetteCompte->id,
+        'exercice' => $exercice, 'operation_id' => $op->id, 'montant_prevu' => 2500.00,
+    ]);
+
+    Livewire::test(BudgetTable::class)
+        ->assertOk()
+        ->assertSee('Gala annuel')
+        ->assertSee('4 000,00')
+        ->assertSee('2 500,00')
+        ->assertSee('Non affecté')
+        ->assertSee('1 500,00');
+});
+
+it('affiche le bandeau de validation du budget quand il n\'est pas encore valide', function () {
+    Livewire::test(BudgetTable::class)
+        ->assertOk()
+        ->assertSee('n\'est pas encore validé', false)
+        ->assertSee('Valider le budget');
+});
+
+it('affiche le bandeau de budget valide avec le nom du validateur', function () {
+    // Exercice n'a NI HasFactory NI ExerciceFactory — création directe, comme
+    // dans tests/Feature/BudgetGelTest.php.
+    $exercice = Exercice::create([
+        'annee' => app(ExerciceService::class)->current(),
+        'statut' => StatutExercice::Ouvert,
+    ]);
+    app(BudgetGelService::class)->valider($exercice, $this->user);
+
+    Livewire::test(BudgetTable::class)
+        ->assertOk()
+        ->assertSee('Budget validé le')
+        ->assertSee($this->user->name)
+        ->assertSee('Déverrouiller');
 });

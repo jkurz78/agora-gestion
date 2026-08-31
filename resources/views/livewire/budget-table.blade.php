@@ -6,6 +6,48 @@
         $totalProduitsRealise = 0;
     @endphp
 
+    {{-- Bandeau : budget figé --}}
+    @if ($exerciceModele?->budgetEstValide())
+    <div class="alert alert-primary d-flex justify-content-between align-items-center py-2">
+        <div>
+            <i class="bi bi-lock-fill"></i>
+            Budget validé le {{ $exerciceModele->budget_valide_le->format('d/m/Y') }}
+            @if ($exerciceModele->budgetValidePar)
+                par {{ $exerciceModele->budgetValidePar->name }}
+            @endif
+            — les enveloppes sont verrouillées, la ventilation par opération reste modifiable.
+        </div>
+        @if ($this->isAdmin)
+        <button wire:click="$set('showDeverrouillageModal', true)" class="btn btn-sm btn-outline-primary">
+            Déverrouiller
+        </button>
+        @endif
+    </div>
+    @elseif ($this->isAdmin && ! $exerciceCloture)
+    <div class="alert alert-light border d-flex justify-content-between align-items-center py-2">
+        <div>Le budget de l'exercice {{ $exerciceLabel }} n'est pas encore validé.</div>
+        <button wire:click="validerBudget"
+                wire:confirm="Valider le budget de l'exercice {{ $exerciceLabel }} ? Les enveloppes passeront en lecture seule."
+                class="btn btn-sm btn-primary">
+            <i class="bi bi-lock"></i> Valider le budget
+        </button>
+    </div>
+    @endif
+
+    {{-- Bandeau : opérations sans budget affecté --}}
+    @if ($operationsSansBudget->isNotEmpty())
+    <div class="alert alert-warning py-2">
+        <i class="bi bi-exclamation-triangle"></i>
+        {{ $operationsSansBudget->count() }}
+        {{ $operationsSansBudget->count() > 1 ? 'opérations ouvertes' : 'opération ouverte' }}
+        sans budget affecté sur cet exercice :
+        @foreach ($operationsSansBudget as $op)
+            <a href="#" wire:click.prevent="$dispatch('ouvrir-affectation', { operationId: {{ $op->id }} })"
+               class="badge bg-warning text-dark text-decoration-none">{{ $op->nom }}</a>
+        @endforeach
+    </div>
+    @endif
+
     {{-- Boutons Export / Import --}}
     <div class="d-flex gap-2 mb-3">
         <button wire:click="openExportModal" class="btn btn-outline-secondary btn-sm">
@@ -134,9 +176,23 @@
                                     $ecart = $prevu - $realise;
                                     $totalChargesPrevu += $prevu;
                                     $totalChargesRealise += $realise;
+
+                                    $lignesVentilees = $ventilations->get($compte->id, collect());
+                                    $sommeVentilee = (float) $lignesVentilees->sum('montant_prevu');
+                                    // Signal signé, jamais une contrainte : positif = reste à
+                                    // affecter, négatif = dépassement engagé.
+                                    $resteAAffecter = $prevu - $sommeVentilee;
                                 @endphp
                                 <tr>
-                                    <td class="ps-4"><span class="font-monospace">{{ $compte->numero_pcg }}</span> — {{ $compte->intitule }}</td>
+                                    <td class="ps-4">
+                                        @if ($lignesVentilees->isNotEmpty())
+                                            <i class="bi bi-chevron-down text-muted me-1"></i>
+                                        @endif
+                                        <span class="font-monospace">{{ $compte->numero_pcg }}</span> — {{ $compte->intitule }}
+                                        @if ($resteAAffecter < 0)
+                                            <span class="badge bg-danger ms-1" title="La ventilation dépasse l'enveloppe">⚠</span>
+                                        @endif
+                                    </td>
                                     <td class="text-end">
                                         @if (! $exerciceCloture && $this->canEdit && $line && $editingLineId === $line->id)
                                             <div class="d-flex justify-content-end gap-1">
@@ -187,6 +243,35 @@
                                         @endif
                                     </td>
                                 </tr>
+                                @foreach ($lignesVentilees as $v)
+                                    @php
+                                        $vRealise = $realiseParOperation[$compte->id][$v->operation_id] ?? 0;
+                                        $vPrevu = (float) $v->montant_prevu;
+                                    @endphp
+                                    <tr class="table-light">
+                                        <td class="ps-5 text-muted small">
+                                            <i class="bi bi-arrow-return-right"></i>
+                                            {{ $v->operation?->nom ?? 'Opération supprimée' }}
+                                        </td>
+                                        <td class="text-end small">{{ number_format($vPrevu, 2, ',', ' ') }} &euro;</td>
+                                        <td class="text-end small">{{ number_format($vRealise, 2, ',', ' ') }} &euro;</td>
+                                        <td class="text-end small {{ $vPrevu - $vRealise < 0 ? 'text-danger' : '' }}">
+                                            {{ number_format($vPrevu - $vRealise, 2, ',', ' ') }} &euro;
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                @endforeach
+                                @if ($lignesVentilees->isNotEmpty())
+                                    <tr class="table-light">
+                                        <td class="ps-5 small fst-italic {{ $resteAAffecter < 0 ? 'text-danger fw-bold' : 'text-muted' }}">
+                                            {{ $resteAAffecter < 0 ? 'Dépassement engagé' : 'Non affecté' }}
+                                        </td>
+                                        <td class="text-end small {{ $resteAAffecter < 0 ? 'text-danger fw-bold' : 'text-muted' }}">
+                                            {{ number_format($resteAAffecter, 2, ',', ' ') }} &euro;
+                                        </td>
+                                        <td colspan="3"></td>
+                                    </tr>
+                                @endif
                             @endforeach
                         @endforeach
                     </tbody>
@@ -234,9 +319,23 @@
                                     $ecart = $prevu - $realise;
                                     $totalProduitsPrevu += $prevu;
                                     $totalProduitsRealise += $realise;
+
+                                    $lignesVentilees = $ventilations->get($compte->id, collect());
+                                    $sommeVentilee = (float) $lignesVentilees->sum('montant_prevu');
+                                    // Signal signé, jamais une contrainte : positif = reste à
+                                    // affecter, négatif = dépassement engagé.
+                                    $resteAAffecter = $prevu - $sommeVentilee;
                                 @endphp
                                 <tr>
-                                    <td class="ps-4"><span class="font-monospace">{{ $compte->numero_pcg }}</span> — {{ $compte->intitule }}</td>
+                                    <td class="ps-4">
+                                        @if ($lignesVentilees->isNotEmpty())
+                                            <i class="bi bi-chevron-down text-muted me-1"></i>
+                                        @endif
+                                        <span class="font-monospace">{{ $compte->numero_pcg }}</span> — {{ $compte->intitule }}
+                                        @if ($resteAAffecter < 0)
+                                            <span class="badge bg-danger ms-1" title="La ventilation dépasse l'enveloppe">⚠</span>
+                                        @endif
+                                    </td>
                                     <td class="text-end">
                                         @if (! $exerciceCloture && $this->canEdit && $line && $editingLineId === $line->id)
                                             <div class="d-flex justify-content-end gap-1">
@@ -287,6 +386,35 @@
                                         @endif
                                     </td>
                                 </tr>
+                                @foreach ($lignesVentilees as $v)
+                                    @php
+                                        $vRealise = $realiseParOperation[$compte->id][$v->operation_id] ?? 0;
+                                        $vPrevu = (float) $v->montant_prevu;
+                                    @endphp
+                                    <tr class="table-light">
+                                        <td class="ps-5 text-muted small">
+                                            <i class="bi bi-arrow-return-right"></i>
+                                            {{ $v->operation?->nom ?? 'Opération supprimée' }}
+                                        </td>
+                                        <td class="text-end small">{{ number_format($vPrevu, 2, ',', ' ') }} &euro;</td>
+                                        <td class="text-end small">{{ number_format($vRealise, 2, ',', ' ') }} &euro;</td>
+                                        <td class="text-end small {{ $vPrevu - $vRealise < 0 ? 'text-danger' : '' }}">
+                                            {{ number_format($vPrevu - $vRealise, 2, ',', ' ') }} &euro;
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                @endforeach
+                                @if ($lignesVentilees->isNotEmpty())
+                                    <tr class="table-light">
+                                        <td class="ps-5 small fst-italic {{ $resteAAffecter < 0 ? 'text-danger fw-bold' : 'text-muted' }}">
+                                            {{ $resteAAffecter < 0 ? 'Dépassement engagé' : 'Non affecté' }}
+                                        </td>
+                                        <td class="text-end small {{ $resteAAffecter < 0 ? 'text-danger fw-bold' : 'text-muted' }}">
+                                            {{ number_format($resteAAffecter, 2, ',', ' ') }} &euro;
+                                        </td>
+                                        <td colspan="3"></td>
+                                    </tr>
+                                @endif
                             @endforeach
                         @endforeach
                     </tbody>
@@ -326,4 +454,33 @@
             </div>
         </div>
     </div>
+
+    @if ($showDeverrouillageModal)
+    <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5)">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Déverrouiller le budget</h5>
+                    <button wire:click="$set('showDeverrouillageModal', false)" type="button" class="btn-close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small">
+                        Le budget voté redeviendra modifiable. L'opération est tracée dans
+                        l'historique de l'exercice.
+                    </p>
+                    <label class="form-label fw-semibold">Motif</label>
+                    <textarea wire:model="commentaireDeverrouillage" class="form-control" rows="3"
+                              placeholder="Ex. : coquille sur le compte 613 signalée en bureau"></textarea>
+                    @error('commentaireDeverrouillage')
+                        <div class="text-danger small mt-1">{{ $message }}</div>
+                    @enderror
+                </div>
+                <div class="modal-footer">
+                    <button wire:click="$set('showDeverrouillageModal', false)" type="button" class="btn btn-secondary">Annuler</button>
+                    <button wire:click="deverrouillerBudget" type="button" class="btn btn-warning">Déverrouiller</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
 </div>

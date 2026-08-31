@@ -8,11 +8,13 @@ use App\Enums\Espace;
 use App\Enums\RoleAssociation;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\BudgetLine;
+use App\Models\Operation;
 use App\Services\Budget\BudgetGelService;
 use App\Services\BudgetImportService;
 use App\Services\BudgetService;
 use App\Services\Compta\PlanComptableSelecteur;
 use App\Services\ExerciceService;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use Livewire\Attributes\Validate;
@@ -260,24 +262,58 @@ final class BudgetTable extends Component
         $depenseGroupes = PlanComptableSelecteur::groupesPourType('depense');
         $recetteGroupes = PlanComptableSelecteur::groupesPourType('recette');
 
+        // Enveloppes et ventilations sont lues SÉPARÉMENT : les mêler dans une
+        // seule collection ferait écraser l'enveloppe par sa ventilation au
+        // keyBy, et doubler tout total.
         $budgetLines = BudgetLine::forExercice($exercice)->enveloppes()->get()->keyBy('compte_id');
+        $ventilations = BudgetLine::forExercice($exercice)
+            ->ventilations()
+            ->with('operation')
+            ->get()
+            ->groupBy('compte_id');
 
-        $tousComptes = $depenseGroupes->flatMap(fn (array $g) => $g['comptes'])
-            ->merge($recetteGroupes->flatMap(fn (array $g) => $g['comptes']));
-
-        $realiseData = [];
-        foreach ($tousComptes as $compte) {
-            $realiseData[$compte->id] = $budgetService->realise((int) $compte->id, $exercice);
-        }
+        // Deux requêtes groupées, au lieu d'un appel par compte.
+        $realiseData = $budgetService->realiseParCompte($exercice);
+        $realiseParOperation = $budgetService->realiseParCompteEtOperation($exercice);
 
         return view('livewire.budget-table', [
             'depenseGroupes' => $depenseGroupes,
             'recetteGroupes' => $recetteGroupes,
             'budgetLines' => $budgetLines,
+            'ventilations' => $ventilations,
             'realiseData' => $realiseData,
+            'realiseParOperation' => $realiseParOperation,
+            'operationsSansBudget' => $this->operationsSansBudget($exercice),
             'exerciceLabel' => app(ExerciceService::class)->label($exercice),
+            'exerciceModele' => app(ExerciceService::class)->exerciceAffiche(),
             'exportExerciceCourant' => $exercice,
             'exportExerciceSuivant' => $exercice + 1,
         ]);
+    }
+
+    /**
+     * Opérations ouvertes chevauchant l'exercice et n'ayant aucune ligne de budget.
+     *
+     * Périmètre volontairement plus étroit que le sélecteur de la modale : celui-ci
+     * ignore les dates (une opération pluriannuelle reste imputable), alors qu'ici
+     * signaler une opération hors période comme « sans budget » serait un faux
+     * positif permanent. Le sélecteur est permissif, la relance est prudente.
+     *
+     * @return Collection<int, Operation>
+     */
+    private function operationsSansBudget(int $exercice): mixed
+    {
+        $budgetees = BudgetLine::forExercice($exercice)
+            ->ventilations()
+            ->pluck('operation_id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
+
+        return Operation::query()
+            ->proposableALaSaisie()
+            ->forExercice($exercice)
+            ->when($budgetees !== [], fn ($q) => $q->whereNotIn('id', $budgetees))
+            ->orderBy('nom')
+            ->get();
     }
 }
