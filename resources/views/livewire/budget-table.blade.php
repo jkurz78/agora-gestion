@@ -35,7 +35,7 @@
     @endif
 
     {{-- Bandeau : opérations sans budget affecté --}}
-    @if ($operationsSansBudget->isNotEmpty())
+    @if (! $exerciceCloture && $operationsSansBudget->isNotEmpty())
     <div class="alert alert-warning py-2">
         <i class="bi bi-exclamation-triangle"></i>
         {{ $operationsSansBudget->count() }}

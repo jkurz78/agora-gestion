@@ -17,6 +17,9 @@
                                 <option value="{{ $op->id }}">{{ $op->nom }}</option>
                             @endforeach
                         </select>
+                        @if ($operationId === null)
+                            <div class="form-text">Choisissez d'abord une opération.</div>
+                        @endif
                     </div>
                     <div class="col-md-5">
                         <label class="form-label fw-semibold">Filtrer</label>
@@ -58,12 +61,18 @@
                                 <td class="text-end">
                                     <input type="number" step="0.01" min="0"
                                            wire:model="montants.{{ $l['compte_id'] }}"
+                                           @disabled($operationId === null)
+                                           data-budget-affectation-montant="{{ $l['compte_id'] }}"
+                                           data-restant="{{ $l['restant'] === null ? '' : $l['restant'] }}"
                                            class="form-control form-control-sm text-end">
-                                    @if ($l['depassement'] > 0)
-                                        <div class="text-danger small mt-1">
-                                            dépasse de {{ number_format($l['depassement'], 2, ',', ' ') }} €
-                                        </div>
-                                    @endif
+                                    {{-- Affiché par le JS ci-dessous pendant la frappe, et déjà présent au
+                                         premier rendu pour ne pas dépendre d'un premier événement input. Le
+                                         serveur reste seul juge à l'enregistrement : ceci n'est qu'un confort
+                                         d'affichage. --}}
+                                    <div id="budget-affectation-depassement-{{ $l['compte_id'] }}"
+                                         class="text-danger small mt-1 {{ $l['depassement'] > 0 ? '' : 'd-none' }}">
+                                        dépasse de {{ number_format($l['depassement'], 2, ',', ' ') }} €
+                                    </div>
                                 </td>
                             </tr>
                         @endforeach
@@ -73,7 +82,7 @@
             <div class="modal-footer">
                 <button wire:click="fermer" type="button" class="btn btn-secondary">Annuler</button>
                 <button wire:click="enregistrer" type="button" class="btn btn-primary"
-                        @disabled(! $this->canEdit || $operationId === null)>
+                        @disabled(! $this->canEdit || $operationId === null || $exerciceCloture)>
                     Enregistrer
                 </button>
             </div>
@@ -81,4 +90,42 @@
     </div>
 </div>
 @endif
+
+{{-- Recalcul du dépassement pendant la frappe, en pur JS (pas de Vite/npm dans
+     ce projet). La modale n'est rendue qu'à l'ouverture (@if ($ouverte) plus
+     haut) : un binding au chargement de la page ne toucherait donc jamais ses
+     champs. On délègue l'écoute au document, indépendamment de l'existence des
+     inputs au moment du binding — Livewire peut recréer les lignes (filtre,
+     changement d'opération) sans que ce script ait besoin de se relier. --}}
+<script>
+    document.addEventListener('input', function (e) {
+        var input = e.target.closest('[data-budget-affectation-montant]');
+        if (!input) return;
+
+        var compteId = input.getAttribute('data-budget-affectation-montant');
+        var depassementEl = document.getElementById('budget-affectation-depassement-' + compteId);
+        if (!depassementEl) return;
+
+        var restantRaw = input.getAttribute('data-restant');
+
+        // Pas d'enveloppe pour ce compte : jamais de dépassement, même si un
+        // montant très élevé est saisi (cf. calcul serveur dans lignes()).
+        if (restantRaw === '') {
+            depassementEl.classList.add('d-none');
+            return;
+        }
+
+        var restant = parseFloat(restantRaw);
+        var montant = parseFloat(String(input.value).replace(',', '.'));
+
+        if (isNaN(montant) || montant <= restant) {
+            depassementEl.classList.add('d-none');
+            return;
+        }
+
+        var depassement = Math.round((montant - restant) * 100) / 100;
+        depassementEl.textContent = 'dépasse de ' + depassement.toFixed(2).replace('.', ',') + ' €';
+        depassementEl.classList.remove('d-none');
+    });
+</script>
 </div>

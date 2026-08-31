@@ -235,3 +235,23 @@ it('affiche le bandeau de budget valide avec le nom du validateur', function () 
         ->assertSee($this->user->name)
         ->assertSee('Déverrouiller');
 });
+
+// Correctif 2 (revue BudgetAffectationModal) : contrairement au bouton
+// générique juste au-dessus, ce bandeau n'était gardé ni par $exerciceCloture
+// ni par canEdit. Sur un exercice clôturé, ses badges ouvraient la modale
+// d'affectation, saisie possible, et Enregistrer levait une 500 (Exercice
+// CloturedException nue, sans handler).
+it('cache le bandeau operations sans budget affecte quand l exercice est cloture', function () {
+    Exercice::create([
+        'annee' => app(ExerciceService::class)->current(),
+        'statut' => StatutExercice::Cloture,
+    ]);
+    $operation = Operation::factory()->create([
+        'association_id' => $this->association->id, 'nom' => 'Op sans budget',
+    ]);
+
+    Livewire::test(BudgetTable::class)
+        ->assertOk()
+        ->assertDontSee('sans budget affecté')
+        ->assertDontSee($operation->nom);
+});

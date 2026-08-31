@@ -6,6 +6,7 @@ namespace App\Livewire;
 
 use App\Enums\Espace;
 use App\Enums\RoleAssociation;
+use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\BudgetLine;
 use App\Models\Operation;
 use App\Services\Compta\PlanComptableSelecteur;
@@ -25,11 +26,15 @@ use Livewire\Component;
  *
  * Une seule propriété tableau et un seul enregistrement transactionnel : une
  * synchronisation live par cellule ferait une centaine d'allers-retours Livewire.
- * Le recalcul du restant pendant la frappe est fait côté client ; le serveur
- * recalcule tout à l'enregistrement et reste seul juge.
+ * Le dépassement (montant saisi vs restant) est recalculé pendant la frappe en
+ * JS vanilla, dans la vue — voir le <script> de budget-affectation-modal.blade.php.
+ * Le « restant » lui-même reste une valeur serveur figée au dernier rendu ; le
+ * serveur recalcule tout à l'enregistrement et reste seul juge.
  */
 final class BudgetAffectationModal extends Component
 {
+    use RespectsExerciceCloture;
+
     public bool $ouverte = false;
 
     public ?int $operationId = null;
@@ -100,22 +105,35 @@ final class BudgetAffectationModal extends Component
         $this->ouverte = false;
         $this->operationId = null;
         $this->montants = [];
-        $this->resetValidation();
     }
 
     public function enregistrer(): void
     {
-        if (! $this->canEdit || $this->operationId === null) {
+        if (! $this->canEdit || $this->operationId === null || $this->exerciceCloture) {
             return;
         }
 
+        // $this->montants et $this->operationId sont entièrement pilotés par le
+        // navigateur : un appel forgé pourrait viser un compte ou une opération
+        // d'une autre association. On confronte donc les deux au périmètre
+        // réellement affiché — plutôt qu'aux seules règles d'autorisation, qui
+        // ne disent rien du tenant.
+        if (! Operation::query()->proposableALaSaisie()->whereKey($this->operationId)->exists()) {
+            return;
+        }
+
+        $comptesAutorises = $this->comptesAutorises();
+
         $exercice = app(ExerciceService::class)->current();
-        app(ExerciceService::class)->assertOuvert($exercice);
 
         // Le gel ne verrouille QUE les enveloppes : aucune garde de validation ici.
 
-        DB::transaction(function () use ($exercice): void {
+        DB::transaction(function () use ($exercice, $comptesAutorises): void {
             foreach ($this->montants as $compteId => $valeur) {
+                if (! in_array((int) $compteId, $comptesAutorises, true)) {
+                    continue;
+                }
+
                 $compteId = (int) $compteId;
                 $valeur = trim((string) $valeur);
 
@@ -151,14 +169,34 @@ final class BudgetAffectationModal extends Component
         $this->fermer();
     }
 
+    /**
+     * Liste blanche des compte_id que la modale expose réellement — les mêmes
+     * comptes que ceux énumérés par {@see lignes()}. Sert de garde tenant pour
+     * {@see enregistrer()} : $this->montants est piloté par le navigateur, il
+     * ne faut jamais faire confiance à ses clés.
+     *
+     * @return list<int>
+     */
+    private function comptesAutorises(): array
+    {
+        $ids = [];
+
+        foreach (['depense', 'recette'] as $type) {
+            foreach (PlanComptableSelecteur::groupesPourType($type) as $groupe) {
+                foreach ($groupe['comptes'] as $compte) {
+                    $ids[] = (int) $compte->id;
+                }
+            }
+        }
+
+        return $ids;
+    }
+
     public function render(): View
     {
         return view('livewire.budget-affectation-modal', [
             'lignes' => $this->ouverte ? $this->lignes() : [],
-            'operations' => Operation::query()->proposableALaSaisie()->orderBy('nom')->get(),
-            'operationNom' => $this->operationId !== null
-                ? Operation::find($this->operationId)?->nom
-                : null,
+            'operations' => $this->ouverte ? Operation::query()->proposableALaSaisie()->orderBy('nom')->get() : collect(),
         ]);
     }
 
@@ -181,9 +219,20 @@ final class BudgetAffectationModal extends Component
 
         // Σ ventilations des AUTRES opérations. Inclure celle qu'on édite ferait
         // afficher un restant amputé du montant en cours de modification.
+        //
+        // Laravel réécrit where(col, '!=', null) en whereNotNull, donc écrire
+        // ->where('operation_id', '!=', $this->operationId) sans opération
+        // choisie serait correct (redondant avec whereNotNull() de
+        // ventilations()) — mais un relecteur pourrait « corriger » ce qui
+        // ressemble, en SQL pur, à une comparaison toujours fausse (<> NULL),
+        // et casser le comportement. Le when() dit l'intention explicitement :
+        // sans opération choisie, TOUTES les ventilations sont déduites.
         $autresVentilations = BudgetLine::forExercice($exercice)
             ->ventilations()
-            ->where('operation_id', '!=', $this->operationId)
+            ->when(
+                $this->operationId !== null,
+                fn ($q) => $q->where('operation_id', '!=', $this->operationId)
+            )
             ->selectRaw('compte_id, SUM(montant_prevu) as total')
             ->groupBy('compte_id')
             ->pluck('total', 'compte_id')
