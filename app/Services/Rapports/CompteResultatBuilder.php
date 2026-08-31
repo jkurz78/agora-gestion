@@ -7,6 +7,7 @@ namespace App\Services\Rapports;
 use App\Enums\PorteeExercices;
 use App\Models\Famille;
 use App\Models\Operation;
+use App\Services\Compta\SensMontantPd;
 use App\Services\ExerciceService;
 use App\Tenant\TenantContext;
 use Carbon\CarbonImmutable;
@@ -1093,7 +1094,7 @@ final class CompteResultatBuilder
                 DB::raw('c.id as compte_id'),
                 DB::raw('c.intitule as compte_nom'),
                 DB::raw('COALESCE(tla2.seance, 0) as seance'),
-                DB::raw('SUM(tla2.montant) as montant'),
+                DB::raw(SensMontantPd::affectation($classe, 'tl', 'tla2').' as montant'),
             ])
             ->groupBy('c.id', 'c.intitule', 'f.id', 'f.code', 'f.nom', DB::raw('COALESCE(tla2.seance, 0)'))
             ->get();
@@ -1128,7 +1129,6 @@ final class CompteResultatBuilder
         bool $withOperation = false,
     ): array {
         $classe = $type === 'recette' ? 7 : 6;
-        $isSigne7 = $classe === 7;
 
         $baseCols = [
             DB::raw('COALESCE(f.id, 0) as famille_id'),
@@ -1166,9 +1166,7 @@ final class CompteResultatBuilder
             $q1Cols[] = 'tl.operation_id';
             $q1Group[] = 'tl.operation_id';
         }
-        $montantQ1 = $isSigne7
-            ? DB::raw('SUM(tl.credit) - SUM(tl.debit) as montant')
-            : DB::raw('SUM(tl.debit) - SUM(tl.credit) as montant');
+        $montantQ1 = DB::raw(SensMontantPd::ligne($classe).' as montant');
         $q1Cols[] = $montantQ1;
 
         $q1 = DB::table('transaction_lignes as tl')
@@ -1212,7 +1210,7 @@ final class CompteResultatBuilder
             $q2Cols[] = 'tla2.operation_id';
             $q2Group[] = 'tla2.operation_id';
         }
-        $q2Cols[] = DB::raw('SUM(tla2.montant) as montant');
+        $q2Cols[] = DB::raw(SensMontantPd::affectation($classe, 'tl', 'tla2').' as montant');
 
         $q2 = DB::table('transaction_ligne_affectations as tla2')
             ->join('transaction_lignes as tl', 'tl.id', '=', 'tla2.transaction_ligne_id')
