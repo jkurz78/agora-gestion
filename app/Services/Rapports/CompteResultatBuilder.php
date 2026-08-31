@@ -766,6 +766,9 @@ final class CompteResultatBuilder
     {
         return DB::table('budget_lines')
             ->whereNotNull('compte_id')
+            // Seules les enveloppes : les lignes ventilées par opération
+            // détaillent l'enveloppe, elles ne s'y ajoutent pas.
+            ->whereNull('operation_id')
             ->where('exercice', $exercice)
             ->tap(fn (Builder $query) => $this->scopeToCurrentTenant($query, 'association_id'))
             ->select('compte_id', DB::raw('SUM(montant_prevu) as budget'))

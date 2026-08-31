@@ -50,4 +50,27 @@ final class BudgetLine extends TenantModel
     {
         return $query->where('exercice', $exercice);
     }
+
+    /**
+     * L'enveloppe du compte : la ligne non ventilée.
+     *
+     * Tout calcul de budget GLOBAL — total, par compte, par famille — passe par
+     * ce scope. Sans lui, l'enveloppe et ses ventilations se cumulent.
+     *
+     * @param  Builder<BudgetLine>  $query
+     */
+    public function scopeEnveloppes(Builder $query): Builder
+    {
+        return $query->whereNull('operation_id');
+    }
+
+    /**
+     * Les ventilations : les lignes rattachées à une opération.
+     *
+     * @param  Builder<BudgetLine>  $query
+     */
+    public function scopeVentilations(Builder $query): Builder
+    {
+        return $query->whereNotNull('operation_id');
+    }
 }

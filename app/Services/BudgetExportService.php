@@ -27,6 +27,7 @@ final class BudgetExportService
         // Pré-charger le budget de l'exercice source en une seule requête
         $budgetMap = $source === 'budget'
             ? BudgetLine::forExercice($sourceExercice)
+                ->enveloppes()
                 ->pluck('montant_prevu', 'compte_id')
                 ->map(fn ($v) => (float) $v)
                 ->all()

@@ -49,6 +49,7 @@ final class Dashboard extends Component
 
         // Budget résumé — agrégation par famille (lecture compte-first)
         $budgetLines = BudgetLine::forExercice($exercice)
+            ->enveloppes()
             ->with(['compte'])
             ->get();
 
@@ -56,9 +57,10 @@ final class Dashboard extends Component
 
         $totalPrevu = (float) $budgetLines->sum('montant_prevu');
         $totalRealise = 0.0;
+        $realiseMap = $budgetService->realiseParCompte($exercice);
         $budgetParFamille = []; // ['nomGroupe' => ['type' => 'depense|recette', 'prevu' => float, 'realise' => float]]
         foreach ($budgetLines as $line) {
-            $r = $line->compte_id !== null ? (float) $budgetService->realise((int) $line->compte_id, $exercice) : 0.0;
+            $r = $line->compte_id !== null ? ($realiseMap[(int) $line->compte_id] ?? 0.0) : 0.0;
             $totalRealise += $r;
 
             $compte = $line->compte;

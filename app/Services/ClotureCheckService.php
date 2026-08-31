@@ -182,7 +182,7 @@ final class ClotureCheckService
 
     private function checkBudgetAbsent(int $annee): CheckItem
     {
-        $count = BudgetLine::forExercice($annee)->count();
+        $count = BudgetLine::forExercice($annee)->enveloppes()->count();
 
         return new CheckItem(
             nom: 'Budget absent',

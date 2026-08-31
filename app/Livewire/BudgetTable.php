@@ -193,7 +193,7 @@ final class BudgetTable extends Component
         $depenseGroupes = PlanComptableSelecteur::groupesPourType('depense');
         $recetteGroupes = PlanComptableSelecteur::groupesPourType('recette');
 
-        $budgetLines = BudgetLine::forExercice($exercice)->get()->keyBy('compte_id');
+        $budgetLines = BudgetLine::forExercice($exercice)->enveloppes()->get()->keyBy('compte_id');
 
         $tousComptes = $depenseGroupes->flatMap(fn (array $g) => $g['comptes'])
             ->merge($recetteGroupes->flatMap(fn (array $g) => $g['comptes']));
