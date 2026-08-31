@@ -9,6 +9,8 @@ enum TypeActionExercice: string
     case Creation = 'creation';
     case Cloture = 'cloture';
     case Reouverture = 'reouverture';
+    case BudgetValide = 'budget_valide';
+    case BudgetDeverrouille = 'budget_deverrouille';
 
     public function label(): string
     {
@@ -16,6 +18,8 @@ enum TypeActionExercice: string
             self::Creation => 'Création',
             self::Cloture => 'Clôture',
             self::Reouverture => 'Réouverture',
+            self::BudgetValide => 'Budget validé',
+            self::BudgetDeverrouille => 'Budget déverrouillé',
         };
     }
 
@@ -25,6 +29,8 @@ enum TypeActionExercice: string
             self::Creation => 'bg-success',
             self::Cloture => 'bg-danger',
             self::Reouverture => 'bg-warning text-dark',
+            self::BudgetValide => 'bg-primary',
+            self::BudgetDeverrouille => 'bg-warning text-dark',
         };
     }
 }

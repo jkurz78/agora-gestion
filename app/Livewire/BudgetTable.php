@@ -8,6 +8,7 @@ use App\Enums\Espace;
 use App\Enums\RoleAssociation;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\BudgetLine;
+use App\Services\Budget\BudgetGelService;
 use App\Services\BudgetImportService;
 use App\Services\BudgetService;
 use App\Services\Compta\PlanComptableSelecteur;
@@ -49,6 +50,12 @@ final class BudgetTable extends Component
 
     public ?string $importSuccess = null;
 
+    // ── Gel du budget ─────────────────────────────────────────────────────────
+    public bool $showDeverrouillageModal = false;
+
+    #[Validate(['required', 'string', 'min:5'])]
+    public string $commentaireDeverrouillage = '';
+
     // ── Computed ──────────────────────────────────────────────────────────────
 
     public function getCanEditProperty(): bool
@@ -56,11 +63,25 @@ final class BudgetTable extends Component
         return RoleAssociation::tryFrom(Auth::user()->currentRole() ?? '')?->canWrite(Espace::Compta) ?? false;
     }
 
+    public function getBudgetValideProperty(): bool
+    {
+        return app(BudgetGelService::class)->estValide(app(ExerciceService::class)->current());
+    }
+
+    public function getIsAdminProperty(): bool
+    {
+        return RoleAssociation::tryFrom(Auth::user()->currentRole() ?? '') === RoleAssociation::Admin;
+    }
+
     // ── Actions édition ───────────────────────────────────────────────────────
 
     public function addLine(int $compteId): void
     {
         if (! $this->canEdit) {
+            return;
+        }
+
+        if ($this->budgetValide) {
             return;
         }
 
@@ -88,9 +109,15 @@ final class BudgetTable extends Component
 
         app(ExerciceService::class)->assertOuvert(app(ExerciceService::class)->current());
 
+        $line = BudgetLine::findOrFail($this->editingLineId);
+
+        if (app(BudgetGelService::class)->ligneEstVerrouillee($line)) {
+            return;
+        }
+
         $this->validate(['editingMontant' => ['required', 'numeric', 'min:0']]);
 
-        BudgetLine::findOrFail($this->editingLineId)->update(['montant_prevu' => $this->editingMontant]);
+        $line->update(['montant_prevu' => $this->editingMontant]);
         $this->cancelEdit();
     }
 
@@ -108,7 +135,47 @@ final class BudgetTable extends Component
 
         app(ExerciceService::class)->assertOuvert(app(ExerciceService::class)->current());
 
-        BudgetLine::findOrFail($lineId)->delete();
+        $line = BudgetLine::findOrFail($lineId);
+
+        if (app(BudgetGelService::class)->ligneEstVerrouillee($line)) {
+            return;
+        }
+
+        $line->delete();
+    }
+
+    public function validerBudget(): void
+    {
+        if (! $this->isAdmin) {
+            return;
+        }
+
+        $exercice = app(ExerciceService::class)->exerciceAffiche();
+
+        if ($exercice === null || $exercice->budgetEstValide()) {
+            return;
+        }
+
+        app(BudgetGelService::class)->valider($exercice, Auth::user());
+    }
+
+    public function deverrouillerBudget(): void
+    {
+        if (! $this->isAdmin) {
+            return;
+        }
+
+        $this->validate(['commentaireDeverrouillage' => ['required', 'string', 'min:5']]);
+
+        $exercice = app(ExerciceService::class)->exerciceAffiche();
+
+        if ($exercice === null || ! $exercice->budgetEstValide()) {
+            return;
+        }
+
+        app(BudgetGelService::class)->deverrouiller($exercice, Auth::user(), $this->commentaireDeverrouillage);
+        $this->commentaireDeverrouillage = '';
+        $this->showDeverrouillageModal = false;
     }
 
     // ── Actions export ────────────────────────────────────────────────────────
