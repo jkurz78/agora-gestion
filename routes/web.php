@@ -18,6 +18,7 @@ use App\Http\Controllers\FacturePdfController;
 use App\Http\Controllers\FormulaireController;
 use App\Http\Controllers\ImmobilisationPdfController;
 use App\Http\Controllers\IncomingDocumentsController;
+use App\Http\Controllers\InformationsTechniquesController;
 use App\Http\Controllers\OnboardingBrandingController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\ParticipantDocumentController;
@@ -112,6 +113,8 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class, CheckEspaceAccess
         Route::get('/recus-fiscaux', RecusFiscaux::class)
             ->name('recus-fiscaux');
         Route::resource('utilisateurs', UserController::class)->only(['index', 'store', 'update', 'destroy']);
+        Route::get('/informations-techniques', InformationsTechniquesController::class)
+            ->name('informations-techniques');
     });
 
 Route::middleware(['auth'])->group(function (): void {

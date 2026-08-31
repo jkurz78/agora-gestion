@@ -71,6 +71,15 @@ final class ParametresNavigation
                     new EcranParametre('ocr-ia', 'OCR / IA', 'parametres.ocr-ia', 'bi-robot', $admin),
                 ],
             ),
+            new SectionParametres(
+                cle: 'systeme',
+                libelle: 'Système',
+                description: 'Consulter la version d’AgoraGestion et celles des composants qui la font tourner. Ces informations servent au support en cas d’anomalie.',
+                icone: 'bi-cpu',
+                ecrans: [
+                    new EcranParametre('informations-techniques', 'Informations techniques', 'parametres.informations-techniques', 'bi-info-square', $admin),
+                ],
+            ),
         ];
 
         self::garantirClesUniques($sections);

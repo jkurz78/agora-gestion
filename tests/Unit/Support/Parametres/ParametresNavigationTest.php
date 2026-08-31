@@ -16,13 +16,13 @@ function invokePrivateStaticMethod(string $class, string $method, array $args): 
     return $reflection->invokeArgs(null, $args);
 }
 
-it('décrit quatre sections et douze écrans', function (): void {
+it('décrit cinq sections et treize écrans', function (): void {
     $sections = ParametresNavigation::sections();
 
-    expect($sections)->toHaveCount(4);
+    expect($sections)->toHaveCount(5);
 
     $total = array_sum(array_map(fn ($s): int => count($s->ecrans), $sections));
-    expect($total)->toBe(12);
+    expect($total)->toBe(13);
 });
 
 it('chaque écran pointe une route déclarée', function (): void {

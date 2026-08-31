@@ -72,7 +72,7 @@ function assertPageAccueilRespecteMatrice(TestResponse $reponse, RoleAssociation
     }
 }
 
-it('un admin voit les quatre sections et les douze écrans', function (): void {
+it('un admin voit les cinq sections et les treize écrans', function (): void {
     $user = connecterAvecRolePageAccueil($this->association, RoleAssociation::Admin);
 
     $reponse = $this->actingAs($user)->get(route('parametres.index'));
@@ -90,8 +90,8 @@ it('un admin voit les quatre sections et les douze écrans', function (): void {
         }
     }
 
-    expect($totalSections)->toBe(4);
-    expect($totalEcrans)->toBe(12);
+    expect($totalSections)->toBe(5);
+    expect($totalEcrans)->toBe(13);
 
     assertPageAccueilRespecteMatrice($reponse, RoleAssociation::Admin);
 });
