@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Models\Association;
 use App\Models\User;
 use App\Tenant\TenantContext;
-use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Support\Facades\Log;
 
 beforeEach(function (): void {
@@ -36,7 +36,7 @@ function demoRequest(mixed $test): mixed
 
     return $test->actingAs($test->adminUser)
         ->withSession(['current_association_id' => $association->id])
-        ->withoutMiddleware(ValidateCsrfToken::class);
+        ->withoutMiddleware(PreventRequestForgery::class);
 }
 
 // ─── Test 1 : env=demo → POST/PUT/DELETE sur routes protégées → 403 + log ───

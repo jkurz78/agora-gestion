@@ -45,7 +45,7 @@ function makeTmpFileKm(string $originalName = 'carte-grise.pdf'): TemporaryUploa
 {
     $livewireDisk = Storage::disk('tmp-for-tests');
     $fullPath = 'livewire-tmp/'.$originalName;
-    $livewireDisk->put($fullPath, 'fake content');
+    $livewireDisk->put($fullPath, "%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF");
 
     return new TemporaryUploadedFile($originalName, 'tmp-for-tests');
 }
