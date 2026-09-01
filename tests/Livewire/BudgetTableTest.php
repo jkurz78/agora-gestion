@@ -871,3 +871,15 @@ it('le resultat suit la regle produit : favorable quand le realise depasse le pr
     expect($html)->toMatch('/(?<!\d)400,00 &euro;/')
         ->and($html)->not->toMatch('/-400,00/');
 });
+
+it('n exige pas le commentaire de deverrouillage pour importer un budget', function () {
+    // Régression : importBudget() appelait $this->validate() sans argument, ce
+    // qui valide TOUTES les propriétés portant un #[Validate] — dont
+    // commentaireDeverrouillage, vide et déclaré required|min:5. L'import
+    // échouait donc en silence, l'erreur n'étant rendue que dans la modale de
+    // déverrouillage, fermée. L'utilisateur cliquait, rien ne se passait.
+    Livewire::test(BudgetTable::class)
+        ->call('importBudget')
+        ->assertHasErrors('budgetFile')
+        ->assertHasNoErrors('commentaireDeverrouillage');
+});

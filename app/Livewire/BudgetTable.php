@@ -61,7 +61,13 @@ final class BudgetTable extends Component
     // ── Gel du budget ─────────────────────────────────────────────────────────
     public bool $showDeverrouillageModal = false;
 
-    #[Validate(['required', 'string', 'min:5'])]
+    /**
+     * Volontairement SANS attribut #[Validate] : ce champ n'est obligatoire que
+     * lors d'un déverrouillage, et deverrouillerBudget() le valide explicitement.
+     * Un #[Validate] ici serait pris en compte par tout appel à validate() sans
+     * argument — importBudget() échouait ainsi en silence sur un commentaire
+     * vide, l'erreur n'étant rendue que dans la modale de déverrouillage fermée.
+     */
     public string $commentaireDeverrouillage = '';
 
     public function mount(): void
@@ -280,7 +286,11 @@ final class BudgetTable extends Component
             return;
         }
 
-        $this->validate();
+        // Validation explicite du seul champ concerné : un validate() nu
+        // embarquerait toute autre règle #[Validate] du composant.
+        $this->validate([
+            'budgetFile' => ['required', 'file', 'mimes:csv,txt,xlsx', 'max:2048'],
+        ]);
 
         $exercice = app(ExerciceService::class)->current();
         $result = app(BudgetImportService::class)->import($this->budgetFile, $exercice);
