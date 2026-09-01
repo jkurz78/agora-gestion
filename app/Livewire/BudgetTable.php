@@ -8,12 +8,16 @@ use App\Enums\Espace;
 use App\Enums\RoleAssociation;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\BudgetLine;
+use App\Models\Operation;
+use App\Services\Budget\BudgetGelService;
 use App\Services\BudgetImportService;
 use App\Services\BudgetService;
 use App\Services\Compta\PlanComptableSelecteur;
 use App\Services\ExerciceService;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -38,6 +42,8 @@ final class BudgetTable extends Component
 
     public string $exportSource = 'courant'; // 'zero' | 'courant' | 'budget'
 
+    public string $exportSourceExercice = '';
+
     // ── Import ────────────────────────────────────────────────────────────────
     public bool $showImportPanel = false;
 
@@ -49,6 +55,28 @@ final class BudgetTable extends Component
 
     public ?string $importSuccess = null;
 
+    /** @var array{enveloppes: int, ventilations: int, montant_ventile: float, operations: int}|null */
+    public ?array $compteRenduImport = null;
+
+    // ── Gel du budget ─────────────────────────────────────────────────────────
+    public bool $showDeverrouillageModal = false;
+
+    /**
+     * Volontairement SANS attribut #[Validate] : ce champ n'est obligatoire que
+     * lors d'un déverrouillage, et deverrouillerBudget() le valide explicitement.
+     * Un #[Validate] ici serait pris en compte par tout appel à validate() sans
+     * argument — importBudget() échouait ainsi en silence sur un commentaire
+     * vide, l'erreur n'étant rendue que dans la modale de déverrouillage fermée.
+     */
+    public string $commentaireDeverrouillage = '';
+
+    public function mount(): void
+    {
+        // Défaut N-1 : l'AG se tient en octobre ou novembre, le réalisé de
+        // l'exercice courant n'aurait que deux mois quand on amorce le budget N.
+        $this->exportSourceExercice = (string) (app(ExerciceService::class)->current() - 1);
+    }
+
     // ── Computed ──────────────────────────────────────────────────────────────
 
     public function getCanEditProperty(): bool
@@ -56,11 +84,34 @@ final class BudgetTable extends Component
         return RoleAssociation::tryFrom(Auth::user()->currentRole() ?? '')?->canWrite(Espace::Compta) ?? false;
     }
 
+    public function getBudgetValideProperty(): bool
+    {
+        return app(BudgetGelService::class)->estValide(app(ExerciceService::class)->current());
+    }
+
+    public function getIsAdminProperty(): bool
+    {
+        return RoleAssociation::tryFrom(Auth::user()->currentRole() ?? '') === RoleAssociation::Admin;
+    }
+
     // ── Actions édition ───────────────────────────────────────────────────────
 
     public function addLine(int $compteId): void
     {
         if (! $this->canEdit) {
+            return;
+        }
+
+        if ($this->budgetValide) {
+            return;
+        }
+
+        // $compteId est entièrement piloté par le navigateur : un appel forgé
+        // pourrait sinon créer une enveloppe sur un compte d'une autre
+        // association, inactif, ou hors classe 6-7 — aucun de ces contrôles
+        // n'existait ici. Même liste blanche que celle utilisée par
+        // BudgetAffectationModal::enregistrer().
+        if (! in_array($compteId, PlanComptableSelecteur::comptesAutorisesPourTypes(['depense', 'recette']), true)) {
             return;
         }
 
@@ -86,11 +137,29 @@ final class BudgetTable extends Component
             return;
         }
 
-        app(ExerciceService::class)->assertOuvert(app(ExerciceService::class)->current());
+        $exercice = app(ExerciceService::class)->current();
+        app(ExerciceService::class)->assertOuvert($exercice);
+
+        $line = BudgetLine::findOrFail($this->editingLineId);
+
+        // Le scope tenant filtre l'association, mais pas l'exercice de la ligne
+        // elle-même : assertOuvert() ci-dessus ne contrôle QUE l'exercice
+        // affiché. Un appel forgé (editingLineId poussé sans passer par
+        // startEdit()) pourrait sinon viser une ligne d'un exercice clôturé —
+        // ligneEstVerrouillee() ne teste que le gel du budget, jamais la
+        // clôture. Sortie silencieuse, cohérente avec les autres gardes de
+        // cette méthode.
+        if ((int) $line->exercice !== (int) $exercice) {
+            return;
+        }
+
+        if (app(BudgetGelService::class)->ligneEstVerrouillee($line)) {
+            return;
+        }
 
         $this->validate(['editingMontant' => ['required', 'numeric', 'min:0']]);
 
-        BudgetLine::findOrFail($this->editingLineId)->update(['montant_prevu' => $this->editingMontant]);
+        $line->update(['montant_prevu' => $this->editingMontant]);
         $this->cancelEdit();
     }
 
@@ -106,9 +175,60 @@ final class BudgetTable extends Component
             return;
         }
 
-        app(ExerciceService::class)->assertOuvert(app(ExerciceService::class)->current());
+        $exercice = app(ExerciceService::class)->current();
+        app(ExerciceService::class)->assertOuvert($exercice);
 
-        BudgetLine::findOrFail($lineId)->delete();
+        $line = BudgetLine::findOrFail($lineId);
+
+        // Voir le commentaire équivalent dans saveEdit() : le scope tenant ne
+        // filtre pas l'exercice de la ligne.
+        if ((int) $line->exercice !== (int) $exercice) {
+            return;
+        }
+
+        if (app(BudgetGelService::class)->ligneEstVerrouillee($line)) {
+            return;
+        }
+
+        $line->delete();
+    }
+
+    public function validerBudget(): void
+    {
+        // $exerciceCloture évite d'atteindre BudgetGelService::valider() dont
+        // la garde de clôture lève ExerciceCloturedException, non rattrapée
+        // ici — elle produirait une 500 au lieu d'un no-op silencieux.
+        if (! $this->isAdmin || $this->exerciceCloture) {
+            return;
+        }
+
+        $exercice = app(ExerciceService::class)->exerciceAffiche();
+
+        if ($exercice === null || $exercice->budgetEstValide()) {
+            return;
+        }
+
+        app(BudgetGelService::class)->valider($exercice, Auth::user());
+    }
+
+    public function deverrouillerBudget(): void
+    {
+        // Voir le commentaire équivalent dans validerBudget().
+        if (! $this->isAdmin || $this->exerciceCloture) {
+            return;
+        }
+
+        $this->validate(['commentaireDeverrouillage' => ['required', 'string', 'min:5']]);
+
+        $exercice = app(ExerciceService::class)->exerciceAffiche();
+
+        if ($exercice === null || ! $exercice->budgetEstValide()) {
+            return;
+        }
+
+        app(BudgetGelService::class)->deverrouiller($exercice, Auth::user(), $this->commentaireDeverrouillage);
+        $this->commentaireDeverrouillage = '';
+        $this->showDeverrouillageModal = false;
     }
 
     // ── Actions export ────────────────────────────────────────────────────────
@@ -128,6 +248,7 @@ final class BudgetTable extends Component
         $this->validate([
             'exportFormat' => ['required', 'in:csv,xlsx'],
             'exportSource' => ['required', 'in:zero,courant,budget'],
+            'exportSourceExercice' => ['required', 'integer'],
         ]);
 
         $exerciceService = app(ExerciceService::class);
@@ -139,6 +260,7 @@ final class BudgetTable extends Component
             'format' => $this->exportFormat,
             'exercice' => $exerciceCible,
             'source' => $this->exportSource,
+            'source_exercice' => $this->exportSourceExercice,
         ]);
 
         $this->js("window.location.href = '{$url}'");
@@ -151,10 +273,13 @@ final class BudgetTable extends Component
     {
         $this->showImportPanel = ! $this->showImportPanel;
 
-        if (! $this->showImportPanel) {
+        if ($this->showImportPanel) {
+            $this->compteRenduImport = app(BudgetImportService::class)->compteRendu(app(ExerciceService::class)->current());
+        } else {
             $this->importErrors = null;
             $this->importSuccess = null;
             $this->budgetFile = null;
+            $this->compteRenduImport = null;
             $this->resetValidation();
         }
     }
@@ -165,7 +290,11 @@ final class BudgetTable extends Component
             return;
         }
 
-        $this->validate();
+        // Validation explicite du seul champ concerné : un validate() nu
+        // embarquerait toute autre règle #[Validate] du composant.
+        $this->validate([
+            'budgetFile' => ['required', 'file', 'mimes:csv,txt,xlsx', 'max:2048'],
+        ]);
 
         $exercice = app(ExerciceService::class)->current();
         $result = app(BudgetImportService::class)->import($this->budgetFile, $exercice);
@@ -182,6 +311,12 @@ final class BudgetTable extends Component
         }
     }
 
+    #[On('budget-affecte')]
+    public function rafraichir(): void
+    {
+        // Le render() suivant relit tout : rien à faire ici.
+    }
+
     // ── Render ────────────────────────────────────────────────────────────────
 
     public function render(): View
@@ -193,24 +328,59 @@ final class BudgetTable extends Component
         $depenseGroupes = PlanComptableSelecteur::groupesPourType('depense');
         $recetteGroupes = PlanComptableSelecteur::groupesPourType('recette');
 
-        $budgetLines = BudgetLine::forExercice($exercice)->get()->keyBy('compte_id');
+        // Enveloppes et ventilations sont lues SÉPARÉMENT : les mêler dans une
+        // seule collection ferait écraser l'enveloppe par sa ventilation au
+        // keyBy, et doubler tout total.
+        $budgetLines = BudgetLine::forExercice($exercice)->enveloppes()->get()->keyBy('compte_id');
+        $ventilations = BudgetLine::forExercice($exercice)
+            ->ventilations()
+            ->with('operation')
+            ->get()
+            ->groupBy('compte_id');
 
-        $tousComptes = $depenseGroupes->flatMap(fn (array $g) => $g['comptes'])
-            ->merge($recetteGroupes->flatMap(fn (array $g) => $g['comptes']));
-
-        $realiseData = [];
-        foreach ($tousComptes as $compte) {
-            $realiseData[$compte->id] = $budgetService->realise((int) $compte->id, $exercice);
-        }
+        // Deux requêtes groupées, au lieu d'un appel par compte.
+        $realiseData = $budgetService->realiseParCompte($exercice);
+        $realiseParOperation = $budgetService->realiseParCompteEtOperation($exercice);
 
         return view('livewire.budget-table', [
             'depenseGroupes' => $depenseGroupes,
             'recetteGroupes' => $recetteGroupes,
             'budgetLines' => $budgetLines,
+            'ventilations' => $ventilations,
             'realiseData' => $realiseData,
+            'realiseParOperation' => $realiseParOperation,
+            'operationsSansBudget' => $this->operationsSansBudget($exercice),
             'exerciceLabel' => app(ExerciceService::class)->label($exercice),
+            'exerciceModele' => app(ExerciceService::class)->exerciceAffiche(),
             'exportExerciceCourant' => $exercice,
             'exportExerciceSuivant' => $exercice + 1,
+            'anneesDisponibles' => app(ExerciceService::class)->availableYears(),
         ]);
+    }
+
+    /**
+     * Opérations ouvertes chevauchant l'exercice et n'ayant aucune ligne de budget.
+     *
+     * Périmètre volontairement plus étroit que le sélecteur de la modale : celui-ci
+     * ignore les dates (une opération pluriannuelle reste imputable), alors qu'ici
+     * signaler une opération hors période comme « sans budget » serait un faux
+     * positif permanent. Le sélecteur est permissif, la relance est prudente.
+     *
+     * @return Collection<int, Operation>
+     */
+    private function operationsSansBudget(int $exercice): mixed
+    {
+        $budgetees = BudgetLine::forExercice($exercice)
+            ->ventilations()
+            ->pluck('operation_id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
+
+        return Operation::query()
+            ->proposableALaSaisie()
+            ->forExercice($exercice)
+            ->when($budgetees !== [], fn ($q) => $q->whereNotIn('id', $budgetees))
+            ->orderBy('nom')
+            ->get();
     }
 }

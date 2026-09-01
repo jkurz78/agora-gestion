@@ -17,7 +17,7 @@ final class BudgetExportService
      * @param  int  $exerciceCible  Valeur à écrire dans la colonne exercice
      * @param  string  $source  'zero' | 'realise' | 'budget'
      * @param  int  $sourceExercice  Exercice source des montants
-     * @return list<array{0: string, 1: string, 2: string, 3: string}>
+     * @return list<array{0: string, 1: string, 2: string, 3: string, 4: string}>
      */
     public function rows(int $exerciceCible, string $source, int $sourceExercice): array
     {
@@ -27,10 +27,13 @@ final class BudgetExportService
         // Pré-charger le budget de l'exercice source en une seule requête
         $budgetMap = $source === 'budget'
             ? BudgetLine::forExercice($sourceExercice)
+                ->enveloppes()
                 ->pluck('montant_prevu', 'compte_id')
                 ->map(fn ($v) => (float) $v)
                 ->all()
             : [];
+
+        $realiseMap = $budgetService->realiseParCompte($sourceExercice);
 
         $rows = [];
 
@@ -41,8 +44,10 @@ final class BudgetExportService
                 $groupeLabel = $groupe['famille']?->libelle() ?? $codeFamille;
 
                 foreach ($groupe['comptes'] as $compte) {
+                    $realiseReference = $realiseMap[$compte->id] ?? 0.0;
+
                     $montant = match ($source) {
-                        'realise' => $budgetService->realise((int) $compte->id, $sourceExercice),
+                        'realise' => $realiseReference,
                         'budget' => $budgetMap[$compte->id] ?? 0.0,
                         default => 0.0,
                     };
@@ -52,6 +57,7 @@ final class BudgetExportService
                         $groupeLabel,
                         $compte->intitule,
                         $montant > 0 ? number_format($montant, 2, '.', '') : '',
+                        $realiseReference != 0.0 ? number_format($realiseReference, 2, '.', '') : '',
                     ];
                 }
             }
@@ -61,13 +67,29 @@ final class BudgetExportService
     }
 
     /**
+     * En-têtes de colonnes, la 5ᵉ portant le libellé de l'exercice de référence.
+     *
+     * @return list<string>
+     */
+    public function enTetes(int $sourceExercice): array
+    {
+        return ['exercice', 'famille', 'compte', 'montant_prevu', 'realise_'.app(ExerciceService::class)->label($sourceExercice)];
+    }
+
+    /**
      * Convertit les lignes en chaîne CSV UTF-8 avec séparateur ';'.
      *
-     * @param  list<array{0: string, 1: string, 2: string}>  $rows
+     * L'en-tête reprend {@see enTetes()} — la même source que le XLSX — afin
+     * que les deux formats d'export ne divergent jamais sur le libellé de la
+     * 5ᵉ colonne (le CSV codait auparavant "realise_reference" en dur, quand
+     * le XLSX produisait "realise_2025-2026").
+     *
+     * @param  list<array{0: string, 1: string, 2: string, 3: string, 4: string}>  $rows
+     * @param  int  $sourceExercice  Exercice de référence, transmis à enTetes()
      */
-    public function toCsv(array $rows): string
+    public function toCsv(array $rows, int $sourceExercice): string
     {
-        $lines = ['exercice;famille;compte;montant_prevu'];
+        $lines = [implode(';', $this->enTetes($sourceExercice))];
 
         foreach ($rows as $row) {
             $escaped = array_map(

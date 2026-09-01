@@ -2,11 +2,16 @@
 
 declare(strict_types=1);
 
+use App\Enums\StatutExercice;
 use App\Models\Association;
 use App\Models\BudgetLine;
 use App\Models\Compte;
+use App\Models\Exercice;
+use App\Models\Operation;
 use App\Models\User;
+use App\Services\Budget\BudgetGelService;
 use App\Services\BudgetImportService;
+use App\Services\ExerciceService;
 use App\Tenant\TenantContext;
 use Illuminate\Http\UploadedFile;
 
@@ -86,18 +91,20 @@ it('rejette si l\'en-tête est invalide', function () {
         ->and($result->errors[0]['message'])->toContain('En-tête invalide');
 });
 
-it('rejette si l\'exercice dans le fichier ne correspond pas', function () {
+it('rejette si l\'exercice dans le fichier ne correspond pas, avec les deux libellés complets et une invitation à changer d\'exercice', function () {
     $csv = "exercice;famille;compte;montant_prevu\n"
          ."2024-2025;Charges;Loyers;100.00\n";
 
     $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
 
     expect($result->success)->toBeFalse()
-        ->and($result->errors[0]['message'])->toContain('2024-2025')
-        ->and($result->errors[0]['message'])->toContain('2025');
+        ->and($result->errors[0]['message'])->toBe(
+            "Ce fichier porte l'exercice 2024-2025, alors que l'exercice affiché est 2025-2026. "
+            ."Basculez sur l'exercice 2024-2025 avant d'importer."
+        );
 });
 
-it('liste tous les exercices incorrects distincts dans le message d\'erreur', function () {
+it('liste tous les exercices incorrects distincts dans le message d\'erreur, sans invitation à changer d\'exercice', function () {
     $csv = "exercice;famille;compte;montant_prevu\n"
          ."2024-2025;Charges;Loyers;100.00\n"
          ."2023-2024;Charges;Électricité;200.00\n";
@@ -105,8 +112,34 @@ it('liste tous les exercices incorrects distincts dans le message d\'erreur', fu
     $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
 
     expect($result->success)->toBeFalse()
-        ->and($result->errors[0]['message'])->toContain('2023-2024')
-        ->and($result->errors[0]['message'])->toContain('2024-2025');
+        ->and($result->errors[0]['message'])->toBe(
+            "Ce fichier mélange plusieurs exercices (2023-2024, 2024-2025), alors que l'exercice affiché est 2025-2026. "
+            ."Un fichier d'import ne doit porter qu'un seul exercice."
+        )
+        ->and($result->errors[0]['message'])->not->toContain('Basculez');
+});
+
+it('normalise une année seule écrite dans le fichier au format complet de l\'exercice', function () {
+    $csv = "exercice;famille;compte;montant_prevu\n"
+         ."2024;Charges;Loyers;100.00\n";
+
+    $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
+
+    expect($result->success)->toBeFalse()
+        ->and($result->errors[0]['message'])->toContain('2024-2025')
+        ->and($result->errors[0]['message'])->not->toContain('2024,')
+        ->and($result->errors[0]['message'])->not->toContain("l'exercice 2024 ");
+});
+
+it('rejette proprement une valeur d\'exercice non parsable, sans libellé absurde ni erreur PHP', function () {
+    $csv = "exercice;famille;compte;montant_prevu\n"
+         ."toto;Charges;Loyers;100.00\n";
+
+    $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
+
+    expect($result->success)->toBeFalse()
+        ->and($result->errors[0]['message'])->toContain('toto')
+        ->and($result->errors[0]['message'])->not->toContain('0-1');
 });
 
 it('rejette si un compte est introuvable', function () {
@@ -189,4 +222,162 @@ it('n\'insère rien si validation échoue (atomicité)', function () {
     // La ligne existante est préservée car aucune suppression n'a eu lieu
     expect(BudgetLine::where('exercice', 2025)->count())->toBe(1);
     expect(BudgetLine::where('exercice', 2025)->value('montant_prevu'))->toBe('999.00');
+});
+
+it('ne detruit pas la ventilation lors d un re-import', function () {
+    $exercice = app(ExerciceService::class)->current();
+    $compte = Compte::factory()->numero('606')->create(['intitule' => 'Achats']);
+    $op = Operation::factory()->create();
+
+    BudgetLine::factory()->create([
+        'compte_id' => $compte->id, 'exercice' => $exercice,
+        'operation_id' => null, 'montant_prevu' => 1000.00,
+    ]);
+    $ventilation = BudgetLine::factory()->create([
+        'compte_id' => $compte->id, 'exercice' => $exercice,
+        'operation_id' => $op->id, 'montant_prevu' => 400.00,
+    ]);
+
+    $csv = "exercice;famille;compte;montant_prevu\n{$exercice};Famille;Achats;1500.00\n";
+    $fichier = UploadedFile::fake()->createWithContent('budget.csv', $csv);
+
+    $resultat = app(BudgetImportService::class)->import($fichier, $exercice);
+
+    expect($resultat->success)->toBeTrue()
+        ->and(BudgetLine::find($ventilation->id))->not->toBeNull()
+        ->and((float) BudgetLine::find($ventilation->id)->montant_prevu)->toBe(400.0)
+        ->and((float) BudgetLine::forExercice($exercice)->enveloppes()->sum('montant_prevu'))->toBe(1500.0);
+});
+
+it('accepte un fichier a cinq colonnes en ignorant la colonne de reference', function () {
+    $exercice = app(ExerciceService::class)->current();
+    Compte::factory()->numero('606')->create(['intitule' => 'Achats']);
+
+    $csv = "exercice;famille;compte;montant_prevu;realise_2024-2025\n{$exercice};Famille;Achats;1500.00;1320.44\n";
+    $fichier = UploadedFile::fake()->createWithContent('budget.csv', $csv);
+
+    $resultat = app(BudgetImportService::class)->import($fichier, $exercice);
+
+    expect($resultat->success)->toBeTrue()
+        ->and((float) BudgetLine::forExercice($exercice)->enveloppes()->sum('montant_prevu'))->toBe(1500.0);
+});
+
+it('refuse l import quand le budget est valide', function () {
+    $exercice = app(ExerciceService::class)->current();
+    Compte::factory()->numero('606')->create(['intitule' => 'Achats']);
+
+    // Pas de factory sur Exercice : création directe.
+    $modele = Exercice::create([
+        'annee' => $exercice, 'statut' => StatutExercice::Ouvert,
+    ]);
+    app(BudgetGelService::class)->valider($modele, $this->user ?? User::factory()->create());
+
+    $csv = "exercice;famille;compte;montant_prevu\n{$exercice};Famille;Achats;1500.00\n";
+    $fichier = UploadedFile::fake()->createWithContent('budget.csv', $csv);
+
+    $resultat = app(BudgetImportService::class)->import($fichier, $exercice);
+
+    expect($resultat->success)->toBeFalse()
+        ->and($resultat->errors[0]['message'])->toContain('déverrouill');
+});
+
+// Correctif audit point 5 : le fichier est validé ligne à ligne, mais rien ne
+// détecte deux lignes visant le MÊME compte. Depuis que l'index unique
+// existe (budget_lines_asso_exercice_compte_operation_unique), la seconde
+// insertion lève une QueryException — non rattrapée, donc une 500 — au lieu
+// d'un message de validation propre.
+
+it('detecte deux lignes visant le meme compte avant toute ecriture, sans lever d exception', function () {
+    $csv = "exercice;famille;compte;montant_prevu\n"
+         ."2025-2026;Charges;Loyers;500.00\n"
+         ."2025-2026;Charges;Loyers;700.00\n";
+
+    $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
+
+    expect($result->success)->toBeFalse()
+        ->and($result->errors[0]['message'])->toContain('Loyers');
+
+    expect(BudgetLine::where('exercice', 2025)->count())->toBe(0);
+});
+
+it('n insere rien quand deux lignes visent le meme compte, meme si un montant est ignorable', function () {
+    // Une ligne valide + une ligne vide/zéro pour le même compte ne
+    // collisionnerait pas techniquement à l'insertion (une seule survit au
+    // filtrage), mais deux lignes pour un même compte restent une ambiguïté
+    // du fichier source que l'utilisateur doit corriger.
+    $csv = "exercice;famille;compte;montant_prevu\n"
+         ."2025-2026;Charges;Loyers;500.00\n"
+         ."2025-2026;Charges;Loyers;\n";
+
+    $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
+
+    expect($result->success)->toBeFalse();
+});
+
+// Faille 2 (revue de sécurité) : le chargement de $compteByName itérait sur
+// Compte::all() sans aucun filtre — un fichier nommant un compte de classe 5
+// (bancaire) ou un compte désactivé créait une enveloppe que l'écran Budget
+// ne liste jamais (PlanComptableSelecteur ne propose que les classes 6/7
+// actives) : ligne invisible et non supprimable depuis l'interface. Même
+// liste blanche que BudgetTable::addLine() et
+// BudgetAffectationModal::enregistrer() —
+// PlanComptableSelecteur::comptesAutorisesPourTypes().
+
+it('rejette un compte de classe 5 hors perimetre budgetaire, sans creer de ligne', function () {
+    Compte::factory()->numero('512')->create(['intitule' => 'Banque']);
+
+    $csv = "exercice;famille;compte;montant_prevu\n"
+         ."2025-2026;Trésorerie;Banque;100.00\n";
+
+    $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
+
+    expect($result->success)->toBeFalse()
+        ->and($result->errors[0]['message'])->toContain('Banque')
+        ->and($result->errors[0]['message'])->not->toContain('introuvable');
+
+    expect(BudgetLine::where('exercice', 2025)->count())->toBe(0);
+});
+
+it('rejette un compte de classe 6 desactive, sans creer de ligne', function () {
+    Compte::factory()->numero('618')->create(['intitule' => 'Frais divers désactivés', 'actif' => false]);
+
+    $csv = "exercice;famille;compte;montant_prevu\n"
+         ."2025-2026;Charges;Frais divers désactivés;100.00\n";
+
+    $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
+
+    expect($result->success)->toBeFalse()
+        ->and($result->errors[0]['message'])->toContain('Frais divers désactivés')
+        ->and($result->errors[0]['message'])->not->toContain('introuvable');
+
+    expect(BudgetLine::where('exercice', 2025)->count())->toBe(0);
+});
+
+it('distingue un compte hors perimetre d un compte reellement introuvable', function () {
+    Compte::factory()->numero('512')->create(['intitule' => 'Banque']);
+
+    $csv = "exercice;famille;compte;montant_prevu\n"
+         ."2025-2026;Charges;Compte fantôme;100.00\n";
+
+    $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
+
+    expect($result->success)->toBeFalse()
+        ->and($result->errors[0]['message'])->toContain('introuvable')
+        ->and($result->errors[0]['message'])->toContain('Compte fantôme');
+});
+
+it('annonce ce qui sera remplace et ce qui sera conserve', function () {
+    $exercice = app(ExerciceService::class)->current();
+    $compte = Compte::factory()->numero('606')->create(['intitule' => 'Achats']);
+    $op = Operation::factory()->create();
+
+    BudgetLine::factory()->create(['compte_id' => $compte->id, 'exercice' => $exercice, 'operation_id' => null, 'montant_prevu' => 1000.00]);
+    BudgetLine::factory()->create(['compte_id' => $compte->id, 'exercice' => $exercice, 'operation_id' => $op->id, 'montant_prevu' => 400.00]);
+
+    $rendu = app(BudgetImportService::class)->compteRendu($exercice);
+
+    expect($rendu['enveloppes'])->toBe(1)
+        ->and($rendu['ventilations'])->toBe(1)
+        ->and($rendu['montant_ventile'])->toBe(400.0)
+        ->and($rendu['operations'])->toBe(1);
 });

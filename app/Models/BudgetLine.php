@@ -17,6 +17,7 @@ final class BudgetLine extends TenantModel
     protected $fillable = [
         'association_id',
         'compte_id',
+        'operation_id',
         'exercice',
         'montant_prevu',
         'notes',
@@ -28,6 +29,7 @@ final class BudgetLine extends TenantModel
             'montant_prevu' => 'decimal:2',
             'exercice' => 'integer',
             'compte_id' => 'integer',
+            'operation_id' => 'integer',
         ];
     }
 
@@ -37,10 +39,44 @@ final class BudgetLine extends TenantModel
     }
 
     /**
+     * withTrashed() : Operation porte SoftDeletes, mais l'historique du budget
+     * doit rester lisible après suppression de l'opération ventilée — sans
+     * elle, l'écran perdrait le nom au moment même où l'utilisateur consulte
+     * a posteriori une ventilation devenue orpheline.
+     */
+    public function operation(): BelongsTo
+    {
+        return $this->belongsTo(Operation::class, 'operation_id')->withTrashed();
+    }
+
+    /**
      * @param  Builder<BudgetLine>  $query
      */
     public function scopeForExercice(Builder $query, int $exercice): Builder
     {
         return $query->where('exercice', $exercice);
+    }
+
+    /**
+     * L'enveloppe du compte : la ligne non ventilée.
+     *
+     * Tout calcul de budget GLOBAL — total, par compte, par famille — passe par
+     * ce scope. Sans lui, l'enveloppe et ses ventilations se cumulent.
+     *
+     * @param  Builder<BudgetLine>  $query
+     */
+    public function scopeEnveloppes(Builder $query): Builder
+    {
+        return $query->whereNull('operation_id');
+    }
+
+    /**
+     * Les ventilations : les lignes rattachées à une opération.
+     *
+     * @param  Builder<BudgetLine>  $query
+     */
+    public function scopeVentilations(Builder $query): Builder
+    {
+        return $query->whereNotNull('operation_id');
     }
 }

@@ -4,22 +4,96 @@ declare(strict_types=1);
 
 use App\Support\ComparaisonBudgetaire;
 
-it('charge : vert sous le budget, orange en approche, rouge au dépassement', function () {
-    expect(ComparaisonBudgetaire::couleurBarre(50.0, true))->toBe('#2E7D32');   // vert
-    expect(ComparaisonBudgetaire::couleurBarre(95.0, true))->toBe('#fd7e14');   // orange
-    expect(ComparaisonBudgetaire::couleurBarre(120.0, true))->toBe('#B5453A');  // rouge
+// couleurBarre() — refonte 2026-09-01 : six paliers asymétriques, tolérance
+// de 3 % autour de la cible. Le côté FAVORABLE est toujours vert (aucune
+// dégradation), seule la mauvaise direction s'assombrit progressivement.
+// Remplace l'ancien barème à 3 paliers (vert/orange/rouge, vert inatteignable
+// pour une charge en dessous de 90 % seulement) qui rendait le vert quasi
+// impossible à obtenir pour un budget correctement tenu.
+
+it('charge : cote favorable toujours vert, y compris tres en dessous du budget', function () {
+    expect(ComparaisonBudgetaire::couleurBarre(40.0, true))->toBe('#2E7D32');
+    // Cas qui motivait la refonte : une charge à 97 % était orange, elle doit être verte.
+    expect(ComparaisonBudgetaire::couleurBarre(97.0, true))->toBe('#2E7D32');
 });
 
-it("produit : rouge sous l'objectif, orange en approche, vert à l'atteinte/dépassement", function () {
-    expect(ComparaisonBudgetaire::couleurBarre(50.0, false))->toBe('#B5453A');  // rouge (moins que prévu)
-    expect(ComparaisonBudgetaire::couleurBarre(95.0, false))->toBe('#fd7e14');  // orange (approche)
-    expect(ComparaisonBudgetaire::couleurBarre(120.0, false))->toBe('#2E7D32'); // vert (plus que prévu)
+it('charge : bornes exactes des six paliers', function () {
+    expect(ComparaisonBudgetaire::couleurBarre(103.0, true))->toBe('#2E7D32');   // vert, borne haute incluse
+    expect(ComparaisonBudgetaire::couleurBarre(103.1, true))->toBe('#E3B341');   // jaune
+    expect(ComparaisonBudgetaire::couleurBarre(108.0, true))->toBe('#E3B341');   // jaune
+    expect(ComparaisonBudgetaire::couleurBarre(108.1, true))->toBe('#E07B39');   // orange
+    expect(ComparaisonBudgetaire::couleurBarre(113.0, true))->toBe('#E07B39');   // orange
+    expect(ComparaisonBudgetaire::couleurBarre(113.1, true))->toBe('#C85A2A');   // orange foncé
+    expect(ComparaisonBudgetaire::couleurBarre(118.0, true))->toBe('#C85A2A');   // orange foncé
+    expect(ComparaisonBudgetaire::couleurBarre(118.1, true))->toBe('#A83C32');   // rouge
+    expect(ComparaisonBudgetaire::couleurBarre(123.0, true))->toBe('#A83C32');   // rouge
+    expect(ComparaisonBudgetaire::couleurBarre(123.1, true))->toBe('#6E1E18');   // rouge foncé
 });
 
-it('produit pile à 100 % (objectif atteint) est vert', function () {
-    expect(ComparaisonBudgetaire::couleurBarre(100.0, false))->toBe('#2E7D32');
+it('produit : cote favorable toujours vert, y compris tres au dessus du budget', function () {
+    expect(ComparaisonBudgetaire::couleurBarre(150.0, false))->toBe('#2E7D32');
+    // Cas qui motivait la refonte : un produit à 99 % était orange, il doit être vert.
+    expect(ComparaisonBudgetaire::couleurBarre(99.0, false))->toBe('#2E7D32');
 });
 
-it('charge pile à 100 % (budget consommé) est orange (à la limite)', function () {
-    expect(ComparaisonBudgetaire::couleurBarre(100.0, true))->toBe('#fd7e14');
+it('produit : bornes exactes des six paliers (symétrique inverse de la charge)', function () {
+    expect(ComparaisonBudgetaire::couleurBarre(97.0, false))->toBe('#2E7D32');   // vert, borne basse incluse
+    expect(ComparaisonBudgetaire::couleurBarre(96.9, false))->toBe('#E3B341');   // jaune
+    expect(ComparaisonBudgetaire::couleurBarre(92.0, false))->toBe('#E3B341');   // jaune
+    expect(ComparaisonBudgetaire::couleurBarre(91.9, false))->toBe('#E07B39');   // orange
+    expect(ComparaisonBudgetaire::couleurBarre(87.0, false))->toBe('#E07B39');   // orange
+    expect(ComparaisonBudgetaire::couleurBarre(86.9, false))->toBe('#C85A2A');   // orange foncé
+    expect(ComparaisonBudgetaire::couleurBarre(82.0, false))->toBe('#C85A2A');   // orange foncé
+    expect(ComparaisonBudgetaire::couleurBarre(81.9, false))->toBe('#A83C32');   // rouge
+    expect(ComparaisonBudgetaire::couleurBarre(77.0, false))->toBe('#A83C32');   // rouge
+    expect(ComparaisonBudgetaire::couleurBarre(76.9, false))->toBe('#6E1E18');   // rouge foncé
+});
+
+it('produit : un realise negatif (contra-produit debite) donne un pct negatif, rouge fonce', function () {
+    // Ex. compte 709A Gratuités accordées, débité : montant_n négatif pour un
+    // budget positif → pct négatif, tout en bas de la rampe. Pas de division
+    // par zéro : c'est $budget qui est au dénominateur, jamais $montantN, et
+    // $renderBar() garde déjà $budget <= 0 en amont.
+    expect(ComparaisonBudgetaire::couleurBarre(-40.0, false))->toBe('#6E1E18');
+});
+
+// écart() — delta brut, IDENTIQUE pour une charge et un produit : réalisé -
+// prévu, point. C'est ecartEstFavorable() qui porte l'appréciation, jamais
+// ecart() lui-même. Les trois cas ci-dessous sont ceux du propriétaire,
+// exactement : mêmes montants (600/670 en recette et en dépense) pour bien
+// montrer que le NOMBRE ne bouge pas — seule la COULEUR change de sens.
+
+it('ecart : recette prevu 600 / realise 670 vaut +70', function () {
+    expect(ComparaisonBudgetaire::ecart(600.0, 670.0))->toBe(70.0);
+});
+
+it('ecart : depense prevu 600 / realise 670 vaut aussi +70 (meme delta brut)', function () {
+    expect(ComparaisonBudgetaire::ecart(600.0, 670.0))->toBe(70.0);
+});
+
+it('ecart : depense prevu 600 / realise 530 vaut -70', function () {
+    expect(ComparaisonBudgetaire::ecart(600.0, 530.0))->toBe(-70.0);
+});
+
+// ecartEstFavorable() — c'est ELLE qui distingue charge et produit, jamais
+// ecart(). Reprend les trois cas ci-dessus pour vérifier l'appréciation.
+
+it('ecartEstFavorable : recette 600/670 (+70) est favorable', function () {
+    $ecart = ComparaisonBudgetaire::ecart(600.0, 670.0);
+
+    expect(ComparaisonBudgetaire::ecartEstFavorable($ecart, false))->toBeTrue();
+});
+
+it('ecartEstFavorable : depense 600/670 (+70) est defavorable', function () {
+    // Dépenser 70 de plus que prévu est une mauvaise nouvelle, même montant
+    // que le cas recette ci-dessus mais appréciation opposée.
+    $ecart = ComparaisonBudgetaire::ecart(600.0, 670.0);
+
+    expect(ComparaisonBudgetaire::ecartEstFavorable($ecart, true))->toBeFalse();
+});
+
+it('ecartEstFavorable : depense 600/530 (-70) est favorable', function () {
+    $ecart = ComparaisonBudgetaire::ecart(600.0, 530.0);
+
+    expect(ComparaisonBudgetaire::ecartEstFavorable($ecart, true))->toBeTrue();
 });

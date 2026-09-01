@@ -73,3 +73,44 @@ it('returns 0 when no transactions', function () {
 
     expect($result)->toBe(0.0);
 });
+
+it('soustrait un contra-produit mouvemente au debit', function () {
+    $compte = Compte::factory()->numero('709')->create(['intitule' => 'Gratuités accordées']);
+
+    $recette = Transaction::factory()->asRecette()->create([
+        'date' => '2025-12-05',
+        'saisi_par' => $this->user->id,
+    ]);
+    $recette->lignes()->forceDelete();
+
+    // Reproduction de tl#1023 en production : classe 7 au DÉBIT.
+    TransactionLigne::factory()->create([
+        'transaction_id' => $recette->id,
+        'compte_id' => $compte->id,
+        'montant' => 50.00,
+        'debit' => 50.00,
+        'credit' => 0.00,
+    ]);
+
+    expect($this->service->realise((int) $compte->id, 2025))->toBe(-50.0);
+});
+
+it('soustrait un rabais obtenu mouvemente au credit', function () {
+    $compte = Compte::factory()->numero('609')->create(['intitule' => 'Rabais obtenus']);
+
+    $depense = Transaction::factory()->asDepense()->create([
+        'date' => '2025-12-06',
+        'saisi_par' => $this->user->id,
+    ]);
+    $depense->lignes()->forceDelete();
+
+    TransactionLigne::factory()->create([
+        'transaction_id' => $depense->id,
+        'compte_id' => $compte->id,
+        'montant' => 30.00,
+        'debit' => 0.00,
+        'credit' => 30.00,
+    ]);
+
+    expect($this->service->realise((int) $compte->id, 2025))->toBe(-30.0);
+});

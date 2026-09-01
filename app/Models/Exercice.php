@@ -20,6 +20,8 @@ final class Exercice extends TenantModel
         'date_cloture',
         'cloture_par_id',
         'helloasso_url',
+        'budget_valide_le',
+        'budget_valide_par_id',
     ];
 
     protected function casts(): array
@@ -29,12 +31,24 @@ final class Exercice extends TenantModel
             'statut' => StatutExercice::class,
             'date_cloture' => 'datetime',
             'cloture_par_id' => 'integer',
+            'budget_valide_le' => 'datetime',
+            'budget_valide_par_id' => 'integer',
         ];
     }
 
     public function cloturePar(): BelongsTo
     {
         return $this->belongsTo(User::class, 'cloture_par_id');
+    }
+
+    public function budgetValidePar(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'budget_valide_par_id');
+    }
+
+    public function budgetEstValide(): bool
+    {
+        return $this->budget_valide_le !== null;
     }
 
     public function actions(): HasMany

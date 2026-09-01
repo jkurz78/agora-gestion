@@ -49,19 +49,29 @@ final class Dashboard extends Component
 
         // Budget résumé — agrégation par famille (lecture compte-first)
         $budgetLines = BudgetLine::forExercice($exercice)
+            ->enveloppes()
             ->with(['compte'])
             ->get();
 
         $familles = Famille::pourComptes(EloquentCollection::make($budgetLines->pluck('compte')->filter()));
 
-        $totalPrevu = (float) $budgetLines->sum('montant_prevu');
-        $totalRealise = 0.0;
+        // Prévu — uniquement les comptes budgétés : une enveloppe n'existe que
+        // là où elle a été saisie, par définition.
+        $recettesPrevu = 0.0;
+        $depensesPrevu = 0.0;
+        $realiseMap = $budgetService->realiseParCompte($exercice);
         $budgetParFamille = []; // ['nomGroupe' => ['type' => 'depense|recette', 'prevu' => float, 'realise' => float]]
         foreach ($budgetLines as $line) {
-            $r = $line->compte_id !== null ? (float) $budgetService->realise((int) $line->compte_id, $exercice) : 0.0;
-            $totalRealise += $r;
+            $r = $line->compte_id !== null ? ($realiseMap[(int) $line->compte_id] ?? 0.0) : 0.0;
 
             $compte = $line->compte;
+            $classe = $compte?->classe;
+            if ($classe === 7) {
+                $recettesPrevu += (float) $line->montant_prevu;
+            } elseif ($classe === 6) {
+                $depensesPrevu += (float) $line->montant_prevu;
+            }
+
             $famille = $compte !== null ? $familles->get(substr($compte->numero_pcg, 0, 2)) : null;
 
             $familleKey = $famille?->nom ?? '—';
@@ -75,6 +85,30 @@ final class Dashboard extends Component
             $budgetParFamille[$familleKey]['prevu'] += (float) $line->montant_prevu;
             $budgetParFamille[$familleKey]['realise'] += $r;
         }
+
+        // Réalisé — TOUS les comptes de classe 6 et 7, budgétés ou non. Une
+        // enveloppe n'est qu'un prévu ; elle ne doit jamais borner le périmètre
+        // du réalisé. En bouclant sur $budgetLines comme le prévu ci-dessus, un
+        // compte mouvementé sans enveloppe disparaissait silencieusement du
+        // résultat de la tuile sans disparaître du « Solde général » calculé
+        // plus haut dans cette même méthode — deux chiffres prétendant tous
+        // deux être le résultat de l'exercice. Le contrôle : resultatRealise
+        // doit toujours égaler $soldeGeneral.
+        $recettesRealise = 0.0;
+        $depensesRealise = 0.0;
+        $comptesResultat = Compte::query()->whereIn('classe', [6, 7])->get(['id', 'classe']);
+        foreach ($comptesResultat as $compte) {
+            $r = $realiseMap[(int) $compte->id] ?? 0.0;
+            if ($compte->classe === 7) {
+                $recettesRealise += $r;
+            } else {
+                $depensesRealise += $r;
+            }
+        }
+
+        $resultatPrevu = $recettesPrevu - $depensesPrevu;
+        $resultatRealise = $recettesRealise - $depensesRealise;
+
         // Tri : recettes en premier, puis dépenses, alpha dans chaque groupe
         uksort($budgetParFamille, function ($a, $b) use ($budgetParFamille): int {
             $ta = $budgetParFamille[$a]['type'] === 'recette' ? 0 : 1;
@@ -163,8 +197,12 @@ final class Dashboard extends Component
             'soldeGeneral' => $soldeGeneral,
             'totalRecettes' => $totalRecettes,
             'totalDepenses' => $totalDepenses,
-            'totalPrevu' => $totalPrevu,
-            'totalRealise' => $totalRealise,
+            'recettesPrevu' => round($recettesPrevu, 2),
+            'recettesRealise' => round($recettesRealise, 2),
+            'depensesPrevu' => round($depensesPrevu, 2),
+            'depensesRealise' => round($depensesRealise, 2),
+            'resultatPrevu' => round($resultatPrevu, 2),
+            'resultatRealise' => round($resultatRealise, 2),
             'budgetParFamille' => $budgetParFamille,
             'dernieresDepenses' => $dernieresDepenses,
             'dernieresRecettes' => $dernieresRecettes,
