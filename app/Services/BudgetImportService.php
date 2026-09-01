@@ -71,7 +71,11 @@ final class BudgetImportService
         foreach (Compte::all() as $compte) {
             $key = Str::lower(trim($compte->intitule));
 
-            if (in_array($compte->id, $comptesAutorisesIds, true)) {
+            // Cast (int) des deux côtés : comparaison stricte sur une PK, et
+            // MySQL peut renvoyer une chaîne selon la configuration PDO. Sans
+            // lui, aucun compte ne serait reconnu et TOUT import échouerait en
+            // production, alors que les tests SQLite resteraient verts.
+            if (in_array((int) $compte->id, $comptesAutorisesIds, true)) {
                 $compteByName[$key][] = $compte;
             } elseif (! isset($compteHorsPerimetreByName[$key])) {
                 $compteHorsPerimetreByName[$key] = $compte;
