@@ -192,6 +192,16 @@
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-striped table-hover mb-0" id="budget-table-charges">
+                    {{-- Largeurs identiques sur les trois tableaux (Charges, Produits,
+                         Résultat) : c'est ce qui fait tomber leurs colonnes à l'aplomb les
+                         unes des autres alors qu'il s'agit de trois <table> distincts. --}}
+                    <colgroup>
+                        <col>
+                        <col style="width: 140px;">
+                        <col style="width: 140px;">
+                        <col style="width: 140px;">
+                        <col style="width: 100px;">
+                    </colgroup>
                     <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                         <tr>
                             <th>Compte</th>
@@ -390,6 +400,13 @@
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-striped table-hover mb-0" id="budget-table-produits">
+                    <colgroup>
+                        <col>
+                        <col style="width: 140px;">
+                        <col style="width: 140px;">
+                        <col style="width: 140px;">
+                        <col style="width: 100px;">
+                    </colgroup>
                     <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                         <tr>
                             <th>Compte</th>
@@ -585,6 +602,13 @@
         <div class="card-body">
             <div class="table-responsive">
                 <table class="table table-bordered mb-0">
+                    <colgroup>
+                        <col>
+                        <col style="width: 140px;">
+                        <col style="width: 140px;">
+                        <col style="width: 140px;">
+                        <col style="width: 100px;">
+                    </colgroup>
                     <thead class="table-primary">
                         <tr class="fw-bold">
                             <th>Résultat (Produits - Charges)</th>

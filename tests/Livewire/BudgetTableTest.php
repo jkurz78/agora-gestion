@@ -48,6 +48,24 @@ it('renders with exercice', function () {
         ->assertSee('SC Recette');
 });
 
+it('aligns charges, produits and resultat tables on identical colgroups', function () {
+    // Point 4 — Charges, Produits et Résultat sont trois <table> distincts :
+    // sans colgroup identique sur les trois, rien ne garantit que leurs
+    // colonnes (Compte, Prévu, Réalisé, Écart, Actions) tombent à l'aplomb.
+    $html = Livewire::test(BudgetTable::class)->html();
+
+    preg_match_all('/<colgroup>.*?<\/colgroup>/s', $html, $matches);
+
+    expect($matches[0])->toHaveCount(3);
+    // Les trois colgroups doivent être identiques (mêmes largeurs, même ordre) :
+    // sans quoi le décalage réapparaît, même de quelques pixels.
+    expect($matches[0][0])->toBe($matches[0][1]);
+    expect($matches[0][1])->toBe($matches[0][2]);
+    // La colonne Actions (100px) doit être reproduite sur les trois : c'est
+    // elle qui évite que le décalage revienne à droite du tableau.
+    expect($matches[0][0])->toContain('width: 100px;');
+});
+
 it('can add a budget line', function () {
     $exercice = app(ExerciceService::class)->current();
 
