@@ -114,16 +114,37 @@ it('inclut le libellé de la famille en deuxième colonne', function () {
     expect($byName['Cotisations'][1])->toBe('75 — Produits');
 });
 
+it('la 5e colonne porte le realise de l\'exercice de reference, quelle que soit la source', function () {
+    BudgetLine::factory()->create(['compte_id' => $this->scLoyers->id, 'exercice' => 2025, 'montant_prevu' => 900.00]);
+
+    $rows = app(BudgetExportService::class)->rows(2026, 'budget', 2025);
+
+    $byName = array_column($rows, null, 2); // col 2 = intitulé du compte
+    // Col 3 (montant_prevu) suit la source choisie...
+    expect($byName['Loyers'][3])->toBe('900.00');
+    // ...mais col 4 (5e, réalisé de référence) reste le réalisé de l'exercice
+    // source, sans lien avec la source utilisée pour remplir montant_prevu.
+    expect($byName['Loyers'][4])->toBe('1200.00');
+    expect($byName['Électricité'][4])->toBe(''); // pas de transaction → vide
+    expect($byName['Cotisations'][4])->toBe('850.00');
+});
+
+it('enTetes retourne le libelle de l\'exercice de reference en 5e position', function () {
+    $entetes = app(BudgetExportService::class)->enTetes(2025);
+
+    expect($entetes)->toBe(['exercice', 'famille', 'compte', 'montant_prevu', 'realise_2025-2026']);
+});
+
 it('toCsv génère un CSV valide avec en-tête', function () {
     $rows = [
-        ['2026-2027', 'Charges', 'Loyers', '1200.00'],
-        ['2026-2027', 'Charges', 'Électricité', ''],
+        ['2026-2027', 'Charges', 'Loyers', '1200.00', '1150.00'],
+        ['2026-2027', 'Charges', 'Électricité', '', ''],
     ];
 
     $csv = app(BudgetExportService::class)->toCsv($rows);
 
     expect($csv)
-        ->toContain('exercice;famille;compte;montant_prevu')
-        ->toContain('2026-2027;Charges;Loyers;1200.00')
-        ->toContain('2026-2027;Charges;Électricité;');
+        ->toContain('exercice;famille;compte;montant_prevu;realise_reference')
+        ->toContain('2026-2027;Charges;Loyers;1200.00;1150.00')
+        ->toContain('2026-2027;Charges;Électricité;;');
 });

@@ -2,11 +2,16 @@
 
 declare(strict_types=1);
 
+use App\Enums\StatutExercice;
 use App\Models\Association;
 use App\Models\BudgetLine;
 use App\Models\Compte;
+use App\Models\Exercice;
+use App\Models\Operation;
 use App\Models\User;
+use App\Services\Budget\BudgetGelService;
 use App\Services\BudgetImportService;
+use App\Services\ExerciceService;
 use App\Tenant\TenantContext;
 use Illuminate\Http\UploadedFile;
 
@@ -189,4 +194,77 @@ it('n\'insère rien si validation échoue (atomicité)', function () {
     // La ligne existante est préservée car aucune suppression n'a eu lieu
     expect(BudgetLine::where('exercice', 2025)->count())->toBe(1);
     expect(BudgetLine::where('exercice', 2025)->value('montant_prevu'))->toBe('999.00');
+});
+
+it('ne detruit pas la ventilation lors d un re-import', function () {
+    $exercice = app(ExerciceService::class)->current();
+    $compte = Compte::factory()->numero('606')->create(['intitule' => 'Achats']);
+    $op = Operation::factory()->create();
+
+    BudgetLine::factory()->create([
+        'compte_id' => $compte->id, 'exercice' => $exercice,
+        'operation_id' => null, 'montant_prevu' => 1000.00,
+    ]);
+    $ventilation = BudgetLine::factory()->create([
+        'compte_id' => $compte->id, 'exercice' => $exercice,
+        'operation_id' => $op->id, 'montant_prevu' => 400.00,
+    ]);
+
+    $csv = "exercice;famille;compte;montant_prevu\n{$exercice};Famille;Achats;1500.00\n";
+    $fichier = UploadedFile::fake()->createWithContent('budget.csv', $csv);
+
+    $resultat = app(BudgetImportService::class)->import($fichier, $exercice);
+
+    expect($resultat->success)->toBeTrue()
+        ->and(BudgetLine::find($ventilation->id))->not->toBeNull()
+        ->and((float) BudgetLine::find($ventilation->id)->montant_prevu)->toBe(400.0)
+        ->and((float) BudgetLine::forExercice($exercice)->enveloppes()->sum('montant_prevu'))->toBe(1500.0);
+});
+
+it('accepte un fichier a cinq colonnes en ignorant la colonne de reference', function () {
+    $exercice = app(ExerciceService::class)->current();
+    Compte::factory()->numero('606')->create(['intitule' => 'Achats']);
+
+    $csv = "exercice;famille;compte;montant_prevu;realise_2024-2025\n{$exercice};Famille;Achats;1500.00;1320.44\n";
+    $fichier = UploadedFile::fake()->createWithContent('budget.csv', $csv);
+
+    $resultat = app(BudgetImportService::class)->import($fichier, $exercice);
+
+    expect($resultat->success)->toBeTrue()
+        ->and((float) BudgetLine::forExercice($exercice)->enveloppes()->sum('montant_prevu'))->toBe(1500.0);
+});
+
+it('refuse l import quand le budget est valide', function () {
+    $exercice = app(ExerciceService::class)->current();
+    Compte::factory()->numero('606')->create(['intitule' => 'Achats']);
+
+    // Pas de factory sur Exercice : création directe.
+    $modele = Exercice::create([
+        'annee' => $exercice, 'statut' => StatutExercice::Ouvert,
+    ]);
+    app(BudgetGelService::class)->valider($modele, $this->user ?? User::factory()->create());
+
+    $csv = "exercice;famille;compte;montant_prevu\n{$exercice};Famille;Achats;1500.00\n";
+    $fichier = UploadedFile::fake()->createWithContent('budget.csv', $csv);
+
+    $resultat = app(BudgetImportService::class)->import($fichier, $exercice);
+
+    expect($resultat->success)->toBeFalse()
+        ->and($resultat->errors[0]['message'])->toContain('déverrouill');
+});
+
+it('annonce ce qui sera remplace et ce qui sera conserve', function () {
+    $exercice = app(ExerciceService::class)->current();
+    $compte = Compte::factory()->numero('606')->create(['intitule' => 'Achats']);
+    $op = Operation::factory()->create();
+
+    BudgetLine::factory()->create(['compte_id' => $compte->id, 'exercice' => $exercice, 'operation_id' => null, 'montant_prevu' => 1000.00]);
+    BudgetLine::factory()->create(['compte_id' => $compte->id, 'exercice' => $exercice, 'operation_id' => $op->id, 'montant_prevu' => 400.00]);
+
+    $rendu = app(BudgetImportService::class)->compteRendu($exercice);
+
+    expect($rendu['enveloppes'])->toBe(1)
+        ->and($rendu['ventilations'])->toBe(1)
+        ->and($rendu['montant_ventile'])->toBe(400.0)
+        ->and($rendu['operations'])->toBe(1);
 });

@@ -20,10 +20,20 @@ final class BudgetExportController extends Controller
             'format' => ['required', 'in:csv,xlsx'],
             'exercice' => ['required', 'integer'],
             'source' => ['required', 'in:zero,courant,budget'],
+            'source_exercice' => ['nullable', 'integer'],
         ]);
 
         $exerciceCible = (int) $request->exercice;
-        $exerciceCourant = $exerciceService->current();
+
+        // L'exercice de référence est choisi, non plus déduit du courant :
+        // l'AG votant en octobre, « le réalisé courant » ne ferait que deux mois.
+        $exerciceSource = $request->filled('source_exercice')
+            ? (int) $request->source_exercice
+            : $exerciceService->current();
+
+        if (! in_array($exerciceSource, $exerciceService->availableYears(), true)) {
+            $exerciceSource = $exerciceService->current();
+        }
 
         $source = match ($request->source) {
             'courant' => 'realise',
@@ -31,11 +41,11 @@ final class BudgetExportController extends Controller
             default => 'zero',
         };
 
-        $rows = $service->rows($exerciceCible, $source, $exerciceCourant);
+        $rows = $service->rows($exerciceCible, $source, $exerciceSource);
         $filename = 'budget-'.$exerciceService->label($exerciceCible).'.'.$request->format;
 
         if ($request->format === 'xlsx') {
-            return $this->downloadXlsx($rows, $filename);
+            return $this->downloadXlsx($rows, $filename, $service->enTetes($exerciceSource));
         }
 
         $csv = $service->toCsv($rows);
@@ -46,13 +56,16 @@ final class BudgetExportController extends Controller
         ]);
     }
 
-    /** @param list<array{0: string, 1: string, 2: string, 3: string}> $rows */
-    private function downloadXlsx(array $rows, string $filename): StreamedResponse
+    /**
+     * @param  list<array{0: string, 1: string, 2: string, 3: string, 4: string}>  $rows
+     * @param  list<string>  $entetes
+     */
+    private function downloadXlsx(array $rows, string $filename, array $entetes): StreamedResponse
     {
         $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->fromArray(
-            array_merge([['exercice', 'famille', 'compte', 'montant_prevu']], $rows)
+            array_merge([$entetes], $rows)
         );
 
         $writer = new Xlsx($spreadsheet);

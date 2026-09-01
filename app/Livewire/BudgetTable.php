@@ -42,6 +42,8 @@ final class BudgetTable extends Component
 
     public string $exportSource = 'courant'; // 'zero' | 'courant' | 'budget'
 
+    public string $exportSourceExercice = '';
+
     // ── Import ────────────────────────────────────────────────────────────────
     public bool $showImportPanel = false;
 
@@ -53,11 +55,21 @@ final class BudgetTable extends Component
 
     public ?string $importSuccess = null;
 
+    /** @var array{enveloppes: int, ventilations: int, montant_ventile: float, operations: int}|null */
+    public ?array $compteRenduImport = null;
+
     // ── Gel du budget ─────────────────────────────────────────────────────────
     public bool $showDeverrouillageModal = false;
 
     #[Validate(['required', 'string', 'min:5'])]
     public string $commentaireDeverrouillage = '';
+
+    public function mount(): void
+    {
+        // Défaut N-1 : l'AG se tient en octobre ou novembre, le réalisé de
+        // l'exercice courant n'aurait que deux mois quand on amorce le budget N.
+        $this->exportSourceExercice = (string) (app(ExerciceService::class)->current() - 1);
+    }
 
     // ── Computed ──────────────────────────────────────────────────────────────
 
@@ -198,6 +210,7 @@ final class BudgetTable extends Component
         $this->validate([
             'exportFormat' => ['required', 'in:csv,xlsx'],
             'exportSource' => ['required', 'in:zero,courant,budget'],
+            'exportSourceExercice' => ['required', 'integer'],
         ]);
 
         $exerciceService = app(ExerciceService::class);
@@ -209,6 +222,7 @@ final class BudgetTable extends Component
             'format' => $this->exportFormat,
             'exercice' => $exerciceCible,
             'source' => $this->exportSource,
+            'source_exercice' => $this->exportSourceExercice,
         ]);
 
         $this->js("window.location.href = '{$url}'");
@@ -221,10 +235,13 @@ final class BudgetTable extends Component
     {
         $this->showImportPanel = ! $this->showImportPanel;
 
-        if (! $this->showImportPanel) {
+        if ($this->showImportPanel) {
+            $this->compteRenduImport = app(BudgetImportService::class)->compteRendu(app(ExerciceService::class)->current());
+        } else {
             $this->importErrors = null;
             $this->importSuccess = null;
             $this->budgetFile = null;
+            $this->compteRenduImport = null;
             $this->resetValidation();
         }
     }
@@ -295,6 +312,7 @@ final class BudgetTable extends Component
             'exerciceModele' => app(ExerciceService::class)->exerciceAffiche(),
             'exportExerciceCourant' => $exercice,
             'exportExerciceSuivant' => $exercice + 1,
+            'anneesDisponibles' => app(ExerciceService::class)->availableYears(),
         ]);
     }
 

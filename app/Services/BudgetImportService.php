@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\BudgetLine;
 use App\Models\Compte;
+use App\Services\Budget\BudgetGelService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -17,6 +18,13 @@ final class BudgetImportService
 
     public function import(UploadedFile $file, int $exercice): BudgetImportResult
     {
+        if (app(BudgetGelService::class)->estValide($exercice)) {
+            return new BudgetImportResult(false, errors: [[
+                'line' => 0,
+                'message' => 'Le budget de cet exercice est validé. Le déverrouiller avant d\'importer.',
+            ]]);
+        }
+
         $rows = $this->parseFile($file);
 
         if ($rows === null) {
@@ -104,7 +112,10 @@ final class BudgetImportService
         $inserted = 0;
 
         DB::transaction(function () use ($dataRows, $exercice, $compteByName, &$inserted) {
-            BudgetLine::where('exercice', $exercice)->delete();
+            // Seules les enveloppes sont remplacées. La ventilation par opération
+            // est construite en cours d'année, dans l'application : un budget
+            // rectificatif chargé en février la détruirait sans un mot.
+            BudgetLine::where('exercice', $exercice)->whereNull('operation_id')->delete();
 
             foreach ($dataRows as $row) {
                 $compteNom = trim((string) ($row[2] ?? ''));
@@ -132,6 +143,27 @@ final class BudgetImportService
         });
 
         return new BudgetImportResult(true, linesImported: $inserted);
+    }
+
+    /**
+     * Ce qu'un import remplacerait et ce qu'il conserverait.
+     *
+     * La règle « les enveloppes sont remplacées, la ventilation est conservée »
+     * serait sinon implicite : l'utilisateur n'en découvrirait l'effet qu'après
+     * coup.
+     *
+     * @return array{enveloppes: int, ventilations: int, montant_ventile: float, operations: int}
+     */
+    public function compteRendu(int $exercice): array
+    {
+        $ventilations = BudgetLine::forExercice($exercice)->ventilations()->get();
+
+        return [
+            'enveloppes' => BudgetLine::forExercice($exercice)->enveloppes()->count(),
+            'ventilations' => $ventilations->count(),
+            'montant_ventile' => round((float) $ventilations->sum('montant_prevu'), 2),
+            'operations' => $ventilations->pluck('operation_id')->unique()->count(),
+        ];
     }
 
     /**

@@ -255,3 +255,59 @@ it('cache le bandeau operations sans budget affecte quand l exercice est cloture
         ->assertDontSee('sans budget affecté')
         ->assertDontSee($operation->nom);
 });
+
+// Task 8 : amorçage du budget N depuis le réalisé N-1 + import qui préserve
+// la ventilation.
+it('propose par defaut l exercice precedent comme reference d export', function () {
+    $exercice = app(ExerciceService::class)->current();
+
+    Livewire::test(BudgetTable::class)
+        ->assertSet('exportSourceExercice', (string) ($exercice - 1));
+});
+
+it('affiche le selecteur d exercice de reference dans la modale export', function () {
+    Livewire::test(BudgetTable::class)
+        ->call('openExportModal')
+        ->assertSee('Exercice de référence');
+});
+
+it('exporte sans erreur de validation avec un exercice de reference choisi', function () {
+    $exercice = app(ExerciceService::class)->current();
+
+    Livewire::test(BudgetTable::class)
+        ->set('exportSourceExercice', (string) ($exercice - 2))
+        ->call('openExportModal')
+        ->call('export')
+        ->assertHasNoErrors()
+        ->assertSet('showExportModal', false);
+});
+
+it('affiche le compte rendu d import avec enveloppes et ventilations conservees', function () {
+    $exercice = app(ExerciceService::class)->current();
+    $op = Operation::factory()->create(['association_id' => $this->association->id, 'nom' => 'Stage été']);
+
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id, 'compte_id' => $this->depenseCompte->id,
+        'exercice' => $exercice, 'operation_id' => null, 'montant_prevu' => 1000.00,
+    ]);
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id, 'compte_id' => $this->depenseCompte->id,
+        'exercice' => $exercice, 'operation_id' => $op->id, 'montant_prevu' => 400.00,
+    ]);
+
+    Livewire::test(BudgetTable::class)
+        ->call('toggleImportPanel')
+        ->assertSet('compteRenduImport.enveloppes', 1)
+        ->assertSet('compteRenduImport.ventilations', 1)
+        ->assertSet('compteRenduImport.montant_ventile', 400.0)
+        ->assertSee('enveloppe(s) seront remplacée(s)', false)
+        ->assertSee('seront conservées', false);
+});
+
+it('efface le compte rendu d import a la fermeture du panneau', function () {
+    Livewire::test(BudgetTable::class)
+        ->call('toggleImportPanel')
+        ->assertNotSet('compteRenduImport', null)
+        ->call('toggleImportPanel')
+        ->assertSet('compteRenduImport', null);
+});

@@ -96,6 +96,17 @@
                             <option value="budget">Budget exercice courant</option>
                         </select>
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Exercice de référence</label>
+                        <select wire:model="exportSourceExercice" class="form-select">
+                            @foreach ($anneesDisponibles as $annee)
+                                <option value="{{ $annee }}">{{ $annee }}-{{ $annee + 1 }}</option>
+                            @endforeach
+                        </select>
+                        <div class="form-text">
+                            Sert au pré-remplissage « réalisé » et à la colonne de référence du fichier.
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button wire:click="closeExportModal" type="button" class="btn btn-secondary">Annuler</button>
@@ -118,8 +129,8 @@
         <div class="card-body">
             <div class="alert alert-warning">
                 <i class="bi bi-exclamation-triangle"></i>
-                L'import supprimera toutes les lignes budgétaires existantes pour l'exercice {{ $exerciceLabel }} avant de charger les nouvelles données.
-                Les montants vides ou nuls ne sont pas chargés. Cette action est irréversible.
+                L'import remplacera les enveloppes existantes pour l'exercice {{ $exerciceLabel }} avant de charger les nouvelles données.
+                La ventilation par opération est conservée. Les montants vides ou nuls ne sont pas chargés. Cette action est irréversible.
             </div>
 
             @if ($importSuccess)
@@ -135,6 +146,20 @@
                         @endforeach
                     </ul>
                 </div>
+            @endif
+
+            @if ($compteRenduImport)
+            <div class="alert alert-info py-2 small mb-2">
+                <div class="fw-semibold">Import du budget {{ $exerciceLabel }}</div>
+                <div>{{ $compteRenduImport['enveloppes'] }} enveloppe(s) seront remplacée(s)</div>
+                @if ($compteRenduImport['ventilations'] > 0)
+                <div>
+                    {{ $compteRenduImport['ventilations'] }} ligne(s) de ventilation
+                    ({{ number_format($compteRenduImport['montant_ventile'], 2, ',', ' ') }} €)
+                    sur {{ $compteRenduImport['operations'] }} opération(s) seront conservées
+                </div>
+                @endif
+            </div>
             @endif
 
             <div class="mb-3">
