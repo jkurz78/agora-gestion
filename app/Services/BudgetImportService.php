@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Models\BudgetLine;
 use App\Models\Compte;
 use App\Services\Budget\BudgetGelService;
+use App\Services\Compta\PlanComptableSelecteur;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -47,13 +48,34 @@ final class BudgetImportService
             return new BudgetImportResult(false, errors: [['line' => 0, 'message' => 'Le fichier ne contient aucune ligne de données.']]);
         }
 
-        // Charger tous les comptes indexés par intitulé (lowercase)
-        // Détecte les homonymes : clé => [Compte, ...]
+        // Charger les comptes éligibles au budget, indexés par intitulé
+        // (lowercase). Détecte les homonymes : clé => [Compte, ...].
+        //
+        // Même liste blanche que BudgetTable::addLine() et
+        // BudgetAffectationModal::enregistrer() : sans elle, un fichier
+        // nommant un compte de classe 5 (bancaire) ou un compte désactivé
+        // créait une enveloppe que l'écran Budget ne liste jamais (classes
+        // 6-7 actives uniquement) — ligne invisible et non supprimable
+        // depuis l'interface.
+        $comptesAutorisesIds = PlanComptableSelecteur::comptesAutorisesPourTypes(['depense', 'recette']);
+
         /** @var array<string, list<Compte>> */
         $compteByName = [];
+        // Comptes réels mais hors périmètre budgétaire (autre classe, ou
+        // désactivés) : sert uniquement à distinguer, dans le message
+        // d'erreur, "compte introuvable" (rien ne porte ce nom) de "compte
+        // hors périmètre" (le nom existe, mais ce compte-là ne peut pas
+        // porter de budget) — un seul exemple par nom suffit à ce diagnostic.
+        /** @var array<string, Compte> */
+        $compteHorsPerimetreByName = [];
         foreach (Compte::all() as $compte) {
             $key = Str::lower(trim($compte->intitule));
-            $compteByName[$key][] = $compte;
+
+            if (in_array($compte->id, $comptesAutorisesIds, true)) {
+                $compteByName[$key][] = $compte;
+            } elseif (! isset($compteHorsPerimetreByName[$key])) {
+                $compteHorsPerimetreByName[$key] = $compte;
+            }
         }
 
         $errors = [];
@@ -92,7 +114,11 @@ final class BudgetImportService
             if ($compteNom === '') {
                 $errors[] = ['line' => $lineNum, 'message' => "Ligne {$lineNum} : compte vide (champ obligatoire)."];
             } elseif (! isset($compteByName[Str::lower($compteNom)])) {
-                $errors[] = ['line' => $lineNum, 'message' => "Ligne {$lineNum} : compte '{$compteNom}' introuvable."];
+                if (isset($compteHorsPerimetreByName[Str::lower($compteNom)])) {
+                    $errors[] = ['line' => $lineNum, 'message' => "Ligne {$lineNum} : le compte '{$compteNom}' existe, mais seuls les comptes de charges et de produits actifs peuvent porter un budget."];
+                } else {
+                    $errors[] = ['line' => $lineNum, 'message' => "Ligne {$lineNum} : compte '{$compteNom}' introuvable."];
+                }
             } elseif (count($compteByName[Str::lower($compteNom)]) > 1) {
                 $errors[] = ['line' => $lineNum, 'message' => "Ligne {$lineNum} : nom '{$compteNom}' ambigu (plusieurs comptes portent ce nom)."];
             }

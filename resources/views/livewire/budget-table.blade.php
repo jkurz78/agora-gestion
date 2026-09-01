@@ -17,7 +17,7 @@
             @endif
             — les enveloppes sont verrouillées, la ventilation par opération reste modifiable.
         </div>
-        @if ($this->isAdmin)
+        @if ($this->isAdmin && ! $exerciceCloture)
         <button wire:click="$set('showDeverrouillageModal', true)" class="btn btn-sm btn-outline-primary">
             Déverrouiller
         </button>

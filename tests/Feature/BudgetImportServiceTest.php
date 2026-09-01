@@ -314,6 +314,58 @@ it('n insere rien quand deux lignes visent le meme compte, meme si un montant es
     expect($result->success)->toBeFalse();
 });
 
+// Faille 2 (revue de sécurité) : le chargement de $compteByName itérait sur
+// Compte::all() sans aucun filtre — un fichier nommant un compte de classe 5
+// (bancaire) ou un compte désactivé créait une enveloppe que l'écran Budget
+// ne liste jamais (PlanComptableSelecteur ne propose que les classes 6/7
+// actives) : ligne invisible et non supprimable depuis l'interface. Même
+// liste blanche que BudgetTable::addLine() et
+// BudgetAffectationModal::enregistrer() —
+// PlanComptableSelecteur::comptesAutorisesPourTypes().
+
+it('rejette un compte de classe 5 hors perimetre budgetaire, sans creer de ligne', function () {
+    Compte::factory()->numero('512')->create(['intitule' => 'Banque']);
+
+    $csv = "exercice;famille;compte;montant_prevu\n"
+         ."2025-2026;Trésorerie;Banque;100.00\n";
+
+    $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
+
+    expect($result->success)->toBeFalse()
+        ->and($result->errors[0]['message'])->toContain('Banque')
+        ->and($result->errors[0]['message'])->not->toContain('introuvable');
+
+    expect(BudgetLine::where('exercice', 2025)->count())->toBe(0);
+});
+
+it('rejette un compte de classe 6 desactive, sans creer de ligne', function () {
+    Compte::factory()->numero('618')->create(['intitule' => 'Frais divers désactivés', 'actif' => false]);
+
+    $csv = "exercice;famille;compte;montant_prevu\n"
+         ."2025-2026;Charges;Frais divers désactivés;100.00\n";
+
+    $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
+
+    expect($result->success)->toBeFalse()
+        ->and($result->errors[0]['message'])->toContain('Frais divers désactivés')
+        ->and($result->errors[0]['message'])->not->toContain('introuvable');
+
+    expect(BudgetLine::where('exercice', 2025)->count())->toBe(0);
+});
+
+it('distingue un compte hors perimetre d un compte reellement introuvable', function () {
+    Compte::factory()->numero('512')->create(['intitule' => 'Banque']);
+
+    $csv = "exercice;famille;compte;montant_prevu\n"
+         ."2025-2026;Charges;Compte fantôme;100.00\n";
+
+    $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
+
+    expect($result->success)->toBeFalse()
+        ->and($result->errors[0]['message'])->toContain('introuvable')
+        ->and($result->errors[0]['message'])->toContain('Compte fantôme');
+});
+
 it('annonce ce qui sera remplace et ce qui sera conserve', function () {
     $exercice = app(ExerciceService::class)->current();
     $compte = Compte::factory()->numero('606')->create(['intitule' => 'Achats']);

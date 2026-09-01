@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\StatutExercice;
 use App\Enums\TypeActionExercice;
+use App\Exceptions\ExerciceCloturedException;
 use App\Livewire\BudgetTable;
 use App\Models\Association;
 use App\Models\BudgetLine;
@@ -153,4 +154,82 @@ it('un deverrouillage sur un budget deja deverrouille ne cree aucune ecriture d 
     expect(ExerciceAction::where('exercice_id', $this->exercice->id)
         ->where('action', TypeActionExercice::BudgetDeverrouille)
         ->count())->toBe(1);
+});
+
+// Faille 1 (revue de sécurité) : BudgetGelService::valider() et
+// deverrouiller() n'avaient AUCUNE garde de clôture — un appel direct (ou une
+// mutation Livewire forgée) pouvait geler/dégeler le budget d'un exercice
+// clôturé et écrire une ligne dans exercice_actions. Même motif de défense en
+// profondeur que ExerciceService::cloturer() : la garde de l'assistant est
+// consultative, ce service reste appelable directement.
+
+it('refuse de valider le budget d un exercice cloture', function () {
+    $exerciceCloture = Exercice::create([
+        'annee' => $this->exerciceAnnee + 1,
+        'statut' => StatutExercice::Cloture,
+    ]);
+
+    expect(fn () => app(BudgetGelService::class)->valider($exerciceCloture, $this->admin))
+        ->toThrow(ExerciceCloturedException::class);
+
+    expect($exerciceCloture->fresh()->budgetEstValide())->toBeFalse();
+    $this->assertDatabaseMissing('exercice_actions', [
+        'exercice_id' => $exerciceCloture->id,
+        'action' => TypeActionExercice::BudgetValide->value,
+    ]);
+});
+
+it('refuse de deverrouiller le budget d un exercice cloture', function () {
+    // Le budget a été validé PENDANT que l'exercice était ouvert, puis
+    // l'exercice a été clôturé (le budget validé reste figé après clôture,
+    // c'est le comportement attendu) : on simule cet état directement plutôt
+    // que d'exercer cloturer() lui-même, hors périmètre de ce test.
+    $exercice = Exercice::create([
+        'annee' => $this->exerciceAnnee + 2,
+        'statut' => StatutExercice::Ouvert,
+    ]);
+    app(BudgetGelService::class)->valider($exercice, $this->admin);
+    $exercice->update(['statut' => StatutExercice::Cloture]);
+
+    expect(fn () => app(BudgetGelService::class)->deverrouiller($exercice->fresh(), $this->admin, 'Tentative sur exercice clos'))
+        ->toThrow(ExerciceCloturedException::class);
+
+    expect($exercice->fresh()->budgetEstValide())->toBeTrue();
+    $this->assertDatabaseMissing('exercice_actions', [
+        'exercice_id' => $exercice->id,
+        'action' => TypeActionExercice::BudgetDeverrouille->value,
+    ]);
+});
+
+it('la mutation Livewire validerBudget sort silencieusement sur un exercice cloture', function () {
+    // Réutilise l'exercice courant du beforeEach (même annee que
+    // ExerciceService::current(), résolu par exerciceAffiche()) : un second
+    // Exercice sur la même année violerait unique(association_id, annee).
+    $this->exercice->update(['statut' => StatutExercice::Cloture]);
+
+    // Pas de findOrFail explosif : la garde du composant doit court-circuiter
+    // AVANT d'atteindre le service, dont l'exception n'est rattrapée nulle
+    // part et produirait une 500.
+    Livewire::test(BudgetTable::class)->call('validerBudget');
+
+    expect($this->exercice->fresh()->budgetEstValide())->toBeFalse();
+    $this->assertDatabaseMissing('exercice_actions', [
+        'exercice_id' => $this->exercice->id,
+        'action' => TypeActionExercice::BudgetValide->value,
+    ]);
+});
+
+it('la mutation Livewire deverrouillerBudget sort silencieusement sur un exercice cloture', function () {
+    app(BudgetGelService::class)->valider($this->exercice, $this->admin);
+    $this->exercice->update(['statut' => StatutExercice::Cloture]);
+
+    Livewire::test(BudgetTable::class)
+        ->set('commentaireDeverrouillage', 'Tentative sur exercice clos')
+        ->call('deverrouillerBudget');
+
+    expect($this->exercice->fresh()->budgetEstValide())->toBeTrue();
+    $this->assertDatabaseMissing('exercice_actions', [
+        'exercice_id' => $this->exercice->id,
+        'action' => TypeActionExercice::BudgetDeverrouille->value,
+    ]);
 });

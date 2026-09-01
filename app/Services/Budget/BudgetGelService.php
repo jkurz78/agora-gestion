@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Budget;
 
 use App\Enums\TypeActionExercice;
+use App\Exceptions\ExerciceCloturedException;
 use App\Models\BudgetLine;
 use App\Models\Exercice;
 use App\Models\ExerciceAction;
@@ -38,6 +39,15 @@ final class BudgetGelService
                 ->lockForUpdate()
                 ->firstOrFail();
 
+            // Défense en profondeur : les gardes de l'assistant (BudgetTable)
+            // sont consultatives, ce service peut être appelé directement.
+            // Refuser ici rend la garde réelle — même motif que
+            // ExerciceService::cloturer(). Contrôlée sur l'état verrouillé,
+            // pas sur $exercice (potentiellement périmé).
+            if ($exerciceVerrouille->isCloture()) {
+                throw new ExerciceCloturedException((int) $exerciceVerrouille->annee);
+            }
+
             if ($exerciceVerrouille->budgetEstValide()) {
                 return;
             }
@@ -68,6 +78,11 @@ final class BudgetGelService
                 ->whereKey((int) $exercice->id)
                 ->lockForUpdate()
                 ->firstOrFail();
+
+            // Voir le commentaire équivalent dans valider().
+            if ($exerciceVerrouille->isCloture()) {
+                throw new ExerciceCloturedException((int) $exerciceVerrouille->annee);
+            }
 
             if (! $exerciceVerrouille->budgetEstValide()) {
                 return;

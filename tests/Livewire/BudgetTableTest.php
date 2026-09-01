@@ -262,6 +262,31 @@ it('affiche le bandeau de budget valide avec le nom du validateur', function () 
         ->assertSee('Déverrouiller');
 });
 
+// Faille 1 (revue de sécurité) : le bouton "Déverrouiller" n'était pas gardé
+// par ! $exerciceCloture, contrairement au bouton "Valider le budget" juste
+// en dessous — il restait donc offert à un admin sur un exercice clôturé.
+// Le texte "Budget validé le …" doit en revanche rester visible : c'est une
+// information légitime sur un exercice clos, seule l'action doit disparaître.
+
+it('masque le bouton deverrouiller mais garde le texte budget valide sur un exercice cloture', function () {
+    // Le budget a été validé PENDANT que l'exercice était ouvert, puis
+    // l'exercice a été clôturé — le budget validé reste figé après clôture.
+    // On simule cet état directement (update du statut) plutôt que d'exercer
+    // ExerciceService::cloturer(), hors périmètre de ce test.
+    $exercice = Exercice::create([
+        'annee' => app(ExerciceService::class)->current(),
+        'statut' => StatutExercice::Ouvert,
+    ]);
+    app(BudgetGelService::class)->valider($exercice, $this->user);
+    $exercice->update(['statut' => StatutExercice::Cloture]);
+
+    Livewire::test(BudgetTable::class)
+        ->assertOk()
+        ->assertSee('Budget validé le')
+        ->assertSee($this->user->name)
+        ->assertDontSee('Déverrouiller');
+});
+
 // Correctif 2 (revue BudgetAffectationModal) : contrairement au bouton
 // générique juste au-dessus, ce bandeau n'était gardé ni par $exerciceCloture
 // ni par canEdit. Sur un exercice clôturé, ses badges ouvraient la modale

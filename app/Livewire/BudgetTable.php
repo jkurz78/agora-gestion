@@ -195,7 +195,10 @@ final class BudgetTable extends Component
 
     public function validerBudget(): void
     {
-        if (! $this->isAdmin) {
+        // $exerciceCloture évite d'atteindre BudgetGelService::valider() dont
+        // la garde de clôture lève ExerciceCloturedException, non rattrapée
+        // ici — elle produirait une 500 au lieu d'un no-op silencieux.
+        if (! $this->isAdmin || $this->exerciceCloture) {
             return;
         }
 
@@ -210,7 +213,8 @@ final class BudgetTable extends Component
 
     public function deverrouillerBudget(): void
     {
-        if (! $this->isAdmin) {
+        // Voir le commentaire équivalent dans validerBudget().
+        if (! $this->isAdmin || $this->exerciceCloture) {
             return;
         }
 
