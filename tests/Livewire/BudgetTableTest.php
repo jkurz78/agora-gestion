@@ -785,10 +785,13 @@ it('le total du bloc produits est calcule realise moins prevu, pas l inverse', f
         ->and($html)->not->toMatch('/-100,00/');
 });
 
-it('les ecarts du bloc charges restent calcules en prevu moins realise apres le correctif produits', function () {
-    // Verrou de non-régression : le bloc Charges était déjà correct, il ne
-    // doit pas bouger. Un compte sous le budget (favorable, vert) et un
-    // compte au-dessus (défavorable, rouge).
+it('les ecarts du bloc charges sont un delta brut realise moins prevu, rouge seulement au depassement', function () {
+    // Convention unifiée avec le compte de résultat (2026-09-01) : l'écart
+    // affiché est TOUJOURS réalisé - prévu, y compris pour une charge — ce
+    // test figeait auparavant l'ancienne convention « prévu - réalisé »,
+    // opposée à celle du compte de résultat sur les charges. Un compte sous
+    // le budget affiche donc désormais un écart NÉGATIF (et reste favorable,
+    // pas rouge), un compte en dépassement un écart POSITIF (et rouge).
     $exercice = app(ExerciceService::class)->current();
     $compteSousBudget = Compte::factory()->numero('611')->create(['association_id' => $this->association->id]);
     $compteDepassement = Compte::factory()->numero('612')->create(['association_id' => $this->association->id]);
@@ -820,12 +823,14 @@ it('les ecarts du bloc charges restent calcules en prevu moins realise apres le 
 
     $html = Livewire::test(BudgetTable::class)->assertOk()->html();
 
-    // Sous le budget (dépensé 800 pour 1000 prévu) : +200, favorable.
-    expect($html)->toMatch('/(?<!\d)200,00 &euro;/')
-        // Au-dessus du budget (dépensé 1200 pour 1000 prévu) : -200, en rouge —
-        // fenêtre large car Livewire insère des commentaires <!--[if BLOCK]>-->
-        // entre la balise et le contenu du @if.
-        ->and($html)->toMatch('/text-end text-danger">[\s\S]{0,120}?-200,00/');
+    // Sous le budget (dépensé 800 pour 1000 prévu) : écart -200, favorable —
+    // donc PAS dans une cellule text-danger.
+    expect($html)->toMatch('/(?<!\d)-200,00 &euro;/')
+        ->and($html)->not->toMatch('/text-end text-danger">[\s\S]{0,120}?-200,00/')
+        // Au-dessus du budget (dépensé 1200 pour 1000 prévu) : écart +200, en
+        // rouge — fenêtre large car Livewire insère des commentaires
+        // <!--[if BLOCK]>--> entre la balise et le contenu du @if.
+        ->and($html)->toMatch('/text-end text-danger">[\s\S]{0,120}?\+200,00/');
 });
 
 it('le resultat suit la regle produit : favorable quand le realise depasse le prevu', function () {

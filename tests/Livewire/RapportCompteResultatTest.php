@@ -118,9 +118,82 @@ it('barre budget recette au-dessus de l\'objectif → verte (et non rouge)', fun
     $d->lignes()->forceDelete();
     crTestLigne($d, $compteD, 5000.00);
 
+    // 120 % > 100 % : la barre est désormais hachurée (voir « la barre budget
+    // est hachurée quand le réalisé dépasse le budget » ci-dessous), donc le
+    // vert n'apparaît plus comme un simple "background:#2E7D32" mais comme la
+    // couleur du motif repeating-linear-gradient — toujours vert, jamais rouge.
     Livewire::test(RapportCompteResultat::class)
         ->assertSee('120 %')
-        ->assertSeeHtml('background:#2E7D32');
+        ->assertSeeHtml('repeating-linear-gradient(45deg,#2E7D32');
+});
+
+it('la barre budget est hachuree quand le realise depasse le budget', function () {
+    // Au-delà de 100 %, min($pct, 100) plafonne le remplissage : sans marqueur,
+    // une charge à 130 % et une charge à 100 % pile produisent la même barre
+    // pleine. Les hachures signalent le dépassement, indépendamment de la
+    // couleur (qui, elle, porte le jugement).
+    $compte = Compte::factory()->numero('636')->create(['association_id' => $this->association->id, 'intitule' => 'Salle']);
+    BudgetLine::factory()->create(['association_id' => $this->association->id, 'compte_id' => $compte->id, 'exercice' => 2025, 'montant_prevu' => 1000.00]);
+    $d = Transaction::factory()->asDepense()->create(['association_id' => $this->association->id, 'date' => '2025-11-01', 'saisi_par' => $this->user->id]);
+    $d->lignes()->forceDelete();
+    crTestLigne($d, $compte, 1300.00);
+
+    $html = Livewire::test(RapportCompteResultat::class)->html();
+
+    expect($html)->toContain('repeating-linear-gradient');
+});
+
+it('la barre budget reste un aplat quand le realise ne depasse pas le budget', function () {
+    $compte = Compte::factory()->numero('636')->create(['association_id' => $this->association->id, 'intitule' => 'Salle']);
+    BudgetLine::factory()->create(['association_id' => $this->association->id, 'compte_id' => $compte->id, 'exercice' => 2025, 'montant_prevu' => 1000.00]);
+    $d = Transaction::factory()->asDepense()->create(['association_id' => $this->association->id, 'date' => '2025-11-01', 'saisi_par' => $this->user->id]);
+    $d->lignes()->forceDelete();
+    crTestLigne($d, $compte, 800.00);
+
+    $html = Livewire::test(RapportCompteResultat::class)->html();
+
+    expect($html)->not->toContain('repeating-linear-gradient');
+});
+
+it('le total budget de la ligne TOTAL est exactement la somme des budgets des lignes visibles', function () {
+    // Verrou demandé par le propriétaire : la ligne TOTAL DEPENSES/RECETTES
+    // affichait deux tirets codés en dur pour Budget et Écart. Ce test
+    // garantit que le total désormais affiché ne peut PAS diverger de ce
+    // qu'on peut vérifier en additionnant à la main la colonne Budget des
+    // lignes de détail — deux comptes de la même section, budgets 400 et 600.
+    $compteA = Compte::factory()->numero('606')->create(['association_id' => $this->association->id, 'intitule' => 'Fournitures']);
+    $compteB = Compte::factory()->numero('607')->create(['association_id' => $this->association->id, 'intitule' => 'Marchandises']);
+
+    BudgetLine::factory()->create(['association_id' => $this->association->id, 'compte_id' => $compteA->id, 'exercice' => 2025, 'montant_prevu' => 400.00]);
+    BudgetLine::factory()->create(['association_id' => $this->association->id, 'compte_id' => $compteB->id, 'exercice' => 2025, 'montant_prevu' => 600.00]);
+
+    $dA = Transaction::factory()->asDepense()->create(['association_id' => $this->association->id, 'date' => '2025-11-01', 'saisi_par' => $this->user->id]);
+    $dA->lignes()->forceDelete();
+    crTestLigne($dA, $compteA, 100.00);
+
+    $dB = Transaction::factory()->asDepense()->create(['association_id' => $this->association->id, 'date' => '2025-11-01', 'saisi_par' => $this->user->id]);
+    $dB->lignes()->forceDelete();
+    crTestLigne($dB, $compteB, 100.00);
+
+    $component = Livewire::test(RapportCompteResultat::class)->assertOk();
+
+    expect($component->viewData('totalChargesBudget'))->toBe(1000.0);
+});
+
+it('le total budget est un tiret (pas 0 euro) quand aucune ligne de la section n a de budget', function () {
+    // Sans ça, Collection::sum() sur une collection sans aucun budget rend 0,
+    // ce qui afficherait un total budget à « 0,00 € » et un écart délirant
+    // (tout le réalisé) — alors qu'aucune ligne budgétaire n'existe pour la
+    // section : le tiret d'une ligne sans budget individuelle doit se
+    // propager au total, pas se transformer en zéro.
+    $compte = Compte::factory()->numero('606')->create(['association_id' => $this->association->id, 'intitule' => 'Fournitures']);
+    $d = Transaction::factory()->asDepense()->create(['association_id' => $this->association->id, 'date' => '2025-11-01', 'saisi_par' => $this->user->id]);
+    $d->lignes()->forceDelete();
+    crTestLigne($d, $compte, 100.00);
+
+    $component = Livewire::test(RapportCompteResultat::class)->assertOk();
+
+    expect($component->viewData('totalChargesBudget'))->toBeNull();
 });
 
 it("n'a pas de filtre opération", function () {

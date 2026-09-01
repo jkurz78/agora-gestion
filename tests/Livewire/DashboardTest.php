@@ -398,7 +398,13 @@ it('tile decomposes recettes and depenses, and resultat is their difference', fu
 
 it('tile line ecarts add up to the resultat ecart, using the exercice 2025 figures', function () {
     // Point 2, propriété d'additivité — chiffres de l'énoncé, contrôlables à
-    // la main : écart recettes + écart dépenses = écart résultat.
+    // la main. Convention unifiée avec le compte de résultat (2026-09-01) :
+    // écart = réalisé - prévu, IDENTIQUE pour une charge et un produit. Ça
+    // inverse le signe de l'écart dépenses par rapport à l'ancienne
+    // convention (prévu - réalisé côté charge) — et donc l'identité passe
+    // d'une ADDITION à une SOUSTRACTION : le résultat est produits MOINS
+    // charges, son écart suit la même logique.
+    // écart recettes = écart résultat + écart dépenses  ⇔  écart résultat = écart recettes − écart dépenses.
     $compteProduit = Compte::factory()->recette()->create(['association_id' => $this->association->id]);
     $compteCharge = Compte::factory()->depense()->create(['association_id' => $this->association->id]);
 
@@ -448,23 +454,26 @@ it('tile line ecarts add up to the resultat ecart, using the exercice 2025 figur
     $ecartRecettes = ComparaisonBudgetaire::ecart(
         $component->viewData('recettesPrevu'),
         $component->viewData('recettesRealise'),
-        false
     );
     $ecartDepenses = ComparaisonBudgetaire::ecart(
         $component->viewData('depensesPrevu'),
         $component->viewData('depensesRealise'),
-        true
     );
     $ecartResultat = ComparaisonBudgetaire::ecart(
         $component->viewData('resultatPrevu'),
         $component->viewData('resultatRealise'),
-        false
     );
 
     expect(round($ecartRecettes, 2))->toBe(-425.99);
-    expect(round($ecartDepenses, 2))->toBe(-12747.40);
+    // Ancienne convention : -12747.40 (prévu - réalisé sur une charge).
+    // Nouvelle convention : +12747.40 (réalisé - prévu, comme partout ailleurs).
+    expect(round($ecartDepenses, 2))->toBe(12747.40);
     expect(round($ecartResultat, 2))->toBe(-13173.39);
-    expect(round($ecartRecettes + $ecartDepenses, 2))->toBe(round($ecartResultat, 2));
+    // Additivité désormais SOUSTRACTIVE : le résultat est produits - charges,
+    // donc son écart est écart recettes - écart dépenses (jamais + comme
+    // avant, ce qui n'avait de sens que parce que l'écart dépenses portait
+    // déjà le signe inversé).
+    expect(round($ecartRecettes - $ecartDepenses, 2))->toBe(round($ecartResultat, 2));
 });
 
 it('famille table shows a positive ecart when produit realise exceeds prevu', function () {

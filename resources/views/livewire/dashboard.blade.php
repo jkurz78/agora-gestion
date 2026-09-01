@@ -327,15 +327,19 @@
                          on veut voir d'où vient le chiffre. Le réalisé de chaque ligne porte
                          sur TOUS les comptes de la classe (voir App\Livewire\Dashboard),
                          donc Résultat réalisé == « Solde général » ci-dessus — c'est le
-                         contrôle de non-régression du périmètre. Écarts orientés favorable
-                         via ComparaisonBudgetaire::ecart() : dépenser plus ou encaisser
-                         moins que prévu est toujours négatif, quelle que soit la ligne. --}}
+                         contrôle de non-régression du périmètre. Écart brut (réalisé - prévu)
+                         via ComparaisonBudgetaire::ecart() — identique pour les recettes et
+                         les dépenses ; c'est ecartEstFavorable() qui distingue les deux, pas
+                         le nombre lui-même. --}}
                     @php
-                        $ecartRecettes = \App\Support\ComparaisonBudgetaire::ecart($recettesPrevu, $recettesRealise, false);
-                        $ecartDepenses = \App\Support\ComparaisonBudgetaire::ecart($depensesPrevu, $depensesRealise, true);
+                        $ecartRecettes = \App\Support\ComparaisonBudgetaire::ecart($recettesPrevu, $recettesRealise);
+                        $ecartDepenses = \App\Support\ComparaisonBudgetaire::ecart($depensesPrevu, $depensesRealise);
                         // Le résultat se comporte comme un produit : favorable = le
                         // réalisé dépasse le prévu (même règle que budget-table.blade.php).
-                        $ecartResultat = \App\Support\ComparaisonBudgetaire::ecart($resultatPrevu, $resultatRealise, false);
+                        $ecartResultat = \App\Support\ComparaisonBudgetaire::ecart($resultatPrevu, $resultatRealise);
+                        $ecartRecettesFavorable = \App\Support\ComparaisonBudgetaire::ecartEstFavorable($ecartRecettes, false);
+                        $ecartDepensesFavorable = \App\Support\ComparaisonBudgetaire::ecartEstFavorable($ecartDepenses, true);
+                        $ecartResultatFavorable = \App\Support\ComparaisonBudgetaire::ecartEstFavorable($ecartResultat, false);
                     @endphp
                     <div class="table-responsive mb-2">
                         <table class="table table-sm mb-0" style="font-size:.85rem">
@@ -352,19 +356,19 @@
                                     <td>Recettes</td>
                                     <td class="text-end">{{ number_format($recettesPrevu, 2, ',', ' ') }} &euro;</td>
                                     <td class="text-end">{{ number_format($recettesRealise, 2, ',', ' ') }} &euro;</td>
-                                    <td class="text-end {{ $ecartRecettes >= 0 ? 'text-success' : 'text-danger' }}">{{ number_format($ecartRecettes, 2, ',', ' ') }} &euro;</td>
+                                    <td class="text-end {{ $ecartRecettesFavorable ? 'text-success' : 'text-danger' }}">{{ number_format($ecartRecettes, 2, ',', ' ') }} &euro;</td>
                                 </tr>
                                 <tr>
                                     <td>Dépenses</td>
                                     <td class="text-end">{{ number_format($depensesPrevu, 2, ',', ' ') }} &euro;</td>
                                     <td class="text-end">{{ number_format($depensesRealise, 2, ',', ' ') }} &euro;</td>
-                                    <td class="text-end {{ $ecartDepenses >= 0 ? 'text-success' : 'text-danger' }}">{{ number_format($ecartDepenses, 2, ',', ' ') }} &euro;</td>
+                                    <td class="text-end {{ $ecartDepensesFavorable ? 'text-success' : 'text-danger' }}">{{ number_format($ecartDepenses, 2, ',', ' ') }} &euro;</td>
                                 </tr>
                                 <tr class="fw-bold border-top">
                                     <td>Résultat</td>
                                     <td class="text-end">{{ number_format($resultatPrevu, 2, ',', ' ') }} &euro;</td>
                                     <td class="text-end">{{ number_format($resultatRealise, 2, ',', ' ') }} &euro;</td>
-                                    <td class="text-end {{ $ecartResultat >= 0 ? 'text-success' : 'text-danger' }}">{{ number_format($ecartResultat, 2, ',', ' ') }} &euro;</td>
+                                    <td class="text-end {{ $ecartResultatFavorable ? 'text-success' : 'text-danger' }}">{{ number_format($ecartResultat, 2, ',', ' ') }} &euro;</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -383,13 +387,14 @@
                             <tbody>
                                 @foreach($budgetParFamille as $familleNom => $data)
                                     @php
-                                        // Écart orienté favorable, via App\Support\ComparaisonBudgetaire —
-                                        // même helper que l'écran Budget. L'ancienne formule
-                                        // « prévu - réalisé », commune aux deux branches, inversait le
-                                        // signe côté recette : 600 prévu / 670 réalisé affichait -70 au
-                                        // lieu de +70 (la couleur, elle, tombait juste par bricolage).
-                                        $familleEcart = \App\Support\ComparaisonBudgetaire::ecart($data['prevu'], $data['realise'], $data['type'] !== 'recette');
-                                        $ecartColor = $familleEcart >= 0 ? 'text-success' : 'text-danger';
+                                        // Écart brut (réalisé - prévu), via App\Support\ComparaisonBudgetaire —
+                                        // même helper que l'écran Budget. Le nombre est identique pour une
+                                        // charge et un produit ; seule la couleur, via ecartEstFavorable(),
+                                        // porte l'appréciation (charge : favorable si réalisé <= prévu ;
+                                        // produit : favorable si réalisé >= prévu).
+                                        $familleIsCharge = $data['type'] !== 'recette';
+                                        $familleEcart = \App\Support\ComparaisonBudgetaire::ecart($data['prevu'], $data['realise']);
+                                        $ecartColor = \App\Support\ComparaisonBudgetaire::ecartEstFavorable($familleEcart, $familleIsCharge) ? 'text-success' : 'text-danger';
                                     @endphp
                                     <tr>
                                         <td>

@@ -49,7 +49,17 @@
             $pct     = $montantN / $budget * 100;
             $pctCap  = min($pct, 100);
             $color   = \App\Support\ComparaisonBudgetaire::couleurBarre($pct, $isCharge);
-            return '<div class="budget-bar-track"><div class="budget-bar-fill" style="width:' . $pctCap . '%;background:' . $color . ';"></div></div>'
+            // Au-delà de 100 %, la barre plafonnée est pleine — indiscernable
+            // d'un budget tenu pile à 100 %. Des hachures signalent le
+            // débordement SANS porter de jugement (c'est la couleur qui juge) :
+            // une recette à 150 % est donc verte ET hachurée. Hachures plutôt
+            // qu'un liseré : à 10 px de haut un trait de 3 px se distingue mal,
+            // et il faudrait dériver une teinte plus sombre pour chacune des
+            // six couleurs — le motif, lui, fonctionne avec n'importe laquelle.
+            $fill = $pct > 100
+                ? 'width:100%;background:repeating-linear-gradient(45deg,' . $color . ',' . $color . ' 4px,rgba(255,255,255,.45) 4px,rgba(255,255,255,.45) 8px);'
+                : 'width:' . $pctCap . '%;background:' . $color . ';';
+            return '<div class="budget-bar-track"><div class="budget-bar-fill" style="' . $fill . '"></div></div>'
                  . '<div class="budget-label">' . number_format($pct, 0) . ' %</div>';
         };
         $renderEcart = function(?float $montantN, ?float $budget, bool $isCharge): string {
@@ -64,8 +74,8 @@
         $fmt = fn(?float $v): string => $v !== null ? number_format($v, 2, ',', ' ') . ' &euro;' : '&mdash;';
     @endphp
 
-    @foreach ([['data' => $charges, 'label' => 'DEPENSES', 'isCharge' => true, 'total' => $totalChargesN],
-               ['data' => $produits, 'label' => 'RECETTES', 'isCharge' => false, 'total' => $totalProduitsN]] as $section)
+    @foreach ([['data' => $charges, 'label' => 'DEPENSES', 'isCharge' => true, 'total' => $totalChargesN, 'totalN1' => $totalChargesN1, 'totalBudget' => $totalChargesBudget],
+               ['data' => $produits, 'label' => 'RECETTES', 'isCharge' => false, 'total' => $totalProduitsN, 'totalN1' => $totalProduitsN1, 'totalBudget' => $totalProduitsBudget]] as $section)
     <div class="card mb-3 border-0 shadow-sm">
         <div class="card-body p-0">
             <table class="table mb-0" style="font-size:13px;border-collapse:collapse;width:100%;">
@@ -129,15 +139,20 @@
                         @endif
                     @endforeach
 
-                    {{-- Total --}}
+                    {{-- Total : budget et écart sommés sur les MÊMES lignes que le détail
+                         ci-dessus ($section['totalBudget'] vient de la même collection
+                         $charges/$produits que $section['data'], voir le commentaire dans
+                         App\Livewire\RapportCompteResultat::render()) — jamais recalculé
+                         depuis budget_lines, pour que ce total reste toujours vérifiable en
+                         additionnant à la main la colonne Budget affichée au-dessus. --}}
                     <tr class="cr-total">
                         <td colspan="2">TOTAL {{ $section['label'] }}</td>
-                        @if($compareN1)<td class="text-end" style="color:#d0e4f7;">&mdash;</td>@endif
+                        @if($compareN1)<td class="text-end" style="color:#d0e4f7;">{!! $fmt($section['totalN1']) !!}</td>@endif
                         <td class="text-end">{{ number_format($section['total'], 2, ',', ' ') }} &euro;</td>
                         @if($compareBudget)
-                        <td class="text-end">&mdash;</td>
-                        <td class="text-end">&mdash;</td>
-                        <td></td>
+                        <td class="text-end">{!! $fmt($section['totalBudget']) !!}</td>
+                        <td class="text-end">{!! $renderEcart($section['total'], $section['totalBudget'], $section['isCharge']) !!}</td>
+                        <td class="text-center">{!! $renderBar($section['total'], $section['totalBudget'], $section['isCharge']) !!}</td>
                         @endif
                     </tr>
                 </tbody>

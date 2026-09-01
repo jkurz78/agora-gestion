@@ -221,7 +221,8 @@
                                     $line = $budgetLines->get($compte->id);
                                     $prevu = $line ? (float) $line->montant_prevu : 0;
                                     $realise = $realiseData[$compte->id] ?? 0;
-                                    $ecart = \App\Support\ComparaisonBudgetaire::ecart($prevu, $realise, true);
+                                    $ecart = \App\Support\ComparaisonBudgetaire::ecart($prevu, $realise);
+                                    $ecartFavorable = \App\Support\ComparaisonBudgetaire::ecartEstFavorable($ecart, true);
                                     $totalChargesPrevu += $prevu;
                                     $totalChargesRealise += $realise;
 
@@ -273,9 +274,9 @@
                                         @endif
                                     </td>
                                     <td class="text-end">{{ number_format($realise, 2, ',', ' ') }} &euro;</td>
-                                    <td class="text-end {{ $ecart < 0 ? 'text-danger' : '' }}">
+                                    <td class="text-end {{ ! $ecartFavorable ? 'text-danger' : '' }}">
                                         @if ($line)
-                                            {{ number_format($ecart, 2, ',', ' ') }} &euro;
+                                            {{ $ecart > 0 ? '+' : '' }}{{ number_format($ecart, 2, ',', ' ') }} &euro;
                                         @else
                                             -
                                         @endif
@@ -303,7 +304,8 @@
                                     @php
                                         $vRealise = $realiseParOperation[$compte->id][$v->operation_id] ?? 0;
                                         $vPrevu = (float) $v->montant_prevu;
-                                        $vEcart = \App\Support\ComparaisonBudgetaire::ecart($vPrevu, $vRealise, true);
+                                        $vEcart = \App\Support\ComparaisonBudgetaire::ecart($vPrevu, $vRealise);
+                                        $vEcartFavorable = \App\Support\ComparaisonBudgetaire::ecartEstFavorable($vEcart, true);
                                     @endphp
                                     @php
                                         // Cliquable seulement si l'opération est encore proposable à la saisie
@@ -341,8 +343,8 @@
                                         </td>
                                         <td class="text-end small">{{ number_format($vPrevu, 2, ',', ' ') }} &euro;</td>
                                         <td class="text-end small">{{ number_format($vRealise, 2, ',', ' ') }} &euro;</td>
-                                        <td class="text-end small {{ $vEcart < 0 ? 'text-danger' : '' }}">
-                                            {{ number_format($vEcart, 2, ',', ' ') }} &euro;
+                                        <td class="text-end small {{ ! $vEcartFavorable ? 'text-danger' : '' }}">
+                                            {{ $vEcart > 0 ? '+' : '' }}{{ number_format($vEcart, 2, ',', ' ') }} &euro;
                                         </td>
                                         <td>
                                             {{-- La ventilation reste modifiable toute l'année, gel ou non : pas de
@@ -375,11 +377,15 @@
                         @endforeach
                     </tbody>
                     <tfoot>
+                        @php
+                            $totalChargesEcart = \App\Support\ComparaisonBudgetaire::ecart($totalChargesPrevu, $totalChargesRealise);
+                            $totalChargesFavorable = \App\Support\ComparaisonBudgetaire::ecartEstFavorable($totalChargesEcart, true);
+                        @endphp
                         <tr class="table-warning fw-bold">
                             <td>Total Charges</td>
                             <td class="text-end">{{ number_format($totalChargesPrevu, 2, ',', ' ') }} &euro;</td>
                             <td class="text-end">{{ number_format($totalChargesRealise, 2, ',', ' ') }} &euro;</td>
-                            <td class="text-end">{{ number_format(\App\Support\ComparaisonBudgetaire::ecart($totalChargesPrevu, $totalChargesRealise, true), 2, ',', ' ') }} &euro;</td>
+                            <td class="text-end {{ ! $totalChargesFavorable ? 'text-danger' : '' }}">{{ $totalChargesEcart > 0 ? '+' : '' }}{{ number_format($totalChargesEcart, 2, ',', ' ') }} &euro;</td>
                             <td></td>
                         </tr>
                     </tfoot>
@@ -426,7 +432,8 @@
                                     $line = $budgetLines->get($compte->id);
                                     $prevu = $line ? (float) $line->montant_prevu : 0;
                                     $realise = $realiseData[$compte->id] ?? 0;
-                                    $ecart = \App\Support\ComparaisonBudgetaire::ecart($prevu, $realise, false);
+                                    $ecart = \App\Support\ComparaisonBudgetaire::ecart($prevu, $realise);
+                                    $ecartFavorable = \App\Support\ComparaisonBudgetaire::ecartEstFavorable($ecart, false);
                                     $totalProduitsPrevu += $prevu;
                                     $totalProduitsRealise += $realise;
 
@@ -478,9 +485,9 @@
                                         @endif
                                     </td>
                                     <td class="text-end">{{ number_format($realise, 2, ',', ' ') }} &euro;</td>
-                                    <td class="text-end {{ $ecart < 0 ? 'text-danger' : '' }}">
+                                    <td class="text-end {{ ! $ecartFavorable ? 'text-danger' : '' }}">
                                         @if ($line)
-                                            {{ number_format($ecart, 2, ',', ' ') }} &euro;
+                                            {{ $ecart > 0 ? '+' : '' }}{{ number_format($ecart, 2, ',', ' ') }} &euro;
                                         @else
                                             -
                                         @endif
@@ -508,7 +515,8 @@
                                     @php
                                         $vRealise = $realiseParOperation[$compte->id][$v->operation_id] ?? 0;
                                         $vPrevu = (float) $v->montant_prevu;
-                                        $vEcart = \App\Support\ComparaisonBudgetaire::ecart($vPrevu, $vRealise, false);
+                                        $vEcart = \App\Support\ComparaisonBudgetaire::ecart($vPrevu, $vRealise);
+                                        $vEcartFavorable = \App\Support\ComparaisonBudgetaire::ecartEstFavorable($vEcart, false);
                                     @endphp
                                     @php
                                         // Cliquable seulement si l'opération est encore proposable à la saisie
@@ -546,8 +554,8 @@
                                         </td>
                                         <td class="text-end small">{{ number_format($vPrevu, 2, ',', ' ') }} &euro;</td>
                                         <td class="text-end small">{{ number_format($vRealise, 2, ',', ' ') }} &euro;</td>
-                                        <td class="text-end small {{ $vEcart < 0 ? 'text-danger' : '' }}">
-                                            {{ number_format($vEcart, 2, ',', ' ') }} &euro;
+                                        <td class="text-end small {{ ! $vEcartFavorable ? 'text-danger' : '' }}">
+                                            {{ $vEcart > 0 ? '+' : '' }}{{ number_format($vEcart, 2, ',', ' ') }} &euro;
                                         </td>
                                         <td>
                                             {{-- La ventilation reste modifiable toute l'année, gel ou non : pas de
@@ -580,11 +588,15 @@
                         @endforeach
                     </tbody>
                     <tfoot>
+                        @php
+                            $totalProduitsEcart = \App\Support\ComparaisonBudgetaire::ecart($totalProduitsPrevu, $totalProduitsRealise);
+                            $totalProduitsFavorable = \App\Support\ComparaisonBudgetaire::ecartEstFavorable($totalProduitsEcart, false);
+                        @endphp
                         <tr class="table-warning fw-bold">
                             <td>Total Produits</td>
                             <td class="text-end">{{ number_format($totalProduitsPrevu, 2, ',', ' ') }} &euro;</td>
                             <td class="text-end">{{ number_format($totalProduitsRealise, 2, ',', ' ') }} &euro;</td>
-                            <td class="text-end">{{ number_format(\App\Support\ComparaisonBudgetaire::ecart($totalProduitsPrevu, $totalProduitsRealise, false), 2, ',', ' ') }} &euro;</td>
+                            <td class="text-end {{ ! $totalProduitsFavorable ? 'text-danger' : '' }}">{{ $totalProduitsEcart > 0 ? '+' : '' }}{{ number_format($totalProduitsEcart, 2, ',', ' ') }} &euro;</td>
                             <td></td>
                         </tr>
                     </tfoot>
@@ -597,6 +609,11 @@
     @php
         $resultatPrevu = $totalProduitsPrevu - $totalChargesPrevu;
         $resultatRealise = $totalProduitsRealise - $totalChargesRealise;
+        // Le résultat se comporte comme un produit : favorable = le réalisé
+        // dépasse le prévu (même règle que la tuile budget du tableau de
+        // bord, resources/views/livewire/dashboard.blade.php).
+        $resultatEcart = \App\Support\ComparaisonBudgetaire::ecart($resultatPrevu, $resultatRealise);
+        $resultatFavorable = \App\Support\ComparaisonBudgetaire::ecartEstFavorable($resultatEcart, false);
     @endphp
     <div class="card">
         <div class="card-body">
@@ -614,10 +631,7 @@
                             <th>Résultat (Produits - Charges)</th>
                             <th class="text-end">{{ number_format($resultatPrevu, 2, ',', ' ') }} &euro;</th>
                             <th class="text-end">{{ number_format($resultatRealise, 2, ',', ' ') }} &euro;</th>
-                            {{-- Le résultat se comporte comme un produit : favorable = le
-                                 réalisé dépasse le prévu (même règle que la tuile budget
-                                 du tableau de bord, resources/views/livewire/dashboard.blade.php). --}}
-                            <th class="text-end">{{ number_format(\App\Support\ComparaisonBudgetaire::ecart($resultatPrevu, $resultatRealise, false), 2, ',', ' ') }} &euro;</th>
+                            <th class="text-end {{ ! $resultatFavorable ? 'text-danger' : '' }}">{{ $resultatEcart > 0 ? '+' : '' }}{{ number_format($resultatEcart, 2, ',', ' ') }} &euro;</th>
                             <th style="width: 100px;"></th>
                         </tr>
                     </thead>

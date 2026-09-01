@@ -43,6 +43,18 @@ final class RapportCompteResultat extends Component
         $totalProduitsN = collect($data['produits'])->sum('montant_n');
         $totalChargesN1 = collect($data['charges'])->sum('montant_n1');
         $totalProduitsN1 = collect($data['produits'])->sum('montant_n1');
+        // Total budget de la ligne TOTAL DEPENSES/RECETTES : somme des budgets
+        // des familles de $data['charges']/$data['produits'], EXACTEMENT la
+        // même collection que celle parcourue par la vue pour afficher les
+        // lignes de détail — jamais une requête séparée sur budget_lines.
+        // $data['charges']/$data['produits'] ne contient que des comptes
+        // ayant un mouvement N ou N-1 (CompteResultatBuilder::buildHierarchyFull()
+        // part des écritures, pas du budget) : un compte budgété sans aucun
+        // mouvement n'y figure pas, donc pas dans ce total non plus — c'est
+        // la même limite que celle du détail affiché, le total ne peut pas
+        // diverger de la colonne qu'il somme.
+        $totalChargesBudget = self::sommeBudget($data['charges']);
+        $totalProduitsBudget = self::sommeBudget($data['produits']);
         $resultatCourant = $totalProduitsN - $totalChargesN;
         $resultatCourantN1 = $totalProduitsN1 - $totalChargesN1;
 
@@ -55,8 +67,30 @@ final class RapportCompteResultat extends Component
             'compareBudget' => $this->compareBudget,
             'totalChargesN' => $totalChargesN,
             'totalProduitsN' => $totalProduitsN,
+            'totalChargesN1' => $totalChargesN1,
+            'totalProduitsN1' => $totalProduitsN1,
+            'totalChargesBudget' => $totalChargesBudget,
+            'totalProduitsBudget' => $totalProduitsBudget,
             'resultatCourant' => $resultatCourant,
             'resultatCourantN1' => $resultatCourantN1,
         ]);
+    }
+
+    /**
+     * Somme des budgets des familles d'une section, en distinguant « aucun
+     * budget nulle part dans la section » (null, comme pour une ligne sans
+     * budget individuelle → tiret) de « la section budgète, et ça tombe à
+     * 0 € » (0.0, un vrai total). Collection::sum() ne fait pas cette
+     * différence : sur une collection vide ou entièrement à null, elle rend
+     * 0 — ce qui afficherait un total budget à 0 € (et un écart délirant)
+     * pour une section qui n'a en réalité aucune ligne budgétée.
+     *
+     * @param  array<int, array{budget: ?float}>  $categories
+     */
+    private static function sommeBudget(array $categories): ?float
+    {
+        $budgets = collect($categories)->pluck('budget')->filter(fn (?float $b): bool => $b !== null);
+
+        return $budgets->isEmpty() ? null : $budgets->sum();
     }
 }
