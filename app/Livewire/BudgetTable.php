@@ -100,6 +100,15 @@ final class BudgetTable extends Component
             return;
         }
 
+        // $compteId est entièrement piloté par le navigateur : un appel forgé
+        // pourrait sinon créer une enveloppe sur un compte d'une autre
+        // association, inactif, ou hors classe 6-7 — aucun de ces contrôles
+        // n'existait ici. Même liste blanche que celle utilisée par
+        // BudgetAffectationModal::enregistrer().
+        if (! in_array($compteId, PlanComptableSelecteur::comptesAutorisesPourTypes(['depense', 'recette']), true)) {
+            return;
+        }
+
         app(ExerciceService::class)->assertOuvert(app(ExerciceService::class)->current());
 
         BudgetLine::create([
@@ -122,9 +131,21 @@ final class BudgetTable extends Component
             return;
         }
 
-        app(ExerciceService::class)->assertOuvert(app(ExerciceService::class)->current());
+        $exercice = app(ExerciceService::class)->current();
+        app(ExerciceService::class)->assertOuvert($exercice);
 
         $line = BudgetLine::findOrFail($this->editingLineId);
+
+        // Le scope tenant filtre l'association, mais pas l'exercice de la ligne
+        // elle-même : assertOuvert() ci-dessus ne contrôle QUE l'exercice
+        // affiché. Un appel forgé (editingLineId poussé sans passer par
+        // startEdit()) pourrait sinon viser une ligne d'un exercice clôturé —
+        // ligneEstVerrouillee() ne teste que le gel du budget, jamais la
+        // clôture. Sortie silencieuse, cohérente avec les autres gardes de
+        // cette méthode.
+        if ((int) $line->exercice !== (int) $exercice) {
+            return;
+        }
 
         if (app(BudgetGelService::class)->ligneEstVerrouillee($line)) {
             return;
@@ -148,9 +169,16 @@ final class BudgetTable extends Component
             return;
         }
 
-        app(ExerciceService::class)->assertOuvert(app(ExerciceService::class)->current());
+        $exercice = app(ExerciceService::class)->current();
+        app(ExerciceService::class)->assertOuvert($exercice);
 
         $line = BudgetLine::findOrFail($lineId);
+
+        // Voir le commentaire équivalent dans saveEdit() : le scope tenant ne
+        // filtre pas l'exercice de la ligne.
+        if ((int) $line->exercice !== (int) $exercice) {
+            return;
+        }
 
         if (app(BudgetGelService::class)->ligneEstVerrouillee($line)) {
             return;

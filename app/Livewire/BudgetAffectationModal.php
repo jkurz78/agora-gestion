@@ -8,7 +8,9 @@ use App\Enums\Espace;
 use App\Enums\RoleAssociation;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\BudgetLine;
+use App\Models\Compte;
 use App\Models\Operation;
+use App\Services\BudgetService;
 use App\Services\Compta\PlanComptableSelecteur;
 use App\Services\ExerciceService;
 use Illuminate\Support\Facades\Auth;
@@ -26,9 +28,11 @@ use Livewire\Component;
  *
  * Une seule propriété tableau et un seul enregistrement transactionnel : une
  * synchronisation live par cellule ferait une centaine d'allers-retours Livewire.
- * Le dépassement (montant saisi vs restant) est recalculé pendant la frappe en
- * JS vanilla, dans la vue — voir le <script> de budget-affectation-modal.blade.php.
- * Le « restant » lui-même reste une valeur serveur figée au dernier rendu ; le
+ * Le "restant à ventiler" par ligne et les totaux "prévu" par section (dérivés
+ * de la saisie) sont recalculés pendant la frappe en JS vanilla, dans la vue —
+ * voir le <script> de budget-affectation-modal.blade.php. Le "réalisé", lui,
+ * est un fait : il ne bouge jamais côté client, seul le serveur le calcule.
+ * Toutes ces valeurs restent des valeurs serveur figées au dernier rendu ; le
  * serveur recalcule tout à l'enregistrement et reste seul juge.
  */
 final class BudgetAffectationModal extends Component
@@ -128,30 +132,73 @@ final class BudgetAffectationModal extends Component
 
         // Le gel ne verrouille QUE les enveloppes : aucune garde de validation ici.
 
-        DB::transaction(function () use ($exercice, $comptesAutorises): void {
-            foreach ($this->montants as $compteId => $valeur) {
-                if (! in_array((int) $compteId, $comptesAutorises, true)) {
-                    continue;
-                }
+        // Classement en deux passes : la première ne touche pas la base, elle se
+        // contente de trier chaque cellule (suppression / écriture / erreur). Une
+        // saisie négative ou non numérique (faute de frappe : "12OO" au lieu de
+        // "1200", un "-500"...) ne doit JAMAIS emprunter la branche de
+        // suppression — sans quoi une coquille détruirait silencieusement une
+        // ventilation existante. On refuse alors l'ENSEMBLE de l'enregistrement,
+        // y compris les comptes valides de la même saisie : un enregistrement
+        // partiel serait plus difficile à comprendre pour l'utilisateur qu'un
+        // refus net, à corriger et à soumettre à nouveau.
+        $aSupprimer = [];
+        $aEcrire = [];
+        $comptesInvalides = [];
 
-                $compteId = (int) $compteId;
-                $valeur = trim((string) $valeur);
+        foreach ($this->montants as $compteId => $valeur) {
+            if (! in_array((int) $compteId, $comptesAutorises, true)) {
+                continue;
+            }
 
+            $compteId = (int) $compteId;
+            $valeur = trim((string) $valeur);
+
+            // Cellule vide ou à zéro : suppression, c'est la spec — la ligne ne
+            // doit pas subsister à zéro, ce qui polluerait le décompte des
+            // opérations budgétées.
+            if ($valeur === '' || (is_numeric($valeur) && (float) $valeur === 0.0)) {
+                $aSupprimer[] = $compteId;
+
+                continue;
+            }
+
+            if (! is_numeric($valeur) || (float) $valeur < 0) {
+                $comptesInvalides[] = $compteId;
+
+                continue;
+            }
+
+            $aEcrire[$compteId] = (float) $valeur;
+        }
+
+        if ($comptesInvalides !== []) {
+            $noms = Compte::whereIn('id', $comptesInvalides)
+                ->orderBy('numero_pcg')
+                ->get()
+                ->map(fn (Compte $c): string => $c->numero_pcg.' — '.$c->intitule)
+                ->implode(', ');
+
+            $this->addError('montants', "Montant invalide pour : {$noms}. Rien n'a été enregistré.");
+
+            return;
+        }
+
+        DB::transaction(function () use ($exercice, $aSupprimer, $aEcrire): void {
+            if ($aSupprimer !== []) {
+                BudgetLine::forExercice($exercice)
+                    ->where('operation_id', $this->operationId)
+                    ->whereIn('compte_id', $aSupprimer)
+                    ->delete();
+            }
+
+            foreach ($aEcrire as $compteId => $montant) {
                 $existante = BudgetLine::forExercice($exercice)
                     ->where('compte_id', $compteId)
                     ->where('operation_id', $this->operationId)
                     ->first();
 
-                // Cellule vide ou nulle : on supprime plutôt que de laisser une
-                // ligne à zéro, qui polluerait le décompte des opérations budgétées.
-                if ($valeur === '' || ! is_numeric($valeur) || (float) $valeur <= 0) {
-                    $existante?->delete();
-
-                    continue;
-                }
-
                 if ($existante !== null) {
-                    $existante->update(['montant_prevu' => (float) $valeur]);
+                    $existante->update(['montant_prevu' => $montant]);
 
                     continue;
                 }
@@ -160,7 +207,7 @@ final class BudgetAffectationModal extends Component
                     'compte_id' => $compteId,
                     'operation_id' => $this->operationId,
                     'exercice' => $exercice,
-                    'montant_prevu' => (float) $valeur,
+                    'montant_prevu' => $montant,
                 ]);
             }
         });
@@ -179,24 +226,18 @@ final class BudgetAffectationModal extends Component
      */
     private function comptesAutorises(): array
     {
-        $ids = [];
-
-        foreach (['depense', 'recette'] as $type) {
-            foreach (PlanComptableSelecteur::groupesPourType($type) as $groupe) {
-                foreach ($groupe['comptes'] as $compte) {
-                    $ids[] = (int) $compte->id;
-                }
-            }
-        }
-
-        return $ids;
+        return PlanComptableSelecteur::comptesAutorisesPourTypes(['depense', 'recette']);
     }
 
     public function render(): View
     {
+        $lignes = $this->ouverte ? $this->lignes() : [];
+
         return view('livewire.budget-affectation-modal', [
-            'lignes' => $this->ouverte ? $this->lignes() : [],
+            'lignes' => $lignes,
+            'totaux' => $this->totaux($lignes),
             'operations' => $this->ouverte ? Operation::query()->proposableALaSaisie()->orderBy('nom')->get() : collect(),
+            'exerciceLabel' => app(ExerciceService::class)->label(app(ExerciceService::class)->current()),
         ]);
     }
 
@@ -204,8 +245,7 @@ final class BudgetAffectationModal extends Component
      * Une entrée par compte de classe 6 et 7, dans l'ordre de l'écran Budget.
      *
      * @return list<array{compte_id: int, numero: string, intitule: string, type: string,
-     *                    enveloppe: float|null, restant: float|null, montant: float,
-     *                    depassement: float}>
+     *                    enveloppe: float|null, restant: float|null, montant: float, realise: float|null}>
      */
     private function lignes(): array
     {
@@ -216,6 +256,14 @@ final class BudgetAffectationModal extends Component
             ->pluck('montant_prevu', 'compte_id')
             ->map(fn ($v): float => (float) $v)
             ->all();
+
+        // Réalisé PAR OPÉRATION : un fait, jamais recalculé côté client (à la
+        // différence du "restant", dérivé de la saisie en cours). Sans
+        // opération choisie, aucune colonne "réalisé" n'a de sens — chaque
+        // ligne portera null, affiché en tiret par la vue.
+        $realiseParOperation = $this->operationId === null
+            ? []
+            : app(BudgetService::class)->realiseParCompteEtOperation($exercice);
 
         // Σ ventilations des AUTRES opérations. Inclure celle qu'on édite ferait
         // afficher un restant amputé du montant en cours de modification.
@@ -256,15 +304,18 @@ final class BudgetAffectationModal extends Component
                     $enveloppe = $enveloppes[$compteId] ?? null;
                     $montant = (float) ($this->montants[$compteId] ?? 0);
 
+                    // BASE, inchangée : enveloppe − ventilations des AUTRES opérations.
+                    // C'est elle qui empêche le restant de fondre à chaque réouverture
+                    // de la modale — ne pas la mêler au montant en cours de saisie ici.
+                    // L'affichage (base − montant, en rouge si négatif) est calculé
+                    // dans la vue, pas dans ce tableau : voir budget-affectation-modal.blade.php.
                     $restant = $enveloppe === null
                         ? null
                         : round($enveloppe - ($autresVentilations[$compteId] ?? 0.0), 2);
 
-                    // Sans enveloppe, aucun dépassement : sinon toute ventilation
-                    // saisie avant le vote de l'AG s'afficherait en rouge.
-                    $depassement = ($restant === null || $montant <= $restant)
-                        ? 0.0
-                        : round($montant - $restant, 2);
+                    $realise = $this->operationId === null
+                        ? null
+                        : (float) ($realiseParOperation[$compteId][$this->operationId] ?? 0.0);
 
                     $lignes[] = [
                         'compte_id' => $compteId,
@@ -274,12 +325,64 @@ final class BudgetAffectationModal extends Component
                         'enveloppe' => $enveloppe,
                         'restant' => $restant,
                         'montant' => $montant,
-                        'depassement' => $depassement,
+                        'realise' => $realise,
                     ];
                 }
             }
         }
 
         return $lignes;
+    }
+
+    /**
+     * Totaux par section (charges/produits) et résultat prévisionnel
+     * (produits − charges), pour les deux colonnes "prévu" (Σ montant saisi)
+     * et "réalisé" (Σ realise). Calculé côté serveur pour que l'affichage
+     * soit juste au premier rendu et après enregistrement — le JS de la vue
+     * ne fait que recalculer la colonne "prévu" en direct pendant la frappe ;
+     * le "réalisé" est un fait, il ne bouge jamais côté client.
+     *
+     * Les totaux "réalisé" restent à null tant qu'aucune opération n'est
+     * choisie, en écho au "—" affiché par chaque ligne : additionner des
+     * valeurs sans opération donnerait un zéro trompeur, comme s'il y avait
+     * un fait à montrer.
+     *
+     * @param  list<array{compte_id: int, numero: string, intitule: string, type: string,
+     *                    enveloppe: float|null, restant: float|null, montant: float, realise: float|null}>  $lignes
+     * @return array{charges_prevu: float, charges_realise: float|null,
+     *               produits_prevu: float, produits_realise: float|null,
+     *               resultat_prevu: float, resultat_realise: float|null}
+     */
+    private function totaux(array $lignes): array
+    {
+        $chargesPrevu = 0.0;
+        $produitsPrevu = 0.0;
+        $chargesRealise = $this->operationId === null ? null : 0.0;
+        $produitsRealise = $this->operationId === null ? null : 0.0;
+
+        foreach ($lignes as $l) {
+            if ($l['type'] === 'depense') {
+                $chargesPrevu += $l['montant'];
+                if ($chargesRealise !== null) {
+                    $chargesRealise += $l['realise'] ?? 0.0;
+                }
+            } else {
+                $produitsPrevu += $l['montant'];
+                if ($produitsRealise !== null) {
+                    $produitsRealise += $l['realise'] ?? 0.0;
+                }
+            }
+        }
+
+        return [
+            'charges_prevu' => round($chargesPrevu, 2),
+            'charges_realise' => $chargesRealise === null ? null : round($chargesRealise, 2),
+            'produits_prevu' => round($produitsPrevu, 2),
+            'produits_realise' => $produitsRealise === null ? null : round($produitsRealise, 2),
+            'resultat_prevu' => round($produitsPrevu - $chargesPrevu, 2),
+            'resultat_realise' => ($chargesRealise === null || $produitsRealise === null)
+                ? null
+                : round($produitsRealise - $chargesRealise, 2),
+        ];
     }
 }

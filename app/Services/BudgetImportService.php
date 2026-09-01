@@ -59,12 +59,25 @@ final class BudgetImportService
         $errors = [];
         $wrongExercices = [];
 
+        // Lignes visées par compte (nom normalisé => numéros de ligne). Sert à
+        // détecter deux lignes visant le MÊME compte : depuis que l'unicité
+        // (association_id, exercice, compte_id, operation_key) existe en base,
+        // la seconde insertion lèverait une QueryException non rattrapée — une
+        // 500 — au lieu d'un message de validation propre. Seuls les comptes
+        // résolus sans ambiguïté comptent ici : un compte déjà en erreur
+        // (introuvable/ambigu) n'a pas besoin d'un second diagnostic.
+        $lignesParCompte = [];
+
         foreach ($dataRows as $idx => $row) {
             $lineNum = $idx + 2;
             $exerciceCell = trim((string) ($row[0] ?? ''));
             // col 1 = famille — ignorée à l'import (lecture seule)
             $compteNom = trim((string) ($row[2] ?? ''));
             $montantCell = trim((string) ($row[3] ?? ''));
+
+            if ($compteNom !== '' && isset($compteByName[Str::lower($compteNom)]) && count($compteByName[Str::lower($compteNom)]) === 1) {
+                $lignesParCompte[Str::lower($compteNom)][] = $lineNum;
+            }
 
             // Exercice : accepte "2025" ou "2025-2026"
             $exerciceCellYear = str_contains($exerciceCell, '-')
@@ -102,6 +115,18 @@ final class BudgetImportService
             sort($unique);
             $list = implode(', ', $unique);
             $errors = array_merge([['line' => 0, 'message' => "Le fichier contient les exercices {$list}, l'exercice ouvert est {$exercice}."]], $errors);
+        }
+
+        // Erreur comptes en doublon : même motif de rapport groupé.
+        $comptesEnDoublon = array_filter($lignesParCompte, fn (array $lignes): bool => count($lignes) > 1);
+        if (! empty($comptesEnDoublon)) {
+            $noms = array_map(
+                fn (string $cle): string => $compteByName[$cle][0]->intitule,
+                array_keys($comptesEnDoublon)
+            );
+            sort($noms);
+            $list = implode(', ', $noms);
+            $errors = array_merge([['line' => 0, 'message' => "Le fichier contient plusieurs lignes pour le(s) compte(s) : {$list}. Une seule ligne par compte est autorisée."]], $errors);
         }
 
         if (! empty($errors)) {

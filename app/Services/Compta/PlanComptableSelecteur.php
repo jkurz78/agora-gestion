@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Compta;
 
+use App\Livewire\BudgetAffectationModal;
+use App\Livewire\BudgetTable;
 use App\Models\Compte;
 use App\Models\Famille;
 use App\Services\Immobilisation\ImmobilisationComptesSeeder;
@@ -84,5 +86,34 @@ final class PlanComptableSelecteur
             'famille' => $familles->get($code),
             'comptes' => $comptesDuGroupe,
         ]);
+    }
+
+    /**
+     * Liste blanche des compte_id réellement proposés pour les types donnés —
+     * mêmes comptes que ceux énumérés par {@see groupesPourType()}, aplatis en
+     * une simple liste d'identifiants.
+     *
+     * Sert de garde tenant partagée à tout écran qui reçoit un compte_id
+     * depuis le navigateur (un appel Livewire forgé peut viser n'importe quel
+     * id) : {@see BudgetTable::addLine()} et
+     * {@see BudgetAffectationModal::enregistrer()} construisaient
+     * chacun leur propre copie de cette boucle avant sa factorisation ici.
+     *
+     * @param  list<string>  $types  'depense' et/ou 'recette' (voir groupesPourType())
+     * @return list<int>
+     */
+    public static function comptesAutorisesPourTypes(array $types): array
+    {
+        $ids = [];
+
+        foreach ($types as $type) {
+            foreach (self::groupesPourType($type) as $groupe) {
+                foreach ($groupe['comptes'] as $compte) {
+                    $ids[] = (int) $compte->id;
+                }
+            }
+        }
+
+        return $ids;
     }
 }

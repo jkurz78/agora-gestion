@@ -48,7 +48,7 @@ final class BudgetExportController extends Controller
             return $this->downloadXlsx($rows, $filename, $service->enTetes($exerciceSource));
         }
 
-        $csv = $service->toCsv($rows);
+        $csv = $service->toCsv($rows, $exerciceSource);
 
         return response($csv, 200, [
             'Content-Type' => 'text/csv; charset=UTF-8',

@@ -2,12 +2,16 @@
 
 use App\Enums\StatutExercice;
 use App\Enums\StatutOperation;
+use App\Enums\TypeTransaction;
 use App\Livewire\BudgetAffectationModal;
 use App\Models\Association;
 use App\Models\BudgetLine;
 use App\Models\Compte;
 use App\Models\Exercice;
 use App\Models\Operation;
+use App\Models\Transaction;
+use App\Models\TransactionLigne;
+use App\Models\TransactionLigneAffectation;
 use App\Models\User;
 use App\Services\Budget\BudgetGelService;
 use App\Services\ExerciceService;
@@ -79,8 +83,7 @@ it('accepte une ventilation sur un compte sans enveloppe et ne signale aucun dep
     $ligne = collect($lignes)->firstWhere('compte_id', (int) $this->compte->id);
 
     expect($ligne['enveloppe'])->toBeNull()
-        ->and($ligne['restant'])->toBeNull()
-        ->and($ligne['depassement'])->toBe(0.0);
+        ->and($ligne['restant'])->toBeNull();
 });
 
 it('supprime la ventilation quand la cellule est videe, sans toucher a l enveloppe', function () {
@@ -322,32 +325,64 @@ it('accepte une ventilation via la modale meme budget valide, car le gel ne verr
     ]);
 });
 
-it('calcule un depassement quand le montant saisi excede le restant', function () {
+// Correctif audit point 9a : la colonne "Restant à ventiler" affichait la
+// BASE serveur (enveloppe − ventilations des AUTRES opérations), figée
+// pendant la frappe — le dépassement n'était visible que dans un message
+// séparé "dépasse de X €". La spec veut désormais que la colonne elle-même
+// affiche base − montant saisi, en rouge si négatif ; le message séparé
+// devient redondant et disparaît. Le calcul de la BASE reste inchangé côté
+// serveur (lignes() n'est pas touché) : seul l'AFFICHAGE change, dans la vue.
+
+it('affiche en rouge le reste a ventiler net quand la saisie depasse le restant', function () {
     BudgetLine::factory()->create([
         'association_id' => $this->association->id, 'compte_id' => $this->compte->id,
         'exercice' => $this->exercice, 'operation_id' => null, 'montant_prevu' => 1000.00,
     ]);
 
-    $lignes = Livewire::test(BudgetAffectationModal::class)
+    $html = Livewire::test(BudgetAffectationModal::class)
         ->call('ouvrir', $this->opA->id)
         ->set("montants.{$this->compte->id}", '1500')
-        ->viewData('lignes');
+        ->html();
 
-    $ligne = collect($lignes)->firstWhere('compte_id', (int) $this->compte->id);
+    preg_match('/id="budget-affectation-restant-'.$this->compte->id.'"[^>]*>([^<]*)</', $html, $m);
 
-    expect($ligne['depassement'])->toBe(500.0);
+    expect(trim($m[1] ?? ''))->toContain('-500,00')
+        ->and($html)->toContain('text-danger')
+        ->and($html)->not->toContain('dépasse de');
 });
 
-it('ne signale aucun depassement pour un compte sans enveloppe quel que soit le montant', function () {
-    $lignes = Livewire::test(BudgetAffectationModal::class)
+it('affiche toujours un tiret pour le reste a ventiler d un compte sans enveloppe, quel que soit le montant', function () {
+    $html = Livewire::test(BudgetAffectationModal::class)
         ->call('ouvrir', $this->opA->id)
         ->set("montants.{$this->compte->id}", '50000')
-        ->viewData('lignes');
+        ->html();
 
-    $ligne = collect($lignes)->firstWhere('compte_id', (int) $this->compte->id);
+    preg_match('/id="budget-affectation-restant-'.$this->compte->id.'"[^>]*>([^<]*)</', $html, $m);
 
-    expect($ligne['enveloppe'])->toBeNull()
-        ->and($ligne['depassement'])->toBe(0.0);
+    expect(trim($m[1] ?? ''))->toBe('—');
+});
+
+it('le reste a ventiler net reste juste apres enregistrement puis reouverture, sans fondre', function () {
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id, 'compte_id' => $this->compte->id,
+        'exercice' => $this->exercice, 'operation_id' => null, 'montant_prevu' => 1000.00,
+    ]);
+
+    Livewire::test(BudgetAffectationModal::class)
+        ->call('ouvrir', $this->opA->id)
+        ->set("montants.{$this->compte->id}", '500')
+        ->call('enregistrer');
+
+    $html = Livewire::test(BudgetAffectationModal::class)
+        ->call('ouvrir', $this->opA->id)
+        ->html();
+
+    // 1 000 − 0 (aucune AUTRE ventilation) − 500 (montant rechargé pour A) =
+    // 500 : exactement la valeur qu'affichait déjà la frappe initiale — la
+    // réouverture ne doit pas faire fondre le restant.
+    preg_match('/id="budget-affectation-restant-'.$this->compte->id.'"[^>]*>([^<]*)</', $html, $m);
+
+    expect(trim($m[1] ?? ''))->toContain('500,00');
 });
 
 it('isole les montants d une association des enveloppes et ventilations d une autre sur un compte homonyme', function () {
@@ -420,7 +455,7 @@ it('rend les attributs et le script consommes par le recalcul cote client du dep
 
     expect($html)->toContain('data-budget-affectation-montant="'.$this->compte->id.'"')
         ->and($html)->toContain('data-restant="500"')
-        ->and($html)->toContain('id="budget-affectation-depassement-'.$this->compte->id.'"')
+        ->and($html)->toContain('id="budget-affectation-restant-'.$this->compte->id.'"')
         ->and($html)->toContain("document.addEventListener('input'");
 });
 
@@ -437,4 +472,238 @@ it('n interroge pas les operations proposables quand la modale est fermee', func
 
     expect($operations)->toHaveCount(0)
         ->and($queries)->not->toContain('from `operations`');
+});
+
+// Correctif audit point 1 : enregistrer() empruntait la même branche de
+// suppression pour une cellule vide/zéro (la spec) ET pour une saisie
+// négative ou non numérique (une faute de frappe). Une ventilation existante
+// pouvait donc être détruite silencieusement par une coquille de saisie. Le
+// correctif sépare les deux cas : vide/zéro supprime, négatif/non-numérique
+// est une erreur de validation qui n'écrit RIEN — même les comptes valides de
+// la même saisie.
+
+it('refuse un montant negatif et ne supprime pas la ventilation existante', function () {
+    $ventilation = BudgetLine::factory()->create([
+        'association_id' => $this->association->id, 'compte_id' => $this->compte->id,
+        'exercice' => $this->exercice, 'operation_id' => $this->opA->id, 'montant_prevu' => 400.00,
+    ]);
+
+    Livewire::test(BudgetAffectationModal::class)
+        ->call('ouvrir', $this->opA->id)
+        ->set("montants.{$this->compte->id}", '-500')
+        ->call('enregistrer');
+
+    expect((float) $ventilation->fresh()->montant_prevu)->toBe(400.0)
+        ->and(BudgetLine::forExercice($this->exercice)->ventilations()->count())->toBe(1);
+});
+
+it('refuse un montant non numerique et ne supprime pas la ventilation existante', function () {
+    $ventilation = BudgetLine::factory()->create([
+        'association_id' => $this->association->id, 'compte_id' => $this->compte->id,
+        'exercice' => $this->exercice, 'operation_id' => $this->opA->id, 'montant_prevu' => 400.00,
+    ]);
+
+    Livewire::test(BudgetAffectationModal::class)
+        ->call('ouvrir', $this->opA->id)
+        ->set("montants.{$this->compte->id}", '12OO') // faute de frappe : lettres O au lieu de zéros
+        ->call('enregistrer');
+
+    expect((float) $ventilation->fresh()->montant_prevu)->toBe(400.0)
+        ->and(BudgetLine::forExercice($this->exercice)->ventilations()->count())->toBe(1);
+});
+
+it('n ecrit aucun compte valide quand un autre compte de la meme saisie est invalide', function () {
+    $autre = Compte::factory()->numero('611')->create([
+        'association_id' => $this->association->id, 'intitule' => 'Sous-traitance',
+    ]);
+
+    Livewire::test(BudgetAffectationModal::class)
+        ->call('ouvrir', $this->opA->id)
+        ->set("montants.{$this->compte->id}", '2000') // valide
+        ->set("montants.{$autre->id}", '-100') // invalide
+        ->call('enregistrer');
+
+    expect(BudgetLine::forExercice($this->exercice)->ventilations()->count())->toBe(0);
+});
+
+it('affiche un message nommant les comptes fautifs sans lever d exception', function () {
+    Livewire::test(BudgetAffectationModal::class)
+        ->call('ouvrir', $this->opA->id)
+        ->set("montants.{$this->compte->id}", '-500')
+        ->call('enregistrer')
+        ->assertOk()
+        ->assertHasErrors('montants');
+
+    expect(BudgetLine::forExercice($this->exercice)->ventilations()->count())->toBe(0);
+});
+
+it('supprime toujours la ventilation pour une cellule videe ou a zero', function () {
+    $ventilation = BudgetLine::factory()->create([
+        'association_id' => $this->association->id, 'compte_id' => $this->compte->id,
+        'exercice' => $this->exercice, 'operation_id' => $this->opA->id, 'montant_prevu' => 400.00,
+    ]);
+
+    Livewire::test(BudgetAffectationModal::class)
+        ->call('ouvrir', $this->opA->id)
+        ->set("montants.{$this->compte->id}", '0')
+        ->call('enregistrer')
+        ->assertHasNoErrors();
+
+    expect(BudgetLine::find($ventilation->id))->toBeNull();
+});
+
+// Retour de recette : totaux et résultat prévisionnel dans la modale, plus
+// une 5ᵉ colonne "Réalisé" alimentée depuis
+// BudgetService::realiseParCompteEtOperation(). Le réalisé est un FAIT (ne se
+// recalcule jamais côté client), les totaux "prévu" sont dérivés de la
+// saisie (recalculés en direct en JS, mais justes dès le premier rendu côté
+// serveur — testé ici sans JS).
+
+it('alimente le realise depuis realiseParCompteEtOperation, y compris une ligne eclatee entre deux operations', function () {
+    $tx = Transaction::factory()->asDepense()->create([
+        'association_id' => $this->association->id, 'date' => "{$this->exercice}-10-15",
+    ]);
+    $tx->lignes()->forceDelete();
+    $ligne = TransactionLigne::factory()->create([
+        'transaction_id' => $tx->id, 'compte_id' => $this->compte->id,
+        'montant' => 300.00, 'debit' => 300.00, 'credit' => 0.00,
+        'operation_id' => $this->opA->id,
+    ]);
+    // Ligne éclatée : 200 sur A, 100 sur B — seule la part de A doit remonter
+    // quand la modale est ouverte sur A.
+    TransactionLigneAffectation::create(['transaction_ligne_id' => $ligne->id, 'operation_id' => $this->opA->id, 'montant' => 200.00]);
+    TransactionLigneAffectation::create(['transaction_ligne_id' => $ligne->id, 'operation_id' => $this->opB->id, 'montant' => 100.00]);
+
+    $lignesA = Livewire::test(BudgetAffectationModal::class)->call('ouvrir', $this->opA->id)->viewData('lignes');
+    $lignesB = Livewire::test(BudgetAffectationModal::class)->call('ouvrir', $this->opB->id)->viewData('lignes');
+
+    $ligneA = collect($lignesA)->firstWhere('compte_id', (int) $this->compte->id);
+    $ligneB = collect($lignesB)->firstWhere('compte_id', (int) $this->compte->id);
+
+    expect($ligneA['realise'])->toBe(200.0)
+        ->and($ligneB['realise'])->toBe(100.0);
+});
+
+it('affiche un tiret pour le realise de chaque ligne quand aucune operation n est choisie', function () {
+    $html = Livewire::test(BudgetAffectationModal::class)
+        ->call('ouvrir', 0)
+        ->html();
+
+    preg_match('/id="budget-affectation-realise-'.$this->compte->id.'"[^>]*>([^<]*)</', $html, $m);
+
+    expect(trim($m[1] ?? ''))->toBe('—');
+});
+
+it('calcule les totaux prevu et realise par section et le resultat produits moins charges', function () {
+    $autreDepense = Compte::factory()->numero('611')->create([
+        'association_id' => $this->association->id, 'intitule' => 'Sous-traitance',
+    ]);
+    $recette1 = Compte::factory()->numero('706')->create([
+        'association_id' => $this->association->id, 'intitule' => 'Prestations',
+    ]);
+    $recette2 = Compte::factory()->numero('754')->create([
+        'association_id' => $this->association->id, 'intitule' => 'Dons',
+    ]);
+
+    // Réalisé de l'opération A pour chacun des 4 comptes.
+    foreach ([
+        [$this->compte, 1890.00, TypeTransaction::Depense],
+        [$autreDepense, 1200.00, TypeTransaction::Depense],
+        [$recette1, 3200.00, TypeTransaction::Recette],
+        [$recette2, 800.00, TypeTransaction::Recette],
+    ] as [$compte, $montant, $type]) {
+        $tx = Transaction::factory()->create([
+            'association_id' => $this->association->id, 'type' => $type, 'date' => "{$this->exercice}-10-15",
+        ]);
+        $tx->lignes()->forceDelete();
+        TransactionLigne::factory()->create([
+            'transaction_id' => $tx->id, 'compte_id' => $compte->id,
+            'montant' => $montant,
+            'debit' => $type === TypeTransaction::Depense ? $montant : 0.0,
+            'credit' => $type === TypeTransaction::Recette ? $montant : 0.0,
+            'operation_id' => $this->opA->id,
+        ]);
+    }
+
+    $totaux = Livewire::test(BudgetAffectationModal::class)
+        ->call('ouvrir', $this->opA->id)
+        ->set("montants.{$this->compte->id}", '2000')
+        ->set("montants.{$autreDepense->id}", '1800')
+        ->set("montants.{$recette1->id}", '3500')
+        ->set("montants.{$recette2->id}", '800')
+        ->viewData('totaux');
+
+    expect($totaux['charges_prevu'])->toBe(3800.0)
+        ->and($totaux['produits_prevu'])->toBe(4300.0)
+        ->and($totaux['resultat_prevu'])->toBe(500.0)
+        ->and($totaux['charges_realise'])->toBe(3090.0)
+        ->and($totaux['produits_realise'])->toBe(4000.0)
+        ->and($totaux['resultat_realise'])->toBe(910.0);
+});
+
+it('un contra-compte reduit le total realise de sa section, pas seulement sa ligne', function () {
+    // Contra-produit (classe 709 : rabais/ristournes accordés) : la ligne
+    // porte un montant positif mais SensMontantPd le rend négatif pour un
+    // compte de recette — le total de la section doit baisser d'autant, pas
+    // seulement l'affichage de sa propre ligne.
+    $recette = Compte::factory()->numero('706')->create([
+        'association_id' => $this->association->id, 'intitule' => 'Prestations',
+    ]);
+    $contraCompte = Compte::factory()->numero('709')->create([
+        'association_id' => $this->association->id, 'intitule' => 'RRR accordés',
+    ]);
+
+    $txRecette = Transaction::factory()->create([
+        'association_id' => $this->association->id, 'type' => TypeTransaction::Recette, 'date' => "{$this->exercice}-10-15",
+    ]);
+    $txRecette->lignes()->forceDelete();
+    TransactionLigne::factory()->create([
+        'transaction_id' => $txRecette->id, 'compte_id' => $recette->id,
+        'montant' => 1000.00, 'debit' => 0.0, 'credit' => 1000.00,
+        'operation_id' => $this->opA->id,
+    ]);
+
+    $txContra = Transaction::factory()->create([
+        'association_id' => $this->association->id, 'type' => TypeTransaction::Recette, 'date' => "{$this->exercice}-10-16",
+    ]);
+    $txContra->lignes()->forceDelete();
+    TransactionLigne::factory()->create([
+        'transaction_id' => $txContra->id, 'compte_id' => $contraCompte->id,
+        'montant' => 150.00, 'debit' => 150.00, 'credit' => 0.0,
+        'operation_id' => $this->opA->id,
+    ]);
+
+    $totaux = Livewire::test(BudgetAffectationModal::class)
+        ->call('ouvrir', $this->opA->id)
+        ->viewData('totaux');
+
+    // 1000 (recette) - 150 (contra) = 850, et non 1000.
+    expect($totaux['produits_realise'])->toBe(850.0);
+});
+
+it('laisse les totaux realise a null quand aucune operation n est choisie, sans casser les totaux prevu', function () {
+    $totaux = Livewire::test(BudgetAffectationModal::class)
+        ->call('ouvrir', 0)
+        ->viewData('totaux');
+
+    expect($totaux['charges_realise'])->toBeNull()
+        ->and($totaux['produits_realise'])->toBeNull()
+        ->and($totaux['resultat_realise'])->toBeNull()
+        // Aucune cellule de saisie possible sans opération choisie (correctif
+        // 1) : les totaux "prévu" sont donc à zéro, pas cassés.
+        ->and($totaux['charges_prevu'])->toBe(0.0)
+        ->and($totaux['produits_prevu'])->toBe(0.0)
+        ->and($totaux['resultat_prevu'])->toBe(0.0);
+});
+
+it('affiche le pied de modale avec le libelle de l exercice et excedent en vert', function () {
+    $exerciceLabel = app(ExerciceService::class)->label($this->exercice);
+
+    $html = Livewire::test(BudgetAffectationModal::class)
+        ->call('ouvrir', $this->opA->id)
+        ->set("montants.{$this->compte->id}", '100') // recette-free : résultat prévu négatif (une charge sans produit)
+        ->html();
+
+    expect($html)->toContain("Sur l'exercice {$exerciceLabel}")
+        ->and($html)->not->toContain('résultat de l\'opération');
 });

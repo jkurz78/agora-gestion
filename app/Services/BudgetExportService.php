@@ -79,11 +79,17 @@ final class BudgetExportService
     /**
      * Convertit les lignes en chaîne CSV UTF-8 avec séparateur ';'.
      *
+     * L'en-tête reprend {@see enTetes()} — la même source que le XLSX — afin
+     * que les deux formats d'export ne divergent jamais sur le libellé de la
+     * 5ᵉ colonne (le CSV codait auparavant "realise_reference" en dur, quand
+     * le XLSX produisait "realise_2025-2026").
+     *
      * @param  list<array{0: string, 1: string, 2: string, 3: string, 4: string}>  $rows
+     * @param  int  $sourceExercice  Exercice de référence, transmis à enTetes()
      */
-    public function toCsv(array $rows): string
+    public function toCsv(array $rows, int $sourceExercice): string
     {
-        $lines = ['exercice;famille;compte;montant_prevu;realise_reference'];
+        $lines = [implode(';', $this->enTetes($sourceExercice))];
 
         foreach ($rows as $row) {
             $escaped = array_map(

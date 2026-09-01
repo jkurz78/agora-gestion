@@ -57,8 +57,11 @@ it('télécharge un CSV budget', function () {
     $response->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
     $response->assertDownload('budget-2026-2027.csv');
 
+    // Correctif audit point 6 : l'en-tête CSV doit porter le libellé de
+    // l'exercice de référence, identique à celui du XLSX (enTetes()), et non
+    // plus un "realise_reference" figé.
     expect($response->getContent())
-        ->toContain('exercice;famille;compte;montant_prevu;realise_reference')
+        ->toContain('exercice;famille;compte;montant_prevu;realise_2025-2026')
         ->toContain('2026-2027;61 — Charges;Loyers;1200.00');
 });
 
@@ -97,7 +100,7 @@ it('renseigne la colonne informative avec l\'exercice de reference choisi, quell
 
     $response->assertOk();
     expect($response->getContent())
-        ->toContain('exercice;famille;compte;montant_prevu;realise_reference')
+        ->toContain('exercice;famille;compte;montant_prevu;realise_2024-2025')
         ->toContain('2026-2027;61 — Charges;Loyers;;555.00');
 });
 

@@ -53,10 +53,15 @@
         <button wire:click="openExportModal" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-download"></i> Exporter
         </button>
-        @if (! $exerciceCloture && $this->canEdit)
+        {{-- L'import ne touche que les enveloppes : gelé avec elles. --}}
+        @if (! $exerciceCloture && $this->canEdit && ! $this->budgetValide)
         <button wire:click="toggleImportPanel" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-upload"></i> Importer
         </button>
+        @endif
+        {{-- La ventilation reste modifiable même budget validé : ce bouton
+             n'est jamais gelé par $this->budgetValide. --}}
+        @if (! $exerciceCloture && $this->canEdit)
         <button wire:click="$dispatch('ouvrir-affectation', { operationId: 0 })"
                 class="btn btn-outline-primary btn-sm">
             <i class="bi bi-diagram-3"></i> Affecter un budget à une opération
@@ -120,7 +125,7 @@
     @endif
 
     {{-- Panel Import --}}
-    @if ($showImportPanel && ! $exerciceCloture)
+    @if ($showImportPanel && ! $exerciceCloture && ! $this->budgetValide)
     <div class="card mb-3 border-warning">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span class="fw-semibold">Importer le budget — exercice {{ $exerciceLabel }}</span>
@@ -223,7 +228,7 @@
                                         @endif
                                     </td>
                                     <td class="text-end">
-                                        @if (! $exerciceCloture && $this->canEdit && $line && $editingLineId === $line->id)
+                                        @if (! $exerciceCloture && $this->canEdit && ! $this->budgetValide && $line && $editingLineId === $line->id)
                                             <div class="d-flex justify-content-end gap-1">
                                                 <input type="number" wire:model="editingMontant" step="0.01" min="0"
                                                        class="form-control form-control-sm" style="width: 120px;"
@@ -236,7 +241,7 @@
                                                     <i class="bi bi-x"></i>
                                                 </button>
                                             </div>
-                                        @elseif ($line && ! $exerciceCloture && $this->canEdit)
+                                        @elseif ($line && ! $exerciceCloture && $this->canEdit && ! $this->budgetValide)
                                             <span wire:click="startEdit({{ $line->id }})" style="cursor: pointer;"
                                                   class="text-primary" title="Cliquer pour modifier">
                                                 {{ number_format($prevu, 2, ',', ' ') }} &euro;
@@ -256,7 +261,9 @@
                                         @endif
                                     </td>
                                     <td>
-                                        @if (! $exerciceCloture && $this->canEdit)
+                                        {{-- Enveloppe uniquement : ces trois contrôles sont gelés avec le
+                                             budget validé, contrairement aux actions de ventilation ci-dessous. --}}
+                                        @if (! $exerciceCloture && $this->canEdit && ! $this->budgetValide)
                                         @if (! $line)
                                             <button wire:click="addLine({{ $compte->id }})"
                                                     class="btn btn-sm btn-outline-primary">
@@ -277,17 +284,55 @@
                                         $vRealise = $realiseParOperation[$compte->id][$v->operation_id] ?? 0;
                                         $vPrevu = (float) $v->montant_prevu;
                                     @endphp
-                                    <tr class="table-light">
+                                    @php
+                                        // Cliquable seulement si l'opération est encore proposable à la saisie
+                                        // (non soft-supprimée) : sinon elle n'est pas dans le sélecteur de la
+                                        // modale et le clic n'aurait aucun effet utile.
+                                        $vCliquable = $v->operation && ! $v->operation->trashed();
+                                    @endphp
+                                    <tr class="table-light"
+                                        @if ($vCliquable)
+                                            wire:click="$dispatch('ouvrir-affectation', { operationId: {{ $v->operation_id }} })"
+                                            style="cursor: pointer;"
+                                            title="Cliquer pour modifier l'affectation"
+                                        @endif
+                                    >
                                         <td class="ps-5 text-muted small">
                                             <i class="bi bi-arrow-return-right"></i>
-                                            {{ $v->operation?->nom ?? 'Opération supprimée' }}
+                                            @if ($vCliquable)
+                                                {{-- Même événement que les badges du bandeau "sans budget affecté" :
+                                                     ouvre la modale d'affectation sur cette opération. Toute la
+                                                     ligne est cliquable (wire:click sur le <tr> ci-dessus) — le nom
+                                                     n'est qu'un repère visuel, plus de wire:click ici. --}}
+                                                {{ $v->operation->nom }}
+                                            @elseif ($v->operation)
+                                                {{-- Opération soft-supprimée : nom conservé (withTrashed() sur la
+                                                     relation), mais non cliquable — elle n'est plus proposable à la
+                                                     saisie, donc pas dans le sélecteur de la modale. --}}
+                                                {{ $v->operation->nom }} <span class="fst-italic">(supprimée)</span>
+                                            @else
+                                                Opération supprimée
+                                            @endif
                                         </td>
                                         <td class="text-end small">{{ number_format($vPrevu, 2, ',', ' ') }} &euro;</td>
                                         <td class="text-end small">{{ number_format($vRealise, 2, ',', ' ') }} &euro;</td>
                                         <td class="text-end small {{ $vPrevu - $vRealise < 0 ? 'text-danger' : '' }}">
                                             {{ number_format($vPrevu - $vRealise, 2, ',', ' ') }} &euro;
                                         </td>
-                                        <td></td>
+                                        <td>
+                                            {{-- La ventilation reste modifiable toute l'année, gel ou non : pas de
+                                                 garde sur $this->budgetValide ici (elle ne s'applique qu'aux
+                                                 enveloppes). wire:click.stop : le bouton est DANS la ligne
+                                                 cliquable ci-dessus, sans quoi le supprimer ouvrirait aussi la
+                                                 modale d'affectation. --}}
+                                            @if (! $exerciceCloture && $this->canEdit)
+                                            <button wire:click.stop="deleteLine({{ $v->id }})"
+                                                    wire:confirm="Supprimer cette ventilation ?"
+                                                    class="btn btn-sm btn-outline-danger">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                            @endif
+                                        </td>
                                     </tr>
                                 @endforeach
                                 @if ($lignesVentilees->isNotEmpty())
@@ -366,7 +411,7 @@
                                         @endif
                                     </td>
                                     <td class="text-end">
-                                        @if (! $exerciceCloture && $this->canEdit && $line && $editingLineId === $line->id)
+                                        @if (! $exerciceCloture && $this->canEdit && ! $this->budgetValide && $line && $editingLineId === $line->id)
                                             <div class="d-flex justify-content-end gap-1">
                                                 <input type="number" wire:model="editingMontant" step="0.01" min="0"
                                                        class="form-control form-control-sm" style="width: 120px;"
@@ -379,7 +424,7 @@
                                                     <i class="bi bi-x"></i>
                                                 </button>
                                             </div>
-                                        @elseif ($line && ! $exerciceCloture && $this->canEdit)
+                                        @elseif ($line && ! $exerciceCloture && $this->canEdit && ! $this->budgetValide)
                                             <span wire:click="startEdit({{ $line->id }})" style="cursor: pointer;"
                                                   class="text-primary" title="Cliquer pour modifier">
                                                 {{ number_format($prevu, 2, ',', ' ') }} &euro;
@@ -399,7 +444,9 @@
                                         @endif
                                     </td>
                                     <td>
-                                        @if (! $exerciceCloture && $this->canEdit)
+                                        {{-- Enveloppe uniquement : ces trois contrôles sont gelés avec le
+                                             budget validé, contrairement aux actions de ventilation ci-dessous. --}}
+                                        @if (! $exerciceCloture && $this->canEdit && ! $this->budgetValide)
                                         @if (! $line)
                                             <button wire:click="addLine({{ $compte->id }})"
                                                     class="btn btn-sm btn-outline-primary">
@@ -420,17 +467,55 @@
                                         $vRealise = $realiseParOperation[$compte->id][$v->operation_id] ?? 0;
                                         $vPrevu = (float) $v->montant_prevu;
                                     @endphp
-                                    <tr class="table-light">
+                                    @php
+                                        // Cliquable seulement si l'opération est encore proposable à la saisie
+                                        // (non soft-supprimée) : sinon elle n'est pas dans le sélecteur de la
+                                        // modale et le clic n'aurait aucun effet utile.
+                                        $vCliquable = $v->operation && ! $v->operation->trashed();
+                                    @endphp
+                                    <tr class="table-light"
+                                        @if ($vCliquable)
+                                            wire:click="$dispatch('ouvrir-affectation', { operationId: {{ $v->operation_id }} })"
+                                            style="cursor: pointer;"
+                                            title="Cliquer pour modifier l'affectation"
+                                        @endif
+                                    >
                                         <td class="ps-5 text-muted small">
                                             <i class="bi bi-arrow-return-right"></i>
-                                            {{ $v->operation?->nom ?? 'Opération supprimée' }}
+                                            @if ($vCliquable)
+                                                {{-- Même événement que les badges du bandeau "sans budget affecté" :
+                                                     ouvre la modale d'affectation sur cette opération. Toute la
+                                                     ligne est cliquable (wire:click sur le <tr> ci-dessus) — le nom
+                                                     n'est qu'un repère visuel, plus de wire:click ici. --}}
+                                                {{ $v->operation->nom }}
+                                            @elseif ($v->operation)
+                                                {{-- Opération soft-supprimée : nom conservé (withTrashed() sur la
+                                                     relation), mais non cliquable — elle n'est plus proposable à la
+                                                     saisie, donc pas dans le sélecteur de la modale. --}}
+                                                {{ $v->operation->nom }} <span class="fst-italic">(supprimée)</span>
+                                            @else
+                                                Opération supprimée
+                                            @endif
                                         </td>
                                         <td class="text-end small">{{ number_format($vPrevu, 2, ',', ' ') }} &euro;</td>
                                         <td class="text-end small">{{ number_format($vRealise, 2, ',', ' ') }} &euro;</td>
                                         <td class="text-end small {{ $vPrevu - $vRealise < 0 ? 'text-danger' : '' }}">
                                             {{ number_format($vPrevu - $vRealise, 2, ',', ' ') }} &euro;
                                         </td>
-                                        <td></td>
+                                        <td>
+                                            {{-- La ventilation reste modifiable toute l'année, gel ou non : pas de
+                                                 garde sur $this->budgetValide ici (elle ne s'applique qu'aux
+                                                 enveloppes). wire:click.stop : le bouton est DANS la ligne
+                                                 cliquable ci-dessus, sans quoi le supprimer ouvrirait aussi la
+                                                 modale d'affectation. --}}
+                                            @if (! $exerciceCloture && $this->canEdit)
+                                            <button wire:click.stop="deleteLine({{ $v->id }})"
+                                                    wire:confirm="Supprimer cette ventilation ?"
+                                                    class="btn btn-sm btn-outline-danger">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                            @endif
+                                        </td>
                                     </tr>
                                 @endforeach
                                 @if ($lignesVentilees->isNotEmpty())

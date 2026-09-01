@@ -38,9 +38,15 @@ final class BudgetLine extends TenantModel
         return $this->belongsTo(Compte::class, 'compte_id');
     }
 
+    /**
+     * withTrashed() : Operation porte SoftDeletes, mais l'historique du budget
+     * doit rester lisible après suppression de l'opération ventilée — sans
+     * elle, l'écran perdrait le nom au moment même où l'utilisateur consulte
+     * a posteriori une ventilation devenue orpheline.
+     */
     public function operation(): BelongsTo
     {
-        return $this->belongsTo(Operation::class, 'operation_id');
+        return $this->belongsTo(Operation::class, 'operation_id')->withTrashed();
     }
 
     /**

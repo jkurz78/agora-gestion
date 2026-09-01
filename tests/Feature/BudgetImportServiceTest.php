@@ -253,6 +253,39 @@ it('refuse l import quand le budget est valide', function () {
         ->and($resultat->errors[0]['message'])->toContain('déverrouill');
 });
 
+// Correctif audit point 5 : le fichier est validé ligne à ligne, mais rien ne
+// détecte deux lignes visant le MÊME compte. Depuis que l'index unique
+// existe (budget_lines_asso_exercice_compte_operation_unique), la seconde
+// insertion lève une QueryException — non rattrapée, donc une 500 — au lieu
+// d'un message de validation propre.
+
+it('detecte deux lignes visant le meme compte avant toute ecriture, sans lever d exception', function () {
+    $csv = "exercice;famille;compte;montant_prevu\n"
+         ."2025-2026;Charges;Loyers;500.00\n"
+         ."2025-2026;Charges;Loyers;700.00\n";
+
+    $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
+
+    expect($result->success)->toBeFalse()
+        ->and($result->errors[0]['message'])->toContain('Loyers');
+
+    expect(BudgetLine::where('exercice', 2025)->count())->toBe(0);
+});
+
+it('n insere rien quand deux lignes visent le meme compte, meme si un montant est ignorable', function () {
+    // Une ligne valide + une ligne vide/zéro pour le même compte ne
+    // collisionnerait pas techniquement à l'insertion (une seule survit au
+    // filtrage), mais deux lignes pour un même compte restent une ambiguïté
+    // du fichier source que l'utilisateur doit corriger.
+    $csv = "exercice;famille;compte;montant_prevu\n"
+         ."2025-2026;Charges;Loyers;500.00\n"
+         ."2025-2026;Charges;Loyers;\n";
+
+    $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
+
+    expect($result->success)->toBeFalse();
+});
+
 it('annonce ce qui sera remplace et ce qui sera conserve', function () {
     $exercice = app(ExerciceService::class)->current();
     $compte = Compte::factory()->numero('606')->create(['intitule' => 'Achats']);

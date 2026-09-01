@@ -27,13 +27,28 @@ final class BudgetGelService
     public function valider(Exercice $exercice, User $user): void
     {
         DB::transaction(function () use ($exercice, $user): void {
-            $exercice->update([
+            // Même protocole que ExerciceService::cloturer() : le verrou
+            // d'abord, le contrôle d'état APRÈS l'avoir acquis. Sans lui, un
+            // import en cours (validation faite AVANT le gel, écriture APRÈS)
+            // ou deux validations concurrentes pourraient toutes deux se
+            // croire premières — soit deux écritures d'audit pour un seul
+            // geste, soit un budget « revalidé » qui écrase sa date d'origine.
+            $exerciceVerrouille = Exercice::query()
+                ->whereKey((int) $exercice->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($exerciceVerrouille->budgetEstValide()) {
+                return;
+            }
+
+            $exerciceVerrouille->update([
                 'budget_valide_le' => now(),
                 'budget_valide_par_id' => $user->id,
             ]);
 
             ExerciceAction::create([
-                'exercice_id' => $exercice->id,
+                'exercice_id' => $exerciceVerrouille->id,
                 'action' => TypeActionExercice::BudgetValide,
                 'user_id' => $user->id,
             ]);
@@ -49,13 +64,22 @@ final class BudgetGelService
         }
 
         DB::transaction(function () use ($exercice, $user, $commentaire): void {
-            $exercice->update([
+            $exerciceVerrouille = Exercice::query()
+                ->whereKey((int) $exercice->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (! $exerciceVerrouille->budgetEstValide()) {
+                return;
+            }
+
+            $exerciceVerrouille->update([
                 'budget_valide_le' => null,
                 'budget_valide_par_id' => null,
             ]);
 
             ExerciceAction::create([
-                'exercice_id' => $exercice->id,
+                'exercice_id' => $exerciceVerrouille->id,
                 'action' => TypeActionExercice::BudgetDeverrouille,
                 'user_id' => $user->id,
                 'commentaire' => $commentaire,

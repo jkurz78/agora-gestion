@@ -9,6 +9,7 @@ use App\Models\Association;
 use App\Models\BudgetLine;
 use App\Models\Compte;
 use App\Models\Exercice;
+use App\Models\ExerciceAction;
 use App\Models\Operation;
 use App\Models\User;
 use App\Services\Budget\BudgetGelService;
@@ -119,4 +120,37 @@ it('refuse la validation par un non-admin', function () {
     Livewire::test(BudgetTable::class)->call('validerBudget');
 
     expect($this->exercice->fresh()->budgetEstValide())->toBeFalse();
+});
+
+// Correctif audit point 4 : valider() et deverrouiller() n'ont aucun verrou —
+// un import commencé avant la validation peut se terminer après le gel, et
+// deux validations concurrentes produisent deux écritures d'audit. Un test de
+// concurrence réelle n'est pas possible ici (process PHP unique) : on vérifie
+// à défaut qu'un DOUBLE APPEL séquentiel — le cas dégénéré d'une course, deux
+// requêtes qui se chevauchent au point de s'exécuter l'une après l'autre sans
+// qu'aucune n'ait rien à re-vérifier — ne produit qu'UNE seule écriture
+// d'audit. Le contrôle d'état après verrouillage (reproduit de cloturer())
+// est ce qui rend ce test vert.
+
+it('une double validation ne cree qu une seule ecriture d audit', function () {
+    $service = app(BudgetGelService::class);
+
+    $service->valider($this->exercice->fresh(), $this->admin);
+    $service->valider($this->exercice->fresh(), $this->admin);
+
+    expect(ExerciceAction::where('exercice_id', $this->exercice->id)
+        ->where('action', TypeActionExercice::BudgetValide)
+        ->count())->toBe(1);
+});
+
+it('un deverrouillage sur un budget deja deverrouille ne cree aucune ecriture d audit supplementaire', function () {
+    $service = app(BudgetGelService::class);
+    $service->valider($this->exercice->fresh(), $this->admin);
+
+    $service->deverrouiller($this->exercice->fresh(), $this->admin, 'Motif 1');
+    $service->deverrouiller($this->exercice->fresh(), $this->admin, 'Motif 2');
+
+    expect(ExerciceAction::where('exercice_id', $this->exercice->id)
+        ->where('action', TypeActionExercice::BudgetDeverrouille)
+        ->count())->toBe(1);
 });

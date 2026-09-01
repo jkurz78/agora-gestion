@@ -135,16 +135,20 @@ it('enTetes retourne le libelle de l\'exercice de reference en 5e position', fun
     expect($entetes)->toBe(['exercice', 'famille', 'compte', 'montant_prevu', 'realise_2025-2026']);
 });
 
-it('toCsv génère un CSV valide avec en-tête', function () {
+// Correctif audit point 6 : toCsv() codait l'en-tête en dur
+// ("realise_reference") alors que le XLSX passe par enTetes(int
+// $sourceExercice) et produit "realise_2025-2026" — les deux formats
+// d'export divergeaient sur la même donnée.
+it('toCsv reprend l en-tete de enTetes(), pas un libelle fige', function () {
     $rows = [
         ['2026-2027', 'Charges', 'Loyers', '1200.00', '1150.00'],
         ['2026-2027', 'Charges', 'Électricité', '', ''],
     ];
 
-    $csv = app(BudgetExportService::class)->toCsv($rows);
+    $csv = app(BudgetExportService::class)->toCsv($rows, 2025);
 
     expect($csv)
-        ->toContain('exercice;famille;compte;montant_prevu;realise_reference')
+        ->toContain('exercice;famille;compte;montant_prevu;realise_2025-2026')
         ->toContain('2026-2027;Charges;Loyers;1200.00;1150.00')
         ->toContain('2026-2027;Charges;Électricité;;');
 });
