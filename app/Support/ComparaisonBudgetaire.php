@@ -39,4 +39,20 @@ final class ComparaisonBudgetaire
         // approche = orange, en dessous = rouge.
         return $pct >= 100 ? self::VERT : ($pct >= 90 ? self::ORANGE : self::ROUGE);
     }
+
+    /**
+     * Écart budgétaire signé, orienté « favorable = positif ».
+     *
+     * Charge  : favorable = dépenser moins que prévu  → prévu − réalisé
+     * Produit : favorable = encaisser plus que prévu  → réalisé − prévu
+     *
+     * Dans les deux cas un résultat négatif est défavorable : la coloration
+     * « < 0 → rouge » déjà utilisée par les écrans budgétaires reste donc
+     * correcte partout tant qu'elle s'applique à CE montant, jamais à un
+     * prévu − réalisé calculé à la main sur une ligne de produit.
+     */
+    public static function ecart(float $prevu, float $realise, bool $isCharge): float
+    {
+        return $isCharge ? $prevu - $realise : $realise - $prevu;
+    }
 }

@@ -7,6 +7,8 @@ use App\Models\BudgetLine;
 use App\Models\Compte;
 use App\Models\Exercice;
 use App\Models\Operation;
+use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Services\Budget\BudgetGelService;
 use App\Services\ExerciceService;
@@ -601,4 +603,253 @@ it('affiche un controle tout deplier tout replier sur les deux blocs', function 
     expect($html)->toContain('data-toggle-all-target="budget-table-charges"')
         ->and($html)->toContain('data-toggle-all-target="budget-table-produits"')
         ->and($html)->toContain('Tout déplier');
+});
+
+// Bug remonté en recette (propriétaire) : la colonne « Écart » était calculée
+// partout en prévu − réalisé, correct pour les charges mais inversé pour les
+// produits — encaisser plus que prévu affichait un écart négatif, encaisser
+// moins affichait un écart positif en noir. Voir App\Support\ComparaisonBudgetaire::ecart().
+//
+// Le « réalisé » vient de vraies écritures (transaction_lignes), lues par
+// BudgetService::realiseParCompte() — pas d'un simple champ de test.
+
+it('un produit qui encaisse plus que prevu affiche un ecart positif favorable', function () {
+    // Cas 1 du propriétaire : dons prévu 600 € / réalisé 670 € → +70, pas -70.
+    $exercice = app(ExerciceService::class)->current();
+    $compteDons = Compte::factory()->numero('758')->create([
+        'association_id' => $this->association->id,
+        'intitule' => 'Dons',
+    ]);
+
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id,
+        'compte_id' => $compteDons->id,
+        'exercice' => $exercice,
+        'montant_prevu' => 600.00,
+    ]);
+
+    $tx = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
+        'date' => $exercice.'-10-15',
+        'saisi_par' => $this->user->id,
+    ]);
+    $tx->lignes()->forceDelete();
+    TransactionLigne::factory()->create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $compteDons->id,
+        'debit' => 0,
+        'credit' => 670.00,
+        'montant' => 670.00,
+    ]);
+
+    $html = Livewire::test(BudgetTable::class)->assertOk()->html();
+
+    // "70,00" seul (non précédé d'un chiffre) : évite de matcher le "70,00"
+    // contenu dans "670,00" (réalisé).
+    expect($html)->toMatch('/(?<!\d)70,00 &euro;/')
+        ->and($html)->not->toMatch('/-70,00/');
+});
+
+it('un produit qui encaisse moins que prevu affiche un ecart negatif en rouge', function () {
+    // Cas 2 du propriétaire, le plus dangereux : cotisations prévu 500 € /
+    // réalisé 300 € → -200 en rouge, pas +200 en noir (ça rassurerait à tort).
+    $exercice = app(ExerciceService::class)->current();
+    $compteCotisations = Compte::factory()->numero('756')->create([
+        'association_id' => $this->association->id,
+        'intitule' => 'Cotisations',
+    ]);
+
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id,
+        'compte_id' => $compteCotisations->id,
+        'exercice' => $exercice,
+        'montant_prevu' => 500.00,
+    ]);
+
+    $tx = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
+        'date' => $exercice.'-10-15',
+        'saisi_par' => $this->user->id,
+    ]);
+    $tx->lignes()->forceDelete();
+    TransactionLigne::factory()->create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $compteCotisations->id,
+        'debit' => 0,
+        'credit' => 300.00,
+        'montant' => 300.00,
+    ]);
+
+    $html = Livewire::test(BudgetTable::class)->assertOk()->html();
+
+    expect($html)->toContain('-200,00')
+        // La cellule Écart doit porter text-danger, pas juste la valeur être
+        // négative — fenêtre large car Livewire insère des commentaires
+        // <!--[if BLOCK]>--> entre la balise et le contenu du @if.
+        ->and($html)->toMatch('/text-end text-danger">[\s\S]{0,120}?-200,00/');
+});
+
+it('les sous lignes de ventilation du bloc produits suivent la meme regle que la ligne de compte', function () {
+    // Ventilation d'un compte de produits sur une opération : réalisé 550 €
+    // pour un prévu de 400 € doit rester favorable (+150), pas -150.
+    $exercice = app(ExerciceService::class)->current();
+    $op = Operation::factory()->create([
+        'association_id' => $this->association->id, 'nom' => 'Vente de livres',
+    ]);
+
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id, 'compte_id' => $this->recetteCompte->id,
+        'exercice' => $exercice, 'operation_id' => null, 'montant_prevu' => 1000.00,
+    ]);
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id, 'compte_id' => $this->recetteCompte->id,
+        'exercice' => $exercice, 'operation_id' => $op->id, 'montant_prevu' => 400.00,
+    ]);
+
+    $tx = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
+        'date' => $exercice.'-10-15',
+        'saisi_par' => $this->user->id,
+    ]);
+    $tx->lignes()->forceDelete();
+    TransactionLigne::factory()->create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $this->recetteCompte->id,
+        'operation_id' => $op->id,
+        'debit' => 0,
+        'credit' => 550.00,
+        'montant' => 550.00,
+    ]);
+
+    $html = Livewire::test(BudgetTable::class)->assertOk()->html();
+
+    expect($html)->toMatch('/(?<!\d)150,00 &euro;/')
+        ->and($html)->not->toMatch('/-150,00/');
+});
+
+it('le total du bloc produits est calcule realise moins prevu, pas l inverse', function () {
+    // Deux comptes de produits qui encaissent chacun plus que prévu : le
+    // total prévu (500) doit être inférieur au total réalisé (600), pour un
+    // écart de pied de tableau à +100 — jamais -100.
+    $exercice = app(ExerciceService::class)->current();
+    $compteX = Compte::factory()->numero('709')->create(['association_id' => $this->association->id]);
+    $compteY = Compte::factory()->numero('710')->create(['association_id' => $this->association->id]);
+
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id, 'compte_id' => $compteX->id,
+        'exercice' => $exercice, 'montant_prevu' => 300.00,
+    ]);
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id, 'compte_id' => $compteY->id,
+        'exercice' => $exercice, 'montant_prevu' => 200.00,
+    ]);
+
+    foreach ([[$compteX, 380.00], [$compteY, 220.00]] as [$compte, $montant]) {
+        $tx = Transaction::factory()->asRecette()->create([
+            'association_id' => $this->association->id,
+            'date' => $exercice.'-10-15',
+            'saisi_par' => $this->user->id,
+        ]);
+        $tx->lignes()->forceDelete();
+        TransactionLigne::factory()->create([
+            'transaction_id' => $tx->id,
+            'compte_id' => $compte->id,
+            'debit' => 0,
+            'credit' => $montant,
+            'montant' => $montant,
+        ]);
+    }
+
+    $html = Livewire::test(BudgetTable::class)->assertOk()->html();
+
+    expect($html)->toContain('Total Produits')
+        ->and($html)->toMatch('/(?<!\d)100,00 &euro;/')
+        ->and($html)->not->toMatch('/-100,00/');
+});
+
+it('les ecarts du bloc charges restent calcules en prevu moins realise apres le correctif produits', function () {
+    // Verrou de non-régression : le bloc Charges était déjà correct, il ne
+    // doit pas bouger. Un compte sous le budget (favorable, vert) et un
+    // compte au-dessus (défavorable, rouge).
+    $exercice = app(ExerciceService::class)->current();
+    $compteSousBudget = Compte::factory()->numero('611')->create(['association_id' => $this->association->id]);
+    $compteDepassement = Compte::factory()->numero('612')->create(['association_id' => $this->association->id]);
+
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id, 'compte_id' => $compteSousBudget->id,
+        'exercice' => $exercice, 'montant_prevu' => 1000.00,
+    ]);
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id, 'compte_id' => $compteDepassement->id,
+        'exercice' => $exercice, 'montant_prevu' => 1000.00,
+    ]);
+
+    foreach ([[$compteSousBudget, 800.00], [$compteDepassement, 1200.00]] as [$compte, $montant]) {
+        $tx = Transaction::factory()->asDepense()->create([
+            'association_id' => $this->association->id,
+            'date' => $exercice.'-10-15',
+            'saisi_par' => $this->user->id,
+        ]);
+        $tx->lignes()->forceDelete();
+        TransactionLigne::factory()->create([
+            'transaction_id' => $tx->id,
+            'compte_id' => $compte->id,
+            'debit' => $montant,
+            'credit' => 0,
+            'montant' => $montant,
+        ]);
+    }
+
+    $html = Livewire::test(BudgetTable::class)->assertOk()->html();
+
+    // Sous le budget (dépensé 800 pour 1000 prévu) : +200, favorable.
+    expect($html)->toMatch('/(?<!\d)200,00 &euro;/')
+        // Au-dessus du budget (dépensé 1200 pour 1000 prévu) : -200, en rouge —
+        // fenêtre large car Livewire insère des commentaires <!--[if BLOCK]>-->
+        // entre la balise et le contenu du @if.
+        ->and($html)->toMatch('/text-end text-danger">[\s\S]{0,120}?-200,00/');
+});
+
+it('le resultat suit la regle produit : favorable quand le realise depasse le prevu', function () {
+    // Le résultat (produits - charges) se comporte comme un produit : plus le
+    // résultat réalisé dépasse le résultat prévu, plus c'est favorable — donc
+    // écart = réalisé - prévu, jamais prévu - réalisé (même bug que la tuile
+    // budget du tableau de bord, corrigé au commit 9cdc3b2d).
+    $exercice = app(ExerciceService::class)->current();
+    $compteCharge = Compte::factory()->numero('613')->create(['association_id' => $this->association->id]);
+    $compteProduit = Compte::factory()->numero('711')->create(['association_id' => $this->association->id]);
+
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id, 'compte_id' => $compteCharge->id,
+        'exercice' => $exercice, 'montant_prevu' => 400.00,
+    ]);
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id, 'compte_id' => $compteProduit->id,
+        'exercice' => $exercice, 'montant_prevu' => 1000.00,
+    ]);
+
+    $depense = Transaction::factory()->asDepense()->create([
+        'association_id' => $this->association->id, 'date' => $exercice.'-10-15', 'saisi_par' => $this->user->id,
+    ]);
+    $depense->lignes()->forceDelete();
+    TransactionLigne::factory()->create([
+        'transaction_id' => $depense->id, 'compte_id' => $compteCharge->id,
+        'debit' => 300.00, 'credit' => 0, 'montant' => 300.00,
+    ]);
+
+    $recette = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id, 'date' => $exercice.'-10-15', 'saisi_par' => $this->user->id,
+    ]);
+    $recette->lignes()->forceDelete();
+    TransactionLigne::factory()->create([
+        'transaction_id' => $recette->id, 'compte_id' => $compteProduit->id,
+        'debit' => 0, 'credit' => 1300.00, 'montant' => 1300.00,
+    ]);
+
+    // Résultat prévu = 1000 - 400 = 600 ; résultat réalisé = 1300 - 300 = 1000
+    // ; écart = réalisé - prévu = 1000 - 600 = +400 (jamais -400).
+    $html = Livewire::test(BudgetTable::class)->assertOk()->html();
+
+    expect($html)->toMatch('/(?<!\d)400,00 &euro;/')
+        ->and($html)->not->toMatch('/-400,00/');
 });
