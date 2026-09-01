@@ -514,3 +514,91 @@ it('ouvre la modale d affectation en cliquant sur une sous-ligne de ventilation'
         // ne doit pas se propager et ouvrir la modale en même temps.
         ->and($html)->toContain("wire:click.stop=\"deleteLine({$ventilation->id})\"");
 });
+
+// Repli/dépliage des sous-lignes de ventilation (JS pur, verrouillé côté PHP
+// via TDD Livewire) : le composant expose l'appariement compte ↔ sous-lignes
+// par des data-attributes, et rend systématiquement les sous-lignes dans le
+// HTML — repliées par défaut via une classe CSS (d-none), jamais absentes
+// côté serveur. Le pliage lui-même n'est pas testable ici (pas de JS dans
+// Livewire::test), seul le contrat HTML que le JS consomme l'est.
+
+it('rend les sous lignes repliees par defaut avec l appariement compte vers sous lignes', function () {
+    $exercice = app(ExerciceService::class)->current();
+    $op = Operation::factory()->create([
+        'association_id' => $this->association->id, 'nom' => 'Stage été 2026',
+    ]);
+
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id, 'compte_id' => $this->depenseCompte->id,
+        'exercice' => $exercice, 'operation_id' => null, 'montant_prevu' => 3500.00,
+    ]);
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id, 'compte_id' => $this->depenseCompte->id,
+        'exercice' => $exercice, 'operation_id' => $op->id, 'montant_prevu' => 2000.00,
+    ]);
+
+    $html = Livewire::test(BudgetTable::class)->assertOk()->html();
+
+    // La ligne de compte porte l'ancre que le JS utilise pour retrouver ses
+    // sous-lignes, et rien d'autre ne doit y ressembler par accident.
+    expect($html)->toContain('data-compte-toggle="'.$this->depenseCompte->id.'"')
+        // Sous-ligne de ventilation ET ligne de solde ("Non affecté") portent
+        // le même id de compte : c'est la clé d'appariement du JS.
+        ->and(substr_count($html, 'data-ventilation-of="'.$this->depenseCompte->id.'"'))->toBe(2)
+        // Repliées par défaut, mais bien présentes dans le HTML — assertSee
+        // ci-dessus le prouve déjà, on vérifie ici que c'est via une classe
+        // CSS (d-none) et non une absence.
+        ->and($html)->toContain('Stage été 2026')
+        ->and($html)->toContain('Non affecté');
+});
+
+it('n affiche pas de chevron ni de repere de repli sur un compte sans ventilation', function () {
+    $exercice = app(ExerciceService::class)->current();
+
+    // Compte avec une enveloppe mais aucune ventilation par opération.
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id, 'compte_id' => $this->depenseCompte->id,
+        'exercice' => $exercice, 'operation_id' => null, 'montant_prevu' => 1000.00,
+    ]);
+
+    $html = Livewire::test(BudgetTable::class)->assertOk()->html();
+
+    // 'budget-chevron' seul apparaît toujours (règle CSS globale du bloc
+    // <style>) : on vérifie l'absence de l'icône elle-même, pas de la classe.
+    expect($html)->not->toContain('data-compte-toggle="'.$this->depenseCompte->id.'"')
+        ->and($html)->not->toContain('data-compte-toggle="'.$this->recetteCompte->id.'"')
+        ->and($html)->not->toContain('bi-chevron-right budget-chevron');
+});
+
+it('porte l appariement compte vers sous lignes aussi sur un compte de produits', function () {
+    // Même garantie que côté Charges, sur le bloc Produits : les deux blocs
+    // symétriques doivent recevoir le même traitement de repli.
+    $exercice = app(ExerciceService::class)->current();
+    $op = Operation::factory()->create([
+        'association_id' => $this->association->id, 'nom' => 'Gala annuel',
+    ]);
+
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id, 'compte_id' => $this->recetteCompte->id,
+        'exercice' => $exercice, 'operation_id' => null, 'montant_prevu' => 4000.00,
+    ]);
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id, 'compte_id' => $this->recetteCompte->id,
+        'exercice' => $exercice, 'operation_id' => $op->id, 'montant_prevu' => 2500.00,
+    ]);
+
+    $html = Livewire::test(BudgetTable::class)->assertOk()->html();
+
+    expect($html)->toContain('data-compte-toggle="'.$this->recetteCompte->id.'"')
+        ->and(substr_count($html, 'data-ventilation-of="'.$this->recetteCompte->id.'"'))->toBe(2)
+        ->and($html)->toContain('id="budget-table-produits"')
+        ->and($html)->toContain('id="budget-table-charges"');
+});
+
+it('affiche un controle tout deplier tout replier sur les deux blocs', function () {
+    $html = Livewire::test(BudgetTable::class)->assertOk()->html();
+
+    expect($html)->toContain('data-toggle-all-target="budget-table-charges"')
+        ->and($html)->toContain('data-toggle-all-target="budget-table-produits"')
+        ->and($html)->toContain('Tout déplier');
+});

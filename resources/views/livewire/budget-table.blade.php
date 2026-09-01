@@ -182,12 +182,16 @@
 
     {{-- Charges (dépenses) --}}
     <div class="card mb-4">
-        <div class="card-header">
+        <div class="card-header d-flex justify-content-between align-items-center">
             <h5 class="mb-0">Charges (dépenses)</h5>
+            <button type="button" class="btn btn-sm btn-outline-secondary budget-toggle-all"
+                    data-toggle-all-target="budget-table-charges">
+                <i class="bi bi-arrows-expand"></i> Tout déplier
+            </button>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-striped table-hover mb-0">
+                <table class="table table-striped table-hover mb-0" id="budget-table-charges">
                     <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                         <tr>
                             <th>Compte</th>
@@ -217,10 +221,16 @@
                                     // affecter, négatif = dépassement engagé.
                                     $resteAAffecter = $prevu - $sommeVentilee;
                                 @endphp
-                                <tr>
+                                <tr
+                                    @if ($lignesVentilees->isNotEmpty())
+                                        data-compte-toggle="{{ $compte->id }}"
+                                        style="cursor: pointer;"
+                                        title="Cliquer pour déplier / replier la ventilation"
+                                    @endif
+                                >
                                     <td class="ps-4">
                                         @if ($lignesVentilees->isNotEmpty())
-                                            <i class="bi bi-chevron-down text-muted me-1"></i>
+                                            <i class="bi bi-chevron-right budget-chevron text-muted me-1"></i>
                                         @endif
                                         <span class="font-monospace">{{ $compte->numero_pcg }}</span> — {{ $compte->intitule }}
                                         @if ($resteAAffecter < 0)
@@ -290,7 +300,11 @@
                                         // modale et le clic n'aurait aucun effet utile.
                                         $vCliquable = $v->operation && ! $v->operation->trashed();
                                     @endphp
-                                    <tr class="table-light"
+                                    {{-- d-none par défaut : la ventilation est repliée au premier affichage.
+                                         Le repli est purement visuel (classe JS/CSS) — la ligne reste bien
+                                         dans le HTML rendu, jamais retirée côté serveur. --}}
+                                    <tr class="table-light d-none"
+                                        data-ventilation-of="{{ $compte->id }}"
                                         @if ($vCliquable)
                                             wire:click="$dispatch('ouvrir-affectation', { operationId: {{ $v->operation_id }} })"
                                             style="cursor: pointer;"
@@ -336,7 +350,7 @@
                                     </tr>
                                 @endforeach
                                 @if ($lignesVentilees->isNotEmpty())
-                                    <tr class="table-light">
+                                    <tr class="table-light d-none" data-ventilation-of="{{ $compte->id }}">
                                         <td class="ps-5 small fst-italic {{ $resteAAffecter < 0 ? 'text-danger fw-bold' : 'text-muted' }}">
                                             {{ $resteAAffecter < 0 ? 'Dépassement engagé' : 'Non affecté' }}
                                         </td>
@@ -365,12 +379,16 @@
 
     {{-- Produits (recettes) --}}
     <div class="card mb-4">
-        <div class="card-header">
+        <div class="card-header d-flex justify-content-between align-items-center">
             <h5 class="mb-0">Produits (recettes)</h5>
+            <button type="button" class="btn btn-sm btn-outline-secondary budget-toggle-all"
+                    data-toggle-all-target="budget-table-produits">
+                <i class="bi bi-arrows-expand"></i> Tout déplier
+            </button>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-striped table-hover mb-0">
+                <table class="table table-striped table-hover mb-0" id="budget-table-produits">
                     <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                         <tr>
                             <th>Compte</th>
@@ -400,10 +418,16 @@
                                     // affecter, négatif = dépassement engagé.
                                     $resteAAffecter = $prevu - $sommeVentilee;
                                 @endphp
-                                <tr>
+                                <tr
+                                    @if ($lignesVentilees->isNotEmpty())
+                                        data-compte-toggle="{{ $compte->id }}"
+                                        style="cursor: pointer;"
+                                        title="Cliquer pour déplier / replier la ventilation"
+                                    @endif
+                                >
                                     <td class="ps-4">
                                         @if ($lignesVentilees->isNotEmpty())
-                                            <i class="bi bi-chevron-down text-muted me-1"></i>
+                                            <i class="bi bi-chevron-right budget-chevron text-muted me-1"></i>
                                         @endif
                                         <span class="font-monospace">{{ $compte->numero_pcg }}</span> — {{ $compte->intitule }}
                                         @if ($resteAAffecter < 0)
@@ -473,7 +497,11 @@
                                         // modale et le clic n'aurait aucun effet utile.
                                         $vCliquable = $v->operation && ! $v->operation->trashed();
                                     @endphp
-                                    <tr class="table-light"
+                                    {{-- d-none par défaut : la ventilation est repliée au premier affichage.
+                                         Le repli est purement visuel (classe JS/CSS) — la ligne reste bien
+                                         dans le HTML rendu, jamais retirée côté serveur. --}}
+                                    <tr class="table-light d-none"
+                                        data-ventilation-of="{{ $compte->id }}"
                                         @if ($vCliquable)
                                             wire:click="$dispatch('ouvrir-affectation', { operationId: {{ $v->operation_id }} })"
                                             style="cursor: pointer;"
@@ -519,7 +547,7 @@
                                     </tr>
                                 @endforeach
                                 @if ($lignesVentilees->isNotEmpty())
-                                    <tr class="table-light">
+                                    <tr class="table-light d-none" data-ventilation-of="{{ $compte->id }}">
                                         <td class="ps-5 small fst-italic {{ $resteAAffecter < 0 ? 'text-danger fw-bold' : 'text-muted' }}">
                                             {{ $resteAAffecter < 0 ? 'Dépassement engagé' : 'Non affecté' }}
                                         </td>
@@ -599,4 +627,124 @@
     @endif
 
     <livewire:budget-affectation-modal />
+
+    {{-- ═══════════════════════════════════════════════════════════
+         JS : REPLI / DÉPLIAGE DES SOUS-LIGNES DE VENTILATION (côté client)
+
+         En JS pur, pas en propriété Livewire : un aller-retour serveur par
+         chevron re-rendrait tout le tableau (deux requêtes groupées + le plan
+         comptable) pour un simple pliage d'affichage.
+
+         L'état ouvert/fermé vit dans un Set JS en mémoire (pas de
+         localStorage : il n'a pas à survivre à un rechargement de page).
+         Piège à éviter : tout re-render Livewire (édition d'un montant,
+         enregistrement depuis la modale d'affectation…) régénère le HTML des
+         lignes avec leurs classes par défaut (repliées), ce qui effacerait
+         l'état sans réapplication — accroché sur Livewire.hook('morph.updated', …),
+         même mécanisme déjà utilisé par le tri de colonnes de l'écran
+         Provisions (resources/views/livewire/provisions/provision-index.blade.php).
+         ═══════════════════════════════════════════════════════════ --}}
+    <style>
+        .budget-chevron { display: inline-block; transition: transform 0.15s ease; }
+        .budget-chevron.expanded { transform: rotate(90deg); }
+    </style>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const tableIds = ['budget-table-charges', 'budget-table-produits'];
+
+            // Ids de compte (string, tel que lu dans data-compte-toggle) actuellement
+            // dépliés. Partagé entre les deux tableaux (Charges / Produits) : les ids
+            // de compte n'entrent jamais en collision entre les deux blocs.
+            const openAccountIds = new Set();
+
+            // Le bouton « Tout déplier / replier » n'a pas d'état à lui : son
+            // libellé est dérivé du Set à chaque applyState(), pour ne jamais
+            // désynchroniser d'un repli/dépliage individuel ou d'un re-render.
+            function syncToggleAllLabel(tableId, rows) {
+                const btn = document.querySelector('[data-toggle-all-target="' + tableId + '"]');
+                if (!btn) return;
+                const allOpen = rows.length > 0 && rows.every(function (row) {
+                    return openAccountIds.has(row.dataset.compteToggle);
+                });
+                btn.innerHTML = allOpen
+                    ? '<i class="bi bi-arrows-collapse"></i> Tout replier'
+                    : '<i class="bi bi-arrows-expand"></i> Tout déplier';
+            }
+
+            function applyState(tableId) {
+                const table = document.getElementById(tableId);
+                if (!table) return;
+
+                const rows = Array.from(table.querySelectorAll('tr[data-compte-toggle]'));
+                rows.forEach(function (row) {
+                    const id = row.dataset.compteToggle;
+                    const open = openAccountIds.has(id);
+                    const chevron = row.querySelector('.budget-chevron');
+                    if (chevron) chevron.classList.toggle('expanded', open);
+
+                    table.querySelectorAll('[data-ventilation-of="' + id + '"]').forEach(function (sub) {
+                        sub.classList.toggle('d-none', !open);
+                    });
+                });
+
+                syncToggleAllLabel(tableId, rows);
+            }
+
+            function toggleAccount(row) {
+                const id = row.dataset.compteToggle;
+                if (openAccountIds.has(id)) {
+                    openAccountIds.delete(id);
+                } else {
+                    openAccountIds.add(id);
+                }
+                applyState(row.closest('table').id);
+            }
+
+            tableIds.forEach(function (tableId) {
+                const table = document.getElementById(tableId);
+                if (!table) return;
+
+                // Délégation sur le tableau entier : le clic sur une ligne de compte
+                // ventilée (data-compte-toggle) replie/déplie ses sous-lignes. Ignoré
+                // si la cible est un contrôle d'édition d'enveloppe (montant, boutons
+                // ajouter/supprimer) déjà porteur de sa propre action wire:click —
+                // sans quoi éditer le montant replierait/déplierait la ligne au passage.
+                table.addEventListener('click', function (e) {
+                    const row = e.target.closest('tr[data-compte-toggle]');
+                    if (!row || !table.contains(row)) return;
+                    if (e.target.closest('button, input, [wire\\:click]')) return;
+                    toggleAccount(row);
+                });
+
+                const toggleAllBtn = document.querySelector('[data-toggle-all-target="' + tableId + '"]');
+                if (toggleAllBtn) {
+                    toggleAllBtn.addEventListener('click', function () {
+                        const rows = Array.from(table.querySelectorAll('tr[data-compte-toggle]'));
+                        const allOpen = rows.length > 0 && rows.every(function (row) {
+                            return openAccountIds.has(row.dataset.compteToggle);
+                        });
+                        rows.forEach(function (row) {
+                            const id = row.dataset.compteToggle;
+                            if (allOpen) {
+                                openAccountIds.delete(id);
+                            } else {
+                                openAccountIds.add(id);
+                            }
+                        });
+                        applyState(tableId);
+                    });
+                }
+
+                applyState(tableId);
+            });
+
+            Livewire.hook('morph.updated', ({ el }) => {
+                tableIds.forEach(function (tableId) {
+                    if (el.id === tableId || el.closest('#' + tableId)) {
+                        requestAnimationFrame(function () { applyState(tableId); });
+                    }
+                });
+            });
+        });
+    </script>
 </div>
