@@ -325,18 +325,22 @@
                     @else
                     <div class="row text-center mb-2">
                         <div class="col-md-4">
-                            <div class="small text-muted">Prévu</div>
-                            <div class="fw-bold">{{ number_format($totalPrevu, 2, ',', ' ') }} &euro;</div>
+                            <div class="small text-muted">Résultat prévu</div>
+                            <div class="fw-bold">{{ number_format($resultatPrevu, 2, ',', ' ') }} &euro;</div>
                         </div>
                         <div class="col-md-4">
-                            <div class="small text-muted">Réalisé</div>
-                            <div class="fw-bold">{{ number_format($totalRealise, 2, ',', ' ') }} &euro;</div>
+                            <div class="small text-muted">Résultat réalisé</div>
+                            <div class="fw-bold">{{ number_format($resultatRealise, 2, ',', ' ') }} &euro;</div>
                         </div>
                         <div class="col-md-4">
-                            @php $ecart = $totalPrevu - $totalRealise; @endphp
+                            {{-- On compare deux résultats entre eux : écart >= 0 = on fait
+                                mieux que prévu (vert), quel que soit le mélange charges/
+                                produits qui le compose. Pas d'ambiguïté de sens ici,
+                                contrairement au tableau par famille ci-dessous. --}}
+                            @php $ecartResultat = $resultatRealise - $resultatPrevu; @endphp
                             <div class="small text-muted">Écart</div>
-                            <div class="fw-bold {{ $ecart >= 0 ? 'text-success' : 'text-danger' }}">
-                                {{ number_format($ecart, 2, ',', ' ') }} &euro;
+                            <div class="fw-bold {{ $ecartResultat >= 0 ? 'text-success' : 'text-danger' }}">
+                                {{ number_format($ecartResultat, 2, ',', ' ') }} &euro;
                             </div>
                         </div>
                     </div>

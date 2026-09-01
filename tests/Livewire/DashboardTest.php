@@ -2,6 +2,7 @@
 
 use App\Livewire\Dashboard;
 use App\Models\Association;
+use App\Models\BudgetLine;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\Transaction;
@@ -124,4 +125,122 @@ it('displays comptes bancaires with soldes', function () {
     Livewire::test(Dashboard::class)
         ->assertSee('Compte Principal')
         ->assertSee('1 500,00');
+});
+
+it('shows the aucun budget defini message when there is no budget line', function () {
+    Livewire::test(Dashboard::class)
+        ->assertSee('Aucun budget défini pour cet exercice.')
+        ->assertDontSee('Résultat prévu');
+});
+
+it('budget tile shows a resultat, not the sum of charges and produits envelopes', function () {
+    // Piège historique : additionner les enveloppes de classe 6 (charges) et
+    // classe 7 (produits) sans les opposer donne un total sans signification
+    // comptable. 1000 de charge + 3000 de produit doit donner un résultat
+    // prévu de 2000 (3000 - 1000), jamais 4000.
+    $compteCharge = Compte::factory()->depense()->create(['association_id' => $this->association->id]);
+    $compteProduit = Compte::factory()->recette()->create(['association_id' => $this->association->id]);
+
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id,
+        'compte_id' => $compteCharge->id,
+        'exercice' => $this->exercice,
+        'montant_prevu' => 1000.00,
+    ]);
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id,
+        'compte_id' => $compteProduit->id,
+        'exercice' => $this->exercice,
+        'montant_prevu' => 3000.00,
+    ]);
+
+    Livewire::test(Dashboard::class)
+        ->assertSee('Résultat prévu')
+        ->assertSee('2 000,00')
+        ->assertDontSee('4 000,00');
+});
+
+it('budget tile computes resultat realise and ecart from actual bookings', function () {
+    $compteCharge = Compte::factory()->depense()->create(['association_id' => $this->association->id]);
+    $compteProduit = Compte::factory()->recette()->create(['association_id' => $this->association->id]);
+
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id,
+        'compte_id' => $compteCharge->id,
+        'exercice' => $this->exercice,
+        'montant_prevu' => 1000.00,
+    ]);
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id,
+        'compte_id' => $compteProduit->id,
+        'exercice' => $this->exercice,
+        'montant_prevu' => 3000.00,
+    ]);
+
+    $depense = Transaction::factory()->asDepense()->create([
+        'association_id' => $this->association->id,
+        'date' => $this->exercice.'-10-15',
+        'montant_total' => 800.00,
+        'saisi_par' => $this->user->id,
+    ]);
+    TransactionLigne::factory()->create([
+        'transaction_id' => $depense->id,
+        'compte_id' => $compteCharge->id,
+        'debit' => 800.00,
+        'credit' => 0,
+        'montant' => 800.00,
+    ]);
+
+    $recette = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
+        'date' => $this->exercice.'-11-01',
+        'montant_total' => 2500.00,
+        'saisi_par' => $this->user->id,
+    ]);
+    TransactionLigne::factory()->create([
+        'transaction_id' => $recette->id,
+        'compte_id' => $compteProduit->id,
+        'debit' => 0,
+        'credit' => 2500.00,
+        'montant' => 2500.00,
+    ]);
+
+    // Résultat prévu = 3000 - 1000 = 2000 ; résultat réalisé = 2500 - 800 = 1700
+    // ; écart = réalisé - prévu = 1700 - 2000 = -300 (en dessous de la prévision).
+    Livewire::test(Dashboard::class)
+        ->assertSee('2 000,00')
+        ->assertSee('1 700,00')
+        ->assertSee('-300,00');
+});
+
+it('a contra-produit debited reduces resultat realise instead of inflating it', function () {
+    $compteProduit = Compte::factory()->recette()->create(['association_id' => $this->association->id]);
+
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id,
+        'compte_id' => $compteProduit->id,
+        'exercice' => $this->exercice,
+        'montant_prevu' => 500.00,
+    ]);
+
+    // Contra-produit : le compte de classe 7 est mouvementé au débit (ex. 709
+    // Gratuités accordées), ce qui doit réduire le réalisé et non l'augmenter.
+    $tx = Transaction::factory()->asDepense()->create([
+        'association_id' => $this->association->id,
+        'date' => $this->exercice.'-10-01',
+        'montant_total' => 200.00,
+        'saisi_par' => $this->user->id,
+    ]);
+    TransactionLigne::factory()->create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $compteProduit->id,
+        'debit' => 200.00,
+        'credit' => 0,
+        'montant' => 200.00,
+    ]);
+
+    // Réalisé = 0 (crédit) - 200 (débit) = -200 : négatif, pas 200 en valeur
+    // absolue ni ignoré.
+    Livewire::test(Dashboard::class)
+        ->assertSee('-200,00');
 });

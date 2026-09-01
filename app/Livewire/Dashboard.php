@@ -55,15 +55,28 @@ final class Dashboard extends Component
 
         $familles = Famille::pourComptes(EloquentCollection::make($budgetLines->pluck('compte')->filter()));
 
-        $totalPrevu = (float) $budgetLines->sum('montant_prevu');
-        $totalRealise = 0.0;
+        // Résultat budgétaire — pas une somme de charges et de produits (les
+        // deux classes n'ont pas le même sens), mais leur différence, comme au
+        // compte de résultat : produits (classe 7) moins charges (classe 6).
+        // Les lignes sans compte, ou dont le compte n'est ni classe 6 ni
+        // classe 7, sont exclues des totaux (elles ne devraient pas exister).
+        $resultatPrevu = 0.0;
+        $resultatRealise = 0.0;
         $realiseMap = $budgetService->realiseParCompte($exercice);
         $budgetParFamille = []; // ['nomGroupe' => ['type' => 'depense|recette', 'prevu' => float, 'realise' => float]]
         foreach ($budgetLines as $line) {
             $r = $line->compte_id !== null ? ($realiseMap[(int) $line->compte_id] ?? 0.0) : 0.0;
-            $totalRealise += $r;
 
             $compte = $line->compte;
+            $classe = $compte?->classe;
+            if ($classe === 7) {
+                $resultatPrevu += (float) $line->montant_prevu;
+                $resultatRealise += $r;
+            } elseif ($classe === 6) {
+                $resultatPrevu -= (float) $line->montant_prevu;
+                $resultatRealise -= $r;
+            }
+
             $famille = $compte !== null ? $familles->get(substr($compte->numero_pcg, 0, 2)) : null;
 
             $familleKey = $famille?->nom ?? '—';
@@ -165,8 +178,8 @@ final class Dashboard extends Component
             'soldeGeneral' => $soldeGeneral,
             'totalRecettes' => $totalRecettes,
             'totalDepenses' => $totalDepenses,
-            'totalPrevu' => $totalPrevu,
-            'totalRealise' => $totalRealise,
+            'resultatPrevu' => round($resultatPrevu, 2),
+            'resultatRealise' => round($resultatRealise, 2),
             'budgetParFamille' => $budgetParFamille,
             'dernieresDepenses' => $dernieresDepenses,
             'dernieresRecettes' => $dernieresRecettes,
