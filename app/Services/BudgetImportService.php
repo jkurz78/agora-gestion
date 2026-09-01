@@ -109,12 +109,29 @@ final class BudgetImportService
             }
         }
 
-        // Erreur exercice : rapport groupé
+        // Erreur exercice : rapport groupé, dans la même notation des deux
+        // côtés (libellé complet, ex. "2025-2026"), avec une invitation à
+        // changer d'exercice — sauf si le fichier mélange plusieurs
+        // exercices, auquel cas ce conseil serait faux : c'est le fichier
+        // qui est incohérent, pas l'exercice affiché.
         if (! empty($wrongExercices)) {
-            $unique = array_unique($wrongExercices);
-            sort($unique);
-            $list = implode(', ', $unique);
-            $errors = array_merge([['line' => 0, 'message' => "Le fichier contient les exercices {$list}, l'exercice ouvert est {$exercice}."]], $errors);
+            $labels = array_values(array_unique(array_map(
+                fn (string $raw): string => $this->formatExerciceLabel($raw),
+                $wrongExercices
+            )));
+            sort($labels);
+            $exerciceLabel = app(ExerciceService::class)->label($exercice);
+
+            if (count($labels) === 1) {
+                $message = "Ce fichier porte l'exercice {$labels[0]}, alors que l'exercice affiché est {$exerciceLabel}. "
+                    ."Basculez sur l'exercice {$labels[0]} avant d'importer.";
+            } else {
+                $list = implode(', ', $labels);
+                $message = "Ce fichier mélange plusieurs exercices ({$list}), alors que l'exercice affiché est {$exerciceLabel}. "
+                    ."Un fichier d'import ne doit porter qu'un seul exercice.";
+            }
+
+            $errors = array_merge([['line' => 0, 'message' => $message]], $errors);
         }
 
         // Erreur comptes en doublon : même motif de rapport groupé.
@@ -252,6 +269,24 @@ final class BudgetImportService
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    /**
+     * Met la valeur d'exercice d'une cellule du fichier dans la même
+     * notation que celle affichée pour l'exercice ouvert (libellé complet,
+     * ex. "2025-2026"), en acceptant l'année seule ("2025") comme le fait
+     * le parseur. Une valeur non parsable (vide, "toto"...) est reprise
+     * telle quelle plutôt que de produire un libellé absurde comme "0-1".
+     */
+    private function formatExerciceLabel(string $raw): string
+    {
+        $yearPart = trim(str_contains($raw, '-') ? explode('-', $raw)[0] : $raw);
+
+        if (! preg_match('/^\d+$/', $yearPart)) {
+            return $raw;
+        }
+
+        return app(ExerciceService::class)->label((int) $yearPart);
     }
 
     private function validateHeader(array $row): ?string

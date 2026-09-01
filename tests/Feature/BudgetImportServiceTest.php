@@ -91,18 +91,20 @@ it('rejette si l\'en-tête est invalide', function () {
         ->and($result->errors[0]['message'])->toContain('En-tête invalide');
 });
 
-it('rejette si l\'exercice dans le fichier ne correspond pas', function () {
+it('rejette si l\'exercice dans le fichier ne correspond pas, avec les deux libellés complets et une invitation à changer d\'exercice', function () {
     $csv = "exercice;famille;compte;montant_prevu\n"
          ."2024-2025;Charges;Loyers;100.00\n";
 
     $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
 
     expect($result->success)->toBeFalse()
-        ->and($result->errors[0]['message'])->toContain('2024-2025')
-        ->and($result->errors[0]['message'])->toContain('2025');
+        ->and($result->errors[0]['message'])->toBe(
+            "Ce fichier porte l'exercice 2024-2025, alors que l'exercice affiché est 2025-2026. "
+            ."Basculez sur l'exercice 2024-2025 avant d'importer."
+        );
 });
 
-it('liste tous les exercices incorrects distincts dans le message d\'erreur', function () {
+it('liste tous les exercices incorrects distincts dans le message d\'erreur, sans invitation à changer d\'exercice', function () {
     $csv = "exercice;famille;compte;montant_prevu\n"
          ."2024-2025;Charges;Loyers;100.00\n"
          ."2023-2024;Charges;Électricité;200.00\n";
@@ -110,8 +112,34 @@ it('liste tous les exercices incorrects distincts dans le message d\'erreur', fu
     $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
 
     expect($result->success)->toBeFalse()
-        ->and($result->errors[0]['message'])->toContain('2023-2024')
-        ->and($result->errors[0]['message'])->toContain('2024-2025');
+        ->and($result->errors[0]['message'])->toBe(
+            "Ce fichier mélange plusieurs exercices (2023-2024, 2024-2025), alors que l'exercice affiché est 2025-2026. "
+            ."Un fichier d'import ne doit porter qu'un seul exercice."
+        )
+        ->and($result->errors[0]['message'])->not->toContain('Basculez');
+});
+
+it('normalise une année seule écrite dans le fichier au format complet de l\'exercice', function () {
+    $csv = "exercice;famille;compte;montant_prevu\n"
+         ."2024;Charges;Loyers;100.00\n";
+
+    $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
+
+    expect($result->success)->toBeFalse()
+        ->and($result->errors[0]['message'])->toContain('2024-2025')
+        ->and($result->errors[0]['message'])->not->toContain('2024,')
+        ->and($result->errors[0]['message'])->not->toContain("l'exercice 2024 ");
+});
+
+it('rejette proprement une valeur d\'exercice non parsable, sans libellé absurde ni erreur PHP', function () {
+    $csv = "exercice;famille;compte;montant_prevu\n"
+         ."toto;Charges;Loyers;100.00\n";
+
+    $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
+
+    expect($result->success)->toBeFalse()
+        ->and($result->errors[0]['message'])->toContain('toto')
+        ->and($result->errors[0]['message'])->not->toContain('0-1');
 });
 
 it('rejette si un compte est introuvable', function () {
