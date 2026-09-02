@@ -17,6 +17,7 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Services\RapportService;
+use App\Support\ComparaisonBudgetaire;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
@@ -444,4 +445,144 @@ it('l ecart du compte de resultat garde ses couleurs apres passage par Comparais
     // Même nombre (+300,00), deux couleurs opposées.
     expect($html)->toContain('<span class="cr-neg">+300,00 &euro;</span>')
         ->and($html)->toContain('<span class="cr-pos">+300,00 &euro;</span>');
+});
+
+it('le resultat porte son budget et son ecart est additif entre recettes et depenses', function (): void {
+    // Une charge budgétée 1 000 €, réalisée 1 300 € (dépassement, défavorable) ;
+    // un produit budgété 2 000 €, réalisé 2 500 € (dépassement, favorable).
+    // Résultat budgété 1 000 €, réalisé 1 200 €.
+    $charge = Compte::factory()->numero('627')->create([
+        'association_id' => $this->association->id,
+        'intitule' => 'Frais bancaires',
+    ]);
+    $produit = Compte::factory()->numero('756')->create([
+        'association_id' => $this->association->id,
+        'intitule' => 'Mécénat',
+    ]);
+
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id,
+        'compte_id' => $charge->id,
+        'exercice' => 2025,
+        'operation_id' => null,
+        'montant_prevu' => 1000.00,
+    ]);
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id,
+        'compte_id' => $produit->id,
+        'exercice' => 2025,
+        'operation_id' => null,
+        'montant_prevu' => 2000.00,
+    ]);
+
+    $depense = Transaction::factory()->asDepense()->create([
+        'association_id' => $this->association->id,
+        'date' => '2025-11-01',
+        'saisi_par' => $this->user->id,
+    ]);
+    $depense->lignes()->forceDelete();
+    TransactionLigne::factory()->create([
+        'transaction_id' => $depense->id,
+        'compte_id' => $charge->id,
+        'debit' => 1300.00,
+        'credit' => 0,
+        'montant' => 1300.00,
+    ]);
+
+    $recette = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
+        'date' => '2025-11-01',
+        'saisi_par' => $this->user->id,
+    ]);
+    $recette->lignes()->forceDelete();
+    TransactionLigne::factory()->create([
+        'transaction_id' => $recette->id,
+        'compte_id' => $produit->id,
+        'debit' => 0,
+        'credit' => 2500.00,
+        'montant' => 2500.00,
+    ]);
+
+    // Additivité affirmée explicitement, pas seulement le nombre final : ce
+    // n'est pas une coïncidence, c'est algébrique — écart(résultat) doit valoir
+    // exactement écart(recettes) - écart(dépenses).
+    $ecartCharges = ComparaisonBudgetaire::ecart(1000.0, 1300.0);
+    $ecartProduits = ComparaisonBudgetaire::ecart(2000.0, 2500.0);
+    $ecartResultatAttendu = ComparaisonBudgetaire::ecart(1000.0, 1200.0);
+
+    expect($ecartResultatAttendu)->toBe($ecartProduits - $ecartCharges)
+        ->and($ecartResultatAttendu)->toBe(200.0);
+
+    $vue = Livewire::test(RapportCompteResultat::class)->assertOk();
+
+    expect((float) $vue->viewData('resultatBudget'))->toBe(1000.0);
+
+    $html = $vue->html();
+
+    // +200,00 est unique dans ce jeu : les autres écarts affichés valent
+    // +300,00 (charge) et +500,00 (produit).
+    expect(substr_count($html, '+200,00'))->toBe(1)
+        ->and($html)->toContain('+200,00 &euro;');
+});
+
+it('sans budget nulle part le resultat budgete est null et la ligne affiche un tiret', function (): void {
+    $charge = Compte::factory()->numero('627')->create([
+        'association_id' => $this->association->id,
+        'intitule' => 'Frais bancaires',
+    ]);
+
+    $tx = Transaction::factory()->asDepense()->create([
+        'association_id' => $this->association->id,
+        'date' => '2025-11-01',
+        'saisi_par' => $this->user->id,
+    ]);
+    $tx->lignes()->forceDelete();
+    TransactionLigne::factory()->create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $charge->id,
+        'debit' => 500.00,
+        'credit' => 0,
+        'montant' => 500.00,
+    ]);
+
+    $vue = Livewire::test(RapportCompteResultat::class)->assertOk();
+
+    expect($vue->viewData('resultatBudget'))->toBeNull();
+
+    $html = $vue->html();
+    $start = mb_strpos($html, '<tr class="cr-resultat"');
+    expect($start)->not->toBeFalse();
+    $end = mb_strpos($html, '</tr>', $start);
+    $resultatRowHtml = mb_substr($html, $start, $end - $start);
+
+    // La cellule Budget (largeur 115 px, sans la teinte pâle de la colonne N-1)
+    // affiche un tiret, jamais « 0,00 € » ; l'écart, faute de budget, tombe
+    // dans la même branche « pas de comparaison possible » que les lignes de
+    // détail sans budget (span text-muted), jamais dans la branche cr-zero
+    // réservée à un écart réellement nul.
+    expect($resultatRowHtml)->toContain('width:115px;padding:12px;">&mdash;</td>')
+        ->and($resultatRowHtml)->not->toContain('width:115px;padding:12px;">0,00 &euro;</td>')
+        ->and($resultatRowHtml)->toContain('<span class="text-muted">&mdash;</span>')
+        ->and($resultatRowHtml)->not->toContain('<span class="cr-zero">0,00 &euro;</span>');
+});
+
+it('les couleurs d ecart des lignes a fond sombre sont definies dans le css rendu', function (): void {
+    $html = Livewire::test(RapportCompteResultat::class)->assertOk()->html();
+
+    expect($html)->toContain('.cr-total .cr-pos')
+        ->and($html)->toContain('.cr-resultat .cr-pos');
+});
+
+it('le fond de la ligne resultat vise la cellule et non la ligne', function (): void {
+    $html = Livewire::test(RapportCompteResultat::class)->assertOk()->html();
+
+    // Trouvé en recette : le fond était posé sur le <tr>, et ne rendait pas.
+    // Bootstrap peint background-color ET color sur « .table > :not(caption) >
+    // * > * », donc la cellule recouvre tout ce que la ligne déclare — c'est
+    // pourquoi toutes les autres règles de cette vue visent le td. La ligne
+    // RÉSULTAT s'affichait blanche, ce qui passait inaperçu tant que ses
+    // cellules budget et écart étaient vides, et devenait illisible dès qu'on
+    // y écrivait les couleurs claires prévues pour un fond sombre.
+    expect($html)->toContain('.cr-resultat td { background:')
+        ->and($html)->not->toMatch('/<tr class="cr-resultat"[^>]*background:/');
 });

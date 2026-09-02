@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Services\ExerciceService;
+use App\Services\Rapports\CompteResultatBuilder;
 use App\Services\RapportService;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -57,10 +58,17 @@ final class RapportCompteResultat extends Component
         // masque les lignes entièrement à zéro ($scVisibles), que ce total
         // compte quand même — une enveloppe posée à 0 € sur un compte non
         // mouvementé affiche donc « 0,00 € » en total, face à un détail vide.
-        $totalChargesBudget = self::sommeBudget($data['charges']);
-        $totalProduitsBudget = self::sommeBudget($data['produits']);
+        $totalChargesBudget = CompteResultatBuilder::sommeBudgetSection($data['charges']);
+        $totalProduitsBudget = CompteResultatBuilder::sommeBudgetSection($data['produits']);
         $resultatCourant = $totalProduitsN - $totalChargesN;
         $resultatCourantN1 = $totalProduitsN1 - $totalChargesN1;
+        // Budget du résultat = budget des produits - budget des charges. null
+        // seulement si AUCUNE des deux sections n'a de budget ; si une seule en
+        // a un, l'autre compte pour zéro — sinon un budget posé sur les seules
+        // dépenses ne produirait jamais de résultat prévu.
+        $resultatBudget = ($totalChargesBudget === null && $totalProduitsBudget === null)
+            ? null
+            : ($totalProduitsBudget ?? 0.0) - ($totalChargesBudget ?? 0.0);
 
         return view('livewire.rapport-compte-resultat', [
             'charges' => $data['charges'],
@@ -77,24 +85,7 @@ final class RapportCompteResultat extends Component
             'totalProduitsBudget' => $totalProduitsBudget,
             'resultatCourant' => $resultatCourant,
             'resultatCourantN1' => $resultatCourantN1,
+            'resultatBudget' => $resultatBudget,
         ]);
-    }
-
-    /**
-     * Somme des budgets des familles d'une section, en distinguant « aucun
-     * budget nulle part dans la section » (null, comme pour une ligne sans
-     * budget individuelle → tiret) de « la section budgète, et ça tombe à
-     * 0 € » (0.0, un vrai total). Collection::sum() ne fait pas cette
-     * différence : sur une collection vide ou entièrement à null, elle rend
-     * 0 — ce qui afficherait un total budget à 0 € (et un écart délirant)
-     * pour une section qui n'a en réalité aucune ligne budgétée.
-     *
-     * @param  array<int, array{budget: ?float}>  $categories
-     */
-    private static function sommeBudget(array $categories): ?float
-    {
-        $budgets = collect($categories)->pluck('budget')->filter(fn (?float $b): bool => $b !== null);
-
-        return $budgets->isEmpty() ? null : $budgets->sum();
     }
 }

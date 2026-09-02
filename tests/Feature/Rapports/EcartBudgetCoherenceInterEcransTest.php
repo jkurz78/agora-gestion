@@ -80,7 +80,18 @@ it('un compte de charge en depassement affiche le meme ecart signe sur l ecran B
     // réalisé est PIRE que prévu) — ce n'est pas ce que ce test vérifie.
     expect($htmlBudget)->toMatch('/text-danger">[\s\S]{0,80}?\+300,00/')
         ->and($htmlCompteResultat)->toMatch('/cr-neg">\+300,00/')
-        ->and($htmlCompteResultat)->not->toMatch('/-300,00/');
+        // Garde anti-inversion : le +300 d'une charge en dépassement n'est
+        // JAMAIS peint favorable. Elle remplace l'ancien « -300,00 absent »,
+        // qui n'est plus tenable depuis que la ligne RÉSULTAT du compte de
+        // résultat porte son propre écart — c'est mot pour mot ce que le
+        // commentaire ci-dessus disait déjà de l'écran Budget, les deux
+        // écrans se comportent enfin pareil.
+        ->and($htmlCompteResultat)->not->toMatch('/cr-pos">\+300,00/')
+        // Et cet écart de résultat est bien défavorable : avec une seule
+        // charge et aucun produit, le résultat réalisé est PIRE que prévu de
+        // 300 €. Un résultat se juge comme un produit — plus il est haut,
+        // mieux c'est — donc -300 est une mauvaise nouvelle, en rouge.
+        ->and($htmlCompteResultat)->toMatch('/cr-neg">-300,00/');
 });
 
 it('un compte de charge sous-consomme affiche le meme ecart negatif favorable sur les deux ecrans', function () {

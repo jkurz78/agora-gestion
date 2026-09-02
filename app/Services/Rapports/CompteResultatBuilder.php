@@ -52,6 +52,24 @@ final class CompteResultatBuilder
     }
 
     /**
+     * Somme des budgets des familles d'une section, en distinguant « aucun
+     * budget nulle part dans la section » (null, comme pour une ligne sans
+     * budget individuelle → tiret) de « la section budgète, et ça tombe à
+     * 0 € » (0.0, un vrai total). Collection::sum() ne fait pas cette
+     * différence : sur une collection vide ou entièrement à null, elle rend
+     * 0 — ce qui afficherait un total budget à 0 € (et un écart délirant)
+     * pour une section qui n'a en réalité aucune ligne budgétée.
+     *
+     * @param  array<int, array{budget: ?float}>  $categories
+     */
+    public static function sommeBudgetSection(array $categories): ?float
+    {
+        $budgets = collect($categories)->pluck('budget')->filter(fn (?float $b): bool => $b !== null);
+
+        return $budgets->isEmpty() ? null : $budgets->sum();
+    }
+
+    /**
      * Totaux charges/produits d'une période, lus sur le grand livre (classes 6
      * et 7) — la définition même du résultat.
      *
