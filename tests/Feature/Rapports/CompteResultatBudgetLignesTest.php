@@ -201,3 +201,72 @@ it('un compte budgete sans mouvement rejoint la famille de ses homologues mouvem
         ->and((float) $famille['montant_n'])->toBe(400.0)
         ->and((float) $famille['budget'])->toBe(1500.0);
 });
+
+it('le total budget de chaque section egale la somme des enveloppes de sa classe', function (): void {
+    // Une charge mouvementée, une charge budgétée sans mouvement, un produit
+    // budgété sans mouvement : le total de chaque section doit contenir les
+    // enveloppes des deux natures, et rien de l'autre section.
+    $chargeMouvementee = Compte::factory()->numero('627')->create([
+        'association_id' => $this->association->id,
+        'intitule' => 'Frais bancaires',
+    ]);
+    $chargeDormante = Compte::factory()->numero('613A')->create([
+        'association_id' => $this->association->id,
+        'intitule' => 'Location salle',
+    ]);
+    $produitDormant = Compte::factory()->numero('756')->create([
+        'association_id' => $this->association->id,
+        'intitule' => 'Mécénat',
+    ]);
+
+    foreach ([[$chargeMouvementee, 1000.00], [$chargeDormante, 1500.00], [$produitDormant, 800.00]] as [$compte, $montant]) {
+        BudgetLine::factory()->create([
+            'association_id' => $this->association->id,
+            'compte_id' => $compte->id,
+            'exercice' => 2025,
+            'operation_id' => null,
+            'montant_prevu' => $montant,
+        ]);
+    }
+
+    $tx = Transaction::factory()->asDepense()->create([
+        'association_id' => $this->association->id,
+        'date' => '2025-11-01',
+        'saisi_par' => $this->user->id,
+    ]);
+    $tx->lignes()->forceDelete();
+    TransactionLigne::factory()->create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $chargeMouvementee->id,
+        'debit' => 900.00,
+        'credit' => 0,
+        'montant' => 900.00,
+    ]);
+
+    $vue = Livewire::test(RapportCompteResultat::class)->assertOk();
+
+    expect((float) $vue->viewData('totalChargesBudget'))->toBe(2500.0)
+        ->and((float) $vue->viewData('totalProduitsBudget'))->toBe(800.0);
+});
+
+it('la ligne budgetee sans mouvement est rendue quel que soit l etat du toggle budget', function (): void {
+    $compte = Compte::factory()->numero('613A')->create([
+        'association_id' => $this->association->id,
+        'intitule' => 'Location salle',
+    ]);
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id,
+        'compte_id' => $compte->id,
+        'exercice' => 2025,
+        'operation_id' => null,
+        'montant_prevu' => 1500.00,
+    ]);
+
+    // Le nombre de lignes du compte de résultat ne doit jamais dépendre d'une
+    // bascule d'affichage : le toggle masque des colonnes, pas des lignes.
+    $avecBudget = Livewire::test(RapportCompteResultat::class, ['compareBudget' => true])->assertOk();
+    $sansBudget = Livewire::test(RapportCompteResultat::class, ['compareBudget' => false])->assertOk();
+
+    expect($avecBudget->html())->toContain('Location salle')
+        ->and($sansBudget->html())->toContain('Location salle');
+});
