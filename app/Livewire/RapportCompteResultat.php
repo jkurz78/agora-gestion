@@ -53,7 +53,10 @@ final class RapportCompteResultat extends Component
         // budgété sans aucun mouvement y figure donc désormais, avec sa propre
         // ligne. Ce que la règle ci-dessus ne change pas : le total ne peut
         // toujours pas diverger de la colonne qu'il somme, puisque c'est la
-        // même collection des deux côtés.
+        // même collection des deux côtés. Une réserve, et une seule : la vue
+        // masque les lignes entièrement à zéro ($scVisibles), que ce total
+        // compte quand même — une enveloppe posée à 0 € sur un compte non
+        // mouvementé affiche donc « 0,00 € » en total, face à un détail vide.
         $totalChargesBudget = self::sommeBudget($data['charges']);
         $totalProduitsBudget = self::sommeBudget($data['produits']);
         $resultatCourant = $totalProduitsN - $totalChargesN;
