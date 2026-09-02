@@ -270,3 +270,119 @@ it('la ligne budgetee sans mouvement est rendue quel que soit l etat du toggle b
     expect($avecBudget->html())->toContain('Location salle')
         ->and($sansBudget->html())->toContain('Location salle');
 });
+
+it('un compte budgete et mouvemente n apparait qu une fois', function (): void {
+    $compte = Compte::factory()->numero('627')->create([
+        'association_id' => $this->association->id,
+        'intitule' => 'Frais bancaires',
+    ]);
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id,
+        'compte_id' => $compte->id,
+        'exercice' => 2025,
+        'operation_id' => null,
+        'montant_prevu' => 1000.00,
+    ]);
+
+    $tx = Transaction::factory()->asDepense()->create([
+        'association_id' => $this->association->id,
+        'date' => '2025-11-01',
+        'saisi_par' => $this->user->id,
+    ]);
+    $tx->lignes()->forceDelete();
+    TransactionLigne::factory()->create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $compte->id,
+        'debit' => 1300.00,
+        'credit' => 0,
+        'montant' => 1300.00,
+    ]);
+
+    $rapport = app(RapportService::class)->compteDeResultat(2025);
+
+    $occurrences = 0;
+    foreach ($rapport['charges'] as $famille) {
+        foreach ($famille['comptes'] as $ligne) {
+            if ((int) $ligne['compte_id'] === (int) $compte->id) {
+                $occurrences++;
+            }
+        }
+    }
+
+    expect($occurrences)->toBe(1);
+
+    $ligne = ligneCompteDuRapport($rapport['charges'], (int) $compte->id);
+    expect((float) $ligne['montant_n'])->toBe(1300.0)
+        ->and((float) $ligne['budget'])->toBe(1000.0);
+});
+
+it('un compte budgete mouvemente seulement en N-1 garde sa ligne de la branche N-1', function (): void {
+    $compte = Compte::factory()->numero('627')->create([
+        'association_id' => $this->association->id,
+        'intitule' => 'Frais bancaires',
+    ]);
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id,
+        'compte_id' => $compte->id,
+        'exercice' => 2025,
+        'operation_id' => null,
+        'montant_prevu' => 1000.00,
+    ]);
+
+    // Exercice 2024 : du 1er septembre 2024 au 31 août 2025. Une date FRANCHEMENT
+    // à l'intérieur de la fenêtre — SQLite exclut le dernier jour d'un
+    // whereBetween sur des dates nues.
+    $tx = Transaction::factory()->asDepense()->create([
+        'association_id' => $this->association->id,
+        'date' => '2024-11-01',
+        'saisi_par' => $this->user->id,
+    ]);
+    $tx->lignes()->forceDelete();
+    TransactionLigne::factory()->create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $compte->id,
+        'debit' => 700.00,
+        'credit' => 0,
+        'montant' => 700.00,
+    ]);
+
+    $rapport = app(RapportService::class)->compteDeResultat(2025);
+    $ligne = ligneCompteDuRapport($rapport['charges'], (int) $compte->id);
+
+    // La branche N-1 a créé la ligne ; la branche budget ne l'a pas écrasée,
+    // et n'a surtout pas remis montant_n1 à null.
+    expect($ligne)->not->toBeNull()
+        ->and((float) $ligne['montant_n'])->toBe(0.0)
+        ->and((float) $ligne['montant_n1'])->toBe(700.0)
+        ->and((float) $ligne['budget'])->toBe(1000.0);
+});
+
+it('sans compte budgete dormant la hierarchie est celle d avant', function (): void {
+    $compte = Compte::factory()->numero('627')->create([
+        'association_id' => $this->association->id,
+        'intitule' => 'Frais bancaires',
+    ]);
+
+    $tx = Transaction::factory()->asDepense()->create([
+        'association_id' => $this->association->id,
+        'date' => '2025-11-01',
+        'saisi_par' => $this->user->id,
+    ]);
+    $tx->lignes()->forceDelete();
+    TransactionLigne::factory()->create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $compte->id,
+        'debit' => 500.00,
+        'credit' => 0,
+        'montant' => 500.00,
+    ]);
+
+    $rapport = app(RapportService::class)->compteDeResultat(2025);
+
+    // Aucune enveloppe : aucune ligne fabriquée, et le budget reste null —
+    // pas 0.0, ce qui ferait afficher « 0,00 € » au lieu d'un tiret.
+    $ligne = ligneCompteDuRapport($rapport['charges'], (int) $compte->id);
+
+    expect($ligne['budget'])->toBeNull()
+        ->and($rapport['produits'])->toBe([]);
+});
