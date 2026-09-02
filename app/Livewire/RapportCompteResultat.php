@@ -47,12 +47,13 @@ final class RapportCompteResultat extends Component
         // des familles de $data['charges']/$data['produits'], EXACTEMENT la
         // même collection que celle parcourue par la vue pour afficher les
         // lignes de détail — jamais une requête séparée sur budget_lines.
-        // $data['charges']/$data['produits'] ne contient que des comptes
-        // ayant un mouvement N ou N-1 (CompteResultatBuilder::buildHierarchyFull()
-        // part des écritures, pas du budget) : un compte budgété sans aucun
-        // mouvement n'y figure pas, donc pas dans ce total non plus — c'est
-        // la même limite que celle du détail affiché, le total ne peut pas
-        // diverger de la colonne qu'il somme.
+        // $data['charges']/$data['produits'] a trois sources de lignes
+        // (CompteResultatBuilder::buildHierarchyFull()) : les écritures de N,
+        // celles de N-1, et les enveloppes budgétaires elles-mêmes — un compte
+        // budgété sans aucun mouvement y figure donc désormais, avec sa propre
+        // ligne. Ce que la règle ci-dessus ne change pas : le total ne peut
+        // toujours pas diverger de la colonne qu'il somme, puisque c'est la
+        // même collection des deux côtés.
         $totalChargesBudget = self::sommeBudget($data['charges']);
         $totalProduitsBudget = self::sommeBudget($data['produits']);
         $resultatCourant = $totalProduitsN - $totalChargesN;

@@ -63,11 +63,13 @@ it('le dashboard ne double ni le prevu ni le realise', function () {
 });
 
 it('le compte de resultat ne double pas la colonne budget', function () {
-    // fetchBudgetMap n'attache 'budget' qu'aux comptes déjà présents dans la
-    // hiérarchie (charges/produits construits depuis le grand livre) : un
-    // compte qui n'a que des lignes de budget, sans aucun mouvement, n'y
-    // apparaît jamais. Mouvement minimal indispensable, même s'il ne compte
-    // pas dans le scénario "enveloppe vs ventilation" — cf. le même motif
+    // Le budget est désormais l'une des TROIS sources de lignes du compte de
+    // résultat (CompteResultatBuilder::buildHierarchyFull()) : ce compte
+    // apparaîtrait avec son budget même sans le mouvement ci-dessous, qui
+    // n'est donc plus indispensable à l'existence de la ligne — il reste ici
+    // pour exercer le cas courant, mouvementé ET budgété. Ce que ce test
+    // vérifie ne change pas : le budget affiché reste l'enveloppe seule
+    // (1000 €), jamais doublée par la ventilation (400 €) — cf. le même motif
     // dans tests/Unit/RapportServiceTest.php.
     $depense = Transaction::factory()->asDepense()->create(['saisi_par' => $this->user->id]);
     $depense->lignes()->forceDelete();

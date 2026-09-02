@@ -793,7 +793,19 @@ final class CompteResultatBuilder
             ->whereNull('bl.operation_id')
             ->where('bl.exercice', $exercice)
             ->whereIn('c.classe', [6, 7])
+            // Les DEUX scopes sont nécessaires, l'un ne remplace pas l'autre :
+            // celui sur `bl` isole les enveloppes du tenant courant, celui sur
+            // `c` isole les comptes qu'elles peuvent joindre. Tant que cette
+            // carte ne faisait qu'accrocher un budget à un compte déjà présent
+            // dans la hiérarchie, une ligne de budget du tenant B pointant sur
+            // un compte du tenant A était inerte : elle n'était jamais consultée,
+            // faute de clé compte_id venant des écritures — elles-mêmes déjà
+            // scopées sur `c.association_id` en amont. Depuis que cette carte
+            // CRÉE des lignes (voir la docblock ci-dessus), l'absence du scope
+            // sur `c` ferait fuiter l'intitulé et la famille du compte de A dans
+            // le compte de résultat de B.
             ->tap(fn (Builder $query) => $this->scopeToCurrentTenant($query, 'bl.association_id'))
+            ->tap(fn (Builder $query) => $this->scopeToCurrentTenant($query, 'c.association_id'))
             ->select([
                 DB::raw('c.id as compte_id'),
                 DB::raw('c.classe as classe'),
