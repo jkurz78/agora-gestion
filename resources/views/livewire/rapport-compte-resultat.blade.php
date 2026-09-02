@@ -62,12 +62,15 @@
             return '<div class="budget-bar-track"><div class="budget-bar-fill" style="' . $fill . '"></div></div>'
                  . '<div class="budget-label">' . number_format($pct, 0) . ' %</div>';
         };
+        // Écart et couleur passent par ComparaisonBudgetaire : l'écart est un
+        // delta brut identique pour une charge et pour un produit, seule la
+        // couleur porte l'appréciation. Nom de classe FQN — un `use` au milieu
+        // d'un bloc @php ne serait pas au niveau attendu par PHP.
         $renderEcart = function(?float $montantN, ?float $budget, bool $isCharge): string {
             if ($budget === null || $montantN === null) return '<span class="text-muted">&mdash;</span>';
-            $ecart = $montantN - $budget;
+            $ecart = \App\Support\ComparaisonBudgetaire::ecart($budget, $montantN);
             if ($ecart == 0) return '<span class="cr-zero">0,00 &euro;</span>';
-            $isNeg = ($isCharge && $ecart < 0) || (!$isCharge && $ecart > 0);
-            $cls = $isNeg ? 'cr-pos' : 'cr-neg';
+            $cls = \App\Support\ComparaisonBudgetaire::ecartEstFavorable($ecart, $isCharge) ? 'cr-pos' : 'cr-neg';
             $sign = $ecart > 0 ? '+' : '';
             return '<span class="' . $cls . '">' . $sign . number_format($ecart, 2, ',', ' ') . ' &euro;</span>';
         };

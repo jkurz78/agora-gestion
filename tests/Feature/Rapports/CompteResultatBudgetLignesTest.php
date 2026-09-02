@@ -386,3 +386,62 @@ it('sans compte budgete dormant la hierarchie est celle d avant', function (): v
     expect($ligne['budget'])->toBeNull()
         ->and($rapport['produits'])->toBe([]);
 });
+
+it('l ecart du compte de resultat garde ses couleurs apres passage par ComparaisonBudgetaire', function (): void {
+    // Une charge en dépassement (défavorable → cr-neg) et un produit en
+    // dépassement (favorable → cr-pos). C'est le couple qui distingue les deux
+    // conventions : l'écart brut vaut +300 dans les deux cas, seule la couleur
+    // les sépare.
+    $charge = Compte::factory()->numero('627')->create([
+        'association_id' => $this->association->id,
+        'intitule' => 'Frais bancaires',
+    ]);
+    $produit = Compte::factory()->numero('756')->create([
+        'association_id' => $this->association->id,
+        'intitule' => 'Mécénat',
+    ]);
+
+    foreach ([$charge, $produit] as $compte) {
+        BudgetLine::factory()->create([
+            'association_id' => $this->association->id,
+            'compte_id' => $compte->id,
+            'exercice' => 2025,
+            'operation_id' => null,
+            'montant_prevu' => 1000.00,
+        ]);
+    }
+
+    $depense = Transaction::factory()->asDepense()->create([
+        'association_id' => $this->association->id,
+        'date' => '2025-11-01',
+        'saisi_par' => $this->user->id,
+    ]);
+    $depense->lignes()->forceDelete();
+    TransactionLigne::factory()->create([
+        'transaction_id' => $depense->id,
+        'compte_id' => $charge->id,
+        'debit' => 1300.00,
+        'credit' => 0,
+        'montant' => 1300.00,
+    ]);
+
+    $recette = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
+        'date' => '2025-11-01',
+        'saisi_par' => $this->user->id,
+    ]);
+    $recette->lignes()->forceDelete();
+    TransactionLigne::factory()->create([
+        'transaction_id' => $recette->id,
+        'compte_id' => $produit->id,
+        'debit' => 0,
+        'credit' => 1300.00,
+        'montant' => 1300.00,
+    ]);
+
+    $html = Livewire::test(RapportCompteResultat::class)->assertOk()->html();
+
+    // Même nombre (+300,00), deux couleurs opposées.
+    expect($html)->toContain('<span class="cr-neg">+300,00 &euro;</span>')
+        ->and($html)->toContain('<span class="cr-pos">+300,00 &euro;</span>');
+});
