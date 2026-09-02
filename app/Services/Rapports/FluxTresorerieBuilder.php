@@ -602,7 +602,14 @@ final class FluxTresorerieBuilder
         // deux colonnes d'un mouvement de net nul.
         $mensuelRows = collect($this->lignesTresorerie($start, $end)
             ->where('t.journal', '!=', JournalComptable::AN->value)
-            ->groupBy('l.transaction_id')
+            // `t.date` doit figurer dans le GROUP BY, même si une transaction
+            // n'a qu'une date : la PRODUCTION tourne sous MariaDB, qui refuse
+            // sous ONLY_FULL_GROUP_BY toute colonne non agrégée absente du
+            // GROUP BY. MySQL 8 l'acceptait en détectant que `t.date` dépend
+            // fonctionnellement de `l.transaction_id` (clé primaire jointe) —
+            // MariaDB n'implémente pas cette détection. D'où un rapport vert en
+            // local et un 500 en production (erreur 1055).
+            ->groupBy('l.transaction_id', 't.date')
             ->selectRaw("
                 l.transaction_id,
                 {$yearExpr} as annee, {$monthExpr} as mois_num,
