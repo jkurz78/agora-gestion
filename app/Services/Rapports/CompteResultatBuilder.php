@@ -40,11 +40,14 @@ final class CompteResultatBuilder
         $produitsN = $this->fetchProduitsRows($startN, $endN, $exercice);
         $produitsN1 = $this->fetchProduitsRows($startN1, $endN1, $exercice - 1);
 
-        $budgetMap = $this->fetchBudgetMap($exercice);
+        $budgetRows = $this->fetchBudgetRows($exercice);
 
+        // Chaque section ne reçoit que les enveloppes de SA classe : le budget
+        // crée désormais des lignes, une carte partagée les créerait des deux
+        // côtés du compte de résultat.
         return [
-            'charges' => $this->buildHierarchyFull($chargesN, $chargesN1, $budgetMap),
-            'produits' => $this->buildHierarchyFull($produitsN, $produitsN1, $budgetMap),
+            'charges' => $this->buildHierarchyFull($chargesN, $chargesN1, self::budgetRowsDeClasse($budgetRows, 6)),
+            'produits' => $this->buildHierarchyFull($produitsN, $produitsN1, self::budgetRowsDeClasse($budgetRows, 7)),
         ];
     }
 
@@ -760,23 +763,81 @@ final class CompteResultatBuilder
     }
 
     /**
-     * @return array<int, float> [compte_id => montant_prevu]
+     * Enveloppes budgétaires de l'exercice, avec de quoi FABRIQUER une ligne.
+     *
+     * Cette carte ne sert plus seulement à accrocher un budget à un compte déjà
+     * présent : elle est devenue la troisième source de lignes de
+     * {@see buildHierarchyFull()}, à côté des écritures de N et de N-1. D'où la
+     * jointure sur `comptes` et `familles` — un compte budgété sans la moindre
+     * écriture n'a aucune autre provenance pour son libellé et sa famille.
+     *
+     * La jointure de famille reprend celle de {@see fetchClasseRowsPD()} : le
+     * code de famille est le préfixe à deux chiffres du numéro PCG, et le
+     * repli `(sans famille)` doit être le MÊME des deux côtés, sans quoi un
+     * compte budgété se retrouverait dans une famille distincte de celle de ses
+     * homologues mouvementés.
+     *
+     * @return array<int, array{budget: float, classe: int, famille_id: int, famille_nom: string, compte_nom: string}>
      */
-    private function fetchBudgetMap(int $exercice): array
+    private function fetchBudgetRows(int $exercice): array
     {
-        return DB::table('budget_lines')
-            ->whereNotNull('compte_id')
+        $rows = DB::table('budget_lines as bl')
+            ->join('comptes as c', 'c.id', '=', 'bl.compte_id')
+            ->leftJoin('familles as f', function ($join): void {
+                $join->on('f.code', '=', DB::raw('SUBSTR(c.numero_pcg, 1, 2)'))
+                    ->on('f.association_id', '=', 'c.association_id');
+            })
+            ->whereNotNull('bl.compte_id')
             // Seules les enveloppes : les lignes ventilées par opération
             // détaillent l'enveloppe, elles ne s'y ajoutent pas.
-            ->whereNull('operation_id')
-            ->where('exercice', $exercice)
-            ->tap(fn (Builder $query) => $this->scopeToCurrentTenant($query, 'association_id'))
-            ->select('compte_id', DB::raw('SUM(montant_prevu) as budget'))
-            ->groupBy('compte_id')
-            ->get()
-            ->keyBy('compte_id')
-            ->map(fn ($row) => (float) $row->budget)
-            ->all();
+            ->whereNull('bl.operation_id')
+            ->where('bl.exercice', $exercice)
+            ->whereIn('c.classe', [6, 7])
+            ->tap(fn (Builder $query) => $this->scopeToCurrentTenant($query, 'bl.association_id'))
+            ->select([
+                DB::raw('c.id as compte_id'),
+                DB::raw('c.classe as classe'),
+                DB::raw('COALESCE(f.id, 0) as famille_id'),
+                DB::raw("COALESCE(CONCAT(f.code, ' — ', f.nom), '(sans famille)') as famille_nom"),
+                DB::raw('c.intitule as compte_nom'),
+                DB::raw('SUM(bl.montant_prevu) as budget'),
+            ])
+            ->groupBy('c.id', 'c.classe', 'c.intitule', 'f.id', 'f.code', 'f.nom')
+            ->get();
+
+        $resultat = [];
+        foreach ($rows as $row) {
+            // Clé castée explicitement : MySQL rend `c.id` en string, SQLite en
+            // entier, et cette clé est comparée à celle de $map dans
+            // buildHierarchyFull().
+            $resultat[(int) $row->compte_id] = [
+                'budget' => (float) $row->budget,
+                'classe' => (int) $row->classe,
+                'famille_id' => (int) $row->famille_id,
+                'famille_nom' => (string) $row->famille_nom,
+                'compte_nom' => (string) $row->compte_nom,
+            ];
+        }
+
+        return $resultat;
+    }
+
+    /**
+     * Enveloppes d'une seule classe PCG.
+     *
+     * Indispensable : {@see buildHierarchyFull()} est appelée deux fois, une
+     * fois par section, et le budget y CRÉE des lignes. Une carte non filtrée
+     * ferait apparaître le même compte en charge et en produit.
+     *
+     * @param  array<int, array{budget: float, classe: int, famille_id: int, famille_nom: string, compte_nom: string}>  $budgetRows
+     * @return array<int, array{budget: float, classe: int, famille_id: int, famille_nom: string, compte_nom: string}>
+     */
+    private static function budgetRowsDeClasse(array $budgetRows, int $classe): array
+    {
+        return array_filter(
+            $budgetRows,
+            fn (array $row): bool => $row['classe'] === $classe,
+        );
     }
 
     // ── Private helpers — construction de la hiérarchie ───────────────────────
@@ -784,12 +845,17 @@ final class CompteResultatBuilder
     /**
      * Construit la hiérarchie complète avec montant_n, montant_n1, budget (onglet 1).
      *
+     * Trois sources de lignes, dans cet ordre : les écritures de N, celles de
+     * N-1, puis les enveloppes budgétaires. Les deux premières existaient déjà ;
+     * la troisième est ce qui rend visible un compte budgété sans le moindre
+     * mouvement.
+     *
      * @param  Collection<int, object>  $flatN  Rows exercice N
      * @param  Collection<int, object>  $flatN1  Rows exercice N-1
-     * @param  array<int, float>  $budgetMap
+     * @param  array<int, array{budget: float, classe: int, famille_id: int, famille_nom: string, compte_nom: string}>  $budgetRows  Enveloppes de la SEULE classe de cette section
      * @return list<array>
      */
-    private function buildHierarchyFull(Collection $flatN, Collection $flatN1, array $budgetMap): array
+    private function buildHierarchyFull(Collection $flatN, Collection $flatN1, array $budgetRows): array
     {
         // Map intermédiaire keyed by compte_id
         /** @var array<int, array> */
@@ -803,7 +869,7 @@ final class CompteResultatBuilder
                 'compte_nom' => $row->compte_nom,
                 'montant_n' => (float) $row->montant,
                 'montant_n1' => null,
-                'budget' => $budgetMap[$scId] ?? null,
+                'budget' => $budgetRows[$scId]['budget'] ?? null,
             ];
         }
 
@@ -819,9 +885,32 @@ final class CompteResultatBuilder
                     'compte_nom' => $row->compte_nom,
                     'montant_n' => 0.0,
                     'montant_n1' => (float) $row->montant,
-                    'budget' => $budgetMap[$scId] ?? null,
+                    'budget' => $budgetRows[$scId]['budget'] ?? null,
                 ];
             }
+        }
+
+        // Troisième source : le budget crée sa ligne.
+        //
+        // Les deux boucles ci-dessus ne connaissent que les comptes mouvementés.
+        // Un compte budgété sans écriture ni en N ni en N-1 n'avait donc aucune
+        // ligne, et son enveloppe manquait au total budget de la section.
+        //
+        // $budgetRows est déjà filtrée sur la classe de cette section (voir
+        // compteDeResultat) : la filtrer ici de nouveau serait redondant, ne pas
+        // l'avoir filtrée en amont serait un bug.
+        foreach ($budgetRows as $scId => $row) {
+            if (isset($map[$scId])) {
+                continue;
+            }
+            $map[$scId] = [
+                'famille_id' => $row['famille_id'],
+                'famille_nom' => $row['famille_nom'],
+                'compte_nom' => $row['compte_nom'],
+                'montant_n' => 0.0,
+                'montant_n1' => null,
+                'budget' => $row['budget'],
+            ];
         }
 
         return $this->groupByFamille($map, true);
