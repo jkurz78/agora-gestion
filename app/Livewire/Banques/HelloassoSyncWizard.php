@@ -468,6 +468,8 @@ final class HelloassoSyncWizard extends Component
             'lignesUpdated' => $syncResult->lignesUpdated,
             'participantsCreated' => $syncResult->participantsCreated,
             'ordersSkipped' => $syncResult->ordersSkipped,
+            'formulairesNonConfigures' => $syncResult->formulairesNonConfigures,
+            'commandesNonConfigurees' => $syncResult->commandesNonConfigurees(),
             'errors' => $syncResult->errors,
             'virementsCreated' => 0,
             'virementsUpdated' => 0,

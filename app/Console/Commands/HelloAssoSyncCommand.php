@@ -98,12 +98,33 @@ final class HelloAssoSyncCommand extends Command
             count($result->errors),
         ));
 
+        // Un formulaire mal configure fait perdre des commandes en silence : on
+        // le remonte en warning, distinct du compteur `skipped` qui agrege aussi
+        // les formulaires volontairement ignores.
+        if ($result->aDesFormulairesNonConfigures()) {
+            $this->warn(sprintf(
+                '[%s] %d commande(s) ecartee(s) faute de configuration, aucune ecriture creee :',
+                $association->nom,
+                $result->commandesNonConfigurees(),
+            ));
+            foreach ($result->formulairesNonConfigures as $formulaire) {
+                $this->warn(sprintf(
+                    '  - %s (%s) : %s non renseigne, %d commande(s)',
+                    $formulaire['slug'],
+                    $formulaire['type'],
+                    $formulaire['manque'],
+                    $formulaire['commandes'],
+                ));
+            }
+        }
+
         Log::info('helloasso.sync.done', [
             'association_id' => $association->id,
             'exercice' => $exercice,
             'transactions_created' => $result->transactionsCreated,
             'transactions_updated' => $result->transactionsUpdated,
             'orders_skipped' => $result->ordersSkipped,
+            'formulaires_non_configures' => $result->formulairesNonConfigures,
             'errors' => $result->errors,
         ]);
 
