@@ -51,11 +51,13 @@
                             <i class="bi bi-cloud-arrow-up" style="font-size:3rem;color:#6c757d"></i>
                             <p class="mt-2 text-muted">Sélectionnez la facture fournisseur à analyser</p>
                         </div>
-                        <label class="btn btn-primary btn-lg mb-3">
-                            <i class="bi bi-upload me-2"></i> Choisir un fichier
-                            <input type="file" wire:model="pieceJointe" accept=".pdf,.jpg,.jpeg,.png" class="d-none"
-                                   @change="const f = $event.target.files[0]; if (f) { sessionStorage.setItem('pj-ocr-preview-url', URL.createObjectURL(f)); sessionStorage.setItem('pj-ocr-preview-name', f.name); }">
-                        </label>
+                        <x-zone-depot aide="ou glissez-déposez la facture ici">
+                            <label class="btn btn-primary btn-lg mb-0">
+                                <i class="bi bi-upload me-2"></i> Choisir un fichier
+                                <input type="file" wire:model="pieceJointe" accept=".pdf,.jpg,.jpeg,.png" class="d-none"
+                                       @change="const f = $event.target.files[0]; if (f) { sessionStorage.setItem('pj-ocr-preview-url', URL.createObjectURL(f)); sessionStorage.setItem('pj-ocr-preview-name', f.name); }">
+                            </label>
+                        </x-zone-depot>
                         <div wire:loading wire:target="pieceJointe" class="mt-2">
                             <div class="spinner-border spinner-border-sm text-primary"></div>
                             <span class="text-muted small">Upload en cours...</span>
