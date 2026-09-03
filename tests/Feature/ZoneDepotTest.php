@@ -72,5 +72,6 @@ it('l ecran d analyse de facture propose le glisser-deposer', function (): void 
 
     // Premiere surface equipee, choisie parce que c'est le depot le plus
     // frequent. Les vingt autres suivront si l'ergonomie convient.
-    expect($vue)->toContain('<x-zone-depot aide="ou glissez-déposez la facture ici">');
+    expect($vue)->toContain('<x-zone-depot')
+        ->and($vue)->toContain('ou glissez-déposez la facture ici');
 });

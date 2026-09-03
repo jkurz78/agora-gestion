@@ -39,9 +39,11 @@
 
                         <div class="mb-3">
                             <label class="form-label">Fichier CSV ou XLSX</label>
-                            <input type="file" wire:model="importFile"
-                                   class="form-control @error('importFile') is-invalid @enderror"
-                                   accept=".csv,.xlsx">
+                            <x-zone-depot>
+                                <input type="file" wire:model="importFile"
+                                       class="form-control @error('importFile') is-invalid @enderror"
+                                       accept=".csv,.xlsx">
+                            </x-zone-depot>
                             @error('importFile') <div class="invalid-feedback">{{ $message }}</div> @enderror
                             <div wire:loading wire:target="importFile,analyzeFile" class="form-text text-muted mt-2">
                                 <span class="spinner-border spinner-border-sm" role="status"></span>

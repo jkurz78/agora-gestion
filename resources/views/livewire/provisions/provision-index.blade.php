@@ -204,8 +204,10 @@
                 {{-- Pièce jointe --}}
                 <div class="mb-3">
                     <label class="form-label small">Pièce jointe</label>
-                    <input type="file" wire:model="piece_jointe"
-                           class="form-control form-control-sm @error('piece_jointe') is-invalid @enderror">
+                    <x-zone-depot>
+                        <input type="file" wire:model="piece_jointe"
+                               class="form-control form-control-sm @error('piece_jointe') is-invalid @enderror">
+                    </x-zone-depot>
                     @error('piece_jointe') <div class="invalid-feedback">{{ $message }}</div> @enderror
                     @if($editingId && \App\Models\Provision::find($editingId)?->hasPieceJointe())
                         <div class="form-text text-muted">

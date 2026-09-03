@@ -249,9 +249,11 @@
                             <label class="form-label">
                                 Fichier (PDF, JPG ou PNG — 5 Mo max)
                             </label>
-                            <input type="file" wire:model="pieceJointeUpload"
-                                   accept=".pdf,image/jpeg,image/png"
-                                   class="form-control @error('pieceJointeUpload') is-invalid @enderror">
+                            <x-zone-depot>
+                                <input type="file" wire:model="pieceJointeUpload"
+                                       accept=".pdf,image/jpeg,image/png"
+                                       class="form-control @error('pieceJointeUpload') is-invalid @enderror">
+                            </x-zone-depot>
                             @error('pieceJointeUpload')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror

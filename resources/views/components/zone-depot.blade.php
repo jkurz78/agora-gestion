@@ -13,10 +13,13 @@
     FileList. Puis on émet un événement `change` — c'est lui, et lui seul, que
     Livewire écoute pour démarrer le téléversement de `wire:model`.
 
-    Un seul fichier est retenu, même si l'utilisateur en dépose plusieurs : les
-    champs qui utilisent ce composant sont tous à fichier unique, et prendre
-    silencieusement le premier vaut mieux que téléverser un fichier que
-    l'utilisateur n'aura pas vu partir.
+    Le nombre de fichiers retenus suit le champ enveloppé : tous s'il porte
+    l'attribut `multiple`, le premier sinon. Prendre le premier en silence sur
+    un champ multiple ferait disparaître les autres sans que l'utilisateur les
+    voie partir.
+
+    L'aide n'apparaît qu'au survol d'un fichier ; `aidePermanente` la fige pour
+    un écran entièrement dédié au dépôt.
 
     Usage :
         <x-zone-depot>
@@ -29,7 +32,7 @@
 {{-- Pour une zone sans texte d'aide, passer une chaîne VIDE (`aide=""`) et
      non `:aide="null"` : @props traite un null explicite comme un attribut
      absent et réapplique la valeur par défaut. --}}
-@props(['aide' => 'ou glissez-déposez le fichier ici'])
+@props(['aide' => 'ou glissez-déposez le fichier ici', 'aidePermanente' => false])
 
 <div
     x-data="{
@@ -47,8 +50,13 @@
                 return;
             }
 
+            // Un champ `multiple` reçoit tous les fichiers déposés ; un champ
+            // simple n'en retient qu'un. Prendre le premier en silence sur un
+            // champ multiple ferait disparaître les autres sans que personne
+            // ne le voie partir.
             const paquet = new DataTransfer();
-            paquet.items.add(fichiers[0]);
+            const retenus = champ.multiple ? Array.from(fichiers) : [fichiers[0]];
+            retenus.forEach((fichier) => paquet.items.add(fichier));
             champ.files = paquet.files;
             champ.dispatchEvent(new Event('change', { bubbles: true }));
         },
@@ -63,7 +71,14 @@
     <div x-ref="contenu">{{ $slot }}</div>
 
     @if ($aide)
-        <div class="zone-depot-aide small text-muted mt-2">
+        {{-- L'aide ne s'affiche que pendant le survol d'un fichier. Trente-trois
+             champs portent cette zone : une ligne de texte permanente sous
+             chacun d'eux encombrerait tous les formulaires de l'application
+             pour une commodité dont on ne se sert qu'au moment de déposer.
+             `aidePermanente` la fige pour les rares écrans qui sont, eux,
+             entièrement dédiés au dépôt. --}}
+        <div class="zone-depot-aide small text-muted mt-2"
+             @unless ($aidePermanente) x-show="survol" x-cloak @endunless>
             <i class="bi bi-arrow-down-circle me-1"></i>{{ $aide }}
         </div>
     @endif
@@ -75,17 +90,26 @@
      utilisée plusieurs fois. --}}
 @once
         <style>
+            /* [x-cloak] n'est pas defini globalement dans le layout : sans
+               cette regle, l'aide clignoterait avant l'initialisation d'Alpine.
+               Le composant porte donc la sienne, ce qui le rend autonome. */
+            .zone-depot [x-cloak] { display: none !important; }
             .zone-depot {
-                border: 2px dashed transparent;
-                border-radius: .75rem;
-                padding: 1rem;
-                transition: border-color .12s ease, background-color .12s ease;
+                /* outline et non border : l'outline ne prend AUCUNE place dans
+                   le flux. C'est ce qui permet d'envelopper trente champs
+                   fichier existants sans deplacer d'un pixel la mise en page
+                   des formulaires qui les portent. Une bordure, elle, aurait
+                   decale chacun d'eux. */
+                outline: 2px dashed transparent;
+                outline-offset: 4px;
+                border-radius: .5rem;
+                transition: outline-color .12s ease, background-color .12s ease;
             }
             /* Le pointillé n'apparaît qu'au survol d'un fichier : au repos la
                zone doit rester invisible, sans quoi elle encombre un formulaire
                où le dépôt n'est qu'une commodité parmi d'autres. */
             .zone-depot-survol {
-                border-color: #3d5473;
+                outline-color: #3d5473;
                 background-color: rgba(61, 84, 115, .06);
             }
             .zone-depot-survol .zone-depot-aide {

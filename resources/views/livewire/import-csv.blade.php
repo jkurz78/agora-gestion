@@ -43,9 +43,11 @@
                         @endif
 
                         <div class="mb-3">
-                            <input type="file" wire:model="csvFile"
-                                   class="form-control @error('csvFile') is-invalid @enderror"
-                                   accept=".csv">
+                            <x-zone-depot>
+                                <input type="file" wire:model="csvFile"
+                                       class="form-control @error('csvFile') is-invalid @enderror"
+                                       accept=".csv">
+                            </x-zone-depot>
                             @error('csvFile') <div class="invalid-feedback">{{ $message }}</div> @enderror
                             <div wire:loading wire:target="csvFile,import" class="form-text text-muted mt-2">
                                 <span class="spinner-border spinner-border-sm" role="status"></span>

@@ -148,10 +148,12 @@
                         <tr class="table-light">
                             <td colspan="3" class="ps-4 pe-3 py-2">
                                 <div class="d-flex align-items-center gap-2">
-                                    <input type="file"
-                                           wire:model="scanFichier"
-                                           accept=".png,.jpg,.jpeg,.pdf"
-                                           class="form-control form-control-sm" style="max-width:300px">
+                                    <x-zone-depot>
+                                        <input type="file"
+                                               wire:model="scanFichier"
+                                               accept=".png,.jpg,.jpeg,.pdf"
+                                               class="form-control form-control-sm" style="max-width:300px">
+                                    </x-zone-depot>
                                     <button class="btn btn-sm btn-primary"
                                             wire:click="importerScanPour"
                                             @if(!$scanFichier) disabled @endif>

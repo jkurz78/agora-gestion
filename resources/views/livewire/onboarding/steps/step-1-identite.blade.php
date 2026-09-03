@@ -82,10 +82,12 @@
     <div class="row mb-4">
         <div class="col-md-6">
             <label class="form-label">Logo</label>
-            <input type="file"
-                   wire:model="logoUpload"
-                   class="form-control @error('logoUpload') is-invalid @enderror"
-                   accept="image/*">
+            <x-zone-depot>
+                <input type="file"
+                       wire:model="logoUpload"
+                       class="form-control @error('logoUpload') is-invalid @enderror"
+                       accept="image/*">
+            </x-zone-depot>
             @error('logoUpload') <div class="invalid-feedback">{{ $message }}</div> @enderror
             <div wire:loading wire:target="logoUpload" class="text-muted small">Téléchargement…</div>
             <div class="form-text">
@@ -113,10 +115,12 @@
     <div class="row mb-4">
         <div class="col-md-6">
             <label class="form-label">Cachet / signature</label>
-            <input type="file"
-                   wire:model="cachetUpload"
-                   class="form-control @error('cachetUpload') is-invalid @enderror"
-                   accept="image/*">
+            <x-zone-depot>
+                <input type="file"
+                       wire:model="cachetUpload"
+                       class="form-control @error('cachetUpload') is-invalid @enderror"
+                       accept="image/*">
+            </x-zone-depot>
             @error('cachetUpload') <div class="invalid-feedback">{{ $message }}</div> @enderror
             <div wire:loading wire:target="cachetUpload" class="text-muted small">Téléchargement…</div>
             <div class="form-text">

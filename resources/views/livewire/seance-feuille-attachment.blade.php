@@ -43,7 +43,9 @@
 
                         @if($this->canEdit)
                             <label class="form-label">Scan PDF de la feuille signée</label>
-                            <input type="file" class="form-control" wire:model="feuilleScan" accept="application/pdf">
+                            <x-zone-depot>
+                                <input type="file" class="form-control" wire:model="feuilleScan" accept="application/pdf">
+                            </x-zone-depot>
                             @error('feuilleScan')
                                 <div class="text-danger small mt-1">{{ $message }}</div>
                             @enderror

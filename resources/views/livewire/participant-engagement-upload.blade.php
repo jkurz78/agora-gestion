@@ -16,9 +16,11 @@
                 </div>
                 <div class="col-md-5">
                     <label class="form-label small">Fichier</label>
-                    <input type="file" wire:model="scanFormulaire"
-                           accept=".pdf,.jpg,.jpeg,.png"
-                           class="form-control form-control-sm">
+                    <x-zone-depot>
+                        <input type="file" wire:model="scanFormulaire"
+                               accept=".pdf,.jpg,.jpeg,.png"
+                               class="form-control form-control-sm">
+                    </x-zone-depot>
                 </div>
                 <div class="col-md-3">
                     @if($scanFormulaire)

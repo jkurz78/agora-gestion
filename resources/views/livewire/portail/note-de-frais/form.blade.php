@@ -223,10 +223,12 @@
                                     Justificatif <span class="text-danger">*</span>
                                 </label>
                                 <p class="text-muted small">Importez le reçu, la facture ou tout document justifiant la dépense (PDF, JPG, PNG ou HEIC, max 5 Mo).</p>
-                                <input type="file"
-                                       wire:model="draftLigne.justif"
-                                       accept=".pdf,.jpg,.jpeg,.png,.heic"
-                                       class="form-control @error('draftLigne.justif') is-invalid @enderror">
+                                <x-zone-depot>
+                                    <input type="file"
+                                           wire:model="draftLigne.justif"
+                                           accept=".pdf,.jpg,.jpeg,.png,.heic"
+                                           class="form-control @error('draftLigne.justif') is-invalid @enderror">
+                                </x-zone-depot>
                                 @error('draftLigne.justif')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
@@ -315,11 +317,13 @@
                             <div class="mb-3">
                                 <label for="km-justif" class="form-label fw-semibold">Carte grise <span class="text-danger">*</span></label>
                                 <p class="text-muted small">Importez la carte grise du véhicule (PDF, JPG, PNG ou HEIC, max 5 Mo).</p>
-                                <input type="file"
-                                       id="km-justif"
-                                       wire:model="draftLigne.justif"
-                                       class="form-control @error('draftLigne.justif') is-invalid @enderror"
-                                       accept=".pdf,.jpg,.jpeg,.png,.heic">
+                                <x-zone-depot>
+                                    <input type="file"
+                                           id="km-justif"
+                                           wire:model="draftLigne.justif"
+                                           class="form-control @error('draftLigne.justif') is-invalid @enderror"
+                                           accept=".pdf,.jpg,.jpeg,.png,.heic">
+                                </x-zone-depot>
                                 <div class="form-text">PDF, JPG, PNG ou HEIC — 5 Mo max.</div>
                                 @error('draftLigne.justif')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                                 @if ($draftLigne['justif'] instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile)
