@@ -124,13 +124,19 @@ it('CompteResultatBuilder::compteDeResultat does not aggregate other-tenant char
         ->and((float) collect($result['charges'])->sum('montant_n'))->toBe(100.0);
 });
 
-it('CompteResultatBuilder fetchBudgetMap does not leak cross-tenant budget lines', function () {
-    // Both tenants have a transaction + budget for the SAME compte_id.
-    // Without the fix, fetchBudgetMap SUMs both tenants' budgets for that compte.
+it('CompteResultatBuilder fetchBudgetRows does not leak cross-tenant budget lines', function () {
+    // Both tenants have a budget for the SAME compte_id (compte belongs to A).
+    // fetchBudgetRows() joins `comptes` to fabricate a line (libellé, famille)
+    // for every budgeted compte, even one with no movement — so it must scope
+    // BOTH `bl.association_id` (the budget row) AND `c.association_id` (the
+    // compte it joins) to the current tenant. Without the second scope, a
+    // budget row planted by B on A's compte_id makes A's compte (its id, its
+    // intitulé, its famille) surface in B's rapport too.
 
     TenantContext::boot($this->assoA);
     $compteA = CompteBancaire::factory()->create(['solde_initial' => 0]);
     $compteVentilationA = Compte::factory()->depense()->create();
+    $intituleCompteVentilationA = (string) $compteVentilationA->intitule;
     $txA = Transaction::factory()->asDepense()->create([
         'compte_id' => $compteA->id,
         'date' => '2025-01-10',
@@ -186,4 +192,19 @@ it('CompteResultatBuilder fetchBudgetMap does not leak cross-tenant budget lines
     // Without the fix, some budget value would be >= 9999 (10199 = 200 + 9999).
     // With the fix, max budget value should be 200.
     expect(collect($allBudgets)->contains(fn ($v) => $v >= 9999.0))->toBeFalse();
+
+    // Direction manquante : côté tenant B, le compte de A ne doit apparaître
+    // NULLE PART — ni son compte_id, ni son intitulé, ni les 9 999 € que B a
+    // budgétés dessus. C'est le sens qui casse sans le scope sur
+    // `c.association_id` dans fetchBudgetRows() : ce compte est de classe 6,
+    // il apparaîtrait donc en entier dans les CHARGES de B, avec l'intitulé
+    // et la famille de A.
+    TenantContext::boot($this->assoB);
+    $resultB = $builder->compteDeResultat(2024);
+    $comptesB = collect(array_merge($resultB['charges'], $resultB['produits']))
+        ->flatMap(fn (array $famille): array => $famille['comptes']);
+
+    expect($comptesB->pluck('compte_id')->all())->not->toContain((int) $compteVentilationA->id)
+        ->and($comptesB->pluck('compte_nom')->all())->not->toContain($intituleCompteVentilationA)
+        ->and($comptesB->pluck('budget')->filter(fn ($b) => $b !== null)->all())->not->toContain(9999.0);
 });

@@ -76,7 +76,7 @@ final class User extends Authenticatable implements MustVerifyEmail
     public function associations(): BelongsToMany
     {
         return $this->belongsToMany(Association::class, 'association_user')
-            ->withPivot('role', 'invited_at', 'joined_at', 'revoked_at')
+            ->withPivot('role', 'invited_at', 'joined_at', 'revoked_at', 'exercice_actif')
             ->withTimestamps();
     }
 
@@ -97,7 +97,19 @@ final class User extends Authenticatable implements MustVerifyEmail
             return null;
         }
 
-        $pivot = $this->associations()->where('association_id', $assoId)->first();
+        // wherePivot() (pas where()) : sans ça, "association_id" ne résout
+        // vers association_user.association_id que parce que la table
+        // "association" n'a elle-même pas de colonne de ce nom — ça tient par
+        // accident. whereNull(revoked_at) : currentRole() alimente les
+        // policies (TiersPolicy, ImmobilisationPolicy, OperationPolicy,
+        // ExtournePolicy…) et est aussi appelée hors requête HTTP (jobs,
+        // commandes artisan, callback HelloAsso) où ResolveTenant et
+        // EnsureTenantAccess — qui bloquent déjà un révoqué côté web — ne
+        // tournent jamais.
+        $pivot = $this->associations()
+            ->wherePivot('association_id', $assoId)
+            ->whereNull('association_user.revoked_at')
+            ->first();
 
         return $pivot?->pivot?->role;
     }

@@ -89,6 +89,19 @@ it('masque Supprimer et Extourner sur une transaction de dotation', function ():
     Livewire::test(DotationsExercice::class)->set('exercice', 2025)->call('genererTout');
     Carbon::setTestNow('2026-01-15 10:00:00');
 
+    // DotationsExercice::mount() lit ExerciceService::current() pendant
+    // l'excursion à Oct. 2026, avant que la dotation n'existe : ni l'exercice
+    // 2025 ni le 2026 ne portent encore d'écriture de classe 6/7 à ce
+    // moment-là, donc current() rend le calcul brut (2026) — et, depuis que
+    // current() mémoïse sa première résolution en session (une écriture par
+    // requête pour épargner les 51 sites d'appel, cf. ExerciceService), ce
+    // 2026 survit au retour à « 2026-01-15 » ci-dessus. Sans purge, le
+    // TransactionUniverselle instancié plus bas hériterait de ce 2026 périmé
+    // et filtrerait hors champ la dotation qu'on vient de générer dans le
+    // 2025. Une requête HTTP normale ne rejoue jamais un tel aller-retour
+    // dans le temps ; c'est un artefact du test, pas un risque en production.
+    session()->forget('exercice_actif');
+
     $dotation = ImmobilisationDotation::where('exercice', 2025)
         ->where('immobilisation_id', $immo->id)
         ->firstOrFail();

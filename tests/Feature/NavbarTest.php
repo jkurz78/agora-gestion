@@ -63,3 +63,12 @@ it('login page title shows product name', function () {
     // Product branding: "AgoraGestion Gestion et comptabilité - Connexion"
     $response->assertSee('AgoraGestion Gestion et comptabilité - Connexion', false);
 });
+
+it('l exercice du bandeau est un lien vers l ecran de changement d exercice', function () {
+    $response = $this->get(route('dashboard'));
+
+    // Le bandeau et l'entrée « Changer d'exercice » du menu de gauche mènent
+    // au MÊME écran : un seul chemin de bascule, donc rien qui puisse diverger.
+    $response->assertSee('class="topbar-exercice', false)
+        ->assertSee('href="'.route('exercices.changer').'"', false);
+});

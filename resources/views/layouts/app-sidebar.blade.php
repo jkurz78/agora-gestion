@@ -67,6 +67,13 @@
             }
         }
 
+        /* Bandeau : l'exercice affiché mène à son écran de changement. Il garde
+           l'allure du texte du bandeau — c'est le soulignement au survol qui
+           annonce qu'il est cliquable, sans le transformer en bouton. */
+        .topbar-exercice { color: inherit; text-decoration: none; }
+        .topbar-exercice:hover,
+        .topbar-exercice:focus { color: inherit; text-decoration: underline; }
+
         /* Sur mobile, le main-content prend toute la largeur */
         @media (max-width: 991.98px) {
             .main-content {
@@ -294,14 +301,18 @@
                     </div>
                     @endif
 
-                    {{-- Exercice --}}
-                    <span class="d-none d-sm-flex align-items-center gap-1">
+                    {{-- Exercice — même destination que « Changer d'exercice »
+                         du menu de gauche, pour qu'il n'y ait qu'un seul écran
+                         de bascule et pas deux chemins qui divergent. --}}
+                    <a href="{{ route('exercices.changer') }}"
+                       class="topbar-exercice d-none d-sm-flex align-items-center gap-1"
+                       title="Changer d'exercice">
                         <i class="bi bi-{{ $exerciceCloture ? 'lock-fill' : 'calendar3' }}"></i>
                         Ex. {{ $exerciceLabel }}
                         @if ($exerciceCloture)
                             <span class="badge bg-warning text-dark" style="font-size: .65rem;">Cloture</span>
                         @endif
-                    </span>
+                    </a>
 
                     {{-- Dropdown Changer d'association --}}
                     @php

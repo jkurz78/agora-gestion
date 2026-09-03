@@ -1,4 +1,5 @@
 <div>
+    @php $resultatColor = $resultatCourant >= 0 ? '#2E7D32' : '#B5453A'; @endphp
     {{-- Style commun aux 3 rapports --}}
     <style>
         .cr-section-header { background: #3d5473; color: #fff; }
@@ -12,6 +13,25 @@
         .cr-neg { color: #B5453A; }
         .cr-pos { color: #2E7D32; }
         .cr-zero { color: #6c757d; }
+        /* Sur les lignes à fond sombre — totaux de section et ligne RÉSULTAT —
+           les couleurs d'écart pensées pour un fond blanc tombent sous 1,2:1 de
+           contraste, et sur la ligne RÉSULTAT le vert #2E7D32 se confond
+           exactement avec son propre fond. Variantes claires, même hue : la
+           lecture reste « vert = favorable, rouge = défavorable ». Le contraste
+           AA 4,5:1 est hors d'atteinte sur ces fonds (le blanc pur plafonne à
+           4,04:1) — on maximise donc la luminosité à teinte constante. */
+        .cr-total .cr-pos, .cr-resultat .cr-pos { color: #C8F5C0; }
+        .cr-total .cr-neg, .cr-resultat .cr-neg { color: #FFD2CB; }
+        .cr-total .cr-zero, .cr-resultat .cr-zero { color: rgba(255,255,255,.75); }
+        /* Le fond de la ligne RÉSULTAT doit être posé sur les CELLULES, jamais
+           sur la ligne : Bootstrap peint background-color ET color sur
+           « .table > :not(caption) > * > * », ce qui recouvre tout ce qu'un
+           <tr> déclare. C'est pourquoi toutes les règles de ce fichier visent
+           le td — et pourquoi le fond inline porté par le <tr> RÉSULTAT n'a
+           jamais rendu, la ligne s'affichant en blanc. Inoffensif tant que ses
+           cellules budget et écart étaient vides ; illisible dès qu'on y écrit
+           les couleurs claires ci-dessus. */
+        .cr-resultat td { background: {{ $resultatColor }}; color: #fff; font-weight: 700; font-size: 14px; }
         @if($compareBudget)
         .budget-bar-track { background: #e2e8f0; border-radius: 4px; height: 10px; width: 110px; overflow: hidden; }
         .cr-total .budget-bar-track { background: rgba(255,255,255,.25); }
@@ -62,12 +82,15 @@
             return '<div class="budget-bar-track"><div class="budget-bar-fill" style="' . $fill . '"></div></div>'
                  . '<div class="budget-label">' . number_format($pct, 0) . ' %</div>';
         };
+        // Écart et couleur passent par ComparaisonBudgetaire : l'écart est un
+        // delta brut identique pour une charge et pour un produit, seule la
+        // couleur porte l'appréciation. Nom de classe FQN — un `use` au milieu
+        // d'un bloc @php ne serait pas au niveau attendu par PHP.
         $renderEcart = function(?float $montantN, ?float $budget, bool $isCharge): string {
             if ($budget === null || $montantN === null) return '<span class="text-muted">&mdash;</span>';
-            $ecart = $montantN - $budget;
+            $ecart = \App\Support\ComparaisonBudgetaire::ecart($budget, $montantN);
             if ($ecart == 0) return '<span class="cr-zero">0,00 &euro;</span>';
-            $isNeg = ($isCharge && $ecart < 0) || (!$isCharge && $ecart > 0);
-            $cls = $isNeg ? 'cr-pos' : 'cr-neg';
+            $cls = \App\Support\ComparaisonBudgetaire::ecartEstFavorable($ecart, $isCharge) ? 'cr-pos' : 'cr-neg';
             $sign = $ecart > 0 ? '+' : '';
             return '<span class="' . $cls . '">' . $sign . number_format($ecart, 2, ',', ' ') . ' &euro;</span>';
         };
@@ -162,19 +185,24 @@
     @endforeach
 
     {{-- Resultat --}}
-    @php $resultatColor = $resultatCourant >= 0 ? '#2E7D32' : '#B5453A'; @endphp
+    {{-- $resultatColor est calculé en tête de vue : la règle .cr-resultat td
+         du bloc <style> en a besoin avant d'arriver ici. --}}
     <div class="card mb-3 border-0 shadow-sm mt-2">
         <div class="card-body p-0">
             <table class="table mb-0" style="font-size:13px;border-collapse:collapse;width:100%;">
                 <tbody>
-                    <tr style="background:{{ $resultatColor }};color:#fff;font-weight:700;font-size:14px;">
+                    <tr class="cr-resultat">
                         <td style="width:20px;padding:12px;"></td>
                         <td style="padding:12px;">RÉSULTAT</td>
                         @if($compareN1)<td class="text-end" style="width:115px;padding:12px;color:rgba(255,255,255,.6);">{!! $resultatCourantN1 != 0 ? number_format($resultatCourantN1, 2, ',', ' ').' &euro;' : '&mdash;' !!}</td>@endif
                         <td class="text-end" style="width:115px;padding:12px;">{{ number_format($resultatCourant, 2, ',', ' ') }} &euro;</td>
                         @if($compareBudget)
-                        <td style="width:115px;padding:12px;"></td>
-                        <td style="width:90px;padding:12px;"></td>
+                        <td class="text-end" style="width:115px;padding:12px;">{!! $fmt($resultatBudget) !!}</td>
+                        <td class="text-end" style="width:90px;padding:12px;">{!! $renderEcart($resultatCourant, $resultatBudget, false) !!}</td>
+                        {{-- Pas de barre de consommation ici : un pourcentage « budget
+                             consommé » n'a pas de sens sur une grandeur qui peut être
+                             négative des deux côtés (résultat déficitaire vs résultat
+                             budgété déficitaire). --}}
                         <td style="width:130px;padding:12px;"></td>
                         @endif
                     </tr>

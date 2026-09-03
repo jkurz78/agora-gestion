@@ -18,6 +18,7 @@ use App\Services\Compta\EtatComptaResolver;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 final class ExerciceService
@@ -29,8 +30,14 @@ final class ExerciceService
 
     /**
      * Return the current exercice year.
-     * Financial year start month is read from the current tenant's exercice_mois_debut.
-     * Falls back to month 9 (September) when no tenant context is booted.
+     *
+     * Résolution en cascade : session (le choix de la requête en cours) → pivot
+     * association_user (le choix mémorisé pour cet utilisateur sur cette
+     * association) → défaut calculé depuis la date du jour.
+     *
+     * La session expire (SESSION_LIFETIME) sans que la clé survive : c'est
+     * précisément pour ça que le pivot existe, il porte le choix au-delà d'une
+     * session.
      */
     public function current(): int
     {
@@ -38,10 +45,104 @@ final class ExerciceService
             return (int) session('exercice_actif');
         }
 
+        $exercice = $this->exerciceMemorise() ?? $this->exerciceParDefaut();
+
+        // On grave le résultat dans la session dès la première résolution :
+        // current() est appelé des dizaines de fois par requête (51 sites
+        // d'appel), et sans ça chaque appel repaierait la lecture du pivot et la
+        // requête du défaut. Réservé au contexte authentifié — un job ou une
+        // commande artisan n'a pas de session à peupler.
+        if (Auth::hasUser()) {
+            session(['exercice_actif' => $exercice]);
+        }
+
+        return $exercice;
+    }
+
+    /**
+     * Lit le choix mémorisé sur le pivot association_user pour l'utilisateur
+     * authentifié et l'association courante.
+     *
+     * Ne lève jamais : appelée par current(), qui tourne aussi hors requête
+     * HTTP (jobs, commandes artisan). Rend null dès qu'un des trois
+     * prérequis manque — pas d'utilisateur, pas de tenant booté, pas de
+     * valeur enregistrée — pour laisser current() retomber sur le défaut
+     * calculé.
+     */
+    private function exerciceMemorise(): ?int
+    {
+        if (! Auth::hasUser() || ! TenantContext::hasBooted()) {
+            return null;
+        }
+
+        $assoId = TenantContext::currentId();
+
+        // wherePivot() + whereNull(revoked_at) : même motif que
+        // ResolveTenant, EnsureTenantAccess et ForceWizardIfNotCompleted — un
+        // membre révoqué ne doit pas piloter l'exercice affiché depuis un
+        // choix mémorisé avant sa révocation.
+        $valeur = Auth::user()
+            ?->associations()
+            ->wherePivot('association_id', $assoId)
+            ->whereNull('association_user.revoked_at')
+            ->first()
+            ?->pivot
+            ?->exercice_actif;
+
+        return $valeur !== null ? (int) $valeur : null;
+    }
+
+    /**
+     * Défaut calculé quand rien n'a été mémorisé : la règle historique
+     * (mois >= moisDebut ? année : année - 1), corrigée du seul cas observé —
+     * le lendemain de bascule d'exercice, quand la nouvelle année ne porte
+     * encore aucune écriture alors que la précédente est toujours celle sur
+     * laquelle on travaille.
+     *
+     * Volontairement étroit : ce n'est PAS une recherche du « dernier exercice
+     * ouvert avec des écritures », qui décalerait l'exercice sous les pieds de
+     * tout le reste du code. Un seul palier en arrière, et seulement si
+     * l'année calculée est vide et l'année précédente ne l'est pas. Dès la
+     * première écriture du nouvel exercice, le calcul normal reprend la main
+     * spontanément.
+     */
+    private function exerciceParDefaut(): int
+    {
         $now = CarbonImmutable::now();
         $moisDebut = $this->moisDebut();
+        $calcule = $now->month >= $moisDebut ? $now->year : $now->year - 1;
 
-        return $now->month >= $moisDebut ? $now->year : $now->year - 1;
+        if (! TenantContext::hasBooted()) {
+            return $calcule;
+        }
+
+        if (! $this->exercicePorteUneEcriture($calcule) && $this->exercicePorteUneEcriture($calcule - 1)) {
+            return $calcule - 1;
+        }
+
+        return $calcule;
+    }
+
+    /**
+     * Au moins une écriture de classe 6 ou 7 sur l'exercice donné.
+     * Tenant-scopé sur c.association_id — TenantContext::hasBooted() est
+     * garanti par l'appelant, exerciceParDefaut(), qui court-circuite avant
+     * tout appel si aucun tenant n'est booté.
+     */
+    private function exercicePorteUneEcriture(int $exercice): bool
+    {
+        $range = $this->dateRange($exercice);
+
+        return DB::table('transaction_lignes as tl')
+            ->join('comptes as c', 'tl.compte_id', '=', 'c.id')
+            ->join('transactions as tx', 'tl.transaction_id', '=', 'tx.id')
+            ->whereIn('c.classe', [6, 7])
+            ->whereNotNull('tl.compte_id')
+            ->whereNull('tl.deleted_at')
+            ->whereNull('tx.deleted_at')
+            ->whereBetween('tx.date', [$range['start']->toDateString(), $range['end']->toDateString()])
+            ->where('c.association_id', TenantContext::currentId())
+            ->exists();
     }
 
     /**
@@ -331,10 +432,22 @@ final class ExerciceService
     }
 
     /**
-     * Switch the displayed exercice in session.
+     * Switch the displayed exercice : session ET pivot association_user.
+     *
+     * Seul site d'écriture de la préférence. La session porte le choix pour
+     * la requête en cours ; le pivot le fait survivre à l'expiration de la
+     * session (SESSION_LIFETIME = 120 min), par utilisateur et par
+     * association — volontaire en multi-tenant, un utilisateur peut suivre
+     * un exercice différent chez chaque association.
      */
     public function changerExerciceAffiche(Exercice $exercice): void
     {
         session(['exercice_actif' => $exercice->annee]);
+
+        if (Auth::hasUser() && TenantContext::hasBooted()) {
+            Auth::user()->associations()->updateExistingPivot(TenantContext::currentId(), [
+                'exercice_actif' => $exercice->annee,
+            ]);
+        }
     }
 }

@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Suite de tests sur MariaDB — la parité avec la PRODUCTION.
+
+    Pourquoi ce fichier existe
+    ==========================
+    La production (O2Switch) tourne sous MariaDB 11.4, pas sous MySQL. Le poste
+    de développement tourne sous MySQL 8.4, la suite par défaut sur SQLite, et
+    `phpunit.mysql.xml` sur MySQL. Autrement dit : jusqu'au 2026-09-02, AUCUN
+    environnement du projet ne parlait au moteur de la production.
+
+    Ce qui a rendu le trou visible : un 500 en production sur
+    /rapports/flux-tresorerie, vert partout ailleurs —
+
+        SQLSTATE[42000]: 1055 't.date' isn't in GROUP BY
+
+    MySQL 8 détecte les dépendances fonctionnelles sous ONLY_FULL_GROUP_BY : il
+    accepte une colonne non agrégée si elle dépend d'une clé primaire présente
+    dans le GROUP BY, même à travers une jointure. MariaDB n'implémente pas
+    cette détection. La requête passait donc en local, en CI et sur la passe
+    MySQL, et cassait en production — pendant 17 jours, jusqu'à ce que
+    quelqu'un ouvre la page.
+
+    Noter que ONLY_FULL_GROUP_BY n'est pas un réglage du serveur : le sql_mode
+    natif de MariaDB ne le contient pas. C'est LARAVEL qui le pose à chaque
+    connexion, via `'strict' => true` dans config/database.php. Le désactiver
+    pour « régler » un échec serait donc dévier de la production, pas s'en
+    rapprocher.
+
+    Le driver est volontairement `mysql`, et non `mariadb` : c'est la
+    configuration réelle de la production, dont les logs portent
+    « Connection: mysql ».
+
+    Prérequis
+    =========
+    Un conteneur MariaDB 11.4 nommé `agora-mariadb-parity`, exposant la base
+    `testing` à l'utilisateur `sail` (mot de passe `password`), et raccordé au
+    réseau `agora-gestion_sail` pour être joignable depuis Sail. La commande
+    exacte est dans la mémoire projet, fichier
+    project_prod_mariadb_pas_mysql.md — elle ne peut pas figurer ici, XML
+    interdisant le double tiret des options longues dans un commentaire.
+
+    Une fois le conteneur debout :
+
+        ./vendor/bin/sail pest -c phpunit.mariadb.xml
+
+    Garde-fou important
+    ===================
+    `DB_DATABASE` est forcé à `testing`, comme dans phpunit.mysql.xml, et pour
+    la même raison vitale : la base de développement (`svs_accounting`) est un
+    CLONE DE PRODUCTION qu'un `RefreshDatabase` détruirait. Ne retire pas ce
+    `force`.
+-->
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+>
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+        <testsuite name="Livewire">
+            <directory>tests/Livewire</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>app</directory>
+        </include>
+    </source>
+    <php>
+        <env name="APP_ENV" value="testing" force="true"/>
+        <env name="DB_CONNECTION" value="mysql" force="true"/>
+        <env name="DB_HOST" value="agora-mariadb-parity" force="true"/>
+        <env name="DB_PORT" value="3306" force="true"/>
+        <env name="DB_DATABASE" value="testing" force="true"/>
+        <env name="DB_USERNAME" value="sail" force="true"/>
+        <env name="DB_PASSWORD" value="password" force="true"/>
+        <env name="APP_MAINTENANCE_DRIVER" value="file" force="true"/>
+        <env name="BCRYPT_ROUNDS" value="4" force="true"/>
+        <env name="CACHE_STORE" value="array" force="true"/>
+        <env name="MAIL_MAILER" value="array" force="true"/>
+        <env name="PULSE_ENABLED" value="false" force="true"/>
+        <env name="QUEUE_CONNECTION" value="sync" force="true"/>
+        <env name="SESSION_DRIVER" value="array" force="true"/>
+        <env name="TELESCOPE_ENABLED" value="false" force="true"/>
+    </php>
+</phpunit>

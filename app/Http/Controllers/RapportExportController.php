@@ -11,12 +11,14 @@ use App\Models\Association;
 use App\Services\ExerciceService;
 use App\Services\Rapports\BalanceComptableBuilder;
 use App\Services\Rapports\BilanComptableBuilder;
+use App\Services\Rapports\CompteResultatBuilder;
 use App\Services\Rapports\GrandLivreBuilder;
 use App\Services\Rapports\JournauxBuilder;
 use App\Services\Rapports\LivreImmobilisationsBuilder;
 use App\Services\Rapports\ProjectionMatrix;
 use App\Services\Rapports\VentilationFinanciereService;
 use App\Services\RapportService;
+use App\Support\ComparaisonBudgetaire;
 use App\Support\CurrentAssociation;
 use App\Support\PdfFooterRenderer;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -167,6 +169,15 @@ final class RapportExportController extends Controller
         $totalProduitsN1 = collect($data['produits'])->sum('montant_n1');
         $resultatCourant = (float) $totalProduitsN - (float) $totalChargesN;
         $resultatCourantN1 = (float) $totalProduitsN1 - (float) $totalChargesN1;
+        $totalChargesBudget = CompteResultatBuilder::sommeBudgetSection($data['charges']);
+        $totalProduitsBudget = CompteResultatBuilder::sommeBudgetSection($data['produits']);
+        // Voir App\Livewire\RapportCompteResultat::render() : même règle null/0.0.
+        $resultatBudget = ($totalChargesBudget === null && $totalProduitsBudget === null)
+            ? null
+            : ($totalProduitsBudget ?? 0.0) - ($totalChargesBudget ?? 0.0);
+        $resultatEcart = $resultatBudget !== null
+            ? ComparaisonBudgetaire::ecart($resultatBudget, $resultatCourant)
+            : null;
 
         $labelN1 = ($exercice - 1).'-'.$exercice;
         $spreadsheet = new Spreadsheet;
@@ -181,8 +192,8 @@ final class RapportExportController extends Controller
         foreach ([['Charge', $data['charges']], ['Produit', $data['produits']]] as [$type, $sections]) {
             foreach ($sections as $cat) {
                 foreach ($cat['comptes'] as $sc) {
-                    $ecart = ($sc['budget'] !== null && $sc['montant_n'] !== null)
-                        ? (float) $sc['montant_n'] - (float) $sc['budget']
+                    $ecart = $sc['budget'] !== null
+                        ? ComparaisonBudgetaire::ecart((float) $sc['budget'], (float) $sc['montant_n'])
                         : null;
                     $sheet->fromArray([[
                         $type,
@@ -203,7 +214,7 @@ final class RapportExportController extends Controller
                     $cat['montant_n1'] !== null ? (float) $cat['montant_n1'] : null,
                     (float) $cat['montant_n'],
                     $cat['budget'] !== null ? (float) $cat['budget'] : null,
-                    ($cat['budget'] !== null) ? (float) $cat['montant_n'] - (float) $cat['budget'] : null,
+                    $cat['budget'] !== null ? ComparaisonBudgetaire::ecart((float) $cat['budget'], (float) $cat['montant_n']) : null,
                 ]], null, 'A'.$row);
                 $sheet->getStyle('A'.$row.':G'.$row)->getFont()->setBold(true);
                 $row++;
@@ -220,8 +231,8 @@ final class RapportExportController extends Controller
             'RÉSULTAT',
             $resultatCourantN1,
             $resultatCourant,
-            null,
-            null,
+            $resultatBudget,
+            $resultatEcart,
         ]], null, 'A'.$row);
         $sheet->getStyle('A'.$row.':G'.$row)->getFont()->setBold(true);
         $row++;
@@ -1800,6 +1811,12 @@ final class RapportExportController extends Controller
         $totalProduitsN1 = collect($data['produits'])->sum('montant_n1');
         $resultatCourant = $totalProduitsN - $totalChargesN;
         $resultatCourantN1 = $totalProduitsN1 - $totalChargesN1;
+        $totalChargesBudget = CompteResultatBuilder::sommeBudgetSection($data['charges']);
+        $totalProduitsBudget = CompteResultatBuilder::sommeBudgetSection($data['produits']);
+        // Voir App\Livewire\RapportCompteResultat::render() : même règle null/0.0.
+        $resultatBudget = ($totalChargesBudget === null && $totalProduitsBudget === null)
+            ? null
+            : ($totalProduitsBudget ?? 0.0) - ($totalChargesBudget ?? 0.0);
 
         return [
             'charges' => $data['charges'],
@@ -1812,6 +1829,7 @@ final class RapportExportController extends Controller
             'totalProduitsN1' => $totalProduitsN1,
             'resultatCourant' => $resultatCourant,
             'resultatCourantN1' => $resultatCourantN1,
+            'resultatBudget' => $resultatBudget,
             'compareN1' => $request->boolean('n1', true),
             'compareBudget' => $request->boolean('budget', true),
         ];

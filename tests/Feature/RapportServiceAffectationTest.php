@@ -94,20 +94,37 @@ it('échoue fermé sur toutes les requêtes brutes quand le tenant est absent', 
     $rapport = $this->service->compteDeResultat(2025);
     $source = file_get_contents(app_path('Services/Rapports/CompteResultatBuilder.php'));
 
-    // Chaque requête brute du builder doit porter son filtre tenant. On l'a
-    // longtemps vérifié par un nombre en dur, qu'il fallait rebomber à chaque
-    // refactor — au risque de l'ajuster machinalement sans contrôler ce qu'il
-    // protège. La relation entre les deux compteurs dit la même chose et se
-    // maintient seule : autant d'appels au scope que de DB::table(), plus un
-    // pour la définition de la méthode.
-    $requetesBrutes = substr_count((string) $source, 'DB::table(');
-    $appelsScope = substr_count((string) $source, 'scopeToCurrentTenant(') - 1;
+    // Chaque requête brute doit porter son filtre tenant. On l'a longtemps
+    // vérifié par un nombre en dur, qu'il fallait rebomber à chaque refactor —
+    // au risque de l'ajuster machinalement sans contrôler ce qu'il protège.
+    // Un compteur global l'a remplacé, puis a menti à son tour : une requête
+    // qui joint DEUX tables tenant-scopées a besoin de DEUX scopes — c'est le
+    // cas de fetchBudgetRows(), qui lit budget_lines et joint comptes.
+    // L'égalité des compteurs interdisait la seule écriture correcte.
+    //
+    // On vérifie donc chaque requête pour elle-même : le texte compris entre
+    // un DB::table( et le suivant doit contenir au moins un appel au scope. Un
+    // total qui tomberait juste par compensation — un scope oublié ici, un
+    // scope en double là — ne passe plus. Le motif recherché porte `$this->`
+    // pour ne jamais confondre un appel avec la définition de la méthode, qui
+    // vit elle-même dans l'une de ces tranches de texte.
+    $chainesDeRequete = array_slice(explode('DB::table(', (string) $source), 1);
+
+    $requetesSansScope = [];
+    foreach ($chainesDeRequete as $chaine) {
+        if (! str_contains($chaine, '$this->scopeToCurrentTenant(')) {
+            // Le nom de la table est le premier littéral de la tranche : de quoi
+            // nommer la requête fautive dans le message d'échec.
+            preg_match("/^'([^']+)'/", $chaine, $correspondance);
+            $requetesSansScope[] = $correspondance[1] ?? '(table non identifiée)';
+        }
+    }
 
     expect($rapport['charges'])->toBeEmpty()
         ->and($rapport['produits'])->toBeEmpty()
         ->and($source)->not->toContain('->when(TenantContext::hasBooted()')
-        ->and($requetesBrutes)->toBeGreaterThan(0)
-        ->and($appelsScope)->toBe($requetesBrutes);
+        ->and($chainesDeRequete)->not->toBeEmpty()
+        ->and($requetesSansScope)->toBe([]);
 });
 
 it('le rapport onglet 2 prend en compte les affectations au lieu de operation_id ligne', function () {

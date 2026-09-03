@@ -6,6 +6,11 @@
         // par défaut on affiche les deux colonnes (comportement d'avant les toggles).
         $compareN1 = $compareN1 ?? true;
         $compareBudget = $compareBudget ?? true;
+        // Même précaution pour resultatBudget : les rendus directs qui
+        // construisent leur $viewData à la main (tests d'audit, notamment) ne
+        // le connaissent pas forcément. null se comporte comme « aucun budget
+        // nulle part » → tiret, un repli sûr.
+        $resultatBudget = $resultatBudget ?? null;
 
         $fmt = fn(?float $v): string => $v !== null ? number_format($v, 2, ',', ' ') . ' €' : '—';
     @endphp
@@ -42,7 +47,7 @@
                         <td class="text-right">{!! $fmt($cat['budget']) !!}</td>
                         <td class="text-right">
                             @if ($cat['budget'] !== null)
-                                {{ number_format((float)$cat['montant_n'] - (float)$cat['budget'], 2, ',', ' ') }} €
+                                {{ number_format(\App\Support\ComparaisonBudgetaire::ecart((float)$cat['budget'], (float)$cat['montant_n']), 2, ',', ' ') }} €
                             @else
                                 —
                             @endif
@@ -61,7 +66,7 @@
                             <td class="text-right">{!! $fmt($sc['budget']) !!}</td>
                             <td class="text-right">
                                 @if ($sc['budget'] !== null)
-                                    {{ number_format((float)$sc['montant_n'] - (float)$sc['budget'], 2, ',', ' ') }} €
+                                    {{ number_format(\App\Support\ComparaisonBudgetaire::ecart((float)$sc['budget'], (float)$sc['montant_n']), 2, ',', ' ') }} €
                                 @else
                                     —
                                 @endif
@@ -96,8 +101,14 @@
                 @endif
                 <td class="text-right" style="width:90px;padding:8px 10px;">{{ number_format($resultatCourant, 2, ',', ' ') }} €</td>
                 @if($compareBudget)
-                <td style="width:90px;padding:8px 10px;"></td>
-                <td style="width:80px;padding:8px 10px;"></td>
+                <td class="text-right" style="width:90px;padding:8px 10px;">{!! $fmt($resultatBudget) !!}</td>
+                <td class="text-right" style="width:80px;padding:8px 10px;">
+                    @if ($resultatBudget !== null)
+                        {{ number_format(\App\Support\ComparaisonBudgetaire::ecart((float)$resultatBudget, (float)$resultatCourant), 2, ',', ' ') }} €
+                    @else
+                        —
+                    @endif
+                </td>
                 @endif
             </tr>
         </tbody>
