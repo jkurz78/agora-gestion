@@ -14,7 +14,9 @@
             <div class="row align-items-end">
                 <div class="col-md-8">
                     <label class="form-label small fw-semibold">Fichier (PNG, JPG ou PDF)</label>
-                    <input type="file" class="form-control form-control-sm" wire:model="fichier" accept=".png,.jpg,.jpeg,.pdf">
+                    <x-zone-depot>
+                        <input type="file" class="form-control form-control-sm" wire:model="fichier" accept=".png,.jpg,.jpeg,.pdf">
+                    </x-zone-depot>
                     @error('fichier') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                 </div>
                 <div class="col-md-4">

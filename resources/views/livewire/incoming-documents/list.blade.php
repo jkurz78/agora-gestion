@@ -13,7 +13,9 @@
         <div class="card-body py-2">
             <div class="d-flex align-items-center gap-2 flex-wrap">
                 <label class="form-label mb-0 text-nowrap small">Ajouter un document :</label>
-                <input type="file" class="form-control form-control-sm" wire:model="fichierAjoute" accept="application/pdf" style="max-width:400px">
+                <x-zone-depot>
+                    <input type="file" class="form-control form-control-sm" wire:model="fichierAjoute" accept="application/pdf" style="max-width:400px">
+                </x-zone-depot>
                 <button class="btn btn-sm btn-primary text-nowrap" wire:click="ajouter">
                     <i class="bi bi-plus-lg"></i> Ajouter
                 </button>

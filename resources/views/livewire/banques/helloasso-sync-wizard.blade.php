@@ -474,6 +474,24 @@
                                 @if ($syncResult['ordersSkipped'] > 0)
                                     <li>Commandes ignorées : <strong>{{ $syncResult['ordersSkipped'] }}</strong></li>
                                 @endif
+                                @if (! empty($syncResult['formulairesNonConfigures']))
+                                    {{-- Distinct des « commandes ignorées » : ici l'argent a bien
+                                         été encaissé chez HelloAsso et aucune écriture n'a été
+                                         créée, faute de configuration du formulaire. --}}
+                                    <li class="text-danger">
+                                        <strong>{{ $syncResult['commandesNonConfigurees'] }} commande(s) écartée(s) faute de configuration</strong> —
+                                        aucune écriture n'a été créée pour elles :
+                                        <ul class="mb-0">
+                                            @foreach ($syncResult['formulairesNonConfigures'] as $formulaire)
+                                                <li>
+                                                    <code>{{ $formulaire['slug'] }}</code>
+                                                    ({{ $formulaire['type'] }}) — {{ $formulaire['manque'] }} non renseigné,
+                                                    {{ $formulaire['commandes'] }} commande(s)
+                                                </li>
+                                            @endforeach
+                                        </ul>
+                                    </li>
+                                @endif
                                 @if (($syncResult['virementsCreated'] ?? 0) > 0)
                                     <li>Virements : <strong>{{ $syncResult['virementsCreated'] }} créé(s)</strong></li>
                                 @endif

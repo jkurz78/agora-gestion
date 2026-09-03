@@ -175,7 +175,9 @@ x-on:click.window="
                     <div class="card-header py-2"><span class="small fw-semibold">Logo</span></div>
                     <div class="card-body">
                         <div class="form-text small mb-2">Optionnel. Si défini, remplace le logo de l'association sur les documents produits pour ce type d'opération (émargement, attestations...).</div>
-                        <input type="file" wire:model="logo" class="form-control form-control-sm @error('logo') is-invalid @enderror" accept="image/*">
+                        <x-zone-depot>
+                            <input type="file" wire:model="logo" class="form-control form-control-sm @error('logo') is-invalid @enderror" accept="image/*">
+                        </x-zone-depot>
                         @error('logo') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         @if($logo)
                             <div class="mt-2">
@@ -586,7 +588,9 @@ x-on:click.window="
             <div class="ms-4 mb-3" x-show="$wire.formulaireParcoursTherapeutique && $wire.formulaireActif" x-cloak>
                 <label class="form-label small">Attestation médicale (pièce jointe)</label>
                 <div class="form-text small mb-2">Document joint au formulaire d'inscription que le participant doit imprimer, faire remplir par son médecin et renvoyer.</div>
-                <input type="file" wire:model="attestationMedicale" class="form-control form-control-sm @error('attestationMedicale') is-invalid @enderror" accept=".pdf,.doc,.docx">
+                <x-zone-depot>
+                    <input type="file" wire:model="attestationMedicale" class="form-control form-control-sm @error('attestationMedicale') is-invalid @enderror" accept=".pdf,.doc,.docx">
+                </x-zone-depot>
                 @error('attestationMedicale') <div class="invalid-feedback">{{ $message }}</div> @enderror
                 @if($existingAttestationPath && $existingAttestationUrl)
                     <div class="mt-1">

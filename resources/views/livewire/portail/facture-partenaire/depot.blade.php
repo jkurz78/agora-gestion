@@ -46,13 +46,15 @@
                     <label for="pdf" class="form-label">
                         Fichier PDF <span class="text-danger">*</span>
                     </label>
-                    <input type="file"
-                           id="pdf"
-                           name="pdf"
-                           class="form-control @error('pdf') is-invalid @enderror"
-                           wire:model="pdf"
-                           accept="application/pdf"
-                           required>
+                    <x-zone-depot>
+                        <input type="file"
+                               id="pdf"
+                               name="pdf"
+                               class="form-control @error('pdf') is-invalid @enderror"
+                               wire:model="pdf"
+                               accept="application/pdf"
+                               required>
+                    </x-zone-depot>
                     <div class="form-text">Format PDF uniquement, 10 Mo maximum.</div>
                     @error('pdf')
                         <div class="invalid-feedback">{{ $message }}</div>

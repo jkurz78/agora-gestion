@@ -169,7 +169,11 @@ trait AnalysePeriodeComptable
         array $prefixes,
     ): Builder {
         return TransactionLigne::query()
-            ->with(['compte', 'tiers', 'transaction'])
+            // `transaction.tiers` est préchargé pour le grand livre, dont la
+            // colonne Tiers se replie sur celui de la transaction quand la
+            // ligne n'en porte pas (classes 6 et 7, où c'est toujours le cas).
+            // Sans ce préchargement, c'est une requête par ligne affichée.
+            ->with(['compte', 'tiers', 'transaction', 'transaction.tiers'])
             ->whereHas('transaction', function (Builder $query) use ($fin, $coupure): void {
                 $query->whereDate('date', '<=', $fin->toDateString());
 

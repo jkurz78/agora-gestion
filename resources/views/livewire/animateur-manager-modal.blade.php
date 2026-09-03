@@ -22,18 +22,20 @@
                         <p class="mt-2 text-muted">Uploadez la facture du fournisseur pour l'afficher pendant la saisie</p>
                     </div>
 
-                    <label class="btn btn-primary btn-lg mb-3">
-                        <i class="bi bi-upload me-2"></i> Choisir un fichier
-                        <input type="file" wire:model="modalPieceJointe" accept=".pdf,.jpg,.jpeg,.png" class="d-none"
-                               @change="
-                                   const file = $event.target.files[0];
-                                   if (file) {
-                                       sessionStorage.setItem('pj-preview-url', URL.createObjectURL(file));
-                                       sessionStorage.setItem('pj-preview-mime', file.type);
-                                       sessionStorage.setItem('pj-preview-name', file.name);
-                                   }
-                               ">
-                    </label>
+                    <x-zone-depot>
+                        <label class="btn btn-primary btn-lg mb-3">
+                            <i class="bi bi-upload me-2"></i> Choisir un fichier
+                            <input type="file" wire:model="modalPieceJointe" accept=".pdf,.jpg,.jpeg,.png" class="d-none"
+                                   @change="
+                                       const file = $event.target.files[0];
+                                       if (file) {
+                                           sessionStorage.setItem('pj-preview-url', URL.createObjectURL(file));
+                                           sessionStorage.setItem('pj-preview-mime', file.type);
+                                           sessionStorage.setItem('pj-preview-name', file.name);
+                                       }
+                                   ">
+                        </label>
+                    </x-zone-depot>
                     <div wire:loading wire:target="modalPieceJointe" class="mt-2">
                         <div class="spinner-border spinner-border-sm text-primary"></div>
                         <span class="text-muted small">Upload en cours...</span>
@@ -82,22 +84,24 @@
 
                                 <div class="text-center py-1 small text-muted d-flex align-items-center justify-content-center gap-2">
                                     <span x-text="previewName"></span>
-                                    <label class="btn btn-sm btn-outline-secondary py-0 px-1 mb-0" title="Remplacer" style="font-size:11px">
-                                        <i class="bi bi-arrow-repeat"></i>
-                                        <input type="file" wire:model="modalPieceJointe" accept=".pdf,.jpg,.jpeg,.png" class="d-none"
-                                               @change="
-                                                   const file = $event.target.files[0];
-                                                   if (file) {
-                                                       const url = URL.createObjectURL(file);
-                                                       sessionStorage.setItem('pj-preview-url', url);
-                                                       sessionStorage.setItem('pj-preview-mime', file.type);
-                                                       sessionStorage.setItem('pj-preview-name', file.name);
-                                                       previewUrl = url;
-                                                       previewMime = file.type;
-                                                       previewName = file.name;
-                                                   }
-                                               ">
-                                    </label>
+                                    <x-zone-depot>
+                                        <label class="btn btn-sm btn-outline-secondary py-0 px-1 mb-0" title="Remplacer" style="font-size:11px">
+                                            <i class="bi bi-arrow-repeat"></i>
+                                            <input type="file" wire:model="modalPieceJointe" accept=".pdf,.jpg,.jpeg,.png" class="d-none"
+                                                   @change="
+                                                       const file = $event.target.files[0];
+                                                       if (file) {
+                                                           const url = URL.createObjectURL(file);
+                                                           sessionStorage.setItem('pj-preview-url', url);
+                                                           sessionStorage.setItem('pj-preview-mime', file.type);
+                                                           sessionStorage.setItem('pj-preview-name', file.name);
+                                                           previewUrl = url;
+                                                           previewMime = file.type;
+                                                           previewName = file.name;
+                                                       }
+                                                   ">
+                                        </label>
+                                    </x-zone-depot>
                                     <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" title="Supprimer" style="font-size:11px"
                                             @click="previewUrl = null; previewMime = null; previewName = null; {{ $clearSS }}"
                                             wire:click="removePieceJointe">
@@ -275,22 +279,24 @@
                                     <i class="bi bi-plus"></i> Ajouter une ligne
                                 </button>
                                 <template x-if="!previewUrl">
-                                    <label class="btn btn-sm btn-outline-secondary mb-0">
-                                        <i class="bi bi-paperclip"></i> Joindre un justificatif
-                                        <input type="file" wire:model="modalPieceJointe" accept=".pdf,.jpg,.jpeg,.png" class="d-none"
-                                               @change="
-                                                   const file = $event.target.files[0];
-                                                   if (file) {
-                                                       const url = URL.createObjectURL(file);
-                                                       sessionStorage.setItem('pj-preview-url', url);
-                                                       sessionStorage.setItem('pj-preview-mime', file.type);
-                                                       sessionStorage.setItem('pj-preview-name', file.name);
-                                                       previewUrl = url;
-                                                       previewMime = file.type;
-                                                       previewName = file.name;
-                                                   }
-                                               ">
-                                    </label>
+                                    <x-zone-depot>
+                                        <label class="btn btn-sm btn-outline-secondary mb-0">
+                                            <i class="bi bi-paperclip"></i> Joindre un justificatif
+                                            <input type="file" wire:model="modalPieceJointe" accept=".pdf,.jpg,.jpeg,.png" class="d-none"
+                                                   @change="
+                                                       const file = $event.target.files[0];
+                                                       if (file) {
+                                                           const url = URL.createObjectURL(file);
+                                                           sessionStorage.setItem('pj-preview-url', url);
+                                                           sessionStorage.setItem('pj-preview-mime', file.type);
+                                                           sessionStorage.setItem('pj-preview-name', file.name);
+                                                           previewUrl = url;
+                                                           previewMime = file.type;
+                                                           previewName = file.name;
+                                                       }
+                                                   ">
+                                        </label>
+                                    </x-zone-depot>
                                 </template>
                             </div>
                         </div>

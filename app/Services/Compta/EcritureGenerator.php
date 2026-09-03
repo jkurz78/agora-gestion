@@ -23,6 +23,7 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\VirementInterne;
 use App\Services\Compta\ANouveau\PosteReporteResolver;
+use App\Services\ExerciceService;
 use App\Services\NumeroPieceService;
 use App\Support\MontantDecimal;
 use App\Tenant\TenantContext;
@@ -1935,7 +1936,15 @@ final class EcritureGenerator
             ->where('numero_pcg', $isDepense ? '781' : '487')
             ->firstOrFail();
 
-        $dateExtourne = Carbon::create($provision->exercice + 1, 9, 1);
+        // Premier jour de l'exercice suivant, lu dans le paramétrage de
+        // l'association et non fixé au 1er septembre : le mois de début
+        // d'exercice est un réglage, et une association en exercice civil
+        // voyait ses extournes datées de septembre — une écriture comptable
+        // au mauvais mois, dont le numéro de pièce héritait ensuite du mauvais
+        // exercice puisqu'il se dérive de cette même date.
+        $dateExtourne = Carbon::instance(
+            app(ExerciceService::class)->dateRange($provision->exercice + 1)['start']->toDateTime(),
+        );
 
         return DB::transaction(function () use ($provision, $montant, $libelle, $isDepense, $tenantId, $compteDebit, $compteCredit, $dateExtourne): Transaction {
             $numeroPiece = app(NumeroPieceService::class)->assign($dateExtourne);

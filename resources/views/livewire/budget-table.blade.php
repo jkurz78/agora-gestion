@@ -169,7 +169,9 @@
 
             <div class="mb-3">
                 <label class="form-label">Fichier budget (CSV ou Excel)</label>
-                <input type="file" wire:model="budgetFile" accept=".csv,.txt,.xlsx" class="form-control">
+                <x-zone-depot>
+                    <input type="file" wire:model="budgetFile" accept=".csv,.txt,.xlsx" class="form-control">
+                </x-zone-depot>
                 @error('budgetFile') <span class="text-danger small">{{ $message }}</span> @enderror
             </div>
             <button wire:click="importBudget" class="btn btn-warning" wire:loading.attr="disabled">

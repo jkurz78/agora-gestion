@@ -51,11 +51,13 @@
                             <i class="bi bi-cloud-arrow-up" style="font-size:3rem;color:#6c757d"></i>
                             <p class="mt-2 text-muted">Sélectionnez la facture fournisseur à analyser</p>
                         </div>
-                        <label class="btn btn-primary btn-lg mb-3">
-                            <i class="bi bi-upload me-2"></i> Choisir un fichier
-                            <input type="file" wire:model="pieceJointe" accept=".pdf,.jpg,.jpeg,.png" class="d-none"
-                                   @change="const f = $event.target.files[0]; if (f) { sessionStorage.setItem('pj-ocr-preview-url', URL.createObjectURL(f)); sessionStorage.setItem('pj-ocr-preview-name', f.name); }">
-                        </label>
+                        <x-zone-depot aide="ou glissez-déposez la facture ici" :aide-permanente="true" class="p-3">
+                            <label class="btn btn-primary btn-lg mb-0">
+                                <i class="bi bi-upload me-2"></i> Choisir un fichier
+                                <input type="file" wire:model="pieceJointe" accept=".pdf,.jpg,.jpeg,.png" class="d-none"
+                                       @change="const f = $event.target.files[0]; if (f) { sessionStorage.setItem('pj-ocr-preview-url', URL.createObjectURL(f)); sessionStorage.setItem('pj-ocr-preview-name', f.name); }">
+                            </label>
+                        </x-zone-depot>
                         <div wire:loading wire:target="pieceJointe" class="mt-2">
                             <div class="spinner-border spinner-border-sm text-primary"></div>
                             <span class="text-muted small">Upload en cours...</span>
@@ -322,18 +324,22 @@
                                         <i class="bi bi-trash"></i>
                                     </button>
                                     @endif
-                                    <label class="btn btn-sm btn-outline-secondary mb-0" title="Remplacer">
-                                        <i class="bi bi-arrow-repeat"></i> Remplacer
-                                        <input type="file" wire:model="pieceJointe" accept=".pdf,.jpg,.jpeg,.png" class="d-none">
-                                    </label>
+                                    <x-zone-depot>
+                                        <label class="btn btn-sm btn-outline-secondary mb-0" title="Remplacer">
+                                            <i class="bi bi-arrow-repeat"></i> Remplacer
+                                            <input type="file" wire:model="pieceJointe" accept=".pdf,.jpg,.jpeg,.png" class="d-none">
+                                        </label>
+                                    </x-zone-depot>
                                 </div>
                             @else
                                 <div class="d-flex align-items-center gap-2" x-data="{ tempUrl: null }">
-                                    <label class="btn btn-sm btn-outline-secondary mb-0">
-                                        <i class="bi bi-paperclip"></i> Joindre un justificatif
-                                        <input type="file" wire:model="pieceJointe" accept=".pdf,.jpg,.jpeg,.png" class="d-none"
-                                               @change="const f = $event.target.files[0]; if (f) { tempUrl = URL.createObjectURL(f); sessionStorage.setItem('pj-ocr-preview-url', tempUrl); }">
-                                    </label>
+                                    <x-zone-depot>
+                                        <label class="btn btn-sm btn-outline-secondary mb-0">
+                                            <i class="bi bi-paperclip"></i> Joindre un justificatif
+                                            <input type="file" wire:model="pieceJointe" accept=".pdf,.jpg,.jpeg,.png" class="d-none"
+                                                   @change="const f = $event.target.files[0]; if (f) { tempUrl = URL.createObjectURL(f); sessionStorage.setItem('pj-ocr-preview-url', tempUrl); }">
+                                        </label>
+                                    </x-zone-depot>
                                     @if ($pieceJointe)
                                         <span class="small text-success"><i class="bi bi-check-circle"></i> {{ $pieceJointe->getClientOriginalName() }}</span>
                                         <a :href="tempUrl" target="_blank" class="btn btn-sm btn-outline-primary" title="Visualiser" x-show="tempUrl">
@@ -505,10 +511,12 @@
                                                                 </li>
                                                                 @if (! $isLockedByFacture && ! $isLockedByImmobilisation)
                                                                 <li>
-                                                                    <label class="dropdown-item mb-0" style="cursor:pointer;">
-                                                                        <i class="bi bi-arrow-repeat me-2"></i>Remplacer
-                                                                        <input type="file" wire:model="lignes.{{ $index }}.piece_jointe_upload" accept=".pdf,.jpg,.jpeg,.png" class="d-none">
-                                                                    </label>
+                                                                    <x-zone-depot>
+                                                                        <label class="dropdown-item mb-0" style="cursor:pointer;">
+                                                                            <i class="bi bi-arrow-repeat me-2"></i>Remplacer
+                                                                            <input type="file" wire:model="lignes.{{ $index }}.piece_jointe_upload" accept=".pdf,.jpg,.jpeg,.png" class="d-none">
+                                                                        </label>
+                                                                    </x-zone-depot>
                                                                 </li>
                                                                 <li><hr class="dropdown-divider"></li>
                                                                 <li>
@@ -530,11 +538,13 @@
                                                             <i class="bi bi-arrow-counterclockwise"></i>
                                                         </button>
                                                     @else
-                                                        <label class="btn btn-sm btn-outline-secondary mb-0"
-                                                               data-tooltip="Ajouter un justificatif">
-                                                            <i class="bi bi-paperclip"></i>
-                                                            <input type="file" wire:model="lignes.{{ $index }}.piece_jointe_upload" accept=".pdf,.jpg,.jpeg,.png" class="d-none">
-                                                        </label>
+                                                        <x-zone-depot>
+                                                            <label class="btn btn-sm btn-outline-secondary mb-0"
+                                                                   data-tooltip="Ajouter un justificatif">
+                                                                <i class="bi bi-paperclip"></i>
+                                                                <input type="file" wire:model="lignes.{{ $index }}.piece_jointe_upload" accept=".pdf,.jpg,.jpeg,.png" class="d-none">
+                                                            </label>
+                                                        </x-zone-depot>
                                                     @endif
                                                     <span wire:loading wire:target="lignes.{{ $index }}.piece_jointe_upload" class="spinner-border spinner-border-sm"></span>
                                                 @elseif (! empty($lignes[$index]['piece_jointe_path']))

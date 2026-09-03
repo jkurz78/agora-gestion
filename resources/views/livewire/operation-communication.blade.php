@@ -155,7 +155,9 @@
             {{-- File attachments --}}
             <div class="mb-3">
                 <label class="form-label small fw-semibold">Pièces jointes <span class="text-muted">(max 5 fichiers, 10 Mo au total)</span></label>
-                <input type="file" class="form-control form-control-sm" wire:model="emailAttachments" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
+                <x-zone-depot>
+                    <input type="file" class="form-control form-control-sm" wire:model="emailAttachments" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
+                </x-zone-depot>
                 @error('emailAttachments.*') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                 @error('emailAttachments') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
 

@@ -23,14 +23,20 @@
 
     <div class="mb-3">
         <label class="form-label">Document 1</label>
-        <input type="file" name="documents[]" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+        <x-zone-depot>
+            <input type="file" name="documents[]" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+        </x-zone-depot>
     </div>
     <div class="mb-3">
         <label class="form-label">Document 2</label>
-        <input type="file" name="documents[]" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+        <x-zone-depot>
+            <input type="file" name="documents[]" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+        </x-zone-depot>
     </div>
     <div class="mb-3">
         <label class="form-label">Document 3</label>
-        <input type="file" name="documents[]" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+        <x-zone-depot>
+            <input type="file" name="documents[]" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+        </x-zone-depot>
     </div>
 </div>

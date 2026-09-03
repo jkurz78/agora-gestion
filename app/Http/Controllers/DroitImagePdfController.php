@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Models\Association;
 use App\Models\Operation;
 use App\Models\Participant;
+use App\Services\ExerciceService;
 use App\Support\CurrentAssociation;
 use App\Support\PdfFooterRenderer;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -34,12 +35,18 @@ final class DroitImagePdfController extends Controller
 
         $qualificatif = $typeOp->formulaire_qualificatif_atelier ?? 'thérapeutique';
 
-        // Derive exercice label: 1 sept N → 31 août N+1  ⇒  "N/N+1"
-        $year = $operation->date_debut?->year ?? now()->year;
-        $month = $operation->date_debut?->month ?? now()->month;
-        $exerciceLabel = $month >= 9
-            ? $year.' / '.($year + 1)
-            : ($year - 1).' / '.$year;
+        // Libellé d'exercice de la date de l'opération. Le mois de début est un
+        // réglage de l'association : septembre était codé en dur ici, ce qui
+        // donnait un libellé faux pour une association en exercice civil.
+        // ExerciceService::label() rend « 2025-2026 » en exercice décalé et
+        // « 2026 » tout court en exercice civil ; le séparateur espacé est la
+        // présentation propre à ce PDF.
+        $exerciceService = app(ExerciceService::class);
+        $exerciceLabel = str_replace(
+            '-',
+            ' / ',
+            $exerciceService->label($exerciceService->anneeForDate($operation->date_debut ?? now())),
+        );
 
         $appLogoPath = public_path('images/agora-gestion.svg');
         $appLogoBase64 = file_exists($appLogoPath) ? base64_encode(file_get_contents($appLogoPath)) : null;

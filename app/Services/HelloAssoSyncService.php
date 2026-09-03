@@ -72,6 +72,8 @@ final class HelloAssoSyncService
         $participantsCreated = 0;
         $skipped = 0;
         $errors = [];
+        /** @var array<string, array{slug: string, type: string, manque: string, commandes: int}> */
+        $nonConfigures = [];
 
         foreach ($orders as $order) {
             try {
@@ -83,6 +85,12 @@ final class HelloAssoSyncService
                 $participantsCreated += $result['participants_created'];
                 $skipped += $result['skipped'];
                 $errors = array_merge($errors, $result['errors']);
+
+                if ($result['non_configure'] !== null) {
+                    $cle = $result['non_configure']['slug'];
+                    $nonConfigures[$cle] ??= $result['non_configure'] + ['commandes' => 0];
+                    $nonConfigures[$cle]['commandes']++;
+                }
             } catch (\Throwable $e) {
                 $errors[] = "Commande #{$order['id']} : {$e->getMessage()}";
                 $skipped++;
@@ -97,15 +105,16 @@ final class HelloAssoSyncService
             participantsCreated: $participantsCreated,
             ordersSkipped: $skipped,
             errors: $errors,
+            formulairesNonConfigures: array_values($nonConfigures),
         );
     }
 
     /**
-     * @return array{tx_created: int, tx_updated: int, lignes_created: int, lignes_updated: int, participants_created: int, skipped: int, errors: list<string>}
+     * @return array{tx_created: int, tx_updated: int, lignes_created: int, lignes_updated: int, participants_created: int, skipped: int, errors: list<string>, non_configure: ?array{slug: string, type: string, manque: string}}
      */
     private function processOrder(array $order, int $exercice): array
     {
-        $result = ['tx_created' => 0, 'tx_updated' => 0, 'lignes_created' => 0, 'lignes_updated' => 0, 'participants_created' => 0, 'skipped' => 0, 'errors' => []];
+        $result = ['tx_created' => 0, 'tx_updated' => 0, 'lignes_created' => 0, 'lignes_updated' => 0, 'participants_created' => 0, 'skipped' => 0, 'errors' => [], 'non_configure' => null];
 
         $formSlug = $order['formSlug'] ?? '';
 
@@ -123,10 +132,20 @@ final class HelloAssoSyncService
 
         // Skip si form Membership/Donation sans ventilation configurée.
         // DC-10a — la ventilation est portée par compte_id (source unique).
+        //
+        // Ce n'est PAS un skip anodin : la commande existe, l'argent a été
+        // encaissé chez HelloAsso, et aucune écriture n'est créée ici. On le
+        // remonte donc nommément, au lieu de le fondre dans le compteur
+        // `skipped` qui agrège aussi les formulaires volontairement ignorés.
         if ($formMapping !== null
             && in_array($formMapping->form_type, ['Membership', 'Donation'], true)
             && $formMapping->compte_id === null) {
             $result['skipped']++;
+            $result['non_configure'] = [
+                'slug' => $formSlug,
+                'type' => (string) $formMapping->form_type,
+                'manque' => 'compte de ventilation',
+            ];
 
             return $result;
         }
@@ -137,6 +156,11 @@ final class HelloAssoSyncService
             && $formMapping->form_type === 'Event'
             && $formMapping->operation_id === null) {
             $result['skipped']++;
+            $result['non_configure'] = [
+                'slug' => $formSlug,
+                'type' => 'Event',
+                'manque' => 'opération',
+            ];
 
             return $result;
         }

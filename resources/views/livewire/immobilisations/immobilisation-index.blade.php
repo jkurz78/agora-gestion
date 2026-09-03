@@ -242,10 +242,12 @@
                             <div class="col-12">
                                 <label class="form-label"><i class="bi bi-paperclip"></i> Justificatif</label>
                                 <div class="d-flex align-items-center gap-2">
-                                    <label class="btn btn-sm btn-outline-secondary mb-0">
-                                        <i class="bi bi-paperclip"></i> Joindre un justificatif
-                                        <input type="file" wire:model="pieceJointeAcquisition" accept=".pdf,.jpg,.jpeg,.png" class="d-none">
-                                    </label>
+                                    <x-zone-depot>
+                                        <label class="btn btn-sm btn-outline-secondary mb-0">
+                                            <i class="bi bi-paperclip"></i> Joindre un justificatif
+                                            <input type="file" wire:model="pieceJointeAcquisition" accept=".pdf,.jpg,.jpeg,.png" class="d-none">
+                                        </label>
+                                    </x-zone-depot>
                                     @if ($pieceJointeAcquisition)
                                         <span class="small text-success"><i class="bi bi-check-circle"></i> {{ $pieceJointeAcquisition->getClientOriginalName() }}</span>
                                     @endif

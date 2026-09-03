@@ -100,8 +100,10 @@
                             <img src="{{ $logoUrl }}" alt="Logo association" style="max-height: 80px; border-radius: 4px;">
                         </div>
                     @endif
-                    <input type="file" class="form-control form-control-sm @error('logo') is-invalid @enderror"
-                           wire:model="logo" accept=".png,.jpg,.jpeg">
+                    <x-zone-depot>
+                        <input type="file" class="form-control form-control-sm @error('logo') is-invalid @enderror"
+                               wire:model="logo" accept=".png,.jpg,.jpeg">
+                    </x-zone-depot>
                     <div class="form-text" style="font-size:11px">PNG ou JPG, max 2 Mo</div>
                     @error('logo') <div class="invalid-feedback">{{ $message }}</div> @enderror
                 </div>
@@ -119,7 +121,9 @@
                             <img src="{{ $cachetUrl }}" alt="Cachet" style="max-height: 80px; border-radius: 4px;">
                         </div>
                     @endif
-                    <input type="file" wire:model="cachet" class="form-control form-control-sm" accept="image/png,image/jpeg">
+                    <x-zone-depot>
+                        <input type="file" wire:model="cachet" class="form-control form-control-sm" accept="image/png,image/jpeg">
+                    </x-zone-depot>
                     @error('cachet') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                 </div>
             </div>
