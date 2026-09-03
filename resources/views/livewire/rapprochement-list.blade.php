@@ -50,7 +50,92 @@
     @if ($showCreateForm && ! $exerciceCloture)
         <div class="p-3 border rounded bg-light mb-3">
             <h6 class="mb-3">Nouveau relevé bancaire</h6>
-            @if ($soldeOuverture !== null)
+
+            {{-- Zone de dépôt d'extrait de compte --}}
+            <div class="mb-3">
+                <label class="form-label small text-muted">
+                    <i class="bi bi-file-earmark-text me-1"></i>Extrait de compte (optionnel)
+                    @if ($iaConfiguree)
+                        <span class="badge bg-info text-dark ms-1" style="font-size:.65rem">
+                            <i class="bi bi-stars"></i> Analyse IA
+                        </span>
+                    @endif
+                </label>
+                @if ($extraitCompte)
+                    <div class="d-flex align-items-center gap-2 p-2 border rounded bg-white">
+                        <i class="bi bi-file-earmark-check text-success"></i>
+                        <span class="small">{{ $extraitCompte->getClientOriginalName() }}</span>
+                        <button wire:click="retirerExtrait" class="btn btn-sm btn-outline-secondary ms-auto" type="button">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+                @else
+                    <x-zone-depot aide="{{ $iaConfiguree ? 'ou glissez un extrait de compte — les soldes et la date seront extraits automatiquement' : 'ou glissez un extrait de compte' }}">
+                        <input type="file" wire:model="extraitCompte"
+                               accept=".pdf,image/jpeg,image/png"
+                               class="form-control form-control-sm @error('extraitCompte') is-invalid @enderror">
+                    </x-zone-depot>
+                @endif
+                @error('extraitCompte') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
+
+                {{-- Spinner pendant l'analyse IA --}}
+                <div wire:loading wire:target="extraitCompte" class="mt-2">
+                    <span class="spinner-border spinner-border-sm text-primary"></span>
+                    <span class="small text-muted">Analyse du relevé en cours…</span>
+                </div>
+            </div>
+
+            {{-- Résultat de l'analyse IA --}}
+            @if ($extraitAnalyse)
+                @if ($extraitAnalyse['concordant'] === false)
+                    <div class="alert alert-danger py-2 small">
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                        <strong>Chronologie incorrecte</strong> — le relevé indique un solde d'ouverture de
+                        <strong>{{ number_format($extraitAnalyse['solde_ouverture'], 2, ',', ' ') }} €</strong>
+                        mais le dernier rapprochement verrouillé se termine à
+                        <strong>{{ number_format($extraitAnalyse['solde_ouverture_attendu'], 2, ',', ' ') }} €</strong>.
+                        Un relevé intermédiaire a peut-être été omis.
+                    </div>
+                @elseif ($extraitAnalyse['concordant'] === true)
+                    <div class="alert alert-success py-2 small">
+                        <i class="bi bi-check-circle-fill me-1"></i>
+                        Relevé analysé — solde d'ouverture concordant
+                        ({{ number_format($extraitAnalyse['solde_ouverture'], 2, ',', ' ') }} €).
+                        @if ($extraitAnalyse['date_cloture'] || $extraitAnalyse['solde_cloture'] !== null)
+                            Date et solde de clôture pré-remplis.
+                        @endif
+                    </div>
+                @else
+                    <div class="alert alert-info py-2 small">
+                        <i class="bi bi-info-circle-fill me-1"></i>
+                        Relevé analysé.
+                        @if ($extraitAnalyse['solde_cloture'] !== null)
+                            Solde de clôture pré-rempli.
+                        @endif
+                        @if ($extraitAnalyse['solde_ouverture'] === null)
+                            Le solde d'ouverture n'a pas pu être extrait — la vérification de chronologie est désactivée.
+                        @endif
+                    </div>
+                @endif
+                @if (! empty($extraitAnalyse['warnings']))
+                    <div class="alert alert-warning py-2 small">
+                        <i class="bi bi-exclamation-circle me-1"></i>
+                        @foreach ($extraitAnalyse['warnings'] as $warning)
+                            {{ $warning }}@if (! $loop->last)<br>@endif
+                        @endforeach
+                    </div>
+                @endif
+            @endif
+
+            @if ($extraitErreur)
+                <div class="alert alert-warning py-2 small">
+                    <i class="bi bi-exclamation-circle me-1"></i>
+                    L'analyse automatique a échoué : {{ $extraitErreur }}
+                    <br>Le fichier sera quand même joint au rapprochement.
+                </div>
+            @endif
+
+            @if ($soldeOuverture !== null && ! $extraitAnalyse)
                 <p class="mb-2 text-muted small">
                     Solde d'ouverture automatique :
                     <strong>{{ number_format($soldeOuverture, 2, ',', ' ') }} €</strong>
@@ -69,7 +154,8 @@
                     @error('solde_fin') <div class="invalid-feedback">{{ $message }}</div> @enderror
                 </div>
                 <div class="col-md-auto">
-                    <button wire:click="create" class="btn btn-success">Créer</button>
+                    <button wire:click="create" class="btn btn-success"
+                            @disabled($extraitBloquant)>Créer</button>
                     <button wire:click="$set('showCreateForm', false)" class="btn btn-secondary">Annuler</button>
                 </div>
             </div>

@@ -7,6 +7,7 @@ namespace App\Livewire;
 use App\Enums\StatutRapprochement;
 use App\Enums\TypeRapprochement;
 use App\Enums\TypeTransaction;
+use App\Exceptions\OcrAnalysisException;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Livewire\Concerns\WithPerPage;
 use App\Models\CompteBancaire;
@@ -14,6 +15,7 @@ use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
 use App\Models\VirementInterne;
 use App\Services\RapprochementBancaireService;
+use App\Services\ReleveOcrService;
 use Illuminate\View\View;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -43,6 +45,18 @@ final class RapprochementList extends Component
     /** @var TemporaryUploadedFile|null */
     public $pieceJointeUpload = null;
 
+    /** @var TemporaryUploadedFile|null */
+    public $extraitCompte = null;
+
+    /** @var array{solde_ouverture: ?float, solde_cloture: ?float, date_cloture: ?string, banque: ?string, concordant: ?bool, warnings: list<string>}|null */
+    public ?array $extraitAnalyse = null;
+
+    public ?string $extraitErreur = null;
+
+    public bool $extraitBloquant = false;
+
+    public bool $extraitEnCours = false;
+
     public function mount(): void
     {
         $premier = CompteBancaire::saisieManuelle()->orderBy('nom')->first();
@@ -58,6 +72,7 @@ final class RapprochementList extends Component
         $this->showCreateForm = false;
         $this->date_fin = '';
         $this->solde_fin = '';
+        $this->resetExtrait();
         $this->resetValidation();
         $this->resetPage();
     }
@@ -65,6 +80,79 @@ final class RapprochementList extends Component
     public function updatedFilterType(): void
     {
         $this->resetPage();
+    }
+
+    public function updatedExtraitCompte(): void
+    {
+        $this->validate([
+            'extraitCompte' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+        ]);
+
+        $this->extraitAnalyse = null;
+        $this->extraitErreur = null;
+        $this->extraitBloquant = false;
+
+        if (! ReleveOcrService::isConfigured()) {
+            return;
+        }
+
+        $this->extraitEnCours = true;
+
+        try {
+            $resultat = app(ReleveOcrService::class)->analyze($this->extraitCompte);
+
+            $soldeOuvertureCalcule = null;
+            if ($this->compte_id) {
+                $compte = CompteBancaire::find($this->compte_id);
+                if ($compte) {
+                    $soldeOuvertureCalcule = app(RapprochementBancaireService::class)
+                        ->calculerSoldeOuverture($compte);
+                }
+            }
+
+            $concordant = null;
+            if ($resultat->solde_ouverture !== null && $soldeOuvertureCalcule !== null) {
+                $concordant = round($resultat->solde_ouverture, 2) === round($soldeOuvertureCalcule, 2);
+                if (! $concordant) {
+                    $this->extraitBloquant = true;
+                }
+            }
+
+            $this->extraitAnalyse = [
+                'solde_ouverture' => $resultat->solde_ouverture,
+                'solde_cloture' => $resultat->solde_cloture,
+                'date_cloture' => $resultat->date_cloture,
+                'banque' => $resultat->banque,
+                'concordant' => $concordant,
+                'solde_ouverture_attendu' => $soldeOuvertureCalcule,
+                'warnings' => $resultat->warnings,
+            ];
+
+            if ($resultat->solde_cloture !== null) {
+                $this->solde_fin = (string) $resultat->solde_cloture;
+            }
+            if ($resultat->date_cloture !== null) {
+                $this->date_fin = $resultat->date_cloture;
+            }
+        } catch (OcrAnalysisException $e) {
+            $this->extraitErreur = $e->getMessage();
+        } finally {
+            $this->extraitEnCours = false;
+        }
+    }
+
+    public function retirerExtrait(): void
+    {
+        $this->resetExtrait();
+    }
+
+    private function resetExtrait(): void
+    {
+        $this->extraitCompte = null;
+        $this->extraitAnalyse = null;
+        $this->extraitErreur = null;
+        $this->extraitBloquant = false;
+        $this->extraitEnCours = false;
     }
 
     public function supprimer(int $id): void
@@ -91,6 +179,12 @@ final class RapprochementList extends Component
 
     public function create(): void
     {
+        if ($this->extraitBloquant) {
+            $this->addError('extraitCompte', 'Le solde d\'ouverture du relevé ne correspond pas — corrigez la chronologie avant de créer.');
+
+            return;
+        }
+
         $this->validate([
             'compte_id' => ['required', 'exists:comptes_bancaires,id'],
             'date_fin' => ['required', 'date'],
@@ -99,12 +193,17 @@ final class RapprochementList extends Component
 
         try {
             $compte = CompteBancaire::findOrFail($this->compte_id);
-            $rapprochement = app(RapprochementBancaireService::class)
-                ->create($compte, $this->date_fin, (float) $this->solde_fin);
+            $service = app(RapprochementBancaireService::class);
+            $rapprochement = $service->create($compte, $this->date_fin, (float) $this->solde_fin);
+
+            if ($this->extraitCompte instanceof TemporaryUploadedFile) {
+                $service->storePieceJointe($rapprochement, $this->extraitCompte);
+            }
 
             $this->showCreateForm = false;
             $this->date_fin = '';
             $this->solde_fin = '';
+            $this->resetExtrait();
             $this->resetValidation();
 
             $this->redirect(route('banques.rapprochement.detail', $rapprochement));
@@ -233,6 +332,7 @@ final class RapprochementList extends Component
             'soldeOuverture' => $soldeOuverture,
             'dernierVerrouilleId' => $dernierVerrouilleId,
             'rapprochementTotals' => $rapprochementTotals,
+            'iaConfiguree' => ReleveOcrService::isConfigured(),
         ]);
     }
 }
