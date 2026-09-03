@@ -635,9 +635,15 @@ final class FluxTresorerieBuilder
 
         $mensuel = [];
         $cumul = $soldeOuverture;
+        $moisDebut = TenantContext::current()?->exercice_mois_debut ?? 9;
         for ($i = 0; $i < 12; $i++) {
-            $moisNum = (($i + 8) % 12) + 1; // 9,10,11,12,1,2,3,4,5,6,7,8
-            $annee = $moisNum >= 9 ? $exercice : $exercice + 1;
+            // Rotation des 12 mois à partir du mois de début d'exercice, qui
+            // est un RÉGLAGE de l'association. Septembre était codé en dur ici
+            // (`(($i + 8) % 12) + 1`), si bien qu'une association en exercice
+            // civil voyait ses mois dans le désordre. Même formule que
+            // VentilationFinanciereService, seul endroit qui le faisait juste.
+            $moisNum = (($moisDebut - 1 + $i) % 12) + 1;
+            $annee = $moisNum >= $moisDebut ? $exercice : $exercice + 1;
             $key = $annee.'-'.str_pad((string) $moisNum, 2, '0', STR_PAD_LEFT);
 
             $recettes = round((float) ($mensuelRows[$key]->recettes ?? 0), 2);
