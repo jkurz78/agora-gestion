@@ -2,7 +2,14 @@
     @php $resultatColor = $resultatCourant >= 0 ? '#2E7D32' : '#B5453A'; @endphp
     {{-- Style commun aux 3 rapports --}}
     <style>
-        .cr-section-header { background: #3d5473; color: #fff; }
+        /* Pas de background ni de color ici : Bootstrap peint les CELLULES et
+           recouvre tout ce qu'un <tr> déclare — la règle qui vivait là n'a
+           donc jamais rendu, et la ligne s'affiche en clair depuis l'origine.
+           Elle n'est pas restaurée sur le td pour autant : le style sombre
+           existe bien, mais dans le PDF (pdf/rapport-layout.blade.php), où
+           cette même classe porte UNE ligne réunissant le titre de section et
+           les libellés de colonnes. À l'écran les deux sont séparés, et
+           foncer celle-ci empilerait deux bandeaux sombres consécutifs. */
         .cr-section-header td { border-bottom: none; padding: 8px 12px; }
         .cr-section-label td { background: #3d5473; color: #fff; font-weight: 700; font-size: 14px; border-bottom: none; padding: 4px 12px 10px; }
         .cr-cat td { background: #dce6f0; color: #1e3a5f; font-weight: 600; border-bottom: 1px solid #b8ccdf; padding: 7px 12px; }
