@@ -149,8 +149,17 @@ final class GrandLivreBuilder
             'numero_piece' => $transaction->numero_piece,
             'reference' => $transaction->reference,
             'libelle' => $ligne->libelle ?: $transaction->libelle,
+            // `tiers_id` reste celui de la LIGNE : il porte la sémantique
+            // auxiliaire (401/411) et sert au lettrage ; le remplir depuis la
+            // transaction changerait le regroupement des comptes auxiliaires.
             'tiers_id' => $ligne->tiers_id !== null ? (int) $ligne->tiers_id : null,
-            'tiers' => $ligne->tiers?->displayName(),
+            // Le LIBELLÉ, lui, se replie sur le tiers de la transaction. Une
+            // ligne de classe 6 ou 7 ne porte jamais de tiers propre — mesuré
+            // sur la base : 0 ligne sur 316 — alors que sa transaction en porte
+            // un dans 316 cas sur 316. Sans ce repli, la colonne reste vide là
+            // où l'information existe, et on ne sait pas de qui vient la
+            // recette ni à qui la dépense a été payée.
+            'tiers' => $ligne->tiers?->displayName() ?? $transaction->tiers?->displayName(),
             'mode_paiement' => $this->modePaiement($transaction),
             'justificatif_url' => $this->urlJustificatif($ligne, $transaction),
             'debit_centimes' => $this->centimes($ligne->debit),
