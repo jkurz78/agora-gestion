@@ -133,6 +133,7 @@ final class RapprochementList extends Component
             }
             if ($resultat->date_cloture !== null) {
                 $this->date_fin = $resultat->date_cloture;
+                $this->dispatch('set-date', name: 'date_fin', value: $resultat->date_cloture);
             }
         } catch (OcrAnalysisException $e) {
             $this->extraitErreur = $e->getMessage();

@@ -35,8 +35,12 @@
                      },
                  });
              },
+             setDate(iso) {
+                 if (this.fp && iso) { this.fp.setDate(iso, true); }
+             },
              destroy() { if (this.fp) this.fp.destroy(); }
-         }">
+         }"
+         @set-date.window="if ($event.detail?.name === '{{ $name }}') setDate($event.detail.value)">
         <input type="text"
                x-ref="input"
                class="form-control"
