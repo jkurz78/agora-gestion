@@ -326,6 +326,55 @@ final class CompteResultatBuilder
         ];
     }
 
+    /**
+     * Prévisions de l'exercice, agrégées à la maille (opération, compte).
+     *
+     * Porte étroite ouverte pour le rapport « Budget par opérations ». Elle
+     * DÉLÈGUE à fetchPrevisionsFlatEntries() plutôt que de recopier ses
+     * jointures : celles-ci portent deux pièges documentés — le OR de date
+     * enfermé dans sa closure, et le scope tenant sur la bonne table de chaque
+     * source. Une seconde implémentation divergerait au premier correctif.
+     *
+     * Les entrées d'exercice 0 (séance sans date) sont ÉCARTÉES : elles ne sont
+     * rattachables à aucun exercice, et une ligne de budget l'est explicitement.
+     * Le compte de résultat, lui, les garde dans son groupe « Exercice non
+     * déterminé » — il n'a pas de budget en face à qui les comparer. Divergence
+     * délibérée : ne pas « harmoniser » les deux côtés.
+     *
+     * @param  list<int>  $operationIds
+     * @return array<int, array<int, float>> operation_id => [compte_id => prévu]
+     */
+    public function previsionsParOperationEtCompte(int $exercice, array $operationIds): array
+    {
+        if ($operationIds === []) {
+            return [];
+        }
+
+        $range = $this->exerciceService->dateRange($exercice);
+        $start = $range['start']->toDateString();
+        $end = $range['end']->toDateString();
+
+        $resultat = [];
+
+        foreach (['depense', 'recette'] as $type) {
+            $map = $this->fetchPrevisionsFlatEntries(
+                $type, $operationIds, withSeance: false, withTiers: false, withOperation: true, start: $start, end: $end,
+            );
+
+            foreach ($map as $entry) {
+                if ((int) $entry['exercice'] !== $exercice) {
+                    continue;
+                }
+                $opId = (int) $entry['operation_id'];
+                $compteId = (int) $entry['compte_id'];
+                $resultat[$opId][$compteId]
+                    = round(($resultat[$opId][$compteId] ?? 0.0) + (float) $entry['montant'], 2);
+            }
+        }
+
+        return $resultat;
+    }
+
     // ── Private helpers — requêtes SQL ────────────────────────────────────────
 
     /**

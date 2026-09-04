@@ -101,6 +101,15 @@ final class RapportService
     }
 
     /**
+     * @param  list<int>  $operationIds
+     * @return array<int, array<int, float>>
+     */
+    public function previsionsParOperationEtCompte(int $exercice, array $operationIds): array
+    {
+        return $this->compteResultat->previsionsParOperationEtCompte($exercice, $operationIds);
+    }
+
+    /**
      * État de flux de trésorerie consolidé.
      *
      * @return array{exercice: array, synthese: array, rapprochement: array, mensuel: list<array>, ecritures_non_pointees: list<array>}
