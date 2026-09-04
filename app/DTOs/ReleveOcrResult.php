@@ -7,6 +7,7 @@ namespace App\DTOs;
 final class ReleveOcrResult
 {
     /**
+     * @param  array<ReleveOcrMouvement>  $mouvements
      * @param  array<string>  $warnings
      */
     public function __construct(
@@ -15,6 +16,7 @@ final class ReleveOcrResult
         public readonly ?string $date_cloture,
         public readonly ?string $banque,
         public readonly ?string $numero_compte,
+        public readonly array $mouvements = [],
         public readonly array $warnings = [],
     ) {}
 }

@@ -11,12 +11,17 @@ use App\Enums\RoleAssociation;
 use App\Enums\StatutRapprochement;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
+use App\Exceptions\OcrAnalysisException;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
 use App\Models\VirementInterne;
 use App\Services\RapprochementBancaireService;
+use App\Services\RapprochementMatchingService;
 use App\Services\ReglementOperationService;
+use App\Services\ReleveOcrService;
+use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\View\View;
@@ -32,6 +37,21 @@ final class RapprochementDetail extends Component
 
     /** @var array<int, bool> */
     public array $expandedRemises = [];
+
+    /** @var array<int, array{date: ?string, libelle: ?string, montant: float}>|null */
+    public ?array $mouvementsReleve = null;
+
+    /** @var array<int, array{id: int, type: string, date: string, libelle: ?string, montant_signe: float}>|null */
+    public ?array $candidatsMatching = null;
+
+    /** @var array<int, array{transaction_id: int, transaction_type: string}> */
+    public array $associationsPointage = [];
+
+    public ?int $mouvementSelectionne = null;
+
+    public bool $matchingEnCours = false;
+
+    public ?string $matchingErreur = null;
 
     public function mount(RapprochementBancaire $rapprochement): void
     {
@@ -90,8 +110,8 @@ final class RapprochementDetail extends Component
         try {
             app(RapprochementBancaireService::class)
                 ->verrouiller($this->rapprochement);
-            $this->rapprochement = $this->rapprochement->fresh();
             session()->flash('success', 'Rapprochement verrouillé avec succès.');
+            $this->redirect(route('banques.rapprochement.index'));
         } catch (\RuntimeException $e) {
             session()->flash('error', $e->getMessage());
         }
@@ -168,38 +188,167 @@ final class RapprochementDetail extends Component
         $this->rapprochement = $this->rapprochement->fresh();
     }
 
-    public function render(): View
+    public function lancerMatchingAutomatique(): void
+    {
+        if (! $this->canEdit || $this->rapprochement->isVerrouille()) {
+            return;
+        }
+
+        if (! $this->rapprochement->hasPieceJointe()) {
+            $this->matchingErreur = 'Aucune pièce jointe sur ce rapprochement.';
+
+            return;
+        }
+
+        $this->matchingEnCours = true;
+        $this->resetModeAssiste();
+
+        try {
+            $storagePath = $this->rapprochement->pieceJointeFullPath();
+            $mime = $this->rapprochement->piece_jointe_mime;
+            $resultat = app(ReleveOcrService::class)->analyzeFromStorage($storagePath, $mime);
+
+            if (empty($resultat->mouvements)) {
+                $this->matchingErreur = 'Aucun mouvement extrait du relevé.';
+                $this->matchingEnCours = false;
+
+                return;
+            }
+
+            $this->mouvementsReleve = array_map(fn ($m) => [
+                'date' => $m->date,
+                'libelle' => $m->libelle,
+                'montant' => $m->montant,
+            ], $resultat->mouvements);
+
+            $candidates = $this->collecterCandidatsMatching();
+            $this->candidatsMatching = $candidates->values()->all();
+
+            $matchingResult = app(RapprochementMatchingService::class)
+                ->matcher($resultat->mouvements, $candidates);
+
+            foreach ($matchingResult->propositions as $prop) {
+                foreach ($this->mouvementsReleve as $i => $mv) {
+                    if (isset($this->associationsPointage[$i])) {
+                        continue;
+                    }
+                    if (abs($mv['montant'] - $prop->mouvement_montant) < 0.001
+                        && $mv['date'] === $prop->mouvement_date
+                        && $mv['libelle'] === $prop->mouvement_libelle) {
+                        $this->associationsPointage[$i] = [
+                            'transaction_id' => $prop->transaction_id,
+                            'transaction_type' => $prop->transaction_type,
+                        ];
+                        break;
+                    }
+                }
+            }
+        } catch (OcrAnalysisException $e) {
+            $this->matchingErreur = $e->getMessage();
+        } catch (\Throwable $e) {
+            $this->matchingErreur = 'Erreur lors de l\'analyse : '.$e->getMessage();
+        } finally {
+            $this->matchingEnCours = false;
+        }
+    }
+
+    public function selectionnerMouvement(int $index): void
+    {
+        $this->mouvementSelectionne = $this->mouvementSelectionne === $index ? null : $index;
+    }
+
+    public function associer(int $transactionId, string $transactionType): void
+    {
+        if ($this->mouvementSelectionne === null) {
+            return;
+        }
+
+        foreach ($this->associationsPointage as $assoc) {
+            if ((int) $assoc['transaction_id'] === $transactionId && $assoc['transaction_type'] === $transactionType) {
+                return;
+            }
+        }
+
+        $this->associationsPointage[$this->mouvementSelectionne] = [
+            'transaction_id' => $transactionId,
+            'transaction_type' => $transactionType,
+        ];
+        $this->mouvementSelectionne = null;
+    }
+
+    public function dissocier(int $index): void
+    {
+        unset($this->associationsPointage[$index]);
+        if ($this->mouvementSelectionne === $index) {
+            $this->mouvementSelectionne = null;
+        }
+    }
+
+    public function validerAssociations(): void
+    {
+        if (! $this->canEdit || empty($this->associationsPointage)) {
+            return;
+        }
+
+        $count = 0;
+        foreach ($this->associationsPointage as $assoc) {
+            $this->toggle($assoc['transaction_type'], (int) $assoc['transaction_id']);
+            $count++;
+        }
+
+        $this->resetModeAssiste();
+
+        if ($count > 0) {
+            session()->flash('success', "{$count} écriture(s) pointée(s).");
+        }
+    }
+
+    public function annulerPointage(): void
+    {
+        $this->resetModeAssiste();
+    }
+
+    private function resetModeAssiste(): void
+    {
+        $this->mouvementsReleve = null;
+        $this->candidatsMatching = null;
+        $this->associationsPointage = [];
+        $this->mouvementSelectionne = null;
+        $this->matchingErreur = null;
+    }
+
+    private function collecterCandidatsMatching(): Collection
+    {
+        return $this->buildTransactions()
+            ->where('pointe', false)
+            ->map(fn (array $tx) => [
+                'id' => (int) $tx['id'],
+                'type' => $tx['type'],
+                'date' => $tx['date']->format('Y-m-d'),
+                'libelle' => $tx['tiers'] ?? $tx['label'],
+                'montant_signe' => (float) $tx['montant_signe'],
+            ])
+            ->values();
+    }
+
+    /**
+     * @return Collection<int, array{id: int, type: string, date: Carbon, label: string, tiers: ?string, reference: ?string, mode_paiement: ?string, montant_signe: float, pointe: bool, sub_transactions: array}>
+     */
+    private function buildTransactions(): Collection
     {
         $service = app(RapprochementBancaireService::class);
         $compte = $this->rapprochement->compte;
         $rid = $this->rapprochement->id;
         $dateFin = $this->rapprochement->date_fin;
-
-        $transactions = collect();
         $verrouille = $this->rapprochement->isVerrouille();
 
-        // Résoudre le compte 512X strict du compte bancaire.
-        // Utilisé pour filtrer la liste pointable : seules les écritures portant une
-        // ligne sur CE compte 512X (ou appartenant à une remise) sont affichées.
-        // Si le compte 512X est introuvable (tenant sans schéma PD), pas de filtre
-        // (dégradation gracieuse).
-        $compte512X = $service->resoudreCompte512X($compte);
+        $transactions = collect();
 
-        // Transactions (dépenses + recettes) — grouper les remises en une seule ligne
-        //
-        // Le filtre par lignes 512X REMPLACE le filtre header compte_id.
-        // La T2 de règlement (créée par pourReglement) n'a pas de compte_id header
-        // mais porte une ligne 512X — sans ce fallback elle serait invisible.
+        $compte512X = $service->resoudreCompte512X($compte);
         $usePdFilter = $compte512X !== null;
 
         $txRows = Transaction::query()
             ->where('journal', '!=', JournalComptable::AN->value)
-            // Les écritures de virement interne sont exclues : le virement est déjà
-            // listé plus bas par sa propre ligne, qui se pointe séparément côté source
-            // et côté destination — la bonne granularité, un virement figurant sur deux
-            // relevés. Sans cette exclusion l'écriture ressort avec type='virement',
-            // chaîne que toggleTransaction() route vers VirementInterne::findOrFail()
-            // en lui passant un id de Transaction : la ligne devient impointable.
             ->where('type', '!=', TypeTransaction::Virement->value)
             ->when(
                 $usePdFilter,
@@ -240,11 +389,9 @@ final class RapprochementDetail extends Component
             ->with('tiers', 'remise')
             ->get();
 
-        // Séparer les transactions en remise et les transactions standalone
         $remiseGroups = $txRows->whereNotNull('remise_id')->groupBy('remise_id');
         $standalone = $txRows->whereNull('remise_id');
 
-        // Lignes remises — une ligne par remise
         foreach ($remiseGroups as $remiseId => $remiseTxs) {
             $remise = $remiseTxs->first()->remise;
             $allPointed = $remiseTxs->every(fn (Transaction $tx) => (int) $tx->rapprochement_id === $rid);
@@ -270,10 +417,6 @@ final class RapprochementDetail extends Component
             ]);
         }
 
-        // Lignes standalone — en mode PD, si la transaction est une T2 (journal=Banque),
-        // on affiche les infos de la T1 source (tiers, libellé, date) car l'utilisateur
-        // raisonne sur la transaction métier, pas sur l'écriture technique de règlement.
-        // Le toggle reçoit l'id T1 → pointage/dépointage symétriques via le code existant.
         $reglementSvc = $usePdFilter ? app(ReglementOperationService::class) : null;
 
         $standalone->each(function (Transaction $tx) use (&$transactions, $rid, $usePdFilter, $reglementSvc) {
@@ -301,7 +444,6 @@ final class RapprochementDetail extends Component
             ]);
         });
 
-        // Virements sortants (source = ce compte)
         VirementInterne::where('compte_source_id', $compte->id)
             ->where(function ($q) use ($rid, $dateFin, $verrouille) {
                 if ($verrouille) {
@@ -330,7 +472,6 @@ final class RapprochementDetail extends Component
                 ]);
             });
 
-        // Virements entrants (destination = ce compte)
         VirementInterne::where('compte_destination_id', $compte->id)
             ->where(function ($q) use ($rid, $dateFin, $verrouille) {
                 if ($verrouille) {
@@ -359,19 +500,54 @@ final class RapprochementDetail extends Component
                 ]);
             });
 
-        $transactions = $transactions->sortBy('date')->values();
+        return $transactions->sortBy('date')->values();
+    }
 
-        // Totals first — always over the full set of pointed transactions
+    public function render(): View
+    {
+        $transactions = $this->buildTransactions();
+
         $totalDebitPointe = abs($transactions->where('pointe', true)->where('montant_signe', '<', 0)->sum('montant_signe'));
         $totalCreditPointe = $transactions->where('pointe', true)->where('montant_signe', '>', 0)->sum('montant_signe');
 
-        // Display filter second — only affects the table, not the summary cards
         if ($this->masquerPointees) {
             $transactions = $transactions->filter(fn (array $tx) => ! $tx['pointe'])->values();
         }
 
+        $service = app(RapprochementBancaireService::class);
         $soldePointage = $service->calculerSoldePointage($this->rapprochement);
         $ecart = $service->calculerEcart($this->rapprochement);
+
+        $projectedDebit = null;
+        $projectedCredit = null;
+        $projectedSolde = null;
+        $projectedEcart = null;
+
+        if ($this->candidatsMatching !== null && ! empty($this->associationsPointage)) {
+            $lookup = [];
+            foreach ($this->candidatsMatching as $tx) {
+                $lookup[$tx['type'].'-'.$tx['id']] = $tx;
+            }
+
+            $addDebit = 0.0;
+            $addCredit = 0.0;
+
+            foreach ($this->associationsPointage as $assoc) {
+                $tx = $lookup[$assoc['transaction_type'].'-'.$assoc['transaction_id']] ?? null;
+                if ($tx !== null) {
+                    if ($tx['montant_signe'] < 0) {
+                        $addDebit += abs($tx['montant_signe']);
+                    } else {
+                        $addCredit += $tx['montant_signe'];
+                    }
+                }
+            }
+
+            $projectedDebit = $totalDebitPointe + $addDebit;
+            $projectedCredit = $totalCreditPointe + $addCredit;
+            $projectedSolde = $soldePointage + ($addCredit - $addDebit);
+            $projectedEcart = (float) $this->rapprochement->solde_fin - $projectedSolde;
+        }
 
         return view('livewire.rapprochement-detail', [
             'transactions' => $transactions,
@@ -379,6 +555,11 @@ final class RapprochementDetail extends Component
             'ecart' => $ecart,
             'totalDebitPointe' => $totalDebitPointe,
             'totalCreditPointe' => $totalCreditPointe,
+            'iaConfiguree' => ReleveOcrService::isConfigured(),
+            'projectedDebit' => $projectedDebit,
+            'projectedCredit' => $projectedCredit,
+            'projectedSolde' => $projectedSolde,
+            'projectedEcart' => $projectedEcart,
         ]);
     }
 }

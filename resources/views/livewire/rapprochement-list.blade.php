@@ -70,7 +70,8 @@
                         </button>
                     </div>
                 @else
-                    <x-zone-depot aide="{{ $iaConfiguree ? 'ou glissez un extrait de compte — les soldes et la date seront extraits automatiquement' : 'ou glissez un extrait de compte' }}">
+                    <x-zone-depot :aide-permanente="true"
+                                  aide="{{ $iaConfiguree ? 'ou glissez un extrait de compte — les soldes et la date seront extraits automatiquement' : 'ou glissez un extrait de compte' }}">
                         <input type="file" wire:model="extraitCompte"
                                accept=".pdf,image/jpeg,image/png"
                                class="form-control form-control-sm @error('extraitCompte') is-invalid @enderror">
@@ -335,7 +336,7 @@
                             <label class="form-label">
                                 Fichier (PDF, JPG ou PNG — 5 Mo max)
                             </label>
-                            <x-zone-depot>
+                            <x-zone-depot :aide-permanente="true" aide="ou glissez le relevé ici">
                                 <input type="file" wire:model="pieceJointeUpload"
                                        accept=".pdf,image/jpeg,image/png"
                                        class="form-control @error('pieceJointeUpload') is-invalid @enderror">

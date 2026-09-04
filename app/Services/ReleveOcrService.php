@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\DTOs\ReleveOcrMouvement;
 use App\DTOs\ReleveOcrResult;
 use App\Exceptions\OcrAnalysisException;
 use App\Exceptions\OcrNotConfiguredException;
@@ -11,6 +12,7 @@ use App\Support\CurrentAssociation;
 use App\Support\Demo;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 
 final class ReleveOcrService
 {
@@ -65,6 +67,26 @@ final class ReleveOcrService
         );
     }
 
+    public function analyzeFromStorage(string $storagePath, string $mime): ReleveOcrResult
+    {
+        if (Demo::isActive()) {
+            return $this->demoStub();
+        }
+
+        $apiKey = $this->apiKey();
+        if ($apiKey === null) {
+            throw new OcrNotConfiguredException;
+        }
+
+        $fullPath = Storage::disk('local')->path($storagePath);
+
+        return $this->performAnalysis(
+            apiKey: $apiKey,
+            base64: base64_encode(file_get_contents($fullPath)),
+            mime: $mime,
+        );
+    }
+
     private function demoStub(): ReleveOcrResult
     {
         return new ReleveOcrResult(
@@ -73,6 +95,23 @@ final class ReleveOcrService
             date_cloture: now()->format('Y-m-d'),
             banque: self::DEMO_STUB_BANQUE,
             numero_compte: self::DEMO_STUB_NUMERO_COMPTE,
+            mouvements: [
+                new ReleveOcrMouvement(
+                    date: now()->subDays(10)->format('Y-m-d'),
+                    libelle: 'Cotisation adhérent',
+                    montant: 50.0,
+                ),
+                new ReleveOcrMouvement(
+                    date: now()->subDays(5)->format('Y-m-d'),
+                    libelle: 'Achat fournitures',
+                    montant: -85.0,
+                ),
+                new ReleveOcrMouvement(
+                    date: now()->subDays(2)->format('Y-m-d'),
+                    libelle: 'Frais bancaires',
+                    montant: -12.5,
+                ),
+            ],
             warnings: [],
         );
     }
@@ -88,7 +127,7 @@ final class ReleveOcrService
             'anthropic-version' => '2023-06-01',
         ])->timeout(30)->post('https://api.anthropic.com/v1/messages', [
             'model' => $this->model(),
-            'max_tokens' => 1024,
+            'max_tokens' => 4096,
             'messages' => [[
                 'role' => 'user',
                 'content' => [
@@ -131,12 +170,13 @@ final class ReleveOcrService
 Tu es un assistant d'extraction de relevés bancaires.
 Extrais les informations suivantes de ce relevé de compte au format JSON :
 
-{"solde_ouverture": 0.00, "solde_cloture": 0.00, "date_cloture": "YYYY-MM-DD", "banque": "nom de la banque", "numero_compte": "numéro ou IBAN partiel", "warnings": []}
+{"solde_ouverture": 0.00, "solde_cloture": 0.00, "date_cloture": "YYYY-MM-DD", "banque": "nom de la banque", "numero_compte": "numéro ou IBAN partiel", "mouvements": [{"date": "YYYY-MM-DD", "libelle": "description", "montant": -85.00}], "warnings": []}
 
 Règles :
 - Cherche le solde d'ouverture (« ancien solde », « solde précédent », « solde au ... ») et le solde de clôture (« nouveau solde », « solde final »).
 - Pour la date de clôture, prends la date de fin du relevé (souvent en en-tête ou en fin de document).
 - Les montants sont en euros. Utilise le point comme séparateur décimal.
+- Pour les mouvements, extrais CHAQUE ligne d'opération du relevé. Le montant est signé : négatif pour un débit, positif pour un crédit. Le libellé est la description de l'opération telle qu'elle apparaît sur le relevé.
 - Si une information est introuvable, mets null.
 - Ajoute un warning si le document ne ressemble pas à un relevé bancaire.
 
@@ -152,7 +192,24 @@ PROMPT;
             date_cloture: $data['date_cloture'] ?? null,
             banque: $data['banque'] ?? null,
             numero_compte: $data['numero_compte'] ?? null,
+            mouvements: $this->parseMouvements($data['mouvements'] ?? []),
             warnings: $data['warnings'] ?? [],
+        );
+    }
+
+    /**
+     * @param  array<mixed>  $mouvements
+     * @return array<ReleveOcrMouvement>
+     */
+    private function parseMouvements(array $mouvements): array
+    {
+        return array_map(
+            fn (array $mouvement): ReleveOcrMouvement => new ReleveOcrMouvement(
+                date: $mouvement['date'] ?? null,
+                libelle: $mouvement['libelle'] ?? null,
+                montant: isset($mouvement['montant']) ? (float) $mouvement['montant'] : 0.0,
+            ),
+            array_filter($mouvements, static fn (mixed $mouvement): bool => is_array($mouvement)),
         );
     }
 }

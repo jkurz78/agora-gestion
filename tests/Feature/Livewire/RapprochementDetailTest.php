@@ -187,3 +187,22 @@ it('ne modifie pas les champs si le rapprochement est verrouillé', function () 
         ->call('updateSoldeFin', '9999.00')
         ->assertHasErrors(['solde_fin']);
 });
+
+it('le verrouillage renvoie a la liste des rapprochements', function () {
+    // Ecart nul : aucune ecriture pointee et solde_fin = solde_ouverture.
+    $rapprochement = RapprochementBancaire::factory()->create([
+        'association_id' => $this->association->id,
+        'compte_id' => $this->compte->id,
+        'statut' => StatutRapprochement::EnCours,
+        'solde_ouverture' => 1000.00,
+        'solde_fin' => 1000.00,
+        'date_fin' => '2026-03-31',
+        'saisi_par' => $this->user->id,
+    ]);
+
+    Livewire::test(RapprochementDetail::class, ['rapprochement' => $rapprochement])
+        ->call('verrouiller')
+        ->assertRedirect(route('banques.rapprochement.index'));
+
+    expect($rapprochement->fresh()->statut)->toBe(StatutRapprochement::Verrouille);
+});
