@@ -218,13 +218,19 @@ final class BudgetOperationBuilder
      * fois — trois copies divergeraient, et un compte se retrouverait dans une
      * famille distincte de celle de ses homologues.
      *
-     * Le scope tenant filtre ici aussi, et c'est LUI le filet qui compte pour
-     * le cas d'une ligne de budget légitime du tenant courant pointant par
-     * erreur un compte étranger : un compte d'un autre tenant est absent de
-     * la carte, et parOperations() écarte alors la ligne (`isset($meta[...])`).
-     * Le filtre équivalent sur `c` dans ventilations() est redondant avec
-     * celui-ci pour ce cas précis — il reste posé par cohérence, pas parce
-     * qu'un test peut l'isoler.
+     * Le scope tenant filtre ici aussi, et c'est LUI — avec le garde
+     * `isset($meta[...])` en aval dans parOperations() — le seul rempart pour
+     * le cas d'une PRÉVISION du tenant courant pointant par erreur un compte
+     * étranger : {@see CompteResultatBuilder::fetchPrevisionsFlatEntries()}
+     * scope `ep.association_id` et `op.association_id`, jamais le compte
+     * lui-même. Une `encadrement_previsions` légitime mais mal pointée n'est
+     * donc arrêtée nulle part avant d'arriver ici.
+     * Le cas symétrique côté ventilation — une `budget_lines` légitime du
+     * tenant courant pointant un compte étranger — n'atteint lui jamais ce
+     * filtre : il est déjà écarté en amont par le `c.association_id` de
+     * ventilations(), avant même que sa ligne ne soit unifiée avec les autres
+     * sources. Le filtre posé ici pour ce cas-là est donc redondant, pas le
+     * seul rempart.
      *
      * @param  list<int>  $compteIds
      * @return array<int, array{classe: int, famille_id: int, famille_nom: string, compte_nom: string}>
