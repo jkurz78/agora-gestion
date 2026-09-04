@@ -546,6 +546,13 @@ $activeGroup = match(true) {
                             </li>
 
                             <li class="nav-item">
+                                <a href="{{ route('rapports.budget-operations') }}"
+                                   class="nav-link {{ request()->routeIs('rapports.budget-operations') ? 'active' : '' }}">
+                                    <i class="bi bi-piggy-bank me-1"></i> Budget par opérations
+                                </a>
+                            </li>
+
+                            <li class="nav-item">
                                 <a href="{{ route('rapports.flux-tresorerie') }}"
                                    class="nav-link {{ request()->routeIs('rapports.flux-tresorerie') ? 'active' : '' }}">
                                     <i class="bi bi-cash-stack me-1"></i> Flux de trésorerie

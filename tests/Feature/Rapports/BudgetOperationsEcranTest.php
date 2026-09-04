@@ -5,6 +5,7 @@ declare(strict_types=1);
 // Deux surfaces, un composant : le rapport du menu et l'onglet de la fiche
 // operation, qui n'est que le meme composant avec sa selection pre-remplie.
 
+use App\Livewire\OperationDetail;
 use App\Livewire\RapportBudgetOperations;
 use App\Models\Association;
 use App\Models\BudgetLine;
@@ -374,4 +375,49 @@ it('un id inconnu mele a un id valide n empeche pas le rapport et ne declenche p
         ->assertOk()
         ->assertSet('selectionIgnoree', false)
         ->assertSee('Fournitures diverses');
+});
+
+// ── Rendre l'ecran atteignable : route, entree de menu, onglet de la fiche
+// operation. Les tests ci-dessus exercent le composant en isolation ; ceux-ci
+// exercent le cablage qui l'expose (Task 7).
+
+it('la route de l ecran budget par operations repond', function (): void {
+    $this->get('/rapports/budget-operations')->assertOk();
+});
+
+it('la route de l ecran budget par operations est fermee a un visiteur non authentifie', function (): void {
+    auth()->logout();
+
+    $this->get('/rapports/budget-operations')
+        ->assertRedirect(route('login'));
+});
+
+it('l onglet budget de la fiche operation embarque le budget de cette operation precise', function (): void {
+    // Test de cablage, pas de comportement du composant (deja couvert
+    // ci-dessus) : il doit tomber si l'onglet passe un :selectedOperationIds
+    // vide ou errone a <livewire:rapport-budget-operations>. Assertion sur un
+    // intitule de compte et un montant formes, pas sur un simple mot comme
+    // « budget » : ce dernier apparaitrait aussi dans le libelle de l'onglet
+    // lui-meme, meme si le composant sous-jacent recevait une selection vide.
+    $compte = Compte::factory()->numero('606')->create([
+        'association_id' => $this->association->id,
+        'intitule' => 'Fournitures atelier poterie',
+        'classe' => 6,
+    ]);
+    $operation = Operation::factory()->create([
+        'association_id' => $this->association->id,
+        'nom' => 'Atelier poterie',
+    ]);
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id,
+        'compte_id' => $compte->id,
+        'operation_id' => $operation->id,
+        'exercice' => 2025,
+        'montant_prevu' => 456.78,
+    ]);
+
+    Livewire::test(OperationDetail::class, ['operation' => $operation])
+        ->set('activeTab', 'budget')
+        ->assertSee('Fournitures atelier poterie')
+        ->assertSee('456,78');
 });
