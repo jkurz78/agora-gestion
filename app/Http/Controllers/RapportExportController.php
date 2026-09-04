@@ -1753,15 +1753,35 @@ final class RapportExportController extends Controller
                     }
                 }
 
-                $this->xlsxEcrireLigneBudget($sheet, $row, 'TOTAL '.$section['label'], $section['totaux']['budget'], $section['totaux']['prevision'], (float) $section['totaux']['realise']);
-                $this->styleTotalXlsx($sheet, 'A'.$row.':'.$lastCol.$row);
-                $row++;
+                // Même règle que l'écran (rapport-budget-operations.blade.php,
+                // `@if (! empty($section['data']))`) : une section vide ne
+                // porte aucune ligne de total — additionner zéro compte
+                // n'est pas une information, juste un bloc vide de plus.
+                if ($section['data'] !== []) {
+                    $this->xlsxEcrireLigneBudget($sheet, $row, 'TOTAL '.$section['label'], $section['totaux']['budget'], $section['totaux']['prevision'], (float) $section['totaux']['realise']);
+                    $this->styleTotalXlsx($sheet, 'A'.$row.':'.$lastCol.$row);
+                    $row++;
+
+                    if ($section['totaux']['hors_dotation'] != 0.0) {
+                        $sheet->setCellValue('A'.$row, 'dont hors dotation : '.number_format($section['totaux']['hors_dotation'], 2, ',', ' ').' €');
+                        $sheet->getStyle('A'.$row)->getFont()->setItalic(true)->setSize(9);
+                        $row++;
+                    }
+                }
                 $row++; // ligne vide entre les deux sections
             }
         }
 
         if ($row > 2) {
             $sheet->getStyle('B2:'.$lastCol.($row - 1))->getNumberFormat()->setFormatCode('#,##0.00');
+
+            // Légende, en pied de classeur : le prévisionnel est un périmètre
+            // plus étroit que le budget — sans elle, un tiret (compte non
+            // couvert) se lirait à tort comme un budget nul. Même texte qu'à
+            // l'écran (voir rapport-budget-operations.blade.php).
+            $row++;
+            $sheet->setCellValue('A'.$row, "Le prévisionnel ne couvre que les règlements des participants et les coûts d'encadrement. Un tiret signale un compte qu'il n'atteint pas — ce n'est pas un zéro.");
+            $sheet->getStyle('A'.$row)->getFont()->setItalic(true)->setSize(9);
         }
 
         return $spreadsheet;
@@ -2109,18 +2129,25 @@ final class RapportExportController extends Controller
      *     realiseParOperation: array<int, array<int, float>>,
      *     avecRealise: bool,
      *     avecVentilations: bool,
+     *     subtitle: string,
      * }
      */
     private function pdfBudgetData(int $exercice, Request $request): array
     {
         $donnees = app(BudgetEcranBuilder::class)->pourExercice($exercice);
 
+        // Défaut décoché : l'usage d'octobre (AG) est le plus proche du
+        // vote, et un défaut qui affiche des colonnes à zéro serait le
+        // mauvais choix.
+        $avecRealise = $request->boolean('realise');
+
         return array_merge($donnees, [
-            // Défaut décoché : l'usage d'octobre (AG) est le plus proche du
-            // vote, et un défaut qui affiche des colonnes à zéro serait le
-            // mauvais choix.
-            'avecRealise' => $request->boolean('realise'),
+            'avecRealise' => $avecRealise,
             'avecVentilations' => $request->boolean('ventilations'),
+            // Sans ce sous-titre, deux impressions à six mois d'écart (le
+            // vote d'octobre, le suivi de mars) portent le même bandeau
+            // « Budget — Exercice… » et se confondent au classement.
+            'subtitle' => $avecRealise ? 'Suivi de gestion' : 'Budget voté',
         ]);
     }
 

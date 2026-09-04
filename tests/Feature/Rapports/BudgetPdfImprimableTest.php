@@ -187,6 +187,29 @@ it('le pdf recoit bien les enveloppes (pas les ventilations) et les bons drapeau
     expect($montant)->toBe(1000.0)->and($montant)->not->toBe(300.0);
 });
 
+it('le sous-titre distingue le budget vote du suivi de gestion', function (): void {
+    // Sans lui, une impression d'octobre (le vote) et une de mars (le suivi)
+    // portent le meme bandeau « Budget — Exercice… » et se confondent au
+    // classement — les deux cases cochees ou non ne changent rien au titre.
+    $captured = null;
+    View::composer('pdf.rapport-budget', function ($view) use (&$captured): void {
+        $captured = $view->getData();
+    });
+
+    $this->get(route('rapports.export', [
+        'rapport' => 'budget', 'format' => 'pdf', 'exercice' => 2025,
+        'realise' => '0', 'ventilations' => '0',
+    ]))->assertOk();
+    expect($captured['subtitle'])->toBe('Budget voté');
+
+    $captured = null;
+    $this->get(route('rapports.export', [
+        'rapport' => 'budget', 'format' => 'pdf', 'exercice' => 2025,
+        'realise' => '1', 'ventilations' => '1',
+    ]))->assertOk();
+    expect($captured['subtitle'])->toBe('Suivi de gestion');
+});
+
 it('le gabarit d aller-retour reste xlsx et csv seulement, jamais la ventilation', function (): void {
     // La ventilation ne doit JAMAIS entrer dans le fichier reimportable : un
     // fichier de septembre reimporte en mars ecraserait six mois de travail.

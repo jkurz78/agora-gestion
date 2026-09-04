@@ -57,6 +57,34 @@ it('produit : un realise negatif (contra-produit debite) donne un pct negatif, r
     expect(ComparaisonBudgetaire::couleurBarre(-40.0, false))->toBe('#6E1E18');
 });
 
+it('charge : un pct negatif ne tombe PAS en bas de la rampe, contrairement au produit', function () {
+    // Asymétrie documentée sur couleurBarre() : côté charge, -40 % passe le
+    // premier palier `<= 103` et ressort VERTE (un compte de charge négatif
+    // est un remboursement ou un avoir reçu, une bonne nouvelle), alors que
+    // le même -40 % côté produit tombe tout en bas de la rampe (test
+    // ci-dessus). Une ancienne version de la docblock affirmait à tort que
+    // la ligne « tombe tout en bas de la rampe » dans les deux cas.
+    expect(ComparaisonBudgetaire::couleurBarre(-40.0, true))->toBe('#2E7D32');
+});
+
+// Réalisé nul : au 1er octobre, toutes les recettes budgétées sont à 0 %
+// encaissé et sortaient en rouge foncé — le palier le plus bas de la rampe.
+// L'écran entier était maximalement alarmant, donc plus rien n'alertait. La
+// barre dit l'avancement, le nombre porte le jugement : réalisé nul, barre
+// vide ; l'écart chiffré, lui, garde sa couleur.
+
+it('un realise nul ne rend aucune couleur de barre, charge comme produit', function () {
+    expect(ComparaisonBudgetaire::couleurBarre(0.0, true))->toBeNull();
+    expect(ComparaisonBudgetaire::couleurBarre(0.0, false))->toBeNull();
+});
+
+it('l ecart d une recette non encaissee reste defavorable malgre la barre vide', function () {
+    // L'alerte survit : seule la barre cesse de crier.
+    $ecart = ComparaisonBudgetaire::ecart(500.0, 0.0);
+    expect($ecart)->toBe(-500.0);
+    expect(ComparaisonBudgetaire::ecartEstFavorable($ecart, false))->toBeFalse();
+});
+
 // écart() — delta brut, IDENTIQUE pour une charge et un produit : réalisé -
 // prévu, point. C'est ecartEstFavorable() qui porte l'appréciation, jamais
 // ecart() lui-même. Les trois cas ci-dessous sont ceux du propriétaire,

@@ -54,8 +54,12 @@ final class ComparaisonBudgetaire
      * fabriquerait ses propres fausses alertes. C'est l'ÉCART chiffré qui porte
      * l'alerte, et il garde sa couleur.
      *
-     * @param  float  $pct  Réalisé / budget × 100. Peut être négatif (contra-produit
-     *                      débité), auquel cas la ligne tombe tout en bas de la rampe.
+     * @param  float  $pct  Réalisé / budget × 100. Peut être négatif (contra-compte
+     *                      débité) : pour un PRODUIT, la ligne tombe alors tout en bas
+     *                      de la rampe (aucun palier `>=` ne matche). Pour une CHARGE en
+     *                      revanche, un pct négatif reste `<= 103` et ressort VERTE — ce
+     *                      n'est pas un bug : une charge négative est un remboursement
+     *                      ou un avoir, une bonne nouvelle budgétaire.
      * @param  bool  $isCharge  true = charge (dépense), false = produit (recette).
      * @return string|null null = ne pas colorer la barre
      */

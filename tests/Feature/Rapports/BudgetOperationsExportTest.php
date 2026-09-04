@@ -9,7 +9,10 @@ use App\Models\Association;
 use App\Models\BudgetLine;
 use App\Models\Compte;
 use App\Models\Operation;
+use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Services\RapportService;
 use App\Tenant\TenantContext;
 use Illuminate\Testing\TestResponse;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -148,5 +151,131 @@ it('une cellule non couverte reste vide dans le xlsx, pas un zero', function ():
 
     // La colonne Réalisé, elle, est un vrai zéro (aucun mouvement) : elle doit
     // rester un nombre affiché, jamais escamotée comme le prévisionnel.
-    expect((float) $sheet->getCell('D'.$rowIndex)->getValue())->toBe(0.0);
+    //
+    // Sans cast, sinon (float) null === 0.0 efface exactement la distinction
+    // que ce test pretend etablir : une cellule jamais posee (relue `null`)
+    // et une cellule posee a `0.0` deviendraient indiscernables, et un
+    // xlsxEcrireLigneBudget() mute en `if ($realise !== 0.0) { ...set... }`
+    // laisserait ce test vert.
+    $valeurRealise = $sheet->getCell('D'.$rowIndex)->getValue();
+
+    expect($valeurRealise)->not->toBeNull()
+        ->and($valeurRealise)->toBeFloat()
+        ->and($valeurRealise)->toBe(0.0);
+});
+
+// ── Section vide : trois surfaces, un seul comportement attendu (celui de
+// l'ecran, qui masque toute la ligne de total quand la section n'a aucun
+// compte). Le fixture partage plus haut ne budgete que des comptes de
+// depense pour $this->operation : le cote RECETTES y est donc toujours vide,
+// et sert a verifier qu'aucune ligne TOTAL RECETTES n'en sort.
+
+it('le pdf n imprime aucune ligne de total quand une section n a aucun compte', function (): void {
+    $operations = app(RapportService::class)->budgetParOperations(2025, [(int) $this->operation->id]);
+
+    $html = view('pdf.rapport-budget-operations', [
+        'operations' => $operations,
+        'title' => 'Budget par operations',
+        'subtitle' => null,
+        'association' => null,
+        'headerLogoBase64' => null,
+        'headerLogoMime' => null,
+        'appLogoBase64' => null,
+        'footerLogoBase64' => null,
+        'footerLogoMime' => null,
+    ])->render();
+
+    expect($html)->toContain('Aucun compte.');
+    expect($html)->not->toContain('TOTAL RECETTES');
+    // Le cote DEPENSES, lui, a bien un compte et garde sa ligne de total.
+    expect($html)->toContain('TOTAL DÉPENSES');
+});
+
+it('le xlsx n ecrit aucune ligne de total quand une section n a aucun compte', function (): void {
+    $response = $this->get(route('rapports.export', [
+        'rapport' => 'budget-operations',
+        'format' => 'xlsx',
+        'exercice' => 2025,
+        'ops' => [(int) $this->operation->id],
+    ]))->assertOk();
+
+    $sheet = lireClasseurBudgetOperations($response);
+    $rows = collect($sheet->toArray())->map(fn ($r) => $r[0] ?? null);
+
+    expect($rows)->not->toContain('TOTAL RECETTES');
+    expect($rows)->toContain('TOTAL DÉPENSES');
+});
+
+// ── La legende et le « dont hors dotation » : presents a l'ecran (voir
+// BudgetOperationsEcranTest.php), absents des deux exports jusqu'ici. C'est
+// pourtant le PDF qu'on pose sur la table en reunion, la ou le tiret est le
+// plus muet.
+
+it('le pdf porte la legende du perimetre du previsionnel et le detail hors dotation', function (): void {
+    $compteHorsDotation = Compte::factory()->numero('625B')->create([
+        'association_id' => $this->association->id,
+        'intitule' => 'Deplacements',
+        'classe' => 6,
+    ]);
+    $tx = Transaction::factory()->create([
+        'association_id' => $this->association->id,
+        'date' => '2025-11-10',
+    ]);
+    TransactionLigne::factory()->create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $compteHorsDotation->id,
+        'operation_id' => $this->operation->id,
+        'debit' => 150.00,
+        'credit' => 0,
+    ]);
+
+    $operations = app(RapportService::class)->budgetParOperations(2025, [(int) $this->operation->id]);
+
+    $html = view('pdf.rapport-budget-operations', [
+        'operations' => $operations,
+        'title' => 'Budget par operations',
+        'subtitle' => null,
+        'association' => null,
+        'headerLogoBase64' => null,
+        'headerLogoMime' => null,
+        'appLogoBase64' => null,
+        'footerLogoBase64' => null,
+        'footerLogoMime' => null,
+    ])->render();
+
+    expect($html)->toContain('règlements des participants');
+    expect($html)->toContain('dont hors dotation');
+    expect($html)->toContain('150,00');
+});
+
+it('le xlsx porte la legende du perimetre du previsionnel et le detail hors dotation', function (): void {
+    $compteHorsDotation = Compte::factory()->numero('625B')->create([
+        'association_id' => $this->association->id,
+        'intitule' => 'Deplacements',
+        'classe' => 6,
+    ]);
+    $tx = Transaction::factory()->create([
+        'association_id' => $this->association->id,
+        'date' => '2025-11-10',
+    ]);
+    TransactionLigne::factory()->create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $compteHorsDotation->id,
+        'operation_id' => $this->operation->id,
+        'debit' => 150.00,
+        'credit' => 0,
+    ]);
+
+    $response = $this->get(route('rapports.export', [
+        'rapport' => 'budget-operations',
+        'format' => 'xlsx',
+        'exercice' => 2025,
+        'ops' => [(int) $this->operation->id],
+    ]))->assertOk();
+
+    $sheet = lireClasseurBudgetOperations($response);
+    $rows = collect($sheet->toArray())->map(fn ($r) => $r[0] ?? null)->filter()->values();
+
+    expect($rows->contains(fn ($v) => str_contains((string) $v, 'règlements des participants')))->toBeTrue();
+    expect($rows->contains(fn ($v) => str_contains((string) $v, 'dont hors dotation')))->toBeTrue();
 });

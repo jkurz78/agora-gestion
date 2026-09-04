@@ -68,15 +68,30 @@
                             <td colspan="5" class="text-center text-muted">Aucun compte.</td>
                         </tr>
                     @endforelse
-                    <tr class="cr-total">
-                        <td>TOTAL {{ $section['label'] }}</td>
-                        <td class="text-right">{{ $fmt($section['totaux']['budget']) }}</td>
-                        <td class="text-right">{{ $fmt($section['totaux']['prevision']) }}</td>
-                        <td class="text-right">{{ $fmt($section['totaux']['realise']) }}</td>
-                        <td class="text-right">{{ $fmtEcart($section['totaux']['budget'], $section['totaux']['realise']) }}</td>
-                    </tr>
+                    @if (! empty($section['data']))
+                        <tr class="cr-total">
+                            <td>TOTAL {{ $section['label'] }}</td>
+                            <td class="text-right">{{ $fmt($section['totaux']['budget']) }}</td>
+                            <td class="text-right">{{ $fmt($section['totaux']['prevision']) }}</td>
+                            <td class="text-right">{{ $fmt($section['totaux']['realise']) }}</td>
+                            <td class="text-right">{{ $fmtEcart($section['totaux']['budget'], $section['totaux']['realise']) }}</td>
+                        </tr>
+                        @if ($section['totaux']['hors_dotation'] != 0.0)
+                            <tr>
+                                <td colspan="5" class="text-muted" style="font-size:10px;">
+                                    dont hors dotation : {{ number_format($section['totaux']['hors_dotation'], 2, ',', ' ') }} €
+                                </td>
+                            </tr>
+                        @endif
+                    @endif
                 </tbody>
             </table>
         @endforeach
     @endforeach
+
+    <p class="text-muted" style="font-size:10px;margin-top:8px;">
+        Le prévisionnel ne couvre que les règlements des participants et les
+        coûts d'encadrement. Un tiret signale un compte qu'il n'atteint pas —
+        ce n'est pas un zéro.
+    </p>
 @endsection
