@@ -114,9 +114,12 @@ it('rend un tableau vide sans toucher la base quand la liste d\'éligibles est v
 });
 
 // ---------------------------------------------------------------------------
-// 3. Opération sans type d'opération — branche `$type?->` : sans le repli,
-//    l'accès à $type->nom exploserait (null->nom) au lieu de produire
-//    'Sans type'/0.
+// 3. Opération sans type d'opération. Le seul null-safe que ce montage exerce
+//    vraiment est `$type?->compte` : sans lui, l'accès sur null lèverait au
+//    lieu de retomber sur '—'/0. Les `??` qui suivent, eux, masquent déjà
+//    l'accès sur null — retirer leur `?->` ne change rien (mutants
+//    équivalents). Ce test épingle donc le repli complet 'Sans type'/'—'/0
+//    d'une opération orpheline, pas chacune des flèches prise isolément.
 // ---------------------------------------------------------------------------
 
 it('replie sur le libellé "Sans type" et l\'id de groupement 0 quand l\'opération n\'a pas de type', function (): void {
@@ -145,9 +148,11 @@ it('replie sur le libellé "Sans type" et l\'id de groupement 0 quand l\'opérat
 });
 
 // ---------------------------------------------------------------------------
-// 4. Type d'opération sans compte — branche `$compte?->` : le type existe
-//    (id et nom réels), seul son compte est absent. Sans le repli, l'accès à
-//    $compte->intitule exploserait (null->intitule) au lieu de produire '—'/0.
+// 4. Type d'opération sans compte. Le type existe — id et nom réels —, seul
+//    son compte est absent. Ce que ce cas prouve, et qu'aucun autre ne couvre :
+//    l'identité propre du type SURVIT au repli du niveau compte. Le test 3
+//    produit lui aussi '—'/0 au niveau compte, mais en perdant le type au
+//    passage ; les deux sorties seraient indiscernables sans ce montage.
 // ---------------------------------------------------------------------------
 
 it('replie sur le libellé "—" et l\'id de groupement 0 quand le type n\'a pas de compte', function (): void {

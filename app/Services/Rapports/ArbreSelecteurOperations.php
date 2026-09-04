@@ -19,9 +19,9 @@ use App\Models\Operation;
  * JS — jamais renvoyée au serveur (seuls les op.id le sont via
  * selectedOperationIds, revalidés en SEL-04).
  *
- * Partagée entre le compte de résultat par opérations
- * (RapportCompteResultatOperations) et le rapport « Budget par opérations » :
- * deux écrans, un seul sélecteur.
+ * Extraite de RapportCompteResultatOperations, son seul consommateur à ce
+ * jour, pour être partagée avec le futur rapport « Budget par opérations » :
+ * deux écrans, un seul sélecteur — à terme.
  */
 final class ArbreSelecteurOperations
 {
