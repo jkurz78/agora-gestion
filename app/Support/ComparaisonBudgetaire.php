@@ -43,12 +43,28 @@ final class ComparaisonBudgetaire
      * économie) est aussi verte qu'une charge à 103 %, une recette à 150 % est
      * aussi verte qu'une recette à 97 %.
      *
+     * Réalisé nul : la barre reste VIDE et non colorée, des deux côtés. Au 1er
+     * octobre toutes les recettes budgétées sont à 0 % : les peindre en rouge
+     * foncé rendait l'écran uniformément alarmant, donc muet. Et une charge à
+     * 0 % n'est pas une bonne nouvelle non plus — « rien dépensé » n'est pas
+     * « bien dépensé ».
+     *
+     * Pas de prorata temporel : l'encaissement d'une association n'est pas
+     * linéaire (cotisations en septembre, stages en avril), une proration
+     * fabriquerait ses propres fausses alertes. C'est l'ÉCART chiffré qui porte
+     * l'alerte, et il garde sa couleur.
+     *
      * @param  float  $pct  Réalisé / budget × 100. Peut être négatif (contra-produit
      *                      débité), auquel cas la ligne tombe tout en bas de la rampe.
      * @param  bool  $isCharge  true = charge (dépense), false = produit (recette).
+     * @return string|null null = ne pas colorer la barre
      */
-    public static function couleurBarre(float $pct, bool $isCharge): string
+    public static function couleurBarre(float $pct, bool $isCharge): ?string
     {
+        if ($pct == 0.0) {
+            return null;
+        }
+
         if ($isCharge) {
             if ($pct <= 103) {
                 return self::VERT;

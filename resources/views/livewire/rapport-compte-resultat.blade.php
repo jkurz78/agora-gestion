@@ -76,6 +76,11 @@
             $pct     = $montantN / $budget * 100;
             $pctCap  = min($pct, 100);
             $color   = \App\Support\ComparaisonBudgetaire::couleurBarre($pct, $isCharge);
+            if ($color === null) {
+                // Rien n'a encore bougé : une piste vide dit l'avancement sans
+                // porter de jugement. Le pourcentage reste affiché.
+                return '<div class="budget-bar-track"></div><div class="budget-label">' . number_format($pct, 0) . ' %</div>';
+            }
             // Au-delà de 100 %, la barre plafonnée est pleine — indiscernable
             // d'un budget tenu pile à 100 %. Des hachures signalent le
             // débordement SANS porter de jugement (c'est la couleur qui juge) :
