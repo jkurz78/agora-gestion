@@ -304,6 +304,23 @@ it('operationsEligibles délègue à OperationsEligiblesQuery pour l\'exercice d
         ->and($this->service->operationsEligibles(2024))->toBe([]);
 });
 
+it('operationsEligibles propage avecBudget à OperationsEligiblesQuery', function () {
+    // Couverture perdue au déménagement des cas $avecBudget vers le test
+    // unitaire de la query : sans ce cas, operationsEligibles() pourrait
+    // cesser de transmettre le drapeau sans qu'aucune assertion ne bronche.
+    $op = Operation::factory()->create();
+    $sc = Compte::factory()->depense()->numero('606')->create(['intitule' => 'Achats']);
+
+    BudgetLine::factory()->create([
+        'compte_id' => $sc->id,
+        'operation_id' => $op->id,
+        'exercice' => 2025,
+    ]);
+
+    expect($this->service->operationsEligibles(2025))->toBe([])
+        ->and($this->service->operationsEligibles(2025, avecBudget: true))->toBe([(int) $op->id]);
+});
+
 it('normaliserOperations garde l\'id éligible et écarte un id inexistant', function () {
     $op = Operation::factory()->create();
     $sc = Compte::factory()->depense()->numero('606')->create(['intitule' => 'Achats']);

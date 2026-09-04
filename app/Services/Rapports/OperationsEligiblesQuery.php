@@ -204,8 +204,14 @@ final class OperationsEligiblesQuery
     /**
      * Branche « ventilation budgétaire » : les lignes de budget rattachées à
      * une opération pour l'exercice affiché, dont le compte est de classe 6
-     * ou 7 — même forme que previsionsCharges()/previsionsProduits(), pour
-     * ne pas diverger de la lecture faite une fois l'opération retenue.
+     * ou 7 — même CRITÈRE de classe que previsionsCharges()/previsionsProduits(),
+     * pour ne pas diverger de la lecture faite une fois l'opération retenue.
+     * Ce n'est qu'une parenté de critère, pas de forme : previsionsCharges()
+     * ne filtre le tenant que sur `ep` et `o`, previsionsProduits() que sur
+     * `op` — ni l'une ni l'autre ne scope sa table de comptes (`cpt`) ni
+     * `seances` (`s`). Le filtre tenant sur `c` ci-dessous va délibérément
+     * plus loin que ces deux branches sœurs ; ce n'est pas un alignement,
+     * c'est un choix propre à cette branche.
      *
      * Rattachement par la COLONNE `exercice` de la ligne, jamais par des dates :
      * une ligne de budget porte son exercice explicitement, c'est tout l'intérêt

@@ -72,7 +72,7 @@ final class RapportCompteResultatOperations extends Component
         // insélectionnable, ce qui viderait la projection de son objet.
         $previsionnel = $this->mode !== 'realise';
 
-        $eligibleIds = $rapportService->operationsEligibles($exercice, $previsionnel);
+        $eligibleIds = $rapportService->operationsEligibles($exercice, avecPrevisions: $previsionnel);
         $operationTree = $this->buildOperationTree($eligibleIds);
 
         // SEL-04 : les ids reçus par l'URL ne sont jamais fiables — on les

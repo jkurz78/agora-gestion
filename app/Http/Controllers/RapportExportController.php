@@ -540,7 +540,7 @@ final class RapportExportController extends Controller
         $operationIds = $rapportService->normaliserOperations(
             (array) $request->query('ops', []),
             $exercice,
-            $previsionnel,
+            avecPrevisions: $previsionnel,
         );
 
         if ($operationIds === []) {
