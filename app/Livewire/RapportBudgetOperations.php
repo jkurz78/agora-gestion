@@ -31,6 +31,18 @@ final class RapportBudgetOperations extends Component
      */
     public bool $selectionIgnoree = false;
 
+    public function exportUrl(string $format): string
+    {
+        $exercice = app(ExerciceService::class)->current();
+
+        return route('rapports.export', [
+            'rapport' => 'budget-operations',
+            'format' => $format,
+            'exercice' => $exercice,
+            'ops' => $this->selectedOperationIds,
+        ]);
+    }
+
     public function render(): mixed
     {
         $exercice = app(ExerciceService::class)->current();

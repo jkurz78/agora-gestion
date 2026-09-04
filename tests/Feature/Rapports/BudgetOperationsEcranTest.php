@@ -421,3 +421,63 @@ it('l onglet budget de la fiche operation embarque le budget de cette operation 
         ->assertSee('Fournitures atelier poterie')
         ->assertSee('456,78');
 });
+
+// ── Exports : les xlsx/pdf existent et sont testes (voir
+// BudgetOperationsExportTest.php), mais jusqu'ici aucun bouton n'y menait —
+// seule une URL tapee a la main y donnait acces.
+
+it('le bouton d export apparait quand une operation est selectionnee, et l url rendue porte le bon rapport et l id', function (): void {
+    $compte = Compte::factory()->numero('606')->create([
+        'association_id' => $this->association->id,
+        'classe' => 6,
+    ]);
+    $operation = Operation::factory()->create(['association_id' => $this->association->id]);
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id,
+        'compte_id' => $compte->id,
+        'operation_id' => $operation->id,
+        'exercice' => 2025,
+        'montant_prevu' => 300.00,
+    ]);
+
+    $component = Livewire::test(RapportBudgetOperations::class, ['selectedOperationIds' => [(int) $operation->id]])
+        ->assertOk()
+        ->assertSee('Exporter');
+
+    // Pas seulement un bouton present : l'URL qu'il produit doit viser le
+    // bon rapport et porter l'id selectionne — c'est elle qui est derriere
+    // le href du bouton dans la vue.
+    $url = $component->instance()->exportUrl('xlsx');
+
+    expect($url)->toContain('/budget-operations/xlsx')
+        ->and($url)->toContain('ops%5B0%5D='.$operation->id);
+});
+
+it('le bouton d export n apparait pas sans selection', function (): void {
+    Livewire::test(RapportBudgetOperations::class)
+        ->assertOk()
+        ->assertDontSee('Exporter');
+});
+
+it('l url rendue par exportUrl xlsx est reellement atteignable', function (): void {
+    $compte = Compte::factory()->numero('606')->create([
+        'association_id' => $this->association->id,
+        'classe' => 6,
+    ]);
+    $operation = Operation::factory()->create(['association_id' => $this->association->id]);
+    BudgetLine::factory()->create([
+        'association_id' => $this->association->id,
+        'compte_id' => $compte->id,
+        'operation_id' => $operation->id,
+        'exercice' => 2025,
+        'montant_prevu' => 300.00,
+    ]);
+
+    $component = Livewire::test(RapportBudgetOperations::class, ['selectedOperationIds' => [(int) $operation->id]]);
+    $url = $component->instance()->exportUrl('xlsx');
+
+    // Vide le `ops` d'exportUrl() (voir la revue) et ce test tombe : l'URL
+    // generique ne porte plus l'operation, budgetOperationsExport() cote
+    // controleur abort en 422 au lieu de rendre 200.
+    $this->get($url)->assertOk();
+});

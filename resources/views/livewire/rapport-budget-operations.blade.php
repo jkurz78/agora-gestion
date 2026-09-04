@@ -24,6 +24,7 @@
          l'arbre étant fourni par le même service partagé. --}}
     <div class="card mb-3">
         <div class="card-body py-2">
+            <div class="d-flex align-items-center gap-3 flex-wrap">
             <div x-data="{
                 selectedIds: @entangle('selectedOperationIds').live,
                 open: false,
@@ -111,6 +112,24 @@
                         </div>
                     </template>
                 </div>
+            </div>
+
+            {{-- Export dropdown — masqué sans sélection : budgetOperationsExport()
+                 abort en 422 quand `ops` est vide (voir RapportExportController),
+                 un bouton qui mènerait à une page d'erreur est pire qu'aucun bouton. --}}
+            @if ($hasSelection)
+                <div class="ms-auto">
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-download me-1"></i>Exporter
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="{{ $this->exportUrl('xlsx') }}"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Excel</a></li>
+                            <li><a class="dropdown-item" href="{{ $this->exportUrl('pdf') }}" target="_blank"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</a></li>
+                        </ul>
+                    </div>
+                </div>
+            @endif
             </div>
         </div>
     </div>
