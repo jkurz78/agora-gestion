@@ -37,23 +37,29 @@ final class RapportBudgetOperations extends Component
         $rapportService = app(RapportService::class);
 
         // avecBudget: true — une opération ventilée mais pas encore dépensée
-        // doit être sélectionnable, et surtout survivre à normaliserOperations()
+        // doit être sélectionnable, et surtout survivre à l'intersection
         // ci-dessous dans l'onglet de sa propre fiche : sans ce drapeau, une
         // opération qui n'a qu'un budget serait écartée par SEL-01 et l'onglet
         // s'afficherait vide sur sa propre fiche.
         $eligibleIds = $rapportService->operationsEligibles($exercice, avecBudget: true);
 
         // SEL-04 : la sélection reçue (URL, ou :selectedOperationIds de
-        // l'onglet fiche opération) n'est jamais fiable. normaliserOperations()
-        // porte déjà l'intersection avec les opérations éligibles — pas de
-        // seconde implémentation ici.
-        $selection = $rapportService->normaliserOperations(
-            $this->selectedOperationIds,
-            $exercice,
-            avecBudget: true,
-        );
+        // l'onglet fiche opération) n'est jamais fiable. On intersecte en
+        // mémoire avec $eligibleIds déjà en main, comme
+        // RapportCompteResultatOperations::render() — passer par
+        // normaliserOperations() referait partir pourExercice() une seconde
+        // fois (elle l'appelle déjà en interne pour construire $eligibleIds),
+        // donc une seconde UNION sur transaction_lignes +
+        // transaction_ligne_affectations + budget_lines à chaque rendu.
+        $demandes = collect($this->selectedOperationIds)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+        $selection = array_values(array_intersect($demandes, $eligibleIds));
 
-        $this->selectionIgnoree = $this->selectedOperationIds !== [] && $selection === [];
+        $this->selectionIgnoree = $demandes !== [] && $selection === [];
 
         return view('livewire.rapport-budget-operations', [
             'operationTree' => app(ArbreSelecteurOperations::class)->construire($eligibleIds),
