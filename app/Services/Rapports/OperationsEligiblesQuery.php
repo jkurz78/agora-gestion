@@ -57,7 +57,7 @@ final class OperationsEligiblesQuery
      *
      * @return list<int> triés, sans doublon
      */
-    public function pourExercice(int $exercice, bool $avecPrevisions = false): array
+    public function pourExercice(int $exercice, bool $avecPrevisions = false, bool $avecBudget = false): array
     {
         if (! TenantContext::hasBooted()) {
             return [];
@@ -111,6 +111,16 @@ final class OperationsEligiblesQuery
             $union
                 ->union($this->previsionsCharges($tenantId, $start, $end))
                 ->union($this->previsionsProduits($tenantId, $start, $end));
+        }
+
+        // Le rapport budget a le même besoin que la projection, pour une autre
+        // raison : une opération ventilée mais pas encore dépensée doit exister
+        // dans son sélecteur, et surtout survivre à normaliser() dans l'onglet
+        // de sa propre fiche — sinon l'onglet se viderait tout seul.
+        // Passé true par le seul rapport budget : le CR par opérations ne
+        // change pas de comportement.
+        if ($avecBudget) {
+            $union->union($this->ventilationsBudgetaires($tenantId, $exercice));
         }
 
         return $union
@@ -178,17 +188,39 @@ final class OperationsEligiblesQuery
     }
 
     /**
+     * Branche « ventilation budgétaire » : les lignes de budget rattachées à
+     * une opération pour l'exercice affiché.
+     *
+     * Rattachement par la COLONNE `exercice` de la ligne, jamais par des dates :
+     * une ligne de budget porte son exercice explicitement, c'est tout l'intérêt
+     * du modèle. Le scope tenant est posé sur `bl` ET sur `o` — deux tables
+     * tenant-scopées jointes, deux filtres.
+     */
+    private function ventilationsBudgetaires(int $tenantId, int $exercice): Builder
+    {
+        return DB::table('budget_lines as bl')
+            ->join('operations as o', 'o.id', '=', 'bl.operation_id')
+            ->whereNotNull('bl.operation_id')
+            ->whereNotNull('bl.compte_id')
+            ->where('bl.exercice', $exercice)
+            ->whereNull('o.deleted_at')
+            ->where('bl.association_id', $tenantId)
+            ->where('o.association_id', $tenantId)
+            ->select('bl.operation_id as operation_id');
+    }
+
+    /**
      * Intersection d'une sélection non fiable (URL, formulaire) avec les
      * opérations éligibles — SEL-04.
      *
-     * $avecPrevisions se propage tel quel vers pourExercice() : la
-     * normalisation d'une sélection doit accepter exactement les mêmes ids que
-     * l'arbre qui les propose, mode par mode.
+     * $avecPrevisions et $avecBudget se propagent tels quels vers
+     * pourExercice() : la normalisation d'une sélection doit accepter
+     * exactement les mêmes ids que l'arbre qui les propose, mode par mode.
      *
      * @param  array<mixed>  $selection
      * @return list<int>
      */
-    public function normaliser(array $selection, int $exercice, bool $avecPrevisions = false): array
+    public function normaliser(array $selection, int $exercice, bool $avecPrevisions = false, bool $avecBudget = false): array
     {
         $demandes = collect($selection)
             ->map(fn ($id): int => (int) $id)
@@ -200,6 +232,6 @@ final class OperationsEligiblesQuery
             return [];
         }
 
-        return array_values(array_intersect($demandes, $this->pourExercice($exercice, $avecPrevisions)));
+        return array_values(array_intersect($demandes, $this->pourExercice($exercice, $avecPrevisions, $avecBudget)));
     }
 }

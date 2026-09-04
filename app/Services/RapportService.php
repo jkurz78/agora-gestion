@@ -65,13 +65,15 @@ final class RapportService
      *
      * $avecPrevisions (EX-03) n'élargit le critère aux deux sources de
      * prévisionnel que lorsque l'écran est en mode projection — voir
-     * OperationsEligiblesQuery pour l'arbitrage complet.
+     * OperationsEligiblesQuery pour l'arbitrage complet. $avecBudget fait de
+     * même pour le rapport budget : une opération ventilée mais pas encore
+     * dépensée doit rester éligible.
      *
      * @return list<int>
      */
-    public function operationsEligibles(int $exercice, bool $avecPrevisions = false): array
+    public function operationsEligibles(int $exercice, bool $avecPrevisions = false, bool $avecBudget = false): array
     {
-        return $this->eligibles->pourExercice($exercice, $avecPrevisions);
+        return $this->eligibles->pourExercice($exercice, $avecPrevisions, $avecBudget);
     }
 
     /**
@@ -82,9 +84,9 @@ final class RapportService
      * @param  array<mixed>  $selection
      * @return list<int>
      */
-    public function normaliserOperations(array $selection, int $exercice, bool $avecPrevisions = false): array
+    public function normaliserOperations(array $selection, int $exercice, bool $avecPrevisions = false, bool $avecBudget = false): array
     {
-        return $this->eligibles->normaliser($selection, $exercice, $avecPrevisions);
+        return $this->eligibles->normaliser($selection, $exercice, $avecPrevisions, $avecBudget);
     }
 
     /**
