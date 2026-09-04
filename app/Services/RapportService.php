@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\PorteeExercices;
+use App\Services\Rapports\BudgetOperationBuilder;
 use App\Services\Rapports\CompteResultatBuilder;
 use App\Services\Rapports\FluxTresorerieBuilder;
 use App\Services\Rapports\OperationsEligiblesQuery;
@@ -17,14 +18,18 @@ final class RapportService
 
     private readonly OperationsEligiblesQuery $eligibles;
 
+    private readonly BudgetOperationBuilder $budgetOperation;
+
     public function __construct(
         ?CompteResultatBuilder $compteResultat = null,
         ?FluxTresorerieBuilder $fluxTresorerie = null,
         ?OperationsEligiblesQuery $operationsEligibles = null,
+        ?BudgetOperationBuilder $budgetOperation = null,
     ) {
         $this->compteResultat = $compteResultat ?? app(CompteResultatBuilder::class);
         $this->fluxTresorerie = $fluxTresorerie ?? app(FluxTresorerieBuilder::class);
         $this->eligibles = $operationsEligibles ?? app(OperationsEligiblesQuery::class);
+        $this->budgetOperation = $budgetOperation ?? app(BudgetOperationBuilder::class);
     }
 
     /**
@@ -109,6 +114,17 @@ final class RapportService
     public function previsionsParOperationEtCompte(int $exercice, array $operationIds): array
     {
         return $this->compteResultat->previsionsParOperationEtCompte($exercice, $operationIds);
+    }
+
+    /**
+     * Budget ventilé, prévisionnel et réalisé, à la maille compte, par opération.
+     *
+     * @param  list<int>  $operationIds
+     * @return array<int, array<string, mixed>>
+     */
+    public function budgetParOperations(int $exercice, array $operationIds): array
+    {
+        return $this->budgetOperation->parOperations($exercice, $operationIds);
     }
 
     /**
