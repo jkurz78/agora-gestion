@@ -11,9 +11,9 @@ use App\Models\BudgetLine;
 use App\Models\Operation;
 use App\Services\Budget\BudgetGelService;
 use App\Services\BudgetImportService;
-use App\Services\BudgetService;
 use App\Services\Compta\PlanComptableSelecteur;
 use App\Services\ExerciceService;
+use App\Services\Rapports\BudgetEcranBuilder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
@@ -357,41 +357,21 @@ final class BudgetTable extends Component
 
     public function render(): View
     {
-        $budgetService = app(BudgetService::class);
         $exercice = app(ExerciceService::class)->current();
 
-        // Comptes de résultat groupés par famille.
-        $depenseGroupes = PlanComptableSelecteur::groupesPourType('depense');
-        $recetteGroupes = PlanComptableSelecteur::groupesPourType('recette');
+        // Les six requêtes (comptes groupés, enveloppes, ventilations,
+        // réalisé) sont partagées avec le PDF imprimable de cet écran — voir
+        // App\Services\Rapports\BudgetEcranBuilder.
+        $donnees = app(BudgetEcranBuilder::class)->pourExercice($exercice);
 
-        // Enveloppes et ventilations sont lues SÉPARÉMENT : les mêler dans une
-        // seule collection ferait écraser l'enveloppe par sa ventilation au
-        // keyBy, et doubler tout total.
-        $budgetLines = BudgetLine::forExercice($exercice)->enveloppes()->get()->keyBy('compte_id');
-        $ventilations = BudgetLine::forExercice($exercice)
-            ->ventilations()
-            ->with('operation')
-            ->get()
-            ->groupBy('compte_id');
-
-        // Deux requêtes groupées, au lieu d'un appel par compte.
-        $realiseData = $budgetService->realiseParCompte($exercice);
-        $realiseParOperation = $budgetService->realiseParCompteEtOperation($exercice);
-
-        return view('livewire.budget-table', [
-            'depenseGroupes' => $depenseGroupes,
-            'recetteGroupes' => $recetteGroupes,
-            'budgetLines' => $budgetLines,
-            'ventilations' => $ventilations,
-            'realiseData' => $realiseData,
-            'realiseParOperation' => $realiseParOperation,
+        return view('livewire.budget-table', array_merge($donnees, [
             'operationsSansBudget' => $this->operationsSansBudget($exercice),
             'exerciceLabel' => app(ExerciceService::class)->label($exercice),
             'exerciceModele' => app(ExerciceService::class)->exerciceAffiche(),
             'exportExerciceCourant' => $exercice,
             'exportExerciceSuivant' => $exercice + 1,
             'anneesDisponibles' => app(ExerciceService::class)->availableYears(),
-        ]);
+        ]));
     }
 
     /**

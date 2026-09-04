@@ -10,11 +10,10 @@ use App\Livewire\AnalysePivot;
 use App\Livewire\BudgetTable;
 use App\Models\Association;
 use App\Models\BudgetLine;
-use App\Services\BudgetService;
-use App\Services\Compta\PlanComptableSelecteur;
 use App\Services\ExerciceService;
 use App\Services\Rapports\BalanceComptableBuilder;
 use App\Services\Rapports\BilanComptableBuilder;
+use App\Services\Rapports\BudgetEcranBuilder;
 use App\Services\Rapports\CompteResultatBuilder;
 use App\Services\Rapports\GrandLivreBuilder;
 use App\Services\Rapports\JournauxBuilder;
@@ -27,6 +26,7 @@ use App\Support\CurrentAssociation;
 use App\Support\PdfFooterRenderer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -2095,11 +2095,16 @@ final class RapportExportController extends Controller
      * du registre lit ses propres paramètres de requête, exportPdf() reste
      * générique sur tous les rapports.
      *
+     * Les six requêtes elles-mêmes vivent dans {@see BudgetEcranBuilder},
+     * partagé avec {@see BudgetTable::render()} — ce contrôleur ne fait plus
+     * que les fusionner avec les deux drapeaux d'affichage, lus depuis la
+     * requête HTTP.
+     *
      * @return array{
      *     depenseGroupes: Collection<string, array{famille: mixed, comptes: Collection}>,
      *     recetteGroupes: Collection<string, array{famille: mixed, comptes: Collection}>,
-     *     budgetLines: Collection<int, BudgetLine>,
-     *     ventilations: Collection<int, Collection<int, BudgetLine>>,
+     *     budgetLines: EloquentCollection<int, BudgetLine>,
+     *     ventilations: Collection<int, EloquentCollection<int, BudgetLine>>,
      *     realiseData: array<int, float>,
      *     realiseParOperation: array<int, array<int, float>>,
      *     avecRealise: bool,
@@ -2108,21 +2113,15 @@ final class RapportExportController extends Controller
      */
     private function pdfBudgetData(int $exercice, Request $request): array
     {
-        $budgetService = app(BudgetService::class);
+        $donnees = app(BudgetEcranBuilder::class)->pourExercice($exercice);
 
-        return [
-            'depenseGroupes' => PlanComptableSelecteur::groupesPourType('depense'),
-            'recetteGroupes' => PlanComptableSelecteur::groupesPourType('recette'),
-            'budgetLines' => BudgetLine::forExercice($exercice)->enveloppes()->get()->keyBy('compte_id'),
-            'ventilations' => BudgetLine::forExercice($exercice)->ventilations()->with('operation')->get()->groupBy('compte_id'),
-            'realiseData' => $budgetService->realiseParCompte($exercice),
-            'realiseParOperation' => $budgetService->realiseParCompteEtOperation($exercice),
+        return array_merge($donnees, [
             // Défaut décoché : l'usage d'octobre (AG) est le plus proche du
             // vote, et un défaut qui affiche des colonnes à zéro serait le
             // mauvais choix.
             'avecRealise' => $request->boolean('realise'),
             'avecVentilations' => $request->boolean('ventilations'),
-        ];
+        ]);
     }
 
     private function pdfFluxTresorerieData(RapportService $rapportService, int $exercice): array

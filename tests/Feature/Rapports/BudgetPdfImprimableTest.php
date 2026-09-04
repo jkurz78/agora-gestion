@@ -10,8 +10,9 @@ declare(strict_types=1);
 // `not->toContain()` sur $response->getContent() passerait quoi qu'il arrive
 // et ne prouverait rien. Voie choisie ici : la vue Blade pdf.rapport-budget
 // est rendue DIRECTEMENT avec les memes structures de donnees que
-// RapportExportController::pdfBudgetData() construit (memes requetes que
-// App\Livewire\BudgetTable::render()), et les assertions portent sur le HTML
+// RapportExportController::pdfBudgetData() construit — via le meme builder
+// partage App\Services\Rapports\BudgetEcranBuilder, aussi appele par
+// App\Livewire\BudgetTable::render() — et les assertions portent sur le HTML
 // produit. Les tests HTTP, eux, se limitent a verifier le statut 200 et le
 // bon aiguillage du registre (ils ne prouvent rien sur le contenu).
 
@@ -22,9 +23,9 @@ use App\Models\Operation;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
-use App\Services\BudgetService;
-use App\Services\Compta\PlanComptableSelecteur;
+use App\Services\Rapports\BudgetEcranBuilder;
 use App\Tenant\TenantContext;
+use Illuminate\Support\Facades\View;
 
 beforeEach(function (): void {
     $this->association = Association::factory()->create();
@@ -84,23 +85,20 @@ afterEach(function (): void {
 
 /**
  * Reconstruit EXACTEMENT les donnees que
- * RapportExportController::pdfBudgetData() construit pour l'exercice donne
- * (memes requetes que App\Livewire\BudgetTable::render()), pour rendre la vue
- * pdf.rapport-budget hors du controleur — sans dependre du rendu PDF binaire.
+ * RapportExportController::pdfBudgetData() construit pour l'exercice donne,
+ * pour rendre la vue pdf.rapport-budget hors du controleur — sans dependre
+ * du rendu PDF binaire. Appelle desormais le meme builder que le controleur
+ * et App\Livewire\BudgetTable::render() (App\Services\Rapports\BudgetEcranBuilder) :
+ * ce helper est un vrai temoin du contrat, pas une quatrieme copie des six
+ * requetes.
  *
  * @return array<string, mixed>
  */
 function budgetPdfViewData(int $exercice, bool $avecRealise, bool $avecVentilations): array
 {
-    $budgetService = app(BudgetService::class);
+    $donnees = app(BudgetEcranBuilder::class)->pourExercice($exercice);
 
-    return [
-        'depenseGroupes' => PlanComptableSelecteur::groupesPourType('depense'),
-        'recetteGroupes' => PlanComptableSelecteur::groupesPourType('recette'),
-        'budgetLines' => BudgetLine::forExercice($exercice)->enveloppes()->get()->keyBy('compte_id'),
-        'ventilations' => BudgetLine::forExercice($exercice)->ventilations()->with('operation')->get()->groupBy('compte_id'),
-        'realiseData' => $budgetService->realiseParCompte($exercice),
-        'realiseParOperation' => $budgetService->realiseParCompteEtOperation($exercice),
+    return array_merge($donnees, [
         'avecRealise' => $avecRealise,
         'avecVentilations' => $avecVentilations,
         'title' => 'Budget',
@@ -111,7 +109,7 @@ function budgetPdfViewData(int $exercice, bool $avecRealise, bool $avecVentilati
         'appLogoBase64' => null,
         'footerLogoBase64' => null,
         'footerLogoMime' => null,
-    ];
+    ]);
 }
 
 it('le budget vote ne montre ni realise ni ventilation', function (): void {
@@ -157,6 +155,36 @@ it('la route pdf du budget repond 200 pour les quatre combinaisons de drapeaux',
             'ventilations' => $ventilations,
         ]))->assertOk();
     }
+});
+
+it('le pdf recoit bien les enveloppes (pas les ventilations) et les bons drapeaux, capture a travers dompdf', function (): void {
+    // Garde-fou indispensable meme apres factorisation : c'est la seule
+    // assertion qui traverse reellement pdfBudgetData() jusqu'a la vue — les
+    // tests precedents rendent la vue directement avec budgetPdfViewData(),
+    // jamais via le controleur. Sans ce test, un enveloppes() -> ventilations()
+    // dans pdfBudgetData() (le bug historique du budget double, imprime en
+    // AG) ou une inversion des deux drapeaux lus depuis la requete HTTP
+    // passeraient inapercus : les 162 tests existants restent verts.
+    $captured = null;
+    View::composer('pdf.rapport-budget', function ($view) use (&$captured): void {
+        $captured = $view->getData();
+    });
+
+    $this->get(route('rapports.export', [
+        'rapport' => 'budget', 'format' => 'pdf', 'exercice' => 2025,
+        'realise' => '1', 'ventilations' => '0',
+    ]))->assertOk();
+
+    expect($captured)->not->toBeNull();
+    expect($captured['avecRealise'])->toBeTrue();
+    expect($captured['avecVentilations'])->toBeFalse();
+
+    // L'enveloppe (1000 €, operation_id null) doit etre la ligne recue pour
+    // ce compte — pas sa ventilation (300 €, operation_id renseigne) : sinon
+    // le budget imprime en AG serait celui, plus petit, d'une seule
+    // operation, jamais alerte par aucun test.
+    $montant = (float) $captured['budgetLines']->get($this->compte->id)->montant_prevu;
+    expect($montant)->toBe(1000.0)->and($montant)->not->toBe(300.0);
 });
 
 it('le gabarit d aller-retour reste xlsx et csv seulement, jamais la ventilation', function (): void {
