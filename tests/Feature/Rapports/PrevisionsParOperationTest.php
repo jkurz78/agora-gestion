@@ -7,9 +7,26 @@ declare(strict_types=1);
 // fetchPrevisionsFlatEntries() (privée, déjà testée par
 // CompteResultatBuilderPrevisionsPlatesTest.php) plutôt que de recopier ses
 // jointures. Ce fichier teste donc la couche d'agrégation qui lui est propre :
-// le filtrage de l'exercice 0 (séance sans date), le cumul + arrondi, et le
-// passe-plat RapportService — pas le OR de date ni le scope tenant des deux
-// sources, déjà couverts côté fetchPrevisionsFlatEntries().
+// le filtrage de l'exercice 0 (séance sans date), le cumul + arrondi, le
+// passe-plat RapportService — et, spécifiquement, le scope tenant de la
+// source RECETTE (cas 6b), qui n'a pas le même montage que la source charge.
+//
+// Le OR de date est déjà couvert côté fetchPrevisionsFlatEntries()
+// (CompteResultatBuilderPrevisionsPlatesTest.php, cas 4) pour les deux
+// sources. Le scope tenant, en revanche, ne l'était que côté CHARGE
+// (encadrement_previsions) avant le cas 6b ci-dessous : côté charge,
+// `whereIn('ep.operation_id', ...)` et `scopeToCurrentTenant(..., 'ep.association_id')`
+// portent sur deux tables distinctes (encadrement_previsions vs son propre
+// association_id), donc un scope manquant fuite même quand l'operation_id
+// demandé est légitime. Côté recette, `whereIn('p.operation_id', ...)` et
+// `scopeToCurrentTenant(..., 'op.association_id')` portent tous deux sur la
+// même opération : un scope manquant ne fuite QUE si l'appelant transmet déjà
+// l'operation_id d'une autre association — ce que fait précisément le cas 6b.
+// Avant son ajout, aucun test (dans ce fichier ni dans
+// CompteResultatBuilderPrevisionsPlatesTest.php) ne tenait ce filtre côté
+// recette : retirer son ->tap(...) laissait les 215 tests de
+// tests/Unit/Services/Rapports, tests/Feature/Rapports, tests/Unit/Tenant et
+// tests/Feature/Tenant entièrement verts.
 
 use App\Models\Association;
 use App\Models\Compte;
@@ -20,7 +37,6 @@ use App\Models\Reglement;
 use App\Models\Seance;
 use App\Models\Tiers;
 use App\Models\TypeOperation;
-use App\Models\User;
 use App\Services\Rapports\CompteResultatBuilder;
 use App\Services\RapportService;
 use App\Tenant\TenantContext;
@@ -39,17 +55,11 @@ const PPOC_DATE_HORS = '2024-10-15';
 
 beforeEach(function (): void {
     $this->association = Association::factory()->create();
-    $this->user = User::factory()->create();
-    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
     TenantContext::boot($this->association);
-    session(['current_association_id' => $this->association->id]);
-    session(['exercice_actif' => 2025]);
-    $this->actingAs($this->user);
 });
 
 afterEach(function (): void {
     TenantContext::clear();
-    session()->forget(['exercice_actif', 'current_association_id']);
 });
 
 /**
@@ -205,11 +215,15 @@ it('cumule deux prévisions du même couple (opération, compte) et arrondit le 
 });
 
 // ---------------------------------------------------------------------------
-// 6. Isolation tenant — un test qui tue le filtre précis : l'opération EST
-//    dans la liste demandée (le whereIn ne l'écarterait pas), seule la ligne
-//    en base appartient à une autre association. Retirer le scope tenant sur
-//    ep.association_id ferait fuiter cette ligne ; un test où tout serait chez
-//    l'autre association ne le prouverait pas (le whereIn suffirait déjà).
+// 6a. Isolation tenant (charge) — un test qui tue le filtre précis :
+//     l'opération EST dans la liste demandée (le whereIn ne l'écarterait
+//     pas), seule la ligne piégée en base appartient à une autre association.
+//     Retirer le scope tenant sur ep.association_id ferait fuiter cette
+//     ligne ; un test où tout serait chez l'autre association ne le
+//     prouverait pas (le whereIn suffirait déjà). Une prévision légitime du
+//     tenant courant est incluse pour que le test prouve une vraie requête
+//     réussie, pas seulement l'absence de la ligne piégée (cf. §3 du bilan
+//     de revue : un tableau vide sans ligne légitime ne prouve rien).
 // ---------------------------------------------------------------------------
 
 it('exclut une prévision d\'encadrement d\'une autre association même quand son operation_id figure dans la liste demandée', function (): void {
@@ -218,18 +232,32 @@ it('exclut une prévision d\'encadrement d\'une autre association même quand so
     $compte = Compte::factory()->numero('611B')->create();
     [$operation] = ppocOperation();
     $tiers = Tiers::factory()->pourDepenses()->create();
-    $seance = Seance::create(['operation_id' => $operation->id, 'numero' => 1, 'date' => PPOC_DATE_DANS]);
+    $seanceLegit = Seance::create(['operation_id' => $operation->id, 'numero' => 1, 'date' => PPOC_DATE_DANS]);
+    $seancePiege = Seance::create(['operation_id' => $operation->id, 'numero' => 2, 'date' => PPOC_DATE_DANS]);
+
+    // Prévision légitime du tenant courant : preuve que la requête rend bien
+    // quelque chose, pas seulement qu'elle écarte la ligne piégée.
+    EncadrementPrevision::create([
+        'operation_id' => $operation->id,
+        'tiers_id' => $tiers->id,
+        'compte_id' => $compte->id,
+        'seance_id' => $seanceLegit->id,
+        'montant_prevu' => 42.00,
+    ]);
 
     // Insertion directe : contourne TenantModel pour forcer une incohérence
     // (association_id de l'autre tenant, operation_id de l'opération courante)
     // qu'aucune écriture applicative normale ne produit, mais que seul le
-    // scope tenant explicite sur ep.association_id peut arrêter.
+    // scope tenant explicite sur ep.association_id peut arrêter. Séance
+    // distincte de la ligne légitime : la contrainte d'unicité de
+    // encadrement_previsions (operation_id, tiers_id, compte_id, seance_id)
+    // ne porte pas sur association_id.
     DB::table('encadrement_previsions')->insert([
         'association_id' => $autre->id,
         'operation_id' => $operation->id,
         'tiers_id' => $tiers->id,
         'compte_id' => $compte->id,
-        'seance_id' => $seance->id,
+        'seance_id' => $seancePiege->id,
         'montant_prevu' => 9999.00,
         'created_at' => now(),
         'updated_at' => now(),
@@ -237,7 +265,74 @@ it('exclut une prévision d\'encadrement d\'une autre association même quand so
 
     $resultat = app(CompteResultatBuilder::class)->previsionsParOperationEtCompte(2025, [$operation->id]);
 
-    expect($resultat)->toBe([]);
+    expect($resultat)->toBe([
+        $operation->id => [
+            $compte->id => 42.00,
+        ],
+    ]);
+});
+
+// ---------------------------------------------------------------------------
+// 6b. Isolation tenant (recette) — symétrique du 6a, mais le montage diffère
+//     et c'est ce qui rend ce cas nécessaire : côté charge,
+//     whereIn('ep.operation_id') et le scope portent sur deux tables
+//     distinctes (encadrement_previsions), donc n'importe quelle fuite de
+//     tenant se voit. Côté recette, whereIn('p.operation_id') et le scope
+//     scopeToCurrentTenant(..., 'op.association_id') portent tous deux sur LA
+//     MÊME opération : le filtre ne mord que si l'appelant transmet déjà
+//     l'operation_id d'une autre association — exactement ce que fait ce
+//     test. Avant ce cas, retirer le ->tap(...) de la branche recette de
+//     fetchPrevisionsFlatEntries() ne faisait échouer aucun test de la suite.
+// ---------------------------------------------------------------------------
+
+it('exclut une prévision de recette d\'une autre association même quand son operation_id figure dans la liste demandée', function (): void {
+    $autre = Association::factory()->create();
+
+    $compteType = Compte::factory()->numero('706')->create(['intitule' => 'Cotisations']);
+    [$operation] = ppocOperation($compteType);
+    $tiers = Tiers::factory()->create();
+    $participant = Participant::factory()->create([
+        'operation_id' => $operation->id,
+        'tiers_id' => $tiers->id,
+    ]);
+    $seance = Seance::create(['operation_id' => $operation->id, 'numero' => 1, 'date' => PPOC_DATE_DANS]);
+
+    // Prévision légitime du tenant courant : preuve que la requête rend bien
+    // quelque chose, pas seulement qu'elle écarte l'opération piégée.
+    Reglement::create([
+        'participant_id' => $participant->id,
+        'seance_id' => $seance->id,
+        'montant_prevu' => 55.00,
+    ]);
+
+    TenantContext::boot($autre);
+    $compteTypeAutre = Compte::factory()->numero('706')->create();
+    [$operationAutre] = ppocOperation($compteTypeAutre);
+    $tiersAutre = Tiers::factory()->create();
+    $participantAutre = Participant::factory()->create([
+        'operation_id' => $operationAutre->id,
+        'tiers_id' => $tiersAutre->id,
+    ]);
+    $seanceAutre = Seance::create(['operation_id' => $operationAutre->id, 'numero' => 1, 'date' => PPOC_DATE_DANS]);
+    Reglement::create([
+        'participant_id' => $participantAutre->id,
+        'seance_id' => $seanceAutre->id,
+        'montant_prevu' => 9999.00,
+    ]);
+    TenantContext::boot($this->association);
+
+    // L'appelant transmet l'operation_id de l'AUTRE association : c'est le
+    // seul montage où un scope manquant sur op.association_id se verrait,
+    // puisque whereIn('p.operation_id') et le scope portent ici sur la même
+    // table (operations).
+    $resultat = app(CompteResultatBuilder::class)
+        ->previsionsParOperationEtCompte(2025, [$operation->id, $operationAutre->id]);
+
+    expect($resultat)->toBe([
+        $operation->id => [
+            $compteType->id => 55.00,
+        ],
+    ]);
 });
 
 // ---------------------------------------------------------------------------

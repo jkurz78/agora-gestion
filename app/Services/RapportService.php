@@ -101,6 +101,8 @@ final class RapportService
     }
 
     /**
+     * Prévisions de l'exercice, agrégées à la maille (opération, compte).
+     *
      * @param  list<int>  $operationIds
      * @return array<int, array<int, float>>
      */

@@ -341,8 +341,24 @@ final class CompteResultatBuilder
      * déterminé » — il n'a pas de budget en face à qui les comparer. Divergence
      * délibérée : ne pas « harmoniser » les deux côtés.
      *
+     * Les deux boucles (charges puis produits) écrivent dans la MÊME case
+     * `$resultat[$opId][$compteId]`, et ni l'une ni l'autre requête ne filtre
+     * sur la classe du compte : rien dans ce code ne sépare charges et
+     * produits, seule la convention des classes 6/7 sur les comptes réels du
+     * plan les distingue en pratique. Conséquence pour l'appelant : charges ET
+     * produits arrivent tous deux ici en montants POSITIFS — c'est la classe du
+     * compte, pas le signe du montant, qui porte le sens. Ne jamais appliquer
+     * un signe une seconde fois côté consommateur.
+     *
+     * $start/$end (calculées ci-dessous) ne sont qu'une réduction de volume
+     * SQL : c'est le filtre PHP `(int) $entry['exercice'] !== $exercice`,
+     * après coup, qui fait à lui seul tout le travail d'appartenance à
+     * l'exercice (constaté par mutation : forcer start/end à null survit aux
+     * 215 tests de la suite Rapports/Tenant). Ne pas retirer ce filtre PHP en
+     * le croyant redondant avec les bornes SQL.
+     *
      * @param  list<int>  $operationIds
-     * @return array<int, array<int, float>> operation_id => [compte_id => prévu]
+     * @return array<int, array<int, float>> operation_id => [compte_id => prévu, en positif]
      */
     public function previsionsParOperationEtCompte(int $exercice, array $operationIds): array
     {
@@ -350,9 +366,7 @@ final class CompteResultatBuilder
             return [];
         }
 
-        $range = $this->exerciceService->dateRange($exercice);
-        $start = $range['start']->toDateString();
-        $end = $range['end']->toDateString();
+        [$start, $end] = $this->exerciceDates($exercice);
 
         $resultat = [];
 
