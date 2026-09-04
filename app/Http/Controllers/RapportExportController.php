@@ -7,7 +7,11 @@ namespace App\Http\Controllers;
 use App\Enums\PorteeExercices;
 use App\Http\Controllers\Concerns\ResolvesLogos;
 use App\Livewire\AnalysePivot;
+use App\Livewire\BudgetTable;
 use App\Models\Association;
+use App\Models\BudgetLine;
+use App\Services\BudgetService;
+use App\Services\Compta\PlanComptableSelecteur;
 use App\Services\ExerciceService;
 use App\Services\Rapports\BalanceComptableBuilder;
 use App\Services\Rapports\BilanComptableBuilder;
@@ -24,6 +28,7 @@ use App\Support\PdfFooterRenderer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
@@ -53,6 +58,9 @@ final class RapportExportController extends Controller
         'analyse-participants' => ['xlsx'],
         'immobilisations' => ['xlsx', 'pdf'],
         'budget-operations' => ['xlsx', 'pdf'],
+        // PDF seul : le gabarit d'aller-retour (import/export CSV/XLSX) reste
+        // dans BudgetExportController, jamais touché par ce registre.
+        'budget' => ['pdf'],
     ];
 
     /** PDF orientations */
@@ -68,6 +76,9 @@ final class RapportExportController extends Controller
         'immobilisations' => 'landscape',
         // Cinq colonnes dont quatre montants : le portrait les écraserait.
         'budget-operations' => 'landscape',
+        // Au plus quatre colonnes (Compte, Prévu, Réalisé, Écart) : le portrait
+        // suffit, contrairement au rapport budget-operations ci-dessus.
+        'budget' => 'portrait',
     ];
 
     /** Human-readable rapport names (for filenames and titles) */
@@ -83,6 +94,7 @@ final class RapportExportController extends Controller
         'analyse-participants' => 'Analyse participants',
         'immobilisations' => 'Livre des immobilisations',
         'budget-operations' => 'Budget par operations',
+        'budget' => 'Budget',
     ];
 
     public function __invoke(
@@ -1913,6 +1925,7 @@ final class RapportExportController extends Controller
             'flux-tresorerie' => $this->pdfFluxTresorerieData($rapportService, $exercice),
             'immobilisations' => $this->pdfImmobilisationsData($exercice),
             'budget-operations' => $this->pdfBudgetOperationsData($rapportService, $exercice, $request),
+            'budget' => $this->pdfBudgetData($exercice, $request),
         };
 
         if (isset($viewData['subtitle'])) {
@@ -2065,6 +2078,50 @@ final class RapportExportController extends Controller
 
         return [
             'operations' => $rapportService->budgetParOperations($exercice, $operationIds),
+        ];
+    }
+
+    /**
+     * Budget voté (les deux drapeaux à false, le défaut) ou suivi (les deux à
+     * true) — MÊMES données, MÊMES requêtes que
+     * {@see BudgetTable::render()} : le PDF reproduit l'écran
+     * Budget, il n'invente aucune colonne (en particulier pas de rappel N-1,
+     * que l'écran n'affiche pas). Seule la vue décide, à partir des deux
+     * drapeaux, quelles colonnes imprimer — la construction des données ne
+     * varie jamais entre le budget voté et le suivi, comme sur l'écran il n'y
+     * a qu'une seule requête, jamais une variante « sans réalisé ».
+     *
+     * Les deux drapeaux sont lus ICI (pas dans exportPdf()) : chaque rapport
+     * du registre lit ses propres paramètres de requête, exportPdf() reste
+     * générique sur tous les rapports.
+     *
+     * @return array{
+     *     depenseGroupes: Collection<string, array{famille: mixed, comptes: Collection}>,
+     *     recetteGroupes: Collection<string, array{famille: mixed, comptes: Collection}>,
+     *     budgetLines: Collection<int, BudgetLine>,
+     *     ventilations: Collection<int, Collection<int, BudgetLine>>,
+     *     realiseData: array<int, float>,
+     *     realiseParOperation: array<int, array<int, float>>,
+     *     avecRealise: bool,
+     *     avecVentilations: bool,
+     * }
+     */
+    private function pdfBudgetData(int $exercice, Request $request): array
+    {
+        $budgetService = app(BudgetService::class);
+
+        return [
+            'depenseGroupes' => PlanComptableSelecteur::groupesPourType('depense'),
+            'recetteGroupes' => PlanComptableSelecteur::groupesPourType('recette'),
+            'budgetLines' => BudgetLine::forExercice($exercice)->enveloppes()->get()->keyBy('compte_id'),
+            'ventilations' => BudgetLine::forExercice($exercice)->ventilations()->with('operation')->get()->groupBy('compte_id'),
+            'realiseData' => $budgetService->realiseParCompte($exercice),
+            'realiseParOperation' => $budgetService->realiseParCompteEtOperation($exercice),
+            // Défaut décoché : l'usage d'octobre (AG) est le plus proche du
+            // vote, et un défaut qui affiche des colonnes à zéro serait le
+            // mauvais choix.
+            'avecRealise' => $request->boolean('realise'),
+            'avecVentilations' => $request->boolean('ventilations'),
         ];
     }
 

@@ -44,6 +44,18 @@ final class BudgetTable extends Component
 
     public string $exportSourceExercice = '';
 
+    /**
+     * Volontairement SANS #[Validate] — voir le commentaire équivalent sur
+     * $commentaireDeverrouillage ci-dessous : un validate() nu ailleurs dans
+     * ce composant (importBudget() en a un, explicite, mais un futur ajout
+     * pourrait ne pas l'être) embarquerait ces deux propriétés. C'est
+     * exactement l'incident de juillet : l'import ne partait jamais, l'erreur
+     * s'affichant dans une modale d'import fermée.
+     */
+    public bool $exportAvecRealise = false;
+
+    public bool $exportAvecVentilations = false;
+
     // ── Import ────────────────────────────────────────────────────────────────
     public bool $showImportPanel = false;
 
@@ -261,6 +273,30 @@ final class BudgetTable extends Component
             'exercice' => $exerciceCible,
             'source' => $this->exportSource,
             'source_exercice' => $this->exportSourceExercice,
+        ]);
+
+        $this->js("window.location.href = '{$url}'");
+        $this->showExportModal = false;
+    }
+
+    /**
+     * PDF imprimable — passe par le registre de rapports (RapportExportController),
+     * jamais par le gabarit d'aller-retour CSV/XLSX ci-dessus : ce sont deux
+     * usages distincts (document à voter en AG vs fichier réimportable).
+     *
+     * Toujours l'exercice COURANT affiché à l'écran (pas exportExercice, qui
+     * ne sert qu'au pré-remplissage du gabarit réimportable vers l'exercice
+     * suivant) : le PDF est un instantané du budget affiché, jamais d'un
+     * exercice qui n'existe pas encore.
+     */
+    public function exportPdf(): void
+    {
+        $url = route('rapports.export', [
+            'rapport' => 'budget',
+            'format' => 'pdf',
+            'exercice' => app(ExerciceService::class)->current(),
+            'realise' => $this->exportAvecRealise ? 1 : 0,
+            'ventilations' => $this->exportAvecVentilations ? 1 : 0,
         ]);
 
         $this->js("window.location.href = '{$url}'");
