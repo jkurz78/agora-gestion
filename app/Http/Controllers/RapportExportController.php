@@ -7,10 +7,13 @@ namespace App\Http\Controllers;
 use App\Enums\PorteeExercices;
 use App\Http\Controllers\Concerns\ResolvesLogos;
 use App\Livewire\AnalysePivot;
+use App\Livewire\BudgetTable;
 use App\Models\Association;
+use App\Models\BudgetLine;
 use App\Services\ExerciceService;
 use App\Services\Rapports\BalanceComptableBuilder;
 use App\Services\Rapports\BilanComptableBuilder;
+use App\Services\Rapports\BudgetEcranBuilder;
 use App\Services\Rapports\CompteResultatBuilder;
 use App\Services\Rapports\GrandLivreBuilder;
 use App\Services\Rapports\JournauxBuilder;
@@ -23,7 +26,9 @@ use App\Support\CurrentAssociation;
 use App\Support\PdfFooterRenderer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
@@ -52,6 +57,10 @@ final class RapportExportController extends Controller
         'analyse-financier' => ['xlsx'],
         'analyse-participants' => ['xlsx'],
         'immobilisations' => ['xlsx', 'pdf'],
+        'budget-operations' => ['xlsx', 'pdf'],
+        // PDF seul : le gabarit d'aller-retour (import/export CSV/XLSX) reste
+        // dans BudgetExportController, jamais touché par ce registre.
+        'budget' => ['pdf'],
     ];
 
     /** PDF orientations */
@@ -65,6 +74,11 @@ final class RapportExportController extends Controller
         'flux-tresorerie' => 'portrait',
         // Neuf colonnes dont quatre montants : le portrait les écraserait.
         'immobilisations' => 'landscape',
+        // Cinq colonnes dont quatre montants : le portrait les écraserait.
+        'budget-operations' => 'landscape',
+        // Au plus quatre colonnes (Compte, Prévu, Réalisé, Écart) : le portrait
+        // suffit, contrairement au rapport budget-operations ci-dessus.
+        'budget' => 'portrait',
     ];
 
     /** Human-readable rapport names (for filenames and titles) */
@@ -79,6 +93,8 @@ final class RapportExportController extends Controller
         'analyse-financier' => 'Analyse financiere',
         'analyse-participants' => 'Analyse participants',
         'immobilisations' => 'Livre des immobilisations',
+        'budget-operations' => 'Budget par operations',
+        'budget' => 'Budget',
     ];
 
     public function __invoke(
@@ -140,6 +156,7 @@ final class RapportExportController extends Controller
             'analyse-financier' => $this->xlsxAnalyse('financier', $exercice, $exerciceService),
             'analyse-participants' => $this->xlsxAnalyse('participants', $exercice, $exerciceService),
             'immobilisations' => $this->xlsxImmobilisations($exercice),
+            'budget-operations' => $this->xlsxBudgetOperations($rapportService, $exercice, $request),
         };
 
         $this->autoSizeColumns($spreadsheet);
@@ -540,11 +557,40 @@ final class RapportExportController extends Controller
         $operationIds = $rapportService->normaliserOperations(
             (array) $request->query('ops', []),
             $exercice,
-            $previsionnel,
+            avecPrevisions: $previsionnel,
         );
 
         if ($operationIds === []) {
             abort(422, 'Aucune opération sélectionnée ne comporte de mouvement sur l’exercice affiché.');
+        }
+
+        return $operationIds;
+    }
+
+    /**
+     * Opérations retenues pour l'export du budget par opérations — même
+     * garantie que operationsExport() (SEL-04 : échec net en 422 plutôt qu'un
+     * fichier vide qui se lirait comme un budget nul).
+     *
+     * `avecBudget: true` est indispensable ici et ici seulement : sans lui,
+     * l'export d'une opération ventilée mais pas encore dépensée serait
+     * écarté par SEL-01 et sortirait vide, alors que l'écran (voir
+     * App\Livewire\RapportBudgetOperations::render()) l'affiche bien. Argument
+     * nommé obligatoire — la même règle que celle documentée sur
+     * OperationsEligiblesQuery::pourExercice().
+     *
+     * @return list<int>
+     */
+    private function budgetOperationsExport(RapportService $rapportService, int $exercice, Request $request): array
+    {
+        $operationIds = $rapportService->normaliserOperations(
+            (array) $request->query('ops', []),
+            $exercice,
+            avecBudget: true,
+        );
+
+        if ($operationIds === []) {
+            abort(422, 'Aucune opération sélectionnée ne comporte de budget ni de mouvement sur l’exercice affiché.');
         }
 
         return $operationIds;
@@ -1639,6 +1685,132 @@ final class RapportExportController extends Controller
     }
 
     /**
+     * Budget ventilé par opération — mêmes cinq colonnes que l'écran
+     * (resources/views/livewire/rapport-budget-operations.blade.php) :
+     * Compte, Budget affecté, Prévisionnel, Réalisé, Écart. Une opération par
+     * bloc quand plusieurs sont sélectionnées.
+     *
+     * `budget` et `prevision` valent `null` quand aucune source ne couvre le
+     * compte (voir la docblock de BudgetOperationBuilder) : {@see xlsxEcrireLigneBudget()}
+     * ne pose alors PAS la cellule, plutôt que d'y écrire un `0` — un `0`
+     * serait additionné par le lecteur et affirmerait à tort « rien n'est
+     * prévu ici ».
+     *
+     * Les cellules sont posées une à une via `setCellValue()`, jamais via
+     * `fromArray()` pour cette ligne : `fromArray()` compare chaque valeur à
+     * son `$nullValue` avec `!=` (comparaison PHP faible), et `0.0 != null`
+     * vaut FALSE — un `réalisé` ou un `écart` valant exactement `0.0`
+     * serait alors lui aussi silencieusement escamoté (cellule jamais posée),
+     * alors que ce sont des zéros réels qui doivent s'afficher « 0,00 »,
+     * jamais un vide. Vérifié par exécution directe (voir le commit de cette
+     * tâche) : une chaîne vide écrite explicitement
+     * (`setCellValueExplicit('', TYPE_STRING)`) ne survit pas non plus à
+     * l'aller-retour écriture→lecture du writer Xlsx — la relecture rend
+     * `null` dans tous les cas où la cellule n'a jamais été posée. Ne pas
+     * poser la cellule est donc le mécanisme le plus direct pour obtenir ce
+     * `null`, et `setCellValue()` évite l'écueil ci-dessus pour les valeurs
+     * qui, elles, doivent s'écrire même quand elles valent zéro.
+     */
+    private function xlsxBudgetOperations(RapportService $rapportService, int $exercice, Request $request): Spreadsheet
+    {
+        $operationIds = $this->budgetOperationsExport($rapportService, $exercice, $request);
+        $operations = $rapportService->budgetParOperations($exercice, $operationIds);
+
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Budget par opérations');
+
+        $headers = ['Compte', 'Budget affecté', 'Prévisionnel', 'Réalisé', 'Écart'];
+        $lastCol = Coordinate::stringFromColumnIndex(count($headers));
+        $multiOperations = count($operations) > 1;
+        $row = 1;
+
+        foreach ($operations as $op) {
+            if ($multiOperations) {
+                $sheet->setCellValue('A'.$row, $op['operation_nom']);
+                $sheet->mergeCells('A'.$row.':'.$lastCol.$row);
+                $sheet->getStyle('A'.$row)->getFont()->setBold(true)->setSize(12);
+                $row++;
+            }
+
+            foreach ([
+                ['data' => $op['charges'], 'totaux' => $op['totaux']['charges'], 'label' => 'DÉPENSES'],
+                ['data' => $op['produits'], 'totaux' => $op['totaux']['produits'], 'label' => 'RECETTES'],
+            ] as $section) {
+                $sheet->fromArray([$headers], null, 'A'.$row);
+                $this->styleEnteteXlsx($sheet, 'A'.$row.':'.$lastCol.$row);
+                $row++;
+
+                foreach ($section['data'] as $famille) {
+                    $this->xlsxEcrireLigneBudget($sheet, $row, $famille['famille_nom'], $famille['budget'], $famille['prevision'], (float) $famille['realise']);
+                    $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFont()->setBold(true);
+                    $row++;
+
+                    foreach ($famille['comptes'] as $compte) {
+                        $nom = $compte['compte_nom'].($compte['hors_dotation'] ? ' (hors dotation)' : '');
+                        $this->xlsxEcrireLigneBudget($sheet, $row, $nom, $compte['budget'], $compte['prevision'], (float) $compte['realise']);
+                        $row++;
+                    }
+                }
+
+                // Même règle que l'écran (rapport-budget-operations.blade.php,
+                // `@if (! empty($section['data']))`) : une section vide ne
+                // porte aucune ligne de total — additionner zéro compte
+                // n'est pas une information, juste un bloc vide de plus.
+                if ($section['data'] !== []) {
+                    $this->xlsxEcrireLigneBudget($sheet, $row, 'TOTAL '.$section['label'], $section['totaux']['budget'], $section['totaux']['prevision'], (float) $section['totaux']['realise']);
+                    $this->styleTotalXlsx($sheet, 'A'.$row.':'.$lastCol.$row);
+                    $row++;
+
+                    if ($section['totaux']['hors_dotation'] != 0.0) {
+                        $sheet->setCellValue('A'.$row, 'dont hors dotation : '.number_format($section['totaux']['hors_dotation'], 2, ',', ' ').' €');
+                        $sheet->getStyle('A'.$row)->getFont()->setItalic(true)->setSize(9);
+                        $row++;
+                    }
+                }
+                $row++; // ligne vide entre les deux sections
+            }
+        }
+
+        if ($row > 2) {
+            $sheet->getStyle('B2:'.$lastCol.($row - 1))->getNumberFormat()->setFormatCode('#,##0.00');
+
+            // Légende, en pied de classeur : le prévisionnel est un périmètre
+            // plus étroit que le budget — sans elle, un tiret (compte non
+            // couvert) se lirait à tort comme un budget nul. Même texte qu'à
+            // l'écran (voir rapport-budget-operations.blade.php).
+            $row++;
+            $sheet->setCellValue('A'.$row, "Le prévisionnel ne couvre que les règlements des participants et les coûts d'encadrement. Un tiret signale un compte qu'il n'atteint pas — ce n'est pas un zéro.");
+            $sheet->getStyle('A'.$row)->getFont()->setItalic(true)->setSize(9);
+        }
+
+        return $spreadsheet;
+    }
+
+    /**
+     * Une ligne (famille, compte ou total) du classeur budget par opérations.
+     * `budget`/`prevision` : cellule non posée quand `null` — voir la docblock
+     * de {@see xlsxBudgetOperations()}. `réalisé` : toujours posé, y compris
+     * zéro. `écart` : posé seulement quand `budget` n'est pas `null` (sans
+     * budget, la comparaison n'a pas de sens), mais alors posé même s'il vaut
+     * exactement zéro — un compte tenu pile n'est pas une absence de donnée.
+     */
+    private function xlsxEcrireLigneBudget(Worksheet $sheet, int $row, string $libelle, ?float $budget, ?float $prevision, float $realise): void
+    {
+        $sheet->setCellValue('A'.$row, $libelle);
+        if ($budget !== null) {
+            $sheet->setCellValue('B'.$row, $budget);
+        }
+        if ($prevision !== null) {
+            $sheet->setCellValue('C'.$row, $prevision);
+        }
+        $sheet->setCellValue('D'.$row, $realise);
+        if ($budget !== null) {
+            $sheet->setCellValue('E'.$row, ComparaisonBudgetaire::ecart($budget, $realise));
+        }
+    }
+
+    /**
      * Livre des immobilisations — une ligne par fiche au registre à la clôture.
      *
      * Les montants sont écrits en euros décimaux (les centimes entiers du
@@ -1772,6 +1944,8 @@ final class RapportExportController extends Controller
             'operations' => $this->pdfOperationsData($rapportService, $exercice, $request),
             'flux-tresorerie' => $this->pdfFluxTresorerieData($rapportService, $exercice),
             'immobilisations' => $this->pdfImmobilisationsData($exercice),
+            'budget-operations' => $this->pdfBudgetOperationsData($rapportService, $exercice, $request),
+            'budget' => $this->pdfBudgetData($exercice, $request),
         };
 
         if (isset($viewData['subtitle'])) {
@@ -1913,6 +2087,68 @@ final class RapportExportController extends Controller
             'projChargesParExercice' => $data['proj_charges_par_exercice'] ?? [],
             'projProduitsParExercice' => $data['proj_produits_par_exercice'] ?? [],
         ];
+    }
+
+    /**
+     * @return array{operations: array<int, array<string, mixed>>}
+     */
+    private function pdfBudgetOperationsData(RapportService $rapportService, int $exercice, Request $request): array
+    {
+        $operationIds = $this->budgetOperationsExport($rapportService, $exercice, $request);
+
+        return [
+            'operations' => $rapportService->budgetParOperations($exercice, $operationIds),
+        ];
+    }
+
+    /**
+     * Budget voté (les deux drapeaux à false, le défaut) ou suivi (les deux à
+     * true) — MÊMES données, MÊMES requêtes que
+     * {@see BudgetTable::render()} : le PDF reproduit l'écran
+     * Budget, il n'invente aucune colonne (en particulier pas de rappel N-1,
+     * que l'écran n'affiche pas). Seule la vue décide, à partir des deux
+     * drapeaux, quelles colonnes imprimer — la construction des données ne
+     * varie jamais entre le budget voté et le suivi, comme sur l'écran il n'y
+     * a qu'une seule requête, jamais une variante « sans réalisé ».
+     *
+     * Les deux drapeaux sont lus ICI (pas dans exportPdf()) : chaque rapport
+     * du registre lit ses propres paramètres de requête, exportPdf() reste
+     * générique sur tous les rapports.
+     *
+     * Les six requêtes elles-mêmes vivent dans {@see BudgetEcranBuilder},
+     * partagé avec {@see BudgetTable::render()} — ce contrôleur ne fait plus
+     * que les fusionner avec les deux drapeaux d'affichage, lus depuis la
+     * requête HTTP.
+     *
+     * @return array{
+     *     depenseGroupes: Collection<string, array{famille: mixed, comptes: Collection}>,
+     *     recetteGroupes: Collection<string, array{famille: mixed, comptes: Collection}>,
+     *     budgetLines: EloquentCollection<int, BudgetLine>,
+     *     ventilations: Collection<int, EloquentCollection<int, BudgetLine>>,
+     *     realiseData: array<int, float>,
+     *     realiseParOperation: array<int, array<int, float>>,
+     *     avecRealise: bool,
+     *     avecVentilations: bool,
+     *     subtitle: string,
+     * }
+     */
+    private function pdfBudgetData(int $exercice, Request $request): array
+    {
+        $donnees = app(BudgetEcranBuilder::class)->pourExercice($exercice);
+
+        // Défaut décoché : l'usage d'octobre (AG) est le plus proche du
+        // vote, et un défaut qui affiche des colonnes à zéro serait le
+        // mauvais choix.
+        $avecRealise = $request->boolean('realise');
+
+        return array_merge($donnees, [
+            'avecRealise' => $avecRealise,
+            'avecVentilations' => $request->boolean('ventilations'),
+            // Sans ce sous-titre, deux impressions à six mois d'écart (le
+            // vote d'octobre, le suivi de mars) portent le même bandeau
+            // « Budget — Exercice… » et se confondent au classement.
+            'subtitle' => $avecRealise ? 'Suivi de gestion' : 'Budget voté',
+        ]);
     }
 
     private function pdfFluxTresorerieData(RapportService $rapportService, int $exercice): array

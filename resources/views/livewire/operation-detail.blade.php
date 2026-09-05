@@ -59,6 +59,11 @@
                 <i class="bi bi-bar-chart-line me-1"></i>Compte résultat
             </button>
         </li>
+        <li class="nav-item">
+            <button class="nav-link {{ $activeTab === 'budget' ? 'active' : '' }}" wire:click="setTab('budget')">
+                <i class="bi bi-piggy-bank me-1"></i>Budget
+            </button>
+        </li>
     </ul>
     </div>
 
@@ -156,6 +161,10 @@
 
     @if($activeTab === 'compte_resultat')
         <livewire:rapport-compte-resultat-operations :selectedOperationIds="[$operation->id]" :key="'cr-'.$operation->id" />
+    @endif
+
+    @if($activeTab === 'budget')
+        <livewire:rapport-budget-operations :selectedOperationIds="[$operation->id]" :key="'budget-'.$operation->id" />
     @endif
 
 </div>

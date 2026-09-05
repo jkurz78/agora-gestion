@@ -10,17 +10,19 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
- * SEL-01 — Opérations éligibles au compte de résultat par opérations.
+ * SEL-01 — Opérations éligibles au compte de résultat par opérations, et au
+ * rapport budget par opérations.
  *
  * Une opération est éligible dès qu'elle porte au moins un mouvement RÉEL de
  * résultat dans l'exercice affiché : une ligne directe de classe 6 ou 7, ou une
  * affectation ventilée dont le compte de la ligne parente est de classe 6 ou 7.
+ * C'est le critère PAR DÉFAUT — les deux drapeaux ci-dessous l'assouplissent
+ * chacun à leur façon, pour un écran qui en a besoin.
  *
  * Ce qui n'entre PAS dans le critère, volontairement : le statut de
  * l'opération, ses dates, l'état actif de son type. Une opération clôturée
  * l'an dernier mais qui reçoit un règlement tardif cette année reste
- * consultable ; une opération en cours sans le moindre mouvement ne pollue pas
- * le sélecteur.
+ * consultable.
  *
  * Les deux branches reprennent l'invariant Q1/Q2 de CompteResultatBuilder pour
  * ne jamais compter une ligne ventilée par ses deux bouts. Ici seule
@@ -45,6 +47,20 @@ use Illuminate\Support\Facades\DB;
  * prévision rattachée à l'exercice. C'est pourquoi l'appelant (le Livewire du
  * rapport) ne passe `true` que lorsque le mode projection est actif — jamais
  * en mode réalisé.
+ *
+ * ── $avecBudget — la ventilation sans mouvement ─────────────────────────────
+ *
+ * Le rapport budget a le même besoin que la projection, pour une autre
+ * raison : une opération ventilée mais pas encore dépensée doit exister dans
+ * son sélecteur, et surtout survivre à normaliser() dans l'onglet de sa propre
+ * fiche — sinon l'onglet se viderait tout seul. On ajoute donc à l'union les
+ * lignes de budget rattachées à une opération pour l'exercice affiché (voir
+ * ventilationsBudgetaires()). Passé `true` par le seul rapport budget : le
+ * compte de résultat par opérations ne change pas de comportement.
+ *
+ * $avecPrevisions et $avecBudget sont exclusifs par écran : un écran est en
+ * projection ou en budget, jamais les deux — chacun ne passe que son propre
+ * drapeau à `true`.
  */
 final class OperationsEligiblesQuery
 {
@@ -55,9 +71,12 @@ final class OperationsEligiblesQuery
     /**
      * Identifiants d'opérations ayant un mouvement de résultat sur l'exercice.
      *
+     * $avecPrevisions et $avecBudget s'appellent en argument nommé, jamais en
+     * positionnel — `pourExercice($exercice, false, true)` ne se lit plus.
+     *
      * @return list<int> triés, sans doublon
      */
-    public function pourExercice(int $exercice, bool $avecPrevisions = false): array
+    public function pourExercice(int $exercice, bool $avecPrevisions = false, bool $avecBudget = false): array
     {
         if (! TenantContext::hasBooted()) {
             return [];
@@ -111,6 +130,11 @@ final class OperationsEligiblesQuery
             $union
                 ->union($this->previsionsCharges($tenantId, $start, $end))
                 ->union($this->previsionsProduits($tenantId, $start, $end));
+        }
+
+        // $avecBudget : voir la docblock de la classe, section « $avecBudget ».
+        if ($avecBudget) {
+            $union->union($this->ventilationsBudgetaires($tenantId, $exercice));
         }
 
         return $union
@@ -178,17 +202,57 @@ final class OperationsEligiblesQuery
     }
 
     /**
+     * Branche « ventilation budgétaire » : les lignes de budget rattachées à
+     * une opération pour l'exercice affiché, dont le compte est de classe 6
+     * ou 7 — même CRITÈRE de classe que previsionsCharges()/previsionsProduits(),
+     * pour ne pas diverger de la lecture faite une fois l'opération retenue.
+     * Ce n'est qu'une parenté de critère, pas de forme : previsionsCharges()
+     * ne filtre le tenant que sur `ep` et `o`, previsionsProduits() que sur
+     * `op` — ni l'une ni l'autre ne scope sa table de comptes (`cpt`) ni
+     * `seances` (`s`). Le filtre tenant sur `c` ci-dessous va délibérément
+     * plus loin que ces deux branches sœurs ; ce n'est pas un alignement,
+     * c'est un choix propre à cette branche.
+     *
+     * Rattachement par la COLONNE `exercice` de la ligne, jamais par des dates :
+     * une ligne de budget porte son exercice explicitement, c'est tout l'intérêt
+     * du modèle. Trois tables jointes (bl, o, c), trois filtres tenant.
+     *
+     * `BudgetLine::operation()` est déclarée `withTrashed()` pour que
+     * l'historique budgétaire reste lisible après suppression de l'opération ;
+     * ici c'est délibérément l'inverse : `whereNull('o.deleted_at')` exclut
+     * l'opération supprimée, parce que l'arbre du sélecteur passe par Eloquent
+     * et ne la proposerait pas.
+     */
+    private function ventilationsBudgetaires(int $tenantId, int $exercice): Builder
+    {
+        // L'INNER JOIN écarte les enveloppes (operation_id NULL) : seules les
+        // ventilations éligibilisent une opération.
+        return DB::table('budget_lines as bl')
+            ->join('operations as o', 'o.id', '=', 'bl.operation_id')
+            ->join('comptes as c', 'c.id', '=', 'bl.compte_id')
+            ->whereIn('c.classe', [6, 7])
+            ->where('bl.exercice', $exercice)
+            ->whereNull('o.deleted_at')
+            ->where('bl.association_id', $tenantId)
+            ->where('o.association_id', $tenantId)
+            ->where('c.association_id', $tenantId)
+            ->select('bl.operation_id as operation_id');
+    }
+
+    /**
      * Intersection d'une sélection non fiable (URL, formulaire) avec les
      * opérations éligibles — SEL-04.
      *
-     * $avecPrevisions se propage tel quel vers pourExercice() : la
-     * normalisation d'une sélection doit accepter exactement les mêmes ids que
-     * l'arbre qui les propose, mode par mode.
+     * $avecPrevisions et $avecBudget se propagent tels quels vers
+     * pourExercice() : la normalisation d'une sélection doit accepter
+     * exactement les mêmes ids que l'arbre qui les propose, mode par mode.
+     * Comme pour pourExercice(), ils s'appellent en argument nommé, jamais en
+     * positionnel — `normaliser($ops, $exercice, false, true)` ne se lit plus.
      *
      * @param  array<mixed>  $selection
      * @return list<int>
      */
-    public function normaliser(array $selection, int $exercice, bool $avecPrevisions = false): array
+    public function normaliser(array $selection, int $exercice, bool $avecPrevisions = false, bool $avecBudget = false): array
     {
         $demandes = collect($selection)
             ->map(fn ($id): int => (int) $id)
@@ -200,6 +264,6 @@ final class OperationsEligiblesQuery
             return [];
         }
 
-        return array_values(array_intersect($demandes, $this->pourExercice($exercice, $avecPrevisions)));
+        return array_values(array_intersect($demandes, $this->pourExercice($exercice, $avecPrevisions, $avecBudget)));
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\StatutOperation;
 use App\Models\Association;
+use App\Models\BudgetLine;
 use App\Models\Compte;
 use App\Models\EncadrementPrevision;
 use App\Models\Operation;
@@ -283,7 +284,7 @@ it('ignore une opération n\'ayant qu\'une prévision de charge sans le drapeau,
     eligPrevisionCharge((int) $op->id, (int) $this->compte606->id, '2025-10-01');
 
     expect($this->query->pourExercice(2025))->toBe([])
-        ->and($this->query->pourExercice(2025, true))->toBe([(int) $op->id]);
+        ->and($this->query->pourExercice(2025, avecPrevisions: true))->toBe([(int) $op->id]);
 });
 
 it('ignore une opération n\'ayant qu\'une prévision de produit sans le drapeau, et la retient avec', function () {
@@ -294,7 +295,7 @@ it('ignore une opération n\'ayant qu\'une prévision de produit sans le drapeau
     eligPrevisionProduit((int) $op->id, '2025-10-01');
 
     expect($this->query->pourExercice(2025))->toBe([])
-        ->and($this->query->pourExercice(2025, true))->toBe([(int) $op->id]);
+        ->and($this->query->pourExercice(2025, avecPrevisions: true))->toBe([(int) $op->id]);
 });
 
 it('ignore une prévision de charge datée hors exercice, avec ou sans le drapeau', function () {
@@ -302,7 +303,7 @@ it('ignore une prévision de charge datée hors exercice, avec ou sans le drapea
     eligPrevisionCharge((int) $op->id, (int) $this->compte606->id, '2024-10-01');
 
     expect($this->query->pourExercice(2025))->toBe([])
-        ->and($this->query->pourExercice(2025, true))->toBe([]);
+        ->and($this->query->pourExercice(2025, avecPrevisions: true))->toBe([]);
 });
 
 it('retient avec le drapeau une opération dont la séance de prévision n\'a pas de date', function () {
@@ -310,7 +311,7 @@ it('retient avec le drapeau une opération dont la séance de prévision n\'a pa
     eligPrevisionCharge((int) $op->id, (int) $this->compte606->id, null);
 
     expect($this->query->pourExercice(2025))->toBe([])
-        ->and($this->query->pourExercice(2025, true))->toBe([(int) $op->id]);
+        ->and($this->query->pourExercice(2025, avecPrevisions: true))->toBe([(int) $op->id]);
 });
 
 it('n\'expose pas, même avec le drapeau, une opération d\'un autre tenant portant une prévision', function () {
@@ -320,18 +321,18 @@ it('n\'expose pas, même avec le drapeau, une opération d\'un autre tenant port
     $autre = Association::factory()->create();
     TenantContext::boot($autre);
 
-    expect($this->query->pourExercice(2025, true))->toBe([]);
+    expect($this->query->pourExercice(2025, avecPrevisions: true))->toBe([]);
 });
 
 it('ignore, même avec le drapeau, une opération supprimée logiquement portant une prévision', function () {
     $op = operationTest('Prévision opération supprimée');
     eligPrevisionCharge((int) $op->id, (int) $this->compte606->id, '2025-10-01');
 
-    expect($this->query->pourExercice(2025, true))->toBe([(int) $op->id]);
+    expect($this->query->pourExercice(2025, avecPrevisions: true))->toBe([(int) $op->id]);
 
     $op->delete();
 
-    expect($this->query->pourExercice(2025, true))->toBe([]);
+    expect($this->query->pourExercice(2025, avecPrevisions: true))->toBe([]);
 });
 
 it('ne retourne pas de doublon quand une opération a un mouvement réel et une prévision', function () {
@@ -339,7 +340,7 @@ it('ne retourne pas de doublon quand une opération a un mouvement réel et une 
     ligneDirecte((int) $this->compte606->id, (int) $op->id, '2025-10-01');
     eligPrevisionCharge((int) $op->id, (int) $this->compte606->id, '2025-11-01');
 
-    expect($this->query->pourExercice(2025, true))->toBe([(int) $op->id]);
+    expect($this->query->pourExercice(2025, avecPrevisions: true))->toBe([(int) $op->id]);
 });
 
 it('normaliser propage le drapeau prévisions à pourExercice', function () {
@@ -347,5 +348,112 @@ it('normaliser propage le drapeau prévisions à pourExercice', function () {
     eligPrevisionCharge((int) $op->id, (int) $this->compte606->id, '2025-10-01');
 
     expect($this->query->normaliser([(string) $op->id], 2025))->toBe([])
-        ->and($this->query->normaliser([(string) $op->id], 2025, true))->toBe([(int) $op->id]);
+        ->and($this->query->normaliser([(string) $op->id], 2025, avecPrevisions: true))->toBe([(int) $op->id]);
+});
+
+/**
+ * Crée une ligne de budget ventilée sur une opération, pour un compte et un
+ * exercice donnés — miroir des helpers eligPrevisionCharge()/
+ * eligPrevisionProduit() ci-dessus, pour la branche $avecBudget.
+ */
+function ligneBudget(int $operationId, int $compteId, int $exercice, ?int $associationId = null): BudgetLine
+{
+    return BudgetLine::factory()->create([
+        'association_id' => $associationId ?? (int) TenantContext::currentId(),
+        'compte_id' => $compteId,
+        'operation_id' => $operationId,
+        'exercice' => $exercice,
+    ]);
+}
+
+it('ignore une opération ventilée au budget sans le drapeau, et la retient avec', function () {
+    $op = operationTest('Ventilée budget seule');
+    ligneBudget((int) $op->id, (int) $this->compte606->id, 2025);
+
+    expect($this->query->pourExercice(2025))->toBe([])
+        ->and($this->query->pourExercice(2025, avecBudget: true))->toBe([(int) $op->id]);
+});
+
+it('une ligne de budget sur un compte de classe 5 n\'éligibilise rien', function () {
+    // Épingle whereIn('c.classe', [6, 7]) dans ventilationsBudgetaires() : sans
+    // ce filtre, les 32 autres tests de ce fichier restent verts (une ligne de
+    // budget sur un compte de trésorerie n'apparaît dans aucun autre cas), donc
+    // rien ne protégeait cet invariant tout juste ajouté.
+    $op = operationTest('Ventilée sur compte de trésorerie');
+    ligneBudget((int) $op->id, (int) $this->compte512->id, 2025);
+
+    expect($this->query->pourExercice(2025, avecBudget: true))->toBe([]);
+});
+
+it('ignore une ventilation budgétaire d\'un autre exercice', function () {
+    $op = operationTest('Ventilée budget autre exercice');
+    ligneBudget((int) $op->id, (int) $this->compte606->id, 2024);
+
+    expect($this->query->pourExercice(2025, avecBudget: true))->toBe([]);
+});
+
+it('une ligne de budget sans opération (enveloppe) n\'éligibilise rien', function () {
+    // Forme dominante en base : BudgetImportService n'écrit que des enveloppes.
+    // L'INNER JOIN sur operations écarte déjà ces lignes.
+    BudgetLine::factory()->create([
+        'association_id' => (int) TenantContext::currentId(),
+        'compte_id' => (int) $this->compte606->id,
+        'operation_id' => null,
+        'exercice' => 2025,
+    ]);
+
+    expect($this->query->pourExercice(2025, avecBudget: true))->toBe([]);
+});
+
+it('ignore, même avec le drapeau budget, une opération supprimée logiquement ventilée', function () {
+    // Divergence délibérée avec BudgetLine::operation() (withTrashed, pour
+    // l'historique budgétaire) : ici l'arbre du sélecteur passe par Eloquent
+    // et ne proposerait pas cette opération, donc on l'exclut aussi ici.
+    $op = operationTest('Ventilée budget supprimée');
+    ligneBudget((int) $op->id, (int) $this->compte606->id, 2025);
+
+    expect($this->query->pourExercice(2025, avecBudget: true))->toBe([(int) $op->id]);
+
+    $op->delete();
+
+    expect($this->query->pourExercice(2025, avecBudget: true))->toBe([]);
+});
+
+it('n\'expose pas une opération d\'un autre tenant ventilée par une ligne de budget du tenant courant', function () {
+    // Isole le filtre sur `o` : bl est bien du tenant courant.
+    $autre = Association::factory()->create();
+    $opAutre = Operation::factory()->create(['association_id' => $autre->id]);
+    ligneBudget((int) $opAutre->id, (int) $this->compte606->id, 2025);
+
+    expect($this->query->pourExercice(2025, avecBudget: true))->toBe([]);
+});
+
+it('n\'expose pas une opération du tenant courant ventilée par une ligne de budget d\'un autre tenant', function () {
+    // Isole le filtre sur `bl` : l'opération et le compte sont bien du tenant courant.
+    $op = operationTest('Ventilée par bl étrangère');
+    $autre = Association::factory()->create();
+    ligneBudget((int) $op->id, (int) $this->compte606->id, 2025, (int) $autre->id);
+
+    expect($this->query->pourExercice(2025, avecBudget: true))->toBe([]);
+});
+
+it('n\'expose pas une opération ventilée sur un compte d\'un autre tenant', function () {
+    // Isole le filtre sur `c` : bl et l'opération sont bien du tenant courant.
+    $op = operationTest('Ventilée sur compte étranger');
+    $autre = Association::factory()->create();
+    $compteAutre = Compte::create([
+        'association_id' => $autre->id, 'numero_pcg' => '606', 'intitule' => 'Achats',
+        'classe' => 6, 'lettrable' => false, 'actif' => true, 'est_systeme' => false, 'pour_inscriptions' => false,
+    ]);
+    ligneBudget((int) $op->id, (int) $compteAutre->id, 2025);
+
+    expect($this->query->pourExercice(2025, avecBudget: true))->toBe([]);
+});
+
+it('normaliser propage le drapeau budget à pourExercice', function () {
+    $op = operationTest('Ventilée normaliser');
+    ligneBudget((int) $op->id, (int) $this->compte606->id, 2025);
+
+    expect($this->query->normaliser([(string) $op->id], 2025))->toBe([])
+        ->and($this->query->normaliser([(string) $op->id], 2025, avecBudget: true))->toBe([(int) $op->id]);
 });

@@ -19,6 +19,7 @@ final class OperationDetail extends Component
     private const ONGLETS = [
         'details', 'participants', 'animateurs', 'seances',
         'reglements', 'questionnaires', 'communication', 'compte_resultat',
+        'budget',
     ];
 
     public Operation $operation;

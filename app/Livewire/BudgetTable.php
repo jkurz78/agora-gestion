@@ -11,9 +11,9 @@ use App\Models\BudgetLine;
 use App\Models\Operation;
 use App\Services\Budget\BudgetGelService;
 use App\Services\BudgetImportService;
-use App\Services\BudgetService;
 use App\Services\Compta\PlanComptableSelecteur;
 use App\Services\ExerciceService;
+use App\Services\Rapports\BudgetEcranBuilder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
@@ -43,6 +43,18 @@ final class BudgetTable extends Component
     public string $exportSource = 'courant'; // 'zero' | 'courant' | 'budget'
 
     public string $exportSourceExercice = '';
+
+    /**
+     * Volontairement SANS #[Validate] — voir le commentaire équivalent sur
+     * $commentaireDeverrouillage ci-dessous : un validate() nu ailleurs dans
+     * ce composant (importBudget() en a un, explicite, mais un futur ajout
+     * pourrait ne pas l'être) embarquerait ces deux propriétés. C'est
+     * exactement l'incident de juillet : l'import ne partait jamais, l'erreur
+     * s'affichant dans une modale d'import fermée.
+     */
+    public bool $exportAvecRealise = false;
+
+    public bool $exportAvecVentilations = false;
 
     // ── Import ────────────────────────────────────────────────────────────────
     public bool $showImportPanel = false;
@@ -267,6 +279,30 @@ final class BudgetTable extends Component
         $this->showExportModal = false;
     }
 
+    /**
+     * PDF imprimable — passe par le registre de rapports (RapportExportController),
+     * jamais par le gabarit d'aller-retour CSV/XLSX ci-dessus : ce sont deux
+     * usages distincts (document à voter en AG vs fichier réimportable).
+     *
+     * Toujours l'exercice COURANT affiché à l'écran (pas exportExercice, qui
+     * ne sert qu'au pré-remplissage du gabarit réimportable vers l'exercice
+     * suivant) : le PDF est un instantané du budget affiché, jamais d'un
+     * exercice qui n'existe pas encore.
+     */
+    public function exportPdf(): void
+    {
+        $url = route('rapports.export', [
+            'rapport' => 'budget',
+            'format' => 'pdf',
+            'exercice' => app(ExerciceService::class)->current(),
+            'realise' => $this->exportAvecRealise ? 1 : 0,
+            'ventilations' => $this->exportAvecVentilations ? 1 : 0,
+        ]);
+
+        $this->js("window.location.href = '{$url}'");
+        $this->showExportModal = false;
+    }
+
     // ── Actions import ────────────────────────────────────────────────────────
 
     public function toggleImportPanel(): void
@@ -321,41 +357,21 @@ final class BudgetTable extends Component
 
     public function render(): View
     {
-        $budgetService = app(BudgetService::class);
         $exercice = app(ExerciceService::class)->current();
 
-        // Comptes de résultat groupés par famille.
-        $depenseGroupes = PlanComptableSelecteur::groupesPourType('depense');
-        $recetteGroupes = PlanComptableSelecteur::groupesPourType('recette');
+        // Les six requêtes (comptes groupés, enveloppes, ventilations,
+        // réalisé) sont partagées avec le PDF imprimable de cet écran — voir
+        // App\Services\Rapports\BudgetEcranBuilder.
+        $donnees = app(BudgetEcranBuilder::class)->pourExercice($exercice);
 
-        // Enveloppes et ventilations sont lues SÉPARÉMENT : les mêler dans une
-        // seule collection ferait écraser l'enveloppe par sa ventilation au
-        // keyBy, et doubler tout total.
-        $budgetLines = BudgetLine::forExercice($exercice)->enveloppes()->get()->keyBy('compte_id');
-        $ventilations = BudgetLine::forExercice($exercice)
-            ->ventilations()
-            ->with('operation')
-            ->get()
-            ->groupBy('compte_id');
-
-        // Deux requêtes groupées, au lieu d'un appel par compte.
-        $realiseData = $budgetService->realiseParCompte($exercice);
-        $realiseParOperation = $budgetService->realiseParCompteEtOperation($exercice);
-
-        return view('livewire.budget-table', [
-            'depenseGroupes' => $depenseGroupes,
-            'recetteGroupes' => $recetteGroupes,
-            'budgetLines' => $budgetLines,
-            'ventilations' => $ventilations,
-            'realiseData' => $realiseData,
-            'realiseParOperation' => $realiseParOperation,
+        return view('livewire.budget-table', array_merge($donnees, [
             'operationsSansBudget' => $this->operationsSansBudget($exercice),
             'exerciceLabel' => app(ExerciceService::class)->label($exercice),
             'exerciceModele' => app(ExerciceService::class)->exerciceAffiche(),
             'exportExerciceCourant' => $exercice,
             'exportExerciceSuivant' => $exercice + 1,
             'anneesDisponibles' => app(ExerciceService::class)->availableYears(),
-        ]);
+        ]));
     }
 
     /**

@@ -112,9 +112,29 @@
                             Sert au pré-remplissage « réalisé » et à la colonne de référence du fichier.
                         </div>
                     </div>
+                    <hr>
+                    <div class="mb-2">
+                        <label class="form-label fw-semibold">PDF imprimable</label>
+                        <div class="form-text mb-2">
+                            Document à voter en assemblée générale (enveloppes seules) ou
+                            suivi de gestion (avec réalisé et ventilations), selon les cases
+                            cochées ci-dessous. Toujours sur l'exercice affiché à l'écran.
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" wire:model="exportAvecRealise" class="form-check-input" id="exportAvecRealise">
+                            <label class="form-check-label" for="exportAvecRealise">Inclure le réalisé et l'écart</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" wire:model="exportAvecVentilations" class="form-check-input" id="exportAvecVentilations">
+                            <label class="form-check-label" for="exportAvecVentilations">Inclure les ventilations par opération</label>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button wire:click="closeExportModal" type="button" class="btn btn-secondary">Annuler</button>
+                    <button wire:click="exportPdf" type="button" class="btn btn-outline-primary">
+                        <i class="bi bi-file-earmark-pdf"></i> PDF
+                    </button>
                     <button wire:click="export" type="button" class="btn btn-primary">
                         <i class="bi bi-download"></i> Télécharger
                     </button>

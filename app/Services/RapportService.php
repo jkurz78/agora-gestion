@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\PorteeExercices;
+use App\Services\Rapports\BudgetOperationBuilder;
 use App\Services\Rapports\CompteResultatBuilder;
 use App\Services\Rapports\FluxTresorerieBuilder;
 use App\Services\Rapports\OperationsEligiblesQuery;
@@ -17,14 +18,18 @@ final class RapportService
 
     private readonly OperationsEligiblesQuery $eligibles;
 
+    private readonly BudgetOperationBuilder $budgetOperation;
+
     public function __construct(
         ?CompteResultatBuilder $compteResultat = null,
         ?FluxTresorerieBuilder $fluxTresorerie = null,
         ?OperationsEligiblesQuery $operationsEligibles = null,
+        ?BudgetOperationBuilder $budgetOperation = null,
     ) {
         $this->compteResultat = $compteResultat ?? app(CompteResultatBuilder::class);
         $this->fluxTresorerie = $fluxTresorerie ?? app(FluxTresorerieBuilder::class);
         $this->eligibles = $operationsEligibles ?? app(OperationsEligiblesQuery::class);
+        $this->budgetOperation = $budgetOperation ?? app(BudgetOperationBuilder::class);
     }
 
     /**
@@ -65,13 +70,15 @@ final class RapportService
      *
      * $avecPrevisions (EX-03) n'élargit le critère aux deux sources de
      * prévisionnel que lorsque l'écran est en mode projection — voir
-     * OperationsEligiblesQuery pour l'arbitrage complet.
+     * OperationsEligiblesQuery pour l'arbitrage complet. $avecBudget fait de
+     * même pour le rapport budget : une opération ventilée mais pas encore
+     * dépensée doit rester éligible.
      *
      * @return list<int>
      */
-    public function operationsEligibles(int $exercice, bool $avecPrevisions = false): array
+    public function operationsEligibles(int $exercice, bool $avecPrevisions = false, bool $avecBudget = false): array
     {
-        return $this->eligibles->pourExercice($exercice, $avecPrevisions);
+        return $this->eligibles->pourExercice($exercice, $avecPrevisions, $avecBudget);
     }
 
     /**
@@ -82,9 +89,9 @@ final class RapportService
      * @param  array<mixed>  $selection
      * @return list<int>
      */
-    public function normaliserOperations(array $selection, int $exercice, bool $avecPrevisions = false): array
+    public function normaliserOperations(array $selection, int $exercice, bool $avecPrevisions = false, bool $avecBudget = false): array
     {
-        return $this->eligibles->normaliser($selection, $exercice, $avecPrevisions);
+        return $this->eligibles->normaliser($selection, $exercice, $avecPrevisions, $avecBudget);
     }
 
     /**
@@ -96,6 +103,28 @@ final class RapportService
     public function rapportSeances(int $exercice, array $operationIds): array
     {
         return $this->compteResultat->rapportSeances($exercice, $operationIds);
+    }
+
+    /**
+     * Prévisions de l'exercice, agrégées à la maille (opération, compte).
+     *
+     * @param  list<int>  $operationIds
+     * @return array<int, array<int, float>>
+     */
+    public function previsionsParOperationEtCompte(int $exercice, array $operationIds): array
+    {
+        return $this->compteResultat->previsionsParOperationEtCompte($exercice, $operationIds);
+    }
+
+    /**
+     * Budget ventilé, prévisionnel et réalisé, à la maille compte, par opération.
+     *
+     * @param  list<int>  $operationIds
+     * @return array<int, array<string, mixed>>
+     */
+    public function budgetParOperations(int $exercice, array $operationIds): array
+    {
+        return $this->budgetOperation->parOperations($exercice, $operationIds);
     }
 
     /**
