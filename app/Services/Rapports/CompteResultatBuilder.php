@@ -81,9 +81,12 @@ final class CompteResultatBuilder
      * une charge, tout en ignorant la dotation aux amortissements qui en est
      * la vraie charge, son journal étant `od`.
      *
-     * La période est fournie par l'appelant, et non recalculée ici : le mois de
-     * début d'exercice est un réglage du tenant (ExerciceService::dateRange()),
-     * alors que exerciceDates() de cette classe le fige au 1er septembre.
+     * La période est fournie par l'appelant, et non recalculée ici : c'est
+     * volontaire, pas une limitation — exerciceDates() de cette classe délègue
+     * lui aussi à ExerciceService::dateRange(), qui lit le mois de début
+     * d'exercice comme un réglage du tenant. Le choix vient d'ailleurs : cette
+     * méthode sert des indicateurs de synthèse qui reçoivent déjà leur borne
+     * de période toute faite, pas de raison de la recalculer une seconde fois.
      *
      * @return array{charges: float, produits: float}
      */
