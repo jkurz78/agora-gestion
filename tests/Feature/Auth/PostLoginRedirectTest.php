@@ -55,6 +55,14 @@ it('redirects fresh super-admin without any association to /super-admin', functi
     // association attached yet (no tenant exists). Pre-fix: the user was
     // logged out with "Compte non rattaché à une association.". Now: they
     // land on /super-admin to create the first tenant.
+    //
+    // Une 2e association (non rattachée à l'utilisateur) casse le mode
+    // mono-association : sinon MonoAssociationResolver résout automatiquement
+    // l'unique association du système sur la route de login et le contrôleur
+    // suit le chemin "branded route" (vérif d'appartenance à CETTE association)
+    // au lieu du chemin standard "0 association" attendu par ce test.
+    Association::factory()->create();
+
     $user = User::factory()->create([
         'role_systeme' => RoleSysteme::SuperAdmin,
     ]);
@@ -69,6 +77,9 @@ it('redirects fresh super-admin without any association to /super-admin', functi
 });
 
 it('still rejects regular users without any association', function () {
+    // Cf. commentaire du test précédent : casse le mode mono-association.
+    Association::factory()->create();
+
     $user = User::factory()->create([
         'role_systeme' => RoleSysteme::User,
     ]);
