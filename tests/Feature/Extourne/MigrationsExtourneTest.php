@@ -75,7 +75,7 @@ test('RapprochementBancaire isBancaire helper returns true only when type Bancai
 });
 
 test('extournee_at index exists on transactions', function (): void {
-    $indexes = collect(DB::select("PRAGMA index_list('transactions')"))
+    $indexes = collect(Schema::getIndexes('transactions'))
         ->pluck('name')
         ->all();
 
@@ -83,7 +83,7 @@ test('extournee_at index exists on transactions', function (): void {
 });
 
 test('type index exists on rapprochements_bancaires', function (): void {
-    $indexes = collect(DB::select("PRAGMA index_list('rapprochements_bancaires')"))
+    $indexes = collect(Schema::getIndexes('rapprochements_bancaires'))
         ->pluck('name')
         ->all();
 
@@ -91,12 +91,12 @@ test('type index exists on rapprochements_bancaires', function (): void {
 });
 
 test('extournes UNIQUE constraints on transaction_origine_id and transaction_extourne_id', function (): void {
-    $indexes = collect(DB::select("PRAGMA index_list('extournes')"))
+    $indexes = collect(Schema::getIndexes('extournes'))
         ->keyBy('name');
 
     expect($indexes->has('extournes_transaction_origine_id_unique'))->toBeTrue();
     expect($indexes->has('extournes_transaction_extourne_id_unique'))->toBeTrue();
 
-    expect((bool) $indexes->get('extournes_transaction_origine_id_unique')->unique)->toBeTrue();
-    expect((bool) $indexes->get('extournes_transaction_extourne_id_unique')->unique)->toBeTrue();
+    expect((bool) $indexes->get('extournes_transaction_origine_id_unique')['unique'])->toBeTrue();
+    expect((bool) $indexes->get('extournes_transaction_extourne_id_unique')['unique'])->toBeTrue();
 });
