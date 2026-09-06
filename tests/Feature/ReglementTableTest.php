@@ -142,7 +142,7 @@ it('renders reglement table', function () {
 it('ouvre la modale de règlement daté sans créer de T2', function (): void {
     SystemeSeeder::seed();
     $produit = Compte::create([
-        'numero_pcg' => '706-REGLEMENT-TABLE',
+        'numero_pcg' => '706-REGTB',
         'intitule' => 'Produit règlement table',
         'classe' => 7,
         'actif' => true,

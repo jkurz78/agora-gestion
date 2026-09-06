@@ -252,7 +252,7 @@ it('utilise l exercice demandé pour les reports AN plutôt que celui de la sess
     $acteur->associations()->attach((int) TenantContext::currentId(), ['role' => 'admin', 'joined_at' => now()]);
     $tiers = Tiers::factory()->create(['nom' => 'Client exercice affiché']);
     $produit = Compte::create([
-        'numero_pcg' => '706-REPORT-EXERCICE',
+        'numero_pcg' => '706-RPTEX',
         'intitule' => 'Produit report exercice',
         'classe' => 7,
         'actif' => true,
@@ -293,7 +293,7 @@ it('filtre les reports AN par bornes, tiers, référence, pièce et sens', funct
     $client = Tiers::factory()->create(['nom' => 'Client AN']);
     $fournisseur = Tiers::factory()->create(['nom' => 'Fournisseur AN']);
     $produit = Compte::create([
-        'numero_pcg' => '706-REPORT-FILTRE',
+        'numero_pcg' => '706-RPTFL',
         'intitule' => 'Produit report filtre',
         'classe' => 7,
         'actif' => true,
@@ -302,7 +302,7 @@ it('filtre les reports AN par bornes, tiers, référence, pièce et sens', funct
         'lettrable' => false,
     ]);
     $charge = Compte::create([
-        'numero_pcg' => '606-REPORT-FILTRE',
+        'numero_pcg' => '606-RPTFL',
         'intitule' => 'Charge report filtre',
         'classe' => 6,
         'actif' => true,

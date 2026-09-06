@@ -31,7 +31,7 @@ beforeEach(function () {
     ]);
     Compte::create([
         'association_id' => $this->association->id,
-        'numero_pcg' => '512_TEST_PJ_'.$this->compteBancaire->id,
+        'numero_pcg' => '512_PJ',
         'intitule' => 'Banque PJ lignes',
         'classe' => 5,
         'actif' => true,

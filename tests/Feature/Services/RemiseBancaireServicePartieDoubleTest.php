@@ -40,7 +40,7 @@ function t25creerLigne5112(object $ctx, float $montant): TransactionLigne
 {
     $tiers = Tiers::factory()->create(['association_id' => TenantContext::currentId()]);
     $compteProduit = Compte::firstOrCreate(
-        ['association_id' => TenantContext::currentId(), 'numero_pcg' => '706_'.uniqid()],
+        ['association_id' => TenantContext::currentId(), 'numero_pcg' => '706_'.substr(uniqid(), -5)],
         [
             'intitule' => 'Produit test',
             'classe' => 7,
@@ -72,7 +72,7 @@ function t25creerLigne530(object $ctx, float $montant): TransactionLigne
 {
     $tiers = Tiers::factory()->create(['association_id' => TenantContext::currentId()]);
     $compteProduit = Compte::firstOrCreate(
-        ['association_id' => TenantContext::currentId(), 'numero_pcg' => '706_'.uniqid()],
+        ['association_id' => TenantContext::currentId(), 'numero_pcg' => '706_'.substr(uniqid(), -5)],
         [
             'intitule' => 'Produit test espèces',
             'classe' => 7,
@@ -666,7 +666,7 @@ function t25creerT1EnAttente(object $ctx, float $montant = 60.00): Transaction
 {
     $tiers = Tiers::factory()->create(['association_id' => TenantContext::currentId()]);
     $compteProduit = Compte::firstOrCreate(
-        ['association_id' => TenantContext::currentId(), 'numero_pcg' => '706_ea_'.uniqid()],
+        ['association_id' => TenantContext::currentId(), 'numero_pcg' => '706EA'.substr(uniqid(), -4)],
         [
             'intitule' => 'Produit en attente',
             'classe' => 7,

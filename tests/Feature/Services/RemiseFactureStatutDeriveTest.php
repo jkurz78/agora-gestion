@@ -58,7 +58,7 @@ beforeEach(function (): void {
 function sdCreerT1Cheque(object $ctx, float $montant = 100.0): Transaction
 {
     $compteProduit = Compte::firstOrCreate(
-        ['association_id' => TenantContext::currentId(), 'numero_pcg' => '706_sd_'.uniqid()],
+        ['association_id' => TenantContext::currentId(), 'numero_pcg' => '706SD'.substr(uniqid(), -4)],
         ['intitule' => 'Produit SD', 'classe' => 7, 'lettrable' => false,
             'actif' => true, 'est_systeme' => false, 'pour_inscriptions' => false],
     );

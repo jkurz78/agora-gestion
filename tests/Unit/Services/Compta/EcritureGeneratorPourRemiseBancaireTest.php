@@ -44,7 +44,7 @@ function compte706Rem(string $suffix = ''): Compte
 {
     return Compte::create([
         'association_id' => TenantContext::currentId(),
-        'numero_pcg' => '706rem'.$suffix,
+        'numero_pcg' => '706R'.substr($suffix, -5),
         'intitule' => 'Cotisations remise '.$suffix,
         'classe' => 7,
         'lettrable' => false,

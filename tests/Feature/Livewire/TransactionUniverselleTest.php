@@ -116,7 +116,7 @@ it('affiche un report AN immuable et ouvre son règlement daté', function (): v
     $acteur->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
     $produit = Compte::create([
         'association_id' => $this->association->id,
-        'numero_pcg' => '706-REPORT-ECRAN',
+        'numero_pcg' => '706-RPTEC',
         'intitule' => 'Produit report écran',
         'classe' => 7,
         'actif' => true,
@@ -165,7 +165,7 @@ it('développe le détail exploitable d un report AN', function (): void {
     $acteur->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
     $produit = Compte::create([
         'association_id' => $this->association->id,
-        'numero_pcg' => '706-REPORT-DETAIL',
+        'numero_pcg' => '706-RPTDT',
         'intitule' => 'Produit report détail',
         'classe' => 7,
         'actif' => true,
@@ -208,7 +208,7 @@ it('affiche les reports AN de l exercice fixé même si la session vise un autre
     $acteur->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
     $produit = Compte::create([
         'association_id' => $this->association->id,
-        'numero_pcg' => '706-REPORT-EXERCICE-COMPOSANT',
+        'numero_pcg' => '706-RPTCM',
         'intitule' => 'Produit report exercice composant',
         'classe' => 7,
         'actif' => true,

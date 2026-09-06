@@ -27,7 +27,7 @@ function compteVentilationLockTest(int $classe = 6, string $numeroPcg = '606'): 
 {
     return Compte::create([
         'association_id' => TenantContext::currentId(),
-        'numero_pcg' => $numeroPcg.'-'.uniqid(),
+        'numero_pcg' => $numeroPcg.'-'.substr(uniqid(), -5),
         'intitule' => 'Compte test '.$numeroPcg,
         'classe' => $classe,
         'lettrable' => false,
