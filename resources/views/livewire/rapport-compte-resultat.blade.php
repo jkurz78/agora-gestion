@@ -206,7 +206,7 @@
                     <tr class="cr-resultat">
                         <td style="width:20px;padding:12px;"></td>
                         <td style="padding:12px;">RÉSULTAT</td>
-                        @if($compareN1)<td class="text-end" style="width:115px;padding:12px;color:rgba(255,255,255,.6);">{!! $resultatCourantN1 != 0 ? number_format($resultatCourantN1, 2, ',', ' ').' &euro;' : '&mdash;' !!}</td>@endif
+                        @if($compareN1)<td class="text-end" style="width:115px;padding:12px;color:rgba(255,255,255,.6);">{!! $resultatCourantN1 !== null ? number_format($resultatCourantN1, 2, ',', ' ').' &euro;' : '&mdash;' !!}</td>@endif
                         <td class="text-end" style="width:115px;padding:12px;">{{ number_format($resultatCourant, 2, ',', ' ') }} &euro;</td>
                         @if($compareBudget)
                         <td class="text-end" style="width:115px;padding:12px;">{!! $fmt($resultatBudget) !!}</td>

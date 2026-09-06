@@ -182,10 +182,15 @@ final class RapportExportController extends Controller
 
         $totalChargesN = collect($data['charges'])->sum('montant_n');
         $totalProduitsN = collect($data['produits'])->sum('montant_n');
-        $totalChargesN1 = collect($data['charges'])->sum('montant_n1');
-        $totalProduitsN1 = collect($data['produits'])->sum('montant_n1');
+        $totalChargesN1 = CompteResultatBuilder::sommeSection($data['charges'], 'montant_n1');
+        $totalProduitsN1 = CompteResultatBuilder::sommeSection($data['produits'], 'montant_n1');
         $resultatCourant = (float) $totalProduitsN - (float) $totalChargesN;
-        $resultatCourantN1 = (float) $totalProduitsN1 - (float) $totalChargesN1;
+        // Même règle que $resultatBudget plus bas : null seulement si NI les
+        // charges NI les produits N-1 n'ont de donnée (première année d'une
+        // association) ; si une seule section en a, l'autre compte pour zéro.
+        $resultatCourantN1 = ($totalChargesN1 === null && $totalProduitsN1 === null)
+            ? null
+            : ($totalProduitsN1 ?? 0.0) - ($totalChargesN1 ?? 0.0);
         $totalChargesBudget = CompteResultatBuilder::sommeBudgetSection($data['charges']);
         $totalProduitsBudget = CompteResultatBuilder::sommeBudgetSection($data['produits']);
         // Voir App\Livewire\RapportCompteResultat::render() : même règle null/0.0.
@@ -1981,10 +1986,14 @@ final class RapportExportController extends Controller
         $data = $rapportService->compteDeResultat($exercice);
         $totalChargesN = collect($data['charges'])->sum('montant_n');
         $totalProduitsN = collect($data['produits'])->sum('montant_n');
-        $totalChargesN1 = collect($data['charges'])->sum('montant_n1');
-        $totalProduitsN1 = collect($data['produits'])->sum('montant_n1');
+        $totalChargesN1 = CompteResultatBuilder::sommeSection($data['charges'], 'montant_n1');
+        $totalProduitsN1 = CompteResultatBuilder::sommeSection($data['produits'], 'montant_n1');
         $resultatCourant = $totalProduitsN - $totalChargesN;
-        $resultatCourantN1 = $totalProduitsN1 - $totalChargesN1;
+        // Voir App\Livewire\RapportCompteResultat::render() : même règle null/0.0
+        // que $resultatBudget ci-dessous, appliquée ici au N-1.
+        $resultatCourantN1 = ($totalChargesN1 === null && $totalProduitsN1 === null)
+            ? null
+            : ($totalProduitsN1 ?? 0.0) - ($totalChargesN1 ?? 0.0);
         $totalChargesBudget = CompteResultatBuilder::sommeBudgetSection($data['charges']);
         $totalProduitsBudget = CompteResultatBuilder::sommeBudgetSection($data['produits']);
         // Voir App\Livewire\RapportCompteResultat::render() : même règle null/0.0.
