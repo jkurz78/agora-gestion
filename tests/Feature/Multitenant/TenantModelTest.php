@@ -23,7 +23,7 @@ it('TenantModel fills association_id on create from TenantContext', function () 
         public $timestamps = true;
     };
 
-    $row = $fake::create(['nom' => 'Dupont', 'type' => 'physique']);
+    $row = $fake::create(['nom' => 'Dupont', 'type' => 'particulier']);
     expect((int) $row->association_id)->toBe($asso->id);
 });
 
@@ -32,8 +32,8 @@ it('TenantModel scopes queries to current tenant', function () {
     $assoB = Association::factory()->create();
 
     DB::table('tiers')->insert([
-        ['association_id' => $assoA->id, 'nom' => 'A1', 'type' => 'physique', 'created_at' => now(), 'updated_at' => now()],
-        ['association_id' => $assoB->id, 'nom' => 'B1', 'type' => 'physique', 'created_at' => now(), 'updated_at' => now()],
+        ['association_id' => $assoA->id, 'nom' => 'A1', 'type' => 'particulier', 'created_at' => now(), 'updated_at' => now()],
+        ['association_id' => $assoB->id, 'nom' => 'B1', 'type' => 'particulier', 'created_at' => now(), 'updated_at' => now()],
     ]);
 
     $fake = new class extends TenantModel
@@ -66,7 +66,7 @@ it('TenantModel does not overwrite association_id if already set', function () {
         public $timestamps = true;
     };
 
-    $row = $fake::create(['nom' => 'Explicit', 'type' => 'physique', 'association_id' => $assoB->id]);
+    $row = $fake::create(['nom' => 'Explicit', 'type' => 'particulier', 'association_id' => $assoB->id]);
     expect((int) $row->association_id)->toBe($assoB->id);
 });
 
@@ -83,7 +83,7 @@ it('TenantModel has association() belongsTo relation', function () {
         public $timestamps = true;
     };
 
-    $row = $fake::create(['nom' => 'Test', 'type' => 'physique']);
+    $row = $fake::create(['nom' => 'Test', 'type' => 'particulier']);
     expect($row->association)->not->toBeNull()
         ->and($row->association->id)->toBe($asso->id);
 });
