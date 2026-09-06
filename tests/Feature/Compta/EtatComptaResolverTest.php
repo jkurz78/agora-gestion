@@ -134,7 +134,7 @@ it('n’exige pas le backfill pour une transaction HelloAsso restée legacy', fu
         'association_id' => $this->association->id,
         'compte_id' => $this->compteBancaire->id,
         'equilibree' => false,
-        'helloasso_order_id' => 'HA-12345',
+        'helloasso_order_id' => 12345,
     ]);
 
     $etat = app(EtatComptaResolver::class)->pourTenantCourant();
