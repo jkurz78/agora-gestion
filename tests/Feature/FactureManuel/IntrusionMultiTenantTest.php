@@ -44,7 +44,7 @@ function creerAssociationAdmin(): array
  * en bypassant les scopes globaux (TenantModel).
  * Retourne la facture.
  */
-function creerFactureValideeAssociation(Association $assoBprime, Tiers $tiersBprime): Facture
+function creerFactureValideeAssociation(Association $assoBprime, Tiers $tiersBprime, User $saisiPar): Facture
 {
     $exercice = app(ExerciceService::class)->current();
 
@@ -55,7 +55,7 @@ function creerFactureValideeAssociation(Association $assoBprime, Tiers $tiersBpr
         'tiers_id' => $tiersBprime->id,
         'montant_total' => 500.0,
         'exercice' => $exercice,
-        'saisi_par' => 1,
+        'saisi_par' => $saisiPar->id,
         'mode_paiement_prevu' => ModePaiement::Virement->value,
     ]);
     $facture->association_id = $assoBprime->id;
@@ -108,7 +108,7 @@ beforeEach(function (): void {
 
     // Tiers et facture appartenant à Asso B
     $this->tiersB = creerTiersAssociation($this->assocB);
-    $this->factureB = creerFactureValideeAssociation($this->assocB, $this->tiersB);
+    $this->factureB = creerFactureValideeAssociation($this->assocB, $this->tiersB, $this->userB);
 
     // Boot le context sur Asso A (l'intrus)
     TenantContext::boot($this->assocA);
