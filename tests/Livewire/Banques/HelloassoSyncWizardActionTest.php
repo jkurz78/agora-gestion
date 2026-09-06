@@ -18,19 +18,26 @@ use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 
 beforeEach(function (): void {
-    $association = Association::firstOrCreate(['id' => 1], [
-        'nom' => 'Asso test',
-        'slug' => 'test-asso',
-    ]);
+    // `id` n'étant pas fillable sur Association, firstOrCreate(['id' => 1], ...)
+    // ne force pas réellement l'id : il est silencieusement ignoré et l'association
+    // est créée avec un id auto-incrémenté quelconque. Le test plus bas (association_id
+    // littéral sur HelloAssoNotification, assertion ->toBe([1])) exige un vrai id 1
+    // sous MySQL/MariaDB (FK appliquées) : on le force donc explicitement.
+    $association = Association::find(1);
+    if ($association === null) {
+        $association = new Association;
+        $association->id = 1;
+        $association->fill(['nom' => 'Asso test', 'slug' => 'test-asso'])->save();
+    }
     TenantContext::boot($association);
 
     $this->user = User::factory()->create();
-    $this->user->associations()->attach(1, ['role' => 'admin', 'joined_at' => now()]);
+    $this->user->associations()->attach($association->id, ['role' => 'admin', 'joined_at' => now()]);
     $this->compteCotisation = Compte::factory()->numero('756')->pourCotisations()->create();
 
     $compte = CompteBancaire::factory()->create();
     $this->parametres = HelloAssoParametres::factory()->create([
-        'association_id' => 1,
+        'association_id' => $association->id,
         'environnement' => HelloAssoEnvironnement::Sandbox,
         'client_id' => 'cid',
         'client_secret' => 'csecret',

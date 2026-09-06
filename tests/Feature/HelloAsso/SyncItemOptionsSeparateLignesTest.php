@@ -55,7 +55,7 @@ beforeEach(function (): void {
     app(UsagesComptablesService::class)->setGratuite($this->scGratuite->id);
 
     $this->parametres = HelloAssoParametres::factory()->create([
-        'association_id' => 1,
+        'association_id' => $association->id,
         'environnement' => HelloAssoEnvironnement::Sandbox,
         'client_id' => 'cid',
         'client_secret' => 'csecret',
