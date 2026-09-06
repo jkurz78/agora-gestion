@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\Association;
 use App\Services\Compta\Migrations\BancairesSeeder;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use Illuminate\Support\Facades\DB;
 
 /*
@@ -459,10 +460,14 @@ it('down() removes all bank sous-comptes including 5-digit numero_pcg (10+ banks
     // A tenant with 10+ banks gets '51210', '51211'… which '512_' silently skipped.
     // The fixed pattern '512_%' (one mandatory char + any suffix) covers all lengths.
     //
-    // Note: Step 5 (SystemeSeeder) already seeds 5112 for every tenant via
-    // RefreshDatabase. The hand-insert that was here before Step 5 landed is
-    // replaced by asserting on the real Step 5 row — the invariant is identical.
+    // Note: sous SQLite, une association "par défaut" pré-existe déjà avec ses
+    // comptes système (effet de bord d'une migration de reprise historique) —
+    // ce n'est pas le cas sous MySQL, dont le schéma de test vient d'un dump
+    // (database/schema/mysql-schema.sql) qui ne rejoue pas cet effet de bord.
+    // On sème donc explicitement les comptes système (dont 5112) pour rester
+    // portable — SystemeSeeder est idempotent (INSERT IGNORE / OR IGNORE).
     $association = Association::firstOrFail();
+    SystemeSeeder::seed();
 
     // 1. Insert 11 banks — ROW_NUMBER() will assign rang 1..11
     //    → numero_pcg: 5121, 5122, …, 5129, 51210, 51211
