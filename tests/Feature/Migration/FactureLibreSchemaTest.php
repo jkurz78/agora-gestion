@@ -44,7 +44,10 @@ it('factures.devis_id FK references devis table with ON DELETE RESTRICT', functi
 
     expect($fk)->not->toBeNull('Expected a FK on factures.devis_id');
     expect($fk['foreign_table'])->toBe('devis');
-    expect(strtolower((string) $fk['on_delete']))->toBe('restrict');
+    // MySQL/MariaDB normalise ON DELETE RESTRICT en NO ACTION dans ses métadonnées
+    // (comportement identique — RESTRICT et NO ACTION ne sont pas distingués côté
+    // InnoDB) ; SQLite préserve littéralement le mot-clé déclaré dans la migration.
+    expect(strtolower((string) $fk['on_delete']))->toBeIn(['restrict', 'no action']);
 });
 
 // ── facture_lignes — new columns ──────────────────────────────────────────────
