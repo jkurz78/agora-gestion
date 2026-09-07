@@ -740,7 +740,7 @@ final class RapportExportController extends Controller
                                 $tValues[] = ($mode === 'projection' && $projMatrix)
                                     ? (float) ($projMatrix->byScTiers($scId)[$tId] ?? 0)
                                     : (float) ($t['montant'] ?? 0);
-                                $sheet->fromArray([$tValues], null, 'A'.$row, strictNullComparison: true);
+                                $sheet->fromArray([$tValues], null, 'A'.$row);
                                 $row++;
                             }
                         }
@@ -760,7 +760,7 @@ final class RapportExportController extends Controller
                         $values[] = ($mode === 'projection' && $projMatrix)
                             ? (float) ($projMatrix->bySc()[$scId] ?? 0)
                             : (float) ($sc['montant'] ?? 0);
-                        $sheet->fromArray([$values], null, 'A'.$row, strictNullComparison: true);
+                        $sheet->fromArray([$values], null, 'A'.$row);
                         if ($parTiers) {
                             $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFont()->setBold(true);
                         }
@@ -785,7 +785,7 @@ final class RapportExportController extends Controller
                     $catValues[] = ($mode === 'projection' && $projMatrix)
                         ? (float) ($projMatrix->byCat()[$catId] ?? 0)
                         : (float) ($cat['montant'] ?? 0);
-                    $sheet->fromArray([$catValues], null, 'A'.$row, strictNullComparison: true);
+                    $sheet->fromArray([$catValues], null, 'A'.$row);
                     $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFont()->setBold(true);
                     $row++;
                 }
@@ -825,7 +825,7 @@ final class RapportExportController extends Controller
                 }
                 $sectionValues[] = $grandTotal;
                 $sectionTotals[$sectionLabel]['_total'] = $grandTotal;
-                $sheet->fromArray([$sectionValues], null, 'A'.$row, strictNullComparison: true);
+                $sheet->fromArray([$sectionValues], null, 'A'.$row);
                 $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFont()->setBold(true);
                 $row++;
                 $row++;
@@ -846,7 +846,7 @@ final class RapportExportController extends Controller
             $recTotal = (float) ($sectionTotals['RECETTES']['_total'] ?? 0.0);
             $depTotal = (float) ($sectionTotals['DÉPENSES']['_total'] ?? 0.0);
             $resultatValues[] = $recTotal - $depTotal;
-            $sheet->fromArray([$resultatValues], null, 'A'.$row, strictNullComparison: true);
+            $sheet->fromArray([$resultatValues], null, 'A'.$row);
             $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFont()->setBold(true);
 
             $firstNumCol = Coordinate::stringFromColumnIndex($labelColCount + 1);
@@ -906,7 +906,7 @@ final class RapportExportController extends Controller
                                 } else {
                                     $sValues[] = (float) ($sc['seances'][$s] ?? 0);
                                 }
-                                $sheet->fromArray([$sValues], null, 'A'.$row, strictNullComparison: true);
+                                $sheet->fromArray([$sValues], null, 'A'.$row);
                                 $row++;
                             }
                         }
@@ -933,7 +933,7 @@ final class RapportExportController extends Controller
                                     }
                                     $tValues[] = (float) ($t['montant'] ?? 0);
                                 }
-                                $sheet->fromArray([$tValues], null, 'A'.$row, strictNullComparison: true);
+                                $sheet->fromArray([$tValues], null, 'A'.$row);
                                 $row++;
                             }
                         }
@@ -963,7 +963,7 @@ final class RapportExportController extends Controller
                             $values[] = $total;
                         }
 
-                        $sheet->fromArray([$values], null, 'A'.$row, strictNullComparison: true);
+                        $sheet->fromArray([$values], null, 'A'.$row);
                         if ($parTiers || $parSeances) {
                             $sheet->getStyle('A'.$row.':'.Coordinate::stringFromColumnIndex(count($values)).$row)->getFont()->setBold(true);
                         }
@@ -996,7 +996,7 @@ final class RapportExportController extends Controller
                         $catValues[] = $catTotal;
                     }
 
-                    $sheet->fromArray([$catValues], null, 'A'.$row, strictNullComparison: true);
+                    $sheet->fromArray([$catValues], null, 'A'.$row);
                     $sheet->getStyle('A'.$row.':'.Coordinate::stringFromColumnIndex(count($catValues)).$row)->getFont()->setBold(true);
                     $row++;
                 }
@@ -1037,7 +1037,7 @@ final class RapportExportController extends Controller
                     $sectionTotals[$sectionLabel]['_total'] = $grandTotal;
                 }
 
-                $sheet->fromArray([$sectionValues], null, 'A'.$row, strictNullComparison: true);
+                $sheet->fromArray([$sectionValues], null, 'A'.$row);
                 $sheet->getStyle('A'.$row.':'.Coordinate::stringFromColumnIndex(count($sectionValues)).$row)->getFont()->setBold(true);
                 $row++;
                 $row++; // blank row between sections
@@ -1061,7 +1061,7 @@ final class RapportExportController extends Controller
             $depTotal = (float) ($sectionTotals['DÉPENSES']['_total'] ?? 0.0);
             $resultatValues[] = $recTotal - $depTotal;
 
-            $sheet->fromArray([$resultatValues], null, 'A'.$row, strictNullComparison: true);
+            $sheet->fromArray([$resultatValues], null, 'A'.$row);
             $sheet->getStyle('A'.$row.':'.Coordinate::stringFromColumnIndex(count($resultatValues)).$row)->getFont()->setBold(true);
             $row++;
 
@@ -1133,7 +1133,7 @@ final class RapportExportController extends Controller
                                     $values[] = (float) ($t['montant'] ?? 0);
                                 }
                             }
-                            $sheet->fromArray([$values], null, 'A'.$row, strictNullComparison: true);
+                            $sheet->fromArray([$values], null, 'A'.$row);
                             $row++;
                         }
                     }
@@ -1162,7 +1162,7 @@ final class RapportExportController extends Controller
                             $values[] = (float) ($sc['montant'] ?? 0);
                         }
                     }
-                    $sheet->fromArray([$values], null, 'A'.$row, strictNullComparison: true);
+                    $sheet->fromArray([$values], null, 'A'.$row);
                     if ($parTiers) {
                         $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFont()->setBold(true);
                     }
@@ -1199,7 +1199,7 @@ final class RapportExportController extends Controller
                         $values[] = (float) ($cat['montant'] ?? 0);
                     }
                 }
-                $sheet->fromArray([$values], null, 'A'.$row, strictNullComparison: true);
+                $sheet->fromArray([$values], null, 'A'.$row);
                 $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFont()->setBold(true);
                 $row++;
             }
@@ -1252,7 +1252,7 @@ final class RapportExportController extends Controller
             }
             $sectionTotals[$sectionLabel] = $secTotal;
 
-            $sheet->fromArray([$secValues], null, 'A'.$row, strictNullComparison: true);
+            $sheet->fromArray([$secValues], null, 'A'.$row);
             $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFont()->setBold(true);
             $row++;
             $row++; // blank row between sections
@@ -1271,7 +1271,7 @@ final class RapportExportController extends Controller
             }
         }
         $resultatValues[] = $recTotal - $depTotal;
-        $sheet->fromArray([$resultatValues], null, 'A'.$row, strictNullComparison: true);
+        $sheet->fromArray([$resultatValues], null, 'A'.$row);
         $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFont()->setBold(true);
         $row++;
 
@@ -1485,7 +1485,7 @@ final class RapportExportController extends Controller
                                 $values = [$type, $famille['famille_nom'], $compte['compte_nom'], $labelAnnee, $labelT];
                                 $appendAxis($values, $vSeancesT, $vOperationsT);
                                 $values[] = $vMontantT;
-                                $sheet->fromArray([$values], null, 'A'.$row, strictNullComparison: true);
+                                $sheet->fromArray([$values], null, 'A'.$row);
                                 $row++;
                             }
                         }
@@ -1496,7 +1496,7 @@ final class RapportExportController extends Controller
                         }
                         $appendAxis($values, $vSeancesEx, $vOperationsEx);
                         $values[] = $vMontantEx;
-                        $sheet->fromArray([$values], null, 'A'.$row, strictNullComparison: true);
+                        $sheet->fromArray([$values], null, 'A'.$row);
                         if ($parTiers) {
                             $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFont()->setBold(true);
                         }
@@ -1512,7 +1512,7 @@ final class RapportExportController extends Controller
                     }
                     $appendAxis($values, $vSeancesSc, $vOperationsSc);
                     $values[] = $vMontantSc;
-                    $sheet->fromArray([$values], null, 'A'.$row, strictNullComparison: true);
+                    $sheet->fromArray([$values], null, 'A'.$row);
                     $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFont()->setBold(true);
                     $row++;
 
@@ -1543,7 +1543,7 @@ final class RapportExportController extends Controller
             }
             $appendAxis($values, $sectionSeanceTotals, $sectionOpTotals);
             $values[] = $grandTotal;
-            $sheet->fromArray([$values], null, 'A'.$row, strictNullComparison: true);
+            $sheet->fromArray([$values], null, 'A'.$row);
             $this->styleTotalXlsx($sheet, 'A'.$row.':'.$lastCol.$row);
             $row++;
             $row++; // ligne vide entre sections
@@ -1567,7 +1567,7 @@ final class RapportExportController extends Controller
             $values[] = '';
         }
         $values[] = $recTotal - $depTotal;
-        $sheet->fromArray([$values], null, 'A'.$row, strictNullComparison: true);
+        $sheet->fromArray([$values], null, 'A'.$row);
         $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFont()->setBold(true);
         $row++;
 
