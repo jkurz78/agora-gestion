@@ -78,21 +78,24 @@ jobs:
   # remplaçant. Verte sur SQLite, rejetée par MySQL (« Cannot drop index …
   # needed in a foreign key constraint »). Elle serait partie en production.
   #
-  # Pourquoi il ne bloque pas (encore)
-  # ----------------------------------
-  # Mesuré le 2026-08-12 : la suite compte ~149 tests qui échouent sur MySQL
-  # alors qu'ils passent sur SQLite, répartis sur une quarantaine de fichiers.
-  # L'échantillonnage montre des divergences de mode strict — données de test qui
-  # dépassent la longueur d'une colonne, valeurs hors énumération — que SQLite
-  # accepte silencieusement. Rendre ce job bloquant aujourd'hui mettrait chaque
-  # push au rouge.
+  # Il bloque, depuis le 2026-09-07 (v5.3.5)
+  # ---------------------------------------
+  # Le cliquet est refermé. Mesuré le 2026-08-12 : ~149 tests échouaient ici en
+  # passant sur SQLite. Repris par vagues en v5.3.5 — numéros de compte trop
+  # longs pour leur colonne, valeurs hors énumération, associations supposées
+  # exister, SQL propre à SQLite dans des tests — la suite est passée de 153
+  # échecs à 0, et ce job est devenu bloquant.
   #
-  # Le cliquet : on corrige ces tests par lots, ce job passe au vert, ET ALORS on
-  # le rend bloquant — en retirant `continue-on-error` et en l'ajoutant au
-  # `needs:` du job `deploy`. Tant que ce n'est pas fait, il sert d'indicateur.
+  # Ce qu'il a rapporté au passage : un 500 en production sur la suppression
+  # d'un virement interne, invisible depuis cinq mois parce que SQLite ne lève
+  # pas sur une colonne inconnue entre guillemets — il la traite comme une
+  # chaîne littérale et rend la condition silencieusement fausse.
+  #
+  # ⚠️ Ne le repasse pas en `continue-on-error` pour débloquer un push. Un échec
+  # ici décrit ce que MariaDB fera en production ; SQLite, lui, ne le dira
+  # jamais.
   test-mysql:
     runs-on: ubuntu-latest
-    continue-on-error: true
 
     services:
       mysql:
@@ -147,7 +150,7 @@ jobs:
 
   deploy:
     runs-on: ubuntu-latest
-    needs: test
+    needs: [test, test-mysql]
 
     steps:
       # ─── Setup: whitelist runner IP on cPanel firewall ────────────────────
