@@ -383,7 +383,7 @@ test('pourReglement — refuse une ligne explicite deja lettree', function () {
     $ligneLettree = $t1->lignes->first(
         fn (TransactionLigne $ligne): bool => $ligne->compte?->numero_pcg === '411'
     );
-    $ligneLettree->update(['lettrage_code' => 'LETTRAGE-DEJA-PRESENT']);
+    $ligneLettree->update(['lettrage_code' => 'DEJA-LETTRE-PRESENT']);
 
     expect(fn () => $this->ecritureGen->pourReglement(
         t1: $t1,

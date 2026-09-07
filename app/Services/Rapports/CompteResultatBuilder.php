@@ -52,21 +52,39 @@ final class CompteResultatBuilder
     }
 
     /**
-     * Somme des budgets des familles d'une section, en distinguant « aucun
-     * budget nulle part dans la section » (null, comme pour une ligne sans
-     * budget individuelle → tiret) de « la section budgète, et ça tombe à
-     * 0 € » (0.0, un vrai total). Collection::sum() ne fait pas cette
-     * différence : sur une collection vide ou entièrement à null, elle rend
-     * 0 — ce qui afficherait un total budget à 0 € (et un écart délirant)
-     * pour une section qui n'a en réalité aucune ligne budgétée.
+     * Somme d'un champ nullable sur les familles d'une section (charges ou
+     * produits), en distinguant « aucune valeur nulle part dans la section »
+     * (null, comme pour une ligne individuelle sans donnée → tiret) de « la
+     * section porte des valeurs, et ça tombe à 0 » (0.0, un vrai total).
+     * Collection::sum() ne fait pas cette différence : sur une collection
+     * vide ou entièrement à null, elle rend 0 — ce qui afficherait un total
+     * à 0 € (et, côté budget, un écart délirant) pour une section qui n'a en
+     * réalité aucune ligne renseignée sur ce champ.
+     *
+     * Généralisée depuis l'ancienne sommeBudgetSection() : le même geste vaut
+     * pour le champ 'budget' (une section sans aucune ligne budgétée) que
+     * pour 'montant_n1' (un exercice N-1 inexistant — le cas réel de la
+     * première année d'une association). Voir RapportExportController et
+     * App\Livewire\RapportCompteResultat.
+     *
+     * @param  array<int, array<string, mixed>>  $categories
+     */
+    public static function sommeSection(array $categories, string $champ): ?float
+    {
+        $valeurs = collect($categories)->pluck($champ)->filter(fn (?float $v): bool => $v !== null);
+
+        return $valeurs->isEmpty() ? null : $valeurs->sum();
+    }
+
+    /**
+     * Alias historique de sommeSection() figé sur le champ 'budget' — conservé
+     * pour ne pas réécrire tous les appelants existants.
      *
      * @param  array<int, array{budget: ?float}>  $categories
      */
     public static function sommeBudgetSection(array $categories): ?float
     {
-        $budgets = collect($categories)->pluck('budget')->filter(fn (?float $b): bool => $b !== null);
-
-        return $budgets->isEmpty() ? null : $budgets->sum();
+        return self::sommeSection($categories, 'budget');
     }
 
     /**
@@ -81,9 +99,12 @@ final class CompteResultatBuilder
      * une charge, tout en ignorant la dotation aux amortissements qui en est
      * la vraie charge, son journal étant `od`.
      *
-     * La période est fournie par l'appelant, et non recalculée ici : le mois de
-     * début d'exercice est un réglage du tenant (ExerciceService::dateRange()),
-     * alors que exerciceDates() de cette classe le fige au 1er septembre.
+     * La période est fournie par l'appelant, et non recalculée ici : c'est
+     * volontaire, pas une limitation — exerciceDates() de cette classe délègue
+     * lui aussi à ExerciceService::dateRange(), qui lit le mois de début
+     * d'exercice comme un réglage du tenant. Le choix vient d'ailleurs : cette
+     * méthode sert des indicateurs de synthèse qui reçoivent déjà leur borne
+     * de période toute faite, pas de raison de la recalculer une seconde fois.
      *
      * @return array{charges: float, produits: float}
      */

@@ -34,7 +34,7 @@ function compte706Jrn(string $suffix = ''): Compte
 {
     return Compte::create([
         'association_id' => TenantContext::currentId(),
-        'numero_pcg' => '706jrn'.$suffix,
+        'numero_pcg' => '706J'.substr($suffix, -5),
         'intitule' => 'Produits journal '.$suffix,
         'classe' => 7,
         'lettrable' => false,
@@ -194,7 +194,7 @@ function creerDetteJrn(float $montant = 200.00): Transaction
     $tiers = tiersJrn();
     $compteCharge = Compte::create([
         'association_id' => TenantContext::currentId(),
-        'numero_pcg' => '607jrn'.uniqid(),
+        'numero_pcg' => '607J'.substr(uniqid(), -5),
         'intitule' => 'Achats journal test',
         'classe' => 6,
         'lettrable' => false,

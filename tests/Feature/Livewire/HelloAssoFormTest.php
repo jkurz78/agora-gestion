@@ -13,11 +13,17 @@ use Livewire\Livewire;
 
 beforeEach(function () {
     // HelloassoForm est hardcodé sur association_id=1 (bug connu, non corrigé ici).
-    // On utilise firstOrCreate pour éviter les conflits de clé unique entre tests.
-    $this->association = Association::firstOrCreate(
-        ['id' => 1],
-        ['nom' => 'Mon Asso', 'slug' => 'mon-asso']
-    );
+    // `id` n'étant pas fillable sur Association, firstOrCreate(['id' => 1], ...)
+    // ne force pas réellement l'id : il est silencieusement ignoré et l'association
+    // est créée avec un id auto-incrémenté quelconque. Sous MySQL/MariaDB (FK
+    // appliquées), les `HelloAssoParametres::create(['association_id' => 1, ...])`
+    // plus bas violent alors la contrainte. On force donc explicitement l'id.
+    $this->association = Association::find(1);
+    if ($this->association === null) {
+        $this->association = new Association;
+        $this->association->id = 1;
+        $this->association->fill(['nom' => 'Mon Asso', 'slug' => 'mon-asso'])->save();
+    }
 
     $this->user = User::factory()->create();
     $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);

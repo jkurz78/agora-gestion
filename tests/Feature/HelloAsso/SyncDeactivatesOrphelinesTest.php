@@ -16,7 +16,7 @@ beforeEach(function (): void {
     ]);
     TenantContext::boot($association);
 
-    $this->parametres = HelloAssoParametres::factory()->create(['association_id' => 1]);
+    $this->parametres = HelloAssoParametres::factory()->create(['association_id' => $association->id]);
     $this->compte = Compte::factory()->pourCotisations()->create();
 });
 

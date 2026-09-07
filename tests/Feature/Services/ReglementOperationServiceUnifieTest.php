@@ -30,6 +30,41 @@ use Tests\Support\CreatesPartieDoubleContext;
 
 uses(CreatesPartieDoubleContext::class);
 
+/**
+ * Pose un trigger sentinelle qui fait échouer la prochaine UPDATE de
+ * mode_paiement sur `transactions` (simule une panne DB au milieu de
+ * marquerRecu, pour prouver que la transaction DB englobante rollback T2 et
+ * le lettrage). Syntaxe de trigger non portable entre moteurs — chaque
+ * branche produit l'équivalent : BEFORE UPDATE OF ... WHEN ... côté SQLite,
+ * BEFORE UPDATE FOR EACH ROW + IF ... SIGNAL côté MySQL/MariaDB.
+ */
+function creerTriggerEchecModeT1(): void
+{
+    if (DB::getDriverName() === 'sqlite') {
+        DB::statement(
+            "CREATE TRIGGER echec_mode_t1
+            BEFORE UPDATE OF mode_paiement ON transactions
+            WHEN OLD.mode_paiement IS NULL AND NEW.mode_paiement IS NOT NULL
+            BEGIN
+                SELECT RAISE(ABORT, 'Échec sentinelle mise à jour mode T1');
+            END"
+        );
+
+        return;
+    }
+
+    DB::unprepared(
+        "CREATE TRIGGER echec_mode_t1
+        BEFORE UPDATE ON transactions
+        FOR EACH ROW
+        BEGIN
+            IF OLD.mode_paiement IS NULL AND NEW.mode_paiement IS NOT NULL THEN
+                SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Échec sentinelle mise à jour mode T1';
+            END IF;
+        END"
+    );
+}
+
 beforeEach(function () {
     $this->setupPartieDoubleContext();
     $this->ecritureGen = app(EcritureGenerator::class);
@@ -427,14 +462,23 @@ test('marquerRecu annule T2 et le lettrage si la mise à jour du mode de T1 éch
         fn (TransactionLigne $ligne): bool => $ligne->compte?->numero_pcg === '411'
     );
     $transactionsAvant = Transaction::count();
-    DB::statement(
-        "CREATE TRIGGER echec_mode_t1
-        BEFORE UPDATE OF mode_paiement ON transactions
-        WHEN OLD.mode_paiement IS NULL AND NEW.mode_paiement IS NOT NULL
-        BEGIN
-            SELECT RAISE(ABORT, 'Échec sentinelle mise à jour mode T1');
-        END"
-    );
+
+    try {
+        creerTriggerEchecModeT1();
+    } catch (QueryException $e) {
+        // Erreur 1419 : certains serveurs MySQL locaux (utilisateur applicatif sans
+        // privilège SUPER + binlog actif) refusent CREATE TRIGGER — restriction de
+        // CET environnement, pas de l'application. Le job CI test-mysql (utilisateur
+        // root sur l'image mysql:8.4 officielle) n'a normalement pas cette restriction.
+        if (str_contains($e->getMessage(), 'SUPER privilege')) {
+            $this->markTestSkipped(
+                'CREATE TRIGGER refusé (erreur 1419 : privilège SUPER manquant + binlog actif) '
+                .'sur ce serveur MySQL local — restriction de l\'environnement, pas de l\'application.'
+            );
+        }
+
+        throw $e;
+    }
 
     try {
         expect(fn () => $this->service->marquerRecu(

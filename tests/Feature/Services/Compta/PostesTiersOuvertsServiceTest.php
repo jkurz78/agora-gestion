@@ -316,7 +316,7 @@ it('restitue une fois chaque reglement et detecte un portage remis non annulable
 
 it('apparie les reglements par compte et code de lettrage en cas de collision 401 411', function (): void {
     $generator = app(EcritureGenerator::class);
-    $banque = compteMetierPostesTiers('512-COLLISION', 5);
+    $banque = compteMetierPostesTiers('512-COLIS', 5);
     $creance = creerCreancePostesTiers(Tiers::factory()->create(), 100.00);
     $dette = creerDettePostesTiers(Tiers::factory()->create(), 45.50);
     $t2Creance = $generator->pourEncaissementCreance(

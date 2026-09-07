@@ -88,9 +88,12 @@ test('unauthenticated user is redirected from operations list', function (): voi
 });
 
 test('unauthenticated user is redirected from operation detail', function (): void {
+    // L'opération est créée pendant que le TenantContext est encore booté :
+    // TypeOperationFactory retombe sur un association_id codé en dur si le
+    // contexte est vidé avant, ce qui viole la FK sous MySQL/MariaDB.
+    $operation = Operation::factory()->create(['association_id' => $this->association->id]);
     TenantContext::clear();
     auth()->logout();
-    $operation = Operation::factory()->create(['association_id' => $this->association->id]);
     $this->get("/operations/{$operation->id}")
         ->assertRedirect('/login');
 });

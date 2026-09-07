@@ -27,7 +27,7 @@ function mdrd_creerTxCheque(object $ctx, float $montant): Transaction
 {
     $tiers = Tiers::factory()->create(['association_id' => TenantContext::currentId()]);
     $compteProduit = Compte::firstOrCreate(
-        ['association_id' => TenantContext::currentId(), 'numero_pcg' => '706_mdrd_'.uniqid()],
+        ['association_id' => TenantContext::currentId(), 'numero_pcg' => '706MD'.substr(uniqid(), -4)],
         [
             'intitule' => 'Produit test découplage',
             'classe' => 7,

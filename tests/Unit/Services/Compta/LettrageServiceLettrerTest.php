@@ -163,7 +163,7 @@ test('amorce la séquence sur les codes déjà présents quand la ligne de séqu
     // le compte mais aucune ligne de séquence n'a jamais été écrite.
     $compte = Compte::create([
         'association_id' => TenantContext::currentId(),
-        'numero_pcg' => '411-REPRISE',
+        'numero_pcg' => '411-REPR',
         'intitule' => 'Clients reprise',
         'classe' => 4,
         'lettrable' => true,
@@ -210,7 +210,7 @@ test('amorce la séquence sur les codes déjà présents quand la ligne de séqu
 test('ne rescanne pas les codes du compte une fois la séquence amorcée', function () {
     $compte = Compte::create([
         'association_id' => TenantContext::currentId(),
-        'numero_pcg' => '411-NORESCAN',
+        'numero_pcg' => '411-NORES',
         'intitule' => 'Clients sans rescan',
         'classe' => 4,
         'lettrable' => true,

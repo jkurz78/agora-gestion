@@ -191,7 +191,7 @@ it('n\'expose pas le mot opération sur le dashboard même avec un token actif s
         'tiers_id' => $tiers->id,
         'operation_id' => $op->id,
     ]);
-    tdb_makeToken($asso, $participant, 'TDB5-VOCAB');
+    tdb_makeToken($asso, $participant, 'TDB5-VOCA');
 
     $this->get("/{$asso->slug}/portail/")
         ->assertStatus(200)

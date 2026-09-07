@@ -318,6 +318,14 @@ test('[D] backfill sans dry-run → toutes Tx equilibree=TRUE, lignes cohérente
 test('[E] re-run immédiat → 0 transaction convertie (idempotence)', function () {
     setupBackfillFixtureStep33Legacy($this);
 
+    // transaction_lignes n'a pas de colonne association_id (scope dérivé de sa
+    // transaction parente via TransactionLigneTenantScope) : on filtre par
+    // transaction_id, comme le reste de ce fichier (voir tests [B]/[F]).
+    $txIds = Transaction::query()
+        ->where('association_id', $this->association->id)
+        ->pluck('id')
+        ->all();
+
     // 1er run
     $this->artisan('compta:backfill-partie-double', [
         '--exercice' => '2025',
@@ -326,7 +334,7 @@ test('[E] re-run immédiat → 0 transaction convertie (idempotence)', function 
 
     // Snapshot après 1er run
     $snapshotApres1 = DB::table('transaction_lignes')
-        ->where('association_id', $this->association->id)
+        ->whereIn('transaction_id', $txIds)
         ->orderBy('id')
         ->get(['id', 'compte_id', 'debit', 'credit', 'tiers_id', 'lettrage_code'])
         ->toArray();
@@ -338,7 +346,7 @@ test('[E] re-run immédiat → 0 transaction convertie (idempotence)', function 
     ])->assertSuccessful();
 
     $snapshotApres2 = DB::table('transaction_lignes')
-        ->where('association_id', $this->association->id)
+        ->whereIn('transaction_id', $txIds)
         ->orderBy('id')
         ->get(['id', 'compte_id', 'debit', 'credit', 'tiers_id', 'lettrage_code'])
         ->toArray();

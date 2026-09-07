@@ -138,7 +138,7 @@ it('lettre le descendant AN d une dette 401 reglee en N plus 1', function (): vo
 it('ne reprend plus en N plus 2 un reliquat AN réglé en N plus 1', function (): void {
     Exercice::create(['annee' => 2026, 'statut' => StatutExercice::Ouvert]);
     $tiers = Tiers::factory()->create();
-    $produit = compteReportAN('706-RELIQUAT', 7);
+    $produit = compteReportAN('706-RELIQ', 7);
     $compteBancaire = CompteBancaire::factory()->create([
         'iban' => 'FR7612345000012345678901234',
     ]);

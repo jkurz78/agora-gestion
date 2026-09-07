@@ -204,7 +204,7 @@ it('préserve le mode et le statut d’une transaction HelloAsso lors d’une sa
         'montant' => '100.00',
         'notes' => null,
     ]]);
-    $transaction->update(['helloasso_order_id' => 'order-review-task-9']);
+    $transaction->update(['helloasso_order_id' => 9]);
     $nombreT2Avant = Transaction::query()
         ->where('journal', JournalComptable::Banque->value)
         ->count();

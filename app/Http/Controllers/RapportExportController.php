@@ -182,10 +182,15 @@ final class RapportExportController extends Controller
 
         $totalChargesN = collect($data['charges'])->sum('montant_n');
         $totalProduitsN = collect($data['produits'])->sum('montant_n');
-        $totalChargesN1 = collect($data['charges'])->sum('montant_n1');
-        $totalProduitsN1 = collect($data['produits'])->sum('montant_n1');
+        $totalChargesN1 = CompteResultatBuilder::sommeSection($data['charges'], 'montant_n1');
+        $totalProduitsN1 = CompteResultatBuilder::sommeSection($data['produits'], 'montant_n1');
         $resultatCourant = (float) $totalProduitsN - (float) $totalChargesN;
-        $resultatCourantN1 = (float) $totalProduitsN1 - (float) $totalChargesN1;
+        // Même règle que $resultatBudget plus bas : null seulement si NI les
+        // charges NI les produits N-1 n'ont de donnée (première année d'une
+        // association) ; si une seule section en a, l'autre compte pour zéro.
+        $resultatCourantN1 = ($totalChargesN1 === null && $totalProduitsN1 === null)
+            ? null
+            : ($totalProduitsN1 ?? 0.0) - ($totalChargesN1 ?? 0.0);
         $totalChargesBudget = CompteResultatBuilder::sommeBudgetSection($data['charges']);
         $totalProduitsBudget = CompteResultatBuilder::sommeBudgetSection($data['produits']);
         // Voir App\Livewire\RapportCompteResultat::render() : même règle null/0.0.
@@ -220,7 +225,7 @@ final class RapportExportController extends Controller
                         (float) $sc['montant_n'],
                         $sc['budget'] !== null ? (float) $sc['budget'] : null,
                         $ecart,
-                    ]], null, 'A'.$row);
+                    ]], null, 'A'.$row, strictNullComparison: true);
                     $row++;
                 }
                 // Category subtotal
@@ -232,7 +237,7 @@ final class RapportExportController extends Controller
                     (float) $cat['montant_n'],
                     $cat['budget'] !== null ? (float) $cat['budget'] : null,
                     $cat['budget'] !== null ? ComparaisonBudgetaire::ecart((float) $cat['budget'], (float) $cat['montant_n']) : null,
-                ]], null, 'A'.$row);
+                ]], null, 'A'.$row, strictNullComparison: true);
                 $sheet->getStyle('A'.$row.':G'.$row)->getFont()->setBold(true);
                 $row++;
             }
@@ -250,7 +255,7 @@ final class RapportExportController extends Controller
             $resultatCourant,
             $resultatBudget,
             $resultatEcart,
-        ]], null, 'A'.$row);
+        ]], null, 'A'.$row, strictNullComparison: true);
         $sheet->getStyle('A'.$row.':G'.$row)->getFont()->setBold(true);
         $row++;
 
@@ -310,14 +315,14 @@ final class RapportExportController extends Controller
         $row = $headerRow + 1;
 
         foreach ($balance['lignes'] as $ligne) {
-            $sheet->fromArray([$this->balanceRow($ligne, $params['colonnes'])], null, 'A'.$row);
+            $sheet->fromArray([$this->balanceRow($ligne, $params['colonnes'])], null, 'A'.$row, strictNullComparison: true);
             $sheet->setCellValueExplicit('A'.$row, (string) $ligne['numero_compte'], DataType::TYPE_STRING);
             $row++;
         }
 
         if ($balance['lignes'] !== []) {
             $totalRow = $this->balanceTotalRow($balance, $params['colonnes']);
-            $sheet->fromArray([$totalRow], null, 'A'.$row);
+            $sheet->fromArray([$totalRow], null, 'A'.$row, strictNullComparison: true);
             $sheet->getStyle('A'.$row.':'.$lastCol.$row)->applyFromArray([
                 'font' => [
                     'bold' => true,
@@ -381,7 +386,7 @@ final class RapportExportController extends Controller
                 $compte['tiers'],
                 null, null, null, 'Solde ouverture', null, null, null, null,
                 $this->euros((int) $compte['solde_ouverture_centimes']),
-            ]], null, 'A'.$row);
+            ]], null, 'A'.$row, strictNullComparison: true);
             $sheet->setCellValueExplicit('A'.$row, (string) $compte['numero_compte'], DataType::TYPE_STRING);
             $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFont()->setBold(true);
             $row++;
@@ -400,7 +405,7 @@ final class RapportExportController extends Controller
                     $this->euros((int) $ligne['debit_centimes']),
                     $this->euros((int) $ligne['credit_centimes']),
                     $this->euros((int) $ligne['solde_progressif_centimes']),
-                ]], null, 'A'.$row);
+                ]], null, 'A'.$row, strictNullComparison: true);
                 $sheet->setCellValueExplicit('A'.$row, (string) $compte['numero_compte'], DataType::TYPE_STRING);
                 $row++;
             }
@@ -413,7 +418,7 @@ final class RapportExportController extends Controller
                 $this->euros((int) $compte['mouvement_debit_centimes']),
                 $this->euros((int) $compte['mouvement_credit_centimes']),
                 $this->euros((int) $compte['solde_fin_centimes']),
-            ]], null, 'A'.$row);
+            ]], null, 'A'.$row, strictNullComparison: true);
             $sheet->setCellValueExplicit('A'.$row, (string) $compte['numero_compte'], DataType::TYPE_STRING);
             $this->styleTotalXlsx($sheet, 'A'.$row.':'.$lastCol.$row);
             $row++;
@@ -479,7 +484,7 @@ final class RapportExportController extends Controller
                         $ligne['lettrage_code'],
                         $this->euros((int) $ligne['debit_centimes']),
                         $this->euros((int) $ligne['credit_centimes']),
-                    ]], null, 'A'.$row);
+                    ]], null, 'A'.$row, strictNullComparison: true);
                     $sheet->setCellValueExplicit('E'.$row, (string) $ligne['numero_compte'], DataType::TYPE_STRING);
                     $row++;
                 }
@@ -490,7 +495,7 @@ final class RapportExportController extends Controller
                 null, null, null, null, null, null, null, null,
                 $this->euros((int) $bloc['debit_centimes']),
                 $this->euros((int) $bloc['credit_centimes']),
-            ]], null, 'A'.$row);
+            ]], null, 'A'.$row, strictNullComparison: true);
             $this->styleTotalXlsx($sheet, 'A'.$row.':'.$lastCol.$row);
             $row++;
         }
@@ -501,7 +506,7 @@ final class RapportExportController extends Controller
                 null, null, null, null, null, null, null, null,
                 $this->euros((int) $resultat['totaux']['debit_centimes']),
                 $this->euros((int) $resultat['totaux']['credit_centimes']),
-            ]], null, 'A'.$row);
+            ]], null, 'A'.$row, strictNullComparison: true);
             $this->styleTotalXlsx($sheet, 'A'.$row.':'.$lastCol.$row);
             $row++;
         }
@@ -1589,17 +1594,17 @@ final class RapportExportController extends Controller
         $sheet->getStyle('A1:E1')->getFont()->setBold(true);
         $row++;
 
-        $sheet->fromArray([['Solde ouverture', null, null, null, $data['synthese']['solde_ouverture']]], null, 'A'.$row);
+        $sheet->fromArray([['Solde ouverture', null, null, null, $data['synthese']['solde_ouverture']]], null, 'A'.$row, strictNullComparison: true);
         $sheet->getStyle('A'.$row.':E'.$row)->getFont()->setBold(true);
         $row++;
 
         foreach ($data['mensuel'] as $m) {
-            $sheet->fromArray([[$m['mois'], $m['recettes'], $m['depenses'], $m['solde'], $m['cumul']]], null, 'A'.$row);
+            $sheet->fromArray([[$m['mois'], $m['recettes'], $m['depenses'], $m['solde'], $m['cumul']]], null, 'A'.$row, strictNullComparison: true);
             $row++;
         }
 
         // Totaux
-        $sheet->fromArray([['TOTAL', $data['synthese']['total_recettes'], $data['synthese']['total_depenses'], $data['synthese']['variation'], $data['synthese']['solde_theorique']]], null, 'A'.$row);
+        $sheet->fromArray([['TOTAL', $data['synthese']['total_recettes'], $data['synthese']['total_depenses'], $data['synthese']['variation'], $data['synthese']['solde_theorique']]], null, 'A'.$row, strictNullComparison: true);
         $sheet->getStyle('A'.$row.':E'.$row)->getFont()->setBold(true);
         $sheet->getStyle('B2:E'.$row)->getNumberFormat()->setFormatCode('#,##0.00');
 
@@ -1845,7 +1850,7 @@ final class RapportExportController extends Controller
                 $ligne['dotation_centimes'] / 100,
                 $ligne['cumul_centimes'] / 100,
                 $ligne['vnc_centimes'] / 100,
-            ]], null, 'A'.$row);
+            ]], null, 'A'.$row, strictNullComparison: true);
             $row++;
         }
 
@@ -1855,7 +1860,7 @@ final class RapportExportController extends Controller
             $livre['totaux']['dotation'] / 100,
             $livre['totaux']['cumul'] / 100,
             $livre['totaux']['vnc'] / 100,
-        ]], null, 'A'.$row);
+        ]], null, 'A'.$row, strictNullComparison: true);
         $sheet->getStyle('A'.$row.':K'.$row)->getFont()->setBold(true);
 
         $sheet->getStyle('H2:K'.$row)->getNumberFormat()->setFormatCode('#,##0.00');
@@ -1899,7 +1904,7 @@ final class RapportExportController extends Controller
 
         $row = 2;
         foreach ($data as $entry) {
-            $sheet->fromArray([array_values($entry)], null, 'A'.$row);
+            $sheet->fromArray([array_values($entry)], null, 'A'.$row, strictNullComparison: true);
             $row++;
         }
 
@@ -1981,10 +1986,14 @@ final class RapportExportController extends Controller
         $data = $rapportService->compteDeResultat($exercice);
         $totalChargesN = collect($data['charges'])->sum('montant_n');
         $totalProduitsN = collect($data['produits'])->sum('montant_n');
-        $totalChargesN1 = collect($data['charges'])->sum('montant_n1');
-        $totalProduitsN1 = collect($data['produits'])->sum('montant_n1');
+        $totalChargesN1 = CompteResultatBuilder::sommeSection($data['charges'], 'montant_n1');
+        $totalProduitsN1 = CompteResultatBuilder::sommeSection($data['produits'], 'montant_n1');
         $resultatCourant = $totalProduitsN - $totalChargesN;
-        $resultatCourantN1 = $totalProduitsN1 - $totalChargesN1;
+        // Voir App\Livewire\RapportCompteResultat::render() : même règle null/0.0
+        // que $resultatBudget ci-dessous, appliquée ici au N-1.
+        $resultatCourantN1 = ($totalChargesN1 === null && $totalProduitsN1 === null)
+            ? null
+            : ($totalProduitsN1 ?? 0.0) - ($totalChargesN1 ?? 0.0);
         $totalChargesBudget = CompteResultatBuilder::sommeBudgetSection($data['charges']);
         $totalProduitsBudget = CompteResultatBuilder::sommeBudgetSection($data['produits']);
         // Voir App\Livewire\RapportCompteResultat::render() : même règle null/0.0.

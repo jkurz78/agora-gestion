@@ -15,6 +15,7 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\TransactionLigneAffectation;
+use App\Models\TypeOperation;
 use App\Models\User;
 use App\Services\Rapports\OperationsEligiblesQuery;
 use App\Tenant\TenantContext;
@@ -456,4 +457,122 @@ it('normaliser propage le drapeau budget à pourExercice', function () {
 
     expect($this->query->normaliser([(string) $op->id], 2025))->toBe([])
         ->and($this->query->normaliser([(string) $op->id], 2025, avecBudget: true))->toBe([(int) $op->id]);
+});
+
+// ── Filtres tenant table par table — previsionsCharges() / previsionsProduits() ──
+//
+// Chaque test ci-dessous ne déplace qu'UNE table vers un autre tenant, toutes
+// les autres restant correctement scopées : sans le filtre visé, la ligne est
+// atteignable par la jointure et rendrait l'opération éligible ; avec, seul ce
+// filtre l'arrête. Un test qui basculerait tout le montage chez l'autre tenant
+// ne prouverait rien (la jointure échouerait de toute façon pour une raison
+// sans rapport) — voir les tests « isole le filtre sur o/bl/c » ci-dessus pour
+// ventilationsBudgetaires(), dont ceux-ci reprennent la forme.
+
+it('isole le filtre sur cpt dans previsionsCharges (prévision sur un compte d\'un autre tenant)', function () {
+    $op = operationTest('Prévision charge compte étranger');
+    $autre = Association::factory()->create();
+    $compteAutre = Compte::create([
+        'association_id' => $autre->id, 'numero_pcg' => '606', 'intitule' => 'Achats étrangers',
+        'classe' => 6, 'lettrable' => false, 'actif' => true, 'est_systeme' => false, 'pour_inscriptions' => false,
+    ]);
+    // ep et o (via operationTest()/le compte_id passé) sont du tenant courant :
+    // seul cpt (le compte) bascule chez l'autre association.
+    eligPrevisionCharge((int) $op->id, (int) $compteAutre->id, '2025-10-01');
+
+    expect($this->query->pourExercice(2025, avecPrevisions: true))->toBe([]);
+});
+
+it('isole le filtre sur s dans previsionsCharges (prévision sur une séance d\'un autre tenant)', function () {
+    $op = operationTest('Prévision charge séance étrangère');
+    $autre = Association::factory()->create();
+    $seanceAutre = Seance::create([
+        'association_id' => $autre->id,
+        'operation_id' => $op->id,
+        'numero' => 1,
+        'date' => '2025-10-01',
+    ]);
+    // ep, o et cpt sont du tenant courant : seule la séance bascule.
+    EncadrementPrevision::create([
+        'operation_id' => $op->id,
+        'tiers_id' => Tiers::factory()->create()->id,
+        'compte_id' => $this->compte606->id,
+        'seance_id' => $seanceAutre->id,
+        'montant_prevu' => 100.0,
+    ]);
+
+    expect($this->query->pourExercice(2025, avecPrevisions: true))->toBe([]);
+});
+
+it('isole le filtre sur p dans previsionsProduits (règlement d\'un participant d\'un autre tenant)', function () {
+    $op = operationTest('Prévision produit participant étranger');
+    $autre = Association::factory()->create();
+    // op, la séance et le compte (via le type_operation par défaut, classe 7)
+    // sont du tenant courant : seul le participant bascule chez l'autre.
+    $participantAutre = Participant::factory()->create([
+        'association_id' => $autre->id,
+        'operation_id' => $op->id,
+    ]);
+    $seance = Seance::create([
+        'operation_id' => $op->id,
+        'numero' => 1,
+        'date' => '2025-10-01',
+    ]);
+    Reglement::create([
+        'participant_id' => $participantAutre->id,
+        'seance_id' => $seance->id,
+        'montant_prevu' => 100.0,
+    ]);
+
+    expect($this->query->pourExercice(2025, avecPrevisions: true))->toBe([]);
+});
+
+it('isole le filtre sur to_ dans previsionsProduits (type d\'opération d\'un autre tenant)', function () {
+    $autre = Association::factory()->create();
+    // Le compte de ventilation (classe 7) reste celui du tenant courant : seul
+    // le type_operation référencé par l'opération bascule chez l'autre.
+    $typeOpAutre = TypeOperation::factory()->create([
+        'association_id' => $autre->id,
+        'compte_id' => $this->compte706->id,
+    ]);
+    $op = Operation::factory()->create(['type_operation_id' => $typeOpAutre->id]);
+    eligPrevisionProduit((int) $op->id, '2025-10-01');
+
+    expect($this->query->pourExercice(2025, avecPrevisions: true))->toBe([]);
+});
+
+it('isole le filtre sur cpt dans previsionsProduits (compte d\'un autre tenant référencé par le type d\'opération)', function () {
+    $autre = Association::factory()->create();
+    $compteAutre = Compte::create([
+        'association_id' => $autre->id, 'numero_pcg' => '706', 'intitule' => 'Prestations étrangères',
+        'classe' => 7, 'lettrable' => false, 'actif' => true, 'est_systeme' => false, 'pour_inscriptions' => false,
+    ]);
+    // Le type_operation lui-même reste du tenant courant : seul le compte
+    // qu'il référence bascule chez l'autre.
+    $typeOp = TypeOperation::factory()->create(['compte_id' => $compteAutre->id]);
+    $op = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+    eligPrevisionProduit((int) $op->id, '2025-10-01');
+
+    expect($this->query->pourExercice(2025, avecPrevisions: true))->toBe([]);
+});
+
+it('isole le filtre sur s dans previsionsProduits (règlement sur une séance d\'un autre tenant)', function () {
+    $op = operationTest('Prévision produit séance étrangère');
+    $autre = Association::factory()->create();
+    // op, le participant et le compte (via le type_operation par défaut) sont
+    // du tenant courant : seule la séance bascule chez l'autre.
+    $participant = Participant::factory()->create(['operation_id' => $op->id]);
+    $seanceAutre = Seance::create([
+        'association_id' => $autre->id,
+        'operation_id' => $op->id,
+        'numero' => 1,
+        'date' => '2025-10-01',
+    ]);
+    Reglement::create([
+        'participant_id' => $participant->id,
+        'seance_id' => $seanceAutre->id,
+        'montant_prevu' => 100.0,
+    ]);
+
+    expect($this->query->pourExercice(2025, avecPrevisions: true))->toBe([]);
 });

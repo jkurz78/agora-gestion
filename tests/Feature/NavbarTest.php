@@ -45,17 +45,24 @@ it('page title is updated', function () {
 });
 
 it('login page shows product logo and app name', function () {
+    // Une 2e association casse le mode mono-association (Association::count() === 1) :
+    // sinon MonoAssociationResolver re-boote automatiquement le TenantContext sur
+    // l'unique association du système, même sur la route publique /login, et la
+    // page affiche alors légitimement son branding (comportement mono voulu).
+    Association::factory()->create();
     TenantContext::clear();
     auth()->logout();
     $response = $this->get('/login');
 
-    // /login is a public route with no tenant context: product branding only.
+    // /login est une route publique sans tenant context (hors mode mono) : branding produit uniquement.
     $response->assertDontSee('Mon Association');
     $response->assertSee('images/agora-gestion.svg', false);
     $response->assertSee('AgoraGestion', false);
 });
 
 it('login page title shows product name', function () {
+    // Cf. commentaire ci-dessus : casse le mode mono-association.
+    Association::factory()->create();
     TenantContext::clear();
     auth()->logout();
     $response = $this->get('/login');

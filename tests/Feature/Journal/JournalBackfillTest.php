@@ -33,11 +33,25 @@ function compteClasseJournalBf(int $classe, string $suffix = ''): Compte
 
 /**
  * Force journal à NULL sur une transaction (simule l'état pré-backfill).
+ *
+ * SQLite uniquement : `transactions.journal` est nullable dans son schéma
+ * jusqu'à cette simulation. Sur MySQL/MariaDB, la migration
+ * 2026_06_01_000002_backfill_journal_in_transactions passe déjà la colonne
+ * NOT NULL (comme en prod) avant qu'aucun test ne s'exécute — le
+ * schema dump (database/schema/mysql-schema.sql) la bake même NOT NULL dès
+ * le départ. Il n'existe donc aucun moyen d'obtenir une ligne journal IS NULL
+ * sur MySQL sans ALTER TABLE le temps du test (DDL = commit implicite qui
+ * casserait l'isolation par transaction de RefreshDatabase). Voir le skip()
+ * sur chaque test de ce fichier.
  */
 function forceJournalNull(Transaction $tx): void
 {
     DB::table('transactions')->where('id', $tx->id)->update(['journal' => null]);
 }
+
+const JOURNAL_BACKFILL_SKIP_RAISON = 'JournalBackfiller simule un état pré-migration (journal IS NULL) devenu '
+    .'irreproductible sur MySQL/MariaDB : la colonne y est NOT NULL comme en prod '
+    .'(migration 2026_06_01_000002), et le schema dump mysql-schema.sql la bake ainsi dès le départ.';
 
 // ---------------------------------------------------------------------------
 // Backfill rule tests
@@ -69,7 +83,7 @@ it('[BF1] recette avec ligne classe 7 (+ ligne classe 4) → journal=vente', fun
 
     $journal = DB::table('transactions')->where('id', $tx->id)->value('journal');
     expect($journal)->toBe(JournalComptable::Vente->value);
-});
+})->skip(fn () => DB::getDriverName() !== 'sqlite', JOURNAL_BACKFILL_SKIP_RAISON);
 
 it('[BF2] dépense avec ligne classe 6 (+ ligne classe 4) → journal=achat', function () {
     $compte6 = compteClasseJournalBf(6, 'b');
@@ -97,7 +111,7 @@ it('[BF2] dépense avec ligne classe 6 (+ ligne classe 4) → journal=achat', fu
 
     $journal = DB::table('transactions')->where('id', $tx->id)->value('journal');
     expect($journal)->toBe(JournalComptable::Achat->value);
-});
+})->skip(fn () => DB::getDriverName() !== 'sqlite', JOURNAL_BACKFILL_SKIP_RAISON);
 
 it('[BF3] recette avec uniquement des lignes classe 5 → journal=banque', function () {
     $compte5 = compteClasseJournalBf(5, 'c');
@@ -117,7 +131,7 @@ it('[BF3] recette avec uniquement des lignes classe 5 → journal=banque', funct
 
     $journal = DB::table('transactions')->where('id', $tx->id)->value('journal');
     expect($journal)->toBe(JournalComptable::Banque->value);
-});
+})->skip(fn () => DB::getDriverName() !== 'sqlite', JOURNAL_BACKFILL_SKIP_RAISON);
 
 it('[BF-fallback] transaction sans aucune ligne → journal=banque (passe 2)', function () {
     // Transaction sans transaction_lignes — simule un enregistrement orphelin ou en cours de création
@@ -130,7 +144,7 @@ it('[BF-fallback] transaction sans aucune ligne → journal=banque (passe 2)', f
 
     $journal = DB::table('transactions')->where('id', $tx->id)->value('journal');
     expect($journal)->toBe(JournalComptable::Banque->value, 'Sans lignes, la passe 2 doit attribuer journal=banque');
-});
+})->skip(fn () => DB::getDriverName() !== 'sqlite', JOURNAL_BACKFILL_SKIP_RAISON);
 
 it('[BF4] idempotence — deuxième appel ne modifie pas les journaux déjà renseignés', function () {
     $compte7 = compteClasseJournalBf(7, 'd');
@@ -187,4 +201,4 @@ it('[BF4] idempotence — deuxième appel ne modifie pas les journaux déjà ren
     expect(DB::table('transactions')->where('id', $tx1->id)->value('journal'))->toBe(JournalComptable::Vente->value);
     expect(DB::table('transactions')->where('id', $tx2->id)->value('journal'))->toBe(JournalComptable::Achat->value);
     expect(DB::table('transactions')->where('id', $tx3->id)->value('journal'))->toBe(JournalComptable::Banque->value);
-});
+})->skip(fn () => DB::getDriverName() !== 'sqlite', JOURNAL_BACKFILL_SKIP_RAISON);

@@ -42,8 +42,8 @@ final class RapportCompteResultat extends Component
 
         $totalChargesN = collect($data['charges'])->sum('montant_n');
         $totalProduitsN = collect($data['produits'])->sum('montant_n');
-        $totalChargesN1 = collect($data['charges'])->sum('montant_n1');
-        $totalProduitsN1 = collect($data['produits'])->sum('montant_n1');
+        $totalChargesN1 = CompteResultatBuilder::sommeSection($data['charges'], 'montant_n1');
+        $totalProduitsN1 = CompteResultatBuilder::sommeSection($data['produits'], 'montant_n1');
         // Total budget de la ligne TOTAL DEPENSES/RECETTES : somme des budgets
         // des familles de $data['charges']/$data['produits'], EXACTEMENT la
         // même collection que celle parcourue par la vue pour afficher les
@@ -61,7 +61,13 @@ final class RapportCompteResultat extends Component
         $totalChargesBudget = CompteResultatBuilder::sommeBudgetSection($data['charges']);
         $totalProduitsBudget = CompteResultatBuilder::sommeBudgetSection($data['produits']);
         $resultatCourant = $totalProduitsN - $totalChargesN;
-        $resultatCourantN1 = $totalProduitsN1 - $totalChargesN1;
+        // Même règle null/0.0 que $resultatBudget ci-dessous, appliquée au
+        // N-1 : null seulement si NI les charges NI les produits N-1 n'ont de
+        // donnée (première année d'une association, aucun exercice N-1) ; si
+        // une seule section en a, l'autre compte pour zéro.
+        $resultatCourantN1 = ($totalChargesN1 === null && $totalProduitsN1 === null)
+            ? null
+            : ($totalProduitsN1 ?? 0.0) - ($totalChargesN1 ?? 0.0);
         // Budget du résultat = budget des produits - budget des charges. null
         // seulement si AUCUNE des deux sections n'a de budget ; si une seule en
         // a un, l'autre compte pour zéro — sinon un budget posé sur les seules

@@ -439,7 +439,7 @@ describe('Multi-tenant : un devis d\'une autre association lève une exception',
         $autreUser = User::factory()->create();
         $autreTiers = Tiers::withoutGlobalScopes()->create([
             'association_id' => $autreAssociation->id,
-            'type' => 'structure',
+            'type' => 'entreprise',
             'nom' => 'Autre Tiers',
             'pour_depenses' => false,
             'pour_recettes' => true,

@@ -169,6 +169,8 @@ final class OperationsEligiblesQuery
             ->whereIn('cpt.classe', [6, 7])
             ->whereNull('o.deleted_at')
             ->where('ep.association_id', $tenantId)
+            ->where('cpt.association_id', $tenantId)
+            ->where('s.association_id', $tenantId)
             ->where('o.association_id', $tenantId)
             ->where(function (Builder $query) use ($start, $end): void {
                 $query->whereNull('s.date')
@@ -193,7 +195,11 @@ final class OperationsEligiblesQuery
             ->whereIn('cpt.classe', [6, 7])
             ->where('r.montant_prevu', '>', 0)
             ->whereNull('op.deleted_at')
+            ->where('p.association_id', $tenantId)
             ->where('op.association_id', $tenantId)
+            ->where('to_.association_id', $tenantId)
+            ->where('cpt.association_id', $tenantId)
+            ->where('s.association_id', $tenantId)
             ->where(function (Builder $query) use ($start, $end): void {
                 $query->whereNull('s.date')
                     ->orWhereBetween('s.date', [$start, $end]);
@@ -207,11 +213,11 @@ final class OperationsEligiblesQuery
      * ou 7 — même CRITÈRE de classe que previsionsCharges()/previsionsProduits(),
      * pour ne pas diverger de la lecture faite une fois l'opération retenue.
      * Ce n'est qu'une parenté de critère, pas de forme : previsionsCharges()
-     * ne filtre le tenant que sur `ep` et `o`, previsionsProduits() que sur
-     * `op` — ni l'une ni l'autre ne scope sa table de comptes (`cpt`) ni
-     * `seances` (`s`). Le filtre tenant sur `c` ci-dessous va délibérément
-     * plus loin que ces deux branches sœurs ; ce n'est pas un alignement,
-     * c'est un choix propre à cette branche.
+     * et previsionsProduits() posent elles aussi un filtre tenant sur chacune
+     * de leurs tables tenant-scopées (`reglements` excepté — cette table n'a
+     * pas de colonne `association_id`, son scope dérive de son parent). Le
+     * filtre tenant sur `c` ci-dessous suit donc la même discipline que ses
+     * deux branches sœurs, pas une exception.
      *
      * Rattachement par la COLONNE `exercice` de la ligne, jamais par des dates :
      * une ligne de budget porte son exercice explicitement, c'est tout l'intérêt

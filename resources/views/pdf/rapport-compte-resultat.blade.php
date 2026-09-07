@@ -79,7 +79,7 @@
             <tr class="cr-total">
                 <td colspan="2">TOTAL {{ $section['label'] }}</td>
                 @if($compareN1)
-                <td class="text-right">{{ number_format($section['totalN1'], 2, ',', ' ') }} €</td>
+                <td class="text-right">{!! $fmt($section['totalN1']) !!}</td>
                 @endif
                 <td class="text-right">{{ number_format($section['total'], 2, ',', ' ') }} €</td>
                 @if($compareBudget)
@@ -97,7 +97,7 @@
             <tr style="background:{{ $resultatColor }};color:#fff;font-weight:700;font-size:13px;">
                 <td colspan="2" style="padding:8px 10px;">RÉSULTAT</td>
                 @if($compareN1)
-                <td class="text-right" style="width:90px;padding:8px 10px;color:rgba(255,255,255,.6);">{{ $resultatCourantN1 != 0 ? number_format($resultatCourantN1, 2, ',', ' ').' €' : '—' }}</td>
+                <td class="text-right" style="width:90px;padding:8px 10px;color:rgba(255,255,255,.6);">{{ $resultatCourantN1 !== null ? number_format($resultatCourantN1, 2, ',', ' ').' €' : '—' }}</td>
                 @endif
                 <td class="text-right" style="width:90px;padding:8px 10px;">{{ number_format($resultatCourant, 2, ',', ' ') }} €</td>
                 @if($compareBudget)

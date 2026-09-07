@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Association;
+use App\Models\Compte;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -15,9 +16,9 @@ it('crée une séquence de lettrage unique par tenant et compte', function (): v
     ]))->toBeTrue();
 
     $association = Association::firstOrFail();
-    $compteId = DB::table('comptes')
-        ->where('association_id', (int) $association->id)
-        ->value('id');
+    // Le compte doit réellement exister : lettrage_sequences.compte_id porte
+    // une FK vers comptes, que SQLite n'applique pas mais que MySQL/MariaDB si.
+    $compteId = Compte::factory()->create(['association_id' => $association->id])->id;
 
     DB::table('lettrage_sequences')->insert([
         'association_id' => (int) $association->id,

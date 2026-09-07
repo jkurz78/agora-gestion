@@ -15,6 +15,72 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Symfony\Component\Yaml\Yaml;
 
+/**
+ * Désactive/réactive les contraintes FK le temps d'un DELETE manuel multi-tables.
+ * Session variable côté MySQL/MariaDB (pas de DDL, aucun risque de commit
+ * implicite dans la transaction de RefreshDatabase) ; PRAGMA côté SQLite.
+ * Même arbitrage que App\Support\Demo\SnapshotLoader::disableForeignKeys().
+ */
+function toggleForeignKeysDemoTest(bool $enabled): void
+{
+    if (DB::getDriverName() === 'sqlite') {
+        DB::statement('PRAGMA foreign_keys = '.($enabled ? 'ON' : 'OFF'));
+
+        return;
+    }
+
+    DB::statement('SET FOREIGN_KEY_CHECKS='.($enabled ? '1' : '0'));
+}
+
+/**
+ * Vérifie qu'aucune ligne ne pointe vers une clé étrangère orpheline.
+ * PRAGMA foreign_key_check côté SQLite ; côté MySQL/MariaDB, ré-implémente le
+ * même contrôle de façon portable via information_schema (SET
+ * FOREIGN_KEY_CHECKS=1 ne revalide pas les lignes déjà en place).
+ */
+function assertNoForeignKeyViolationsDemoTest(): void
+{
+    if (DB::getDriverName() === 'sqlite') {
+        expect(DB::select('PRAGMA foreign_key_check'))->toBe([]);
+
+        return;
+    }
+
+    // Alias explicitement en minuscules : ce serveur MySQL renvoie les noms de
+    // colonnes de INFORMATION_SCHEMA en MAJUSCULES (TABLE_NAME, ...) par défaut.
+    $foreignKeys = DB::select(<<<'SQL'
+        SELECT
+            table_name AS table_name,
+            column_name AS column_name,
+            referenced_table_name AS referenced_table_name,
+            referenced_column_name AS referenced_column_name
+        FROM information_schema.key_column_usage
+        WHERE table_schema = DATABASE()
+          AND referenced_table_name IS NOT NULL
+    SQL);
+
+    $violations = [];
+    foreach ($foreignKeys as $fk) {
+        $orphans = DB::table($fk->table_name)
+            ->whereNotNull($fk->column_name)
+            ->whereNotExists(function ($query) use ($fk): void {
+                $query->select(DB::raw(1))
+                    ->from($fk->referenced_table_name)
+                    ->whereColumn(
+                        "{$fk->referenced_table_name}.{$fk->referenced_column_name}",
+                        "{$fk->table_name}.{$fk->column_name}"
+                    );
+            })
+            ->count();
+
+        if ($orphans > 0) {
+            $violations[] = "{$fk->table_name}.{$fk->column_name} -> {$fk->referenced_table_name}.{$fk->referenced_column_name}: {$orphans} orphelin(s)";
+        }
+    }
+
+    expect($violations)->toBe([]);
+}
+
 afterEach(function (): void {
     app()->detectEnvironment(fn (): string => 'testing');
     Carbon::setTestNow(null);
@@ -141,11 +207,11 @@ it('resets DB from valid snapshot with correct date rehydration and password', f
     // Clear existing rows inserted by the global beforeEach (association + user).
     // --skip-migrate avoids calling migrate:fresh inside a RefreshDatabase transaction.
     TenantContext::clear();
-    DB::statement('PRAGMA foreign_keys = OFF');
+    toggleForeignKeysDemoTest(false);
     DB::table('association_user')->delete();
     DB::table('users')->delete();
     DB::table('association')->delete();
-    DB::statement('PRAGMA foreign_keys = ON');
+    toggleForeignKeysDemoTest(true);
 
     $exitCode = $this->artisan('demo:reset', [
         '--snapshot' => $snapshotPath,
@@ -283,11 +349,11 @@ it('skips files entries with path traversal in target and logs a warning', funct
     ]);
 
     TenantContext::clear();
-    DB::statement('PRAGMA foreign_keys = OFF');
+    toggleForeignKeysDemoTest(false);
     DB::table('association_user')->delete();
     DB::table('users')->delete();
     DB::table('association')->delete();
-    DB::statement('PRAGMA foreign_keys = ON');
+    toggleForeignKeysDemoTest(true);
 
     $this->artisan('demo:reset', [
         '--snapshot' => $snapshotPath,
@@ -334,11 +400,11 @@ it('round-trips data through demo:capture then demo:reset', function (): void {
     // migrate:fresh cannot run inside a transaction (SQLite VACUUM constraint),
     // so we delete rows directly. Foreign keys off to handle pivot table.
     TenantContext::clear();
-    DB::statement('PRAGMA foreign_keys = OFF');
+    toggleForeignKeysDemoTest(false);
     DB::table('association_user')->delete();
     DB::table('users')->delete();
     DB::table('association')->delete();
-    DB::statement('PRAGMA foreign_keys = ON');
+    toggleForeignKeysDemoTest(true);
     expect(DB::table('association')->count())->toBe(0);
 
     // Step 3: reset (--skip-migrate because we can't run migrate:fresh inside a transaction)
@@ -392,5 +458,5 @@ it('loads the real V2 snapshot on the final account-first schema', function (): 
         ->groupBy('transaction_id')
         ->havingRaw('ROUND(SUM(debit), 2) <> ROUND(SUM(credit), 2)')
         ->count())->toBe(0);
-    expect(DB::select('PRAGMA foreign_key_check'))->toBe([]);
+    assertNoForeignKeyViolationsDemoTest();
 });

@@ -85,7 +85,7 @@ function mtCreerTiers(Association $asso): Tiers
     $tiers = new Tiers;
     $tiers->forceFill([
         'association_id' => $asso->id,
-        'type' => 'structure',
+        'type' => 'entreprise',
         'nom' => 'Tiers '.$asso->id,
         'pour_depenses' => false,
         'pour_recettes' => true,

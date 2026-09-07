@@ -344,7 +344,7 @@ test('pourEncaissementCreance lève LettrageDejaPresentException si créance dé
 
     $ligne411T1 = $transactionCreance->lignes->firstWhere('compte_id', $compte411->id);
 
-    TransactionLigne::where('id', $ligne411T1->id)->update(['lettrage_code' => 'CODE_DEJA_PRESENT_XXX']);
+    TransactionLigne::where('id', $ligne411T1->id)->update(['lettrage_code' => 'CODE_DEJA_PRESENT_XX']);
 
     $transactionsBefore = Transaction::count();
 

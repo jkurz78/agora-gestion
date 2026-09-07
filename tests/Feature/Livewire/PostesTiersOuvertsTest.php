@@ -51,7 +51,7 @@ function creerCreancePostesTiersOuverts(
     $transaction = app(EcritureGenerator::class)->pourRecetteACredit(
         tiers: $tiers,
         ventilations: [['sens' => SensVentilation::Credit,
-            'compte' => comptePostesTiersOuverts('706-'.str_replace('-', '', $reference), 7),
+            'compte' => comptePostesTiersOuverts('706-'.substr(str_replace('-', '', $reference), 0, 5), 7),
             'montant' => 100.00,
         ]],
         dateConstatation: new DateTimeImmutable($dateConstatation),
@@ -70,7 +70,7 @@ function creerDettePostesTiersOuverts(
     return app(EcritureGenerator::class)->pourDepenseACredit(
         tiers: $tiers,
         ventilations: [[
-            'compte' => comptePostesTiersOuverts('606-'.$suffixeCompte, 6),
+            'compte' => comptePostesTiersOuverts('606-'.substr(str_replace('-', '', $suffixeCompte), 0, 5), 6),
             'montant' => 45.50,
         ]],
         dateConstatation: new DateTimeImmutable('2026-08-21'),
