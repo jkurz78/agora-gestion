@@ -15,6 +15,13 @@ use Zxing\QrReader;
 
 final class ImagickQrCodeExtractor implements QrCodeExtractor
 {
+    /**
+     * @param  string|null  $zbarBin  null disables zbar, which is how production runs (zbar is not installed there)
+     */
+    public function __construct(
+        private readonly ?string $zbarBin = '/usr/bin/zbarimg',
+    ) {}
+
     public function extractSeanceIdFromPdf(string $pdfPath): QrExtractionResult
     {
         $tempPng = storage_path(
@@ -43,10 +50,7 @@ final class ImagickQrCodeExtractor implements QrCodeExtractor
 
             if ($decoded === null) {
                 try {
-                    $zxingResult = (new QrReader($tempPng))->text();
-                    $decoded = ($zxingResult !== null && $zxingResult !== false && $zxingResult !== '')
-                        ? (string) $zxingResult
-                        : null;
+                    $decoded = $this->decodeViaZxing($tempPng);
                 } catch (Throwable $e) {
                     return QrExtractionResult::failure('qr_unreadable', $e->getMessage());
                 }
@@ -84,19 +88,36 @@ final class ImagickQrCodeExtractor implements QrCodeExtractor
 
     private function decodeViaZbar(string $imagePath): ?string
     {
-        $zbarBin = '/usr/bin/zbarimg';
-        if (! file_exists($zbarBin)) {
+        if ($this->zbarBin === null || ! file_exists($this->zbarBin)) {
             return null;
         }
 
         $output = [];
         $exitCode = 0;
-        exec($zbarBin.' --raw -q '.escapeshellarg($imagePath).' 2>/dev/null', $output, $exitCode);
+        exec(escapeshellarg($this->zbarBin).' --raw -q '.escapeshellarg($imagePath).' 2>/dev/null', $output, $exitCode);
 
         if ($exitCode !== 0 || $output === []) {
             return null;
         }
 
         return trim(implode("\n", $output));
+    }
+
+    /**
+     * Zxing's default pass misses some intact QR codes on the real sheet
+     * (seances 12, 24, 35 and 131 at 150 dpi); a TRY_HARDER pass reads them.
+     * It only runs when the default pass found nothing.
+     */
+    private function decodeViaZxing(string $imagePath): ?string
+    {
+        foreach ([null, ['TRY_HARDER' => true]] as $hints) {
+            $result = (new QrReader($imagePath))->text($hints);
+
+            if ($result !== null && $result !== false && $result !== '') {
+                return (string) $result;
+            }
+        }
+
+        return null;
     }
 }
