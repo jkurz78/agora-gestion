@@ -34,33 +34,24 @@ uses(CreatesPartieDoubleContext::class);
  * Pose un trigger sentinelle qui fait échouer la prochaine UPDATE de
  * mode_paiement sur `transactions` (simule une panne DB au milieu de
  * marquerRecu, pour prouver que la transaction DB englobante rollback T2 et
- * le lettrage). Syntaxe de trigger non portable entre moteurs — chaque
- * branche produit l'équivalent : BEFORE UPDATE OF ... WHEN ... côté SQLite,
- * BEFORE UPDATE FOR EACH ROW + IF ... SIGNAL côté MySQL/MariaDB.
+ * le lettrage).
+ *
+ * SQLite uniquement. Sous MySQL/MariaDB, CREATE TRIGGER est une instruction
+ * DDL : elle valide implicitement la transaction ouverte par RefreshDatabase,
+ * et Laravel ne retrouve plus ensuite son point de sauvegarde (« SAVEPOINT
+ * trans2 does not exist » — constaté en CI le 2026-09-10). Le test qui s'en
+ * sert saute donc hors SQLite, pour la même raison que JournalBackfillTest. Ce
+ * qu'il prouve — le rollback de la transaction englobante — est une propriété
+ * de Laravel, pas du moteur.
  */
 function creerTriggerEchecModeT1(): void
 {
-    if (DB::getDriverName() === 'sqlite') {
-        DB::statement(
-            "CREATE TRIGGER echec_mode_t1
-            BEFORE UPDATE OF mode_paiement ON transactions
-            WHEN OLD.mode_paiement IS NULL AND NEW.mode_paiement IS NOT NULL
-            BEGIN
-                SELECT RAISE(ABORT, 'Échec sentinelle mise à jour mode T1');
-            END"
-        );
-
-        return;
-    }
-
-    DB::unprepared(
+    DB::statement(
         "CREATE TRIGGER echec_mode_t1
-        BEFORE UPDATE ON transactions
-        FOR EACH ROW
+        BEFORE UPDATE OF mode_paiement ON transactions
+        WHEN OLD.mode_paiement IS NULL AND NEW.mode_paiement IS NOT NULL
         BEGIN
-            IF OLD.mode_paiement IS NULL AND NEW.mode_paiement IS NOT NULL THEN
-                SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Échec sentinelle mise à jour mode T1';
-            END IF;
+            SELECT RAISE(ABORT, 'Échec sentinelle mise à jour mode T1');
         END"
     );
 }
@@ -463,22 +454,7 @@ test('marquerRecu annule T2 et le lettrage si la mise à jour du mode de T1 éch
     );
     $transactionsAvant = Transaction::count();
 
-    try {
-        creerTriggerEchecModeT1();
-    } catch (QueryException $e) {
-        // Erreur 1419 : certains serveurs MySQL locaux (utilisateur applicatif sans
-        // privilège SUPER + binlog actif) refusent CREATE TRIGGER — restriction de
-        // CET environnement, pas de l'application. Le job CI test-mysql (utilisateur
-        // root sur l'image mysql:8.4 officielle) n'a normalement pas cette restriction.
-        if (str_contains($e->getMessage(), 'SUPER privilege')) {
-            $this->markTestSkipped(
-                'CREATE TRIGGER refusé (erreur 1419 : privilège SUPER manquant + binlog actif) '
-                .'sur ce serveur MySQL local — restriction de l\'environnement, pas de l\'application.'
-            );
-        }
-
-        throw $e;
-    }
+    creerTriggerEchecModeT1();
 
     try {
         expect(fn () => $this->service->marquerRecu(
@@ -496,4 +472,8 @@ test('marquerRecu annule T2 et le lettrage si la mise à jour du mode de T1 éch
         ->and($t1->fresh()->mode_paiement)->toBeNull()
         ->and($t1->fresh()->compte_id)->toBeNull()
         ->and($t1->fresh()->statut_reglement)->toBe(StatutReglement::EnAttente);
-});
+})->skip(
+    fn (): bool => DB::getDriverName() !== 'sqlite',
+    'CREATE TRIGGER est une instruction DDL : sous MySQL/MariaDB elle valide implicitement '
+    .'la transaction de RefreshDatabase et casse l\'isolation du test.'
+);
