@@ -3,17 +3,17 @@
 declare(strict_types=1);
 
 /**
- * `Worksheet::fromArray()` compare chaque valeur à sa sentinelle `null` avec un
- * `!=` LÂCHE tant que `strictNullComparison` vaut `false` (son défaut) :
- * `0.0 != null` rend `false`, donc la cellule n'est jamais posée. En partie
- * double, une pièce déséquilibrée signalée par JournauxBuilder porte un
- * débit ou un crédit à zéro — un zéro RÉEL, jamais une absence — et ce zéro
- * doit remonter jusqu'aux trois totaux (ligne, journal, général).
+ * Les journaux présentent chaque écriture en colonnes débit/crédit : une ligne
+ * est au débit OU au crédit, jamais les deux. Le côté inutilisé reste VIDE —
+ * décision du propriétaire (2026-09-10) après lecture d'un export réel, où les
+ * 0,00 encombraient plus qu'ils n'éclairaient.
  *
- * Ce test réutilise le scénario de pièce déséquilibrée déjà éprouvé dans
- * JournauxTest.php (« signale une pièce déséquilibrée au lieu de la
- * masquer ») : une seule écriture, tout en crédit, débit_centimes = 0 partout
- * puisque c'est la seule transaction de l'exercice.
+ * Ce test épingle cette décision : reposer `strictNullComparison: true` sur
+ * l'un des trois sites des journaux (ligne, total du journal, total général)
+ * le fait tomber. GrandLivreExportZeroTest détaille le raisonnement.
+ *
+ * Scénario : une pièce déséquilibrée volontairement, toute au crédit — celle
+ * de JournauxTest.php — dont le débit nul se retrouve aux deux totaux.
  */
 
 use App\Enums\JournalComptable;
@@ -52,7 +52,7 @@ function lireClasseurJournauxZero(TestResponse $response): Worksheet
     return $sheet;
 }
 
-it('les journaux ecrivent 0,00 pour un debit reellement nul, a la ligne comme aux deux totaux, et laissent vides les colonnes non montaires du TOTAL', function (): void {
+it('les journaux laissent vide le cote debit inutilise, a la ligne comme aux deux totaux', function (): void {
     $compte706 = Compte::factory()->numero('706')->create([
         'association_id' => $this->association->id,
         'intitule' => 'Cotisations',
@@ -117,29 +117,20 @@ it('les journaux ecrivent 0,00 pour un debit reellement nul, a la ligne comme au
         ->and($ligneTotalJournalIndex)->not->toBeNull()
         ->and($ligneTotalGeneralIndex)->not->toBeNull();
 
-    // Ligne d'écriture : Débit (J) = 0,00, un vrai zéro puisque la pièce est
-    // réellement déséquilibrée côté crédit.
-    $debitLigne = $sheet->getCell('J'.$ligneEcritureIndex)->getValue();
-    expect($debitLigne)->not->toBeNull()
-        ->and($debitLigne)->toBeFloat()
-        ->and($debitLigne)->toBe(0.0);
+    // La ligne porte bien son montant : 100,00 au crédit. Sans cette
+    // vérification, un export vide passerait toutes les assertions ci-dessous.
+    $creditLigne = $sheet->getCell('K'.$ligneEcritureIndex)->getValue();
+    expect($creditLigne)->not->toBeNull()
+        ->and((float) $creditLigne)->toBe(100.0);
 
-    // TOTAL du journal des OD : Débit (J) = 0,00.
-    $debitTotalJournal = $sheet->getCell('J'.$ligneTotalJournalIndex)->getValue();
-    expect($debitTotalJournal)->not->toBeNull()
-        ->and($debitTotalJournal)->toBeFloat()
-        ->and($debitTotalJournal)->toBe(0.0);
+    // Débit (J) reste VIDE — la pièce est toute au crédit, le côté débit est
+    // celui qu'on n'utilise pas. Idem aux deux totaux.
+    expect($sheet->getCell('J'.$ligneEcritureIndex)->getValue())->toBeNull();
+    expect($sheet->getCell('J'.$ligneTotalJournalIndex)->getValue())->toBeNull();
+    expect($sheet->getCell('J'.$ligneTotalGeneralIndex)->getValue())->toBeNull();
 
-    // TOTAL GÉNÉRAL : Débit (J) = 0,00 — seule transaction de l'exercice.
-    $debitTotalGeneral = $sheet->getCell('J'.$ligneTotalGeneralIndex)->getValue();
-    expect($debitTotalGeneral)->not->toBeNull()
-        ->and($debitTotalGeneral)->toBeFloat()
-        ->and($debitTotalGeneral)->toBe(0.0);
-
-    // Le pendant : sur la ligne TOTAL GÉNÉRAL, les colonnes non monétaires
-    // (Date à Lettrage) n'ont jamais été posées et doivent rester vides —
-    // le drapeau ne doit pas se mettre à écrire des '0' ou chaînes vides à
-    // leur place.
+    // Les colonnes non monétaires du TOTAL GÉNÉRAL (Date à Lettrage) restent
+    // vides, comme elles l'ont toujours été.
     foreach (['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'] as $col) {
         expect($sheet->getCell($col.$ligneTotalGeneralIndex)->getValue())->toBeNull();
     }

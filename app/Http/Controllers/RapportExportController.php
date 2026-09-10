@@ -315,14 +315,14 @@ final class RapportExportController extends Controller
         $row = $headerRow + 1;
 
         foreach ($balance['lignes'] as $ligne) {
-            $sheet->fromArray([$this->balanceRow($ligne, $params['colonnes'])], null, 'A'.$row, strictNullComparison: true);
+            $sheet->fromArray([$this->balanceRow($ligne, $params['colonnes'])], null, 'A'.$row);
             $sheet->setCellValueExplicit('A'.$row, (string) $ligne['numero_compte'], DataType::TYPE_STRING);
             $row++;
         }
 
         if ($balance['lignes'] !== []) {
             $totalRow = $this->balanceTotalRow($balance, $params['colonnes']);
-            $sheet->fromArray([$totalRow], null, 'A'.$row, strictNullComparison: true);
+            $sheet->fromArray([$totalRow], null, 'A'.$row);
             $sheet->getStyle('A'.$row.':'.$lastCol.$row)->applyFromArray([
                 'font' => [
                     'bold' => true,
@@ -386,7 +386,7 @@ final class RapportExportController extends Controller
                 $compte['tiers'],
                 null, null, null, 'Solde ouverture', null, null, null, null,
                 $this->euros((int) $compte['solde_ouverture_centimes']),
-            ]], null, 'A'.$row, strictNullComparison: true);
+            ]], null, 'A'.$row);
             $sheet->setCellValueExplicit('A'.$row, (string) $compte['numero_compte'], DataType::TYPE_STRING);
             $sheet->getStyle('A'.$row.':'.$lastCol.$row)->getFont()->setBold(true);
             $row++;
@@ -405,7 +405,7 @@ final class RapportExportController extends Controller
                     $this->euros((int) $ligne['debit_centimes']),
                     $this->euros((int) $ligne['credit_centimes']),
                     $this->euros((int) $ligne['solde_progressif_centimes']),
-                ]], null, 'A'.$row, strictNullComparison: true);
+                ]], null, 'A'.$row);
                 $sheet->setCellValueExplicit('A'.$row, (string) $compte['numero_compte'], DataType::TYPE_STRING);
                 $row++;
             }
@@ -418,7 +418,7 @@ final class RapportExportController extends Controller
                 $this->euros((int) $compte['mouvement_debit_centimes']),
                 $this->euros((int) $compte['mouvement_credit_centimes']),
                 $this->euros((int) $compte['solde_fin_centimes']),
-            ]], null, 'A'.$row, strictNullComparison: true);
+            ]], null, 'A'.$row);
             $sheet->setCellValueExplicit('A'.$row, (string) $compte['numero_compte'], DataType::TYPE_STRING);
             $this->styleTotalXlsx($sheet, 'A'.$row.':'.$lastCol.$row);
             $row++;
@@ -484,7 +484,7 @@ final class RapportExportController extends Controller
                         $ligne['lettrage_code'],
                         $this->euros((int) $ligne['debit_centimes']),
                         $this->euros((int) $ligne['credit_centimes']),
-                    ]], null, 'A'.$row, strictNullComparison: true);
+                    ]], null, 'A'.$row);
                     $sheet->setCellValueExplicit('E'.$row, (string) $ligne['numero_compte'], DataType::TYPE_STRING);
                     $row++;
                 }
@@ -495,7 +495,7 @@ final class RapportExportController extends Controller
                 null, null, null, null, null, null, null, null,
                 $this->euros((int) $bloc['debit_centimes']),
                 $this->euros((int) $bloc['credit_centimes']),
-            ]], null, 'A'.$row, strictNullComparison: true);
+            ]], null, 'A'.$row);
             $this->styleTotalXlsx($sheet, 'A'.$row.':'.$lastCol.$row);
             $row++;
         }
@@ -506,7 +506,7 @@ final class RapportExportController extends Controller
                 null, null, null, null, null, null, null, null,
                 $this->euros((int) $resultat['totaux']['debit_centimes']),
                 $this->euros((int) $resultat['totaux']['credit_centimes']),
-            ]], null, 'A'.$row, strictNullComparison: true);
+            ]], null, 'A'.$row);
             $this->styleTotalXlsx($sheet, 'A'.$row.':'.$lastCol.$row);
             $row++;
         }

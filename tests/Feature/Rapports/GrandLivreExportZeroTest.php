@@ -3,19 +3,25 @@
 declare(strict_types=1);
 
 /**
- * `Worksheet::fromArray()` compare chaque valeur à sa sentinelle `null` avec un
- * `!=` LÂCHE tant que `strictNullComparison` vaut `false` (son défaut) :
- * `0.0 != null` rend `false`, donc la cellule n'est jamais posée. En partie
- * double, une ligne est au débit OU au crédit : l'autre colonne vaut zéro,
- * et ce zéro EXISTE (c'est la contrepartie), il ne doit jamais disparaître.
+ * Le grand livre, les journaux et la balance présentent leurs montants en
+ * colonnes débit/crédit : une écriture est au débit OU au crédit, jamais les
+ * deux. Le côté inutilisé reste VIDE. C'est la convention de lecture d'un
+ * grand livre, et c'est une décision du propriétaire (2026-09-10), prise après
+ * lecture d'un export réel où les 0,00 encombraient plus qu'ils n'éclairaient.
  *
- * Ce test couvre les trois sites du grand livre avec un seul compte à
- * mouvement débit-seul (jamais crédité) :
- * - la ligne « Solde ouverture » : le Solde doit porter 0,00 (compte neuf,
- *   aucun mouvement antérieur), et ses colonnes Débit/Crédit doivent elles
- *   rester VIDES (elles ne représentent rien pour une ligne de solde) ;
- * - la ligne d'écriture : le Crédit doit porter 0,00, la contrepartie ;
- * - la ligne TOTAL du compte : le Mouvement crédit doit porter 0,00.
+ * Ces trois rapports ont donc retrouvé, en entier, leur présentation d'avant
+ * la 5.3.5 — y compris le Solde nul d'un compte neuf, qui reste vide lui aussi.
+ * Les autres exports (compte de résultat, flux de trésorerie, immobilisations,
+ * analyse) écrivent au contraire leurs zéros : là, un zéro est une grandeur
+ * métier — un mois sans recette, un bien totalement amorti — et non le côté
+ * vide d'une présentation débit/crédit.
+ *
+ * Ce test épingle la décision sur les trois sites du grand livre (solde
+ * d'ouverture, écriture, total du compte). `Worksheet::fromArray()` compare
+ * chaque valeur à sa sentinelle `null` avec un `!=` lâche tant que
+ * `strictNullComparison` vaut `false` — `0.0 != null` rend `false`, donc le
+ * zéro n'est pas posé. Reposer le drapeau sur l'un de ces sites fait tomber
+ * ce test.
  */
 
 use App\Models\Association;
@@ -52,7 +58,7 @@ function lireClasseurGrandLivreZero(TestResponse $response): Worksheet
     return $sheet;
 }
 
-it('le grand livre ecrit 0,00 pour une contrepartie et un solde d ouverture reels, mais laisse vides les colonnes Debit/Credit de la ligne de solde', function (): void {
+it('le grand livre laisse vides le cote debit/credit inutilise et le solde nul, a l ouverture, a l ecriture et au total', function (): void {
     $compte = Compte::factory()->numero('606')->create([
         'association_id' => $this->association->id,
         'intitule' => 'Achats non stockés',
@@ -114,26 +120,17 @@ it('le grand livre ecrit 0,00 pour une contrepartie et un solde d ouverture reel
         ->and($ligneEcritureIndex)->not->toBeNull()
         ->and($ligneTotalIndex)->not->toBeNull();
 
-    // Ligne « Solde ouverture » : Débit (J) et Crédit (K) restent VIDES —
-    // elles ne représentent rien sur cette ligne — mais Solde (L) est un vrai
-    // 0,00 (compte neuf sans mouvement antérieur au 01/09/2025).
-    expect($sheet->getCell('J'.$ligneSoldeOuvertureIndex)->getValue())->toBeNull();
-    expect($sheet->getCell('K'.$ligneSoldeOuvertureIndex)->getValue())->toBeNull();
-    $soldeOuverture = $sheet->getCell('L'.$ligneSoldeOuvertureIndex)->getValue();
-    expect($soldeOuverture)->not->toBeNull()
-        ->and($soldeOuverture)->toBeFloat()
-        ->and($soldeOuverture)->toBe(0.0);
+    // Ligne « Solde ouverture » : rien n'y est écrit. Débit et Crédit n'y ont
+    // aucun sens, et le Solde nul d'un compte neuf reste vide lui aussi — le
+    // rapport entier a retrouvé sa présentation d'avant la 5.3.5.
+    foreach (['J', 'K', 'L'] as $col) {
+        expect($sheet->getCell($col.$ligneSoldeOuvertureIndex)->getValue())->toBeNull();
+    }
 
-    // Ligne d'écriture : Débit = 90,00 (déjà vérifié par la recherche), Crédit
-    // (K) = 0,00 — la contrepartie de la partie double, qui EXISTE.
-    $creditEcriture = $sheet->getCell('K'.$ligneEcritureIndex)->getValue();
-    expect($creditEcriture)->not->toBeNull()
-        ->and($creditEcriture)->toBeFloat()
-        ->and($creditEcriture)->toBe(0.0);
+    // Ligne d'écriture : Débit = 90,00 (la recherche ci-dessus le prouve),
+    // Crédit reste VIDE — le côté inutilisé d'une écriture au débit.
+    expect($sheet->getCell('K'.$ligneEcritureIndex)->getValue())->toBeNull();
 
-    // Ligne TOTAL du compte : Mouvement crédit (K) = 0,00.
-    $creditTotal = $sheet->getCell('K'.$ligneTotalIndex)->getValue();
-    expect($creditTotal)->not->toBeNull()
-        ->and($creditTotal)->toBeFloat()
-        ->and($creditTotal)->toBe(0.0);
+    // Ligne TOTAL du compte : le Mouvement crédit, nul, reste vide.
+    expect($sheet->getCell('K'.$ligneTotalIndex)->getValue())->toBeNull();
 });

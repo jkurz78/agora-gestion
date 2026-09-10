@@ -3,14 +3,17 @@
 declare(strict_types=1);
 
 /**
- * `Worksheet::fromArray()` compare chaque valeur à sa sentinelle `null` avec un
- * `!=` LÂCHE tant que `strictNullComparison` vaut `false` (son défaut) :
- * `0.0 != null` rend `false`, donc la cellule n'est jamais posée.
+ * La balance présente ses montants en colonnes débit/crédit (ouverture,
+ * mouvements, solde). Le côté inutilisé reste VIDE — décision du propriétaire
+ * (2026-09-10), prise avec celle du grand livre et des journaux, les trois
+ * rapports partageant cette présentation.
  *
- * Un compte qui n'a mouvementé qu'un seul sens (ici 411, débité de 120 €,
- * jamais crédité) porte un Mouvement crédit à 0,00 : un vrai zéro comptable,
- * pas une absence — la balance doit l'écrire, à la ligne du compte comme à
- * la ligne TOTAL.
+ * Ce test épingle cette décision : reposer `strictNullComparison: true` sur
+ * l'un des deux sites de la balance (ligne de compte, total) le fait tomber.
+ * GrandLivreExportZeroTest détaille le raisonnement.
+ *
+ * Scénario : un 411 débité de 120 €, jamais crédité — son Mouvement crédit
+ * nul reste vide.
  */
 
 use App\Enums\SensVentilation;
@@ -45,7 +48,7 @@ function lireClasseurBalanceZero(TestResponse $response): Worksheet
     return $sheet;
 }
 
-it('la balance ecrit 0,00 pour un mouvement credit reellement nul, a la ligne de compte comme au TOTAL', function (): void {
+it('la balance laisse vide un mouvement credit nul, a la ligne de compte comme au TOTAL', function (): void {
     $tiers = Tiers::factory()->create([
         'association_id' => (int) $this->association->id,
         'nom' => 'Client Balance Zero',
@@ -97,17 +100,16 @@ it('la balance ecrit 0,00 pour un mouvement credit reellement nul, a la ligne de
     expect($ligneCompteIndex)->not->toBeNull()
         ->and($ligneTotalIndex)->not->toBeNull();
 
-    $creditLigne = $sheet->getCell('G'.$ligneCompteIndex)->getValue();
-    expect($creditLigne)->not->toBeNull()
-        ->and($creditLigne)->toBeFloat()
-        ->and($creditLigne)->toBe(0.0);
+    // La ligne porte bien son montant : 120,00 en Mouvement débit (F). Sans
+    // cette vérification, un export vide passerait les assertions suivantes.
+    $debitLigne = $sheet->getCell('F'.$ligneCompteIndex)->getValue();
+    expect($debitLigne)->not->toBeNull()
+        ->and((float) $debitLigne)->toBe(120.0);
 
-    $creditTotal = $sheet->getCell('G'.$ligneTotalIndex)->getValue();
-    expect($creditTotal)->not->toBeNull()
-        ->and($creditTotal)->toBeFloat()
-        ->and($creditTotal)->toBe(0.0);
+    // Mouvement crédit (G), nul, reste VIDE — à la ligne comme au TOTAL.
+    expect($sheet->getCell('G'.$ligneCompteIndex)->getValue())->toBeNull();
+    expect($sheet->getCell('G'.$ligneTotalIndex)->getValue())->toBeNull();
 
-    // Le pendant : sur la ligne TOTAL, la colonne Intitulé (B) n'a jamais été
-    // posée et doit rester vide.
+    // La colonne Intitulé (B) du TOTAL, jamais posée, reste vide.
     expect($sheet->getCell('B'.$ligneTotalIndex)->getValue())->toBeNull();
 });
