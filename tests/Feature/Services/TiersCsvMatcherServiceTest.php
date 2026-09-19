@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\Civilite;
 use App\Models\Tiers;
 use App\Services\TiersCsvMatcherService;
 
@@ -312,4 +313,40 @@ it('retourne enrichment même quand la ligne CSV a des champs vides', function (
     expect($result[0]['status'])->toBe('identical');
     expect($result[0]['matched_tiers_id'])->not->toBeNull();
     expect($result[0]['conflict_fields'])->toBe([]);
+});
+
+// ---------------------------------------------------------------------------
+// Régression : tiers existant avec une civilité (enum)
+// ---------------------------------------------------------------------------
+it('compare la civilité d\'un tiers existant sans erreur', function () {
+    $tiers = Tiers::factory()->create([
+        'type' => 'particulier',
+        'civilite' => Civilite::Mme,
+        'nom' => 'Kohl',
+        'prenom' => 'Sabrina',
+        'email' => null,
+    ]);
+
+    $rows = [
+        [
+            'type' => 'particulier',
+            'civilite' => 'M.',
+            'nom' => 'Kohl',
+            'prenom' => 'Sabrina',
+            'entreprise' => '',
+            'email' => '',
+            'telephone' => '',
+            'adresse_ligne1' => '',
+            'code_postal' => '',
+            'ville' => '',
+            'pays' => '',
+            'pour_depenses' => false,
+            'pour_recettes' => true,
+        ],
+    ];
+
+    $result = app(TiersCsvMatcherService::class)->match($rows);
+
+    expect($result[0]['matched_tiers_id'])->toBe($tiers->id)
+        ->and($result[0]['conflict_fields'])->toBe(['civilite']);
 });
