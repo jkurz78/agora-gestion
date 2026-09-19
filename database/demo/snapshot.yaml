@@ -11328,6 +11328,8 @@ tables:
       logo_path: null
       nom: 'Parcours de soins A'
       nombre_seances: 30
+      participation_seance_active: 1
+      participation_seance_libelle: Kiné
       reserve_adherents: 1
       updated_at: 0d
     -
@@ -11350,6 +11352,8 @@ tables:
       logo_path: null
       nom: Formation
       nombre_seances: 12
+      participation_seance_active: 0
+      participation_seance_libelle: null
       reserve_adherents: 0
       updated_at: 0d
   usages_comptes:

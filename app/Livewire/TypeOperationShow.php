@@ -57,7 +57,7 @@ final class TypeOperationShow extends Component
 
     public bool $participationSeanceActive = false;
 
-    public string $participationSeanceLibelle = 'Kiné';
+    public string $participationSeanceLibelle = TypeOperation::LIBELLE_PARTICIPATION_SEANCE_DEFAUT;
 
     public bool $reserve_adherents = false;
 
@@ -140,7 +140,7 @@ final class TypeOperationShow extends Component
         $this->formulairePrescripteurTitre = $type->formulaire_prescripteur_titre ?? '';
         $this->formulaireQualificatifAtelier = $type->formulaire_qualificatif_atelier ?? '';
         $this->participationSeanceActive = (bool) $type->participation_seance_active;
-        $this->participationSeanceLibelle = $type->participation_seance_libelle ?? 'Kiné';
+        $this->participationSeanceLibelle = $type->participation_seance_libelle ?? TypeOperation::LIBELLE_PARTICIPATION_SEANCE_DEFAUT;
         $this->reserve_adherents = (bool) $type->reserve_adherents;
         $this->actif = (bool) $type->actif;
         $this->logo = null;
@@ -249,7 +249,6 @@ final class TypeOperationShow extends Component
             'email_from_name' => 'nullable|string|max:255',
             'participationSeanceLibelle' => [
                 Rule::requiredIf($this->participationSeanceActive),
-                'nullable',
                 'string',
                 'max:12',
             ],
@@ -260,10 +259,26 @@ final class TypeOperationShow extends Component
                 'participationSeanceLibelle' => 'libellé de la participation',
             ]);
         } catch (ValidationException $e) {
-            // Le libellé vit dans l'onglet Séances : sans bascule, l'erreur
-            // resterait invisible depuis un autre onglet.
-            if (array_key_exists('participationSeanceLibelle', $e->errors())) {
-                $this->activeTab = 'seances';
+            // Chaque champ vit dans un onglet distinct : sans bascule, une
+            // erreur resterait invisible depuis un autre onglet. On bascule
+            // vers l'onglet du premier champ en erreur, dans cet ordre.
+            $ongletParChamp = [
+                'nom' => 'general',
+                'description' => 'general',
+                'compte_id' => 'general',
+                'logo' => 'general',
+                'participationSeanceLibelle' => 'seances',
+                'email_from' => 'emails',
+                'email_from_name' => 'emails',
+                'attestationMedicale' => 'formulaire',
+            ];
+
+            foreach ($ongletParChamp as $champ => $onglet) {
+                if (array_key_exists($champ, $e->errors())) {
+                    $this->activeTab = $onglet;
+
+                    break;
+                }
             }
 
             throw $e;

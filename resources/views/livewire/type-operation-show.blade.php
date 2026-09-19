@@ -173,19 +173,22 @@ x-on:click.window="
                     <div class="card-header py-2"><span class="small fw-semibold">Informations suivies sur les participants</span></div>
                     <div class="card-body">
                         <div class="form-check form-switch">
-                            <input type="checkbox" wire:model="formulairePrescripteur" class="form-check-input" id="optPrescripteur">
+                            <input type="checkbox" wire:model="formulairePrescripteur" class="form-check-input" id="optPrescripteur"
+                                   x-on:change="isDirty = true">
                             <label class="form-check-label fw-semibold" for="optPrescripteur">Prescripteur</label>
                         </div>
                         <small class="text-muted d-block mb-2">Coordonnées du prescripteur sur la fiche participant, les PDF et l'export.</small>
 
                         <div class="form-check form-switch">
-                            <input type="checkbox" wire:model="formulaireParcoursTherapeutique" class="form-check-input" id="optParcours">
+                            <input type="checkbox" wire:model="formulaireParcoursTherapeutique" class="form-check-input" id="optParcours"
+                                   x-on:change="isDirty = true">
                             <label class="form-check-label fw-semibold" for="optParcours">Parcours thérapeutique (données médicales)</label>
                         </div>
                         <small class="text-muted d-block mb-2">Données médicales des participants ; feuille d'émargement sans lignes vides.</small>
 
                         <div class="form-check form-switch">
-                            <input type="checkbox" wire:model="formulaireDroitImage" class="form-check-input" id="optDroitImage">
+                            <input type="checkbox" wire:model="formulaireDroitImage" class="form-check-input" id="optDroitImage"
+                                   x-on:change="isDirty = true">
                             <label class="form-check-label fw-semibold" for="optDroitImage">Droit à l'image</label>
                         </div>
                         <small class="text-muted d-block mb-0">Autorisations photo et vidéo des participants.</small>
@@ -284,7 +287,8 @@ x-on:click.window="
             <div class="card-header py-2"><span class="small fw-semibold">Participation optionnelle</span></div>
             <div class="card-body">
                 <div class="form-check form-switch mb-1">
-                    <input type="checkbox" wire:model.live="participationSeanceActive" class="form-check-input" id="optParticipationSeance">
+                    <input type="checkbox" wire:model.live="participationSeanceActive" class="form-check-input" id="optParticipationSeance"
+                           x-on:change="isDirty = true">
                     <label class="form-check-label fw-semibold" for="optParticipationSeance">Collecter une participation optionnelle sur les séances</label>
                 </div>
                 <small class="text-muted d-block">Colonne oui / non affichée dans l'onglet Séances de l'opération et sur la feuille d'émargement.</small>
@@ -293,7 +297,7 @@ x-on:click.window="
                         <label class="form-label small mb-1" for="participationSeanceLibelle">Libellé <span class="text-danger">*</span></label>
                         <input type="text" id="participationSeanceLibelle" wire:model="participationSeanceLibelle" maxlength="12"
                                class="form-control form-control-sm @error('participationSeanceLibelle') is-invalid @enderror"
-                               placeholder="Kiné">
+                               placeholder="{{ \App\Models\TypeOperation::LIBELLE_PARTICIPATION_SEANCE_DEFAUT }}">
                         @error('participationSeanceLibelle') <div class="invalid-feedback">{{ $message }}</div> @enderror
                     </div>
                 @endif
@@ -621,8 +625,7 @@ x-on:click.window="
             ]));
         @endphp
         <p class="small text-muted mb-3">
-            Le formulaire collecte les informations suivies cochées dans l'onglet Général :
-            {{ $informationsSuivies === [] ? 'aucune' : implode(', ', $informationsSuivies) }}.
+            Le formulaire collecte les informations suivies cochées dans l'onglet Général : {{ $informationsSuivies === [] ? 'aucune' : implode(', ', $informationsSuivies) }}.
         </p>
 
         <div class="ms-4" x-data x-bind:class="!$wire.formulaireActif && 'opacity-50'">
@@ -657,6 +660,7 @@ x-on:click.window="
                     <label class="form-label small">Qualificatif des parcours</label>
                     <input type="text" wire:model="formulaireQualificatifAtelier" class="form-control form-control-sm"
                            placeholder="thérapeutique">
+                    <div class="form-text small">Utilisé dans le texte de l'autorisation photo et vidéo.</div>
                 </div>
             @endif
         </div>

@@ -32,6 +32,8 @@ final class TypeOperationSeeder extends Seeder
                 'formulaire_prescripteur' => true,
                 'formulaire_parcours_therapeutique' => true,
                 'formulaire_droit_image' => true,
+                'participation_seance_active' => true,
+                'participation_seance_libelle' => 'Kiné',
                 'reserve_adherents' => true,
                 'actif' => true,
             ],

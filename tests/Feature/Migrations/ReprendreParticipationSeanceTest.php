@@ -6,6 +6,7 @@ use App\Models\Association;
 use App\Models\TypeOperation;
 use App\Models\User;
 use App\Tenant\TenantContext;
+use Illuminate\Support\Facades\DB;
 
 /*
  * Reprise : un type qui avait le parcours thérapeutique affichait la colonne
@@ -58,4 +59,35 @@ it('ne touche pas un type déjà réglé et reste rejouable', function () {
     $regle->refresh();
     expect($regle->participation_seance_active)->toBeFalse()
         ->and($regle->participation_seance_libelle)->toBe('Repas');
+});
+
+it('reprend les types de toutes les associations quand artisan migrate tourne sans TenantContext', function () {
+    // En prod, `artisan migrate` s'exécute hors requête HTTP : TenantContext
+    // n'est jamais booté. La migration doit donc traiter toutes les
+    // associations via une requête brute, jamais via le modèle Eloquent
+    // (scope tenant fail-closed : `WHERE 1 = 0` sans contexte).
+    $autreAssociation = Association::factory()->create();
+
+    $parcoursAssociationCourante = TypeOperation::factory()->create([
+        'association_id' => $this->association->id,
+        'formulaire_parcours_therapeutique' => true,
+    ]);
+
+    TenantContext::boot($autreAssociation);
+    $parcoursAutreAssociation = TypeOperation::factory()->create([
+        'association_id' => $autreAssociation->id,
+        'formulaire_parcours_therapeutique' => true,
+    ]);
+
+    TenantContext::clear();
+
+    repriseParticipationSeanceMigration()->up();
+
+    $ligneCourante = DB::table('type_operations')->where('id', $parcoursAssociationCourante->id)->first();
+    $ligneAutre = DB::table('type_operations')->where('id', $parcoursAutreAssociation->id)->first();
+
+    expect((bool) $ligneCourante->participation_seance_active)->toBeTrue()
+        ->and($ligneCourante->participation_seance_libelle)->toBe('Kiné')
+        ->and((bool) $ligneAutre->participation_seance_active)->toBeTrue()
+        ->and($ligneAutre->participation_seance_libelle)->toBe('Kiné');
 });

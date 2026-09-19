@@ -321,6 +321,31 @@ it('propose « Kiné » comme libellé par défaut', function () {
         ->assertSet('participationSeanceLibelle', 'Kiné');
 });
 
+it('recharge la participation active et son libellé depuis un type existant', function () {
+    $type = TypeOperation::factory()->participationSeance('Repas')->create([
+        'compte_id' => $this->compte->id,
+        'association_id' => $this->association->id,
+    ]);
+
+    Livewire::test(TypeOperationShow::class, ['typeOperation' => $type])
+        ->assertSet('participationSeanceActive', true)
+        ->assertSet('participationSeanceLibelle', 'Repas');
+});
+
+it('garde le libellé de participation choisi même quand l\'option est inactive', function () {
+    Livewire::test(TypeOperationShow::class)
+        ->set('nom', 'Libellé gardé malgré inactif')
+        ->set('compte_id', (string) $this->compte->id)
+        ->set('participationSeanceActive', false)
+        ->set('participationSeanceLibelle', 'Repas')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $type = TypeOperation::where('nom', 'Libellé gardé malgré inactif')->sole();
+    expect($type->participation_seance_active)->toBeFalse()
+        ->and($type->participation_seance_libelle)->toBe('Repas');
+});
+
 it('exige un libellé quand la participation est active et ouvre l\'onglet Séances', function () {
     Livewire::test(TypeOperationShow::class)
         ->set('nom', 'Sans libellé')
@@ -332,6 +357,17 @@ it('exige un libellé quand la participation est active et ouvre l\'onglet Séan
         ->assertSet('activeTab', 'seances');
 
     expect(TypeOperation::where('nom', 'Sans libellé')->exists())->toBeFalse();
+});
+
+it('bascule vers l\'onglet Général quand le nom ET le libellé de participation sont en erreur', function () {
+    Livewire::test(TypeOperationShow::class)
+        ->set('nom', '')
+        ->set('compte_id', (string) $this->compte->id)
+        ->set('participationSeanceActive', true)
+        ->set('participationSeanceLibelle', '')
+        ->call('save')
+        ->assertHasErrors(['nom', 'participationSeanceLibelle'])
+        ->assertSet('activeTab', 'general');
 });
 
 it('n\'exige pas de libellé quand la participation est inactive', function () {
@@ -389,7 +425,14 @@ it('l\'onglet Formulaire liste les informations suivies et leurs réglages propr
 
     Livewire::test(TypeOperationShow::class)
         ->call('setTab', 'formulaire')
-        ->assertSee('aucune');
+        ->assertSee("l'onglet Général : aucune", false);
+
+    Livewire::test(TypeOperationShow::class)
+        ->set('formulairePrescripteur', true)
+        ->set('formulaireDroitImage', true)
+        ->call('setTab', 'formulaire')
+        ->assertSee('Titre du bloc prescripteur')
+        ->assertSee('Qualificatif des parcours');
 });
 
 it('l\'onglet Séances porte l\'option de participation et son libellé', function () {

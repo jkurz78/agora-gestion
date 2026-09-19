@@ -16,6 +16,8 @@ final class TypeOperation extends TenantModel
     use HasFactory;
     use TenantStorage;
 
+    public const LIBELLE_PARTICIPATION_SEANCE_DEFAUT = 'Kiné';
+
     protected $fillable = [
         'association_id',
         'nom',
@@ -76,7 +78,7 @@ final class TypeOperation extends TenantModel
 
         $libelle = trim((string) $this->participation_seance_libelle);
 
-        return $libelle !== '' ? $libelle : 'Kiné';
+        return $libelle !== '' ? $libelle : self::LIBELLE_PARTICIPATION_SEANCE_DEFAUT;
     }
 
     public function compte(): BelongsTo
