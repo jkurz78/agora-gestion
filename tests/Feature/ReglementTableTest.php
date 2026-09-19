@@ -455,3 +455,67 @@ it('le bouton Aujourd\'hui remplace la date par celle du jour et est utilisée �
     $tx = Transaction::where('compte_id', $compte->id)->sole();
     expect($tx->date->format('Y-m-d'))->toBe($aujourdhui);
 });
+
+/**
+ * Opération dont le type porte un compte de produit (classe 7) — prérequis de
+ * la comptabilisation — avec une séance datée du 2025-11-03.
+ *
+ * @return array{operation: Operation, seance: Seance, compte: CompteBancaire}
+ */
+function seanceComptabilisableTableTest(): array
+{
+    SystemeSeeder::seed();
+    $compteVentilation = Compte::create([
+        'association_id' => TenantContext::currentId(),
+        'numero_pcg' => '706R',
+        'intitule' => 'Recettes séances',
+        'classe' => 7,
+        'actif' => true,
+    ]);
+    $typeOp = TypeOperation::factory()->create(['compte_id' => $compteVentilation->id]);
+    $operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+    $seance = Seance::create([
+        'operation_id' => $operation->id,
+        'numero' => 1,
+        'date' => '2025-11-03',
+    ]);
+
+    return [
+        'operation' => $operation,
+        'seance' => $seance,
+        'compte' => CompteBancaire::factory()->create(['actif_recettes_depenses' => true]),
+    ];
+}
+
+function reglementTableTest(Operation $operation, Seance $seance, ?ModePaiement $mode, float $montant = 30.0): Reglement
+{
+    $participant = Participant::create([
+        'tiers_id' => Tiers::factory()->create()->id,
+        'operation_id' => $operation->id,
+        'date_inscription' => now(),
+    ]);
+
+    return Reglement::create([
+        'participant_id' => (int) $participant->id,
+        'seance_id' => (int) $seance->id,
+        'mode_paiement' => $mode?->value,
+        'montant_prevu' => $montant,
+    ]);
+}
+
+it('comptabilise les règlements prêts et laisse de côté ceux sans mode, sans erreur', function () {
+    ['operation' => $operation, 'seance' => $seance, 'compte' => $compte] = seanceComptabilisableTableTest();
+    $avecMode = reglementTableTest($operation, $seance, ModePaiement::Cheque);
+    $sansMode = reglementTableTest($operation, $seance, null);
+
+    Livewire::test(ReglementTable::class, ['operation' => $operation])
+        ->call('ouvrirComptabiliser', $seance->id)
+        ->set('comptabiliserCompteId', $compte->id)
+        ->call('comptabiliserSeance')
+        ->assertHasNoErrors()
+        ->assertSet('showComptabiliserModal', false)
+        ->assertDispatched('comptabiliser-modal-close');
+
+    expect($avecMode->fresh()->estComptabilise())->toBeTrue()
+        ->and($sansMode->fresh()->estComptabilise())->toBeFalse();
+});

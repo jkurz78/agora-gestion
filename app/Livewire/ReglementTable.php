@@ -304,28 +304,9 @@ final class ReglementTable extends Component
             return;
         }
 
-        // Only process reglements WITHOUT an existing transaction
-        $reglements = Reglement::with('participant.tiers')
-            ->where('seance_id', (int) $this->comptabiliserSeanceId)
-            ->where('montant_prevu', '>', 0)
-            ->whereDoesntHave('transaction')
-            ->get();
-
-        if ($reglements->isEmpty()) {
-            $this->showComptabiliserModal = false;
-            $this->dispatch('comptabiliser-modal-close');
-
-            return;
-        }
-
-        $sansMoyenPaiement = $reglements->filter(fn ($r) => $r->mode_paiement === null);
-        if ($sansMoyenPaiement->isNotEmpty()) {
-            $noms = $sansMoyenPaiement->map(fn ($r) => $r->participant->tiers->displayName())->join(', ');
-            $this->addError('comptabiliserCompteId', "Moyen de paiement manquant pour : {$noms}.");
-
-            return;
-        }
-
+        // Le service ne prend que les règlements prêts
+        // (Reglement::aComptabiliser()) : ceux sans mode de paiement attendent
+        // le passage suivant, sans bloquer les autres.
         $date = Carbon::parse($this->comptabiliserDate);
 
         // Délègue au service métier (Step 26) : crée les Transactions + enrichit partie double
