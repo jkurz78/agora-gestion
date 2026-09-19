@@ -103,13 +103,14 @@ final class ReglementOperationService
             $compteVentilation = null;
         }
 
-        // Règlements sans transaction existante, avec montant > 0.
+        // Règlements prêts (montant, mode de paiement, pas encore de
+        // transaction) : une séance se comptabilise en plusieurs fois, les
+        // règlements sans mode attendent le passage suivant.
         // Guard multi-tenant : Reglement n'a pas de association_id propre → dérivé via Participant.
         $reglements = Reglement::with('participant.tiers')
             ->where('seance_id', (int) $seance->id)
             ->whereHas('participant', fn ($q) => $q->where('association_id', (int) TenantContext::currentId()))
-            ->where('montant_prevu', '>', 0)
-            ->whereDoesntHave('transaction')
+            ->aComptabiliser()
             ->get();
 
         if ($reglements->isEmpty()) {
