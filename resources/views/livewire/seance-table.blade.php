@@ -109,15 +109,15 @@
                             </td>
                         @endforeach
                     </tr>
-                    {{-- Sub-header row: Présence / Kiné --}}
+                    {{-- Sub-header row: Présence / participation --}}
                     <tr>
                         <td style="position:sticky;left:0;z-index:1;background:#f0f0f0"></td>
                         @foreach($seances as $seance)
                             <td style="background:#f0f0f0;padding:2px 0;font-size:12px;color:#888">
                                 <div class="d-flex">
                                     <span style="flex:1;text-align:center">Présence</span>
-                                    @if($operation->typeOperation?->formulaire_parcours_therapeutique)
-                                        <span style="width:40px;text-align:center;border-left:1px solid #ddd">Kiné</span>
+                                    @if($participationLibelle !== null)
+                                        <span data-participation-seance style="width:{{ $participationLargeur }}px;text-align:center;border-left:1px solid #ddd">{{ $participationLibelle }}</span>
                                     @endif
                                 </div>
                             </td>
@@ -126,7 +126,7 @@
                 </thead>
                 <tbody>
                     @foreach($participants as $participant)
-                        {{-- Ligne 1 : Présence + Kiné --}}
+                        {{-- Ligne 1 : Présence + participation --}}
                         <tr>
                             <td rowspan="2" style="position:sticky;left:0;z-index:1;background:#fff;font-weight:500;white-space:nowrap;vertical-align:middle;font-size:11px">
                                 {{ $participant->tiers->nom }} {{ $participant->tiers->prenom }}
@@ -165,8 +165,8 @@
                                                 @endforeach
                                             </select>
                                         </div>
-                                        @if($operation->typeOperation?->formulaire_parcours_therapeutique)
-                                            <div style="width:40px;border-left:1px solid #dee2e6;background:{{ $kineBg }};cursor:pointer;display:flex;align-items:center;justify-content:center"
+                                        @if($participationLibelle !== null)
+                                            <div style="width:{{ $participationLargeur }}px;border-left:1px solid #dee2e6;background:{{ $kineBg }};cursor:pointer;display:flex;align-items:center;justify-content:center"
                                                  onclick="
                                                     var vals = ['', 'oui', 'non'];
                                                     var cur = '{{ $kine }}';
