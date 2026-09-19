@@ -258,6 +258,7 @@ it('refuse de modifier le montant d\'un règlement comptabilisé', function () {
 it('la recopie de ligne saute les séances comptabilisées', function () {
     $s1 = Seance::create(['operation_id' => $this->operation->id, 'numero' => 1]);
     $s2 = Seance::create(['operation_id' => $this->operation->id, 'numero' => 2]);
+    $s3 = Seance::create(['operation_id' => $this->operation->id, 'numero' => 3]);
     $source = reglementTableTest($this->operation, $s1, ModePaiement::Cheque, 25.0);
     $cible = Reglement::create([
         'participant_id' => (int) $source->participant_id,
@@ -266,6 +267,13 @@ it('la recopie de ligne saute les séances comptabilisées', function () {
         'montant_prevu' => 10.00,
     ]);
     comptabiliserReglementTableTest($cible);
+    // Non comptabilisée : doit être écrasée par la recopie, contrairement à s2.
+    $nonComptabilisee = Reglement::create([
+        'participant_id' => (int) $source->participant_id,
+        'seance_id' => (int) $s3->id,
+        'mode_paiement' => ModePaiement::Especes->value,
+        'montant_prevu' => 10.00,
+    ]);
 
     Livewire::test(ReglementTable::class, ['operation' => $this->operation])
         ->call('copierLigne', (int) $source->participant_id);
@@ -273,6 +281,10 @@ it('la recopie de ligne saute les séances comptabilisées', function () {
     $cible->refresh();
     expect($cible->mode_paiement)->toBe(ModePaiement::Especes)
         ->and((float) $cible->montant_prevu)->toBe(10.00);
+
+    $nonComptabilisee->refresh();
+    expect($nonComptabilisee->mode_paiement)->toBe(ModePaiement::Cheque)
+        ->and((float) $nonComptabilisee->montant_prevu)->toBe(25.00);
 });
 
 it('refuse de changer le mode d\'un règlement comptabilisé', function () {
