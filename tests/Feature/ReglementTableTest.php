@@ -505,6 +505,7 @@ it('affiche l\'état de chaque règlement dans sa case', function () {
     Livewire::test(ReglementTable::class, ['operation' => $operation])
         ->assertSee('À comptabiliser')
         ->assertSee('Sans mode')
+        ->assertDontSee('Déjà comptabilisé')
         ->assertSee('Comptabiliser (2)')
         ->call('ouvrirComptabiliser', $seance->id)
         ->assertSee('Créer 2 transactions');
@@ -542,6 +543,26 @@ it('affiche « Comptabilisé » après deux passages', function () {
         ->assertSeeHtml('&#10003; Comptabilisé');
 
     expect(Transaction::whereNotNull('reglement_id')->count())->toBe(2);
+});
+
+it('ignore les règlements à 0 € dans l\'état des cases et le badge de séance', function () {
+    ['operation' => $operation, 'seance' => $seance] = seanceComptabilisableTableTest();
+    $paye = reglementTableTest($operation, $seance, ModePaiement::Cheque);
+    reglementTableTest($operation, $seance, null, 0.0);
+    comptabiliserReglementTableTest($paye);
+
+    Livewire::test(ReglementTable::class, ['operation' => $operation])
+        ->assertSeeHtml('&#10003; Comptabilisé')
+        ->assertDontSee('Sans mode');
+});
+
+it('ne marque pas comptabilisée une séance sans règlement à payer', function () {
+    ['operation' => $operation, 'seance' => $seance] = seanceComptabilisableTableTest();
+    reglementTableTest($operation, $seance, ModePaiement::Cheque, 0.0);
+
+    Livewire::test(ReglementTable::class, ['operation' => $operation])
+        ->assertDontSeeHtml('&#10003; Comptabilisé')
+        ->assertSee('Aucun règlement prêt');
 });
 
 it('montre le statut « Dû » à un lecteur sans droit d\'écriture', function () {

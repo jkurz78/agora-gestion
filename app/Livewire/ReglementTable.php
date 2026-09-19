@@ -364,7 +364,8 @@ final class ReglementTable extends Component
 
         // Transaction de chaque règlement (une transaction supprimée ne compte
         // pas). Couvre tous les règlements, y compris à 0 € : le cadenas de la
-        // grille doit correspondre exactement à Reglement::estComptabilise().
+        // grille suit la même règle que Reglement::estComptabilise() (une
+        // transaction non supprimée liée) ; ici l'association est toujours active.
         $txByReglement = Transaction::whereIn('reglement_id', $reglements->pluck('id'))
             ->get()
             ->keyBy(fn ($tx) => (int) $tx->reglement_id);
