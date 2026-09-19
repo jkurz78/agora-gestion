@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\ModePaiement;
+use App\Tenant\TenantScope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -58,22 +59,37 @@ final class Reglement extends Model
      * compte pas). Seule définition de « prêt » — le service de
      * comptabilisation et la grille des règlements s'en servent tous deux.
      *
+     * Colonnes qualifiées : `mode_paiement` existe aussi sur `transactions`,
+     * qualifier lève l'ambiguïté en cas de jointure future.
+     *
+     * Le scope tenant de Transaction est retiré de la sous-requête « a une
+     * transaction » : ce fait ne dépend pas de l'association active (la
+     * transaction liée est nécessairement de la même association, via le
+     * participant) — sans ce retrait, en l'absence d'association active
+     * (TenantContext non booté) la réponse s'inverserait.
+     *
      * @param  Builder<Reglement>  $query
      * @return Builder<Reglement>
      */
     public function scopeAComptabiliser(Builder $query): Builder
     {
-        return $query->where('montant_prevu', '>', 0)
-            ->whereNotNull('mode_paiement')
-            ->whereDoesntHave('transaction');
+        return $query->where($query->qualifyColumn('montant_prevu'), '>', 0)
+            ->whereNotNull($query->qualifyColumn('mode_paiement'))
+            ->whereDoesntHave('transaction', fn (Builder $q) => $q->withoutGlobalScope(TenantScope::class));
     }
 
     /**
      * Vrai dès qu'une transaction non supprimée pointe vers ce règlement :
      * sa case est alors verrouillée dans la grille.
+     *
+     * Le scope tenant de Transaction est retiré : ce fait ne dépend pas de
+     * l'association active (la transaction liée est nécessairement de la
+     * même association, via le participant) — sans ce retrait, en l'absence
+     * d'association active la réponse s'inverserait (false pour un règlement
+     * pourtant comptabilisé).
      */
     public function estComptabilise(): bool
     {
-        return $this->transaction()->exists();
+        return $this->transaction()->withoutGlobalScope(TenantScope::class)->exists();
     }
 }

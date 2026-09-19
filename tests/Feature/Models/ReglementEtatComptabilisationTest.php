@@ -79,10 +79,13 @@ it('écarte un règlement sans mode de paiement', function () {
     expect(Reglement::aComptabiliser()->count())->toBe(0);
 });
 
-it('écarte un règlement à 0 €', function () {
+it('écarte un règlement à 0 € ou à montant négatif', function () {
+    $temoin = reglementEtatTest($this, ModePaiement::Cheque, 30.0);
     reglementEtatTest($this, ModePaiement::Cheque, 0.0);
+    reglementEtatTest($this, ModePaiement::Cheque, -10.0);
 
-    expect(Reglement::aComptabiliser()->count())->toBe(0);
+    expect(Reglement::aComptabiliser()->pluck('id')->map(fn ($id) => (int) $id)->all())
+        ->toBe([(int) $temoin->id]);
 });
 
 it('écarte un règlement déjà comptabilisé', function () {
@@ -108,4 +111,15 @@ it('estComptabilise suit la présence d\'une transaction non supprimée', functi
 
     $tx->delete();
     expect($reglement->fresh()->estComptabilise())->toBeFalse();
+});
+
+it('le verrou d\'un règlement comptabilisé ne dépend pas d\'une association active', function () {
+    $reglement = reglementEtatTest($this, ModePaiement::Cheque, 30.0);
+    transactionEtatTest($reglement);
+    $reglement = $reglement->fresh();
+
+    TenantContext::clear();
+
+    expect($reglement->estComptabilise())->toBeTrue()
+        ->and(Reglement::aComptabiliser()->whereKey($reglement->id)->exists())->toBeFalse();
 });

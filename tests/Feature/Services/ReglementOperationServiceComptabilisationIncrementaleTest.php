@@ -81,11 +81,14 @@ it('ne comptabilise que les règlements dont le mode est renseigné', function (
 });
 
 it('ignore un règlement à 0 €', function () {
-    reglementIncrementalTest($this, ModePaiement::Cheque, 0.0);
+    $temoin = reglementIncrementalTest($this, ModePaiement::Cheque);
+    $zero = reglementIncrementalTest($this, ModePaiement::Cheque, 0.0);
 
     comptabiliserIncrementalTest($this);
 
-    expect(Transaction::whereNotNull('reglement_id')->count())->toBe(0);
+    expect(Transaction::whereNotNull('reglement_id')->count())->toBe(1)
+        ->and(Transaction::where('reglement_id', (int) $temoin->id)->count())->toBe(1)
+        ->and(Transaction::where('reglement_id', (int) $zero->id)->count())->toBe(0);
 });
 
 it('comptabilise au second passage le règlement dont le mode a été renseigné entre-temps', function () {

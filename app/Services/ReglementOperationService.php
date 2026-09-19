@@ -47,11 +47,14 @@ final class ReglementOperationService
     ) {}
 
     /**
-     * Comptabilise tous les règlements sans transaction d'une séance.
+     * Comptabilise les règlements prêts d'une séance (Reglement::aComptabiliser()).
+     * Les règlements sans mode de paiement attendent un passage suivant : une
+     * séance se comptabilise en plusieurs fois, sans jamais recréer une
+     * transaction existante.
      *
-     * Crée N Transactions (1 par Reglement avec montant > 0 et sans tx existante)
-     * avec statut_reglement = EnAttente (créance). Enrichit chaque Transaction avec
-     * les écritures partie double via pourRecetteACredit.
+     * Crée 1 Transaction par règlement retenu, avec statut_reglement = EnAttente
+     * (créance). Enrichit chaque Transaction avec les écritures partie double via
+     * pourRecetteACredit.
      *
      * Skip silencieux (best-effort) si les prérequis partie double ne sont pas satisfaits
      * (compte de classe 7 introuvable, etc.).
