@@ -6,6 +6,7 @@ namespace App\Livewire;
 
 use App\Models\Tiers;
 use App\Services\TiersService;
+use BackedEnum;
 use Illuminate\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -247,6 +248,12 @@ final class TiersMergeModal extends Component
 
     private function normalizeValue(mixed $value): ?string
     {
+        // Un attribut casté en enum (la civilité) se compare et s'affiche par
+        // sa valeur : un enum ne se convertit pas en texte par (string).
+        if ($value instanceof BackedEnum) {
+            $value = $value->value;
+        }
+
         if ($value === null || $value === '') {
             return null;
         }

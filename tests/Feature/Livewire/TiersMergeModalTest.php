@@ -434,3 +434,32 @@ it('expose civilite dans MERGE_FIELDS et permet l\'arbitrage', function () {
 
     expect($tiers->fresh()->civilite)->toBe(Civilite::M);
 });
+
+it('ouvre la fusion quand le tiers existant a une civilité, et la conserve', function () {
+    // Régression : la civilité est un enum ; la convertir en texte par un
+    // simple (string) levait une erreur 500 à l'ouverture de la modale
+    // (« Associer » de la synchronisation HelloAsso, fusion, import CSV…).
+    $tiers = Tiers::factory()->create([
+        'association_id' => $this->association->id,
+        'type' => 'particulier',
+        'civilite' => Civilite::Mme,
+        'nom' => 'Kohl',
+        'prenom' => 'Sabrina',
+    ]);
+
+    Livewire::test(TiersMergeModal::class)
+        ->dispatch('open-tiers-merge',
+            sourceData: ['type' => 'particulier', 'nom' => 'KOHL', 'prenom' => 'SABRINA', 'email' => 'kohl@example.com'],
+            tiersId: $tiers->id,
+            sourceLabel: 'Données HelloAsso',
+            targetLabel: 'Tiers existant',
+            confirmLabel: 'Associer ce tiers HelloAsso',
+            context: 'helloasso',
+        )
+        ->assertSet('showModal', true)
+        ->assertSet('targetData.civilite', 'Mme')
+        ->assertSet('resultData.civilite', 'Mme')
+        ->call('confirmMerge');
+
+    expect($tiers->fresh()->civilite)->toBe(Civilite::Mme);
+});

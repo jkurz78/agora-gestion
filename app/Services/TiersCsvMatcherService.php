@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Livewire\TiersMergeModal;
 use App\Models\Tiers;
+use BackedEnum;
 use Illuminate\Support\Str;
 
 final class TiersCsvMatcherService
@@ -241,6 +242,14 @@ final class TiersCsvMatcherService
             return trim((string) ($tiers->getRawOriginal('nom') ?? ''));
         }
 
-        return trim((string) ($tiers->$field ?? ''));
+        $value = $tiers->$field;
+
+        // Un attribut casté en enum (la civilité) se compare par sa valeur :
+        // un enum ne se convertit pas en texte par (string).
+        if ($value instanceof BackedEnum) {
+            $value = $value->value;
+        }
+
+        return trim((string) ($value ?? ''));
     }
 }
