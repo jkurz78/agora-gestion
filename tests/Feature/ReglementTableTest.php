@@ -483,3 +483,65 @@ it('comptabilise les règlements prêts et laisse de côté ceux sans mode, sans
     expect($avecMode->fresh()->estComptabilise())->toBeTrue()
         ->and($sansMode->fresh()->estComptabilise())->toBeFalse();
 });
+
+it('affiche l\'état de chaque règlement dans sa case', function () {
+    ['operation' => $operation, 'seance' => $seance] = seanceComptabilisableTableTest();
+    reglementTableTest($operation, $seance, ModePaiement::Cheque);
+    reglementTableTest($operation, $seance, ModePaiement::Especes);
+    reglementTableTest($operation, $seance, null);
+
+    Livewire::test(ReglementTable::class, ['operation' => $operation])
+        ->assertSee('À comptabiliser')
+        ->assertSee('Sans mode')
+        ->assertSee('Comptabiliser (2)')
+        ->call('ouvrirComptabiliser', $seance->id)
+        ->assertSee('Créer 2 transactions');
+});
+
+it('verrouille la case et retire « À comptabiliser » une fois le règlement comptabilisé', function () {
+    ['operation' => $operation, 'seance' => $seance] = seanceComptabilisableTableTest();
+    $reglement = reglementTableTest($operation, $seance, ModePaiement::Cheque);
+    reglementTableTest($operation, $seance, null);
+    comptabiliserReglementTableTest($reglement);
+
+    Livewire::test(ReglementTable::class, ['operation' => $operation])
+        ->assertDontSee('À comptabiliser')
+        ->assertSee('Déjà comptabilisé')
+        ->assertSee('Sans mode')
+        ->assertSee('Aucun règlement prêt');
+});
+
+it('affiche « Comptabilisé » après deux passages', function () {
+    ['operation' => $operation, 'seance' => $seance, 'compte' => $compte] = seanceComptabilisableTableTest();
+    reglementTableTest($operation, $seance, ModePaiement::Cheque);
+    $tardif = reglementTableTest($operation, $seance, null);
+
+    $composant = Livewire::test(ReglementTable::class, ['operation' => $operation])
+        ->call('ouvrirComptabiliser', $seance->id)
+        ->set('comptabiliserCompteId', $compte->id)
+        ->call('comptabiliserSeance')
+        ->assertDontSeeHtml('&#10003; Comptabilisé');
+
+    $tardif->update(['mode_paiement' => ModePaiement::Virement->value]);
+
+    $composant->call('ouvrirComptabiliser', $seance->id)
+        ->set('comptabiliserCompteId', $compte->id)
+        ->call('comptabiliserSeance')
+        ->assertSeeHtml('&#10003; Comptabilisé');
+
+    expect(Transaction::whereNotNull('reglement_id')->count())->toBe(2);
+});
+
+it('montre le statut « Dû » à un lecteur sans droit d\'écriture', function () {
+    ['operation' => $operation, 'seance' => $seance] = seanceComptabilisableTableTest();
+    $reglement = reglementTableTest($operation, $seance, ModePaiement::Cheque);
+    comptabiliserReglementTableTest($reglement);
+
+    $lecteur = User::factory()->create();
+    $lecteur->associations()->attach($this->association->id, ['role' => 'consultation', 'joined_at' => now()]);
+    $this->actingAs($lecteur);
+
+    Livewire::test(ReglementTable::class, ['operation' => $operation])
+        ->assertDontSee('Marquer reçu')
+        ->assertSee('Dû');
+});

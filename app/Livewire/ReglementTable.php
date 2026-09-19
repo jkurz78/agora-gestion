@@ -362,41 +362,48 @@ final class ReglementTable extends Component
             ->groupBy('participant_id')
             ->map(fn ($items) => $items->keyBy(fn ($item) => $item->type->value));
 
-        // Determine which seances are fully comptabilisées (all their reglements have a transaction)
-        $operationReglements = Reglement::whereIn('seance_id', $seanceIds)
-            ->where('montant_prevu', '>', 0)
-            ->get(['id', 'seance_id', 'participant_id']);
-
-        $reglementIdsWithTx = Transaction::whereIn('reglement_id', $operationReglements->pluck('id'))
-            ->whereNotNull('reglement_id')
-            ->pluck('reglement_id')
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->all();
-
-        $seanceComptabiliseeFlags = [];
-        foreach ($seances as $seance) {
-            $seanceReglements = $operationReglements->where('seance_id', $seance->id);
-            if ($seanceReglements->isEmpty()) {
-                $seanceComptabiliseeFlags[(int) $seance->id] = false;
-
-                continue;
-            }
-            $allHaveTx = $seanceReglements->every(fn ($r) => in_array((int) $r->id, $reglementIdsWithTx, true));
-            $seanceComptabiliseeFlags[(int) $seance->id] = $allHaveTx;
-        }
-
-        // Build transactionMap: "participantId-seanceId" => Transaction
-        // Only for transactions linked via reglement_id (created by Comptabiliser)
-        $txByReglement = Transaction::whereIn('reglement_id', $operationReglements->pluck('id'))
+        // Transaction de chaque règlement (une transaction supprimée ne compte
+        // pas). Couvre tous les règlements, y compris à 0 € : le cadenas de la
+        // grille doit correspondre exactement à Reglement::estComptabilise().
+        $txByReglement = Transaction::whereIn('reglement_id', $reglements->pluck('id'))
             ->get()
             ->keyBy(fn ($tx) => (int) $tx->reglement_id);
 
         $transactionMap = [];
-        foreach ($operationReglements as $reglement) {
+        foreach ($reglements as $reglement) {
             $tx = $txByReglement->get((int) $reglement->id);
             if ($tx !== null) {
                 $transactionMap[(int) $reglement->participant_id.'-'.(int) $reglement->seance_id] = $tx;
+            }
+        }
+
+        // Séance comptabilisée : au moins un règlement > 0 €, et tous ont leur transaction.
+        $seanceComptabiliseeFlags = [];
+        foreach ($seances as $seance) {
+            $aPayer = $reglements->filter(
+                fn ($r) => (int) $r->seance_id === (int) $seance->id && (float) $r->montant_prevu > 0
+            );
+            $seanceComptabiliseeFlags[(int) $seance->id] = $aPayer->isNotEmpty()
+                && $aPayer->every(fn ($r) => $txByReglement->has((int) $r->id));
+        }
+
+        // Règlements prêts : seule définition, celle du service (Reglement::aComptabiliser()).
+        $prets = Reglement::whereIn('seance_id', $seanceIds)
+            ->aComptabiliser()
+            ->get(['id', 'seance_id']);
+        $seanceNbPrets = $prets->countBy(fn ($r) => (int) $r->seance_id)->all();
+        $idsPrets = $prets->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+        // État de chaque case, indexé "participantId-seanceId".
+        $etatMap = [];
+        foreach ($reglements as $reglement) {
+            $key = (int) $reglement->participant_id.'-'.(int) $reglement->seance_id;
+            if (isset($transactionMap[$key])) {
+                $etatMap[$key] = 'comptabilise';
+            } elseif (in_array((int) $reglement->id, $idsPrets, true)) {
+                $etatMap[$key] = 'a_comptabiliser';
+            } elseif ((float) $reglement->montant_prevu > 0) {
+                $etatMap[$key] = 'sans_mode';
             }
         }
 
@@ -411,6 +418,8 @@ final class ReglementTable extends Component
             'realiseMap' => $realiseMap,
             'docVersions' => $docVersions,
             'seanceComptabiliseeFlags' => $seanceComptabiliseeFlags,
+            'seanceNbPrets' => $seanceNbPrets,
+            'etatMap' => $etatMap,
             'comptesBancaires' => $comptesBancaires,
             'transactionMap' => $transactionMap,
         ]);

@@ -121,7 +121,7 @@
                                     $reglement = $reglementMap[$key] ?? null;
                                     $mode = $reglement?->mode_paiement;
                                     $montant = $reglement ? number_format((float) $reglement->montant_prevu, 2, ',', '') : '0,00';
-                                    $locked = $reglement?->remise_id !== null;
+                                    $locked = isset($transactionMap[$key]);
                                     $triColors = [
                                         'cheque' => 'background:#e7f1ff;color:#0d6efd',
                                         'virement' => 'background:#d4edda;color:#155724',
@@ -133,11 +133,11 @@
                                 <td style="padding:4px 6px;vertical-align:middle;white-space:nowrap">
                                     <div class="d-flex align-items-center justify-content-center gap-1">
                                         @if($locked)
-                                            <i class="bi bi-lock-fill" style="font-size:10px;color:#6c757d" title="Remise en banque effectuée"></i>
+                                            <i class="bi bi-lock-fill" style="font-size:10px;color:#6c757d" title="Déjà comptabilisé — pour corriger, supprimez la transaction"></i>
                                         @endif
                                         <span style="font-weight:600;font-size:11px;padding:2px 5px;border-radius:3px;{{ $triStyle }};{{ $locked ? '' : 'cursor:pointer;' }}"
                                               @if(!$locked) wire:click="cycleModePaiement({{ $participant->id }}, {{ $seance->id }})" @endif
-                                              title="{{ $locked ? 'Verrouillé' : 'Clic pour changer' }}">{{ $triLabel }}</span>
+                                              title="{{ $locked ? 'Déjà comptabilisé' : 'Clic pour changer' }}">{{ $triLabel }}</span>
                                         @if($locked)
                                             <span style="font-size:12px;font-variant-numeric:tabular-nums">{{ $montant }}</span>
                                         @else
@@ -181,6 +181,13 @@
                                     $color = $prevu == 0 && $realise == 0 ? '#6c757d' : ($realise >= $prevu && $prevu > 0 ? '#2E7D32' : '#B5453A');
                                     $txKey = (int) $participant->id . '-' . (int) $seance->id;
                                     $tx = $transactionMap[$txKey] ?? null;
+                                    $etat = $etatMap[$txKey] ?? null;
+                                    $badgeStatut = match ($tx?->statut_reglement) {
+                                        \App\Enums\StatutReglement::Pointe => 'background:#6c757d;color:#fff',
+                                        \App\Enums\StatutReglement::EnMain => 'background:#ffc107;color:#000',
+                                        \App\Enums\StatutReglement::EnAttente => 'background:#B5453A;color:#fff',
+                                        default => 'background:#198754;color:#fff',
+                                    };
                                 @endphp
                                 <td style="padding:2px 6px;background:#f8f9fa;text-align:center">
                                     <span style="font-size:11px;color:{{ $color }}">
@@ -194,12 +201,18 @@
                                                 title="Marquer comme reçu">
                                             Marquer reçu
                                         </button>
-                                    @elseif($tx && $tx->statut_reglement !== \App\Enums\StatutReglement::EnAttente)
+                                    @elseif($tx)
                                         <br>
-                                        <span class="badge mt-1"
-                                              style="font-size:9px;background:{{ $tx->statut_reglement === \App\Enums\StatutReglement::Pointe ? '#6c757d' : ($tx->statut_reglement === \App\Enums\StatutReglement::EnMain ? '#ffc107' : '#198754') }};color:{{ $tx->statut_reglement === \App\Enums\StatutReglement::EnMain ? '#000' : '#fff' }}">
+                                        <span class="badge mt-1" style="font-size:9px;{{ $badgeStatut }}">
                                             {{ $tx->statut_reglement->label(\App\Enums\Sens::Recette) }}
                                         </span>
+                                    @elseif($etat === 'a_comptabiliser')
+                                        <br>
+                                        <span class="badge mt-1" style="font-size:9px;background:transparent;border:1px solid #0d6efd;color:#0d6efd">À comptabiliser</span>
+                                    @elseif($etat === 'sans_mode')
+                                        <br>
+                                        <span class="badge mt-1" style="font-size:9px;background:transparent;border:1px solid #adb5bd;color:#6c757d"
+                                              title="Ne sera pas comptabilisé tant que le mode de paiement n'est pas renseigné">Sans mode</span>
                                     @endif
                                 </td>
                             @endforeach
@@ -242,17 +255,25 @@
                     <tr style="background:#f0f4ff">
                         <td colspan="2" style="position:sticky;left:0;z-index:1;background:#f0f4ff;padding:4px 12px;font-size:11px;color:#555;font-weight:500">Comptabiliser</td>
                         @foreach($seances as $seance)
-                            @php $estComptabilisee = $seanceComptabiliseeFlags[(int) $seance->id] ?? false; @endphp
+                            @php
+                                $estComptabilisee = $seanceComptabiliseeFlags[(int) $seance->id] ?? false;
+                                $nbPrets = $seanceNbPrets[(int) $seance->id] ?? 0;
+                            @endphp
                             <td style="text-align:center;padding:4px 6px">
-                                @if(! $estComptabilisee)
+                                @if($estComptabilisee)
+                                    <span class="badge bg-success" style="font-size:10px">&#10003; Comptabilisé</span>
+                                @elseif($nbPrets > 0)
                                     <button wire:click="ouvrirComptabiliser({{ $seance->id }})"
                                             class="btn btn-sm btn-outline-primary py-0 px-1"
                                             style="font-size:10px;line-height:1.6"
-                                            title="Créer les transactions pour cette séance">
-                                        Comptabiliser
-                                    </button>
+                                            title="Créer les transactions des règlements prêts">Comptabiliser ({{ $nbPrets }})</button>
                                 @else
-                                    <span class="badge bg-success" style="font-size:10px">&#10003; Comptabilisé</span>
+                                    {{-- Un bouton désactivé n'affiche pas son title : l'info-bulle est portée par le span. --}}
+                                    <span class="d-inline-block" tabindex="0"
+                                          title="Aucun règlement prêt : il faut un montant et un mode de paiement">
+                                        <button class="btn btn-sm btn-outline-secondary py-0 px-1"
+                                                style="font-size:10px;line-height:1.6;pointer-events:none" disabled>Comptabiliser</button>
+                                    </span>
                                 @endif
                             </td>
                         @endforeach
@@ -355,9 +376,10 @@
                 </div>
                 <div class="modal-footer py-2">
                     <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    @php $nbPretsModale = $seanceNbPrets[(int) $comptabiliserSeanceId] ?? 0; @endphp
                     <button wire:click="comptabiliserSeance" class="btn btn-sm btn-primary"
-                            wire:loading.attr="disabled">
-                        <span wire:loading.remove wire:target="comptabiliserSeance">Créer les transactions</span>
+                            wire:loading.attr="disabled" @disabled($nbPretsModale === 0)>
+                        <span wire:loading.remove wire:target="comptabiliserSeance">Créer {{ $nbPretsModale }} transaction{{ $nbPretsModale > 1 ? 's' : '' }}</span>
                         <span wire:loading wire:target="comptabiliserSeance"><i class="bi bi-hourglass-split"></i> Création...</span>
                     </button>
                 </div>
