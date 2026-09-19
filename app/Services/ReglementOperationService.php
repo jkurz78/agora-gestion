@@ -47,11 +47,14 @@ final class ReglementOperationService
     ) {}
 
     /**
-     * Comptabilise tous les règlements sans transaction d'une séance.
+     * Comptabilise les règlements prêts d'une séance (Reglement::aComptabiliser()).
+     * Les règlements sans mode de paiement attendent un passage suivant : une
+     * séance se comptabilise en plusieurs fois, sans jamais recréer une
+     * transaction existante.
      *
-     * Crée N Transactions (1 par Reglement avec montant > 0 et sans tx existante)
-     * avec statut_reglement = EnAttente (créance). Enrichit chaque Transaction avec
-     * les écritures partie double via pourRecetteACredit.
+     * Crée 1 Transaction par règlement retenu, avec statut_reglement = EnAttente
+     * (créance). Enrichit chaque Transaction avec les écritures partie double via
+     * pourRecetteACredit.
      *
      * Skip silencieux (best-effort) si les prérequis partie double ne sont pas satisfaits
      * (compte de classe 7 introuvable, etc.).
@@ -103,13 +106,14 @@ final class ReglementOperationService
             $compteVentilation = null;
         }
 
-        // Règlements sans transaction existante, avec montant > 0.
+        // Règlements prêts (montant, mode de paiement, pas encore de
+        // transaction) : une séance se comptabilise en plusieurs fois, les
+        // règlements sans mode attendent le passage suivant.
         // Guard multi-tenant : Reglement n'a pas de association_id propre → dérivé via Participant.
         $reglements = Reglement::with('participant.tiers')
             ->where('seance_id', (int) $seance->id)
             ->whereHas('participant', fn ($q) => $q->where('association_id', (int) TenantContext::currentId()))
-            ->where('montant_prevu', '>', 0)
-            ->whereDoesntHave('transaction')
+            ->aComptabiliser()
             ->get();
 
         if ($reglements->isEmpty()) {
