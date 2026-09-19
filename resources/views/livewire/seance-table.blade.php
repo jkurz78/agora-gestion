@@ -43,13 +43,13 @@
         </div>
     @else
         <div class="table-responsive">
-            <table class="table table-sm table-bordered mb-0" style="font-size:12px;table-layout:fixed;width:{{ 150 + ($seances->count() * 180) }}px">
+            <table class="table table-sm table-bordered mb-0" style="font-size:12px;table-layout:fixed;width:{{ 150 + ($seances->count() * (180 + $participationLargeur)) }}px">
                 {{-- Header: Titles --}}
                 <thead>
                     <tr style="background:#3d5473;color:#fff">
                         <td rowspan="3" style="position:sticky;left:0;z-index:2;background:#fff;vertical-align:middle;font-weight:600;color:#555;font-size:11px">Participants</td>
                         @foreach($seances as $seance)
-                            <th style="min-width:170px;text-align:center;font-size:12px">
+                            <th style="min-width:{{ 170 + $participationLargeur }}px;text-align:center;font-size:12px">
                                 <div class="d-flex align-items-center justify-content-center gap-2">
                                     <span>S{{ $seance->numero }}</span>
                                     @if($this->canEdit)
@@ -117,7 +117,7 @@
                                 <div class="d-flex">
                                     <span style="flex:1;text-align:center">Présence</span>
                                     @if($participationLibelle !== null)
-                                        <span data-participation-seance style="width:{{ $participationLargeur }}px;text-align:center;border-left:1px solid #ddd">{{ $participationLibelle }}</span>
+                                        <span data-participation-seance style="width:{{ $participationLargeur }}px;text-align:center;border-left:1px solid #ddd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="{{ $participationLibelle }}">{{ $participationLibelle }}</span>
                                     @endif
                                 </div>
                             </td>
@@ -166,10 +166,10 @@
                                             </select>
                                         </div>
                                         @if($participationLibelle !== null)
-                                            <div style="width:{{ $participationLargeur }}px;border-left:1px solid #dee2e6;background:{{ $kineBg }};cursor:pointer;display:flex;align-items:center;justify-content:center"
+                                            <div data-participation-seance-cellule style="width:{{ $participationLargeur }}px;border-left:1px solid #dee2e6;background:{{ $kineBg }};cursor:pointer;display:flex;align-items:center;justify-content:center"
                                                  onclick="
                                                     var vals = ['', 'oui', 'non'];
-                                                    var cur = '{{ $kine }}';
+                                                    var cur = @js($kine);
                                                     var next = vals[(vals.indexOf(cur) + 1) % vals.length];
                                                     @this.call('updatePresence', {{ $seance->id }}, {{ $participant->id }}, 'kine', next);
                                                  "

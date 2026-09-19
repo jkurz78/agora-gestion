@@ -96,9 +96,14 @@ function operationParticipationSeanceTableTest(object $ctx, ?string $libelle, bo
 it('affiche la colonne de participation avec son libellé', function () {
     $operation = operationParticipationSeanceTableTest($this, 'Repas');
 
-    Livewire::test(SeanceTable::class, ['operation' => $operation])
+    $component = Livewire::test(SeanceTable::class, ['operation' => $operation])
         ->assertSee('Repas')
-        ->assertSeeHtml('data-participation-seance');
+        ->assertSeeHtml('data-participation-seance')
+        ->assertSeeHtml('title="Repas"');
+
+    // Le helper crée 1 séance × 1 participant : la cellule cliquable de
+    // participation ne doit apparaître qu'une seule fois.
+    expect(substr_count($component->html(), 'data-participation-seance-cellule'))->toBe(1);
 });
 
 it('n\'affiche pas la colonne sans l\'option, même en parcours thérapeutique', function () {
@@ -106,7 +111,8 @@ it('n\'affiche pas la colonne sans l\'option, même en parcours thérapeutique',
 
     Livewire::test(SeanceTable::class, ['operation' => $operation])
         ->assertDontSee('Kiné')
-        ->assertDontSeeHtml('data-participation-seance');
+        ->assertDontSeeHtml('data-participation-seance')
+        ->assertDontSeeHtml('data-participation-seance-cellule');
 });
 
 it('refuse d\'enregistrer la participation quand l\'option est inactive', function () {
@@ -129,4 +135,15 @@ it('enregistre la participation quand l\'option est active', function () {
         ->call('updatePresence', $seance->id, $participant->id, 'kine', 'oui');
 
     expect(Presence::where('seance_id', $seance->id)->where('participant_id', $participant->id)->sole()->kine)->toBe('oui');
+});
+
+it('refuse toute valeur de participation hors oui/non, même quand l\'option est active', function () {
+    $operation = operationParticipationSeanceTableTest($this, 'Kiné');
+    $seance = Seance::where('operation_id', $operation->id)->sole();
+    $participant = Participant::where('operation_id', $operation->id)->sole();
+
+    Livewire::test(SeanceTable::class, ['operation' => $operation])
+        ->call('updatePresence', $seance->id, $participant->id, 'kine', "';alert(1);'");
+
+    expect(Presence::where('seance_id', $seance->id)->where('participant_id', $participant->id)->first()?->kine)->toBeNull();
 });

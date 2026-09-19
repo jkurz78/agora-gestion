@@ -126,6 +126,13 @@ final class SeanceTable extends Component
             return;
         }
 
+        // Valeurs de participation strictement bornées à oui/non/vide : la vue
+        // réinjecte la valeur dans du JS inline (@js), aucune autre chaîne ne
+        // doit atteindre la base.
+        if ($field === 'kine' && ! in_array($value, ['oui', 'non', '', null], true)) {
+            return;
+        }
+
         // Verify seance belongs to this operation
         $seance = Seance::where('operation_id', $this->operation->id)->findOrFail($seanceId);
 
