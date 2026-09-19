@@ -293,3 +293,110 @@ it('redirects old URLs to new ones', function () {
     $response->assertRedirect('/operations/types-operation');
     $response->assertStatus(301);
 });
+
+it('enregistre la participation optionnelle et son libellé', function () {
+    Livewire::test(TypeOperationShow::class)
+        ->set('nom', 'Atelier repas')
+        ->set('compte_id', (string) $this->compte->id)
+        ->set('participationSeanceActive', true)
+        ->set('participationSeanceLibelle', ' Repas ')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $type = TypeOperation::where('nom', 'Atelier repas')->sole();
+    expect($type->participation_seance_active)->toBeTrue()
+        ->and($type->participation_seance_libelle)->toBe('Repas');
+});
+
+it('propose « Kiné » comme libellé par défaut', function () {
+    Livewire::test(TypeOperationShow::class)
+        ->assertSet('participationSeanceLibelle', 'Kiné');
+
+    $type = TypeOperation::factory()->create([
+        'compte_id' => $this->compte->id,
+        'association_id' => $this->association->id,
+    ]);
+    Livewire::test(TypeOperationShow::class, ['typeOperation' => $type])
+        ->assertSet('participationSeanceActive', false)
+        ->assertSet('participationSeanceLibelle', 'Kiné');
+});
+
+it('exige un libellé quand la participation est active et ouvre l\'onglet Séances', function () {
+    Livewire::test(TypeOperationShow::class)
+        ->set('nom', 'Sans libellé')
+        ->set('compte_id', (string) $this->compte->id)
+        ->set('participationSeanceActive', true)
+        ->set('participationSeanceLibelle', '   ')
+        ->call('save')
+        ->assertHasErrors(['participationSeanceLibelle' => 'required'])
+        ->assertSet('activeTab', 'seances');
+
+    expect(TypeOperation::where('nom', 'Sans libellé')->exists())->toBeFalse();
+});
+
+it('n\'exige pas de libellé quand la participation est inactive', function () {
+    Livewire::test(TypeOperationShow::class)
+        ->set('nom', 'Formation simple')
+        ->set('compte_id', (string) $this->compte->id)
+        ->set('participationSeanceLibelle', '')
+        ->call('save')
+        ->assertHasNoErrors();
+});
+
+it('limite le libellé de participation à 12 caractères', function () {
+    Livewire::test(TypeOperationShow::class)
+        ->set('nom', 'Libellé long')
+        ->set('compte_id', (string) $this->compte->id)
+        ->set('participationSeanceActive', true)
+        ->set('participationSeanceLibelle', str_repeat('a', 13))
+        ->call('save')
+        ->assertHasErrors(['participationSeanceLibelle' => 'max']);
+});
+
+it('range prescripteur, parcours et droit à l\'image dans l\'onglet Général, sans les griser', function () {
+    Livewire::test(TypeOperationShow::class)
+        ->assertSet('activeTab', 'general')
+        ->assertSeeHtml('id="optPrescripteur"')
+        ->assertSeeHtml('id="optParcours"')
+        ->assertSeeHtml('id="optDroitImage"')
+        ->assertDontSeeHtml('x-bind:disabled="!$wire.formulaireActif"')
+        ->call('setTab', 'formulaire')
+        ->assertDontSeeHtml('id="optParcours"')
+        ->assertDontSeeHtml('id="optPrescripteur"')
+        ->assertDontSeeHtml('id="optDroitImage"');
+});
+
+it('enregistre le parcours thérapeutique sans activer les formulaires', function () {
+    Livewire::test(TypeOperationShow::class)
+        ->set('nom', 'Parcours sans formulaire')
+        ->set('compte_id', (string) $this->compte->id)
+        ->set('formulaireActif', false)
+        ->set('formulaireParcoursTherapeutique', true)
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect(TypeOperation::where('nom', 'Parcours sans formulaire')->sole()->formulaire_parcours_therapeutique)->toBeTrue();
+});
+
+it('l\'onglet Formulaire liste les informations suivies et leurs réglages propres', function () {
+    Livewire::test(TypeOperationShow::class)
+        ->set('formulaireParcoursTherapeutique', true)
+        ->call('setTab', 'formulaire')
+        ->assertSee('le parcours thérapeutique')
+        ->assertSee('Attestation médicale')
+        ->assertDontSee('Titre du bloc prescripteur')
+        ->assertDontSee('Qualificatif des parcours');
+
+    Livewire::test(TypeOperationShow::class)
+        ->call('setTab', 'formulaire')
+        ->assertSee('aucune');
+});
+
+it('l\'onglet Séances porte l\'option de participation et son libellé', function () {
+    Livewire::test(TypeOperationShow::class)
+        ->call('setTab', 'seances')
+        ->assertSee('Collecter une participation optionnelle sur les séances')
+        ->assertDontSeeHtml('id="participationSeanceLibelle"')
+        ->set('participationSeanceActive', true)
+        ->assertSeeHtml('id="participationSeanceLibelle"');
+});

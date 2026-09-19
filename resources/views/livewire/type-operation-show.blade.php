@@ -167,6 +167,30 @@ x-on:click.window="
                         </small>
                     </div>
                 </div>
+
+                {{-- Cadre Informations suivies sur les participants --}}
+                <div class="card mb-3">
+                    <div class="card-header py-2"><span class="small fw-semibold">Informations suivies sur les participants</span></div>
+                    <div class="card-body">
+                        <div class="form-check form-switch">
+                            <input type="checkbox" wire:model="formulairePrescripteur" class="form-check-input" id="optPrescripteur">
+                            <label class="form-check-label fw-semibold" for="optPrescripteur">Prescripteur</label>
+                        </div>
+                        <small class="text-muted d-block mb-2">Coordonnées du prescripteur sur la fiche participant, les PDF et l'export.</small>
+
+                        <div class="form-check form-switch">
+                            <input type="checkbox" wire:model="formulaireParcoursTherapeutique" class="form-check-input" id="optParcours">
+                            <label class="form-check-label fw-semibold" for="optParcours">Parcours thérapeutique (données médicales)</label>
+                        </div>
+                        <small class="text-muted d-block mb-2">Données médicales des participants ; feuille d'émargement sans lignes vides.</small>
+
+                        <div class="form-check form-switch">
+                            <input type="checkbox" wire:model="formulaireDroitImage" class="form-check-input" id="optDroitImage">
+                            <label class="form-check-label fw-semibold" for="optDroitImage">Droit à l'image</label>
+                        </div>
+                        <small class="text-muted d-block mb-0">Autorisations photo et vidéo des participants.</small>
+                    </div>
+                </div>
             </div>
 
             <div class="col-lg-4">
@@ -255,6 +279,27 @@ x-on:click.window="
     {{-- ── Onglet Séances ─────────────────────────────────────────── --}}
     @if($activeTab === 'seances')
     <div class="mt-3 mx-auto" style="max-width:600px">
+        {{-- Participation optionnelle collectée à chaque séance --}}
+        <div class="card mb-3">
+            <div class="card-header py-2"><span class="small fw-semibold">Participation optionnelle</span></div>
+            <div class="card-body">
+                <div class="form-check form-switch mb-1">
+                    <input type="checkbox" wire:model.live="participationSeanceActive" class="form-check-input" id="optParticipationSeance">
+                    <label class="form-check-label fw-semibold" for="optParticipationSeance">Collecter une participation optionnelle sur les séances</label>
+                </div>
+                <small class="text-muted d-block">Colonne oui / non affichée dans l'onglet Séances de l'opération et sur la feuille d'émargement.</small>
+                @if($participationSeanceActive)
+                    <div class="mt-2" style="max-width:220px">
+                        <label class="form-label small mb-1" for="participationSeanceLibelle">Libellé <span class="text-danger">*</span></label>
+                        <input type="text" id="participationSeanceLibelle" wire:model="participationSeanceLibelle" maxlength="12"
+                               class="form-control form-control-sm @error('participationSeanceLibelle') is-invalid @enderror"
+                               placeholder="Kiné">
+                        @error('participationSeanceLibelle') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                    </div>
+                @endif
+            </div>
+        </div>
+
         {{-- Nombre de séances avec +/- --}}
         <div class="d-flex align-items-center gap-3 mb-3">
             <span class="small fw-semibold">Nombre de séances :</span>
@@ -568,49 +613,52 @@ x-on:click.window="
             <label class="form-check-label fw-semibold" for="optFormulaireActif">Utiliser l'envoi de formulaires</label>
         </div>
 
+        @php
+            $informationsSuivies = array_keys(array_filter([
+                'le prescripteur' => $formulairePrescripteur,
+                'le parcours thérapeutique' => $formulaireParcoursTherapeutique,
+                'le droit à l\'image' => $formulaireDroitImage,
+            ]));
+        @endphp
+        <p class="small text-muted mb-3">
+            Le formulaire collecte les informations suivies cochées dans l'onglet Général :
+            {{ $informationsSuivies === [] ? 'aucune' : implode(', ', $informationsSuivies) }}.
+        </p>
+
         <div class="ms-4" x-data x-bind:class="!$wire.formulaireActif && 'opacity-50'">
-            <div class="form-check form-switch mb-2">
-                <input type="checkbox" wire:model.live="formulairePrescripteur" class="form-check-input" id="optPrescripteur"
-                       x-bind:disabled="!$wire.formulaireActif">
-                <label class="form-check-label" for="optPrescripteur">Demander les coordonnées du prescripteur</label>
-            </div>
-            <div class="ms-4 mb-3" x-show="$wire.formulairePrescripteur && $wire.formulaireActif" x-cloak>
-                <label class="form-label small">Titre du bloc</label>
-                <input type="text" wire:model="formulairePrescripteurTitre" class="form-control form-control-sm"
-                       placeholder="Je vous suis adressé(e) par">
-            </div>
+            @if($formulairePrescripteur)
+                <div class="mb-3">
+                    <label class="form-label small">Titre du bloc prescripteur</label>
+                    <input type="text" wire:model="formulairePrescripteurTitre" class="form-control form-control-sm"
+                           placeholder="Je vous suis adressé(e) par">
+                </div>
+            @endif
 
-            <div class="form-check form-switch mb-2">
-                <input type="checkbox" wire:model.live="formulaireParcoursTherapeutique" class="form-check-input" id="optParcours"
-                       x-bind:disabled="!$wire.formulaireActif">
-                <label class="form-check-label" for="optParcours">Récolter les informations nécessaires aux parcours thérapeutiques</label>
-            </div>
-            <div class="ms-4 mb-3" x-show="$wire.formulaireParcoursTherapeutique && $wire.formulaireActif" x-cloak>
-                <label class="form-label small">Attestation médicale (pièce jointe)</label>
-                <div class="form-text small mb-2">Document joint au formulaire d'inscription que le participant doit imprimer, faire remplir par son médecin et renvoyer.</div>
-                <x-zone-depot>
-                    <input type="file" wire:model="attestationMedicale" class="form-control form-control-sm @error('attestationMedicale') is-invalid @enderror" accept=".pdf,.doc,.docx">
-                </x-zone-depot>
-                @error('attestationMedicale') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                @if($existingAttestationPath && $existingAttestationUrl)
-                    <div class="mt-1">
-                        <a href="{{ $existingAttestationUrl }}" target="_blank" class="small">
-                            <i class="bi bi-file-earmark-pdf"></i> Voir le fichier actuel
-                        </a>
-                    </div>
-                @endif
-            </div>
+            @if($formulaireParcoursTherapeutique)
+                <div class="mb-3">
+                    <label class="form-label small">Attestation médicale (pièce jointe)</label>
+                    <div class="form-text small mb-2">Document joint au formulaire d'inscription que le participant doit imprimer, faire remplir par son médecin et renvoyer.</div>
+                    <x-zone-depot>
+                        <input type="file" wire:model="attestationMedicale" class="form-control form-control-sm @error('attestationMedicale') is-invalid @enderror" accept=".pdf,.doc,.docx">
+                    </x-zone-depot>
+                    @error('attestationMedicale') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                    @if($existingAttestationPath && $existingAttestationUrl)
+                        <div class="mt-1">
+                            <a href="{{ $existingAttestationUrl }}" target="_blank" class="small">
+                                <i class="bi bi-file-earmark-pdf"></i> Voir le fichier actuel
+                            </a>
+                        </div>
+                    @endif
+                </div>
+            @endif
 
-            <div class="form-check form-switch mb-2">
-                <input type="checkbox" wire:model.live="formulaireDroitImage" class="form-check-input" id="optDroitImage"
-                       x-bind:disabled="!$wire.formulaireActif">
-                <label class="form-check-label" for="optDroitImage">Demander les autorisations photo et vidéo</label>
-            </div>
-            <div class="ms-4 mb-3" x-show="$wire.formulaireDroitImage && $wire.formulaireActif" x-cloak>
-                <label class="form-label small">Qualificatif des parcours</label>
-                <input type="text" wire:model="formulaireQualificatifAtelier" class="form-control form-control-sm"
-                       placeholder="thérapeutique">
-            </div>
+            @if($formulaireDroitImage)
+                <div class="mb-3">
+                    <label class="form-label small">Qualificatif des parcours</label>
+                    <input type="text" wire:model="formulaireQualificatifAtelier" class="form-control form-control-sm"
+                           placeholder="thérapeutique">
+                </div>
+            @endif
         </div>
     </div>
     @endif
