@@ -11,7 +11,6 @@ use App\Models\CompteBancaire;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Reglement;
-use App\Models\RemiseBancaire;
 use App\Models\Seance;
 use App\Models\Tiers;
 use App\Models\Transaction;
@@ -230,107 +229,72 @@ it('can copy line from first seance', function () {
     expect(Reglement::where('seance_id', $s3->id)->first()->montant_prevu)->toBe('25.00');
 });
 
-it('refuses modification on locked reglement', function () {
+/** Lie une transaction au règlement, comme le fait la comptabilisation. */
+function comptabiliserReglementTableTest(Reglement $reglement): Transaction
+{
+    return Transaction::create([
+        'type' => 'recette',
+        'date' => '2025-11-15',
+        'libelle' => 'Règlement comptabilisé',
+        'montant_total' => (float) $reglement->montant_prevu,
+        'mode_paiement' => $reglement->mode_paiement?->value,
+        'tiers_id' => (int) $reglement->participant->tiers_id,
+        'compte_id' => (int) CompteBancaire::factory()->create()->id,
+        'reglement_id' => (int) $reglement->id,
+    ]);
+}
+
+it('refuse de modifier le montant d\'un règlement comptabilisé', function () {
     $seance = Seance::create(['operation_id' => $this->operation->id, 'numero' => 1]);
-    $participant = Participant::create([
-        'tiers_id' => Tiers::factory()->create()->id,
-        'operation_id' => $this->operation->id,
-        'date_inscription' => now(),
-    ]);
-
-    $remise = RemiseBancaire::create([
-        'numero' => 1,
-        'date' => now()->toDateString(),
-        'mode_paiement' => 'cheque',
-        'compte_cible_id' => CompteBancaire::factory()->create()->id,
-        'libelle' => 'Test remise',
-        'saisi_par' => $this->user->id,
-    ]);
-
-    Reglement::create([
-        'participant_id' => $participant->id,
-        'seance_id' => $seance->id,
-        'mode_paiement' => ModePaiement::Cheque->value,
-        'montant_prevu' => 30.00,
-        'remise_id' => $remise->id,
-    ]);
+    $reglement = reglementTableTest($this->operation, $seance, ModePaiement::Cheque, 30.0);
+    comptabiliserReglementTableTest($reglement);
 
     Livewire::test(ReglementTable::class, ['operation' => $this->operation])
-        ->call('updateMontant', $participant->id, $seance->id, '50,00');
+        ->call('updateMontant', (int) $reglement->participant_id, $seance->id, '50,00');
 
-    // Should not have changed
-    expect((float) Reglement::first()->montant_prevu)->toBe(30.00);
+    expect((float) $reglement->fresh()->montant_prevu)->toBe(30.00);
 });
 
-it('copier ligne skips locked cells', function () {
+it('la recopie de ligne saute les séances comptabilisées', function () {
     $s1 = Seance::create(['operation_id' => $this->operation->id, 'numero' => 1]);
     $s2 = Seance::create(['operation_id' => $this->operation->id, 'numero' => 2]);
-    $participant = Participant::create([
-        'tiers_id' => Tiers::factory()->create()->id,
-        'operation_id' => $this->operation->id,
-        'date_inscription' => now(),
-    ]);
-
-    $remise = RemiseBancaire::create([
-        'numero' => 1,
-        'date' => now()->toDateString(),
-        'mode_paiement' => 'cheque',
-        'compte_cible_id' => CompteBancaire::factory()->create()->id,
-        'libelle' => 'Test remise',
-        'saisi_par' => $this->user->id,
-    ]);
-
-    Reglement::create([
-        'participant_id' => $participant->id,
-        'seance_id' => $s1->id,
-        'mode_paiement' => ModePaiement::Cheque->value,
-        'montant_prevu' => 25.00,
-    ]);
-    Reglement::create([
-        'participant_id' => $participant->id,
-        'seance_id' => $s2->id,
+    $source = reglementTableTest($this->operation, $s1, ModePaiement::Cheque, 25.0);
+    $cible = Reglement::create([
+        'participant_id' => (int) $source->participant_id,
+        'seance_id' => (int) $s2->id,
         'mode_paiement' => ModePaiement::Especes->value,
         'montant_prevu' => 10.00,
-        'remise_id' => $remise->id,
     ]);
+    comptabiliserReglementTableTest($cible);
 
     Livewire::test(ReglementTable::class, ['operation' => $this->operation])
-        ->call('copierLigne', $participant->id);
+        ->call('copierLigne', (int) $source->participant_id);
 
-    $s2Reg = Reglement::where('seance_id', $s2->id)->first();
-    expect($s2Reg->mode_paiement)->toBe(ModePaiement::Especes);
-    expect((float) $s2Reg->montant_prevu)->toBe(10.00);
+    $cible->refresh();
+    expect($cible->mode_paiement)->toBe(ModePaiement::Especes)
+        ->and((float) $cible->montant_prevu)->toBe(10.00);
 });
 
-it('refuses cycle on locked reglement', function () {
+it('refuse de changer le mode d\'un règlement comptabilisé', function () {
     $seance = Seance::create(['operation_id' => $this->operation->id, 'numero' => 1]);
-    $participant = Participant::create([
-        'tiers_id' => Tiers::factory()->create()->id,
-        'operation_id' => $this->operation->id,
-        'date_inscription' => now(),
-    ]);
-
-    $remise = RemiseBancaire::create([
-        'numero' => 1,
-        'date' => now()->toDateString(),
-        'mode_paiement' => 'cheque',
-        'compte_cible_id' => CompteBancaire::factory()->create()->id,
-        'libelle' => 'Test remise',
-        'saisi_par' => $this->user->id,
-    ]);
-
-    Reglement::create([
-        'participant_id' => $participant->id,
-        'seance_id' => $seance->id,
-        'mode_paiement' => ModePaiement::Cheque->value,
-        'montant_prevu' => 30.00,
-        'remise_id' => $remise->id,
-    ]);
+    $reglement = reglementTableTest($this->operation, $seance, ModePaiement::Cheque, 30.0);
+    comptabiliserReglementTableTest($reglement);
 
     Livewire::test(ReglementTable::class, ['operation' => $this->operation])
-        ->call('cycleModePaiement', $participant->id, $seance->id);
+        ->call('cycleModePaiement', (int) $reglement->participant_id, $seance->id);
 
-    expect(Reglement::first()->mode_paiement)->toBe(ModePaiement::Cheque);
+    expect($reglement->fresh()->mode_paiement)->toBe(ModePaiement::Cheque);
+});
+
+it('déverrouille la case quand la transaction est supprimée', function () {
+    $seance = Seance::create(['operation_id' => $this->operation->id, 'numero' => 1]);
+    $reglement = reglementTableTest($this->operation, $seance, ModePaiement::Cheque, 30.0);
+    comptabiliserReglementTableTest($reglement)->delete();
+
+    Livewire::test(ReglementTable::class, ['operation' => $this->operation])
+        ->call('updateMontant', (int) $reglement->participant_id, $seance->id, '50,00');
+
+    expect((float) $reglement->fresh()->montant_prevu)->toBe(50.00);
 });
 
 it('displays realized amounts from transactions', function () {

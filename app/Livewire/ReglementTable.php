@@ -124,7 +124,7 @@ final class ReglementTable extends Component
             ->where('seance_id', $seance->id)
             ->first();
 
-        if ($reglement?->remise_id !== null) {
+        if ($reglement?->estComptabilise()) {
             return;
         }
 
@@ -149,7 +149,7 @@ final class ReglementTable extends Component
             ->where('seance_id', $seance->id)
             ->first();
 
-        if ($existing?->remise_id !== null) {
+        if ($existing?->estComptabilise()) {
             return;
         }
 
@@ -200,7 +200,7 @@ final class ReglementTable extends Component
                 ->where('seance_id', $seance->id)
                 ->first();
 
-            if ($existing?->remise_id !== null) {
+            if ($existing?->estComptabilise()) {
                 continue;
             }
 
