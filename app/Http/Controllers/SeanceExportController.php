@@ -42,6 +42,12 @@ final class SeanceExportController extends Controller
             $presenceMap[$p->seance_id.'-'.$p->participant_id] = $p;
         }
 
+        // Colonne de participation optionnelle : null = une seule colonne par
+        // séance (présence), sinon présence + participation.
+        $operation->loadMissing('typeOperation');
+        $participationLibelle = $operation->typeOperation?->libelleParticipationSeance();
+        $colonnesParSeance = $participationLibelle !== null ? 2 : 1;
+
         $filename = 'seances-'.Str::slug($operation->nom).'-'.now()->format('Y-m-d').'.xlsx';
         $tempPath = storage_path('app/temp/'.$filename);
 
@@ -89,25 +95,30 @@ final class SeanceExportController extends Controller
         $nameStyle = (new Style)->withCellVerticalAlignment(CellVerticalAlignment::CENTER)->withBorder($border);
 
         // 1-based indices for mergeCells(colStart, rowStart, colEnd, rowEnd, sheetIndex)
-        // Col A=1 (Participant), then per séance: col 2+i*2 (Présence), col 3+i*2 (Kiné)
+        // Col A=1 (Participant), then par séance : col 2+i*$colonnesParSeance (Présence),
+        // col 3+i*$colonnesParSeance (participation, si activée)
         $rowNum = 1;
 
         $writer->openToFile($tempPath);
 
-        // Column widths: A=Participant (25), then alternating Présence (18) + Kiné (8)
+        // Column widths: A=Participant (25), puis Présence (18) [+ participation (8) si activée]
         $options->setColumnWidth(25.0, 1);
         for ($i = 0; $i < $seances->count(); $i++) {
-            $options->setColumnWidth(18.0, 2 + $i * 2);  // Présence
-            $options->setColumnWidth(8.0, 3 + $i * 2);    // Kiné
+            $options->setColumnWidth(18.0, 2 + $i * $colonnesParSeance);  // Présence
+            if ($participationLibelle !== null) {
+                $options->setColumnWidth(8.0, 3 + $i * $colonnesParSeance);  // Participation
+            }
         }
 
-        // Row 1: Séance numbers (merged across 2 cols each)
+        // Row 1: Séance numbers (merged across colonnesParSeance cols each)
         $cells = [Cell::fromValue('Participant', $bold)];
         foreach ($seances as $i => $seance) {
             $cells[] = Cell::fromValue('S'.$seance->numero, $boldCenter);
-            $cells[] = Cell::fromValue('', $base);
-            $colStart = 1 + $i * 2;
-            $options->mergeCells($colStart, $rowNum, $colStart + 1, $rowNum, 0);
+            if ($participationLibelle !== null) {
+                $cells[] = Cell::fromValue('', $base);
+                $colStart = 1 + $i * $colonnesParSeance;
+                $options->mergeCells($colStart, $rowNum, $colStart + 1, $rowNum, 0);
+            }
         }
         $writer->addRow(new Row($cells));
         $rowNum++;
@@ -116,9 +127,11 @@ final class SeanceExportController extends Controller
         $cells = [Cell::fromValue('', $base)];
         foreach ($seances as $i => $seance) {
             $cells[] = Cell::fromValue($seance->titre ?? '', $centerStyle);
-            $cells[] = Cell::fromValue('', $base);
-            $colStart = 1 + $i * 2;
-            $options->mergeCells($colStart, $rowNum, $colStart + 1, $rowNum, 0);
+            if ($participationLibelle !== null) {
+                $cells[] = Cell::fromValue('', $base);
+                $colStart = 1 + $i * $colonnesParSeance;
+                $options->mergeCells($colStart, $rowNum, $colStart + 1, $rowNum, 0);
+            }
         }
         $writer->addRow(new Row($cells));
         $rowNum++;
@@ -127,25 +140,29 @@ final class SeanceExportController extends Controller
         $cells = [Cell::fromValue('', $base)];
         foreach ($seances as $i => $seance) {
             $cells[] = Cell::fromValue($seance->date?->format('d/m/Y') ?? '', $centerStyle);
-            $cells[] = Cell::fromValue('', $base);
-            $colStart = 1 + $i * 2;
-            $options->mergeCells($colStart, $rowNum, $colStart + 1, $rowNum, 0);
+            if ($participationLibelle !== null) {
+                $cells[] = Cell::fromValue('', $base);
+                $colStart = 1 + $i * $colonnesParSeance;
+                $options->mergeCells($colStart, $rowNum, $colStart + 1, $rowNum, 0);
+            }
         }
         $writer->addRow(new Row($cells));
         $rowNum++;
 
-        // Row 4: Sub-headers Présence / Kiné
+        // Row 4: Sub-headers Présence / participation
         $cells = [Cell::fromValue('', $base)];
         foreach ($seances as $seance) {
             $cells[] = Cell::fromValue('Présence', $boldCenter);
-            $cells[] = Cell::fromValue('Kiné', $boldCenter);
+            if ($participationLibelle !== null) {
+                $cells[] = Cell::fromValue($participationLibelle, $boldCenter);
+            }
         }
         $writer->addRow(new Row($cells));
         $rowNum++;
 
         // Participants
         foreach ($participants as $p) {
-            // Ligne 1: Présence + Kiné
+            // Ligne 1: Présence + participation
             $cells = [Cell::fromValue(($p->tiers->nom ?? '').' '.($p->tiers->prenom ?? ''), $nameStyle)];
             // Merge participant name vertically across 2 rows (présence + commentaire)
             $options->mergeCells(0, $rowNum, 0, $rowNum + 1, 0);
@@ -165,17 +182,19 @@ final class SeanceExportController extends Controller
 
                 $cells[] = Cell::fromValue($statusLabel, $centerStyle);
 
-                $kineLabel = match ($kine) {
-                    'oui' => 'Oui',
-                    'non' => 'Non',
-                    default => '',
-                };
-                $kineStyle = match ($kine) {
-                    'oui' => $kineOuiCenter,
-                    'non' => $kineNonCenter,
-                    default => null,
-                };
-                $cells[] = Cell::fromValue($kineLabel, $kineStyle ?? $centerStyle);
+                if ($participationLibelle !== null) {
+                    $kineLabel = match ($kine) {
+                        'oui' => 'Oui',
+                        'non' => 'Non',
+                        default => '',
+                    };
+                    $kineStyle = match ($kine) {
+                        'oui' => $kineOuiCenter,
+                        'non' => $kineNonCenter,
+                        default => null,
+                    };
+                    $cells[] = Cell::fromValue($kineLabel, $kineStyle ?? $centerStyle);
+                }
             }
             $writer->addRow(new Row($cells));
             $rowNum++;
@@ -187,9 +206,11 @@ final class SeanceExportController extends Controller
                 $presence = $presenceMap[$key] ?? null;
                 $commentaire = $presence?->commentaire ?? '';
                 $cells[] = Cell::fromValue($commentaire !== '' ? $commentaire : ' ', $commentStyle);
-                $cells[] = Cell::fromValue(' ', $commentStyle);
-                $colStart = 1 + $i * 2;
-                $options->mergeCells($colStart, $rowNum, $colStart + 1, $rowNum, 0);
+                if ($participationLibelle !== null) {
+                    $cells[] = Cell::fromValue(' ', $commentStyle);
+                    $colStart = 1 + $i * $colonnesParSeance;
+                    $options->mergeCells($colStart, $rowNum, $colStart + 1, $rowNum, 0);
+                }
             }
             $writer->addRow(new Row($cells));
             $rowNum++;
@@ -206,9 +227,11 @@ final class SeanceExportController extends Controller
                 }
             }
             $cells[] = Cell::fromValue($presents.'/'.$participants->count(), $boldCenter);
-            $cells[] = Cell::fromValue('', $base);
-            $colStart = 1 + $i * 2;
-            $options->mergeCells($colStart, $rowNum, $colStart + 1, $rowNum, 0);
+            if ($participationLibelle !== null) {
+                $cells[] = Cell::fromValue('', $base);
+                $colStart = 1 + $i * $colonnesParSeance;
+                $options->mergeCells($colStart, $rowNum, $colStart + 1, $rowNum, 0);
+            }
         }
         $writer->addRow(new Row($cells));
 

@@ -11,6 +11,7 @@ use App\Models\TypeOperation;
 use App\Models\User;
 use App\Tenant\TenantContext;
 use Barryvdh\DomPDF\Facade\Pdf;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 /*
  * La colonne de participation optionnelle suit TypeOperation::
@@ -116,4 +117,37 @@ it('la matrice PDF n\'a pas la colonne sans l\'option, même en parcours', funct
     $html = htmlPdfParticipationTest($this, route('operations.seances.matrice-pdf', $operation));
 
     expect($html)->not->toContain('class="col-participation');
+});
+
+/** @return array<int, array<int, mixed>> lignes du classeur exporté */
+function lignesExportParticipationTest(object $ctx, Operation $operation): array
+{
+    $response = $ctx->get(route('operations.seances.export', $operation));
+    $response->assertOk();
+
+    return IOFactory::load($response->baseResponse->getFile()->getPathname())
+        ->getActiveSheet()
+        ->toArray(null, true, false);
+}
+
+it('l\'export Excel nomme la colonne de participation avec son libellé', function () {
+    ['operation' => $operation] = operationParticipationPdfTest($this, 'Repas');
+    Seance::create(['operation_id' => $operation->id, 'numero' => 2]);
+
+    $lignes = lignesExportParticipationTest($this, $operation);
+
+    // Ligne 4 : sous-en-têtes « Présence » / libellé pour chaque séance.
+    expect(array_values(array_filter($lignes[3], fn ($v) => $v !== null && $v !== '')))
+        ->toBe(['Présence', 'Repas', 'Présence', 'Repas']);
+});
+
+it('l\'export Excel n\'a qu\'une colonne par séance sans l\'option', function () {
+    ['operation' => $operation] = operationParticipationPdfTest($this, null, parcours: true);
+    Seance::create(['operation_id' => $operation->id, 'numero' => 2]);
+
+    $lignes = lignesExportParticipationTest($this, $operation);
+
+    expect(array_values(array_filter($lignes[3], fn ($v) => $v !== null && $v !== '')))
+        ->toBe(['Présence', 'Présence'])
+        ->and(count($lignes[0]))->toBe(3); // Participant + 1 colonne par séance
 });
