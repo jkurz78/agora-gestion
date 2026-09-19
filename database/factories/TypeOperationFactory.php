@@ -62,7 +62,7 @@ class TypeOperationFactory extends Factory
         return $this->state(['actif' => false]);
     }
 
-    public function participationSeance(string $libelle = 'Kiné'): static
+    public function participationSeance(string $libelle = TypeOperation::LIBELLE_PARTICIPATION_SEANCE_DEFAUT): static
     {
         return $this->state([
             'participation_seance_active' => true,

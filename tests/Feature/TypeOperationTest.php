@@ -443,3 +443,13 @@ it('l\'onglet Séances porte l\'option de participation et son libellé', functi
         ->set('participationSeanceActive', true)
         ->assertSeeHtml('id="participationSeanceLibelle"');
 });
+
+it('bascule vers l\'onglet Séances quand le nombre de séances est invalide', function () {
+    Livewire::test(TypeOperationShow::class)
+        ->set('nom', 'Nombre invalide')
+        ->set('compte_id', (string) $this->compte->id)
+        ->set('nombre_seances', '0')
+        ->call('save')
+        ->assertHasErrors(['nombre_seances' => 'min'])
+        ->assertSet('activeTab', 'seances');
+});

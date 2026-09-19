@@ -267,6 +267,7 @@ final class TypeOperationShow extends Component
                 'description' => 'general',
                 'compte_id' => 'general',
                 'logo' => 'general',
+                'nombre_seances' => 'seances',
                 'participationSeanceLibelle' => 'seances',
                 'email_from' => 'emails',
                 'email_from_name' => 'emails',
