@@ -120,6 +120,19 @@ final class SeanceTable extends Component
             return;
         }
 
+        // La participation optionnelle n'est collectée que si le type
+        // d'opération l'active (colonne masquée sinon).
+        if ($field === 'kine' && $this->operation->typeOperation?->libelleParticipationSeance() === null) {
+            return;
+        }
+
+        // Valeurs de participation strictement bornées à oui/non/vide : la vue
+        // réinjecte la valeur dans du JS inline (@js), aucune autre chaîne ne
+        // doit atteindre la base.
+        if ($field === 'kine' && ! in_array($value, ['oui', 'non', '', null], true)) {
+            return;
+        }
+
         // Verify seance belongs to this operation
         $seance = Seance::where('operation_id', $this->operation->id)->findOrFail($seanceId);
 
@@ -171,11 +184,20 @@ final class SeanceTable extends Component
             $presenceMap[$p->seance_id.'-'.$p->participant_id] = $p;
         }
 
+        // Colonne de participation optionnelle : null = pas de colonne. Largeur
+        // adaptée au libellé (12 caractères max), 40 px au minimum.
+        $participationLibelle = $this->operation->typeOperation?->libelleParticipationSeance();
+        $participationLargeur = $participationLibelle === null
+            ? 0
+            : max(40, 7 * mb_strlen($participationLibelle) + 12);
+
         return view('livewire.seance-table', [
             'seances' => $seances,
             'participants' => $participants,
             'presenceMap' => $presenceMap,
             'statuts' => StatutPresence::cases(),
+            'participationLibelle' => $participationLibelle,
+            'participationLargeur' => $participationLargeur,
         ]);
     }
 }

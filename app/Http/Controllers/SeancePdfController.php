@@ -31,6 +31,7 @@ final class SeancePdfController extends Controller
 
         $operation->loadMissing('typeOperation');
         $isConfidentiel = $operation->typeOperation?->formulaire_parcours_therapeutique ?? false;
+        $participationLibelle = $operation->typeOperation?->libelleParticipationSeance();
 
         $participants = Participant::where('operation_id', $operation->id)
             ->with('tiers')
@@ -43,7 +44,7 @@ final class SeancePdfController extends Controller
         $appLogoBase64 = file_exists($appLogoPath) ? base64_encode(file_get_contents($appLogoPath)) : null;
 
         // Calcul des lignes vides à ajouter pour compléter la dernière page.
-        // En parcours thérapeutique (case Kiné), pas de lignes vides : la liste est fermée.
+        // En parcours thérapeutique, pas de lignes vides : la liste est fermée.
         // En formation, on complète la dernière page pour accueillir d'éventuels participants de dernière minute.
         $emptyRows = 0;
         if (! $isConfidentiel) {
@@ -63,7 +64,7 @@ final class SeancePdfController extends Controller
             'seance' => $seance,
             'participants' => $participants,
             'association' => $association,
-            'isConfidentiel' => $isConfidentiel,
+            'participationLibelle' => $participationLibelle,
             'headerLogoBase64' => $headerLogoBase64,
             'headerLogoMime' => $headerLogoMime,
             'footerLogoBase64' => $footerLogoBase64,
@@ -81,7 +82,7 @@ final class SeancePdfController extends Controller
     public function matrice(Request $request, Operation $operation): Response
     {
         $operation->loadMissing('typeOperation');
-        $isConfidentiel = $operation->typeOperation?->formulaire_parcours_therapeutique ?? false;
+        $participationLibelle = $operation->typeOperation?->libelleParticipationSeance();
 
         $seances = Seance::where('operation_id', $operation->id)
             ->orderBy('numero')
@@ -112,7 +113,7 @@ final class SeancePdfController extends Controller
             'participants' => $participants,
             'presenceMap' => $presenceMap,
             'association' => $association,
-            'isConfidentiel' => $isConfidentiel,
+            'participationLibelle' => $participationLibelle,
             'headerLogoBase64' => $headerLogoBase64,
             'headerLogoMime' => $headerLogoMime,
             'footerLogoBase64' => $footerLogoBase64,

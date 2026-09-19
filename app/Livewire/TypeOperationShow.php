@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -53,6 +54,10 @@ final class TypeOperationShow extends Component
     public string $formulairePrescripteurTitre = '';
 
     public string $formulaireQualificatifAtelier = '';
+
+    public bool $participationSeanceActive = false;
+
+    public string $participationSeanceLibelle = TypeOperation::LIBELLE_PARTICIPATION_SEANCE_DEFAUT;
 
     public bool $reserve_adherents = false;
 
@@ -134,6 +139,8 @@ final class TypeOperationShow extends Component
         $this->formulaireDroitImage = (bool) $type->formulaire_droit_image;
         $this->formulairePrescripteurTitre = $type->formulaire_prescripteur_titre ?? '';
         $this->formulaireQualificatifAtelier = $type->formulaire_qualificatif_atelier ?? '';
+        $this->participationSeanceActive = (bool) $type->participation_seance_active;
+        $this->participationSeanceLibelle = $type->participation_seance_libelle ?? TypeOperation::LIBELLE_PARTICIPATION_SEANCE_DEFAUT;
         $this->reserve_adherents = (bool) $type->reserve_adherents;
         $this->actif = (bool) $type->actif;
         $this->logo = null;
@@ -240,9 +247,43 @@ final class TypeOperationShow extends Component
             'attestationMedicale' => 'nullable|file|mimes:pdf,doc,docx|max:5120',
             'email_from' => 'nullable|email|max:255',
             'email_from_name' => 'nullable|string|max:255',
+            'participationSeanceLibelle' => [
+                Rule::requiredIf($this->participationSeanceActive),
+                'string',
+                'max:12',
+            ],
         ];
 
-        $this->validate($rules);
+        try {
+            $this->validate($rules, [], [
+                'participationSeanceLibelle' => 'libellé de la participation',
+            ]);
+        } catch (ValidationException $e) {
+            // Chaque champ vit dans un onglet distinct : sans bascule, une
+            // erreur resterait invisible depuis un autre onglet. On bascule
+            // vers l'onglet du premier champ en erreur, dans cet ordre.
+            $ongletParChamp = [
+                'nom' => 'general',
+                'description' => 'general',
+                'compte_id' => 'general',
+                'logo' => 'general',
+                'nombre_seances' => 'seances',
+                'participationSeanceLibelle' => 'seances',
+                'email_from' => 'emails',
+                'email_from_name' => 'emails',
+                'attestationMedicale' => 'formulaire',
+            ];
+
+            foreach ($ongletParChamp as $champ => $onglet) {
+                if (array_key_exists($champ, $e->errors())) {
+                    $this->activeTab = $onglet;
+
+                    break;
+                }
+            }
+
+            throw $e;
+        }
 
         $type = DB::transaction(function (): TypeOperation {
             $data = [
@@ -257,6 +298,8 @@ final class TypeOperationShow extends Component
                 'formulaire_droit_image' => $this->formulaireDroitImage,
                 'formulaire_prescripteur_titre' => $this->formulairePrescripteurTitre !== '' ? $this->formulairePrescripteurTitre : null,
                 'formulaire_qualificatif_atelier' => $this->formulaireQualificatifAtelier !== '' ? $this->formulaireQualificatifAtelier : null,
+                'participation_seance_active' => $this->participationSeanceActive,
+                'participation_seance_libelle' => trim($this->participationSeanceLibelle) !== '' ? trim($this->participationSeanceLibelle) : null,
                 'reserve_adherents' => $this->reserve_adherents,
                 'actif' => $this->actif,
                 'email_from' => $this->email_from !== '' ? $this->email_from : null,

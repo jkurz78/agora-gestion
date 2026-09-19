@@ -10,6 +10,7 @@ use App\Models\Participant;
 use App\Models\Presence;
 use App\Models\Seance;
 use App\Models\Tiers;
+use App\Models\TypeOperation;
 use App\Models\User;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
@@ -22,7 +23,10 @@ beforeEach(function () {
     $this->user = User::factory()->create(['peut_voir_donnees_sensibles' => true]);
     $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
 
-    $this->operation = Operation::factory()->create(['association_id' => $this->association->id]);
+    $this->operation = Operation::factory()->create([
+        'association_id' => $this->association->id,
+        'type_operation_id' => TypeOperation::factory()->participationSeance()->create(['association_id' => $this->association->id])->id,
+    ]);
     $this->seance = Seance::create([
         'operation_id' => $this->operation->id,
         'numero' => 1,

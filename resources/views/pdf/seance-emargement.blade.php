@@ -112,8 +112,8 @@
             <tr>
                 <th class="col-name">Participant</th>
                 <th class="col-signature">Signature</th>
-                @if($isConfidentiel)
-                    <th class="col-kine">Kiné</th>
+                @if($participationLibelle !== null)
+                    <th class="col-kine">{{ $participationLibelle }}</th>
                 @endif
                 <th class="col-obs">Observations</th>
             </tr>
@@ -123,7 +123,7 @@
                 <tr>
                     <td style="font-weight:600">{{ $p->tiers->nom ?? '' }} {{ $p->tiers->prenom ?? '' }}</td>
                     <td class="col-signature"></td>
-                    @if($isConfidentiel)
+                    @if($participationLibelle !== null)
                         <td class="col-kine"><span class="checkbox-empty"></span></td>
                     @endif
                     <td></td>
@@ -133,7 +133,7 @@
                 <tr>
                     <td>&nbsp;</td>
                     <td class="col-signature">&nbsp;</td>
-                    @if($isConfidentiel)
+                    @if($participationLibelle !== null)
                         <td class="col-kine"><span class="checkbox-empty"></span></td>
                     @endif
                     <td>&nbsp;</td>

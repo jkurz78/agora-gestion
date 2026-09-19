@@ -73,10 +73,10 @@
 
     <table class="matrix">
         <thead>
-            @php $colSpan = $isConfidentiel ? 2 : 1; @endphp
+            @php $colSpan = $participationLibelle !== null ? 2 : 1; @endphp
             {{-- Séance numbers --}}
             <tr>
-                <th rowspan="{{ $isConfidentiel ? 4 : 3 }}" class="col-name" style="vertical-align:middle">Participant</th>
+                <th rowspan="{{ $participationLibelle !== null ? 4 : 3 }}" class="col-name" style="vertical-align:middle">Participant</th>
                 @foreach($seances as $seance)
                     <th colspan="{{ $colSpan }}" style="text-align:center">S{{ $seance->numero }}</th>
                 @endforeach
@@ -93,19 +93,19 @@
                     <td colspan="{{ $colSpan }}" style="text-align:center">{{ $seance->date?->format('d/m/Y') }}</td>
                 @endforeach
             </tr>
-            @if($isConfidentiel)
-                {{-- Sub-header: Présence / Kiné --}}
+            @if($participationLibelle !== null)
+                {{-- Sub-header: Présence / participation --}}
                 <tr class="header-row">
                     @foreach($seances as $seance)
                         <td style="text-align:center;font-size:6px;color:#888">Présence</td>
-                        <td style="text-align:center;font-size:6px;color:#888;width:18px">K</td>
+                        <td class="col-participation-entete" style="text-align:center;font-size:6px;color:#888;width:18px">{{ mb_strtoupper(mb_substr($participationLibelle, 0, 1)) }}</td>
                     @endforeach
                 </tr>
             @endif
         </thead>
         <tbody>
             @foreach($participants->sortBy(fn ($p) => mb_strtolower(($p->tiers->nom ?? '').' '.($p->tiers->prenom ?? ''))) as $p)
-                {{-- Ligne 1 : Présence + Kiné --}}
+                {{-- Ligne 1 : Présence / participation --}}
                 <tr>
                     <td rowspan="2" class="col-name" style="vertical-align:middle">{{ $p->tiers->nom }} {{ $p->tiers->prenom }}</td>
                     @foreach($seances as $seance)
@@ -137,8 +137,8 @@
                             };
                         @endphp
                         <td class="{{ $statusClass }}" style="font-size:7px">{{ $statusLabel }}</td>
-                        @if($isConfidentiel)
-                            <td style="background:{{ $kineBg }};width:18px">
+                        @if($participationLibelle !== null)
+                            <td class="col-participation" style="background:{{ $kineBg }};width:18px">
                                 @if($kine === 'oui') <span style="color:#2E7D32">✓</span> @elseif($kine === 'non') <span style="color:#B5453A">✗</span> @endif
                             </td>
                         @endif
