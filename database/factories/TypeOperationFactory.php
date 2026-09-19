@@ -36,6 +36,7 @@ class TypeOperationFactory extends Factory
             )->id,
             'nombre_seances' => fake()->optional()->numberBetween(5, 30),
             'formulaire_parcours_therapeutique' => false,
+            'participation_seance_active' => false,
             'formulaire_actif' => false,
             'reserve_adherents' => false,
             'actif' => true,
@@ -59,5 +60,13 @@ class TypeOperationFactory extends Factory
     public function inactif(): static
     {
         return $this->state(['actif' => false]);
+    }
+
+    public function participationSeance(string $libelle = 'Kiné'): static
+    {
+        return $this->state([
+            'participation_seance_active' => true,
+            'participation_seance_libelle' => $libelle,
+        ]);
     }
 }

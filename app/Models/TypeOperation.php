@@ -35,6 +35,8 @@ final class TypeOperation extends TenantModel
         'formulaire_droit_image',
         'formulaire_prescripteur_titre',
         'formulaire_qualificatif_atelier',
+        'participation_seance_active',
+        'participation_seance_libelle',
     ];
 
     protected function casts(): array
@@ -48,6 +50,7 @@ final class TypeOperation extends TenantModel
             'formulaire_prescripteur' => 'boolean',
             'formulaire_parcours_therapeutique' => 'boolean',
             'formulaire_droit_image' => 'boolean',
+            'participation_seance_active' => 'boolean',
         ];
     }
 
@@ -57,6 +60,23 @@ final class TypeOperation extends TenantModel
     public function scopeActif(Builder $query): Builder
     {
         return $query->where('actif', true);
+    }
+
+    /**
+     * Libellé de la participation optionnelle collectée à chaque séance
+     * (colonne oui / non), ou null si l'option est inactive. SEULE condition
+     * d'affichage de cette colonne : grille Séances, feuille d'émargement,
+     * matrice PDF et export Excel passent tous par ici.
+     */
+    public function libelleParticipationSeance(): ?string
+    {
+        if (! $this->participation_seance_active) {
+            return null;
+        }
+
+        $libelle = trim((string) $this->participation_seance_libelle);
+
+        return $libelle !== '' ? $libelle : 'Kiné';
     }
 
     public function compte(): BelongsTo
