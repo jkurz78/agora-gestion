@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Tenant\TenantContext;
 use Barryvdh\DomPDF\Facade\Pdf;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 /*
  * La colonne de participation optionnelle suit TypeOperation::
@@ -93,13 +94,27 @@ it('la feuille d\'émargement n\'a pas la colonne sans l\'option, même en parco
         ->and(substr_count($html, 'class="col-signature"'))->toBe(2); // en-tête + 1 participant, aucune ligne vide
 });
 
+it('la feuille d\'émargement garde les lignes vides sans l\'option, hors parcours, mais sans colonne', function () {
+    ['operation' => $operation, 'seance' => $seance] = operationParticipationPdfTest($this, null);
+
+    $html = htmlPdfParticipationTest($this, route('operations.seances.emargement-pdf', [$operation, $seance]));
+
+    expect($html)->not->toContain('class="col-kine"')
+        ->and(substr_count($html, 'class="col-signature"'))->toBeGreaterThan(2);
+});
+
 it('la feuille d\'émargement hors parcours ajoute des lignes vides, même avec l\'option', function () {
     ['operation' => $operation, 'seance' => $seance] = operationParticipationPdfTest($this, 'Kiné');
 
     $html = htmlPdfParticipationTest($this, route('operations.seances.emargement-pdf', [$operation, $seance]));
 
-    expect(substr_count($html, 'class="col-signature"'))->toBeGreaterThan(2)
-        ->and($html)->toContain('<th class="col-kine">Kiné</th>');
+    $signatureCount = substr_count($html, 'class="col-signature"');
+
+    // class="col-signature" : 1 en-tête + 1 par ligne (participant ou vide).
+    // class="col-kine" en <td> : 1 par ligne seulement (l'en-tête est un <th>).
+    expect($signatureCount)->toBeGreaterThan(2)
+        ->and($html)->toContain('<th class="col-kine">Kiné</th>')
+        ->and(substr_count($html, '<td class="col-kine">'))->toBe($signatureCount - 1);
 });
 
 it('la matrice PDF affiche la colonne avec l\'initiale du libellé', function () {
@@ -108,7 +123,9 @@ it('la matrice PDF affiche la colonne avec l\'initiale du libellé', function ()
     $html = htmlPdfParticipationTest($this, route('operations.seances.matrice-pdf', $operation));
 
     expect($html)->toContain('class="col-participation"')
-        ->and($html)->toMatch('/class="col-participation-entete"[^>]*>R</');
+        ->and($html)->toMatch('/class="col-participation-entete"[^>]*>R</')
+        ->and($html)->toContain('colspan="2"')
+        ->and($html)->toContain('rowspan="4"');
 });
 
 it('la matrice PDF n\'a pas la colonne sans l\'option, même en parcours', function () {
@@ -116,25 +133,40 @@ it('la matrice PDF n\'a pas la colonne sans l\'option, même en parcours', funct
 
     $html = htmlPdfParticipationTest($this, route('operations.seances.matrice-pdf', $operation));
 
-    expect($html)->not->toContain('class="col-participation');
+    expect($html)->not->toContain('class="col-participation')
+        ->and($html)->toContain('colspan="1"')
+        ->and($html)->toContain('rowspan="3"');
 });
 
-/** @return array<int, array<int, mixed>> lignes du classeur exporté */
-function lignesExportParticipationTest(object $ctx, Operation $operation): array
+/**
+ * Charge le classeur exporté et renvoie la feuille active (lignes ET fusions).
+ * Nettoie le fichier temporaire : deleteFileAfterSend() ne s'exécute jamais en
+ * test (pas d'appel réel à send()), sans quoi storage/app/temp accumule des .xlsx.
+ */
+function feuilleExportParticipationTest(object $ctx, Operation $operation): Worksheet
 {
     $response = $ctx->get(route('operations.seances.export', $operation));
     $response->assertOk();
 
-    return IOFactory::load($response->baseResponse->getFile()->getPathname())
-        ->getActiveSheet()
-        ->toArray(null, true, false);
+    $path = $response->baseResponse->getFile()->getPathname();
+    $sheet = IOFactory::load($path)->getActiveSheet();
+    @unlink($path);
+
+    return $sheet;
 }
 
 it('l\'export Excel nomme la colonne de participation avec son libellé', function () {
     ['operation' => $operation] = operationParticipationPdfTest($this, 'Repas');
     Seance::create(['operation_id' => $operation->id, 'numero' => 2]);
 
-    $lignes = lignesExportParticipationTest($this, $operation);
+    $sheet = feuilleExportParticipationTest($this, $operation);
+    $lignes = $sheet->toArray(null, true, false);
+    $merges = $sheet->getMergeCells();
+
+    // Ligne 1 : numéros de séance, chacun fusionné sur 2 colonnes (Présence + participation).
+    expect($lignes[0])->toBe(['Participant', 'S1', null, 'S2', null]);
+    expect($merges)->toHaveKey('B1:C1');
+    expect($merges)->toHaveKey('D1:E1');
 
     // Ligne 4 : sous-en-têtes « Présence » / libellé pour chaque séance.
     expect(array_values(array_filter($lignes[3], fn ($v) => $v !== null && $v !== '')))
@@ -145,9 +177,19 @@ it('l\'export Excel n\'a qu\'une colonne par séance sans l\'option', function (
     ['operation' => $operation] = operationParticipationPdfTest($this, null, parcours: true);
     Seance::create(['operation_id' => $operation->id, 'numero' => 2]);
 
-    $lignes = lignesExportParticipationTest($this, $operation);
+    $sheet = feuilleExportParticipationTest($this, $operation);
+    $lignes = $sheet->toArray(null, true, false);
+
+    expect($lignes[0])->toBe(['Participant', 'S1', 'S2']);
+    expect(count($lignes[0]))->toBe(3); // Participant + 1 colonne par séance
+
+    // Aucune fusion horizontale (2 colonnes) : seules les fusions verticales du nom
+    // de participant (même colonne des deux côtés) sont attendues, ex. A5:A6.
+    foreach (array_keys($sheet->getMergeCells()) as $range) {
+        [$debut, $fin] = explode(':', $range);
+        expect(preg_replace('/\d+/', '', $debut))->toBe(preg_replace('/\d+/', '', $fin));
+    }
 
     expect(array_values(array_filter($lignes[3], fn ($v) => $v !== null && $v !== '')))
-        ->toBe(['Présence', 'Présence'])
-        ->and(count($lignes[0]))->toBe(3); // Participant + 1 colonne par séance
+        ->toBe(['Présence', 'Présence']);
 });

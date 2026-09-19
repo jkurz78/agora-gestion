@@ -64,7 +64,6 @@ final class SeancePdfController extends Controller
             'seance' => $seance,
             'participants' => $participants,
             'association' => $association,
-            'isConfidentiel' => $isConfidentiel,
             'participationLibelle' => $participationLibelle,
             'headerLogoBase64' => $headerLogoBase64,
             'headerLogoMime' => $headerLogoMime,
@@ -83,7 +82,6 @@ final class SeancePdfController extends Controller
     public function matrice(Request $request, Operation $operation): Response
     {
         $operation->loadMissing('typeOperation');
-        $isConfidentiel = $operation->typeOperation?->formulaire_parcours_therapeutique ?? false;
         $participationLibelle = $operation->typeOperation?->libelleParticipationSeance();
 
         $seances = Seance::where('operation_id', $operation->id)
@@ -115,7 +113,6 @@ final class SeancePdfController extends Controller
             'participants' => $participants,
             'presenceMap' => $presenceMap,
             'association' => $association,
-            'isConfidentiel' => $isConfidentiel,
             'participationLibelle' => $participationLibelle,
             'headerLogoBase64' => $headerLogoBase64,
             'headerLogoMime' => $headerLogoMime,

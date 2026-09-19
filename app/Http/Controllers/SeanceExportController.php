@@ -94,19 +94,24 @@ final class SeanceExportController extends Controller
         $centerStyle = (new Style)->withCellAlignment(CellAlignment::CENTER)->withBorder($border);
         $nameStyle = (new Style)->withCellVerticalAlignment(CellVerticalAlignment::CENTER)->withBorder($border);
 
-        // 1-based indices for mergeCells(colStart, rowStart, colEnd, rowEnd, sheetIndex)
-        // Col A=1 (Participant), then par séance : col 2+i*$colonnesParSeance (Présence),
-        // col 3+i*$colonnesParSeance (participation, si activée)
+        // Attention, deux indexations coexistent dans OpenSpout :
+        // - setColumnWidth(largeur, colonne) : colonne 1-based (1 = A) ;
+        // - mergeCells(colStart, rowStart, colEnd, rowEnd, sheetIndex) : colonnes
+        //   0-based (0 = A), lignes 1-based ($rowNum, déjà la ligne réelle).
+        // Col A=1 (Participant) pour setColumnWidth, puis par séance :
+        // col 2+i*$colonnesParSeance (Présence), col 3+i*$colonnesParSeance (participation, si activée).
         $rowNum = 1;
 
         $writer->openToFile($tempPath);
 
-        // Column widths: A=Participant (25), puis Présence (18) [+ participation (8) si activée]
+        // Column widths: A=Participant (25), puis Présence (18) [+ participation si activée,
+        // assez large pour ne pas tronquer le libellé paramétré]
         $options->setColumnWidth(25.0, 1);
         for ($i = 0; $i < $seances->count(); $i++) {
             $options->setColumnWidth(18.0, 2 + $i * $colonnesParSeance);  // Présence
             if ($participationLibelle !== null) {
-                $options->setColumnWidth(8.0, 3 + $i * $colonnesParSeance);  // Participation
+                $largeurParticipation = max(8.0, mb_strlen($participationLibelle) + 2.0);
+                $options->setColumnWidth($largeurParticipation, 3 + $i * $colonnesParSeance);  // Participation
             }
         }
 
