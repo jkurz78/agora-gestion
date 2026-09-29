@@ -40,6 +40,8 @@ final class TransactionService
      * compte, l'opération et la séance d'une ligne se corrigent par l'action
      * « Reclasser » (ReclassementLigneService), jamais par cet enregistrement.
      */
+    private const REFUS_STRUCTURE_TRANSACTION_REGLEE = 'On ne peut ni ajouter ni supprimer une ligne sur une transaction réglée — annulez le règlement d\'abord.';
+
     private const REFUS_LIGNES_TRANSACTION_REGLEE = 'Les lignes d\'une transaction réglée ne peuvent pas être modifiées ici (compte, opération, séance, montant) — utilisez l\'action « Reclasser » sur la ligne concernée.';
 
     public function __construct(
@@ -1196,13 +1198,13 @@ final class TransactionService
             ->horsRemiseHelloAsso()
             ->get()->keyBy('id');
         if (count($lignes) !== $lignesExistantes->count()) {
-            throw new \RuntimeException(self::REFUS_LIGNES_TRANSACTION_REGLEE);
+            throw new \RuntimeException(self::REFUS_STRUCTURE_TRANSACTION_REGLEE);
         }
 
         foreach ($lignes as $ligneData) {
             $id = $ligneData['id'] ?? null;
             if ($id === null || ! $lignesExistantes->has($id)) {
-                throw new \RuntimeException(self::REFUS_LIGNES_TRANSACTION_REGLEE);
+                throw new \RuntimeException(self::REFUS_STRUCTURE_TRANSACTION_REGLEE);
             }
 
             /** @var TransactionLigne $ligneExistante */
