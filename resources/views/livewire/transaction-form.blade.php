@@ -147,9 +147,18 @@
                             </div>
                         </div>
                     @endif
+                    @php
+                        // « Reclasser » corrige le compte, l'opération et la séance d'une ligne
+                        // réglée, sans toucher au montant ni au règlement. Offert à qui peut
+                        // écrire en compta, hors exercice clôturé (écran en consultation).
+                        $peutReclasser = $isLockedByReglement && $this->canEdit && ! $exerciceCloture;
+                    @endphp
                     @if ($isLockedByReglement)
                         <div class="alert alert-warning small py-2 mb-3">
-                            <i class="bi bi-lock"></i> Des règlements sont enregistrés : annulez-les avant de modifier la date, le tiers, le compte bancaire, les montants ou le compte d'une ligne. La répartition par opération et séance reste modifiable.
+                            <i class="bi bi-lock"></i> Des règlements sont enregistrés : annulez-les avant de modifier la date, le tiers, le compte bancaire ou les montants.
+                            @if ($peutReclasser)
+                                Pour corriger le compte, l'opération ou la séance d'une ligne, utilisez « Reclasser » sur cette ligne.
+                            @endif
                         </div>
                     @endif
                     <div class="row g-3 mb-4">
@@ -433,6 +442,22 @@
                                             @error('lignes.' . $index . '.compte_id')
                                                 <div class="text-danger small mt-1">{{ $message }}</div>
                                             @enderror
+                                            @if (! empty($ligne['reclassee_le']))
+                                                {{-- Marque de reclassement : discrète, le motif en info-bulle. --}}
+                                                <div class="small text-muted mt-1" title="{{ $ligne['reclassement_motif'] ?? '' }}">
+                                                    <i class="bi bi-arrow-left-right"></i>
+                                                    Reclassée le {{ $ligne['reclassee_le'] }}@if (! empty($ligne['reclassee_par'])) par {{ $ligne['reclassee_par'] }}@endif
+                                                    @if (! empty($ligne['reclassement_compte_origine']))
+                                                        — depuis {{ $ligne['reclassement_compte_origine'] }}
+                                                    @endif
+                                                </div>
+                                            @endif
+                                            @if ($peutReclasser && ! empty($ligne['id']))
+                                                <button type="button" class="btn btn-link btn-sm p-0 mt-1"
+                                                        wire:click="ouvrirReclassement({{ (int) $ligne['id'] }})">
+                                                    <i class="bi bi-arrow-left-right"></i> Reclasser
+                                                </button>
+                                            @endif
                                         </td>
                                         <td>
                                             <select wire:model.live="lignes.{{ $index }}.operation_id"
@@ -727,6 +752,105 @@
         </div>
         </div>
     @endif
+
+    {{-- Fenêtre « Reclasser » une ligne d'une transaction réglée.
+         Placée HORS de la couche plein écran du formulaire (z-index 1040) : dans
+         son contexte d'empilement, le fond grisé de Bootstrap (1050, ajouté au
+         body) passerait devant elle. Son état est vidé quand Bootstrap la
+         referme (fermerReclassement), quelle que soit la façon de la fermer. --}}
+    <div class="modal fade"
+         id="reclassementModal"
+         tabindex="-1"
+         aria-labelledby="reclassementModalTitle"
+         aria-hidden="true"
+         wire:ignore.self
+         x-data
+         x-init="$el.addEventListener('hidden.bs.modal', () => $wire.fermerReclassement())"
+         x-on:reclassement-modal-open.window="bootstrap.Modal.getOrCreateInstance($el).show()"
+         x-on:reclassement-modal-close.window="bootstrap.Modal.getOrCreateInstance($el).hide()">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="reclassementModalTitle">Reclasser cette ligne</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                </div>
+
+                @if ($reclassementLigneId !== null)
+                    @php
+                        $opReclassement = $reclassementOperationId !== ''
+                            ? ($operationsAffichees[(int) $reclassementOperationId] ?? null)
+                            : null;
+                    @endphp
+                    <div class="modal-body">
+                        @error('reclassement')
+                            <div class="alert alert-danger py-2" role="alert">{{ $message }}</div>
+                        @enderror
+
+                        <div class="alert alert-light border py-2 small">
+                            <div><strong>Compte actuel :</strong> {{ $reclassementCompteActuelLabel }}</div>
+                            <div><strong>Montant :</strong> {{ number_format((float) $reclassementMontant, 2, ',', ' ') }} €</div>
+                            <div class="text-muted mt-1">Le montant et le règlement ne changent pas : seule l'imputation est corrigée.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Nouveau compte <span class="text-danger">*</span></label>
+                            <livewire:compte-autocomplete
+                                :key="'reclassement-'.$reclassementLigneId"
+                                wire:model="reclassementCompteId"
+                                filtre="{{ $type }}"
+                            />
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-8">
+                                <label for="reclassement-operation" class="form-label">Opération</label>
+                                <select id="reclassement-operation" wire:model.live="reclassementOperationId" class="form-select">
+                                    <option value="">-- Aucune --</option>
+                                    @if ($opReclassement !== null && ! $operations->contains('id', (int) $opReclassement->id))
+                                        <option value="{{ $opReclassement->id }}" selected>{{ $opReclassement->nom }}</option>
+                                    @endif
+                                    @foreach ($operations->groupBy(fn ($op) => $op->typeOperation?->nom ?? 'Sans type') as $typeName => $ops)
+                                        <optgroup label="{{ $typeName }}">
+                                            @foreach ($ops as $op)
+                                                <option value="{{ $op->id }}">{{ $op->nom }}</option>
+                                            @endforeach
+                                        </optgroup>
+                                    @endforeach
+                                </select>
+                            </div>
+                            @if ($opReclassement?->nombre_seances)
+                                <div class="col-md-4">
+                                    <label for="reclassement-seance" class="form-label">Séance</label>
+                                    <select id="reclassement-seance" wire:model="reclassementSeance" class="form-select">
+                                        <option value="">--</option>
+                                        @for ($s = 1; $s <= $opReclassement->nombre_seances; $s++)
+                                            <option value="{{ $s }}">{{ $s }}</option>
+                                        @endfor
+                                    </select>
+                                </div>
+                            @endif
+                        </div>
+
+                        <div class="mb-0">
+                            <label for="reclassement-motif" class="form-label">Motif <span class="text-danger">*</span></label>
+                            <textarea id="reclassement-motif" wire:model="reclassementMotif" class="form-control"
+                                      rows="2" maxlength="255" required
+                                      placeholder="Pourquoi cette ligne change-t-elle de compte ?"></textarea>
+                            <div class="form-text">10 caractères minimum. Conservé sur la ligne, avec la date, votre nom et le compte d'origine.</div>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                        <button type="button" class="btn btn-primary" wire:click="reclasser" wire:loading.attr="disabled" wire:target="reclasser">
+                            <span wire:loading wire:target="reclasser" class="spinner-border spinner-border-sm me-1"></span>
+                            Reclasser cette ligne
+                        </button>
+                    </div>
+                @endif
+            </div>
+        </div>
+    </div>
 
     <livewire:compta.poste-tiers-reglement-modal />
     <livewire:compta.annulation-reglement-tiers-modal />

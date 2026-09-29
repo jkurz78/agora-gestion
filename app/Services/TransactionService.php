@@ -35,6 +35,13 @@ final class TransactionService
         'image/png',
     ];
 
+    /**
+     * Refus unique de tout écart sur les lignes d'une transaction réglée. Le
+     * compte, l'opération et la séance d'une ligne se corrigent par l'action
+     * « Reclasser » (ReclassementLigneService), jamais par cet enregistrement.
+     */
+    private const REFUS_LIGNES_TRANSACTION_REGLEE = 'Les lignes d\'une transaction réglée ne peuvent pas être modifiées ici (compte, opération, séance, montant) — utilisez l\'action « Reclasser » sur la ligne concernée.';
+
     public function __construct(
         private readonly ExerciceService $exerciceService,
         private readonly EcritureGenerator $ecritureGenerator,
@@ -1189,13 +1196,13 @@ final class TransactionService
             ->horsRemiseHelloAsso()
             ->get()->keyBy('id');
         if (count($lignes) !== $lignesExistantes->count()) {
-            throw new \RuntimeException('Les lignes d\'une transaction réglée ne peuvent pas être modifiées (compte, montant, opération) — annulez le règlement d\'abord. La répartition par opération et séance, elle, reste modifiable.');
+            throw new \RuntimeException(self::REFUS_LIGNES_TRANSACTION_REGLEE);
         }
 
         foreach ($lignes as $ligneData) {
             $id = $ligneData['id'] ?? null;
             if ($id === null || ! $lignesExistantes->has($id)) {
-                throw new \RuntimeException('Les lignes d\'une transaction réglée ne peuvent pas être modifiées (compte, montant, opération) — annulez le règlement d\'abord. La répartition par opération et séance, elle, reste modifiable.');
+                throw new \RuntimeException(self::REFUS_LIGNES_TRANSACTION_REGLEE);
             }
 
             /** @var TransactionLigne $ligneExistante */
@@ -1204,7 +1211,7 @@ final class TransactionService
                 || (int) round((float) $ligneExistante->montant * 100) !== (int) round((float) $ligneData['montant'] * 100)
                 || ! $this->memeIdentifiantNullable($ligneExistante->operation_id, $ligneData['operation_id'] ?? null)
                 || ! $this->memeIdentifiantNullable($ligneExistante->seance, $ligneData['seance'] ?? null)) {
-                throw new \RuntimeException('Les lignes d\'une transaction réglée ne peuvent pas être modifiées (compte, montant, opération) — annulez le règlement d\'abord. La répartition par opération et séance, elle, reste modifiable.');
+                throw new \RuntimeException(self::REFUS_LIGNES_TRANSACTION_REGLEE);
             }
         }
     }

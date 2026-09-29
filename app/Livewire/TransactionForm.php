@@ -30,6 +30,7 @@ use App\Models\TransactionLigne;
 use App\Models\TransactionLigneAffectation;
 use App\Services\Compta\PlanComptableSelecteur;
 use App\Services\Compta\PostesTiersOuvertsService;
+use App\Services\Compta\ReclassementLigneService;
 use App\Services\Compta\TransactionAvecReglementService;
 use App\Services\ExerciceService;
 use App\Services\InvoiceOcrService;
@@ -191,6 +192,34 @@ final class TransactionForm extends Component
 
     public bool $ventilationHasAffectations = false;
 
+    // État de la fenêtre « Reclasser » (une ligne d'une transaction réglée).
+
+    /**
+     * Ligne en cours de reclassement. #[Locked] : seule ouvrirReclassement() la
+     * pose, après avoir vérifié qu'elle appartient à la transaction affichée —
+     * le client ne peut pas y glisser l'identifiant d'une autre ligne.
+     */
+    #[Locked]
+    public ?int $reclassementLigneId = null;
+
+    public string $reclassementCompteActuelLabel = '';
+
+    public string $reclassementMontant = '';
+
+    /**
+     * Lié au sélecteur de compte (CompteAutocomplete, `#[Modelable]`) : il y
+     * pose un entier, ou null quand on efface le choix — d'où le type large.
+     */
+    public int|string|null $reclassementCompteId = '';
+
+    public string $reclassementOperationId = '';
+
+    public string $reclassementSeance = '';
+
+    public string $reclassementMotif = '';
+
+    public bool $showReclassementModal = false;
+
     public function getCanEditProperty(): bool
     {
         return RoleAssociation::tryFrom(Auth::user()->currentRole() ?? '')?->canWrite(Espace::Compta) ?? false;
@@ -227,6 +256,7 @@ final class TransactionForm extends Component
             'pieceJointe', 'existingPieceJointeNom', 'existingPieceJointeUrl',
             'ocrMode', 'ocrWaitingForFile', 'ocrAnalyzing', 'ocrError', 'ocrWarnings', 'ocrTiersNom',
             'incomingDocumentId', 'factureDeposeeId', 'incomingDocumentPreviewUrl', 'linkedNdf']);
+        $this->fermerReclassement();
         $this->type = $type;
         $this->sensTresorerie = $type;
         $this->isExtourneMiroir = false;
@@ -514,6 +544,128 @@ final class TransactionForm extends Component
         $this->dispatch('transaction-saved');
     }
 
+    /**
+     * Ouvre la fenêtre « Reclasser » sur une ligne de ventilation.
+     *
+     * L'action n'est offerte que sur une transaction réglée (seul cas où
+     * l'édition directe est refusée) et à qui peut écrire en compta, comme les
+     * autres mutations de cet écran. L'identifiant vient du client : la ligne
+     * doit être une ligne de ventilation de la transaction affichée.
+     */
+    public function ouvrirReclassement(int $ligneId): void
+    {
+        if (! $this->canEdit) {
+            return;
+        }
+
+        $ligne = $this->ligneReclassable($ligneId);
+        if ($ligne === null) {
+            return;
+        }
+
+        $this->reclassementLigneId = (int) $ligne->id;
+        $this->reclassementCompteActuelLabel = $this->libelleCompte($ligne->compte);
+        $this->reclassementMontant = (string) $ligne->montant;
+        $this->reclassementCompteId = (string) ($ligne->compte_id ?? '');
+        $this->reclassementOperationId = (string) ($ligne->operation_id ?? '');
+        $this->reclassementSeance = (string) ($ligne->seance ?? '');
+        $this->reclassementMotif = '';
+        $this->resetErrorBag('reclassement');
+        $this->showReclassementModal = true;
+        $this->dispatch('reclassement-modal-open');
+    }
+
+    public function fermerReclassement(): void
+    {
+        $this->reset([
+            'reclassementLigneId', 'reclassementCompteActuelLabel', 'reclassementMontant',
+            'reclassementCompteId', 'reclassementOperationId', 'reclassementSeance',
+            'reclassementMotif', 'showReclassementModal',
+        ]);
+        $this->resetErrorBag('reclassement');
+    }
+
+    /**
+     * Une séance n'a de sens que pour une opération : changer d'opération
+     * repart d'une séance vide plutôt que de garder le numéro de l'ancienne.
+     */
+    public function updatedReclassementOperationId(): void
+    {
+        $this->reclassementSeance = '';
+    }
+
+    public function reclasser(): void
+    {
+        if (! $this->canEdit) {
+            return;
+        }
+
+        $this->resetErrorBag('reclassement');
+
+        // Revérifiée à la validation, pas seulement à l'ouverture : l'écran a pu
+        // changer de transaction entre-temps, ou la ligne disparaître.
+        $ligne = $this->reclassementLigneId !== null ? $this->ligneReclassable($this->reclassementLigneId) : null;
+        if ($ligne === null) {
+            $this->addError('reclassement', 'Cette ligne n\'existe plus ou n\'appartient pas à la transaction affichée.');
+
+            return;
+        }
+
+        $operationId = $this->reclassementOperationId !== '' ? (int) $this->reclassementOperationId : null;
+        $seance = filter_var($this->reclassementSeance, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+
+        try {
+            app(ReclassementLigneService::class)->reclasser(
+                ligne: $ligne,
+                compteId: (int) $this->reclassementCompteId,
+                operationId: $operationId,
+                seance: $operationId !== null && $seance !== false ? $seance : null,
+                motif: $this->reclassementMotif,
+                auteur: Auth::user(),
+            );
+        } catch (\RuntimeException $e) {
+            // Toutes les gardes métier (motif, classe du compte, reçu fiscal,
+            // exercice clôturé, facture, immobilisation, extourne) vivent dans
+            // le service, qui les énonce en français. ExerciceCloturedException
+            // en hérite. Le refus s'affiche dans la fenêtre, qui reste ouverte.
+            $this->addError('reclassement', $e->getMessage());
+
+            return;
+        }
+
+        // La fenêtre reste rendue le temps de son animation de fermeture ; son
+        // état est vidé à la fin (fermerReclassement, appelée par l'événement
+        // Bootstrap `hidden.bs.modal`), pour que la prochaine ouverture reparte
+        // d'un sélecteur de compte neuf.
+        $this->showReclassementModal = false;
+        $this->dispatch('reclassement-modal-close');
+        $this->edit((int) $this->transactionId);
+        $this->dispatch('transaction-saved');
+    }
+
+    /**
+     * Une ligne de ventilation de la transaction affichée — celles que l'écran
+     * liste : ni la contrepartie 411/401, ni la remise HelloAsso, ni la ligne
+     * d'une autre transaction. Résolue sous le scope tenant.
+     */
+    private function ligneReclassable(int $ligneId): ?TransactionLigne
+    {
+        if ($this->transactionId === null) {
+            return null;
+        }
+
+        return TransactionLigne::with('compte')
+            ->where('transaction_id', (int) $this->transactionId)
+            ->ventilation()
+            ->horsRemiseHelloAsso()
+            ->find($ligneId);
+    }
+
+    private function libelleCompte(?Compte $compte): string
+    {
+        return $compte === null ? '' : $compte->intitule.' ('.$compte->numero_pcg.')';
+    }
+
     #[On('edit-transaction')]
     public function edit(int $id): void
     {
@@ -534,7 +686,7 @@ final class TransactionForm extends Component
         // posée au débit par la synchro) sans la corrompre. Elle reste en
         // base, gérée exclusivement par TransactionService::update().
         $transaction = Transaction::with([
-            'lignes' => fn ($q) => $q->ventilation()->horsRemiseHelloAsso(),
+            'lignes' => fn ($q) => $q->ventilation()->horsRemiseHelloAsso()->with(['compteOrigine', 'reclassePar']),
             'noteDeFrais',
         ])->findOrFail($id);
 
@@ -566,6 +718,13 @@ final class TransactionForm extends Component
             'piece_jointe_filename' => $ligne->piece_jointe_path
                 ? basename($ligne->piece_jointe_path)
                 : null,
+            // Marque « reclassée » : lue ici pour que la vue l'affiche sans
+            // requête supplémentaire. Absente (null) tant que la ligne n'a
+            // jamais été reclassée.
+            'reclassee_le' => $ligne->reclassee_at?->format('d/m/Y'),
+            'reclassee_par' => $ligne->reclassePar?->nom,
+            'reclassement_motif' => $ligne->reclassement_motif,
+            'reclassement_compte_origine' => $this->libelleCompte($ligne->compteOrigine),
         ])->toArray();
 
         $this->existingPieceJointeNom = $transaction->piece_jointe_nom;
@@ -620,6 +779,7 @@ final class TransactionForm extends Component
             'ocrMode', 'ocrWaitingForFile', 'ocrAnalyzing', 'ocrError', 'ocrWarnings', 'ocrTiersNom',
             'incomingDocumentId', 'factureDeposeeId', 'incomingDocumentPreviewUrl', 'linkedNdf',
         ]);
+        $this->fermerReclassement();
         $this->resetValidation();
     }
 
