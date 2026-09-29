@@ -744,6 +744,18 @@ final class HelloAssoSyncService
         ];
 
         if ($existingLigne) {
+            if ($existingLigne->estReclassee()) {
+                // Imputation corrigée à la main : la synchronisation met tout à
+                // jour SAUF le compte et l'opération. Sans ça, la correction
+                // disparaîtrait au passage suivant, sans aucun signal — et le
+                // don repartirait en don, éligible à un reçu fiscal.
+                unset($data['compte_id'], $data['operation_id']);
+                Log::info('[HelloAsso] imputation corrigée à la main : compte et opération conservés', [
+                    'ligne_id' => (int) $existingLigne->id,
+                    'compte_id' => (int) $existingLigne->compte_id,
+                ]);
+            }
+
             $existingLigne->update($data);
             $result['lignes_updated']++;
         } else {

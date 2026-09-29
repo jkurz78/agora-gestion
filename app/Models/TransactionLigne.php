@@ -52,6 +52,11 @@ final class TransactionLigne extends Model
         'lettrage_code',
         'poste_tiers_parent_id',
         'libelle',
+        // Reclassement manuel de l'imputation (traçabilité + marque anti-resynchronisation)
+        'reclassement_compte_origine_id',
+        'reclassement_motif',
+        'reclassee_at',
+        'reclassee_par_user_id',
     ];
 
     protected function casts(): array
@@ -70,6 +75,9 @@ final class TransactionLigne extends Model
             'credit' => 'decimal:2',
             'tiers_id' => 'integer',
             'poste_tiers_parent_id' => 'integer',
+            'reclassement_compte_origine_id' => 'integer',
+            'reclassee_par_user_id' => 'integer',
+            'reclassee_at' => 'datetime',
         ];
     }
 
@@ -143,6 +151,15 @@ final class TransactionLigne extends Model
     }
 
     /**
+     * Vrai si le compte de cette ligne a été choisi à la main (reclassement).
+     * La synchronisation HelloAsso ne réécrit alors ni le compte ni l'opération.
+     */
+    public function estReclassee(): bool
+    {
+        return $this->reclassee_at !== null;
+    }
+
+    /**
      * Retourne le montant signé : debit - credit.
      * Positif pour une écriture débit, négatif pour une écriture crédit.
      */
@@ -179,6 +196,22 @@ final class TransactionLigne extends Model
     public function tiers(): BelongsTo
     {
         return $this->belongsTo(Tiers::class);
+    }
+
+    /**
+     * Compte d'imputation avant le premier reclassement manuel.
+     */
+    public function compteOrigine(): BelongsTo
+    {
+        return $this->belongsTo(Compte::class, 'reclassement_compte_origine_id');
+    }
+
+    /**
+     * Utilisateur qui a reclassé la ligne.
+     */
+    public function reclassePar(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reclassee_par_user_id');
     }
 
     public function posteTiersParent(): BelongsTo
