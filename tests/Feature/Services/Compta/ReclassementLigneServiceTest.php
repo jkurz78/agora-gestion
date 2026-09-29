@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 use App\Enums\ModePaiement;
 use App\Enums\SensVentilation;
+use App\Enums\StatutFacture;
 use App\Enums\TypeTransaction;
 use App\Exceptions\ExerciceCloturedException;
 use App\Models\Association;
 use App\Models\Compte;
 use App\Models\Exercice;
+use App\Models\Extourne;
+use App\Models\Facture;
+use App\Models\Immobilisation;
 use App\Models\Operation;
 use App\Models\RecuFiscalEmis;
+use App\Models\RemiseBancaire;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -399,4 +404,90 @@ it('contrôle l\'exercice de la pièce, pas l\'exercice courant', function () {
         ->toThrow(ExerciceCloturedException::class);
 
     expect((int) $ligne->fresh()->compte_id)->toBe((int) $this->compte754->id);
+});
+
+// ---------------------------------------------------------------------------
+// Une autre pièce pilote l'écriture : la reclasser ici ferait diverger les deux.
+// Une remise, elle, ne concerne que l'encaissement.
+// ---------------------------------------------------------------------------
+
+it('refuse une transaction pilotée par une facture validée', function () {
+    $ligne = ligneDonPourReclassementTest($this);
+    $facture = Facture::create([
+        'association_id' => (int) $this->association->id,
+        'numero' => 'F-2025-0001',
+        'date' => '2025-11-15',
+        'statut' => StatutFacture::Validee->value,
+        'exercice' => 2025,
+        'tiers_id' => (int) $ligne->transaction->lignes()->whereNotNull('tiers_id')->value('tiers_id'),
+        'saisi_par' => (int) $this->user->id,
+    ]);
+    $facture->transactions()->attach((int) $ligne->transaction_id);
+
+    expect(fn () => $this->service->reclasser($ligne, (int) $this->compte706B->id, null, null, 'Reclassement refusé attendu', $this->user))
+        ->toThrow(RuntimeException::class);
+
+    expect((int) $ligne->fresh()->compte_id)->toBe((int) $this->compte754->id);
+});
+
+it('refuse une transaction pilotée par une fiche d\'immobilisation', function () {
+    $ligne = ligneDonPourReclassementTest($this);
+    Immobilisation::create([
+        'association_id' => (int) $this->association->id,
+        'numero' => 'IMMO-0001',
+        'libelle' => 'Matériel de test',
+        'quantite' => 1,
+        'compte_id' => (int) $this->compte754->id,
+        'compte_amortissement_id' => (int) $this->compte754->id,
+        'montant_acquisition' => 175.00,
+        'date_mise_en_service' => '2025-11-15',
+        'duree_mois' => 36,
+        'transaction_id' => (int) $ligne->transaction_id,
+    ]);
+
+    expect(fn () => $this->service->reclasser($ligne, (int) $this->compte706B->id, null, null, 'Reclassement refusé attendu', $this->user))
+        ->toThrow(RuntimeException::class);
+
+    expect((int) $ligne->fresh()->compte_id)->toBe((int) $this->compte754->id);
+});
+
+it('refuse une transaction extournée et son miroir', function () {
+    $origine = ligneDonPourReclassementTest($this);
+    $miroir = ligneDonPourReclassementTest($this);
+
+    Extourne::create([
+        'association_id' => (int) $this->association->id,
+        'transaction_origine_id' => (int) $origine->transaction_id,
+        'transaction_extourne_id' => (int) $miroir->transaction_id,
+        'created_by' => (int) $this->user->id,
+    ]);
+    Transaction::whereKey((int) $origine->transaction_id)->update(['extournee_at' => now()]);
+
+    expect(fn () => $this->service->reclasser($origine, (int) $this->compte706B->id, null, null, 'Origine extournée refusée', $this->user))
+        ->toThrow(RuntimeException::class);
+    expect(fn () => $this->service->reclasser($miroir, (int) $this->compte706B->id, null, null, 'Miroir d\'extourne refusé', $this->user))
+        ->toThrow(RuntimeException::class);
+
+    expect((int) $origine->fresh()->compte_id)->toBe((int) $this->compte754->id)
+        ->and((int) $miroir->fresh()->compte_id)->toBe((int) $this->compte754->id);
+});
+
+it('accepte une transaction remise en banque', function () {
+    // Une remise concerne l'encaissement, jamais la ventilation de produit :
+    // rien ne doit la refuser (garde-fou contre un durcissement par symétrie).
+    $ligne = ligneDonPourReclassementTest($this);
+    $remise = RemiseBancaire::create([
+        'association_id' => (int) $this->association->id,
+        'numero' => 1,
+        'date' => '2025-11-16',
+        'mode_paiement' => ModePaiement::Virement->value,
+        'compte_cible_id' => (int) $this->compteBancaire->id,
+        'libelle' => 'Remise de test',
+        'saisi_par' => (int) $this->user->id,
+    ]);
+    Transaction::whereKey((int) $ligne->transaction_id)->update(['remise_id' => (int) $remise->id]);
+
+    $this->service->reclasser($ligne, (int) $this->compte706B->id, null, null, 'Remise ne bloque pas', $this->user);
+
+    expect((int) $ligne->fresh()->compte_id)->toBe((int) $this->compte706B->id);
 });

@@ -6,6 +6,7 @@ namespace App\Services\Compta;
 
 use App\Enums\TypeTransaction;
 use App\Models\Compte;
+use App\Models\Extourne;
 use App\Models\Operation;
 use App\Models\RecuFiscalEmis;
 use App\Models\TransactionLigne;
@@ -79,6 +80,25 @@ final class ReclassementLigneService
             $this->exerciceService->assertOuvertVerrouille(
                 $this->exerciceService->anneeForDate(CarbonImmutable::parse($transaction->date))
             );
+
+            // Une autre pièce pilote cette écriture : sa ventilation reflète un
+            // document (facture, fiche d'immobilisation) ou fait couple avec un
+            // miroir d'extourne. Reclasser ici ne corrigerait qu'un côté.
+            // Une remise bancaire, elle, ne concerne que l'encaissement : elle
+            // ne bloque rien.
+            if ($transaction->isLockedByFacture()) {
+                throw new RuntimeException('Cette transaction est pilotée par une facture validée : corrigez la facture.');
+            }
+
+            if ($transaction->isLockedByImmobilisation()) {
+                throw new RuntimeException('Cette transaction est pilotée par une fiche d\'immobilisation : corrigez la fiche.');
+            }
+
+            if ($transaction->extournee_at !== null
+                || $transaction->type_ecriture === 'extourne'
+                || Extourne::where('transaction_extourne_id', (int) $transaction->id)->exists()) {
+                throw new RuntimeException('Cette transaction a été extournée (ou en est l\'extourne) : le reclassement ne s\'appliquerait qu\'à une des deux écritures.');
+            }
 
             // Seule une imputation de produit (ou de charge) se reclasse : jamais
             // une contrepartie 411/401 ni une ligne de trésorerie.
