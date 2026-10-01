@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
-use App\Enums\TypeTransaction;
 use App\Models\Compte;
 use App\Models\Provision;
 use App\Models\User;
@@ -25,14 +24,13 @@ final class ProvisionFactory extends Factory
         return [
             'association_id' => TenantContext::currentId() ?? 1,
             'exercice' => $exercice,
-            'type' => fake()->randomElement(TypeTransaction::cases()),
+            'transaction_ligne_id' => null,
             'compte_id' => Compte::factory(),
-            'libelle' => 'Provision '.fake()->word(),
-            'montant' => fake()->randomFloat(2, -5000, 5000),
+            'libelle' => 'Rattachement '.fake()->word(),
+            'montant' => fake()->randomFloat(2, 10, 5000),
             'tiers_id' => null,
             'operation_id' => null,
             'seance' => null,
-            'date' => $exerciceService->dateRange($exercice)['end']->toDateString(),
             'notes' => null,
             'piece_jointe_path' => null,
             'piece_jointe_nom' => null,

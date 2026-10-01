@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Enums\TypeTransaction;
+use App\Enums\CasProvision;
 use App\Traits\TenantStorage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use InvalidArgumentException;
+use RuntimeException;
 
 final class Provision extends TenantModel
 {
@@ -19,14 +21,13 @@ final class Provision extends TenantModel
     protected $fillable = [
         'association_id',
         'exercice',
-        'type',
+        'transaction_ligne_id',
         'compte_id',
         'libelle',
         'montant',
         'tiers_id',
         'operation_id',
         'seance',
-        'date',
         'notes',
         'piece_jointe_path',
         'piece_jointe_nom',
@@ -34,19 +35,110 @@ final class Provision extends TenantModel
         'saisi_par',
     ];
 
+    protected static function booted(): void
+    {
+        // Indispensable : TenantModel::booted() pose le scope global fail-closed sur
+        // association_id et l'hydratation de association_id à la création.
+        parent::booted();
+
+        self::saving(function (self $provision): void {
+            $adossee = $provision->transaction_ligne_id !== null;
+            $libre = $provision->compte_id !== null;
+
+            // D5 : exactement l'une des deux colonnes. La nullité porte le sens —
+            // adossée (CCA/PCA) ou saisie libre (FNP/PAR), jamais les deux, jamais
+            // aucune.
+            if ($adossee === $libre) {
+                throw new InvalidArgumentException(
+                    'Rattachement : renseignez transaction_ligne_id (CCA/PCA) OU compte_id (FNP/PAR), jamais les deux ni aucun.'
+                );
+            }
+
+            // D12 : le rattachement est tout ou rien, et le sens est porté par le
+            // cas. Un montant négatif était l'ancienne mécanique du signe.
+            if (round((float) $provision->montant, 2) <= 0.0) {
+                throw new InvalidArgumentException('Rattachement : le montant est strictement positif.');
+            }
+        });
+    }
+
     protected function casts(): array
     {
         return [
-            'type' => TypeTransaction::class,
-            'date' => 'date',
             'montant' => 'decimal:2',
             'exercice' => 'integer',
+            'transaction_ligne_id' => 'integer',
             'compte_id' => 'integer',
             'tiers_id' => 'integer',
             'operation_id' => 'integer',
             'seance' => 'integer',
             'saisi_par' => 'integer',
         ];
+    }
+
+    public function ligne(): BelongsTo
+    {
+        return $this->belongsTo(TransactionLigne::class, 'transaction_ligne_id');
+    }
+
+    public function estAdossee(): bool
+    {
+        return $this->transaction_ligne_id !== null;
+    }
+
+    /**
+     * Le cas se déduit, il ne se stocke pas (D2).
+     *
+     * classe 6 + adossé = CCA, classe 7 + adossé = PCA,
+     * classe 6 + libre  = FNP, classe 7 + libre  = PAR.
+     */
+    public function cas(): CasProvision
+    {
+        $compte = $this->compteResultat();
+
+        if ($compte === null) {
+            throw new RuntimeException("Rattachement #{$this->id} : aucun compte de résultat résolu.");
+        }
+
+        $classe = (int) $compte->classe;
+
+        return match (true) {
+            $classe === 6 && $this->estAdossee() => CasProvision::ChargeConstateeDavance,
+            $classe === 7 && $this->estAdossee() => CasProvision::ProduitConstateDavance,
+            $classe === 6 => CasProvision::FactureNonParvenue,
+            $classe === 7 => CasProvision::ProduitARecevoir,
+            default => throw new RuntimeException("Rattachement #{$this->id} : compte de classe {$classe} inattendu."),
+        };
+    }
+
+    /** Le compte de résultat mouvementé par l'écriture. */
+    public function compteResultat(): ?Compte
+    {
+        return $this->estAdossee() ? $this->ligne?->compte : $this->compte;
+    }
+
+    /** L'opération héritée de l'origine, ou saisie en mode libre. */
+    public function operationEffectiveId(): ?int
+    {
+        if (! $this->estAdossee()) {
+            return $this->operation_id !== null ? (int) $this->operation_id : null;
+        }
+
+        $op = $this->ligne?->operation_id;
+
+        return $op !== null ? (int) $op : null;
+    }
+
+    /** La séance héritée de l'origine, ou saisie en mode libre. */
+    public function seanceEffective(): ?int
+    {
+        if (! $this->estAdossee()) {
+            return $this->seance !== null ? (int) $this->seance : null;
+        }
+
+        $s = $this->ligne?->seance;
+
+        return $s !== null ? (int) $s : null;
     }
 
     public function compte(): BelongsTo
@@ -72,18 +164,6 @@ final class Provision extends TenantModel
     public function transactions(): HasMany
     {
         return $this->hasMany(Transaction::class);
-    }
-
-    /**
-     * Impact on the P&L result.
-     * depense → +montant (adds to charges)
-     * recette → montant as-is (negative for PCA = reduces revenue)
-     */
-    public function montantSigne(): float
-    {
-        $montant = (float) $this->montant;
-
-        return $this->type === TypeTransaction::Depense ? abs($montant) : $montant;
     }
 
     /**

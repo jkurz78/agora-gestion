@@ -16,14 +16,12 @@ use App\Exceptions\Compta\TiersInterditException;
 use App\Exceptions\Compta\TiersRequisException;
 use App\Models\Compte;
 use App\Models\Immobilisation;
-use App\Models\Provision;
 use App\Models\RemiseBancaire;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\VirementInterne;
 use App\Services\Compta\ANouveau\PosteReporteResolver;
-use App\Services\ExerciceService;
 use App\Services\NumeroPieceService;
 use App\Support\MontantDecimal;
 use App\Tenant\TenantContext;
@@ -1854,142 +1852,6 @@ final class EcritureGenerator
             $this->assertPasDeTiersSurClasse5($lignes);
 
             // Reload avec lignes pour que le caller puisse les lire
-            return $transaction->load('lignes.compte');
-        });
-    }
-
-    public function pourProvisionDotation(Provision $provision): Transaction
-    {
-        $montant = (float) $provision->montant;
-        $libelle = 'Dotation : '.$provision->libelle;
-        $isDepense = $provision->type === TypeTransaction::Depense;
-        $tenantId = (int) TenantContext::currentId();
-
-        $compteDebit = Compte::where('association_id', $tenantId)
-            ->where('numero_pcg', $isDepense ? '681' : '487')
-            ->firstOrFail();
-
-        $compteCredit = Compte::where('association_id', $tenantId)
-            ->where('numero_pcg', $isDepense ? '486' : '781')
-            ->firstOrFail();
-
-        return DB::transaction(function () use ($provision, $montant, $libelle, $isDepense, $tenantId, $compteDebit, $compteCredit): Transaction {
-            $numeroPiece = app(NumeroPieceService::class)->assign(Carbon::parse($provision->date));
-
-            $transaction = Transaction::create([
-                'association_id' => $tenantId,
-                'type' => $isDepense ? TypeTransaction::Depense : TypeTransaction::Recette,
-                'date' => $provision->date->format('Y-m-d'),
-                'libelle' => $libelle,
-                'montant_total' => $montant,
-                'mode_paiement' => null,
-                'saisi_par' => Auth::id(),
-                'equilibree' => true,
-                'type_ecriture' => 'normale',
-                'journal' => JournalComptable::Od,
-                'numero_piece' => $numeroPiece,
-                'provision_id' => $provision->id,
-            ]);
-
-            $ligneDebit = TransactionLigne::create([
-                'transaction_id' => $transaction->id,
-                'compte_id' => $compteDebit->id,
-                'debit' => $montant,
-                'credit' => 0,
-                'tiers_id' => null,
-                'libelle' => $libelle,
-                'montant' => 0,
-            ]);
-            $ligneDebit->setRelation('compte', $compteDebit);
-
-            $ligneCredit = TransactionLigne::create([
-                'transaction_id' => $transaction->id,
-                'compte_id' => $compteCredit->id,
-                'debit' => 0,
-                'credit' => $montant,
-                'tiers_id' => null,
-                'libelle' => $libelle,
-                'montant' => 0,
-            ]);
-            $ligneCredit->setRelation('compte', $compteCredit);
-
-            $lignes = collect([$ligneDebit, $ligneCredit]);
-            $this->assertEquilibre($lignes);
-            $this->assertTenantCoherence($lignes);
-
-            return $transaction->load('lignes.compte');
-        });
-    }
-
-    public function pourProvisionExtourne(Provision $provision): Transaction
-    {
-        $montant = (float) $provision->montant;
-        $libelle = 'Extourne : '.$provision->libelle;
-        $isDepense = $provision->type === TypeTransaction::Depense;
-        $tenantId = (int) TenantContext::currentId();
-
-        $compteDebit = Compte::where('association_id', $tenantId)
-            ->where('numero_pcg', $isDepense ? '486' : '681')
-            ->firstOrFail();
-
-        $compteCredit = Compte::where('association_id', $tenantId)
-            ->where('numero_pcg', $isDepense ? '781' : '487')
-            ->firstOrFail();
-
-        // Premier jour de l'exercice suivant, lu dans le paramétrage de
-        // l'association et non fixé au 1er septembre : le mois de début
-        // d'exercice est un réglage, et une association en exercice civil
-        // voyait ses extournes datées de septembre — une écriture comptable
-        // au mauvais mois, dont le numéro de pièce héritait ensuite du mauvais
-        // exercice puisqu'il se dérive de cette même date.
-        $dateExtourne = Carbon::instance(
-            app(ExerciceService::class)->dateRange($provision->exercice + 1)['start']->toDateTime(),
-        );
-
-        return DB::transaction(function () use ($provision, $montant, $libelle, $isDepense, $tenantId, $compteDebit, $compteCredit, $dateExtourne): Transaction {
-            $numeroPiece = app(NumeroPieceService::class)->assign($dateExtourne);
-
-            $transaction = Transaction::create([
-                'association_id' => $tenantId,
-                'type' => $isDepense ? TypeTransaction::Recette : TypeTransaction::Depense,
-                'date' => $dateExtourne->format('Y-m-d'),
-                'libelle' => $libelle,
-                'montant_total' => $montant,
-                'mode_paiement' => null,
-                'saisi_par' => Auth::id(),
-                'equilibree' => true,
-                'type_ecriture' => 'extourne',
-                'journal' => JournalComptable::Od,
-                'numero_piece' => $numeroPiece,
-                'provision_id' => $provision->id,
-            ]);
-
-            $ligneDebit = TransactionLigne::create([
-                'transaction_id' => $transaction->id,
-                'compte_id' => $compteDebit->id,
-                'debit' => $montant,
-                'credit' => 0,
-                'tiers_id' => null,
-                'libelle' => $libelle,
-                'montant' => 0,
-            ]);
-            $ligneDebit->setRelation('compte', $compteDebit);
-
-            $ligneCredit = TransactionLigne::create([
-                'transaction_id' => $transaction->id,
-                'compte_id' => $compteCredit->id,
-                'debit' => 0,
-                'credit' => $montant,
-                'tiers_id' => null,
-                'libelle' => $libelle,
-                'montant' => 0,
-            ]);
-            $ligneCredit->setRelation('compte', $compteCredit);
-
-            $lignes = collect([$ligneDebit, $ligneCredit]);
-            $this->assertEquilibre($lignes);
-            $this->assertTenantCoherence($lignes);
-
             return $transaction->load('lignes.compte');
         });
     }

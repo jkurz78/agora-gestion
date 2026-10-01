@@ -3,15 +3,12 @@
 declare(strict_types=1);
 
 use App\Enums\StatutExercice;
-use App\Livewire\Provisions\ProvisionIndex;
 use App\Models\Association;
-use App\Models\Compte;
 use App\Models\Exercice;
 use App\Models\Provision;
 use App\Models\User;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Tenant\TenantContext;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
@@ -55,51 +52,6 @@ it('pieceJointeFullPath() retourne uniquement le basename si piece_jointe_path c
     // Même si l'ancienne valeur contenait un slash, basename() isole le fichier
     $expected = "associations/{$this->aid}/provisions/{$provision->id}/piece-jointe.pdf";
     expect($provision->pieceJointeFullPath())->toBe($expected);
-});
-
-// ── Upload via ProvisionIndex → chemin tenant-scoped ─────────────────────────
-
-it('upload PJ dans ProvisionIndex place le fichier sous associations/{aid}/provisions/{pid}/piece-jointe.{ext}', function () {
-    $component = Livewire\Livewire::test(ProvisionIndex::class);
-
-    // On prépare les données du formulaire
-    // DC-10a : le sélecteur porte directement un id de compte.
-    $compte = Compte::factory()->numero('606')->create();
-    $file = UploadedFile::fake()->create('contrat.pdf', 100, 'application/pdf');
-
-    $component
-        ->set('libelle', 'Provision test')
-        ->set('compte_id', (string) $compte->id)
-        ->set('type', 'depense')
-        ->set('montant', '500')
-        ->set('piece_jointe', $file)
-        ->call('save');
-
-    $provision = Provision::latest('id')->first();
-    expect($provision)->not->toBeNull();
-
-    // piece_jointe_path doit être le nom court (sans slash)
-    expect($provision->piece_jointe_path)->not->toContain('/');
-    expect($provision->piece_jointe_nom)->toBe('contrat.pdf');
-    expect($provision->piece_jointe_mime)->toBe('application/pdf');
-
-    // Le fichier doit exister sur le disque local au chemin tenant-scoped
-    $expectedFull = "associations/{$this->aid}/provisions/{$provision->id}/{$provision->piece_jointe_path}";
-    Storage::disk('local')->assertExists($expectedFull);
-});
-
-it('piece_jointe_path sans PJ reste null', function () {
-    $compte = Compte::factory()->numero('706')->create();
-
-    Livewire\Livewire::test(ProvisionIndex::class)
-        ->set('libelle', 'Provision sans PJ')
-        ->set('compte_id', (string) $compte->id)
-        ->set('type', 'recette')
-        ->set('montant', '200')
-        ->call('save');
-
-    $provision = Provision::latest('id')->first();
-    expect($provision->piece_jointe_path)->toBeNull();
 });
 
 // ── Migration backfill (chemin court déjà = skip) ────────────────────────────
