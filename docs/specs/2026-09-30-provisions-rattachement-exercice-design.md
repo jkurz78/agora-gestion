@@ -67,18 +67,22 @@ Le § 6.1 de la spec de juin (« CompteResultatBuilder — Aucun changement ») 
 question sans la poser : c'était une spec de plomberie, et son § 8 excluait explicitement toute
 modification de l'IHM.
 
-### 2.4 Le grain « ligne » ne sait pas exprimer une ventilation par affectations
+### 2.4 Une ligne ventilée par affectations n'a pas d'opération à hériter
 
-Une ligne peut porter sa ventilation soit directement (`tl.operation_id`), soit par
+Une ligne porte sa ventilation soit directement (`tl.operation_id`), soit par
 `transaction_ligne_affectations` — et dans ce second cas `tl.operation_id` est généralement nul.
 Le compte de résultat traite chaque affectation séparément
 ([Q2](../../app/Services/Rapports/CompteResultatBuilder.php#L1422)).
 
-La mesure est sans ambiguïté : la **seule** ligne multi-affectations de la base est
-`transaction_lignes#84`, **741 — Subvention État Ministère des Sports**, 20 000 € au crédit,
-`tl.operation_id = NULL`, ventilée en 10 000 € / 5 000 € / 5 000 € sur trois opérations. Au grain
-ligne, une provision y hériterait d'une opération nulle et d'un plafond de 20 000 € : elle ne
-pourrait pas exprimer le report d'une part.
+La **seule** ligne à affectations de la base est `transaction_lignes#84`,
+**741 — Subvention État Ministère des Sports**, 20 000 € au crédit, `tl.operation_id = NULL`,
+ventilée en 10 000 € / 5 000 € / 5 000 € sur trois opérations.
+
+Rattacher une telle ligne au grain de la ligne lui ferait hériter d'une **opération nulle** —
+c'est-à-dire reproduire en silence le défaut même que cette spec répare. Elle doit donc être
+**refusée avec un message**, pas servie approximativement. Le grain affectation est hors scope
+(§ 12) : aucune ligne de la base n'a d'affectation unique, et celle qui en a trois est une
+subvention, dont le traitement relève des fonds dédiés.
 
 ### 2.5 La classe du compte ne suffit pas à déduire le sens
 
@@ -117,14 +121,15 @@ Deux conséquences supplémentaires :
 | D1 | Schéma d'écriture aligné sur le PCG ; 681/781 abandonnés | Ce sont les comptes des dotations et reprises aux amortissements et provisions, pas ceux de la régularisation (classe 48). Le sens devient porté par le cas, plus par le signe du montant. |
 | D2 | Le cas (CCA/PCA/FNP/PAR) est **déduit**, jamais choisi ni stocké | `classe 6 + adossé = CCA`, `classe 7 + adossé = PCA`, `classe 6 + libre = FNP`, `classe 7 + libre = PAR`. Une charge payée d'avance a forcément une écriture d'origine ; une facture non parvenue n'en a par définition aucune. |
 | D3 | Une CCA/PCA s'adosse à son origine et en hérite compte, opération, séance, et le tiers de la **transaction** | Les dimensions analytiques ne peuvent plus diverger : le CR de l'opération se réconcilie par construction. Le tiers d'une écriture 6/7 est porté par la transaction, et c'est lui que lit le rapport ([#L1354](../../app/Services/Rapports/CompteResultatBuilder.php#L1354)) ; `transaction_lignes.tiers_id` reste la place du tiers *porté par* la ligne 408/418 du lot 2. |
-| D4 | **Le grain d'adossement est l'affectation quand elle existe, la ligne sinon** | § 2.4. Sans quoi le report d'une part de subvention est inexprimable. |
-| D5 | La table `provisions` ne garde que la **décision** ; les champs de saisie libre sont nullables et réservés au lot 2 | Invariant à trois branches, exactement l'une renseignée : la nullité porte le sens. |
+| D4 | Le grain est **la ligne** ; une ligne porteuse d'affectations est **refusée avec un message** | § 2.4. Aucune ligne de la base n'a d'affectation unique ; la seule qui en a trois est une subvention relevant des fonds dédiés. Servir ces lignes au grain ligne reproduirait le défaut réparé. |
+| D5 | La table `provisions` ne garde que la **décision** ; les champs de saisie libre sont nullables et réservés au lot 2 | Invariant à deux branches, exactement l'une renseignée : la nullité porte le sens. |
 | D6 | Point d'entrée unique : l'écran, avec **détection des candidats** | Le geste est un balayage de clôture. La détection propose, la recherche libre complète. |
 | D7 | Une ligne adossée est **verrouillée**, et le verrou gèle sa transaction entière | § 2.6. L'incohérence ne peut pas naître ; on retire le rattachement, on corrige, on le repasse. |
 | D8 | `operation_id` et `seance` propagés sur **la seule ligne de classe 6/7** de chaque écriture | Seule celle-là change les rapports. Les porter aussi sur la contrepartie de classe 4 créerait de la surface sans bénéfice — décision révisée après revue. |
 | D9 | Lot 1 n'accepte qu'une ligne de **classe 6 au débit ou de classe 7 au crédit** | § 2.5. Formulé par le sens observé et non par une liste de numéros : résiste à tout contra-compte futur. |
 | D10 | Livraison en deux lots : CCA/PCA d'abord, FNP/PAR ensuite | Le premier couvre le besoin mesuré et n'exige aucun nouveau compte. Le second demande de seeder 408 et 418. |
 | D11 | Vocabulaire comptable à l'écran : « écritures de rattachement », « charge / produit constaté d'avance » | CCA/PCA/FNP/PAR sont des comptes de régularisation (classe 48), pas des provisions (15/29/39/49/59). Les noms **physiques** `provisions` / `Provision` sont conservés — même arbitrage que `code_cerfa`, relibellé « Compte comptable » sans renommer la colonne. |
+| D12 | Le rattachement est **tout ou rien** : le montant est celui de l'origine, jamais saisi | Aucun cas mesuré n'appelle un décalage partiel — l'opération 8 démarre entièrement dans l'exercice suivant. Supprime d'un coup le plafond, le cumul par origine, le verrou de concurrence et la notion de reste à décaler. |
 
 ## 4. Modèle de données
 
@@ -133,40 +138,33 @@ sans reprise de données.
 
 | Colonne | Statut | Rôle |
 |---|---|---|
-| `transaction_ligne_affectation_id` | **ajoutée** | FK nullable, `ON DELETE RESTRICT`. Renseignée ⇒ CCA/PCA au grain affectation. |
-| `transaction_ligne_id` | **ajoutée** | FK nullable, `ON DELETE RESTRICT`. Renseignée ⇒ CCA/PCA sur une ligne sans affectation. |
+| `transaction_ligne_id` | **ajoutée** | FK nullable, `ON DELETE RESTRICT`. Renseignée ⇒ CCA/PCA. |
 | `compte_id`, `operation_id`, `seance`, `tiers_id` | **rendues nullables** | Réservées au lot 2. `compte_id` renseigné ⇒ FNP/PAR. |
-| `montant` | conservée | Toujours **positif**, stocké tel quel, comparé en centimes. |
+| `montant` | conservée | Toujours **positif**, égal au montant de la ligne d'origine. Recopié à la création, jamais saisi (D12). |
 | `exercice` | conservée | Exercice de rattachement. |
 | `libelle` | conservée, nullable | Hérité en mode adossé, saisi en mode libre. |
 | `notes`, `piece_jointe_*`, `saisi_par` | conservées | Inchangées. |
 | `type` | **supprimée** | Remplacée par le cas déduit. |
 | `date` | **supprimée** | Dérivable de `exercice` ; la date qui fait foi est celle de l'écriture, immuable. |
 
-**Invariant** : exactement **une** de ces trois colonnes est renseignée —
-`transaction_ligne_affectation_id`, `transaction_ligne_id`, `compte_id`.
+**Invariant** : exactement **une** de ces deux colonnes est renseignée —
+`transaction_ligne_id` (lot 1) ou `compte_id` (lot 2).
 
 Garde **applicative**, pas contrainte SQL : la production tourne sur MariaDB 11.4 et aucun
 environnement de test ne la parle. Un test verrouille l'invariant dans les deux sens (aucune
-renseignée, plusieurs renseignées).
+renseignée, les deux renseignées).
 
-**Ce qui est hérité, selon le grain** :
+**Ce qui est hérité de la ligne d'origine** : le compte (`tl.compte_id`), l'opération et la séance
+(`tl.operation_id`, `tl.seance`), le sens (lu sur la ligne), le montant
+(`max(tl.debit, tl.credit)` — non ambigu puisque les lignes de sens inverse sont refusées par D9),
+et le tiers d'affichage (`transactions.tiers_id`).
 
-| | grain affectation | grain ligne |
-|---|---|---|
-| compte | `tl.compte_id` de la ligne parente | `tl.compte_id` |
-| opération, séance | `tla.operation_id`, `tla.seance` | `tl.operation_id`, `tl.seance` |
-| sens | **celui de la ligne parente** | celui de la ligne |
-| plafond | `tla.montant` | `max(tl.debit, tl.credit)` |
-| tiers (affichage) | `transactions.tiers_id` | `transactions.tiers_id` |
-
-Le sens est lu sur la ligne parente dans les deux cas : les affectations ne portent qu'une
-magnitude positive, sans signe propre — c'est la règle documentée par `SensMontantPd`.
-
-**Plafond** : `montant ≤ plafond − Σ (provisions non supprimées du même grain)`. Le décalage
-partiel est permis. Le cumul est calculé **en centimes**, sous `lockForUpdate` de l'origine
-(ligne ou affectation) et des provisions qui s'y rattachent, dans la transaction DB de
-l'écriture — sans quoi deux requêtes concurrentes voient chacune le même disponible.
+Une ligne ne peut porter **qu'un seul** rattachement non supprimé, puisqu'il couvre son montant
+entier. Garde applicative, comme l'invariant et pour la même raison de moteur — un index unique
+filtré n'existe ni sur MariaDB ni sur MySQL, et un rattachement retiré doit pouvoir être repassé.
+Le `lockForUpdate` posé sur la ligne d'origine dans la transaction DB de l'écriture suffit à
+écarter la création simultanée de deux rattachements : un appel, pas un mécanisme — c'est le cumul
+par origine et son calcul en centimes que D12 supprime, pas le verrou.
 
 **Enum `App\Enums\CasProvision`** : `ChargeConstateeDavance`, `ProduitConstateDavance`,
 `FactureNonParvenue`, `ProduitARecevoir`. Calculé, jamais persisté.
@@ -212,27 +210,25 @@ Menu : Exercices > **Écritures de rattachement**. Sélecteur d'exercice en têt
 
 ### 6.1 Zone « À rattacher » — candidats détectés
 
-Est candidate toute origine — affectation, ou ligne sans affectation — de l'exercice dont
-l'opération a un `date_debut` postérieur à la fin de l'exercice.
+Est candidate toute ligne de classe 6 ou 7 de l'exercice dont l'opération a un `date_debut`
+postérieur à la fin de l'exercice. **Une seule requête** — la ventilation est lue sur
+`tl.operation_id`.
 
-Deux requêtes, sur le motif Q1/Q2 déjà établi dans `CompteResultatBuilder` : les lignes sans
-affectation d'un côté, les affectations de l'autre.
+**Exclusions** :
 
-**Exclusions, dans les deux branches** :
-
-- origine dont la ligne parente est de **sens inverse** — classe 6 au crédit, classe 7 au débit
-  (D9) ;
+- ligne de **sens inverse** — classe 6 au crédit, classe 7 au débit (D9) ;
+- ligne **porteuse d'affectations** (D4). Elle n'a pas d'opération propre à hériter ; elle est
+  listée comme **écartée, avec son motif**, jamais omise en silence ;
 - ligne appartenant à une transaction de rattachement : `transactions.provision_id IS NOT NULL`.
   Sans cette exclusion, l'extourne de notre PCA — un crédit sur 706B en N+1 — se présenterait
   elle-même comme candidate à la recherche libre. La règle de sens écarte déjà la dotation, qui
   est un débit sur un compte de classe 7 ;
-- origine **intégralement** rattachée. Une origine **partiellement** rattachée reste listée, en
-  affichant le montant déjà décalé et le reste à décaler.
+- ligne déjà rattachée.
 
-Colonnes : date, pièce, compte, libellé, tiers, opération avec ses dates, montant de l'origine,
-reste à décaler, action **« Constater d'avance »**.
+Colonnes : date, pièce, compte, libellé, tiers, opération avec ses dates, montant, action
+**« Constater d'avance »**.
 
-La détection **propose**. Une recherche libre, à côté, permet de rattacher toute origine de
+La détection **propose**. Une recherche libre, à côté, permet de rattacher toute ligne de
 l'exercice respectant les mêmes exclusions : le décalage porté par une opération n'est pas le seul
 légitime.
 
@@ -241,18 +237,19 @@ construction avec l'exercice sélectionné, puisque les candidats en sont tirés
 
 ### 6.2 Zone « Rattachements de l'exercice »
 
-Cas, origine cliquable vers sa transaction, compte, opération, montant, pièce jointe, auteur,
+Cas, ligne d'origine cliquable vers sa transaction, compte, opération, montant, pièce jointe, auteur,
 date de saisie, action **« Retirer »**.
 
 ### 6.3 La modale
 
-Héritées et en lecture seule : compte, opération, séance, tiers, montant de l'origine, date de
-pièce. Cas déduit, écrit en clair :
+Héritées et en lecture seule : compte, opération, séance, tiers, **montant**, date de pièce. Cas
+déduit, écrit en clair :
 
 > **Produit constaté d'avance** — les 175,00 € encaissés le 08/04/2026 seront retirés du résultat
 > 2025‑2026 et reconnus sur 2026‑2027.
 
-Saisis : montant à décaler (pré-rempli au reste à décaler, plafonné), notes, pièce jointe.
+Saisis : notes, pièce jointe. Le montant n'est pas saisissable (D12) — le rattachement porte la
+ligne entière.
 
 **Aperçu des deux écritures avant validation** — quatre lignes, avec dates, débits et crédits.
 Ce n'est pas cosmétique : l'inversion de la v2.10 a survécu parce que l'écriture produite n'a
@@ -275,7 +272,7 @@ Les lignes sont soft-deletées à certains endroits et `forceDelete`-ées à d'a
 `RESTRICT` n'est qu'un filet de dernier recours, et sur le chemin d'édition elle produirait une
 erreur SQL brute. **La garde est applicative et vit au service.**
 
-Une origine rattachée gèle **sa transaction entière** : il n'existe aucun chemin d'édition léger à
+Une ligne rattachée gèle **sa transaction entière** : il n'existe aucun chemin d'édition léger à
 exempter, `update()` reconstruisant toutes les lignes. Le refus nomme le rattachement et la
 sortie : le retirer, corriger, le repasser.
 
@@ -295,7 +292,7 @@ Sites à garder :
 Le **reçu fiscal ne bloque pas** : un rattachement ne change ni le compte, ni le tiers, ni la date
 du don, seulement l'exercice de reconnaissance du produit.
 
-**Résolution de l'origine** : l'id reçu de l'IHM est résolu dans le scope tenant courant, et son
+**Résolution de la ligne** : l'id reçu de l'IHM est résolu dans le scope tenant courant, et son
 compte, son exercice et son association sont vérifiés avant toute écriture. Un appel forgé portant
 l'id d'une autre association doit être refusé, pas servi.
 
@@ -337,13 +334,13 @@ Extourne  01/09/2026  OD   487  D 175,00          /  706B C 175,00 (op. 8)
 | 2025‑2026 | 706B : 175 − 175 = **0,00** | **0,00** | 487 créditeur de 175 au **passif**, rubrique « Produits constatés d'avance » |
 | 2026‑2027 | 706B : **+175,00** | **+175,00** | 487 soldé |
 
-**Second cas, au grain affectation** : `transaction_ligne_affectations#9`, 10 000 € de la
-subvention `transaction_lignes#84` (741, crédit) sur l'opération 3. Un rattachement partiel de
-3 000 € doit produire `741 D 3 000 (op. 3) / 487 C 3 000`, laisser 7 000 € de reste à décaler sur
-cette affectation, et **ne rien changer** aux deux autres affectations de la même ligne.
+**Second cas, le refus** : `transaction_lignes#84` (741, 20 000 € au crédit, trois affectations)
+doit être **refusée** — à la détection, à la recherche libre et au service sur appel direct — avec
+un motif lisible. C'est le test qui prouve que D4 ne laisse pas passer une ligne sans opération
+propre.
 
-Ce second cas n'est pas un scénario comptable recommandé — une subvention acquise mais affectée
-relève des fonds dédiés (§ 12) — mais c'est le test qui éprouve le grain.
+**Troisième cas, le refus de sens** : la ligne `709A` débitrice doit être refusée aux trois mêmes
+endroits (D9).
 
 ## 10. Critères d'acceptation
 
@@ -353,44 +350,41 @@ relève des fonds dédiés (§ 12) — mais c'est le test qui éprouve le grain.
 2. **AC‑2** — Mutation : inverser débit et crédit dans le générateur fait tomber AC‑1. À prouver,
    pas à supposer.
 3. **AC‑3** — Le bilan sort 487 au passif en « Produits constatés d'avance » au 31/08/2026.
-4. **AC‑4** — Rattachement partiel au **grain affectation** (second cas du § 9) : montants justes,
-   reste à décaler juste, affectations sœurs intactes.
-5. **AC‑5** — Le cas est correctement déduit pour les quatre combinaisons, et le grain pour les
-   trois branches de l'invariant.
-6. **AC‑6** — L'invariant des trois colonnes est refusé dans les deux sens : aucune renseignée,
-   plusieurs renseignées.
-7. **AC‑7** — Une ligne **de sens inverse** est refusée : une ligne 709A débitrice n'est ni
-   détectée, ni rattachable par recherche libre, ni acceptée par le service sur appel direct.
-8. **AC‑8** — Un test **par site** du verrou du § 7 : `update()`, `affecterLigne()`,
+4. **AC‑4** — Le cas est correctement déduit pour les quatre combinaisons, et l'invariant des deux
+   colonnes est refusé dans les deux sens : aucune renseignée, les deux renseignées.
+5. **AC‑5** — Une ligne **de sens inverse** est refusée aux trois endroits — détection, recherche
+   libre, appel direct au service : la ligne `709A` débitrice du § 9.
+6. **AC‑6** — Une ligne **porteuse d'affectations** est refusée aux trois mêmes endroits, avec un
+   motif, et n'est **jamais** traitée au grain ligne : la ligne 84 du § 9.
+7. **AC‑7** — Un test **par site** du verrou du § 7 : `update()`, `affecterLigne()`,
    `supprimerAffectations()`, `delete()`, `annuler()`, extourne, `reclasser()`, `removeLigne()`,
    et modification du montant par la synchronisation HelloAsso. Chacun doit tuer une garde précise
    — retirer n'importe laquelle fait tomber exactement un test.
-9. **AC‑9** — `update()` sur une transaction porteuse rend un **refus métier lisible**, jamais une
+8. **AC‑8** — `update()` sur une transaction porteuse rend un **refus métier lisible**, jamais une
    erreur SQL de contrainte de clé étrangère.
-10. **AC‑10** — Création, modification et retrait sont refusés si N **ou** N+1 est clôturé.
-11. **AC‑11** — Concurrence : deux créations simultanées sur la même origine ne peuvent pas
-    dépasser le plafond ensemble.
-12. **AC‑12** — Une transaction de rattachement n'est jamais candidate : ni sa dotation (écartée
+9. **AC‑9** — Création, modification et retrait sont refusés si N **ou** N+1 est clôturé.
+10. **AC‑10** — Une ligne ne peut porter qu'un rattachement non supprimé ; deux créations
+    simultanées sur la même ligne n'en produisent qu'un. Un rattachement retiré peut être repassé.
+11. **AC‑11** — Une transaction de rattachement n'est jamais candidate : ni sa dotation (écartée
     par le sens), ni son extourne (écartée par `provision_id`).
-13. **AC‑13** — Tenant : un appel forgé portant l'id d'une origine d'une autre association est
-    refusé. Un test **par filtre** sur la requête de détection, qui joint `operations`, `comptes`,
-    `transaction_lignes` et `transaction_ligne_affectations`.
-14. **AC‑14** — La détection trouve l'origine de la ligne 145 ; une origine intégralement
-    rattachée sort de la liste, une origine partiellement rattachée y reste avec son reste.
-15. **AC‑15** — Le récap du wizard de clôture affiche le compte de l'origine, jamais « Compte
+12. **AC‑12** — Tenant : un appel forgé portant l'id d'une ligne d'une autre association est
+    refusé. Un test **par filtre** sur la requête de détection, qui joint `operations`, `comptes`
+    et `transaction_lignes`.
+13. **AC‑13** — La détection trouve la ligne 145 ; une ligne déjà rattachée sort de la liste.
+14. **AC‑14** — Le récap du wizard de clôture affiche le compte de l'origine, jamais « Compte
     supprimé ».
-16. **AC‑16** — Aucune écriture de rattachement ne porte de débit ou de crédit négatif.
-17. **AC‑17** — Suite **complète** verte — pas un sous-ensemble : le garde du lot budget 2a vivait
-    à la racine de `tests/Feature/` et deux revues ciblées l'avaient manqué.
-18. **AC‑18** — `pest -c phpunit.mysql.xml` vert dans le conteneur sur le périmètre : la détection
-    fait des jointures et un `GROUP BY`, la production tourne sur MariaDB.
+15. **AC‑15** — Aucune écriture de rattachement ne porte de débit ou de crédit négatif.
+16. **AC‑16** — Suite **complète** verte — pas un sous-ensemble : le garde du lot budget 2a vivait
+    à la racine de `tests/Feature/` et deux revues ciblées l'avaient manqué. Plus
+    `pest -c phpunit.mysql.xml` dans le conteneur sur le périmètre : la détection fait des
+    jointures et un `GROUP BY`, la production tourne sur MariaDB.
 
 ## 11. Lots
 
-**Lot 1 — CCA et PCA.** Migration de la table, enum `CasProvision`, schéma d'écriture PCG,
-grain affectation, règle de sens, propagation analytique, écran avec détection et aperçu, verrou
-sur les neuf sites, verrouillage de N et N+1, adaptation du wizard de clôture, relibellé de l'IHM.
-Aucun nouveau compte à seeder.
+**Lot 1 — CCA et PCA.** Migration de la table, enum `CasProvision`, schéma d'écriture PCG, règle de
+sens, refus des lignes à affectations, propagation analytique, écran avec détection et aperçu,
+verrou sur les neuf sites, verrouillage de N et N+1, adaptation du wizard de clôture, relibellé de
+l'IHM. Aucun nouveau compte à seeder, aucun montant à saisir.
 
 **Lot 2 — FNP et PAR.** Seed de 408 et 418, mode de saisie libre dans la modale, `tiers_id` sur la
 ligne de contrepartie. Le modèle de données du lot 1 l'accueille sans migration supplémentaire.
@@ -420,10 +414,16 @@ numérotation fine des sous-comptes reste à confronter au plan ANC. Le besoin e
 calcul de consommation à construire (part affectée moins charges engagées sur l'opération) et une
 annexe à produire. **Chantier propre, spec propre.**
 
-Également hors scope :
+Également hors scope, et chacun pour une raison mesurée :
 
-- le **prorata temporel assisté** : le montant partiel est saisi à la main ;
-- la granularité 6815 / 6868 : sans objet, les rattachements n'emploient plus 681/781 ;
-- toute modification du **plancher de date** ou du verrou de période ;
-- une **voie d'édition légère** des transactions porteuses : écartée au profit du gel complet, qui
+- **Le rattachement partiel** (D12). Aucun cas de la base ne le demande. Il coûterait le plafond,
+  le cumul par ligne, le calcul en centimes et la notion de reste à décaler. Une prestation à
+  cheval sur deux exercices le rouvrirait — et c'est alors le prorata qui serait la vraie question.
+- **Le grain affectation** (D4). Aucune ligne n'a d'affectation unique, et la seule qui en a trois
+  est une subvention relevant des fonds dédiés. Le jour où une ligne à affectations doit être
+  rattachée, il faudra une colonne `transaction_ligne_affectation_id`, l'invariant à trois branches
+  et une seconde branche de détection. D'ici là, elle est refusée explicitement.
+- La granularité 6815 / 6868 : sans objet, les rattachements n'emploient plus 681/781.
+- Toute modification du **plancher de date** ou du verrou de période.
+- Une **voie d'édition légère** des transactions porteuses : écartée au profit du gel complet, qui
   n'ajoute aucun second écrivain sur `transactions`.
