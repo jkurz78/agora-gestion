@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\JournalComptable;
+use App\Enums\TypeTransaction;
 use App\Livewire\OperationDetail;
 use App\Models\Association;
 use App\Models\Compte;
@@ -14,6 +15,7 @@ use App\Models\User;
 use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\Compta\ProvisionPDService;
+use App\Services\TransactionUniverselleService;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Artisan;
@@ -293,6 +295,55 @@ test('compta:check-integrity ne signale aucune écriture de rattachement', funct
 
     expect($texte)->not->toContain('anomalie');
     expect($code)->toBe(0);
+})->with([
+    'PCA' => [7, 175.0],
+    'CCA' => [6, 90.0],
+]);
+
+// ── Le type de transaction : une écriture d'inventaire n'est ni recette ni dépense ──
+//
+// Toutes les écritures de rattachement sont typées « dépense », comme les dotations
+// d'amortissement : le type ne sert qu'à les tenir hors des écrans de travail. Typées
+// « recette », une sur deux apparaissait dans « Toutes les transactions » avec un
+// badge et une couleur qui disaient l'inverse de ce qu'elle fait (« recette » en
+// rouge sur −90 pour la dotation d'une CCA).
+
+test('les deux écritures d’un rattachement sont typées dépense, pour une PCA comme pour une CCA', function (int $classe, float $montant) {
+    $ligne = $this->ligneOrigine($classe, $montant);
+    $provision = provisionPourLigne($ligne);
+
+    $generateur = app(EcritureGenerator::class);
+
+    expect($generateur->pourProvisionDotation($provision)->type)->toBe(TypeTransaction::Depense);
+    expect($generateur->pourProvisionExtourne($provision)->type)->toBe(TypeTransaction::Depense);
+})->with([
+    'PCA' => [7, 175.0],
+    'CCA' => [6, 90.0],
+]);
+
+test('aucune écriture de rattachement n’apparaît dans la liste universelle des transactions', function (int $classe, float $montant) {
+    $ligne = $this->ligneOrigine($classe, $montant);
+    $provision = provisionPourLigne($ligne);
+    app(ProvisionPDService::class)->generer($provision);
+
+    $ecrituresRattachement = Transaction::where('provision_id', $provision->id)->pluck('id')->map(fn ($id) => (int) $id)->all();
+    expect($ecrituresRattachement)->toHaveCount(2);
+
+    foreach ([2025, 2026] as $exercice) {
+        $lignes = collect(app(TransactionUniverselleService::class)
+            ->paginate(null, null, null, null, null, null, null, null, null, null, null, exercice: $exercice, perPage: 100)['paginator']
+            ->items());
+
+        // La pièce d'origine, elle, est bien listée : la liste n'est pas vide par accident.
+        expect($lignes->pluck('id')->map(fn ($id) => (int) $id)->all())->toContain((int) $ligne->transaction_id);
+
+        // Les identifiants d'une union peuvent se recouper entre sources (virements,
+        // remises) : on ne regarde que les lignes issues de `transactions`.
+        $listees = $lignes->whereIn('source_type', ['recette', 'depense'])
+            ->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+        expect(array_intersect($ecrituresRattachement, $listees))->toBe([]);
+    }
 })->with([
     'PCA' => [7, 175.0],
     'CCA' => [6, 90.0],

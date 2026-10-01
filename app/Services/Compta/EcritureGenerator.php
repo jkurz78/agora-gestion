@@ -1885,10 +1885,9 @@ final class EcritureGenerator
     /**
      * Dotation aux amortissements d'une immobilisation : 6811 D / 281X C.
      *
-     * type = Depense et journal = Od : la dotation diminue le résultat, et c'est
-     * la règle qui type aussi les écritures de rattachement (voir
-     * pourRattachement()). C'est une opération d'inventaire, pas un mouvement de
-     * trésorerie.
+     * type = Depense et journal = Od, comme les écritures de rattachement (voir
+     * pourRattachement()) : c'est une opération d'inventaire, ni une recette ni une
+     * dépense, et le type ne sert qu'à la tenir hors des écrans de travail.
      *
      * La date est imposée par l'appelant (dernier jour de l'exercice cible) et
      * n'est jamais dérivée de now().
@@ -2012,12 +2011,6 @@ final class EcritureGenerator
         $libelle = ($extourne ? 'Extourne' : 'Rattachement').' '.$cas->sigle().' : '
             .($provision->libelle ?? $provision->ligne?->libelle ?? $compteResultat->intitule);
 
-        // Le type suit l'impact sur le résultat : une écriture qui le diminue est
-        // typée « dépense », celle qui l'augmente « recette ». Débiter le compte de
-        // résultat le diminue dans les deux classes (un produit débité baisse, une
-        // charge débitée pèse) ; le crédit l'augmente.
-        $type = $resultatAuDebit ? TypeTransaction::Depense : TypeTransaction::Recette;
-
         // `montant_total` est SIGNÉ : c'est le net de la ligne 6/7, charge au débit et
         // produit au crédit, comme sur le miroir d'une extourne. La dotation d'une PCA
         // ou d'une CCA retire un produit ou une charge, elle est donc négative ; son
@@ -2029,16 +2022,25 @@ final class EcritureGenerator
 
         return DB::transaction(function () use (
             $provision, $montant, $montantTotal, $libelle, $tenantId, $compteResultat,
-            $compteContrepartie, $resultatAuDebit, $date, $type, $extourne
+            $compteContrepartie, $resultatAuDebit, $date, $extourne
         ): Transaction {
             // Pas de `tiers_id` sur l'écriture, volontairement. Le tiers de l'origine
             // (D3) sert à l'affichage — récapitulatif, détection — et ne se recopie
             // pas ici : poser `transactions.tiers_id` ferait apparaître cette écriture
             // d'inventaire sur la fiche du tiers (TiersTransactionService ne filtre
             // aucun journal) et dans ses totaux. Ce n'est pas un oubli.
+            // `type` = Depense pour la dotation ET pour l'extourne, quel que soit le cas.
+            // Une écriture d'inventaire n'est ni une recette ni une dépense : le type ne
+            // sert plus qu'à la tenir hors des écrans de travail, et c'est le choix de
+            // pourDotationAmortissement(). Le compte de résultat lit la classe et
+            // debit/credit, CHECK 3 lit `montant_total` (signé, voir plus haut),
+            // scopeOperationnel() exclut l'OD ; seule la branche recette de la liste
+            // universelle inclut le journal OD, et elle ne retient que les recettes. Typée
+            // recette, une écriture sur deux s'y affichait avec un badge et une couleur
+            // qui disaient l'inverse de ce qu'elle fait. Ne pas « harmoniser » sur le sens.
             $transaction = Transaction::create([
                 'association_id' => $tenantId,
-                'type' => $type,
+                'type' => TypeTransaction::Depense,
                 'date' => $date->format('Y-m-d'),
                 'libelle' => $libelle,
                 'montant_total' => $montantTotal,
