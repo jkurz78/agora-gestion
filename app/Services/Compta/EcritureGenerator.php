@@ -2018,16 +2018,30 @@ final class EcritureGenerator
         // charge débitée pèse) ; le crédit l'augmente.
         $type = $resultatAuDebit ? TypeTransaction::Depense : TypeTransaction::Recette;
 
+        // `montant_total` est SIGNÉ : c'est le net de la ligne 6/7, charge au débit et
+        // produit au crédit, comme sur le miroir d'une extourne. La dotation d'une PCA
+        // ou d'une CCA retire un produit ou une charge, elle est donc négative ; son
+        // extourne, positive. `compta:check-integrity` (CHECK 3) compare le champ à ce
+        // net : avec une magnitude positive, chaque dotation serait signalée par le
+        // cron quotidien et `--fix` réécrirait le champ.
+        $ligneAuSensNaturel = $cas->classe() === 6 ? $resultatAuDebit : ! $resultatAuDebit;
+        $montantTotal = $ligneAuSensNaturel ? $montant : -$montant;
+
         return DB::transaction(function () use (
-            $provision, $montant, $libelle, $tenantId, $compteResultat,
+            $provision, $montant, $montantTotal, $libelle, $tenantId, $compteResultat,
             $compteContrepartie, $resultatAuDebit, $date, $type, $extourne
         ): Transaction {
+            // Pas de `tiers_id` sur l'écriture, volontairement. Le tiers de l'origine
+            // (D3) sert à l'affichage — récapitulatif, détection — et ne se recopie
+            // pas ici : poser `transactions.tiers_id` ferait apparaître cette écriture
+            // d'inventaire sur la fiche du tiers (TiersTransactionService ne filtre
+            // aucun journal) et dans ses totaux. Ce n'est pas un oubli.
             $transaction = Transaction::create([
                 'association_id' => $tenantId,
                 'type' => $type,
                 'date' => $date->format('Y-m-d'),
                 'libelle' => $libelle,
-                'montant_total' => $montant,
+                'montant_total' => $montantTotal,
                 'mode_paiement' => null,
                 'saisi_par' => Auth::id(),
                 'equilibree' => true,
@@ -2037,11 +2051,11 @@ final class EcritureGenerator
                 'provision_id' => $provision->id,
             ]);
 
-            // `montant` porte la magnitude sur les deux lignes, et non 0 : l'écran de
-            // l'opération (OperationDetail) somme `montant` par type de transaction
-            // pour ses dépenses. À 0, la dotation d'une PCA — typée dépense — n'y
-            // retrancherait rien et le solde de l'opération serait faux (verrouillé
-            // par un test). Les autres rapports lisent debit/credit.
+            // `montant` porte la magnitude sur les deux lignes, comme le fait
+            // pourDotationAmortissement() sur sa ligne de charge. Les rapports lisent
+            // debit/credit ; les écrans qui somment `montant` d'une opération
+            // (OperationDetail) excluent le journal OD — c'est ce filtre, et non la
+            // valeur de `montant`, qui garde leurs totaux justes (verrouillé par test).
             //
             // Ligne de résultat : porte l'opération et la séance (D8).
             $ligneResultat = TransactionLigne::create([

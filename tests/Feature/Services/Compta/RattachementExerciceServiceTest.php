@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\JournalComptable;
 use App\Livewire\OperationDetail;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\Operation;
 use App\Models\Provision;
 use App\Models\Transaction;
@@ -15,6 +16,7 @@ use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\Compta\ProvisionPDService;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Artisan;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -233,13 +235,16 @@ test('une origine sans opération ni séance donne des lignes sans opération ni
     }
 });
 
-// ── Un consommateur de `montant` : l'écran de l'opération ────────────────────
+// ── L'écran de l'opération ───────────────────────────────────────────────────
 //
-// OperationDetail somme `transaction_lignes.montant` par type de transaction. Les
-// lignes de rattachement portent donc la magnitude, pas 0 : à 0, le solde de
-// l'opération serait faux (350 € au lieu de 175 € pour une PCA).
+// Une écriture de rattachement n'est ni une recette ni une dépense de l'opération :
+// c'est une écriture d'inventaire. Elle corrige son compte de résultat (le CR par
+// opération la lit), mais OperationDetail ne doit afficher aucun de ses trois
+// totaux modifié. Sans le filtre de journal, une ligne de classe 7 dans une
+// transaction typée « dépense » donnait « recettes 350 / dépenses 175 » pour une
+// opération qui avait encaissé 175.
 
-test('l’écran de l’opération garde un solde juste une fois le rattachement écrit', function (int $classe, float $montant, float $soldeAttendu) {
+test('l’écran de l’opération n’affiche aucun total modifié par un rattachement', function (int $classe, float $montant, bool $compteDeDon, array $attendu) {
     $operation = Operation::factory()->create([
         'association_id' => TenantContext::currentId(),
         'date_debut' => '2026-09-18',
@@ -247,13 +252,50 @@ test('l’écran de l’opération garde un solde juste une fois le rattachement
     ]);
     $ligne = $this->ligneOrigine($classe, $montant, operationId: (int) $operation->id);
 
+    if ($compteDeDon) {
+        $compteDon = Compte::factory()->recette()->pourDons()->create(['association_id' => TenantContext::currentId()]);
+        $ligne->update(['compte_id' => $compteDon->id]);
+    }
+
+    $totaux = fn (): array => collect(['totalRecettes', 'totalDepenses', 'totalDons', 'solde'])
+        ->mapWithKeys(fn (string $cle) => [$cle => Livewire::test(OperationDetail::class, ['operation' => $operation])->viewData($cle)])
+        ->all();
+
+    $avant = $totaux();
+    expect($avant)->toBe($attendu);
+
     app(ProvisionPDService::class)->generer(provisionPourLigne($ligne));
 
-    Livewire::test(OperationDetail::class, ['operation' => $operation])
-        ->assertViewHas('solde', $soldeAttendu);
+    expect($totaux())->toBe($attendu);
 })->with([
-    'PCA : 175 € encaissés, le solde reste 175 €' => [7, 175.0, 175.0],
-    'CCA : 90 € payés, le solde reste −90 €' => [6, 90.0, -90.0],
+    'PCA : 175 € encaissés' => [7, 175.0, false, ['totalRecettes' => 175.0, 'totalDepenses' => 0.0, 'totalDons' => 0.0, 'solde' => 175.0]],
+    'CCA : 90 € payés' => [6, 90.0, false, ['totalRecettes' => 0.0, 'totalDepenses' => 90.0, 'totalDons' => 0.0, 'solde' => -90.0]],
+    'PCA sur un compte de don' => [7, 175.0, true, ['totalRecettes' => 0.0, 'totalDepenses' => 0.0, 'totalDons' => 175.0, 'solde' => 175.0]],
+]);
+
+// ── compta:check-integrity ───────────────────────────────────────────────────
+//
+// Le contrôle quotidien compare montant_total au net débit/crédit des lignes 6/7.
+// La dotation d'un rattachement retire un produit ou une charge : son montant_total
+// est donc négatif, comme celui d'une extourne. C'est la commande réelle qui doit se
+// taire — recalculer la règle ici à la main ne prouverait rien.
+
+test('compta:check-integrity ne signale aucune écriture de rattachement', function (int $classe, float $montant) {
+    $association = TenantContext::current();
+    $ligne = $this->ligneOrigine($classe, $montant);
+    app(ProvisionPDService::class)->generer(provisionPourLigne($ligne));
+
+    $code = Artisan::call('compta:check-integrity');
+    $texte = Artisan::output();
+
+    // La commande réamorce le tenant à chaque association : on remet le nôtre.
+    TenantContext::boot($association);
+
+    expect($texte)->not->toContain('anomalie');
+    expect($code)->toBe(0);
+})->with([
+    'PCA' => [7, 175.0],
+    'CCA' => [6, 90.0],
 ]);
 
 // ── Gardes ───────────────────────────────────────────────────────────────────
