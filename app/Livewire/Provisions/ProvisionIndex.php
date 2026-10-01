@@ -17,7 +17,7 @@ final class ProvisionIndex extends Component
         $exercice = $exerciceService->current();
 
         return view('livewire.provisions.provision-index', [
-            'provisions' => Provision::forExercice($exercice)->with('ligne.compte', 'compte')->get(),
+            'provisions' => Provision::forExercice($exercice)->avecCompteResultat()->get(),
             'exerciceLabel' => $exerciceService->label($exercice),
         ]);
     }

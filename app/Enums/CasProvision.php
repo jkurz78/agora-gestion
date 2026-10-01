@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use InvalidArgumentException;
+
 /**
  * Les quatre écritures de rattachement à l'exercice.
  *
@@ -28,6 +30,41 @@ enum CasProvision: string
             self::ProduitConstateDavance => 'Produit constaté d’avance',
             self::FactureNonParvenue => 'Facture non parvenue',
             self::ProduitARecevoir => 'Produit à recevoir',
+        };
+    }
+
+    /**
+     * Déduit le cas de ses deux déterminants : la classe du compte de résultat
+     * et l'adossement à une écriture d'origine.
+     *
+     * Bijection avec classe() et estAdosse() : pour tout cas $c,
+     * deduire($c->classe(), $c->estAdosse()) === $c. Les deux moitiés vivent ici,
+     * côte à côte, pour qu'on ne puisse pas les modifier l'une sans l'autre.
+     *
+     * classe 6 + adossé = CCA, classe 7 + adossé = PCA,
+     * classe 6 + libre  = FNP, classe 7 + libre  = PAR.
+     *
+     * @throws InvalidArgumentException si la classe n'est ni 6 ni 7
+     */
+    public static function deduire(int $classe, bool $adossee): self
+    {
+        return match (true) {
+            $classe === 6 && $adossee => self::ChargeConstateeDavance,
+            $classe === 7 && $adossee => self::ProduitConstateDavance,
+            $classe === 6 => self::FactureNonParvenue,
+            $classe === 7 => self::ProduitARecevoir,
+            default => throw new InvalidArgumentException(
+                "Rattachement : un compte de classe {$classe} ne porte aucun cas (classe 6 ou 7 attendue)."
+            ),
+        };
+    }
+
+    /** Vrai quand l'écriture s'adosse à une ligne d'origine (CCA, PCA) plutôt qu'à une saisie libre (FNP, PAR). */
+    public function estAdosse(): bool
+    {
+        return match ($this) {
+            self::ChargeConstateeDavance, self::ProduitConstateDavance => true,
+            self::FactureNonParvenue, self::ProduitARecevoir => false,
         };
     }
 

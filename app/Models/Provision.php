@@ -14,6 +14,18 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use InvalidArgumentException;
 use RuntimeException;
 
+/**
+ * Un rattachement à l'exercice : la décision de rattacher à un exercice donné un
+ * produit ou une charge qui appartient économiquement à l'autre (CCA, PCA, FNP,
+ * PAR). Les écritures comptables en sont dérivées, elles ne sont pas stockées ici.
+ *
+ * Référence : docs/specs/2026-09-30-provisions-rattachement-exercice-design.md
+ * (§ 3 pour les décisions citées en commentaire, § 4 pour le modèle de données).
+ *  - D2  : le cas est déduit de la classe du compte et de l'adossement, jamais stocké.
+ *  - D5  : exactement l'une de `transaction_ligne_id` (adossé : CCA/PCA) ou
+ *          `compte_id` (saisie libre : FNP/PAR) est renseignée.
+ *  - D12 : tout ou rien — le montant est celui de l'origine, strictement positif.
+ */
 final class Provision extends TenantModel
 {
     use HasFactory, SoftDeletes, TenantStorage;
@@ -59,6 +71,27 @@ final class Provision extends TenantModel
             if (round((float) $provision->montant, 2) <= 0.0) {
                 throw new InvalidArgumentException('Rattachement : le montant est strictement positif.');
             }
+
+            // Le compte de résultat doit être de classe 6 ou 7 : sans quoi cas() ne
+            // peut rien déduire et lève plus tard, à la lecture, là où l'erreur
+            // casse tout un récapitulatif pour une seule ligne. On ne contrôle que
+            // quand l'origine change, pour ne pas bloquer la mise à jour d'une
+            // pièce jointe sur un rattachement dont le compte aurait été supprimé.
+            if (! $provision->exists || $provision->isDirty(['transaction_ligne_id', 'compte_id'])) {
+                $classe = $provision->classeDuCompteResultatEnBase();
+
+                if ($classe === null) {
+                    throw new InvalidArgumentException(
+                        'Rattachement : le compte de résultat est introuvable (compte ou ligne d\'origine inexistant pour cette association).'
+                    );
+                }
+
+                if (! in_array($classe, [6, 7], true)) {
+                    throw new InvalidArgumentException(
+                        "Rattachement : le compte de résultat doit être de classe 6 ou 7 — classe {$classe} reçue."
+                    );
+                }
+            }
         });
     }
 
@@ -87,28 +120,14 @@ final class Provision extends TenantModel
     }
 
     /**
-     * Le cas se déduit, il ne se stocke pas (D2).
-     *
-     * classe 6 + adossé = CCA, classe 7 + adossé = PCA,
-     * classe 6 + libre  = FNP, classe 7 + libre  = PAR.
+     * Le cas se déduit, il ne se stocke pas (D2) : voir CasProvision::deduire().
      */
     public function cas(): CasProvision
     {
-        $compte = $this->compteResultat();
+        $compte = $this->compteResultat()
+            ?? throw new RuntimeException("Rattachement #{$this->id} : aucun compte de résultat résolu.");
 
-        if ($compte === null) {
-            throw new RuntimeException("Rattachement #{$this->id} : aucun compte de résultat résolu.");
-        }
-
-        $classe = (int) $compte->classe;
-
-        return match (true) {
-            $classe === 6 && $this->estAdossee() => CasProvision::ChargeConstateeDavance,
-            $classe === 7 && $this->estAdossee() => CasProvision::ProduitConstateDavance,
-            $classe === 6 => CasProvision::FactureNonParvenue,
-            $classe === 7 => CasProvision::ProduitARecevoir,
-            default => throw new RuntimeException("Rattachement #{$this->id} : compte de classe {$classe} inattendu."),
-        };
+        return CasProvision::deduire((int) $compte->classe, $this->estAdossee());
     }
 
     /** Le compte de résultat mouvementé par l'écriture. */
@@ -167,6 +186,18 @@ final class Provision extends TenantModel
     }
 
     /**
+     * Charge ce que compteResultat() lit : la ligne d'origine et son compte pour
+     * un rattachement adossé, le compte saisi pour un rattachement libre. Cette
+     * liste est le pendant, côté chargement, du choix que compteResultat() fait.
+     *
+     * @param  Builder<Provision>  $query
+     */
+    public function scopeAvecCompteResultat(Builder $query): Builder
+    {
+        return $query->with('ligne.compte', 'compte');
+    }
+
+    /**
      * @param  Builder<Provision>  $query
      */
     public function scopeForExercice(Builder $query, int $exercice): Builder
@@ -184,5 +215,19 @@ final class Provision extends TenantModel
         return $this->piece_jointe_path
             ? $this->storagePath('provisions/'.$this->id.'/'.basename($this->piece_jointe_path))
             : null;
+    }
+
+    /**
+     * Classe du compte de résultat telle qu'elle est en base, sans passer par les
+     * relations déjà chargées (qui peuvent être périmées quand on change l'origine).
+     * Nulle quand le compte ou la ligne d'origine est introuvable dans l'association.
+     */
+    private function classeDuCompteResultatEnBase(): ?int
+    {
+        $compte = $this->estAdossee()
+            ? TransactionLigne::query()->with('compte')->find($this->transaction_ligne_id)?->compte
+            : Compte::query()->find($this->compte_id);
+
+        return $compte !== null ? (int) $compte->classe : null;
     }
 }

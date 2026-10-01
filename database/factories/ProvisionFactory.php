@@ -6,6 +6,7 @@ namespace Database\Factories;
 
 use App\Models\Compte;
 use App\Models\Provision;
+use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Services\ExerciceService;
 use App\Tenant\TenantContext;
@@ -37,5 +38,19 @@ final class ProvisionFactory extends Factory
             'piece_jointe_mime' => null,
             'saisi_par' => User::factory(),
         ];
+    }
+
+    /**
+     * Rattachement adossé à une ligne d'origine (CCA/PCA). Le compte vient de la
+     * ligne : `compte_id` doit être nul, l'invariant exigeant exactement l'une des
+     * deux colonnes (D5). Le montant par défaut reste aléatoire — passer celui de
+     * la ligne pour un rattachement fidèle à l'origine (D12).
+     */
+    public function adossee(TransactionLigne $ligne): static
+    {
+        return $this->state([
+            'transaction_ligne_id' => (int) $ligne->id,
+            'compte_id' => null,
+        ]);
     }
 }

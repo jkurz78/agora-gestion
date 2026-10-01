@@ -64,13 +64,15 @@ it('calcule les totaux depuis les seules ventilations de classes 6 et 7', functi
 });
 
 it('mesure les OD sur débit/crédit et non sur la colonne montant', function (): void {
-    // Écriture de dotation aux provisions : 681 D / 486 C. Le générateur pose
-    // montant = 0 sur ces lignes — la vérité est portée par débit/crédit.
-    $compteDotation = Compte::factory()->numero('681')->create([
+    // Écriture de rattachement d'une facture non parvenue : 606 D / 408 C (la
+    // charge de N est ajoutée, en contrepartie du compte de factures non
+    // parvenues). Le générateur pose montant = 0 sur les lignes d'OD — la vérité
+    // est portée par débit/crédit.
+    $compteCharges = Compte::factory()->numero('606')->create([
         'association_id' => (int) $this->association->id,
         'est_systeme' => true,
     ]);
-    $compteCharges = Compte::factory()->numero('486')->create([
+    $compteFacturesNonParvenues = Compte::factory()->numero('408')->create([
         'association_id' => (int) $this->association->id,
         'est_systeme' => true,
     ]);
@@ -79,21 +81,21 @@ it('mesure les OD sur débit/crédit et non sur la colonne montant', function ()
         'association_id' => (int) $this->association->id,
         'type' => 'depense',
         'date' => '2026-01-15',
-        'libelle' => 'Dotation provision FNP',
+        'libelle' => 'Facture non parvenue',
         'montant_total' => 123.45,
         'type_ecriture' => 'normale',
     ]);
 
     TransactionLigne::forceCreate([
         'transaction_id' => (int) $transaction->id,
-        'compte_id' => (int) $compteDotation->id,
+        'compte_id' => (int) $compteCharges->id,
         'montant' => 0.00,
         'debit' => 123.45,
         'credit' => 0.00,
     ]);
     TransactionLigne::forceCreate([
         'transaction_id' => (int) $transaction->id,
-        'compte_id' => (int) $compteCharges->id,
+        'compte_id' => (int) $compteFacturesNonParvenues->id,
         'montant' => 0.00,
         'debit' => 0.00,
         'credit' => 123.45,

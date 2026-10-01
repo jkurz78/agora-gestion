@@ -11,13 +11,17 @@ return new class extends Migration
 {
     /**
      * Réécriture de la table provisions : elle est vide sur toutes les
-     * associations, aucune reprise de données n'est nécessaire. Le `delete`
-     * n'est là que pour garantir l'invariant sur une base de développement qui
-     * aurait des lignes de test.
+     * associations de production, aucune reprise de données n'est nécessaire.
+     *
+     * La migration REFUSE de s'exécuter sur une table non vide plutôt que de la
+     * purger : un `delete` contournerait les SoftDeletes d'une table financière,
+     * et `transactions.provision_id` étant en `nullOnDelete`, il laisserait les
+     * écritures OD de l'ancien schéma orphelines et inatteignables
+     * (ProvisionPDService::supprimer() est indexé sur provision_id).
      */
     public function up(): void
     {
-        DB::table('provisions')->delete();
+        $this->exigerTableVide();
 
         Schema::table('provisions', function (Blueprint $table) {
             $table->foreignId('transaction_ligne_id')
@@ -35,7 +39,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        DB::table('provisions')->delete();
+        $this->exigerTableVide();
 
         Schema::table('provisions', function (Blueprint $table) {
             $table->dropConstrainedForeignId('transaction_ligne_id');
@@ -43,5 +47,22 @@ return new class extends Migration
             $table->date('date')->nullable();
             $table->string('libelle', 255)->nullable(false)->change();
         });
+    }
+
+    /**
+     * Compte aussi les lignes supprimées logiquement : elles portent des
+     * écritures et ne doivent pas disparaître en silence.
+     */
+    private function exigerTableVide(): void
+    {
+        $restantes = DB::table('provisions')->count();
+
+        if ($restantes > 0) {
+            throw new RuntimeException(
+                "Migration refusée : la table provisions contient {$restantes} ligne(s). "
+                .'Le lot rattachement réécrit cette table et suppose qu\'elle est vide. '
+                .'Retirez ces rattachements par l\'IHM — ce qui supprime aussi leurs écritures — avant de migrer.'
+            );
+        }
     }
 };
