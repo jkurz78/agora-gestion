@@ -30,7 +30,7 @@ beforeEach(function () {
 /**
  * Rattache à l'exercice 2025 une ligne d'origine de la classe donnée, pour son montant.
  */
-function rattacher(object $test, int $classe, float $montant): Provision
+function provisionServiceRattacher(object $test, int $classe, float $montant): Provision
 {
     $ligne = $test->ligneOrigine($classe, $montant);
 
@@ -43,8 +43,8 @@ function rattacher(object $test, int $classe, float $montant): Provision
 }
 
 it('lit le compte de chaque rattachement via son origine', function (): void {
-    $pca = rattacher($this, 7, 175.0);
-    $cca = rattacher($this, 6, 100.0);
+    $pca = provisionServiceRattacher($this, 7, 175.0);
+    $cca = provisionServiceRattacher($this, 6, 100.0);
 
     $recap = $this->service->provisionsExercice(2025)->keyBy('id');
 
@@ -55,8 +55,8 @@ it('lit le compte de chaque rattachement via son origine', function (): void {
 });
 
 it('porte le cas de chaque rattachement sous la clé cas', function (): void {
-    rattacher($this, 7, 175.0);
-    rattacher($this, 6, 100.0);
+    provisionServiceRattacher($this, 7, 175.0);
+    provisionServiceRattacher($this, 6, 100.0);
 
     $cas = $this->service->provisionsExercice(2025)->pluck('cas')->sort()->values()->all();
 
@@ -64,7 +64,7 @@ it('porte le cas de chaque rattachement sous la clé cas', function (): void {
 });
 
 it('signe l’impact sur le résultat de N selon le cas', function (int $classe, float $attendu): void {
-    rattacher($this, $classe, 175.0);
+    provisionServiceRattacher($this, $classe, 175.0);
 
     expect($this->service->provisionsExercice(2025)->first()['montant_signe'])->toBe($attendu);
 })->with([
@@ -73,15 +73,15 @@ it('signe l’impact sur le résultat de N selon le cas', function (int $classe,
 ]);
 
 it('le total est la somme des impacts signés', function (): void {
-    rattacher($this, 7, 175.0); // -175
-    rattacher($this, 6, 100.0); // +100
+    provisionServiceRattacher($this, 7, 175.0); // -175
+    provisionServiceRattacher($this, 6, 100.0); // +100
 
     expect($this->service->totalProvisions(2025))->toBe(-75.0);
 });
 
 it('l’extourne de N+1 est l’image inverse du rattachement de N', function (): void {
-    rattacher($this, 7, 175.0);
-    rattacher($this, 6, 100.0);
+    provisionServiceRattacher($this, 7, 175.0);
+    provisionServiceRattacher($this, 6, 100.0);
 
     $extournes = $this->service->extournesExercice(2026)->keyBy('cas');
 
@@ -91,7 +91,7 @@ it('l’extourne de N+1 est l’image inverse du rattachement de N', function ()
 });
 
 it('ne mélange pas les exercices', function (): void {
-    rattacher($this, 7, 175.0);
+    provisionServiceRattacher($this, 7, 175.0);
 
     expect($this->service->provisionsExercice(2026))->toBeEmpty()
         ->and($this->service->totalProvisions(2026))->toBe(0.0)

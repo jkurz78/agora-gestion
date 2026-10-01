@@ -18,10 +18,15 @@ return new class extends Migration
      * et `transactions.provision_id` étant en `nullOnDelete`, il laisserait les
      * écritures OD de l'ancien schéma orphelines et inatteignables
      * (ProvisionPDService::supprimer() est indexé sur provision_id).
+     *
+     * Le message d'erreur est écrit pour quelqu'un qui le découvre en plein
+     * déploiement : il distingue les lignes actives des lignes supprimées
+     * logiquement et donne les requêtes à passer, sans compter sur un écran
+     * (celui du lot rattachement n'existe pas encore sur la version déployée).
      */
     public function up(): void
     {
-        $this->exigerTableVide();
+        $this->exigerTableVide('à la montée');
 
         Schema::table('provisions', function (Blueprint $table) {
             $table->foreignId('transaction_ligne_id')
@@ -39,7 +44,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        $this->exigerTableVide();
+        $this->exigerTableVide('au retour arrière');
 
         Schema::table('provisions', function (Blueprint $table) {
             $table->dropConstrainedForeignId('transaction_ligne_id');
@@ -50,19 +55,34 @@ return new class extends Migration
     }
 
     /**
-     * Compte aussi les lignes supprimées logiquement : elles portent des
-     * écritures et ne doivent pas disparaître en silence.
+     * Compte séparément les lignes actives et les lignes supprimées logiquement.
+     *
+     * Les secondes sont comptées elles aussi : l'ancien écran supprimait d'abord
+     * les écritures OD d'un rattachement (forceDelete), puis le rattachement en
+     * suppression logique ; il ne reste donc normalement rien qui s'y rattache,
+     * mais seul l'opérateur peut le constater, d'où la requête de vérification.
      */
-    private function exigerTableVide(): void
+    private function exigerTableVide(string $sens): void
     {
-        $restantes = DB::table('provisions')->count();
+        $actives = DB::table('provisions')->whereNull('deleted_at')->count();
+        $supprimees = DB::table('provisions')->whereNotNull('deleted_at')->count();
 
-        if ($restantes > 0) {
-            throw new RuntimeException(
-                "Migration refusée : la table provisions contient {$restantes} ligne(s). "
-                .'Le lot rattachement réécrit cette table et suppose qu\'elle est vide. '
-                .'Retirez ces rattachements par l\'IHM — ce qui supprime aussi leurs écritures — avant de migrer.'
-            );
+        if ($actives + $supprimees === 0) {
+            return;
         }
+
+        $message = "Migration refusée {$sens} : la table provisions n'est pas vide — "
+            ."{$actives} ligne(s) active(s), {$supprimees} ligne(s) supprimée(s) logiquement. "
+            .'Le lot rattachement réécrit cette table et suppose qu\'elle est vide. '
+            .'Vérifiez d\'abord qu\'aucune écriture comptable n\'en dépend : '
+            .'SELECT COUNT(*) FROM transactions WHERE provision_id IS NOT NULL; ';
+
+        $message .= $actives > 0
+            ? 'Des rattachements actifs existent : ne les supprimez pas à la main, arrêtez le déploiement '
+                .'et examinez-les (et leurs écritures) avant toute décision.'
+            : 'Il ne reste que des lignes supprimées logiquement. Si ce comptage vaut 0, purgez-les avec : '
+                .'DELETE FROM provisions WHERE deleted_at IS NOT NULL; puis relancez la migration.';
+
+        throw new RuntimeException($message);
     }
 };

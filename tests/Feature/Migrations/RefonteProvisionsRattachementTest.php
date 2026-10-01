@@ -14,16 +14,24 @@ use Tests\Support\IsolatedMigrationDatabase;
  * l'ancien schéma (transactions.provision_id est en nullOnDelete).
  */
 
+/** Les deux requêtes que le message d'erreur donne à l'opérateur : elles doivent être exécutables telles quelles. */
+const REFONTE_PROVISIONS_VERIFICATION_SQL = 'SELECT COUNT(*) FROM transactions WHERE provision_id IS NOT NULL';
+const REFONTE_PROVISIONS_PURGE_SQL = 'DELETE FROM provisions WHERE deleted_at IS NOT NULL';
+
 /**
  * Monte la table provisions telle qu'elle est AVANT la migration (schéma de l'ancien écran).
  *
  * @param  Closure(): void  $fixtures
  * @param  Closure(object): mixed  $test  reçoit l'instance de la migration
  */
-function avecAncienSchemaProvisions(Closure $fixtures, Closure $test): mixed
+function refonteProvisionsAvecAncienSchema(Closure $fixtures, Closure $test): mixed
 {
     return IsolatedMigrationDatabase::run(function () use ($fixtures): void {
         Schema::create('transaction_lignes', fn (Blueprint $table) => $table->id());
+        Schema::create('transactions', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('provision_id')->nullable();
+        });
         Schema::create('provisions', function (Blueprint $table): void {
             $table->id();
             $table->smallInteger('exercice');
@@ -44,7 +52,7 @@ function avecAncienSchemaProvisions(Closure $fixtures, Closure $test): mixed
 }
 
 /** Une ligne de l'ancien schéma, éventuellement supprimée logiquement. */
-function ancienneProvision(?string $supprimeeLe = null): void
+function refonteProvisionsInsererAncienneLigne(?string $supprimeeLe = null): void
 {
     DB::table('provisions')->insert([
         'exercice' => 2025,
@@ -57,7 +65,7 @@ function ancienneProvision(?string $supprimeeLe = null): void
 }
 
 it('réécrit la table vide : colonne d’adossement ajoutée, type et date retirés, libellé facultatif', function (): void {
-    avecAncienSchemaProvisions(fn () => null, function ($migration): void {
+    refonteProvisionsAvecAncienSchema(fn () => null, function ($migration): void {
         $migration->up();
 
         expect(Schema::hasColumn('provisions', 'transaction_ligne_id'))->toBeTrue()
@@ -69,10 +77,19 @@ it('réécrit la table vide : colonne d’adossement ajoutée, type et date reti
     });
 });
 
-it('refuse de réécrire une table qui contient des rattachements', function (): void {
-    avecAncienSchemaProvisions(fn () => ancienneProvision(), function ($migration): void {
-        expect(fn () => $migration->up())
-            ->toThrow(RuntimeException::class, 'contient 1 ligne(s)');
+it('refuse de réécrire une table qui contient des rattachements actifs, et ne propose pas de les purger', function (): void {
+    refonteProvisionsAvecAncienSchema(fn () => refonteProvisionsInsererAncienneLigne(), function ($migration): void {
+        $erreur = null;
+        try {
+            $migration->up();
+        } catch (RuntimeException $e) {
+            $erreur = $e->getMessage();
+        }
+
+        expect($erreur)->not->toBeNull()
+            ->toContain('1 ligne(s) active(s), 0 ligne(s) supprimée(s) logiquement')
+            ->toContain(REFONTE_PROVISIONS_VERIFICATION_SQL)
+            ->not->toContain('DELETE FROM');
 
         // Rien n'a été touché : ni la ligne, ni le schéma.
         expect(DB::table('provisions')->count())->toBe(1)
@@ -81,15 +98,47 @@ it('refuse de réécrire une table qui contient des rattachements', function ():
     });
 });
 
-it('compte aussi les rattachements supprimés logiquement', function (): void {
-    avecAncienSchemaProvisions(fn () => ancienneProvision('2026-01-01 00:00:00'), function ($migration): void {
+it('compte à part les rattachements supprimés logiquement et donne la sortie : vérifier, purger, relancer', function (): void {
+    refonteProvisionsAvecAncienSchema(fn () => refonteProvisionsInsererAncienneLigne('2026-01-01 00:00:00'), function ($migration): void {
+        $erreur = null;
+        try {
+            $migration->up();
+        } catch (RuntimeException $e) {
+            $erreur = $e->getMessage();
+        }
+
+        expect($erreur)->not->toBeNull()
+            ->toContain('0 ligne(s) active(s), 1 ligne(s) supprimée(s) logiquement')
+            ->toContain(REFONTE_PROVISIONS_VERIFICATION_SQL.';')
+            ->toContain(REFONTE_PROVISIONS_PURGE_SQL.';');
+
+        // L'opérateur suit le message à la lettre : la vérification vaut 0 ...
+        expect((int) array_values((array) DB::selectOne(REFONTE_PROVISIONS_VERIFICATION_SQL))[0])->toBe(0);
+
+        // ... il purge ...
+        DB::statement(REFONTE_PROVISIONS_PURGE_SQL);
+
+        // ... et la migration passe.
+        $migration->up();
+
+        expect(Schema::hasColumn('provisions', 'transaction_ligne_id'))->toBeTrue()
+            ->and(Schema::hasColumn('provisions', 'type'))->toBeFalse();
+    });
+});
+
+it('refuse de réécrire une table qui contient à la fois des lignes actives et supprimées, et les compte chacune', function (): void {
+    refonteProvisionsAvecAncienSchema(function (): void {
+        refonteProvisionsInsererAncienneLigne();
+        refonteProvisionsInsererAncienneLigne('2026-01-01 00:00:00');
+        refonteProvisionsInsererAncienneLigne('2026-02-01 00:00:00');
+    }, function ($migration): void {
         expect(fn () => $migration->up())
-            ->toThrow(RuntimeException::class, 'contient 1 ligne(s)');
+            ->toThrow(RuntimeException::class, '1 ligne(s) active(s), 2 ligne(s) supprimée(s) logiquement');
     });
 });
 
 it('rétablit l’ancien schéma sur une table vide', function (): void {
-    avecAncienSchemaProvisions(fn () => null, function ($migration): void {
+    refonteProvisionsAvecAncienSchema(fn () => null, function ($migration): void {
         $migration->up();
         $migration->down();
 
@@ -100,7 +149,7 @@ it('rétablit l’ancien schéma sur une table vide', function (): void {
 });
 
 it('refuse de revenir à l’ancien schéma tant que la table contient des rattachements', function (): void {
-    avecAncienSchemaProvisions(fn () => null, function ($migration): void {
+    refonteProvisionsAvecAncienSchema(fn () => null, function ($migration): void {
         $migration->up();
 
         DB::table('provisions')->insert([
@@ -111,7 +160,7 @@ it('refuse de revenir à l’ancien schéma tant que la table contient des ratta
         ]);
 
         expect(fn () => $migration->down())
-            ->toThrow(RuntimeException::class, 'contient 1 ligne(s)');
+            ->toThrow(RuntimeException::class, 'au retour arrière : la table provisions n\'est pas vide');
 
         // Le schéma réécrit est resté en place.
         expect(Schema::hasColumn('provisions', 'transaction_ligne_id'))->toBeTrue()

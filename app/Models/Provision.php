@@ -77,7 +77,9 @@ final class Provision extends TenantModel
             // casse tout un récapitulatif pour une seule ligne. On ne contrôle que
             // quand l'origine change, pour ne pas bloquer la mise à jour d'une
             // pièce jointe sur un rattachement dont le compte aurait été supprimé.
-            if (! $provision->exists || $provision->isDirty(['transaction_ligne_id', 'compte_id'])) {
+            // À la création, D5 garantit qu'une des deux colonnes est renseignée,
+            // donc modifiée : le contrôle y est systématique sans test d'existence.
+            if ($provision->isDirty(['transaction_ligne_id', 'compte_id'])) {
                 $classe = $provision->classeDuCompteResultatEnBase();
 
                 if ($classe === null) {

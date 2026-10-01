@@ -43,14 +43,15 @@ final class ProvisionFactory extends Factory
     /**
      * Rattachement adossé à une ligne d'origine (CCA/PCA). Le compte vient de la
      * ligne : `compte_id` doit être nul, l'invariant exigeant exactement l'une des
-     * deux colonnes (D5). Le montant par défaut reste aléatoire — passer celui de
-     * la ligne pour un rattachement fidèle à l'origine (D12).
+     * deux colonnes (D5). Le montant est celui de la ligne, au débit pour une charge
+     * et au crédit pour un produit : le rattachement est tout ou rien (D12).
      */
     public function adossee(TransactionLigne $ligne): static
     {
         return $this->state([
             'transaction_ligne_id' => (int) $ligne->id,
             'compte_id' => null,
+            'montant' => max((float) $ligne->debit, (float) $ligne->credit),
         ]);
     }
 }
