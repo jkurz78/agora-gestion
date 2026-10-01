@@ -387,7 +387,15 @@ verrou sur les neuf sites, verrouillage de N et N+1, adaptation du wizard de cl�
 l'IHM. Aucun nouveau compte à seeder, aucun montant à saisir.
 
 **Lot 2 — FNP et PAR.** Seed de 408 et 418, mode de saisie libre dans la modale, `tiers_id` sur la
-ligne de contrepartie. Le modèle de données du lot 1 l'accueille sans migration supplémentaire.
+ligne de contrepartie. Le modèle de données du lot 1 l'accueille, **à une exception près** :
+
+⚠️ `provisions.compte_id` porte une FK `ON DELETE SET NULL`, héritée de la migration
+`2026_07_07_100002` qui l'a posée uniformément sur dix tables de ventilation. Un hard-delete de
+compte mettrait `compte_id` à NULL et laisserait un rattachement dont **aucune** des deux colonnes
+de l'invariant n'est renseignée — la garde applicative ne revalide pas les lignes existantes. Le
+risque est nul au lot 1, qui ne peuple jamais `compte_id`, et `Compte` utilise `SoftDeletes`, donc
+il reste faible au lot 2. **Le lot 2 doit néanmoins passer cette FK en `restrictOnDelete()`**, par
+symétrie avec `transaction_ligne_id`.
 
 **Associations non assujetties à la TVA.** Le PCG prévoit que 408 et 418 portent des montants
 toutes taxes comprises, avec des comptes de TVA en contrepartie. Aucun compte `445*` n'existe au
