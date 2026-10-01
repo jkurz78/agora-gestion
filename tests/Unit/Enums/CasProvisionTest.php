@@ -8,8 +8,10 @@ use App\Enums\CasProvision;
  * Ce que ces tests verrouillent, c'est le SENS des écritures de rattachement :
  * quelle classe, quelle contrepartie, et si la dotation débite ou crédite le
  * compte de résultat. Une erreur de sens ne fait planter rien : elle produit
- * des écritures bien équilibrées et fausses. C'est ainsi que l'ancien écran
- * a vécu dix-huit mois en débitant le 487 comme s'il était un produit (spec § 2.1).
+ * des écritures bien équilibrées et fausses. C'est ainsi que l'ancien schéma a
+ * débité le 487 comme s'il était un produit (spec § 2.1) : écrit le 18 juin 2026,
+ * il a vécu 3,4 mois (jusqu'au 1er octobre) sur un écran qui existait depuis 5,7 mois
+ * sans jamais servir. Il n'a donc produit aucune écriture fausse en production.
  *
  * Le tableau ci-dessous est volontairement écrit en dur, à la main, et non
  * recalculé depuis l'enum : un test qui relit le code qu'il vérifie ne vérifie rien.

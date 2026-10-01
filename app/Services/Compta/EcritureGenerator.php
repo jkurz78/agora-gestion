@@ -59,6 +59,9 @@ use Illuminate\Support\Str;
  */
 final class EcritureGenerator
 {
+    /** Longueur de la colonne `libelle` de `transactions` et de `transaction_lignes`. */
+    private const LIBELLE_LONGUEUR_MAX = 255;
+
     public function __construct(
         private readonly LettrageService $lettrageService,
         private readonly PosteReporteResolver $posteReporteResolver,
@@ -1963,8 +1966,8 @@ final class EcritureGenerator
 
     /**
      * Écriture de rattachement à l'exercice : la dotation (extourne = false) ou son
-     * miroir (extourne = true). Les deux ne diffèrent que par la date, le sens et
-     * le type d'écriture.
+     * miroir (extourne = true). Les deux ne diffèrent que par la date, le sens, le
+     * signe de `montant_total`, le type d'écriture et le libellé.
      *
      * Le sens se lit sur le cas, jamais sur le signe du montant, qui est toujours
      * strictement positif : voir CasProvision::dotationDebiteLeResultat().
@@ -1978,8 +1981,10 @@ final class EcritureGenerator
             throw new \RuntimeException('Un rattachement porte un montant strictement positif.');
         }
 
-        // Le compte est résolu avant le cas : cas() lèverait sinon, avec un autre
-        // message, sur un compte introuvable ou d'une autre association.
+        // Le compte est résolu, et son appartenance vérifiée, avant d'en déduire le cas.
+        // Relations non chargées, le compte est introuvable sous le scope de
+        // l'association courante (null). Relations chargées dans une autre association,
+        // il existe mais n'est pas le nôtre : seule la comparaison explicite le refuse.
         $compteResultat = $provision->compteResultat();
 
         if ($compteResultat === null || (int) $compteResultat->association_id !== $tenantId) {
@@ -1998,6 +2003,22 @@ final class EcritureGenerator
             ? ! $cas->dotationDebiteLeResultat()
             : $cas->dotationDebiteLeResultat();
 
+        $debitResultat = $resultatAuDebit ? $montant : 0.0;
+        $creditResultat = $resultatAuDebit ? 0.0 : $montant;
+
+        // `montant_total` est SIGNÉ : c'est le net de la ligne 6/7, un produit au crédit
+        // et une charge au débit, que `compta:check-integrity` (CHECK 3) compare au
+        // champ. La dotation d'une PCA ou d'une CCA retire un produit ou une charge : son
+        // net est négatif. Son extourne le rend : positive. À ne pas confondre avec une
+        // extourne ordinaire (TransactionExtourneService), qui nie le montant de la pièce
+        // extournée : celle-là est négative parce que son origine est positive. Ici c'est
+        // la dotation qui est négative, et son miroir `type_ecriture = 'extourne'` qui est
+        // positif. Avec une magnitude positive, chaque dotation serait signalée par le
+        // cron quotidien et `--fix` réécrirait le champ.
+        $montantTotal = $cas->classe() === 7
+            ? $creditResultat - $debitResultat
+            : $debitResultat - $creditResultat;
+
         // Les dates viennent du réglage d'exercice de l'association, jamais d'un
         // 1er septembre en dur : une association en exercice civil aurait des
         // extournes datées de septembre, et un numéro de pièce rattaché au mauvais
@@ -2009,28 +2030,20 @@ final class EcritureGenerator
         $date = Carbon::parse($date->toDateString());
 
         // Le cas en toutes lettres, pas en sigle : ce libellé est lu au journal OD et au
-        // grand livre. Tronqué à la colonne (255 caractères) : le préfixe en consomme une
-        // quarantaine, et MySQL refuse l'insertion d'un libellé plus long là où SQLite
-        // l'accepte en silence.
-        $libelle = Str::limit(
-            ($extourne ? 'Extourne' : 'Rattachement').' — '.mb_strtolower($cas->label()).' : '
-                .($provision->libelle ?? $provision->ligne?->libelle ?? $compteResultat->intitule),
-            254,
-            '…',
-        );
+        // grand livre.
+        $libelle = ($extourne ? 'Extourne' : 'Rattachement').' — '.mb_strtolower($cas->label()).' : '
+            .$provision->libelleEffectif();
 
-        // `montant_total` est SIGNÉ : c'est le net de la ligne 6/7, charge au débit et
-        // produit au crédit, comme sur le miroir d'une extourne. La dotation d'une PCA
-        // ou d'une CCA retire un produit ou une charge, elle est donc négative ; son
-        // extourne, positive. `compta:check-integrity` (CHECK 3) compare le champ à ce
-        // net : avec une magnitude positive, chaque dotation serait signalée par le
-        // cron quotidien et `--fix` réécrirait le champ.
-        $ligneAuSensNaturel = $cas->classe() === 6 ? $resultatAuDebit : ! $resultatAuDebit;
-        $montantTotal = $ligneAuSensNaturel ? $montant : -$montant;
+        // Tronqué à la colonne : le préfixe en consomme une quarantaine, et MySQL refuse
+        // l'insertion d'un libellé plus long là où SQLite l'accepte en silence. On garde
+        // 255 caractères en tout, le « … » compris : donc 255 − 1 de texte.
+        if (mb_strlen($libelle) > self::LIBELLE_LONGUEUR_MAX) {
+            $libelle = mb_substr($libelle, 0, self::LIBELLE_LONGUEUR_MAX - 1).'…';
+        }
 
         return DB::transaction(function () use (
             $provision, $montant, $montantTotal, $libelle, $tenantId, $compteResultat,
-            $compteContrepartie, $resultatAuDebit, $date, $extourne
+            $compteContrepartie, $debitResultat, $creditResultat, $date, $extourne
         ): Transaction {
             // Pas de `tiers_id` sur l'écriture, volontairement. Le tiers de l'origine
             // (D3) sert à l'affichage — récapitulatif, détection — et ne se recopie
@@ -2043,9 +2056,10 @@ final class EcritureGenerator
             // pourDotationAmortissement(). Le compte de résultat lit la classe et
             // debit/credit, CHECK 3 lit `montant_total` (signé, voir plus haut),
             // scopeOperationnel() exclut l'OD ; seule la branche recette de la liste
-            // universelle inclut le journal OD, et elle ne retient que les recettes. Typée
-            // recette, une écriture sur deux s'y affichait avec un badge et une couleur
-            // qui disaient l'inverse de ce qu'elle fait. Ne pas « harmoniser » sur le sens.
+            // universelle inclut le journal OD, et elle ne retient que les recettes. Typées
+            // selon leur impact sur le résultat (« recette » quand il monte), une
+            // écriture sur deux s'y affichait avec un badge et une couleur qui disaient
+            // l'inverse de ce qu'elle fait. Ne pas « harmoniser » sur le sens.
             $transaction = Transaction::create([
                 'association_id' => $tenantId,
                 'type' => TypeTransaction::Depense,
@@ -2071,8 +2085,8 @@ final class EcritureGenerator
             $ligneResultat = TransactionLigne::create([
                 'transaction_id' => $transaction->id,
                 'compte_id' => $compteResultat->id,
-                'debit' => $resultatAuDebit ? $montant : 0,
-                'credit' => $resultatAuDebit ? 0 : $montant,
+                'debit' => $debitResultat,
+                'credit' => $creditResultat,
                 'operation_id' => $provision->operationEffectiveId(),
                 'seance' => $provision->seanceEffective(),
                 'tiers_id' => null,
@@ -2081,12 +2095,12 @@ final class EcritureGenerator
             ]);
             $ligneResultat->setRelation('compte', $compteResultat);
 
-            // Contrepartie de régularisation : aucune dimension analytique.
+            // Contrepartie de régularisation : l'autre jambe, aucune dimension analytique.
             $ligneContrepartie = TransactionLigne::create([
                 'transaction_id' => $transaction->id,
                 'compte_id' => $compteContrepartie->id,
-                'debit' => $resultatAuDebit ? 0 : $montant,
-                'credit' => $resultatAuDebit ? $montant : 0,
+                'debit' => $creditResultat,
+                'credit' => $debitResultat,
                 'operation_id' => null,
                 'seance' => null,
                 'tiers_id' => null,
@@ -2099,7 +2113,11 @@ final class EcritureGenerator
             $this->assertEquilibre($lignes);
             $this->assertTenantCoherence($lignes);
 
-            return $transaction->load('lignes.compte');
+            // Les lignes sont en mémoire, avec leur compte : on les rattache sans les
+            // relire, comme les autres méthodes pour*() de ce service.
+            $transaction->setRelation('lignes', $lignes);
+
+            return $transaction;
         });
     }
 

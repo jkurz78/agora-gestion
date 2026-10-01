@@ -122,3 +122,19 @@ it('compte pour zéro un rattachement dont le compte a disparu, et le dit au jou
             && $contexte['compte_id'] === (int) $compte->id)
         ->atLeast()->once();
 });
+
+it('donne au récapitulatif le libellé effectif : celui de l’origine, à défaut l’intitulé du compte', function (): void {
+    $ligne = $this->ligneOrigine(7, 175.0);
+    $ligne->update(['libelle' => null]);
+    $provision = Provision::create([
+        'exercice' => 2025,
+        'transaction_ligne_id' => $ligne->id,
+        'montant' => 175.0,
+        'saisi_par' => auth()->id(),
+    ]);
+
+    $recap = $this->service->provisionsExercice(2025)->keyBy('id');
+
+    // Même repli que le libellé des écritures générées : jamais une ligne blanche.
+    expect($recap[$provision->id]['libelle'])->toBe($ligne->compte->intitule);
+});

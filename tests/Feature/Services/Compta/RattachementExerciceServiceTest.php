@@ -20,7 +20,18 @@ use App\Services\TransactionUniverselleService;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
+
+dataset('rattachement_pca_cca', [
+    'PCA' => [7, 175.0],
+    'CCA' => [6, 90.0],
+]);
+
+dataset('rattachement_pca_cca_contrepartie', [
+    'PCA' => [7, '487'],
+    'CCA' => [6, '486'],
+]);
 
 beforeEach(function () {
     $this->user = User::factory()->create();
@@ -103,7 +114,7 @@ function impactSurLeResultat(Transaction $ecriture): float
 
 // ── Dotation : dernier jour de N ─────────────────────────────────────────────
 
-test('PCA : dotation 7xx D / 487 C au dernier jour de N, opération portée par la seule ligne 7xx', function () {
+test('PCA : dotation 7xx D / 487 C au dernier jour de N, en journal OD, rattachée à son rattachement', function () {
     $ligne = $this->ligneOrigine(7, 175.0, operationId: null);
     $provision = provisionPourLigne($ligne);
 
@@ -174,9 +185,11 @@ test('CCA : l’extourne est le miroir exact, 6xx D / 486 C, au premier jour de 
 
 // ── Le sens de l'impact sur le résultat ──────────────────────────────────────
 //
-// L'erreur de la spec de juin 2026 a survécu dix-huit mois parce qu'aucun test
-// n'affirmait CE QUE L'ÉCRITURE FAIT AU RÉSULTAT, seulement quels comptes elle
-// touchait. Ces tests le disent en euros, par cas, dotation puis extourne.
+// L'erreur de la spec de juin 2026 a survécu parce qu'aucun test n'affirmait CE QUE
+// L'ÉCRITURE FAIT AU RÉSULTAT, seulement quels comptes elle touchait. Ces tests le
+// disent en euros, par cas, dotation puis extourne. (Le schéma inversé date du
+// 18 juin 2026 ; l'écran existait depuis avril sans jamais servir : l'erreur n'a
+// produit aucune écriture fausse en production.)
 
 test('l’impact sur le résultat : la dotation corrige N, l’extourne rend à N+1, et la somme est nulle', function (int $classe, float $montant, float $impactDotation) {
     $ligne = $this->ligneOrigine($classe, $montant);
@@ -211,10 +224,7 @@ test('le compte de résultat n’est touché que par la ligne de l’origine ; l
 
         expect($comptes)->toBe(collect([$contrepartie, (string) $ligne->compte->numero_pcg])->sort()->values()->all());
     }
-})->with([
-    'PCA' => [7, '487'],
-    'CCA' => [6, '486'],
-]);
+})->with('rattachement_pca_cca_contrepartie');
 
 // ── D8 : la dimension analytique ─────────────────────────────────────────────
 
@@ -238,10 +248,7 @@ test('l’opération et la séance sont portées par la ligne 6/7 et PAS par la 
         expect($lignes[$contrepartie]->operation_id)->toBeNull();
         expect($lignes[$contrepartie]->seance)->toBeNull();
     }
-})->with([
-    'PCA' => [7, '487'],
-    'CCA' => [6, '486'],
-]);
+})->with('rattachement_pca_cca_contrepartie');
 
 test('une origine sans opération ni séance donne des lignes sans opération ni séance', function () {
     $ligne = $this->ligneOrigine(7, 175.0);
@@ -249,6 +256,7 @@ test('une origine sans opération ni séance donne des lignes sans opération ni
 
     $dotation = app(EcritureGenerator::class)->pourProvisionDotation($provision);
 
+    expect($dotation->lignes)->toHaveCount(2);
     foreach ($dotation->lignes as $l) {
         expect($l->operation_id)->toBeNull();
         expect($l->seance)->toBeNull();
@@ -276,23 +284,22 @@ test('les écritures ne portent pas le tiers de l’origine, ni sur la transacti
     foreach ([$generateur->pourProvisionDotation($provision), $generateur->pourProvisionExtourne($provision)] as $ecriture) {
         expect($ecriture->tiers_id)->toBeNull();
 
+        expect($ecriture->lignes)->toHaveCount(2);
         foreach ($ecriture->lignes as $l) {
             expect($l->tiers_id)->toBeNull();
         }
     }
-})->with([
-    'PCA' => [7, 175.0],
-    'CCA' => [6, 90.0],
-]);
+})->with('rattachement_pca_cca');
 
 // ── L'écran de l'opération ───────────────────────────────────────────────────
 //
 // Une écriture de rattachement n'est ni une recette ni une dépense de l'opération :
 // c'est une écriture d'inventaire. Elle corrige son compte de résultat (le CR par
 // opération la lit), mais OperationDetail ne doit afficher aucun de ses trois
-// totaux modifié. Sans le filtre de journal, une ligne de classe 7 dans une
-// transaction typée « dépense » donnait « recettes 350 / dépenses 175 » pour une
-// opération qui avait encaissé 175.
+// totaux modifié. Tout rattachement est typé « dépense » : ses deux écritures
+// tombent du même côté et s'additionnent aux dépenses. Sans le filtre de journal,
+// une PCA de 175 € encaissés donnait recettes 175 / dépenses 350 / solde −175, et
+// une CCA de 90 € payés des dépenses de 270 au lieu de 90.
 
 test('l’écran de l’opération n’affiche aucun total modifié par un rattachement', function (int $classe, float $montant, bool $compteDeDon, array $attendu) {
     $operation = Operation::factory()->create([
@@ -380,8 +387,9 @@ test('les trois totaux de l’écran de l’opération ignorent une écriture d�
 //
 // Le contrôle quotidien compare montant_total au net débit/crédit des lignes 6/7.
 // La dotation d'un rattachement retire un produit ou une charge : son montant_total
-// est donc négatif, comme celui d'une extourne. C'est la commande réelle qui doit se
-// taire — recalculer la règle ici à la main ne prouverait rien.
+// est donc négatif, et celui de son extourne positif — à l'inverse d'une extourne
+// ordinaire, qui nie le montant de sa pièce d'origine. C'est la commande réelle qui
+// doit se taire — recalculer la règle ici à la main ne prouverait rien.
 
 test('compta:check-integrity ne signale aucune écriture de rattachement', function (int $classe, float $montant) {
     $association = TenantContext::current();
@@ -396,18 +404,16 @@ test('compta:check-integrity ne signale aucune écriture de rattachement', funct
 
     expect($texte)->not->toContain('anomalie');
     expect($code)->toBe(0);
-})->with([
-    'PCA' => [7, 175.0],
-    'CCA' => [6, 90.0],
-]);
+})->with('rattachement_pca_cca');
 
 // ── Le type de transaction : une écriture d'inventaire n'est ni recette ni dépense ──
 //
 // Toutes les écritures de rattachement sont typées « dépense », comme les dotations
 // d'amortissement : le type ne sert qu'à les tenir hors des écrans de travail. Typées
-// « recette », une sur deux apparaissait dans « Toutes les transactions » avec un
-// badge et une couleur qui disaient l'inverse de ce qu'elle fait (« recette » en
-// rouge sur −90 pour la dotation d'une CCA).
+// selon leur impact sur le résultat (« recette » quand il monte), une sur deux
+// apparaissait dans « Toutes les transactions » avec un badge et une couleur qui
+// disaient l'inverse de ce qu'elle fait (« recette » en rouge sur −90 pour la
+// dotation d'une CCA).
 
 test('les deux écritures d’un rattachement sont typées dépense, pour une PCA comme pour une CCA', function (int $classe, float $montant) {
     $ligne = $this->ligneOrigine($classe, $montant);
@@ -417,10 +423,7 @@ test('les deux écritures d’un rattachement sont typées dépense, pour une PC
 
     expect($generateur->pourProvisionDotation($provision)->type)->toBe(TypeTransaction::Depense);
     expect($generateur->pourProvisionExtourne($provision)->type)->toBe(TypeTransaction::Depense);
-})->with([
-    'PCA' => [7, 175.0],
-    'CCA' => [6, 90.0],
-]);
+})->with('rattachement_pca_cca');
 
 test('aucune écriture de rattachement n’apparaît dans la liste universelle des transactions', function (int $classe, float $montant) {
     $ligne = $this->ligneOrigine($classe, $montant);
@@ -446,12 +449,31 @@ test('aucune écriture de rattachement n’apparaît dans la liste universelle d
         ->pluck('id')->map(fn ($id) => (int) $id)->all();
 
     expect(array_intersect($ecrituresRattachement, $listees))->toBe([]);
-})->with([
-    'PCA' => [7, 175.0],
-    'CCA' => [6, 90.0],
-]);
+})->with('rattachement_pca_cca');
 
 // ── Gardes ───────────────────────────────────────────────────────────────────
+
+test('l’écriture rendue porte déjà ses lignes et leurs comptes : aucune relecture', function () {
+    $ligne = $this->ligneOrigine(7, 175.0);
+    $provision = provisionPourLigne($ligne);
+    $provision->load('ligne.compte');
+
+    DB::enableQueryLog();
+    $dotation = app(EcritureGenerator::class)->pourProvisionDotation($provision);
+    $requetes = collect(DB::getQueryLog())->pluck('query');
+    DB::disableQueryLog();
+
+    // Les lignes viennent d'être créées en mémoire, avec leur compte : les relire
+    // (`load('lignes.compte')`) coûterait deux requêtes par écriture, quatre par
+    // `generer()`. Le rattachement a ses relations préchargées : toute lecture de
+    // `transaction_lignes` pendant la génération serait cette relecture.
+    $relectures = $requetes->filter(fn (string $sql) => str_starts_with(mb_strtolower($sql), 'select')
+        && str_contains($sql, 'transaction_lignes'));
+
+    expect($dotation->relationLoaded('lignes'))->toBeTrue();
+    expect($dotation->lignes)->toHaveCount(2);
+    expect($relectures->all())->toBe([]);
+});
 
 test('le libellé de l’écriture nomme le cas en toutes lettres et reprend le libellé de l’origine', function (int $classe, string $cas) {
     $ligne = $this->ligneOrigine($classe, 100.0);
@@ -467,7 +489,7 @@ test('le libellé de l’écriture nomme le cas en toutes lettres et reprend le 
     'CCA' => [6, 'charge constatée d’avance'],
 ]);
 
-test('le libellé tient dans les 255 caractères de la colonne, même quand celui de l’origine est long', function () {
+test('le libellé est tronqué à la colonne : 255 caractères exactement, terminés par « … »', function () {
     $ligne = $this->ligneOrigine(7, 175.0);
     $ligne->update(['libelle' => str_repeat('é', 255)]);
 
@@ -475,14 +497,42 @@ test('le libellé tient dans les 255 caractères de la colonne, même quand celu
     $generateur = app(EcritureGenerator::class);
 
     foreach ([$generateur->pourProvisionDotation($provision), $generateur->pourProvisionExtourne($provision)] as $ecriture) {
-        expect(mb_strlen($ecriture->libelle))->toBeLessThanOrEqual(255);
+        // Ni plus (MySQL refuserait l'insertion), ni moins (on ne perd pas de texte
+        // gratuitement) : la colonne est pleine, et la coupure se voit.
+        expect(mb_strlen($ecriture->libelle))->toBe(255);
+        expect($ecriture->libelle)->toEndWith('…');
         expect($ecriture->libelle)->toStartWith($ecriture->type_ecriture === 'extourne' ? 'Extourne — ' : 'Rattachement — ');
 
+        expect($ecriture->lignes)->toHaveCount(2);
         foreach ($ecriture->lignes as $l) {
-            expect(mb_strlen($l->libelle))->toBeLessThanOrEqual(255);
+            expect($l->libelle)->toBe($ecriture->libelle);
         }
     }
 });
+
+test('un libellé qui tient dans la colonne n’est pas tronqué', function () {
+    $ligne = $this->ligneOrigine(7, 175.0);
+    // Le préfixe « Rattachement — produit constaté d’avance : » fait 43 caractères.
+    $ligne->update(['libelle' => str_repeat('é', 212)]);
+
+    $dotation = app(EcritureGenerator::class)->pourProvisionDotation(provisionPourLigne($ligne->fresh()));
+
+    expect(mb_strlen($dotation->libelle))->toBe(255);
+    expect($dotation->libelle)->not->toEndWith('…');
+});
+
+test('le libellé retombe sur l’intitulé du compte quand l’origine n’en a pas, nul ou vide', function (?string $libelleOrigine) {
+    $ligne = $this->ligneOrigine(7, 175.0);
+    $ligne->update(['libelle' => $libelleOrigine]);
+
+    $dotation = app(EcritureGenerator::class)->pourProvisionDotation(provisionPourLigne($ligne->fresh()));
+
+    // Le même repli que le récapitulatif : Provision::libelleEffectif(), jamais « … : ».
+    expect($dotation->libelle)->toBe('Rattachement — produit constaté d’avance : '.$ligne->compte->intitule);
+})->with([
+    'libellé nul' => [null],
+    'libellé vide' => [''],
+]);
 
 test('un montant nul ou négatif est refusé par le générateur lui-même', function (float $montant) {
     $ligne = $this->ligneOrigine(7, 175.0);

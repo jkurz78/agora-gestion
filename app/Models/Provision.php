@@ -88,7 +88,7 @@ final class Provision extends TenantModel
                     );
                 }
 
-                // « Classe 6 ou 7 » n'est écrit qu'à un endroit : CasProvision::deduire()
+                // « Classe 6 ou 7 » n'est écrit que dans l'enum : CasProvision::deduire()
                 // refuse toute autre classe, et son InvalidArgumentException remonte telle quelle.
                 CasProvision::deduire($classe, $adossee);
             }
@@ -146,6 +146,25 @@ final class Provision extends TenantModel
         $op = $this->ligne?->operation_id;
 
         return $op !== null ? (int) $op : null;
+    }
+
+    /**
+     * Le libellé à afficher et à écrire : celui du rattachement quand il en a un
+     * (saisie libre), à défaut celui de la ligne d'origine, à défaut l'intitulé du
+     * compte de résultat. Vide seulement si rien de cela n'existe (compte supprimé).
+     *
+     * Un libellé vide ou blanc ne compte pas : le dernier repli est l'intitulé du
+     * compte plutôt qu'une ligne blanche, au récapitulatif comme au journal.
+     */
+    public function libelleEffectif(): string
+    {
+        foreach ([$this->libelle, $this->ligne?->libelle, $this->compteResultat()?->intitule] as $candidat) {
+            if (filled($candidat)) {
+                return (string) $candidat;
+            }
+        }
+
+        return '';
     }
 
     /** La séance héritée de l'origine, ou saisie en mode libre. */

@@ -70,7 +70,7 @@ final class ProvisionService
 
             return [
                 'id' => $p->id,
-                'libelle' => $p->libelle ?? $p->ligne?->libelle ?? '',
+                'libelle' => $p->libelleEffectif(),
                 'cas' => $compte !== null ? $p->cas()->value : '',
                 'montant' => (float) $p->montant,
                 'montant_signe' => $montantSigne($p),

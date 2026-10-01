@@ -228,6 +228,45 @@ it('un rattachement n’est visible que de son association, qui est posée à la
         ->and(Provision::withoutGlobalScopes()->count())->toBe(1);
 });
 
+// ── Libellé effectif ──────────────────────────────────────────────────────────
+
+it('le libellé effectif est le libellé saisi, puis celui de l’origine, puis l’intitulé du compte', function (): void {
+    $ligne = $this->ligneOrigine(7);
+
+    // Adossé, sans libellé propre : celui de la ligne d'origine.
+    $adossee = Provision::create(provisionAttributs(['transaction_ligne_id' => $ligne->id]));
+    expect($adossee->libelleEffectif())->toBe('Ligne d’origine');
+
+    // Un libellé propre l'emporte sur celui de l'origine.
+    $adossee->libelle = 'Libellé saisi';
+    expect($adossee->libelleEffectif())->toBe('Libellé saisi');
+
+    // Libre : son libellé saisi.
+    $compte = Compte::factory()->recette()->create(['association_id' => $this->association->id]);
+    $libre = Provision::create(provisionAttributs(['compte_id' => $compte->id, 'libelle' => 'Produit à recevoir']));
+    expect($libre->libelleEffectif())->toBe('Produit à recevoir');
+});
+
+it('le libellé effectif retombe sur l’intitulé du compte quand l’origine n’en a pas, vide ou nul', function (?string $libelleOrigine): void {
+    $ligne = $this->ligneOrigine(7);
+    $ligne->update(['libelle' => $libelleOrigine]);
+
+    $provision = Provision::create(provisionAttributs(['transaction_ligne_id' => $ligne->id]));
+
+    expect($provision->libelleEffectif())->toBe($ligne->compte->intitule);
+})->with([
+    'libellé nul' => [null],
+    'libellé vide' => [''],
+]);
+
+it('le libellé effectif est vide quand rien ne peut le fournir', function (): void {
+    $compte = Compte::factory()->recette()->create(['association_id' => $this->association->id]);
+    $provision = Provision::create(provisionAttributs(['compte_id' => $compte->id, 'libelle' => null]));
+    $compte->delete(); // suppression logique : plus d'intitulé non plus
+
+    expect($provision->fresh()->libelleEffectif())->toBe('');
+});
+
 // ── Factory et scope ──────────────────────────────────────────────────────────
 
 it('la factory fabrique un rattachement adossé sans compte propre, pour le montant de sa ligne', function (int $classe, float $montant, CasProvision $attendu): void {

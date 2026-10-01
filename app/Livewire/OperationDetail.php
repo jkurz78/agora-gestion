@@ -58,10 +58,12 @@ final class OperationDetail extends Component
         // Les écritures d'inventaire (journal OD : rattachement à l'exercice, dotations)
         // ne sont ni des recettes ni des dépenses de l'opération. Leur ligne de
         // résultat porte bien l'opération — c'est ce que lit le compte de résultat par
-        // opération — mais l'écran la compterait dans le mauvais sens : une ligne de
-        // classe 7 dans une transaction typée « dépense » donnait « recettes 350 /
-        // dépenses 175 » pour 175 € encaissés. On les exclut des trois totaux, comme
-        // Transaction::scopeOperationnel().
+        // opération — mais l'écran la compterait dans les dépenses : tout rattachement
+        // est typé « dépense », ses deux écritures (dotation et extourne) tombent donc du
+        // même côté et s'additionnent. Sans ce filtre, une PCA de 175 € encaissés donnait
+        // recettes 175 / dépenses 350 / solde −175, et une CCA de 90 € payés des dépenses
+        // de 270 au lieu de 90. On exclut l'OD des trois totaux, comme
+        // Transaction::scopeOperationnel() : la règle vaut quel que soit le type.
         $horsOd = fn ($q) => $q->where('journal', '!=', JournalComptable::Od->value);
 
         // IMPORTANT — ne pas toucher $totalDepenses (tâche 13, chantier 709A).
