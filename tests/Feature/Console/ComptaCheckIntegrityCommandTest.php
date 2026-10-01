@@ -66,8 +66,9 @@ it('calcule les totaux depuis les seules ventilations de classes 6 et 7', functi
 it('mesure les OD sur débit/crédit et non sur la colonne montant', function (): void {
     // Écriture de rattachement d'une facture non parvenue : 606 D / 408 C (la
     // charge de N est ajoutée, en contrepartie du compte de factures non
-    // parvenues). Le générateur pose montant = 0 sur les lignes d'OD — la vérité
-    // est portée par débit/crédit.
+    // parvenues). Ces lignes d'OD ont montant = 0 — la vérité est portée par
+    // débit/crédit, que le montant soit à 0 ou à la magnitude (les rattachements
+    // à l'exercice y posent la magnitude).
     $compteCharges = Compte::factory()->numero('606')->create([
         'association_id' => (int) $this->association->id,
         'est_systeme' => true,

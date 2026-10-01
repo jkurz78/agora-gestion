@@ -2008,8 +2008,16 @@ final class EcritureGenerator
             : $exerciceService->dateRange((int) $provision->exercice)['end'];
         $date = Carbon::parse($date->toDateString());
 
-        $libelle = ($extourne ? 'Extourne' : 'Rattachement').' '.$cas->sigle().' : '
-            .($provision->libelle ?? $provision->ligne?->libelle ?? $compteResultat->intitule);
+        // Le cas en toutes lettres, pas en sigle : ce libellé est lu au journal OD et au
+        // grand livre. Tronqué à la colonne (255 caractères) : le préfixe en consomme une
+        // quarantaine, et MySQL refuse l'insertion d'un libellé plus long là où SQLite
+        // l'accepte en silence.
+        $libelle = Str::limit(
+            ($extourne ? 'Extourne' : 'Rattachement').' — '.mb_strtolower($cas->label()).' : '
+                .($provision->libelle ?? $provision->ligne?->libelle ?? $compteResultat->intitule),
+            254,
+            '…',
+        );
 
         // `montant_total` est SIGNÉ : c'est le net de la ligne 6/7, charge au débit et
         // produit au crédit, comme sur le miroir d'une extourne. La dotation d'une PCA

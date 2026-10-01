@@ -9,6 +9,7 @@ use App\Models\Association;
 use App\Models\Compte;
 use App\Models\Operation;
 use App\Models\Provision;
+use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
@@ -56,6 +57,23 @@ function provisionPourLigne(TransactionLigne $ligne, int $exercice = 2025): Prov
 function lignesParCompte(Transaction $ecriture): Collection
 {
     return $ecriture->lignes->keyBy(fn (TransactionLigne $l) => $l->compte->numero_pcg);
+}
+
+/**
+ * Les quatre chiffres qu'affiche l'écran de l'opération.
+ *
+ * @return array{totalRecettes: float, totalDepenses: float, totalDons: float, solde: float}
+ */
+function totauxOperation(Operation $operation): array
+{
+    $composant = Livewire::test(OperationDetail::class, ['operation' => $operation]);
+
+    return [
+        'totalRecettes' => $composant->viewData('totalRecettes'),
+        'totalDepenses' => $composant->viewData('totalDepenses'),
+        'totalDons' => $composant->viewData('totalDons'),
+        'solde' => $composant->viewData('solde'),
+    ];
 }
 
 /**
@@ -237,6 +255,36 @@ test('une origine sans opération ni séance donne des lignes sans opération ni
     }
 });
 
+// ── D3 : le tiers de l'origine sert à l'affichage, il ne va pas sur l'écriture ──
+//
+// Poser `transactions.tiers_id` ferait apparaître cette écriture d'inventaire sur la
+// fiche du tiers (TiersTransactionService ne filtre aucun journal) et dans ses totaux.
+// LigneOrigineHelper ne pose aucun tiers : sans ce test, rien ne protégerait la règle
+// que ne défend qu'un commentaire.
+
+test('les écritures ne portent pas le tiers de l’origine, ni sur la transaction ni sur leurs lignes', function (int $classe, float $montant) {
+    $tiers = Tiers::factory()->create(['association_id' => TenantContext::currentId()]);
+    $ligne = $this->ligneOrigine($classe, $montant);
+    Transaction::whereKey($ligne->transaction_id)->update(['tiers_id' => $tiers->id]);
+
+    // La prémisse : l'origine porte bien un tiers.
+    expect((int) Transaction::find($ligne->transaction_id)->tiers_id)->toBe((int) $tiers->id);
+
+    $provision = provisionPourLigne($ligne);
+    $generateur = app(EcritureGenerator::class);
+
+    foreach ([$generateur->pourProvisionDotation($provision), $generateur->pourProvisionExtourne($provision)] as $ecriture) {
+        expect($ecriture->tiers_id)->toBeNull();
+
+        foreach ($ecriture->lignes as $l) {
+            expect($l->tiers_id)->toBeNull();
+        }
+    }
+})->with([
+    'PCA' => [7, 175.0],
+    'CCA' => [6, 90.0],
+]);
+
 // ── L'écran de l'opération ───────────────────────────────────────────────────
 //
 // Une écriture de rattachement n'est ni une recette ni une dépense de l'opération :
@@ -259,21 +307,74 @@ test('l’écran de l’opération n’affiche aucun total modifié par un ratta
         $ligne->update(['compte_id' => $compteDon->id]);
     }
 
-    $totaux = fn (): array => collect(['totalRecettes', 'totalDepenses', 'totalDons', 'solde'])
-        ->mapWithKeys(fn (string $cle) => [$cle => Livewire::test(OperationDetail::class, ['operation' => $operation])->viewData($cle)])
-        ->all();
-
-    $avant = $totaux();
-    expect($avant)->toBe($attendu);
+    expect(totauxOperation($operation))->toBe($attendu);
 
     app(ProvisionPDService::class)->generer(provisionPourLigne($ligne));
 
-    expect($totaux())->toBe($attendu);
+    expect(totauxOperation($operation))->toBe($attendu);
 })->with([
     'PCA : 175 € encaissés' => [7, 175.0, false, ['totalRecettes' => 175.0, 'totalDepenses' => 0.0, 'totalDons' => 0.0, 'solde' => 175.0]],
     'CCA : 90 € payés' => [6, 90.0, false, ['totalRecettes' => 0.0, 'totalDepenses' => 90.0, 'totalDons' => 0.0, 'solde' => -90.0]],
     'PCA sur un compte de don' => [7, 175.0, true, ['totalRecettes' => 0.0, 'totalDepenses' => 0.0, 'totalDons' => 175.0, 'solde' => 175.0]],
 ]);
+
+// Un rattachement est typé « dépense » : il ne peut donc plus atteindre les filtres des
+// recettes et des dons. La règle vaut pourtant quel que soit le type — la branche
+// recette de la liste universelle inclut le journal OD, une OD typée recette n'est pas
+// une hypothèse d'école. Ce test pose directement de telles écritures, ventilées sur
+// l'opération, et exige que les trois totaux les ignorent. Chacun des trois filtres
+// tombe si on le retire.
+
+test('les trois totaux de l’écran de l’opération ignorent une écriture d’inventaire, quel que soit son type', function () {
+    $assocId = (int) TenantContext::currentId();
+    $operation = Operation::factory()->create([
+        'association_id' => $assocId,
+        'date_debut' => '2026-09-18',
+        'date_fin' => '2027-06-18',
+    ]);
+
+    // Une vraie recette de l'opération : la référence que les OD ne doivent pas bouger.
+    $this->ligneOrigine(7, 175.0, operationId: (int) $operation->id);
+    $attendu = ['totalRecettes' => 175.0, 'totalDepenses' => 0.0, 'totalDons' => 0.0, 'solde' => 175.0];
+    expect(totauxOperation($operation))->toBe($attendu);
+
+    $compteRecette = Compte::factory()->recette()->create(['association_id' => $assocId]);
+    $compteDon = Compte::factory()->recette()->pourDons()->create(['association_id' => $assocId]);
+    $compteCharge = Compte::factory()->depense()->create(['association_id' => $assocId]);
+
+    $ecritureOd = function (TypeTransaction $type, array $lignes) use ($assocId, $operation): void {
+        $ecriture = Transaction::create([
+            'association_id' => $assocId,
+            'type' => $type,
+            'date' => '2026-08-31',
+            'libelle' => 'Écriture d’inventaire',
+            'montant_total' => 100.0,
+            'saisi_par' => auth()->id(),
+            'equilibree' => true,
+            'type_ecriture' => 'normale',
+            'journal' => JournalComptable::Od,
+        ]);
+
+        foreach ($lignes as [$compte, $debit, $credit]) {
+            TransactionLigne::create([
+                'transaction_id' => $ecriture->id,
+                'compte_id' => $compte->id,
+                'debit' => $debit,
+                'credit' => $credit,
+                'montant' => max($debit, $credit),
+                'operation_id' => $operation->id,
+                'libelle' => 'Écriture d’inventaire',
+            ]);
+        }
+    };
+
+    // OD typée recette : une ligne de classe 7 au crédit et une ligne de don.
+    $ecritureOd(TypeTransaction::Recette, [[$compteRecette, 0.0, 100.0], [$compteDon, 0.0, 40.0]]);
+    // OD typée dépense : une ligne de classe 6 au débit.
+    $ecritureOd(TypeTransaction::Depense, [[$compteCharge, 60.0, 0.0]]);
+
+    expect(totauxOperation($operation))->toBe($attendu);
+});
 
 // ── compta:check-integrity ───────────────────────────────────────────────────
 //
@@ -329,21 +430,22 @@ test('aucune écriture de rattachement n’apparaît dans la liste universelle d
     $ecrituresRattachement = Transaction::where('provision_id', $provision->id)->pluck('id')->map(fn ($id) => (int) $id)->all();
     expect($ecrituresRattachement)->toHaveCount(2);
 
-    foreach ([2025, 2026] as $exercice) {
-        $lignes = collect(app(TransactionUniverselleService::class)
-            ->paginate(null, null, null, null, null, null, null, null, null, null, null, exercice: $exercice, perPage: 100)['paginator']
-            ->items());
+    // Aucune borne de date : la liste porte toute la table `transactions`. (`exercice:`
+    // ne filtre pas les dates des transactions, il ne sert qu'aux reports à nouveau :
+    // on ne prétend donc pas couvrir un exercice.)
+    $lignes = collect(app(TransactionUniverselleService::class)
+        ->paginate(null, null, null, null, null, null, null, null, null, null, null, perPage: 100)['paginator']
+        ->items());
 
-        // La pièce d'origine, elle, est bien listée : la liste n'est pas vide par accident.
-        expect($lignes->pluck('id')->map(fn ($id) => (int) $id)->all())->toContain((int) $ligne->transaction_id);
+    // La pièce d'origine, elle, est bien listée : la liste n'est pas vide par accident.
+    expect($lignes->pluck('id')->map(fn ($id) => (int) $id)->all())->toContain((int) $ligne->transaction_id);
 
-        // Les identifiants d'une union peuvent se recouper entre sources (virements,
-        // remises) : on ne regarde que les lignes issues de `transactions`.
-        $listees = $lignes->whereIn('source_type', ['recette', 'depense'])
-            ->pluck('id')->map(fn ($id) => (int) $id)->all();
+    // Les identifiants d'une union peuvent se recouper entre sources (virements,
+    // remises) : on ne regarde que les lignes issues de `transactions`.
+    $listees = $lignes->whereIn('source_type', ['recette', 'depense'])
+        ->pluck('id')->map(fn ($id) => (int) $id)->all();
 
-        expect(array_intersect($ecrituresRattachement, $listees))->toBe([]);
-    }
+    expect(array_intersect($ecrituresRattachement, $listees))->toBe([]);
 })->with([
     'PCA' => [7, 175.0],
     'CCA' => [6, 90.0],
@@ -351,14 +453,35 @@ test('aucune écriture de rattachement n’apparaît dans la liste universelle d
 
 // ── Gardes ───────────────────────────────────────────────────────────────────
 
-test('le libellé de l’écriture nomme le cas et reprend le libellé de l’origine', function () {
-    $ligne = $this->ligneOrigine(7, 175.0);
+test('le libellé de l’écriture nomme le cas en toutes lettres et reprend le libellé de l’origine', function (int $classe, string $cas) {
+    $ligne = $this->ligneOrigine($classe, 100.0);
     $provision = provisionPourLigne($ligne);
 
     $generateur = app(EcritureGenerator::class);
 
-    expect($generateur->pourProvisionDotation($provision)->libelle)->toBe('Rattachement PCA : Ligne d’origine');
-    expect($generateur->pourProvisionExtourne($provision)->libelle)->toBe('Extourne PCA : Ligne d’origine');
+    // Visible au journal OD et au grand livre : des mots, pas un sigle.
+    expect($generateur->pourProvisionDotation($provision)->libelle)->toBe("Rattachement — {$cas} : Ligne d’origine");
+    expect($generateur->pourProvisionExtourne($provision)->libelle)->toBe("Extourne — {$cas} : Ligne d’origine");
+})->with([
+    'PCA' => [7, 'produit constaté d’avance'],
+    'CCA' => [6, 'charge constatée d’avance'],
+]);
+
+test('le libellé tient dans les 255 caractères de la colonne, même quand celui de l’origine est long', function () {
+    $ligne = $this->ligneOrigine(7, 175.0);
+    $ligne->update(['libelle' => str_repeat('é', 255)]);
+
+    $provision = provisionPourLigne($ligne->fresh());
+    $generateur = app(EcritureGenerator::class);
+
+    foreach ([$generateur->pourProvisionDotation($provision), $generateur->pourProvisionExtourne($provision)] as $ecriture) {
+        expect(mb_strlen($ecriture->libelle))->toBeLessThanOrEqual(255);
+        expect($ecriture->libelle)->toStartWith($ecriture->type_ecriture === 'extourne' ? 'Extourne — ' : 'Rattachement — ');
+
+        foreach ($ecriture->lignes as $l) {
+            expect(mb_strlen($l->libelle))->toBeLessThanOrEqual(255);
+        }
+    }
 });
 
 test('un montant nul ou négatif est refusé par le générateur lui-même', function (float $montant) {
@@ -383,16 +506,38 @@ test('un montant nul ou négatif est refusé par le générateur lui-même', fun
     'négatif' => [-175.0],
 ]);
 
-test('un compte de résultat qui n’est pas celui de l’association courante est refusé', function () {
+test('un compte de résultat introuvable dans l’association courante est refusé (relations non chargées)', function () {
     $ligne = $this->ligneOrigine(7, 175.0);
     $provision = provisionPourLigne($ligne);
 
     // On change d'association sans recharger le rattachement : ses relations ne
-    // sont pas encore chargées, elles se résolvent sous le scope de l'autre.
+    // sont pas encore chargées, elles se résolvent sous le scope de l'autre et le
+    // compte est introuvable.
     TenantContext::clear();
     TenantContext::boot(Association::factory()->create());
 
     expect(fn () => app(EcritureGenerator::class)->pourProvisionDotation($provision))
+        ->toThrow(RuntimeException::class, 'introuvable dans cette association');
+
+    expect(Transaction::query()->count())->toBe(0);
+});
+
+test('un compte de résultat qui appartient à une autre association est refusé (relations chargées)', function () {
+    $ligne = $this->ligneOrigine(7, 175.0);
+    $provision = provisionPourLigne($ligne);
+
+    // Relations chargées AVANT de changer d'association : le compte est bien là, c'est
+    // celui de l'association d'origine. Seule la comparaison de son association à
+    // l'association courante peut le refuser — c'est l'autre moitié de la garde.
+    $provision->load('ligne.compte');
+    expect($provision->compteResultat())->not->toBeNull();
+
+    TenantContext::clear();
+    TenantContext::boot(Association::factory()->create());
+
+    expect(fn () => app(EcritureGenerator::class)->pourProvisionDotation($provision))
+        ->toThrow(RuntimeException::class, 'introuvable dans cette association');
+    expect(fn () => app(EcritureGenerator::class)->pourProvisionExtourne($provision))
         ->toThrow(RuntimeException::class, 'introuvable dans cette association');
 
     expect(Transaction::query()->count())->toBe(0);
