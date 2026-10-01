@@ -159,8 +159,9 @@ renseignée, les deux renseignées).
 (`max(tl.debit, tl.credit)` — non ambigu puisque les lignes de sens inverse sont refusées par D9),
 et le tiers d'affichage (`transactions.tiers_id`).
 
-Une ligne ne peut porter **qu'un seul** rattachement non supprimé, puisqu'il couvre son montant
-entier. Garde applicative, comme l'invariant et pour la même raison de moteur — un index unique
+Une ligne ne peut porter **qu'un seul** rattachement, puisqu'il couvre son montant entier — et
+le retrait supprimant physiquement la ligne (§ 6.4), « un seul rattachement » et « un seul
+rattachement non supprimé » sont la même phrase. Garde applicative, comme l'invariant et pour la même raison de moteur — un index unique
 filtré n'existe ni sur MariaDB ni sur MySQL, et un rattachement retiré doit pouvoir être repassé.
 Le `lockForUpdate` posé sur la ligne d'origine dans la transaction DB de l'écriture suffit à
 écarter la création simultanée de deux rattachements : un appel, pas un mécanisme — c'est le cumul
@@ -258,6 +259,32 @@ jamais été regardée. C'est la seule barrière qui ne dépende ni d'un test ni
 ### 6.4 Retrait
 
 Supprime les deux écritures et libère le verrou. Refusé si N ou N+1 est clôturé.
+
+**Le retrait supprime physiquement la ligne de `provisions`** (`forceDelete`), il ne la
+soft-delete pas. Un seul invariant en découle, et il est vrai des deux côtés :
+
+> une ligne de `provisions` existe ⟺ la ligne d'origine est verrouillée.
+
+Révisé le 2026-10-01, pendant l'exécution. Le soft-delete créait une **contradiction entre
+l'application et la base** : `TransactionLigne::estRattachee()` lit `provisions()->exists()`, qui
+exclut les lignes soft-deletées, tandis que la FK `restrictOnDelete()` les compte. Après un
+retrait, l'application considérait la ligne libre et la base continuait de bloquer le
+`forceDelete()` des lignes que fait `TransactionService::update()` — soit précisément l'erreur SQL
+brute que l'AC‑8 interdit, sur le chemin même que le § 7 recommande (« retirez-le, corrigez,
+repassez-le »).
+
+Trois options existaient : passer la FK en `nullOnDelete` (l'invariant du § 4 devient alors
+violable au repos sur les lignes retirées), supprimer la FK (l'application reste seule gardienne),
+ou supprimer physiquement. La troisième est retenue parce qu'elle laisse **une seule règle sans
+exception** et garde la FK exactement alignée sur ce que l'application veut dire.
+
+**Conséquence assumée : il n'y a pas de trace en base d'un rattachement retiré.** Ce n'est pas une
+perte nette — les deux écritures sont déjà supprimées physiquement par `ProvisionPDService`, donc
+le retrait n'a de toute façon aucune trace comptable, et une ligne soft-deletée n'en était qu'une
+demi-trace. La trace vit dans le journal applicatif : `Log::info('[Rattachement] … retiré')` porte
+la provision, la ligne d'origine, l'exercice, et — automatiquement, via `App\Support\LogContext` —
+l'`association_id` et l'`user_id`. Si un historique consultable à l'écran devient nécessaire, il
+appellera une table d'audit dédiée, pas un `deleted_at` détourné.
 
 ### 6.5 Wizard de clôture
 
@@ -363,8 +390,10 @@ endroits (D9).
 8. **AC‑8** — `update()` sur une transaction porteuse rend un **refus métier lisible**, jamais une
    erreur SQL de contrainte de clé étrangère.
 9. **AC‑9** — Création, modification et retrait sont refusés si N **ou** N+1 est clôturé.
-10. **AC‑10** — Une ligne ne peut porter qu'un rattachement non supprimé ; deux créations
-    simultanées sur la même ligne n'en produisent qu'un. Un rattachement retiré peut être repassé.
+10. **AC‑10** — Une ligne ne peut porter qu'un rattachement ; deux créations simultanées sur la
+    même ligne n'en produisent qu'un. Un rattachement retiré peut être repassé sur la même ligne.
+    **Et après un retrait, `TransactionService::update()` sur la pièce d'origine réussit** — c'est
+    ce test qui aurait attrapé la contradiction entre le soft-delete et la FK (§ 6.4).
 11. **AC‑11** — Une transaction de rattachement n'est jamais candidate : ni sa dotation (écartée
     par le sens), ni son extourne (écartée par `provision_id`).
 12. **AC‑12** — Tenant : un appel forgé portant l'id d'une ligne d'une autre association est
