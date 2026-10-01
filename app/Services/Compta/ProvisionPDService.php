@@ -7,6 +7,7 @@ namespace App\Services\Compta;
 use App\Models\Provision;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use Illuminate\Support\Facades\DB;
 
 final class ProvisionPDService
 {
@@ -16,7 +17,15 @@ final class ProvisionPDService
 
     public function generer(Provision $provision): void
     {
-        throw new \LogicException('ProvisionPDService::generer() est réécrit en Task 2 du lot rattachement.');
+        DB::transaction(function () use ($provision): void {
+            $this->supprimer($provision);
+
+            $dotation = $this->ecritureGenerator->pourProvisionDotation($provision);
+            PartieDoubleGuard::assertComplete($dotation);
+
+            $extourne = $this->ecritureGenerator->pourProvisionExtourne($provision);
+            PartieDoubleGuard::assertComplete($extourne);
+        });
     }
 
     public function supprimer(Provision $provision): void

@@ -72,13 +72,13 @@ final class Provision extends TenantModel
                 throw new InvalidArgumentException('Rattachement : le montant est strictement positif.');
             }
 
-            // Le compte de résultat doit être de classe 6 ou 7 : sans quoi cas() ne
-            // peut rien déduire et lève plus tard, à la lecture, là où l'erreur
-            // casse tout un récapitulatif pour une seule ligne. On ne contrôle que
-            // quand l'origine change, pour ne pas bloquer la mise à jour d'une
-            // pièce jointe sur un rattachement dont le compte aurait été supprimé.
-            // À la création, D5 garantit qu'une des deux colonnes est renseignée,
-            // donc modifiée : le contrôle y est systématique sans test d'existence.
+            // Le compte de résultat doit porter un cas : sans quoi cas() ne peut rien
+            // déduire et lève plus tard, à la lecture, là où l'erreur casse tout un
+            // récapitulatif pour une seule ligne. On ne contrôle que quand l'origine
+            // change, pour ne pas bloquer la mise à jour d'une pièce jointe sur un
+            // rattachement dont le compte aurait été supprimé. À la création, D5
+            // garantit qu'une des deux colonnes est renseignée, donc modifiée : le
+            // contrôle y est systématique sans test d'existence.
             if ($provision->isDirty(['transaction_ligne_id', 'compte_id'])) {
                 $classe = $provision->classeDuCompteResultatEnBase();
 
@@ -88,11 +88,9 @@ final class Provision extends TenantModel
                     );
                 }
 
-                if (! in_array($classe, [6, 7], true)) {
-                    throw new InvalidArgumentException(
-                        "Rattachement : le compte de résultat doit être de classe 6 ou 7 — classe {$classe} reçue."
-                    );
-                }
+                // « Classe 6 ou 7 » n'est écrit qu'à un endroit : CasProvision::deduire()
+                // refuse toute autre classe, et son InvalidArgumentException remonte telle quelle.
+                CasProvision::deduire($classe, $adossee);
             }
         });
     }

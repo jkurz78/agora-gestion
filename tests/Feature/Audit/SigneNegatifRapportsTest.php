@@ -330,12 +330,13 @@ it('rapport_export_controller_synthese_compte_resultat_avec_negatifs', function 
 
 // ── Test 10 (test croisé) ─────────────────────────────────────────────────────
 
-it('compte_resultat_avec_transactions_negatives_ET_provisions_PCA', function () {
+it('compte_resultat_avec_transactions_negatives_ET_rattachement_libre_PAR_sans_ecriture', function () {
     // (a) Tx recette -50 € (future extourne Slice 1)
     $this->makeAuditTransaction('recette', -50.0, $this->sc, $this->compte, 2025);
 
     // (b) Enregistrement `provisions` créé directement, sans passer par le
     // service de rattachement : aucune écriture de dotation n'existe pour lui.
+    // Libre (compte_id) et de classe 7 : c'est un produit à recevoir (PAR).
     // En partie double, seules les écritures du grand livre alimentent le
     // compte de résultat — ce record n'a donc aucun effet sur le résultat, et
     // ne provoque pas de double comptage. (Le montant d'un rattachement est

@@ -16,12 +16,14 @@ use App\Exceptions\Compta\TiersInterditException;
 use App\Exceptions\Compta\TiersRequisException;
 use App\Models\Compte;
 use App\Models\Immobilisation;
+use App\Models\Provision;
 use App\Models\RemiseBancaire;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\VirementInterne;
 use App\Services\Compta\ANouveau\PosteReporteResolver;
+use App\Services\ExerciceService;
 use App\Services\NumeroPieceService;
 use App\Support\MontantDecimal;
 use App\Tenant\TenantContext;
@@ -1857,10 +1859,36 @@ final class EcritureGenerator
     }
 
     /**
+     * Dotation d'un rattachement à l'exercice, datée du dernier jour de N.
+     *
+     * Schéma PCG, aligné sur la spec du 2026-09-30 (§ 5) :
+     *   PCA  7xx D / 487 C      CCA  486 D / 6xx C
+     *   PAR  418 D / 7xx C      FNP  6xx D / 408 C
+     *
+     * 681 et 781 ne sont PAS employés : ce sont les comptes des dotations et
+     * reprises aux amortissements et provisions, pas ceux de la régularisation.
+     *
+     * L'opération et la séance ne sont portées que par la ligne de classe 6/7
+     * (D8) : c'est la seule que lisent les rapports.
+     */
+    public function pourProvisionDotation(Provision $provision): Transaction
+    {
+        return $this->pourRattachement($provision, extourne: false);
+    }
+
+    /** Extourne du rattachement : le miroir exact de la dotation, datée du premier jour de N+1. */
+    public function pourProvisionExtourne(Provision $provision): Transaction
+    {
+        return $this->pourRattachement($provision, extourne: true);
+    }
+
+    /**
      * Dotation aux amortissements d'une immobilisation : 6811 D / 281X C.
      *
-     * type = Depense et journal = Od, comme pourProvisionDotation : c'est une
-     * opération d'inventaire, pas un mouvement de trésorerie.
+     * type = Depense et journal = Od : la dotation diminue le résultat, et c'est
+     * la règle qui type aussi les écritures de rattachement (voir
+     * pourRattachement()). C'est une opération d'inventaire, pas un mouvement de
+     * trésorerie.
      *
      * La date est imposée par l'appelant (dernier jour de l'exercice cible) et
      * n'est jamais dérivée de now().
@@ -1933,6 +1961,123 @@ final class EcritureGenerator
     // =========================================================================
     // Méthodes privées
     // =========================================================================
+
+    /**
+     * Écriture de rattachement à l'exercice : la dotation (extourne = false) ou son
+     * miroir (extourne = true). Les deux ne diffèrent que par la date, le sens et
+     * le type d'écriture.
+     *
+     * Le sens se lit sur le cas, jamais sur le signe du montant, qui est toujours
+     * strictement positif : voir CasProvision::dotationDebiteLeResultat().
+     */
+    private function pourRattachement(Provision $provision, bool $extourne): Transaction
+    {
+        $tenantId = (int) TenantContext::currentId();
+        $montant = round((float) $provision->montant, 2);
+
+        if ($montant <= 0.0) {
+            throw new \RuntimeException('Un rattachement porte un montant strictement positif.');
+        }
+
+        // Le compte est résolu avant le cas : cas() lèverait sinon, avec un autre
+        // message, sur un compte introuvable ou d'une autre association.
+        $compteResultat = $provision->compteResultat();
+
+        if ($compteResultat === null || (int) $compteResultat->association_id !== $tenantId) {
+            throw new \RuntimeException('Le compte de résultat du rattachement est introuvable dans cette association.');
+        }
+
+        $cas = $provision->cas();
+
+        $compteContrepartie = Compte::where('association_id', $tenantId)
+            ->where('numero_pcg', $cas->compteContrepartie())
+            ->firstOrFail();
+
+        // La dotation débite le résultat pour une PCA (on retire le produit) ;
+        // l'extourne inverse. Le compte de régularisation prend l'autre jambe.
+        $resultatAuDebit = $extourne
+            ? ! $cas->dotationDebiteLeResultat()
+            : $cas->dotationDebiteLeResultat();
+
+        // Les dates viennent du réglage d'exercice de l'association, jamais d'un
+        // 1er septembre en dur : une association en exercice civil aurait des
+        // extournes datées de septembre, et un numéro de pièce rattaché au mauvais
+        // exercice puisqu'il se dérive de cette même date.
+        $exerciceService = app(ExerciceService::class);
+        $date = $extourne
+            ? $exerciceService->dateRange((int) $provision->exercice + 1)['start']
+            : $exerciceService->dateRange((int) $provision->exercice)['end'];
+        $date = Carbon::parse($date->toDateString());
+
+        $libelle = ($extourne ? 'Extourne' : 'Rattachement').' '.$cas->sigle().' : '
+            .($provision->libelle ?? $provision->ligne?->libelle ?? $compteResultat->intitule);
+
+        // Le type suit l'impact sur le résultat : une écriture qui le diminue est
+        // typée « dépense », celle qui l'augmente « recette ». Débiter le compte de
+        // résultat le diminue dans les deux classes (un produit débité baisse, une
+        // charge débitée pèse) ; le crédit l'augmente.
+        $type = $resultatAuDebit ? TypeTransaction::Depense : TypeTransaction::Recette;
+
+        return DB::transaction(function () use (
+            $provision, $montant, $libelle, $tenantId, $compteResultat,
+            $compteContrepartie, $resultatAuDebit, $date, $type, $extourne
+        ): Transaction {
+            $transaction = Transaction::create([
+                'association_id' => $tenantId,
+                'type' => $type,
+                'date' => $date->format('Y-m-d'),
+                'libelle' => $libelle,
+                'montant_total' => $montant,
+                'mode_paiement' => null,
+                'saisi_par' => Auth::id(),
+                'equilibree' => true,
+                'type_ecriture' => $extourne ? 'extourne' : 'normale',
+                'journal' => JournalComptable::Od,
+                'numero_piece' => app(NumeroPieceService::class)->assign($date),
+                'provision_id' => $provision->id,
+            ]);
+
+            // `montant` porte la magnitude sur les deux lignes, et non 0 : l'écran de
+            // l'opération (OperationDetail) somme `montant` par type de transaction
+            // pour ses dépenses. À 0, la dotation d'une PCA — typée dépense — n'y
+            // retrancherait rien et le solde de l'opération serait faux (verrouillé
+            // par un test). Les autres rapports lisent debit/credit.
+            //
+            // Ligne de résultat : porte l'opération et la séance (D8).
+            $ligneResultat = TransactionLigne::create([
+                'transaction_id' => $transaction->id,
+                'compte_id' => $compteResultat->id,
+                'debit' => $resultatAuDebit ? $montant : 0,
+                'credit' => $resultatAuDebit ? 0 : $montant,
+                'operation_id' => $provision->operationEffectiveId(),
+                'seance' => $provision->seanceEffective(),
+                'tiers_id' => null,
+                'libelle' => $libelle,
+                'montant' => $montant,
+            ]);
+            $ligneResultat->setRelation('compte', $compteResultat);
+
+            // Contrepartie de régularisation : aucune dimension analytique.
+            $ligneContrepartie = TransactionLigne::create([
+                'transaction_id' => $transaction->id,
+                'compte_id' => $compteContrepartie->id,
+                'debit' => $resultatAuDebit ? 0 : $montant,
+                'credit' => $resultatAuDebit ? $montant : 0,
+                'operation_id' => null,
+                'seance' => null,
+                'tiers_id' => null,
+                'libelle' => $libelle,
+                'montant' => $montant,
+            ]);
+            $ligneContrepartie->setRelation('compte', $compteContrepartie);
+
+            $lignes = collect([$ligneResultat, $ligneContrepartie]);
+            $this->assertEquilibre($lignes);
+            $this->assertTenantCoherence($lignes);
+
+            return $transaction->load('lignes.compte');
+        });
+    }
 
     /**
      * Re-bind les relations compte sur une collection de lignes après rechargement DB.

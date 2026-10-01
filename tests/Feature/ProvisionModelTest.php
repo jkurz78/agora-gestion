@@ -151,7 +151,7 @@ it('refuse un rattachement libre sur un compte qui n’est ni de classe 6 ni de 
     $compte = Compte::factory()->numero('4119')->create(['association_id' => $this->association->id]);
 
     expect(fn () => Provision::create(provisionAttributs(['compte_id' => $compte->id])))
-        ->toThrow(InvalidArgumentException::class, 'classe 4 reçue');
+        ->toThrow(InvalidArgumentException::class, 'classe 4 ne porte aucun cas');
 });
 
 it('refuse un rattachement adossé à une ligne dont le compte n’est ni de classe 6 ni de classe 7', function (): void {
@@ -160,7 +160,7 @@ it('refuse un rattachement adossé à une ligne dont le compte n’est ni de cla
     $ligne->update(['compte_id' => $compteClasse4->id]);
 
     expect(fn () => Provision::create(provisionAttributs(['transaction_ligne_id' => $ligne->id])))
-        ->toThrow(InvalidArgumentException::class, 'classe 4 reçue');
+        ->toThrow(InvalidArgumentException::class, 'classe 4 ne porte aucun cas');
 });
 
 it('refuse un compte ou une ligne d’origine introuvable', function (): void {
@@ -185,7 +185,7 @@ it('refuse de repointer un rattachement existant vers un compte de classe 4', fu
     $compteClasse4 = Compte::factory()->numero('4117')->create(['association_id' => $this->association->id]);
 
     expect(fn () => $provision->update(['compte_id' => $compteClasse4->id]))
-        ->toThrow(InvalidArgumentException::class, 'classe 4 reçue');
+        ->toThrow(InvalidArgumentException::class, 'classe 4 ne porte aucun cas');
 });
 
 it('refuse de repointer un rattachement adossé vers une ligne dont le compte est de classe 4', function (): void {
@@ -196,7 +196,7 @@ it('refuse de repointer un rattachement adossé vers une ligne dont le compte es
     $autreLigne->update(['compte_id' => $compteClasse4->id]);
 
     expect(fn () => $provision->update(['transaction_ligne_id' => $autreLigne->id]))
-        ->toThrow(InvalidArgumentException::class, 'classe 4 reçue');
+        ->toThrow(InvalidArgumentException::class, 'classe 4 ne porte aucun cas');
 });
 
 it('ne revalide pas la classe quand l’origine ne change pas', function (): void {

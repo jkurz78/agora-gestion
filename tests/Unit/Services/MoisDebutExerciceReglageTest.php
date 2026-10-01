@@ -14,10 +14,10 @@ declare(strict_types=1);
  */
 
 use App\Models\Association;
-use App\Models\Compte;
 use App\Models\Provision;
 use App\Models\User;
 use App\Services\Compta\EcritureGenerator;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\NumeroPieceService;
 use App\Services\RapportService;
 use App\Tenant\TenantContext;
@@ -82,26 +82,63 @@ it('le flux de tresorerie garde son ordre de septembre pour une association en s
         ->and($mensuel[11]['mois'])->toBe('Août 2026');
 });
 
-it('l extourne d une provision est datee du premier jour de l exercice suivant', function (): void {
-    $association = tenantAvecMoisDebut(1);
+/**
+ * Rattachement de l'exercice $exercice d'une charge de 500 € déjà comptabilisée
+ * (CCA : 486 D / 6xx C), dans le tenant courant.
+ *
+ * La pièce d'origine est datée du 2026-04-08 : elle tombe dans l'exercice 2026 d'une
+ * association en exercice civil, dans l'exercice 2025 d'une association en septembre.
+ */
+function rattachementDeChargeAvance(int $exercice): Provision
+{
+    SystemeSeeder::seed();
+    $ligne = test()->ligneOrigine(6, 500.0);
 
-    // 486 / 781 : le couple d'extourne d'une provision de dépense.
-    foreach (['486', '781'] as $numero) {
-        Compte::factory()->numero($numero)->create(['association_id' => $association->id]);
-    }
-    $compte = Compte::factory()->numero('606')->create(['association_id' => $association->id]);
-
-    $provision = Provision::factory()->create([
-        'association_id' => $association->id,
-        'exercice' => 2026,
-        'compte_id' => $compte->id,
-        'montant' => 500.00,
+    return Provision::create([
+        'association_id' => TenantContext::currentId(),
+        'exercice' => $exercice,
+        'transaction_ligne_id' => $ligne->id,
+        'montant' => 500.0,
+        'saisi_par' => auth()->id(),
     ]);
+}
+
+it('l extourne d un rattachement est datee du premier jour de l exercice suivant', function (): void {
+    tenantAvecMoisDebut(1);
+    $provision = rattachementDeChargeAvance(2026);
 
     $transaction = app(EcritureGenerator::class)->pourProvisionExtourne($provision);
 
     // Exercice civil : l'exercice 2027 commence le 1er janvier. L'ancien code
     // écrivait le 1er septembre — une écriture au mauvais mois, dont le numéro
     // de pièce héritait ensuite du mauvais exercice.
-    expect($transaction->date->toDateString())->toBe('2027-01-01');
-})->skip('Lot rattachement — Task 1 a supprimé pourProvisionExtourne() (schéma faux) ; à réactiver et adapter en Task 2, qui la réécrit : la date du 1er jour de l\'exercice suivant doit toujours suivre le réglage exercice_mois_debut.');
+    expect($transaction->date->toDateString())->toBe('2027-01-01')
+        ->and($transaction->numero_piece)->toStartWith('2027:');
+});
+
+it('la dotation d un rattachement est datee du dernier jour de l exercice', function (): void {
+    tenantAvecMoisDebut(1);
+    $provision = rattachementDeChargeAvance(2026);
+
+    $transaction = app(EcritureGenerator::class)->pourProvisionDotation($provision);
+
+    // Exercice civil : l'exercice 2026 se clôt le 31 décembre, pas le 31 août.
+    expect($transaction->date->toDateString())->toBe('2026-12-31')
+        ->and($transaction->numero_piece)->toStartWith('2026:');
+});
+
+it('les ecritures de rattachement ne bougent pas pour une association en septembre', function (): void {
+    tenantAvecMoisDebut(9);
+    $provision = rattachementDeChargeAvance(2025);
+
+    $generateur = app(EcritureGenerator::class);
+    $dotation = $generateur->pourProvisionDotation($provision);
+    $extourne = $generateur->pourProvisionExtourne($provision);
+
+    // Le comportement historique, inchangé : le 1er septembre n'est plus codé en
+    // dur, mais c'est ce que le réglage donne pour une association en septembre.
+    expect($dotation->date->toDateString())->toBe('2026-08-31')
+        ->and($dotation->numero_piece)->toStartWith('2025-2026:')
+        ->and($extourne->date->toDateString())->toBe('2026-09-01')
+        ->and($extourne->numero_piece)->toStartWith('2026-2027:');
+});
