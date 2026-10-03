@@ -103,6 +103,45 @@ L'utilisateur saisit donc une date qui n'aura aucun effet, sans en être averti.
 | D5 | **Le wizard affiche la période imposée en lecture seule** quand la formule porte des dates fixes | Arbitré par le propriétaire. Le champ de saisie ne réapparaît que pour une formule en durée réelle. `dateFinCalculee()` doit connaître les dates HelloAsso pour que l'aperçu cesse d'être muet. |
 | D6 | **On peut créer une adhésion manuelle sur n'importe quelle formule**, y compris HelloAsso | Arbitré par le propriétaire : « idéalement on peut créer une adhésion manuellement sur toutes les formules ». Évite de dupliquer une formule pour la saisie manuelle. Le **compte bancaire** HelloAsso reste exclu du wizard, comme aujourd'hui. |
 
+## 4bis. 🔴 L'index unique, révisé le 2026-10-03
+
+**Défaut de cette spec, trouvé en l'exécutant.** La table porte
+`UNIQUE adhesions_unique_per_exercice (association_id, tiers_id, exercice)`. L'exercice nul servait
+d'échappatoire : en SQL, deux NULL sont distincts. **Le remplir (D1) rend AC‑4 impossible** — deux
+adhésions d'un même tiers sur une même saison deviennent interdites en base.
+
+Pire : **l'index compte les lignes en suppression logique**. Mircea Notz porte deux adhésions sur la
+même transaction 192 — la 25 vivante à exercice nul, et la 26 « Adhésion legacy » à exercice 2025,
+soft-deletée le 21/06/2026 par la migration `2026_06_20_000001`. Donner 2025 à la 25 violerait la
+clé de la 26, et **`artisan migrate` échouerait au déploiement en production**.
+
+**D7 — l'index devient `(association_id, tiers_id, exercice, date_debut, adhesion_key)`**, où
+`adhesion_key` est une colonne générée :
+
+```php
+$table->string('adhesion_key', 30)
+    ->virtualAs("COALESCE(DATE_FORMAT(deleted_at, '%Y%m%d%H%i%s'), '0')");
+```
+
+C'est le motif déjà employé par [`budget_lines.operation_key`](../../database/migrations/2026_08_31_100000_add_operation_id_to_budget_lines.php#L29),
+et pour la même raison. ⚠️ **`virtualAs` et jamais `storedAs`** : SQLite refuse d'ajouter une colonne
+générée STORED par `ALTER TABLE`.
+
+Effet : les lignes vivantes partagent la valeur `'0'` et restent contraintes entre elles ; une ligne
+supprimée porte son horodatage et ne bloque plus personne. `date_debut` autorise par ailleurs deux
+adhésions en durée de débuts différents.
+
+⚠️ **Ordre de migration impératif** : créer le nouvel index **avant** de supprimer l'ancien.
+L'ancien sert de support à la clé étrangère `association_id` ; l'ordre inverse produit l'erreur
+MySQL 1553.
+
+**D8 — la ligne 26 de Notz est laissée telle quelle.** On corrige l'index, on ne supprime pas des
+données historiques pour contourner un problème d'index. Avec D7 elle ne bloque plus rien, et Notz
+est repris normalement.
+
+**Mesuré en production** : **un seul** tiers porte ce doublon, **une seule** ligne est en suppression
+logique dans toute la table. Le cas est isolé, pas le premier d'une série.
+
 ## 5. Ce qui change
 
 | Fichier | Changement |
@@ -149,8 +188,12 @@ migration doit néanmoins les **laisser telles quelles et les compter**, jamais 
    deux sens.
 8. **AC‑8** — Dans le wizard, choisir une formule à dates fixes affiche la période imposée **et**
    une date de fin non vide ; aucun champ de saisie de date n'est proposé.
-9. **AC‑9** — La migration de reprise renseigne les 4 lignes connues, laisse intactes les adhésions
-   sans `date_debut`, et rend leur nombre.
+9. **AC‑9** — La migration de reprise renseigne les 4 lignes connues **y compris celle de Notz**,
+   laisse intactes les adhésions sans `date_debut`, et rend leur nombre.
+9bis. **AC‑9bis** — Deux adhésions d'un même tiers sur le même exercice avec des dates de début
+   **différentes** coexistent en base ; avec la **même** date de début, la contrainte les refuse.
+   Et une ligne en suppression logique ne bloque jamais une ligne vivante. À éprouver sous **MySQL**,
+   la contrainte étant inopérante autrement.
 10. **AC‑10** — Le filtre de communication « Adhérents / Exercice en cours » rend **le même nombre
     qu'avant** le correctif : 25 pour 2025‑2026. Il ne doit pas bouger — c'est le témoin de
     non-régression du chemin qui marchait.
