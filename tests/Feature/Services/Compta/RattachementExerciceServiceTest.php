@@ -1122,18 +1122,27 @@ describe('RattachementExerciceService : création', function () {
         expect(DB::table('transactions')->count())->toBe($transactionsAvant);
     });
 
-    test('un rattachement apparu entre le contrôle et le verrou est refusé sous le verrou : jamais deux rattachements', function () {
+    test('le recontrôle « déjà rattachée » a lieu dans la transaction, après le verrou de la ligne : jamais deux rattachements', function () {
         $ligne = $this->ligneOrigine(7, 175.0);
+        $niveauAvant = DB::transactionLevel();
         $injecte = false;
 
-        // Simule une requête concurrente validée juste après le contrôle de
-        // motifDeRefus() (la ligne est alors libre) et avant la transaction du service :
-        // dès que ce contrôle a lu `provisions`, un rattachement concurrent existe, validé
-        // hors de la transaction du service. Une vraie concurrence ne se provoque pas
-        // dans un seul processus ; ce que le contrôle fait sous le verrou de ce qu'il
-        // trouve, lui, se teste ici.
-        DB::listen(function ($requete) use (&$injecte, $ligne): void {
-            if ($injecte || ! str_contains($requete->sql, 'provisions')) {
+        // Fait apparaître un rattachement de la même ligne DANS la transaction du
+        // service, juste après sa première lecture de transaction_lignes — le verrou de
+        // la ligne (le test d'ordre des verrous établit que c'est la première). Le
+        // contrôle de motifDeRefus(), fait avant la transaction, a déjà conclu que la ligne
+        // était libre : seul un recontrôle placé après ce verrou peut voir le rattachement.
+        // Un recontrôle déplacé avant la transaction, ou supprimé, fait tomber ce test : le
+        // service créerait un second rattachement au lieu de lever.
+        //
+        // Ce que le test ne prouve pas : l'exclusion mutuelle de deux requêtes. C'est le
+        // moteur qui la fournit, par le verrou de ligne ; une vraie concurrence ne se
+        // provoque pas dans un seul processus. Il prouve où est le recontrôle et ce qu'il
+        // fait de ce qu'il trouve.
+        DB::listen(function ($requete) use (&$injecte, $ligne, $niveauAvant): void {
+            if ($injecte
+                || DB::transactionLevel() <= $niveauAvant
+                || ! str_contains($requete->sql, 'transaction_lignes')) {
                 return;
             }
 
@@ -1145,9 +1154,9 @@ describe('RattachementExerciceService : création', function () {
             ->toThrow(RuntimeException::class, 'déjà rattachée');
 
         expect($injecte)->toBeTrue();
-        // Le seul rattachement est celui du concurrent, qui n'a pas généré d'écritures ;
-        // le service n'en a ajouté ni rattachement ni écriture.
-        expect(DB::table('provisions')->count())->toBe(1);
+        // Le rattachement injecté vivait dans la transaction du service : son refus
+        // l'annule avec elle. Il ne reste ni rattachement ni écriture.
+        expect(DB::table('provisions')->count())->toBe(0);
         expect(Transaction::whereNotNull('provision_id')->count())->toBe(0);
     });
 });
