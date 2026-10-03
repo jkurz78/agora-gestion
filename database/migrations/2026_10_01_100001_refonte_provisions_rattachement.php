@@ -23,14 +23,17 @@ return new class extends Migration
      * migration n'ayant jamais été déployée, la modifier ne réécrit aucun historique.
      *
      * Le message d'erreur est écrit pour quelqu'un qui le découvre en plein
-     * déploiement : tant que la colonne existe, il distingue les lignes actives des
-     * lignes supprimées logiquement ; il donne les requêtes à passer, sans compter
-     * sur un écran (celui du lot rattachement n'existe pas encore sur la version
-     * déployée).
+     * déploiement ou en plein retour arrière, et sa fin diffère selon le sens.
+     * À la montée, la version déployée est celle de l'ancien écran : l'écran du lot
+     * rattachement n'existe pas encore, le message donne les requêtes à passer et,
+     * tant que la colonne existe, distingue les lignes actives des lignes supprimées
+     * logiquement. Au retour arrière, le code du lot est encore déployé (sans lui ce
+     * fichier n'existerait pas) : l'écran « Exercices > Écritures de rattachement »
+     * est là, et c'est par lui qu'on retire un rattachement.
      */
     public function up(): void
     {
-        $this->exigerTableVide('à la montée');
+        $this->exigerTableVide(auRetourArriere: false);
 
         Schema::table('provisions', function (Blueprint $table) {
             $table->foreignId('transaction_ligne_id')
@@ -47,9 +50,15 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Même garde qu'à la montée, mais la sortie diffère : ici le code du lot est
+     * encore déployé et son écran retire un rattachement avec ses deux écritures ;
+     * à la montée, cet écran n'existe pas encore et la table ne contient que des
+     * provisions de l'ancien écran.
+     */
     public function down(): void
     {
-        $this->exigerTableVide('au retour arrière');
+        $this->exigerTableVide(auRetourArriere: true);
 
         Schema::table('provisions', function (Blueprint $table) {
             $table->dropConstrainedForeignId('transaction_ligne_id');
@@ -74,9 +83,15 @@ return new class extends Migration
      * rattachement en suppression logique ; il ne reste donc normalement rien qui
      * s'y rattache, mais seul l'opérateur peut le constater, d'où la requête de
      * vérification.
+     *
+     * La fin du message est propre à chaque sens (voir le docblock de la classe) :
+     * au retour arrière, chaque rattachement porte deux écritures, donc la requête
+     * ne sert qu'à les compter et la sortie est l'écran de rattachement.
      */
-    private function exigerTableVide(string $sens): void
+    private function exigerTableVide(bool $auRetourArriere): void
     {
+        $sens = $auRetourArriere ? 'au retour arrière' : 'à la montée';
+
         if (Schema::hasColumn('provisions', 'deleted_at')) {
             $actives = DB::table('provisions')->whereNull('deleted_at')->count();
             $supprimees = DB::table('provisions')->whereNotNull('deleted_at')->count();
@@ -92,13 +107,25 @@ return new class extends Migration
         }
 
         $message = "Migration refusée {$sens} : la table provisions n'est pas vide — {$detail}. "
-            .'Le lot rattachement réécrit cette table et suppose qu\'elle est vide. '
-            .'Vérifiez d\'abord qu\'aucune écriture comptable n\'en dépend : '
+            .'Le lot rattachement réécrit cette table et suppose qu\'elle est vide. ';
+
+        if ($auRetourArriere) {
+            $message .= 'Comptage des écritures comptables liées à un rattachement : '
+                .'SELECT COUNT(*) FROM transactions WHERE provision_id IS NOT NULL; '
+                .'Des rattachements existent, chacun avec ses deux écritures (la requête ci-dessus les compte) : '
+                .'retirez-les depuis l\'écran Exercices > Écritures de rattachement, qui supprime aussi leurs écritures, '
+                .'puis relancez le retour arrière. Ne les supprimez pas à la main.';
+
+            throw new RuntimeException($message);
+        }
+
+        $message .= 'Vérifiez d\'abord qu\'aucune écriture comptable n\'en dépend : '
             .'SELECT COUNT(*) FROM transactions WHERE provision_id IS NOT NULL; ';
 
         $message .= $actives > 0
-            ? 'Des rattachements actifs existent : ne les supprimez pas à la main, arrêtez la migration '
-                .'et examinez-les (et leurs écritures) avant toute décision.'
+            ? 'Des provisions de l\'ancien écran existent : ne les supprimez pas à la main '
+                .'(leurs écritures OD resteraient orphelines) ; n\'allez pas plus loin '
+                .'et examinez-les avec leurs écritures.'
             : 'Il ne reste que des lignes supprimées logiquement. Si ce comptage vaut 0, purgez-les avec : '
                 .'DELETE FROM provisions WHERE deleted_at IS NOT NULL; puis relancez la migration.';
 

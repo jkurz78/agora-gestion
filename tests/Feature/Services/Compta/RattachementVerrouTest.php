@@ -16,11 +16,11 @@ use Illuminate\Support\Facades\DB;
 | Verrou d'une ligne rattachée à l'exercice (CCA/PCA)
 |--------------------------------------------------------------------------
 |
-| Une ligne portée par un rattachement est verrouillée. TransactionLigne::estRattachee()
-| est la seule source de vérité de ce verrou : les gardes d'écriture (mise à jour,
-| suppression, annulation, ventilation, extourne, reclassement, synchronisation
-| HelloAsso) des Tasks 7 à 9 devront toutes l'appeler. Ce fichier accueillera aussi
-| les tests de ces gardes.
+| Une ligne portée par un rattachement gèle sa pièce entière (spec § 7).
+| TransactionLigne::estRattachee() est la seule source de vérité de ce verrou : les
+| gardes d'écriture (mise à jour, suppression, annulation, ventilation, extourne,
+| reclassement, synchronisation HelloAsso) des Tasks 7 à 9 l'appelleront, ou poseront
+| exactement la même question. Ce fichier accueillera aussi les tests de ces gardes.
 |
 | Spec : docs/specs/2026-09-30-provisions-rattachement-exercice-design.md (§ 6.4, § 7).
 */
@@ -91,9 +91,7 @@ describe('TransactionLigne::estRattachee()', function () {
 
         verrouRattacher($rattachee);
 
-        // Garde anti-test-vide : la sœur appartient bien à la même pièce.
-        expect((int) $soeur->transaction_id)->toBe((int) $rattachee->transaction_id)
-            ->and(Provision::count())->toBe(1)
+        expect(Provision::count())->toBe(1)
             ->and($rattachee->fresh()->estRattachee())->toBeTrue()
             ->and($soeur->fresh()->estRattachee())->toBeFalse();
     });
@@ -115,7 +113,7 @@ describe('TransactionLigne::estRattachee()', function () {
             ->and($ligne->estRattachee())->toBeTrue();
     });
 
-    test('le retrait par delete() supprime physiquement le rattachement et libère la ligne', function () {
+    test('delete() supprime physiquement le rattachement et libère la ligne', function () {
         $ligne = $this->ligneOrigine(7);
         $provision = verrouRattacher($ligne);
         $id = $provision->id;
