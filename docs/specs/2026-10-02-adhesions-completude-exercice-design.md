@@ -119,9 +119,33 @@ clé de la 26, et **`artisan migrate` échouerait au déploiement en production*
 `adhesion_key` est une colonne générée :
 
 ```php
-$table->string('adhesion_key', 30)
-    ->virtualAs("COALESCE(DATE_FORMAT(deleted_at, '%Y%m%d%H%i%s'), '0')");
+$table->unsignedTinyInteger('adhesion_key')
+    ->virtualAs('CASE WHEN deleted_at IS NULL THEN 1 END');
 ```
+
+🔴 **Corrigé le 2026-10-03, après mesure sur les trois moteurs.** La première rédaction de cette
+spec proposait `COALESCE(DATE_FORMAT(deleted_at, '%Y%m%d%H%i%s'), '0')`. Elle était **inutilisable
+en production** :
+
+```
+MariaDB 11.4.13 → ERROR 1901 (HY000): Function or expression 'date_format()'
+                  cannot be used in the GENERATED ALWAYS AS clause
+```
+
+MySQL 8.4 l'accepte, MariaDB la refuse, SQLite n'a pas `DATE_FORMAT` du tout. `artisan migrate`
+aurait échoué **au déploiement**. Deux défauts supplémentaires de cette version : la valeur d'un
+`DATE_FORMAT` sur un `TIMESTAMP` dépend du fuseau de session, et deux lignes supprimées **dans la
+même seconde** auraient collisionné (`1062 Duplicate entry`, reproduit sur MySQL).
+
+La forme `CASE WHEN deleted_at IS NULL THEN 1 END` est acceptée par **les trois moteurs**. Les
+lignes vivantes valent `1` et restent contraintes entre elles ; les lignes supprimées valent `NULL`,
+distinct de tout sur SQLite, MySQL **et** MariaDB, et ne bloquent personne — pas même une autre
+ligne supprimée.
+
+⚠️ **Limite de cette clé, à connaître** : une ligne dont `date_debut` ou `exercice` est `NULL` n'est
+contrainte par rien, puisqu'un NULL dans un index unique le neutralise. C'est le cas des adhésions
+offertes de `creerGratuite()`, dont le `mode` et la `date_debut` sont nuls. Leur protection reste
+**applicative**. Ne pas écrire que « la protection une-par-exercice demeure » sans cette réserve.
 
 C'est le motif déjà employé par [`budget_lines.operation_key`](../../database/migrations/2026_08_31_100000_add_operation_id_to_budget_lines.php#L29),
 et pour la même raison. ⚠️ **`virtualAs` et jamais `storedAs`** : SQLite refuse d'ajouter une colonne
