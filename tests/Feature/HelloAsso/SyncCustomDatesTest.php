@@ -96,5 +96,4 @@ it('Custom utilise les dates du form HelloAsso (pas l\'exercice asso)', function
     $adhesion = Adhesion::first();
     expect($adhesion->date_debut?->toDateString())->toBe('2025-03-01');
     expect($adhesion->date_fin?->toDateString())->toBe('2026-02-28');
-    expect($adhesion->exercice)->toBeNull();
 });

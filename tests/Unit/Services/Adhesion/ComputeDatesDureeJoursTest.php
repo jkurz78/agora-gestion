@@ -58,7 +58,6 @@ it('creerDepuisTransaction : formule duree_jours=10, tx date 2025-10-15 → date
     expect($adhesion)->not->toBeNull();
     expect($adhesion->date_debut->toDateString())->toBe('2025-10-15');
     expect($adhesion->date_fin->toDateString())->toBe('2025-10-24'); // 10 jours inclusifs
-    expect($adhesion->exercice)->toBeNull();
 });
 
 it('creerDepuisWizard : formule duree_jours=300 (saison ~10 mois), date_debut=2025-09-01 → date_fin=2026-06-27', function (): void {
@@ -88,7 +87,6 @@ it('creerDepuisWizard : formule duree_jours=300 (saison ~10 mois), date_debut=20
 
     expect($adhesion->date_debut->toDateString())->toBe('2025-09-01');
     expect($adhesion->date_fin->toDateString())->toBe('2026-06-27'); // 300 jours inclusifs = 2025-09-01 + 300j - 1j
-    expect($adhesion->exercice)->toBeNull();
 });
 
 it('creerDepuisTransaction : formule duree_mois=12 reste inchangé (régression)', function (): void {
@@ -117,5 +115,4 @@ it('creerDepuisTransaction : formule duree_mois=12 reste inchangé (régression)
     expect($adhesion)->not->toBeNull();
     expect($adhesion->date_debut->toDateString())->toBe('2025-10-15');
     expect($adhesion->date_fin->toDateString())->toBe('2026-10-14'); // 12 mois - 1 jour
-    expect($adhesion->exercice)->toBeNull();
 });

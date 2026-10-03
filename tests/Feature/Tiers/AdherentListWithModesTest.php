@@ -22,7 +22,7 @@ afterEach(function (): void {
     session()->forget('exercice_actif');
 });
 
-it('filtre a_jour inclut un adhérent en mode durée dont la période couvre aujourd\'hui', function (): void {
+it('filtre a_jour inclut un adhérent en mode durée dont la période recouvre l\'exercice sélectionné', function (): void {
     $tiers = Tiers::factory()->create(['nom' => 'DUREE_AJOUR']);
     $formule = FormuleAdhesion::factory()->modeDuree(12)->create(['compte_id' => $this->compteCotisation->id]);
 
@@ -40,7 +40,9 @@ it('filtre a_jour inclut un adhérent en mode durée dont la période couvre auj
         ->assertSee('DUREE_AJOUR');
 });
 
-it('filtre a_jour exclut un adhérent en mode durée dont la période est expirée', function (): void {
+it('filtre a_jour exclut un adhérent en mode durée dont la période est échue avant l\'exercice sélectionné', function (): void {
+    // Référence unique : l'exercice sélectionné (2025-2026, du 01/09/2025 au 31/08/2026),
+    // pas la date du jour (spec 2026-10-02, D3).
     $tiers = Tiers::factory()->create(['nom' => 'DUREE_EXPIRE']);
     $formule = FormuleAdhesion::factory()->modeDuree(12)->create(['compte_id' => $this->compteCotisation->id]);
 
@@ -48,8 +50,8 @@ it('filtre a_jour exclut un adhérent en mode durée dont la période est expir�
         'tiers_id' => $tiers->id,
         'formule_adhesion_id' => $formule->id,
         'exercice' => null,
-        'date_debut' => now()->subMonths(15)->toDateString(),
-        'date_fin' => now()->subMonths(3)->toDateString(),
+        'date_debut' => '2024-01-15',
+        'date_fin' => '2025-01-14',
     ]);
 
     Livewire::actingAs($this->user)
@@ -58,7 +60,8 @@ it('filtre a_jour exclut un adhérent en mode durée dont la période est expir�
         ->assertDontSee('DUREE_EXPIRE');
 });
 
-it('filtre en_retard inclut un adhérent en mode durée expiré dans les 30 derniers jours', function (): void {
+it('filtre en_retard inclut un adhérent en mode durée échu pendant l\'exercice précédent', function (): void {
+    // Échu le 15/08/2025, soit pendant l'exercice 2024-2025 : à jour hier, plus aujourd'hui.
     $tiers = Tiers::factory()->create(['nom' => 'DUREE_RETARD']);
     $formule = FormuleAdhesion::factory()->modeDuree(12)->create(['compte_id' => $this->compteCotisation->id]);
 
@@ -66,8 +69,8 @@ it('filtre en_retard inclut un adhérent en mode durée expiré dans les 30 dern
         'tiers_id' => $tiers->id,
         'formule_adhesion_id' => $formule->id,
         'exercice' => null,
-        'date_debut' => now()->subMonths(13)->toDateString(),
-        'date_fin' => now()->subDays(15)->toDateString(),
+        'date_debut' => '2024-10-01',
+        'date_fin' => '2025-08-15',
     ]);
 
     Livewire::actingAs($this->user)

@@ -76,22 +76,33 @@ final class NouvelleAdhesionModal extends Component
         if ($formule->montant_par_defaut !== null && $this->montant === 0.0 && ! $this->gratuite) {
             $this->montant = (float) $formule->montant_par_defaut;
         }
-        if ($formule->isModeDuree() && $this->dateDebut === null) {
+        // Une formule à dates fixes impose sa période : pas de date de début à proposer.
+        if ($formule->isModeDuree() && ! $formule->aDatesFixes() && $this->dateDebut === null) {
             $this->dateDebut = Carbon::today()->toDateString();
         }
     }
 
     /**
-     * Computed : date_fin calculée depuis date_debut selon l'unité de la formule (mois ou jours).
+     * Computed : date_fin de l'adhésion à créer.
+     *  - formule à dates fixes (HelloAsso) : la fin imposée par la formule ;
+     *  - formule en durée : calculée depuis date_debut selon l'unité (mois ou jours).
      */
     #[Computed]
     public function dateFinCalculee(): ?string
     {
-        if ($this->formuleId === null || $this->dateDebut === null) {
+        if ($this->formuleId === null) {
             return null;
         }
         $formule = FormuleAdhesion::find($this->formuleId);
         if ($formule === null || ! $formule->isModeDuree()) {
+            return null;
+        }
+
+        if ($formule->aDatesFixes()) {
+            return $formule->helloasso_end_date?->toDateString();
+        }
+
+        if ($this->dateDebut === null) {
             return null;
         }
 
@@ -130,7 +141,8 @@ final class NouvelleAdhesionModal extends Component
             tiersId: (int) $this->tiersId,
             formuleId: (int) $this->formuleId,
             exercice: $formule->isModeExercice() ? ($this->exercice ?? app(ExerciceService::class)->current()) : null,
-            dateDebut: $formule->isModeDuree() && $this->dateDebut !== null ? Carbon::parse($this->dateDebut) : null,
+            // Une formule à dates fixes impose sa période : on ne transmet pas une date qui n'aurait aucun effet.
+            dateDebut: $formule->isModeDuree() && ! $formule->aDatesFixes() && $this->dateDebut !== null ? Carbon::parse($this->dateDebut) : null,
             montant: $this->montant,
             notes: $this->notes,
             datePaiement: $this->montant > 0 ? $this->datePaiement : null,
