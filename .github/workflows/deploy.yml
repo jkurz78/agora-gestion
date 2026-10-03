@@ -94,19 +94,24 @@ jobs:
   # ⚠️ Ne le repasse pas en `continue-on-error` pour débloquer un push. Un échec
   # ici décrit ce que MariaDB fera en production ; SQLite, lui, ne le dira
   # jamais.
+  # Éprouve le moteur de la PRODUCTION. Jusqu'au 2026-10-03 ce job tournait sur
+  # mysql:8.4 : le garde-fou qui conditionne les déploiements n'éprouvait donc
+  # pas le moteur réel. MySQL et MariaDB divergent sur des points qui ont déjà
+  # produit des pannes ici — DATE_FORMAT interdit dans une colonne générée
+  # (erreur 1901), colonnes générées à l'import d'un dump, longueurs de varchar.
   test-mysql:
     runs-on: ubuntu-latest
 
     services:
       mysql:
-        image: mysql:8.4
+        image: mariadb:11.4
         env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: testing
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: testing
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=10
@@ -138,7 +143,7 @@ jobs:
           cp .env.example .env
           php artisan key:generate
 
-      - name: Run tests on MySQL
+      - name: Run tests on MariaDB (moteur de production)
         # -c phpunit.mysql.xml : phpunit.xml force DB_CONNECTION=sqlite, donc des
         # variables d'environnement ne suffiraient pas à basculer sur MySQL.
         run: php artisan test --no-ansi -c phpunit.mysql.xml

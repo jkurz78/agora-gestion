@@ -83,10 +83,11 @@ it('creerDepuisTransaction est idempotent', function (): void {
 });
 
 it('creerDepuisTransaction ne duplique pas une adhésion déjà liée à la transaction (exercice différent)', function (): void {
-    // Régression : adhésion saisie via le wizard en mode durée (exercice=NULL),
-    // puis "marquer reçu" rejoue creerDepuisTransaction. L'ancien lookup par
-    // exercice (calculé à 2025) ne retrouvait pas l'adhésion exercice=NULL liée
-    // à la même transaction → doublon. Le bon idempotent = transaction_id.
+    // Régression : adhésion saisie via le wizard en mode durée, puis "marquer reçu"
+    // rejoue creerDepuisTransaction. Un lookup par clé métier (ici l'exercice calculé
+    // à 2025) ne retrouvait pas l'adhésion liée à la même transaction → doublon. Le bon
+    // idempotent = transaction_id. La ligne est posée à exercice NULL, l'état historique
+    // d'avant la complétude de l'exercice : l'idempotence ne doit pas en dépendre.
     $service = app(AdhesionService::class);
 
     $sc = Compte::create([
@@ -115,7 +116,7 @@ it('creerDepuisTransaction ne duplique pas une adhésion déjà liée à la tran
         ]);
     });
 
-    // Adhésion déjà créée par le wizard pour CETTE transaction, mode durée → exercice NULL.
+    // Adhésion déjà créée par le wizard pour CETTE transaction (état historique : exercice NULL).
     $existante = Adhesion::create([
         'association_id' => $tiers->association_id,
         'tiers_id' => $tiers->id,

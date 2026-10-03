@@ -20,7 +20,9 @@ final class AdhesionLigneDTO
             return 'Ex. '.$this->adhesion->exercice.'-'.($this->adhesion->exercice + 1);
         }
 
-        return '—'; // mode durée → la colonne Formule/Validité affichera l'intervalle
+        // L'exercice est renseigné pour tous les modes (durée et illimité compris). Seule une
+        // adhésion sans date de début, laissée telle quelle par la reprise, n'en a pas.
+        return '—';
     }
 
     public function libelleType(): string

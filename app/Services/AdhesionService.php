@@ -18,8 +18,10 @@ use App\Services\Adhesion\NouvelleAdhesionDTO;
 use App\Tenant\TenantContext;
 use Carbon\CarbonImmutable;
 use DomainException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 final class AdhesionService
 {
@@ -78,35 +80,33 @@ final class AdhesionService
         return DB::transaction(function () use ($tx, $formule): Adhesion {
             // Idempotence forte : une adhésion déjà liée à CETTE transaction est
             // l'adhésion de la transaction, quel que soit son exercice/mode. Le
-            // wizard la crée parfois en mode durée (exercice=NULL) — que le lookup
-            // par exercice ci-dessous ne retrouverait pas, d'où un doublon quand
-            // l'observer rejoue creerDepuisTransaction (ex. au "marquer reçu").
+            // wizard la crée parfois en mode durée, que la recherche par clé
+            // ci-dessous ne retrouverait pas toujours (clé = dates, pas exercice),
+            // d'où un doublon quand l'observer rejoue creerDepuisTransaction
+            // (ex. au "marquer reçu").
             $parTransaction = Adhesion::withTrashed()
                 ->where('transaction_id', (int) $tx->id)
                 ->first();
 
             if ($parTransaction !== null) {
-                if ($parTransaction->trashed()) {
-                    $parTransaction->restore();
-                }
-
-                return $parTransaction;
+                return $parTransaction->trashed()
+                    ? $this->restaurerOuRetrouver($parTransaction)
+                    : $parTransaction;
             }
 
             $datesEtExercice = $this->computeDatesEtExercice($tx, $formule);
 
-            // Idempotence : lookup selon mode
+            // Idempotence : la clé de recherche dépend du MODE de la formule.
             $adhesion = $this->findExistingAdhesion(
                 tiersId: (int) $tx->tiers_id,
+                formule: $formule,
                 exercice: $datesEtExercice['exercice'],
                 dateDebut: $datesEtExercice['date_debut'],
                 dateFin: $datesEtExercice['date_fin'],
             );
 
             if ($adhesion?->trashed()) {
-                $adhesion->restore();
-
-                return $adhesion;
+                return $this->restaurerOuRetrouver($adhesion);
             }
 
             if ($adhesion !== null) {
@@ -136,22 +136,87 @@ final class AdhesionService
                 ->selectRaw('SUM(CASE WHEN c.classe = 6 THEN tl.debit - tl.credit ELSE tl.credit - tl.debit END) as net')
                 ->value('net') ?? 0);
 
-            return Adhesion::create([
-                'association_id' => TenantContext::currentId(),
-                'tiers_id' => (int) $tx->tiers_id,
-                'exercice' => $datesEtExercice['exercice'],
-                'transaction_id' => (int) $tx->id,
-                'formule_adhesion_id' => $formule?->id,
-                'date_debut' => $datesEtExercice['date_debut'],
-                'date_fin' => $datesEtExercice['date_fin'],
-                'saisi_par' => $tx->saisi_par !== null ? (int) $tx->saisi_par : null,
-                'montant_facial' => round($montantFacial, 2),
-                'deductible_fiscal' => $formule?->deductible_fiscal ?? false,
-                'mode' => $formule?->mode ?? 'exercice',
-                'duree_mois' => $formule?->duree_mois,
-                'label_formule' => $formule?->nom ?? 'Adhésion legacy',
-            ]);
+            // TOLÉRANCE à l'import : une machine (synchro HelloAsso, observer, « marquer
+            // reçu ») enregistre de l'argent, elle ne doit jamais s'arrêter sur une règle
+            // d'adhésion. Si la clé unique refuse une seconde adhésion de la même saison, on
+            // rend l'adhésion existante : l'écriture comptable est importée, l'adhésion ne se
+            // dédouble pas. Le refus lisible est réservé à la saisie humaine (wizard).
+            try {
+                return Adhesion::create([
+                    'association_id' => TenantContext::currentId(),
+                    'tiers_id' => (int) $tx->tiers_id,
+                    'exercice' => $datesEtExercice['exercice'],
+                    'transaction_id' => (int) $tx->id,
+                    'formule_adhesion_id' => $formule?->id,
+                    'date_debut' => $datesEtExercice['date_debut'],
+                    'date_fin' => $datesEtExercice['date_fin'],
+                    'saisi_par' => $tx->saisi_par !== null ? (int) $tx->saisi_par : null,
+                    'montant_facial' => round($montantFacial, 2),
+                    'deductible_fiscal' => $formule?->deductible_fiscal ?? false,
+                    'mode' => $formule?->mode ?? 'exercice',
+                    'duree_mois' => $formule?->duree_mois,
+                    'label_formule' => $formule?->nom ?? 'Adhésion legacy',
+                ]);
+            } catch (UniqueConstraintViolationException $e) {
+                $existante = $this->adhesionVivanteDeMemeCle(
+                    (int) $tx->tiers_id,
+                    $datesEtExercice['exercice'],
+                    $datesEtExercice['date_debut'],
+                );
+
+                if ($existante === null) {
+                    throw $e;
+                }
+
+                Log::info('[adhesions] Collision de clé à l\'import : adhésion existante conservée, transaction importée', [
+                    'transaction_id' => (int) $tx->id,
+                    'adhesion_id' => (int) $existante->id,
+                ]);
+
+                return $existante;
+            }
         });
+    }
+
+    /**
+     * Restaure une adhésion supprimée. Si une adhésion vivante occupe déjà sa clé
+     * (cas d'une « Adhésion legacy » annulée, doublée par une adhésion vivante), la
+     * restauration est refusée par la clé unique : on rend alors l'adhésion vivante
+     * plutôt que de laisser l'erreur remonter jusqu'à l'écran de saisie.
+     */
+    private function restaurerOuRetrouver(Adhesion $adhesion): Adhesion
+    {
+        try {
+            $adhesion->restore();
+
+            return $adhesion;
+        } catch (UniqueConstraintViolationException $e) {
+            $vivante = $this->adhesionVivanteDeMemeCle(
+                (int) $adhesion->tiers_id,
+                $adhesion->exercice,
+                $adhesion->date_debut,
+            );
+
+            if ($vivante === null) {
+                throw $e;
+            }
+
+            return $vivante;
+        }
+    }
+
+    /** L'adhésion vivante qui occupe la clé unique (tiers, exercice, date_debut), s'il y en a une. */
+    private function adhesionVivanteDeMemeCle(int $tiersId, ?int $exercice, ?\DateTimeInterface $dateDebut): ?Adhesion
+    {
+        if ($exercice === null || $dateDebut === null) {
+            return null;
+        }
+
+        return Adhesion::query()
+            ->where('tiers_id', $tiersId)
+            ->where('exercice', $exercice)
+            ->whereDate('date_debut', $dateDebut->format('Y-m-d'))
+            ->first();
     }
 
     /**
@@ -192,15 +257,21 @@ final class AdhesionService
     }
 
     /**
-     * @return array{exercice: ?int, date_debut: ?CarbonImmutable, date_fin: ?CarbonImmutable}
+     * L'exercice est la SAISON d'adhésion : dérivé de la date de DÉBUT de l'adhésion,
+     * pour tous les modes. C'est une information, jamais la clé de dédoublonnage d'une
+     * formule en durée (voir findExistingAdhesion).
+     *
+     * @return array{exercice: int, date_debut: CarbonImmutable, date_fin: ?CarbonImmutable}
      */
     private function computeDatesEtExercice(Transaction $tx, ?FormuleAdhesion $formule): array
     {
         // Mode durée avec dates HelloAsso explicites (Custom) → utiliser les dates du form
-        if ($formule !== null && $formule->isModeDuree() && $formule->helloasso_start_date !== null) {
+        if ($formule !== null && $formule->aDatesFixes()) {
+            $debut = CarbonImmutable::parse($formule->helloasso_start_date);
+
             return [
-                'exercice' => null,
-                'date_debut' => CarbonImmutable::parse($formule->helloasso_start_date),
+                'exercice' => $this->exerciceFromDate($debut),
+                'date_debut' => $debut,
                 'date_fin' => $formule->helloasso_end_date !== null
                     ? CarbonImmutable::parse($formule->helloasso_end_date)
                     : null,
@@ -213,7 +284,7 @@ final class AdhesionService
             $fin = $debut->addDays((int) $formule->duree_jours)->subDay();
 
             return [
-                'exercice' => null,
+                'exercice' => $this->exerciceFromDate($debut),
                 'date_debut' => $debut,
                 'date_fin' => $fin,
             ];
@@ -225,7 +296,7 @@ final class AdhesionService
             $fin = $debut->addMonths((int) $formule->duree_mois)->subDay();
 
             return [
-                'exercice' => null,
+                'exercice' => $this->exerciceFromDate($debut),
                 'date_debut' => $debut,
                 'date_fin' => $fin,
             ];
@@ -235,7 +306,7 @@ final class AdhesionService
             $debut = CarbonImmutable::parse($tx->date);
 
             return [
-                'exercice' => null,
+                'exercice' => $this->exerciceFromDate($debut),
                 'date_debut' => $debut,
                 'date_fin' => null,
             ];
@@ -254,30 +325,64 @@ final class AdhesionService
         ];
     }
 
-    private function findExistingAdhesion(int $tiersId, ?int $exercice, ?CarbonImmutable $dateDebut, ?CarbonImmutable $dateFin): ?Adhesion
+    /**
+     * La déduplication est fondée sur le MODE de la formule (jamais sur la nullité de
+     * l'exercice, désormais toujours renseigné) :
+     *  - mode exercice, ou sans formule (legacy) : clé (tiers, exercice) — elle retrouve
+     *    aussi une adhésion en durée de la même saison : une seule adhésion par tiers et
+     *    par saison, quelle que soit la formule ;
+     *  - mode durée : clé (date_debut, date_fin), pour que deux adhésions successives
+     *    d'une même saison — formule trimestrielle renouvelée — restent distinctes. Une
+     *    formule à dates fixes sans date de fin cherche une adhésion sans date de fin ;
+     *  - mode illimité : une seule adhésion permanente par tiers.
+     */
+    private function findExistingAdhesion(int $tiersId, ?FormuleAdhesion $formule, int $exercice, CarbonImmutable $dateDebut, ?CarbonImmutable $dateFin): ?Adhesion
     {
         $query = Adhesion::withTrashed()->where('tiers_id', $tiersId);
 
-        if ($exercice !== null) {
+        if ($this->estParExercice($formule)) {
             return $query->where('exercice', $exercice)->first();
         }
 
+        if ($formule->isModeIllimite()) {
+            return $query->where('mode', 'illimite')->first();
+        }
+
         // Mode durée : lookup par (date_debut, date_fin)
-        if ($dateDebut !== null && $dateFin !== null) {
-            return $query
-                ->whereDate('date_debut', $dateDebut->toDateString())
-                ->whereDate('date_fin', $dateFin->toDateString())
-                ->first();
-        }
+        $query->whereDate('date_debut', $dateDebut->toDateString());
 
-        // Mode illimite : 1 seule adhésion permanente possible par tiers
-        if ($dateDebut !== null && $dateFin === null) {
-            return $query
-                ->where('mode', 'illimite')
-                ->first();
-        }
+        return ($dateFin !== null
+            ? $query->whereDate('date_fin', $dateFin->toDateString())
+            : $query->whereNull('date_fin'))
+            ->first();
+    }
 
-        return null;
+    /** Une adhésion sans formule (legacy) suit la clé « exercice », comme computeDatesEtExercice. */
+    private function estParExercice(?FormuleAdhesion $formule): bool
+    {
+        return $formule === null || (! $formule->isModeDuree() && ! $formule->isModeIllimite());
+    }
+
+    /**
+     * Création par la SAISIE HUMAINE (wizard) : la violation de la clé unique devient un
+     * refus lisible, que l'utilisateur peut corriger. Le chemin d'import (transaction,
+     * synchro, observer), lui, tolère la collision — voir creerDepuisTransaction.
+     *
+     * La clé (association, tiers, exercice, date_debut) refuse deux adhésions vivantes
+     * d'un même tiers qui commencent le même jour d'une même saison, quelle que soit la
+     * formule : une adhésion « par exercice » et une formule HelloAsso du 1er septembre,
+     * une formule à dates fixes sans fin, une adhésion illimitée saisie deux fois le même
+     * jour. Sans cette traduction, l'utilisateur recevrait une erreur SQL brute.
+     *
+     * @param  array<string, mixed>  $attributs
+     */
+    private function creerAdhesion(array $attributs): Adhesion
+    {
+        try {
+            return Adhesion::create($attributs);
+        } catch (UniqueConstraintViolationException) {
+            throw new DomainException('Ce tiers a déjà une adhésion sur cette période.');
+        }
     }
 
     public function creerGratuite(Tiers $tiers, int $exercice, string $motif, User $createur): Adhesion
@@ -321,27 +426,28 @@ final class AdhesionService
         $formule = FormuleAdhesion::findOrFail($dto->formuleId);
 
         return DB::transaction(function () use ($dto, $createur, $formule): Adhesion {
-            // 1. Calcul dates / exercice
-            if ($formule->isModeDuree() && $formule->helloasso_start_date !== null) {
+            // 1. Calcul dates / exercice. L'exercice est la saison d'adhésion : dérivé
+            // de la date de début dans tous les modes (information, pas clé — D2).
+            if ($formule->aDatesFixes()) {
                 // Durée avec dates HelloAsso explicites (Custom)
                 $dateDebut = Carbon::parse($formule->helloasso_start_date);
                 $dateFin = $formule->helloasso_end_date !== null
                     ? Carbon::parse($formule->helloasso_end_date)
                     : null;
-                $exercice = null;
+                $exercice = $this->exerciceFromDate($dateDebut);
             } elseif ($formule->isModeDuree() && $formule->duree_jours !== null) {
                 // Durée en jours (branche avant duree_mois)
                 $dateDebut = $dto->dateDebut ?? Carbon::today();
                 $dateFin = $dateDebut->copy()->addDays((int) $formule->duree_jours)->subDay();
-                $exercice = null;
+                $exercice = $this->exerciceFromDate($dateDebut);
             } elseif ($formule->isModeDuree()) {
                 $dateDebut = $dto->dateDebut ?? Carbon::today();
                 $dateFin = $dateDebut->copy()->addMonths((int) $formule->duree_mois)->subDay();
-                $exercice = null;
+                $exercice = $this->exerciceFromDate($dateDebut);
             } elseif ($formule->isModeIllimite()) {
                 $dateDebut = $dto->dateDebut ?? Carbon::today();
                 $dateFin = null;
-                $exercice = null;
+                $exercice = $this->exerciceFromDate($dateDebut);
             } else {
                 $exercice = $dto->exercice ?? $this->exerciceFromDate(Carbon::today());
                 $exerciceMoisDebut = TenantContext::current()?->exercice_mois_debut ?? 9;
@@ -349,9 +455,10 @@ final class AdhesionService
                 $dateFin = $dateDebut->copy()->addYear()->subDay();
             }
 
-            // 2. Validation doublon (exercice) ou recouvrement (durée)
+            // 2. Validation doublon (mode exercice) ou recouvrement (durée, illimité)
             $this->guardAgainstOverlap(
                 tiersId: $dto->tiersId,
+                parExercice: $this->estParExercice($formule),
                 exercice: $exercice,
                 dateDebut: $dateDebut,
                 dateFin: $dateFin,
@@ -364,7 +471,7 @@ final class AdhesionService
             }
 
             // 4. Création adhésion
-            return Adhesion::create([
+            return $this->creerAdhesion([
                 'association_id' => TenantContext::currentId(),
                 'tiers_id' => $dto->tiersId,
                 'exercice' => $exercice,
@@ -384,9 +491,19 @@ final class AdhesionService
         });
     }
 
-    private function guardAgainstOverlap(int $tiersId, ?int $exercice, ?Carbon $dateDebut, ?Carbon $dateFin): void
+    /**
+     * Même règle que findExistingAdhesion : la garde suit le MODE de la formule, pas la
+     * nullité de l'exercice — sinon elle refuserait une seconde adhésion légitime sur
+     * une même saison pour une formule en durée. Une adhésion « par exercice » est en
+     * revanche refusée si le tiers a déjà une adhésion de cette saison, de n'importe
+     * quelle formule.
+     *
+     * Les cas qui échappent à la garde (formule sans date de fin, illimité) sont rattrapés
+     * par la clé unique, traduite par creerAdhesion().
+     */
+    private function guardAgainstOverlap(int $tiersId, bool $parExercice, int $exercice, ?Carbon $dateDebut, ?Carbon $dateFin): void
     {
-        if ($exercice !== null) {
+        if ($parExercice) {
             $existante = Adhesion::withTrashed()
                 ->where('tiers_id', $tiersId)
                 ->where('exercice', $exercice)

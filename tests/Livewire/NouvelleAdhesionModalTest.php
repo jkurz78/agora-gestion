@@ -292,7 +292,7 @@ it('mode duree_jours=10 : submit crée adhésion avec dates correctes', function
     $adhesion = Adhesion::first();
     expect($adhesion->date_debut->toDateString())->toBe('2025-09-01');
     expect($adhesion->date_fin->toDateString())->toBe('2025-09-10');
-    expect($adhesion->exercice)->toBeNull();
+    expect($adhesion->exercice)->toBe(2025);
 });
 
 it('régression : mode duree_mois=12, dateDebut=2025-10-15 → date_fin=2026-10-14 (inchangé)', function (): void {
@@ -309,4 +309,182 @@ it('régression : mode duree_mois=12, dateDebut=2025-10-15 → date_fin=2026-10-
         ->set('formuleId', $formuleDureeMois->id)
         ->set('dateDebut', '2025-10-15')
         ->assertSet('dateFinCalculee', '2026-10-14');
+});
+
+// ─── Spec 2026-10-02 — D5 / D6 : formule à dates fixes (HelloAsso « Custom ») ─
+
+/** La formule de la saison telle que la synchro la crée : durée, dates fixes, aucune unité. */
+function formuleSaisonHelloAssoModale(Compte $compte, ?string $fin = '2027-08-31'): FormuleAdhesion
+{
+    return FormuleAdhesion::factory()->helloasso('cotisation-saison', 7)->create([
+        'compte_id' => $compte->id,
+        'nom' => 'Adhésion saison 2026-2027',
+        'mode' => 'duree',
+        'duree_mois' => null,
+        'duree_jours' => null,
+        'montant_par_defaut' => 30.00,
+        'helloasso_start_date' => '2026-09-01',
+        'helloasso_end_date' => $fin,
+    ]);
+}
+
+it('AC-8 · une formule à dates fixes affiche la période imposée et une date de fin, sans champ de saisie de date', function (): void {
+    $formule = formuleSaisonHelloAssoModale($this->sc);
+
+    $component = Livewire::actingAs($this->user)
+        ->test(NouvelleAdhesionModal::class)
+        ->dispatch('nouvelle-adhesion', gratuite: true)
+        ->set('formuleId', $formule->id)
+        ->assertSet('dateFinCalculee', '2027-08-31');
+
+    $html = $component->html();
+    expect($html)->toContain('01/09/2026')
+        ->and($html)->toContain('31/08/2027')
+        ->and($html)->not->toContain('nouvelle-date-debut')
+        ->and($html)->not->toContain('wire:model.live="dateDebut"');
+});
+
+it('D5 · le champ de date de début n\'est proposé que pour une formule en durée réelle', function (): void {
+    $this->formuleExercice->update(['actif' => false]);
+    $formuleDuree = FormuleAdhesion::factory()->modeDuree(12)->create(['compte_id' => $this->sc->id]);
+
+    $html = Livewire::actingAs($this->user)
+        ->test(NouvelleAdhesionModal::class)
+        ->dispatch('nouvelle-adhesion', gratuite: true)
+        ->set('formuleId', $formuleDuree->id)
+        ->html();
+
+    expect($html)->toContain('nouvelle-date-debut');
+});
+
+it('D5 · une formule à dates fixes ne reçoit pas de date de début par défaut', function (): void {
+    $formule = formuleSaisonHelloAssoModale($this->sc);
+
+    Livewire::actingAs($this->user)
+        ->test(NouvelleAdhesionModal::class)
+        ->dispatch('nouvelle-adhesion', gratuite: true)
+        ->set('formuleId', $formule->id)
+        ->assertSet('dateDebut', null);
+});
+
+it('D5 · sans date de fin, la période imposée l\'annonce et l\'aperçu reste vide', function (): void {
+    $formule = formuleSaisonHelloAssoModale($this->sc, null);
+
+    $component = Livewire::actingAs($this->user)
+        ->test(NouvelleAdhesionModal::class)
+        ->dispatch('nouvelle-adhesion', gratuite: true)
+        ->set('formuleId', $formule->id)
+        ->assertSet('dateFinCalculee', null);
+
+    expect($component->html())->toContain('01/09/2026')
+        ->and($component->html())->not->toContain('nouvelle-date-debut');
+});
+
+it('D5 · une date de début saisie sur une formule à dates fixes n\'a aucun effet : la période imposée l\'emporte', function (): void {
+    $formule = formuleSaisonHelloAssoModale($this->sc);
+
+    Livewire::actingAs($this->user)
+        ->test(NouvelleAdhesionModal::class)
+        ->dispatch('nouvelle-adhesion', gratuite: true)
+        ->set('tiersId', $this->tiers->id)
+        ->set('formuleId', $formule->id)
+        ->set('dateDebut', '2026-03-15')
+        ->set('montant', 0.0)
+        ->call('submit')
+        ->assertSet('visible', false);
+
+    $adhesion = Adhesion::firstOrFail();
+    expect($adhesion->date_debut->toDateString())->toBe('2026-09-01')
+        ->and($adhesion->date_fin->toDateString())->toBe('2027-08-31');
+});
+
+it('D6 · AC-1 · on crée une adhésion manuelle sur la formule HelloAsso : exercice 2026, période imposée (cas Moniotte)', function (): void {
+    $formule = formuleSaisonHelloAssoModale($this->sc);
+
+    $html = Livewire::actingAs($this->user)
+        ->test(NouvelleAdhesionModal::class)
+        ->dispatch('nouvelle-adhesion')
+        ->html();
+    expect($html)->toContain('Formules HelloAsso')->and($html)->toContain('Adhésion saison 2026-2027');
+
+    Livewire::actingAs($this->user)
+        ->test(NouvelleAdhesionModal::class)
+        ->dispatch('nouvelle-adhesion')
+        ->set('tiersId', $this->tiers->id)
+        ->set('formuleId', $formule->id)
+        ->set('montant', 30.00)
+        ->set('datePaiement', '2026-10-02')
+        ->set('modePaiement', ModePaiement::Cheque->value)
+        ->set('compteId', $this->compte->id)
+        ->call('submit')
+        ->assertSet('visible', false)
+        ->assertDispatched('adhesion-creee');
+
+    $adhesion = Adhesion::firstOrFail();
+    expect($adhesion->exercice)->toBe(2026)
+        ->and($adhesion->date_debut->toDateString())->toBe('2026-09-01')
+        ->and($adhesion->date_fin->toDateString())->toBe('2027-08-31')
+        ->and((int) $adhesion->formule_adhesion_id)->toBe((int) $formule->id)
+        ->and($adhesion->transaction_id)->not->toBeNull();
+});
+
+it('D6 · le compte bancaire HelloAsso reste exclu de la saisie manuelle, même sur une formule HelloAsso', function (): void {
+    CompteBancaire::factory()->create(['nom' => 'HelloAsso SVS', 'saisie_automatisee' => true]);
+    $formule = formuleSaisonHelloAssoModale($this->sc);
+
+    $html = Livewire::actingAs($this->user)
+        ->test(NouvelleAdhesionModal::class)
+        ->dispatch('nouvelle-adhesion')
+        ->set('tiersId', $this->tiers->id)
+        ->set('formuleId', $formule->id)
+        ->html();
+
+    expect($html)->toContain($this->compte->nom)->and($html)->not->toContain('HelloAsso SVS');
+});
+
+it('doublon · une formule à dates fixes sans fin saisie deux fois affiche un refus lisible, pas une erreur SQL', function (): void {
+    $sansFin = formuleSaisonHelloAssoModale($this->sc, null);
+
+    $saisie = fn () => Livewire::actingAs($this->user)
+        ->test(NouvelleAdhesionModal::class)
+        ->dispatch('nouvelle-adhesion', gratuite: true)
+        ->set('tiersId', $this->tiers->id)
+        ->set('formuleId', $sansFin->id)
+        ->set('montant', 0.0)
+        ->call('submit');
+
+    $saisie()->assertSet('visible', false);
+
+    $saisie()
+        ->assertSet('visible', true)
+        ->assertSet('errorMessage', 'Ce tiers a déjà une adhésion sur cette période.')
+        ->assertSee('déjà une adhésion sur cette période');
+
+    expect(Adhesion::count())->toBe(1);
+});
+
+it('doublon · une adhésion « par exercice » sur une saison déjà couverte par la formule HelloAsso est refusée lisiblement', function (): void {
+    $saison = formuleSaisonHelloAssoModale($this->sc);
+
+    Livewire::actingAs($this->user)
+        ->test(NouvelleAdhesionModal::class)
+        ->dispatch('nouvelle-adhesion', gratuite: true)
+        ->set('tiersId', $this->tiers->id)
+        ->set('formuleId', $saison->id)
+        ->set('montant', 0.0)
+        ->call('submit')
+        ->assertSet('visible', false);
+
+    Livewire::actingAs($this->user)
+        ->test(NouvelleAdhesionModal::class)
+        ->dispatch('nouvelle-adhesion', gratuite: true)
+        ->set('tiersId', $this->tiers->id)
+        ->set('formuleId', $this->formuleExercice->id)
+        ->set('exercice', 2026)
+        ->set('montant', 0.0)
+        ->call('submit')
+        ->assertSet('visible', true)
+        ->assertSee('déjà une adhésion');
+
+    expect(Adhesion::count())->toBe(1);
 });

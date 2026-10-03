@@ -114,6 +114,16 @@ final class FormuleAdhesion extends TenantModel
         return $this->mode === 'illimite';
     }
 
+    /**
+     * Formule en durée dont la PÉRIODE est imposée : dates fixes issues de HelloAsso
+     * (« Custom »), sans unité de durée. Ni la durée ni la date de début ne se
+     * choisissent : la période est celle de la formule.
+     */
+    public function aDatesFixes(): bool
+    {
+        return $this->isModeDuree() && $this->helloasso_start_date !== null;
+    }
+
     /** Retourne true si la formule est en mode durée avec une unité en jours. */
     public function isUniteJours(): bool
     {

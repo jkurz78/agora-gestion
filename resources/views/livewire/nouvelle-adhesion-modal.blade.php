@@ -104,6 +104,18 @@
                                     @endforeach
                                 </select>
                             </div>
+                        @elseif($selectedFormule && $selectedFormule->aDatesFixes())
+                            <div class="alert alert-info py-2 small mb-3" id="nouvelle-periode-imposee">
+                                <i class="bi bi-calendar-range me-1"></i>
+                                @if($this->dateFinCalculee)
+                                    Période imposée par la formule : du
+                                    <strong>{{ $selectedFormule->helloasso_start_date->format('d/m/Y') }}</strong>
+                                    au <strong>{{ \Illuminate\Support\Carbon::parse($this->dateFinCalculee)->format('d/m/Y') }}</strong>.
+                                @else
+                                    Période imposée par la formule : à partir du
+                                    <strong>{{ $selectedFormule->helloasso_start_date->format('d/m/Y') }}</strong>, sans date de fin.
+                                @endif
+                            </div>
                         @elseif($selectedFormule && $selectedFormule->isModeDuree())
                             <div class="row g-2 mb-3">
                                 <div class="col-md-6">
