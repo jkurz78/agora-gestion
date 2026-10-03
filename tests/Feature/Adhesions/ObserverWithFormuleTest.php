@@ -58,7 +58,7 @@ it('observer applique la formule active de le compte (priorité 2)', function ()
     expect($adhesion->label_formule)->toBe($formule->nom);
 });
 
-it('observer en mode durée pose date_debut + date_fin et exercice null', function (): void {
+it('observer en mode durée pose date_debut + date_fin + exercice de la date de début', function (): void {
     $formule = FormuleAdhesion::factory()->modeDuree(12)->create([
         'compte_id' => $this->sc->id,
         'actif' => true,
@@ -81,7 +81,7 @@ it('observer en mode durée pose date_debut + date_fin et exercice null', functi
     expect($adhesion->formule_adhesion_id)->toBe($formule->id);
     expect($adhesion->date_debut?->toDateString())->toBe('2025-10-15');
     expect($adhesion->date_fin?->toDateString())->toBe('2026-10-14');
-    expect($adhesion->exercice)->toBeNull();
+    expect($adhesion->exercice)->toBe(2025); // dérivé de la date de début, pas de la fin
 });
 
 it('observer applique la formule depuis le mapping HelloAsso (priorité 1)', function (): void {
@@ -219,6 +219,6 @@ it('observer pose mode illimite avec date_fin null', function (): void {
     expect($adhesion->mode)->toBe('illimite');
     expect($adhesion->date_debut?->toDateString())->toBe('2025-10-15');
     expect($adhesion->date_fin)->toBeNull();
-    expect($adhesion->exercice)->toBeNull();
+    expect($adhesion->exercice)->toBe(2025);
     expect($adhesion->label_formule)->toBe('Adhésion à vie');
 });

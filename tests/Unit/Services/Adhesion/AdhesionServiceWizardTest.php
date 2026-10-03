@@ -123,7 +123,7 @@ it('crée une adhésion mode durée avec date_debut/date_fin calculées', functi
 
     expect($adhesion->date_debut->toDateString())->toBe('2025-10-15');
     expect($adhesion->date_fin->toDateString())->toBe('2026-10-14');
-    expect($adhesion->exercice)->toBeNull();
+    expect($adhesion->exercice)->toBe(2025); // dérivé de la date de début, pas de la fin
 });
 
 it('refuse un doublon en mode exercice', function (): void {
@@ -266,7 +266,7 @@ it('crée une adhésion mode illimite (permanente)', function (): void {
     expect($adhesion->mode)->toBe('illimite');
     expect($adhesion->date_debut?->toDateString())->toBe('2025-10-15');
     expect($adhesion->date_fin)->toBeNull();
-    expect($adhesion->exercice)->toBeNull();
+    expect($adhesion->exercice)->toBe(2025);
 });
 
 it('refuse une adhésion si une adhésion soft-deleted existe pour le même exercice', function (): void {

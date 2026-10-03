@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Livewire\Concerns\WithPerPage;
+use App\Models\Adhesion;
 use App\Models\Tiers;
 use App\Services\ExerciceService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -39,50 +41,62 @@ final class AdherentList extends Component
         $this->resetPage();
     }
 
+    /**
+     * Restreint une requête d'adhésions à celles qui sont « à jour pour l'exercice $annee ».
+     *
+     * UNE SEULE référence de temps : l'exercice demandé, jamais la date du jour.
+     * Une adhésion est à jour pour l'exercice E si :
+     *  - son exercice vaut E ; ou
+     *  - sa période recouvre E (elle chevauche les bornes de l'exercice) ; ou
+     *  - elle est illimitée et a commencé au plus tard à la fin de E.
+     *
+     * Mélanger l'exercice sélectionné et « aujourd'hui » rendait une liste fausse
+     * dans les deux sens : membres de la saison suivante comptés, membre de la
+     * saison visée oublié (spec 2026-10-02, D3).
+     *
+     * @param  Builder<Adhesion>  $adhesions
+     */
+    private function aJourPourExercice(Builder $adhesions, int $annee): void
+    {
+        $bornes = app(ExerciceService::class)->dateRange($annee);
+        $debut = $bornes['start']->toDateString();
+        $fin = $bornes['end']->toDateString();
+
+        $adhesions->where(function (Builder $s) use ($annee, $debut, $fin): void {
+            $s->where('exercice', $annee)
+                ->orWhere(function (Builder $d) use ($debut, $fin): void {
+                    $d->whereNotNull('date_debut')
+                        ->whereNotNull('date_fin')
+                        ->whereDate('date_debut', '<=', $fin)
+                        ->whereDate('date_fin', '>=', $debut);
+                })
+                ->orWhere(function (Builder $i) use ($fin): void {
+                    $i->where('mode', 'illimite')
+                        ->where(function (Builder $c) use ($fin): void {
+                            $c->whereNull('date_debut')
+                                ->orWhereDate('date_debut', '<=', $fin);
+                        });
+                });
+        });
+    }
+
     public function render(): View
     {
         $exercice = app(ExerciceService::class)->current();
 
         $query = Tiers::query();
 
-        $today = now()->toDateString();
-        $days30Ago = now()->subDays(30)->toDateString();
-
         match ($this->filtre) {
-            'a_jour' => $query->whereHas('adhesions', function ($q) use ($exercice, $today): void {
-                $q->where(function ($s) use ($exercice, $today): void {
-                    $s->where('exercice', $exercice)
-                        ->orWhere(function ($d) use ($today): void {
-                            $d->whereNotNull('date_debut')
-                                ->whereNotNull('date_fin')
-                                ->whereDate('date_debut', '<=', $today)
-                                ->whereDate('date_fin', '>=', $today);
-                        })
-                        ->orWhere('mode', 'illimite');
-                });
+            'a_jour' => $query->whereHas('adhesions', function (Builder $q) use ($exercice): void {
+                $this->aJourPourExercice($q, $exercice);
             }),
+            // En retard : à jour pour l'exercice précédent, pas pour celui qui est sélectionné.
             'en_retard' => $query
-                ->whereHas('adhesions', function ($q) use ($exercice, $days30Ago, $today): void {
-                    $q->where(function ($s) use ($exercice, $days30Ago, $today): void {
-                        $s->where('exercice', $exercice - 1)
-                            ->orWhere(function ($d) use ($days30Ago, $today): void {
-                                $d->whereNotNull('date_fin')
-                                    ->whereDate('date_fin', '>=', $days30Ago)
-                                    ->whereDate('date_fin', '<', $today);
-                            });
-                    });
+                ->whereHas('adhesions', function (Builder $q) use ($exercice): void {
+                    $this->aJourPourExercice($q, $exercice - 1);
                 })
-                ->whereDoesntHave('adhesions', function ($q) use ($exercice, $today): void {
-                    $q->where(function ($s) use ($exercice, $today): void {
-                        $s->where('exercice', $exercice)
-                            ->orWhere(function ($d) use ($today): void {
-                                $d->whereNotNull('date_debut')
-                                    ->whereNotNull('date_fin')
-                                    ->whereDate('date_debut', '<=', $today)
-                                    ->whereDate('date_fin', '>=', $today);
-                            })
-                            ->orWhere('mode', 'illimite');
-                    });
+                ->whereDoesntHave('adhesions', function (Builder $q) use ($exercice): void {
+                    $this->aJourPourExercice($q, $exercice);
                 }),
             default => $query->whereHas('adhesions'),
         };
@@ -99,8 +113,13 @@ final class AdherentList extends Component
         $membres->getCollection()->each(function (Tiers $tiers): void {
             $derniereAdhesion = $tiers->adhesions()
                 ->with(['transaction.compte', 'formuleAdhesion'])
+                // D'abord la fin de validité : une adhésion illimitée n'en a pas, elle
+                // remonte (COALESCE). L'exercice ne passe qu'en second : une adhésion
+                // à exercice nul ne doit plus perdre contre une plus ancienne, NULL
+                // étant classé en dernier par ORDER BY ... DESC. DATE() normalise le
+                // format de stockage ; SQL standard, valable en MySQL et MariaDB.
+                ->orderByRaw("COALESCE(DATE(date_fin), '9999-12-31') DESC")
                 ->orderByDesc('exercice')
-                ->orderByDesc('date_fin')
                 ->orderByDesc('id')
                 ->first();
             $tiers->setAttribute('derniereAdhesion', $derniereAdhesion);
