@@ -10,8 +10,11 @@ use Tests\Support\IsolatedMigrationDatabase;
 /*
  * La migration réécrit une table financière. Elle suppose la table vide, et
  * refuse de s'exécuter si elle ne l'est pas, plutôt que de purger : un delete
- * contournerait les SoftDeletes et laisserait orphelines les écritures OD de
- * l'ancien schéma (transactions.provision_id est en nullOnDelete).
+ * laisserait orphelines les écritures OD de l'ancien schéma
+ * (transactions.provision_id est en nullOnDelete). Elle retire aussi la colonne
+ * deleted_at (le retrait d'un rattachement est physique, spec § 6.4) et la
+ * rétablit au retour arrière ; la garde de table vide vaut dans les deux états
+ * de cette colonne.
  */
 
 /** Les deux requêtes que le message d'erreur donne à l'opérateur : elles doivent être exécutables telles quelles. */
@@ -64,13 +67,17 @@ function refonteProvisionsInsererAncienneLigne(?string $supprimeeLe = null): voi
     ]);
 }
 
-it('réécrit la table vide : colonne d’adossement ajoutée, type et date retirés, libellé facultatif', function (): void {
+it('réécrit la table vide : colonne d’adossement ajoutée, type, date et deleted_at retirés, libellé facultatif', function (): void {
     refonteProvisionsAvecAncienSchema(fn () => null, function ($migration): void {
+        // Garde anti-test-vide : l'ancien schéma porte bien la suppression logique.
+        expect(Schema::hasColumn('provisions', 'deleted_at'))->toBeTrue();
+
         $migration->up();
 
         expect(Schema::hasColumn('provisions', 'transaction_ligne_id'))->toBeTrue()
             ->and(Schema::hasColumn('provisions', 'type'))->toBeFalse()
-            ->and(Schema::hasColumn('provisions', 'date'))->toBeFalse();
+            ->and(Schema::hasColumn('provisions', 'date'))->toBeFalse()
+            ->and(Schema::hasColumn('provisions', 'deleted_at'))->toBeFalse();
 
         $libelle = collect(Schema::getColumns('provisions'))->firstWhere('name', 'libelle');
         expect($libelle['nullable'])->toBeTrue();
@@ -122,7 +129,8 @@ it('compte à part les rattachements supprimés logiquement et donne la sortie :
         $migration->up();
 
         expect(Schema::hasColumn('provisions', 'transaction_ligne_id'))->toBeTrue()
-            ->and(Schema::hasColumn('provisions', 'type'))->toBeFalse();
+            ->and(Schema::hasColumn('provisions', 'type'))->toBeFalse()
+            ->and(Schema::hasColumn('provisions', 'deleted_at'))->toBeFalse();
     });
 });
 
@@ -144,11 +152,56 @@ it('rétablit l’ancien schéma sur une table vide', function (): void {
 
         expect(Schema::hasColumn('provisions', 'transaction_ligne_id'))->toBeFalse()
             ->and(Schema::hasColumn('provisions', 'type'))->toBeTrue()
-            ->and(Schema::hasColumn('provisions', 'date'))->toBeTrue();
+            ->and(Schema::hasColumn('provisions', 'date'))->toBeTrue()
+            ->and(Schema::hasColumn('provisions', 'deleted_at'))->toBeTrue();
     });
 });
 
-it('refuse de revenir à l’ancien schéma tant que la table contient des rattachements', function (): void {
+it('refuse de revenir à l’ancien schéma tant que la table contient des rattachements, sans la colonne deleted_at', function (): void {
+    refonteProvisionsAvecAncienSchema(fn () => null, function ($migration): void {
+        $migration->up();
+
+        // Garde anti-test-vide : la garde s'exécute bien dans l'état « colonne retirée ».
+        // Une garde qui interrogerait encore deleted_at échouerait sur une erreur SQL,
+        // pas sur le refus lisible que ce test attend.
+        expect(Schema::hasColumn('provisions', 'deleted_at'))->toBeFalse();
+
+        DB::table('provisions')->insert([
+            'exercice' => 2025,
+            'libelle' => 'Rattachement',
+            'montant' => 175,
+            'transaction_ligne_id' => null,
+        ]);
+
+        $erreur = null;
+        try {
+            $migration->down();
+        } catch (RuntimeException $e) {
+            $erreur = $e->getMessage();
+        }
+
+        // Sans suppression logique, rien à distinguer ni à purger : le message ne
+        // propose pas une requête visant une colonne absente.
+        expect($erreur)->not->toBeNull()
+            ->toContain('au retour arrière : la table provisions n\'est pas vide')
+            ->toContain('1 ligne(s) (la table n\'a plus de suppression logique : toutes sont actives)')
+            ->toContain(REFONTE_PROVISIONS_VERIFICATION_SQL)
+            ->toContain('Des rattachements actifs existent')
+            ->not->toContain('deleted_at')
+            ->not->toContain('DELETE FROM');
+
+        // La requête de vérification donnée à l'opérateur reste exécutable telle quelle.
+        expect((int) array_values((array) DB::selectOne(REFONTE_PROVISIONS_VERIFICATION_SQL))[0])->toBe(0);
+
+        // Le schéma réécrit est resté en place : la colonne n'a pas été rétablie.
+        expect(Schema::hasColumn('provisions', 'transaction_ligne_id'))->toBeTrue()
+            ->and(Schema::hasColumn('provisions', 'type'))->toBeFalse()
+            ->and(Schema::hasColumn('provisions', 'deleted_at'))->toBeFalse()
+            ->and(DB::table('provisions')->count())->toBe(1);
+    });
+});
+
+it('rétablit deleted_at au retour arrière, et le retour arrière est rejouable une fois la table vidée', function (): void {
     refonteProvisionsAvecAncienSchema(fn () => null, function ($migration): void {
         $migration->up();
 
@@ -159,11 +212,19 @@ it('refuse de revenir à l’ancien schéma tant que la table contient des ratta
             'transaction_ligne_id' => null,
         ]);
 
-        expect(fn () => $migration->down())
-            ->toThrow(RuntimeException::class, 'au retour arrière : la table provisions n\'est pas vide');
+        expect(fn () => $migration->down())->toThrow(RuntimeException::class);
 
-        // Le schéma réécrit est resté en place.
-        expect(Schema::hasColumn('provisions', 'transaction_ligne_id'))->toBeTrue()
-            ->and(Schema::hasColumn('provisions', 'type'))->toBeFalse();
+        // L'opérateur a examiné puis retiré le rattachement : le retour arrière passe.
+        DB::table('provisions')->delete();
+        $migration->down();
+
+        expect(Schema::hasColumn('provisions', 'deleted_at'))->toBeTrue();
+
+        // Et la colonne rétablie est utilisable comme avant : une ligne supprimée logiquement
+        // est comptée par la garde de la montée suivante.
+        refonteProvisionsInsererAncienneLigne('2026-01-01 00:00:00');
+
+        expect(fn () => $migration->up())
+            ->toThrow(RuntimeException::class, '0 ligne(s) active(s), 1 ligne(s) supprimée(s) logiquement');
     });
 });

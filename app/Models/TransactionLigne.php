@@ -159,31 +159,27 @@ final class TransactionLigne extends Model
         return $this->reclassee_at !== null;
     }
 
-    /** @return HasMany<Provision, $this> */
+    /**
+     * Les rattachements de cette ligne, sous le scope tenant : bon pour afficher,
+     * pas pour verrouiller — le verrou se lit par estRattachee().
+     *
+     * @return HasMany<Provision, $this>
+     */
     public function provisions(): HasMany
     {
         return $this->hasMany(Provision::class, 'transaction_ligne_id');
     }
 
     /**
-     * Vrai quand un rattachement à l'exercice (CCA/PCA) porte cette ligne.
+     * Vrai dès qu'une ligne de provisions référence cette ligne-ci. C'est un fait de
+     * la ligne ; le gel qu'il entraîne porte sur sa transaction entière (spec § 7) :
+     * une garde de transaction interroge donc chacune de ses lignes.
      *
-     * Une ligne rattachée est verrouillée : ni reclassement, ni suppression, ni
-     * changement de montant ou de ventilation tant que le rattachement existe.
-     *
-     * Elle compte tout ce que compte la clé étrangère restrictOnDelete() de
-     * provisions.transaction_ligne_id, pas seulement ce que l'application voit :
-     *  - les rattachements supprimés logiquement. Le retrait (spec § 6.4) supprime
-     *    physiquement, mais une ligne laissée en soft-delete par un autre chemin
-     *    bloquerait encore le forceDelete() des lignes de TransactionService::update() ;
-     *    la garde doit donc refuser avant, en clair, plutôt que laisser la base lever
-     *    une erreur SQL brute ;
-     *  - quel que soit le contexte d'association. Le scope tenant est fail-closed en
-     *    lecture (WHERE 1 = 0 hors contexte) : c'est la sécurité d'une lecture, mais
-     *    pour un verrou c'est l'inverse, la ligne paraîtrait libre et le verrou s'ouvrirait.
-     *
-     * Seuls les scopes globaux de Provision sont levés : la relation reste limitée
-     * aux rattachements de CETTE ligne.
+     * Compte exactement ce que compte la FK restrictOnDelete(), d'où
+     * withoutGlobalScopes() SANS argument, délibérément : la FK ignore tout scope,
+     * présent ou futur, et hors contexte TenantScope (WHERE 1 = 0) ferait paraître
+     * la ligne libre. La contrainte de relation n'est pas un scope : seule cette
+     * ligne est lue.
      */
     public function estRattachee(): bool
     {
