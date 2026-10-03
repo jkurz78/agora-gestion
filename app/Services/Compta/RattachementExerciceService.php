@@ -22,8 +22,9 @@ use RuntimeException;
  * service, l'écran et la requête de détection s'y réfèrent, de sorte qu'une ligne
  * proposée à l'écran est acceptée par le service, et réciproquement. L'ouverture
  * de la PÉRIODE se contrôle à part : sous verrou dans rattacher() (exercices N et
- * N+1), et par période à l'écran. Une ligne éligible d'un exercice clôturé est
- * donc refusée par rattacher() sans que motifDeRefus() l'ait écartée.
+ * N+1), et par période à l'écran (Task 11). Une ligne éligible dont l'exercice, ou
+ * le suivant, est clôturé est donc refusée par rattacher() sans que motifDeRefus()
+ * l'ait écartée.
  *
  * Référence : docs/specs/2026-09-30-provisions-rattachement-exercice-design.md
  * (D4, D9, D13, D14 pour les gardes ; § 5 pour les verrous d'exercice ; § 7 pour
@@ -148,19 +149,22 @@ final class RattachementExerciceService
             $this->exerciceService->assertOuvertPourEcriture($exercice);
             $this->exerciceService->assertOuvertVerrouille($exercice + 1);
 
-            // Verrou de la ligne : deux requêtes simultanées ne créent pas deux
-            // rattachements sur la même ligne.
+            // Verrou de la ligne (§ 4). Deux rattacher() de la même association sont
+            // en pratique déjà sérialisés par le verrou d'association pris plus haut ;
+            // celui-ci tient la ligne elle-même jusqu'au commit.
             TransactionLigne::whereKey((int) $ligne->id)->lockForUpdate()->first();
 
-            // Relu sous le verrou : le contrôle de motifDeRefus(), fait avant la
+            // Relu sous les verrous : le contrôle de motifDeRefus(), fait avant la
             // transaction, a pu être dépassé par un rattachement validé entre-temps.
             //
-            // Cette lecture n'est PAS verrouillante. Sous REPEATABLE READ (MariaDB), elle ne
-            // voit le dernier commit que parce qu'aucune lecture cohérente n'a eu lieu avant
-            // elle dans cette transaction : les lectures précédentes sont toutes FOR UPDATE,
-            // et le cliché est pris à la première lecture non verrouillante. Si un appelant
-            // enveloppait un jour rattacher() dans sa propre transaction, après des lectures
-            // ordinaires, ce recontrôle pourrait manquer un rattachement concurrent.
+            // Cette lecture n'est PAS verrouillante. Sous REPEATABLE READ (MariaDB), elle
+            // lit le cliché de la transaction, pris au plus tôt après le verrou
+            // d'association (la sous-requête tenant du verrou de ligne n'est pas, elle,
+            // verrouillante) : un rattachement concurrent, sérialisé par ce verrou, est
+            // donc déjà validé quand le cliché est pris. Si un appelant enveloppait un jour
+            // rattacher() dans sa propre transaction, après des lectures ordinaires, le
+            // cliché pourrait précéder ce verrou et le recontrôle manquer un rattachement
+            // concurrent.
             if ($ligne->estRattachee()) {
                 throw new RuntimeException(self::MOTIF_DEJA_RATTACHEE);
             }

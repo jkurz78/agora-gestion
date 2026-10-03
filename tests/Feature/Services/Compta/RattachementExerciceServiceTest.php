@@ -1136,9 +1136,9 @@ describe('RattachementExerciceService : création', function () {
         // service créerait un second rattachement au lieu de lever.
         //
         // Ce que le test ne prouve pas : l'exclusion mutuelle de deux requêtes. C'est le
-        // moteur qui la fournit, par le verrou de ligne ; une vraie concurrence ne se
-        // provoque pas dans un seul processus. Il prouve où est le recontrôle et ce qu'il
-        // fait de ce qu'il trouve.
+        // moteur qui la fournit, par les verrous (association, puis ligne) ; une vraie
+        // concurrence ne se provoque pas dans un seul processus. Il prouve où est le
+        // recontrôle et ce qu'il fait de ce qu'il trouve.
         DB::listen(function ($requete) use (&$injecte, $ligne, $niveauAvant): void {
             if ($injecte
                 || DB::transactionLevel() <= $niveauAvant
