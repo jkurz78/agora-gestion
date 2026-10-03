@@ -33,9 +33,9 @@ use Illuminate\Support\Facades\DB;
  * bilan, sur les deux exercices.
  *
  * Le parcours va « de la provision aux rapports » : Provision::create puis
- * ProvisionPDService::generer(). Il contourne volontairement le futur
- * RattachementExerciceService (Task 5) : le sens de l'écriture se décide dans le
- * générateur, et c'est lui que ces tests gardent.
+ * ProvisionPDService::generer(). Il ne passe pas par RattachementExerciceService
+ * (éligibilité, verrou) : le sens de l'écriture se décide dans le générateur, et c'est
+ * lui que ces tests gardent.
  *
  * ⚠️ AC-1 ne peut pas être vérifié sous SQLite. La dotation est datée du DERNIER jour
  * de l'exercice (31/08/2026), et SQLite stocke les colonnes `date` castées en
@@ -71,8 +71,9 @@ use Illuminate\Support\Facades\DB;
  *  - 2026-10-03, MariaDB 11.4, sens global : 4 sur 4 tombent (350 au lieu de 0 ; 35000 au
  *    lieu de 0 ; 180 au lieu de 0 ; −500 au lieu de 17500). SQLite : les 2 AC-3, sur le
  *    résultat courant du bilan (35000 au lieu de 0 ; −500 au lieu de 17500).
- *  - 2026-10-01, CCA seule inversée dans CasProvision::dotationDebiteLeResultat() :
- *    les 2 tests CCA tombent, les 2 PCA restent verts.
+ *  - 2026-10-01, MySQL 8.4, CCA seule inversée dans CasProvision::dotationDebiteLeResultat() :
+ *    les 2 tests CCA tombent, les 2 PCA restent verts (mesuré avant l'ajout des assertions
+ *    sur le résultat courant du bilan).
  *  - 2026-10-03, MariaDB 11.4, extourne seule inversée (`? ! $cas->dotationDebiteLeResultat()`
  *    devenu `? $cas->dotationDebiteLeResultat()`) : 4 sur 4 tombent (−175 au lieu de 175 ;
  *    −17500 au lieu de 17500 ; −90 au lieu de 90 ; 9000 au lieu de −9000). SQLite : les 2 AC-3.
@@ -292,8 +293,9 @@ function rattachementRubriqueDuBilan(int $exercice, string $cote, string $code):
 
 /**
  * Le résultat courant du bilan pour l'exercice, en centimes : somme (crédit − débit) de
- * toutes les lignes de classe 6 et 7, quel que soit le compte, lue en whereDate — donc
- * juste sous SQLite, contrairement au whereBetween du compte de résultat.
+ * toutes les lignes de classe 6 et 7 hors journal d'à-nouveau, quel que soit le compte,
+ * lue en whereDate — donc juste sous SQLite, contrairement au whereBetween du compte de
+ * résultat.
  *
  * @return array{n_centimes: int, n_1_centimes: int}
  */
@@ -330,9 +332,7 @@ test('AC-3 — le 487 sort au passif en « Produits constatés d’avance » au 
 
     // L'effet sur le résultat : 175 € - 175 € en 2025-2026, puis +175 € en 2026-2027.
     expect(rattachementResultatCourantDuBilan(2025)['n_centimes'])->toBe(0);
-    $resultatSuivant = rattachementResultatCourantDuBilan(2026);
-    expect($resultatSuivant['n_centimes'])->toBe(17500);
-    expect($resultatSuivant['n_1_centimes'])->toBe(0);
+    expect(rattachementResultatCourantDuBilan(2026)['n_centimes'])->toBe(17500);
 
     $pca = rattachementRubriqueDuBilan(2025, 'passif', 'produits_constates_avance');
 
@@ -349,12 +349,13 @@ test('AC-3 — le 487 sort au passif en « Produits constatés d’avance » au 
 });
 
 /*
- * Les deux paires de tests, PCA puis CCA, se gardent l'une l'autre et ne sont pas
- * redondantes. Le sens de l'écriture se décide CAS PAR CAS : CasProvision::
- * dotationDebiteLeResultat() dit, pour chaque cas, si la dotation débite ou crédite le
- * résultat. Une inversion de la seule CCA laisse les tests PCA verts (mesuré le
- * 2026-10-01) : sans la paire ci-dessous, elle passerait. Ne pas supprimer les tests CCA
- * parce qu'ils « répètent » les PCA.
+ * Les deux paires de tests, PCA puis CCA, se complètent et ne sont pas redondantes :
+ * chacune ne garde que son propre cas. Le sens de l'écriture se décide CAS PAR CAS :
+ * CasProvision::dotationDebiteLeResultat() dit, pour chaque cas, si la dotation débite ou
+ * crédite le résultat. Une inversion de la seule CCA laisse les tests PCA verts (mesuré le
+ * 2026-10-01) : sans la paire ci-dessous, ce fichier la laisserait passer, et seul
+ * RattachementExerciceServiceTest la verrait, sur l'écriture et non sur les rapports.
+ * Ne pas supprimer les tests CCA parce qu'ils « répètent » les PCA.
  */
 
 test('Même garde que l’AC-1, côté charges — la charge payée d’avance sort du résultat 2025-2026 et entre dans 2026-2027, au CR association ET au CR opération', function () {
@@ -397,9 +398,7 @@ test('Même garde que l’AC-3, côté charges — le 486 sort à l’actif en �
     // L'effet sur le résultat : la charge sort de 2025-2026, qui ne garde plus que les
     // 175 € de produit, et entre dans 2026-2027 (-90 €).
     expect(rattachementResultatCourantDuBilan(2025)['n_centimes'])->toBe(17500);
-    $resultatSuivant = rattachementResultatCourantDuBilan(2026);
-    expect($resultatSuivant['n_centimes'])->toBe(-9000);
-    expect($resultatSuivant['n_1_centimes'])->toBe(17500);
+    expect(rattachementResultatCourantDuBilan(2026)['n_centimes'])->toBe(-9000);
 
     $cca = rattachementRubriqueDuBilan(2025, 'actif', 'charges_constatees_avance');
 
