@@ -12,6 +12,7 @@ use App\Models\FormuleAdhesion;
 use App\Models\HelloAssoFormMapping;
 use App\Models\HelloAssoParametres;
 use App\Models\Tiers;
+use App\Models\Transaction;
 use App\Models\User;
 use App\Services\Adhesion\NouvelleAdhesionDTO;
 use App\Services\AdhesionService;
@@ -185,4 +186,31 @@ it('AC-5 · une seconde commande du même tiers sur la même saison reste dédup
     syncExerciceSansErreur($service->synchroniser([syncExerciceCommande(9102, '2026-09-20T10:00:00Z', 'Anne', 'KOHL')], 2026));
 
     expect(Adhesion::where('tiers_id', $this->kohl->id)->count())->toBe(1);
+});
+
+it('E1 · une commande en collision de clé est importée : transaction créée, aucune erreur, aucune seconde adhésion', function (): void {
+    // Le tiers a déjà une adhésion de la saison 2026, de 3 mois, commencée le 1er septembre.
+    $existante = Adhesion::factory()->create([
+        'tiers_id' => $this->kohl->id,
+        'exercice' => 2026,
+        'date_debut' => '2026-09-01',
+        'date_fin' => '2026-11-30',
+        'mode' => 'duree',
+    ]);
+
+    // La commande HelloAsso du 5 septembre porte sur la formule du 01/09/2026 au 31/08/2027 :
+    // même saison, même début, fin différente. La recherche par les dates ne la retrouve pas ;
+    // la clé unique refuse la seconde adhésion.
+    $resultat = (new HelloAssoSyncService($this->parametres))
+        ->synchroniser([syncExerciceCommande(9101, '2026-09-05T10:00:00Z', 'Anne', 'KOHL')], 2026);
+
+    // L'argent passe : c'est le point qui compte. Une machine qui importe ne s'arrête pas
+    // sur une règle d'adhésion.
+    syncExerciceSansErreur($resultat);
+    expect($resultat->transactionsCreated)->toBe(1)
+        ->and(Transaction::where('helloasso_order_id', 9101)->count())->toBe(1);
+
+    // Et l'adhésion ne se dédouble pas.
+    expect(Adhesion::where('tiers_id', $this->kohl->id)->count())->toBe(1)
+        ->and(Adhesion::where('tiers_id', $this->kohl->id)->first()->id)->toBe($existante->id);
 });

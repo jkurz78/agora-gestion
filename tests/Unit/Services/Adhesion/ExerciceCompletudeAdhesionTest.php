@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Enums\ModePaiement;
 use App\Enums\UsageComptable;
 use App\Models\Adhesion;
 use App\Models\Compte;
+use App\Models\CompteBancaire;
 use App\Models\FormuleAdhesion;
 use App\Models\Tiers;
 use App\Models\Transaction;
@@ -12,6 +14,7 @@ use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Services\Adhesion\NouvelleAdhesionDTO;
 use App\Services\AdhesionService;
+use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Carbon;
 
@@ -308,31 +311,57 @@ it('doublon inter-modes · transaction : un règlement « par exercice » ne cr�
         ->and(Adhesion::where('tiers_id', $this->tiers->id)->count())->toBe(1);
 });
 
-it('doublon inter-modes · transaction : une formule en durée commençant le même jour qu\'une adhésion « par exercice » est refusée lisiblement', function (): void {
+it('doublon inter-modes · transaction : une collision de clé à l\'import rend l\'adhésion existante, sans lever', function (): void {
     $annuelle = completudeFormuleAnnuelle();
     FormuleAdhesion::factory()->modeDuree(3)->create(['compte_id' => $this->compte->id]);
 
-    $this->service->creerDepuisTransaction(completudeTransaction($this->tiers, $annuelle->compte, '2026-09-01'));
+    $existante = $this->service->creerDepuisTransaction(completudeTransaction($this->tiers, $annuelle->compte, '2026-09-01'));
 
     // Même début (1er septembre), fin différente : la recherche par dates ne la retrouve pas,
-    // la clé unique la refuse — traduite en message lisible.
+    // la clé unique refuse la seconde adhésion. Une machine importe de l'argent : on ne lève pas,
+    // on rend l'adhésion existante.
     $tx = completudeTransaction($this->tiers, $this->compte, '2026-09-01');
-    expect(fn () => $this->service->creerDepuisTransaction($tx))
-        ->toThrow(DomainException::class, 'déjà une adhésion sur cette période');
-    expect(Adhesion::where('tiers_id', $this->tiers->id)->count())->toBe(1);
+    $rendue = $this->service->creerDepuisTransaction($tx);
+
+    expect($rendue->id)->toBe($existante->id)
+        ->and(Adhesion::where('tiers_id', $this->tiers->id)->count())->toBe(1);
 });
 
-it('doublon inter-modes · le refus ne laisse ni adhésion ni transaction orphelines côté wizard', function (): void {
-    $saison = completudeFormuleSaisonHelloAsso($this->compte);
-    $annuelle = completudeFormuleAnnuelle();
-    $this->service->creerDepuisWizard(completudeDto($this->tiers, $saison), $this->user);
-    $avant = Transaction::count();
+it('doublon · le refus du wizard annule la transaction de paiement créée juste avant', function (): void {
+    SystemeSeeder::seed();
+    $banque = CompteBancaire::factory()->create();
+    $sansFin = FormuleAdhesion::factory()->helloasso('cotisation-sans-fin', 8)->create([
+        'compte_id' => $this->compte->id,
+        'mode' => 'duree',
+        'duree_mois' => null,
+        'duree_jours' => null,
+        'helloasso_start_date' => '2026-09-01',
+        'helloasso_end_date' => null,
+    ]);
+    $payant = fn (): NouvelleAdhesionDTO => new NouvelleAdhesionDTO(
+        tiersId: (int) $this->tiers->id,
+        formuleId: (int) $sansFin->id,
+        exercice: null,
+        dateDebut: null,
+        montant: 30,
+        notes: null,
+        datePaiement: '2026-10-02',
+        modePaiement: ModePaiement::Cheque,
+        compteId: (int) $banque->id,
+        reference: null,
+    );
 
-    expect(fn () => $this->service->creerDepuisWizard(completudeDto($this->tiers, $annuelle, null, 2026), $this->user))
-        ->toThrow(DomainException::class);
+    $this->service->creerDepuisWizard($payant(), $this->user);
+    $transactions = Transaction::count();
+    $adhesions = Adhesion::count();
 
-    expect(Transaction::count())->toBe($avant)
-        ->and(Adhesion::count())->toBe(1);
+    // La garde de chevauchement ne s'applique pas sans date de fin : le paiement est créé,
+    // PUIS la clé unique refuse l'adhésion. Le refus doit défaire aussi le paiement.
+    expect(fn () => $this->service->creerDepuisWizard($payant(), $this->user))
+        ->toThrow(DomainException::class, 'déjà une adhésion sur cette période');
+
+    expect(Transaction::count())->toBe($transactions)
+        ->and(Adhesion::count())->toBe($adhesions);
 });
 
 it('doublon · formule à dates fixes sans date de fin : une seconde saisie est refusée lisiblement', function (): void {
@@ -425,4 +454,64 @@ it('D2 · la déduplication d\'une formule en durée reste fondée sur les dates
     expect($a2->id)->toBe($a1->id)
         ->and(Adhesion::where('tiers_id', $this->tiers->id)->count())->toBe(1)
         ->and((int) $a1->formule_adhesion_id)->toBe((int) $formule->id);
+});
+
+it('E2 · la restauration d\'une adhésion annulée, dont la clé est reprise par une adhésion vivante, ne lève pas (cas Notz)', function (): void {
+    FormuleAdhesion::factory()->create(['compte_id' => $this->compte->id, 'mode' => 'exercice']);
+
+    // « Adhésion legacy » annulée : exercice 2025, début 2025-09-01. Créée la première, donc
+    // trouvée la première par la recherche (withTrashed).
+    $annulee = Adhesion::factory()->create([
+        'tiers_id' => $this->tiers->id,
+        'exercice' => 2025,
+        'date_debut' => '2025-09-01',
+        'date_fin' => '2026-08-31',
+        'mode' => 'exercice',
+    ]);
+    $annulee->delete();
+
+    // L'adhésion vivante qui occupe désormais la même clé.
+    $vivante = Adhesion::factory()->create([
+        'tiers_id' => $this->tiers->id,
+        'exercice' => 2025,
+        'date_debut' => '2025-09-01',
+        'date_fin' => '2026-08-31',
+        'mode' => 'duree',
+    ]);
+
+    $rendue = $this->service->creerDepuisTransaction(completudeTransaction($this->tiers, $this->compte, '2025-10-15'));
+
+    expect($rendue->id)->toBe($vivante->id)
+        ->and(Adhesion::where('tiers_id', $this->tiers->id)->count())->toBe(1)
+        ->and(Adhesion::withTrashed()->find($annulee->id)->trashed())->toBeTrue();
+});
+
+it('E2 · une adhésion annulée liée à la transaction, dont la clé est reprise par une vivante, ne fait pas lever non plus', function (): void {
+    FormuleAdhesion::factory()->create(['compte_id' => $this->compte->id, 'mode' => 'exercice']);
+    $tx = completudeTransaction($this->tiers, $this->compte, '2025-10-15');
+
+    // Les deux lignes de Notz portent la même transaction : l'annulée, créée la première,
+    // est celle que la recherche par transaction retrouve.
+    $annulee = Adhesion::factory()->create([
+        'tiers_id' => $this->tiers->id,
+        'transaction_id' => $tx->id,
+        'exercice' => 2025,
+        'date_debut' => '2025-09-01',
+        'date_fin' => '2026-08-31',
+        'mode' => 'exercice',
+    ]);
+    $annulee->delete();
+    $vivante = Adhesion::factory()->create([
+        'tiers_id' => $this->tiers->id,
+        'transaction_id' => $tx->id,
+        'exercice' => 2025,
+        'date_debut' => '2025-09-01',
+        'date_fin' => '2026-08-31',
+        'mode' => 'duree',
+    ]);
+
+    $rendue = $this->service->creerDepuisTransaction($tx);
+
+    expect($rendue->id)->toBe($vivante->id)
+        ->and(Adhesion::withTrashed()->find($annulee->id)->trashed())->toBeTrue();
 });

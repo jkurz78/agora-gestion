@@ -21,6 +21,7 @@ use DomainException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 final class AdhesionService
 {
@@ -88,11 +89,9 @@ final class AdhesionService
                 ->first();
 
             if ($parTransaction !== null) {
-                if ($parTransaction->trashed()) {
-                    $parTransaction->restore();
-                }
-
-                return $parTransaction;
+                return $parTransaction->trashed()
+                    ? $this->restaurerOuRetrouver($parTransaction)
+                    : $parTransaction;
             }
 
             $datesEtExercice = $this->computeDatesEtExercice($tx, $formule);
@@ -107,9 +106,7 @@ final class AdhesionService
             );
 
             if ($adhesion?->trashed()) {
-                $adhesion->restore();
-
-                return $adhesion;
+                return $this->restaurerOuRetrouver($adhesion);
             }
 
             if ($adhesion !== null) {
@@ -139,22 +136,87 @@ final class AdhesionService
                 ->selectRaw('SUM(CASE WHEN c.classe = 6 THEN tl.debit - tl.credit ELSE tl.credit - tl.debit END) as net')
                 ->value('net') ?? 0);
 
-            return $this->creerAdhesion([
-                'association_id' => TenantContext::currentId(),
-                'tiers_id' => (int) $tx->tiers_id,
-                'exercice' => $datesEtExercice['exercice'],
-                'transaction_id' => (int) $tx->id,
-                'formule_adhesion_id' => $formule?->id,
-                'date_debut' => $datesEtExercice['date_debut'],
-                'date_fin' => $datesEtExercice['date_fin'],
-                'saisi_par' => $tx->saisi_par !== null ? (int) $tx->saisi_par : null,
-                'montant_facial' => round($montantFacial, 2),
-                'deductible_fiscal' => $formule?->deductible_fiscal ?? false,
-                'mode' => $formule?->mode ?? 'exercice',
-                'duree_mois' => $formule?->duree_mois,
-                'label_formule' => $formule?->nom ?? 'Adhésion legacy',
-            ]);
+            // TOLÉRANCE à l'import : une machine (synchro HelloAsso, observer, « marquer
+            // reçu ») enregistre de l'argent, elle ne doit jamais s'arrêter sur une règle
+            // d'adhésion. Si la clé unique refuse une seconde adhésion de la même saison, on
+            // rend l'adhésion existante : l'écriture comptable est importée, l'adhésion ne se
+            // dédouble pas. Le refus lisible est réservé à la saisie humaine (wizard).
+            try {
+                return Adhesion::create([
+                    'association_id' => TenantContext::currentId(),
+                    'tiers_id' => (int) $tx->tiers_id,
+                    'exercice' => $datesEtExercice['exercice'],
+                    'transaction_id' => (int) $tx->id,
+                    'formule_adhesion_id' => $formule?->id,
+                    'date_debut' => $datesEtExercice['date_debut'],
+                    'date_fin' => $datesEtExercice['date_fin'],
+                    'saisi_par' => $tx->saisi_par !== null ? (int) $tx->saisi_par : null,
+                    'montant_facial' => round($montantFacial, 2),
+                    'deductible_fiscal' => $formule?->deductible_fiscal ?? false,
+                    'mode' => $formule?->mode ?? 'exercice',
+                    'duree_mois' => $formule?->duree_mois,
+                    'label_formule' => $formule?->nom ?? 'Adhésion legacy',
+                ]);
+            } catch (UniqueConstraintViolationException $e) {
+                $existante = $this->adhesionVivanteDeMemeCle(
+                    (int) $tx->tiers_id,
+                    $datesEtExercice['exercice'],
+                    $datesEtExercice['date_debut'],
+                );
+
+                if ($existante === null) {
+                    throw $e;
+                }
+
+                Log::info('[adhesions] Collision de clé à l\'import : adhésion existante conservée, transaction importée', [
+                    'transaction_id' => (int) $tx->id,
+                    'adhesion_id' => (int) $existante->id,
+                ]);
+
+                return $existante;
+            }
         });
+    }
+
+    /**
+     * Restaure une adhésion supprimée. Si une adhésion vivante occupe déjà sa clé
+     * (cas d'une « Adhésion legacy » annulée, doublée par une adhésion vivante), la
+     * restauration est refusée par la clé unique : on rend alors l'adhésion vivante
+     * plutôt que de laisser l'erreur remonter jusqu'à l'écran de saisie.
+     */
+    private function restaurerOuRetrouver(Adhesion $adhesion): Adhesion
+    {
+        try {
+            $adhesion->restore();
+
+            return $adhesion;
+        } catch (UniqueConstraintViolationException $e) {
+            $vivante = $this->adhesionVivanteDeMemeCle(
+                (int) $adhesion->tiers_id,
+                $adhesion->exercice,
+                $adhesion->date_debut,
+            );
+
+            if ($vivante === null) {
+                throw $e;
+            }
+
+            return $vivante;
+        }
+    }
+
+    /** L'adhésion vivante qui occupe la clé unique (tiers, exercice, date_debut), s'il y en a une. */
+    private function adhesionVivanteDeMemeCle(int $tiersId, ?int $exercice, ?\DateTimeInterface $dateDebut): ?Adhesion
+    {
+        if ($exercice === null || $dateDebut === null) {
+            return null;
+        }
+
+        return Adhesion::query()
+            ->where('tiers_id', $tiersId)
+            ->where('exercice', $exercice)
+            ->whereDate('date_debut', $dateDebut->format('Y-m-d'))
+            ->first();
     }
 
     /**
@@ -298,11 +360,13 @@ final class AdhesionService
     /** Une adhésion sans formule (legacy) suit la clé « exercice », comme computeDatesEtExercice. */
     private function estParExercice(?FormuleAdhesion $formule): bool
     {
-        return $formule === null || $formule->isModeExercice();
+        return $formule === null || (! $formule->isModeDuree() && ! $formule->isModeIllimite());
     }
 
     /**
-     * Crée l'adhésion en traduisant la violation de la clé unique en message lisible.
+     * Création par la SAISIE HUMAINE (wizard) : la violation de la clé unique devient un
+     * refus lisible, que l'utilisateur peut corriger. Le chemin d'import (transaction,
+     * synchro, observer), lui, tolère la collision — voir creerDepuisTransaction.
      *
      * La clé (association, tiers, exercice, date_debut) refuse deux adhésions vivantes
      * d'un même tiers qui commencent le même jour d'une même saison, quelle que soit la
