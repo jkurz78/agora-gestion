@@ -96,4 +96,6 @@ it('Custom utilise les dates du form HelloAsso (pas l\'exercice asso)', function
     $adhesion = Adhesion::first();
     expect($adhesion->date_debut?->toDateString())->toBe('2025-03-01');
     expect($adhesion->date_fin?->toDateString())->toBe('2026-02-28');
+    // Saison commencée le 1er mars 2025 : exercice 2024-2025, dérivé de la date de début.
+    expect($adhesion->exercice)->toBe(2024);
 });

@@ -292,6 +292,7 @@ it('mode duree_jours=10 : submit crée adhésion avec dates correctes', function
     $adhesion = Adhesion::first();
     expect($adhesion->date_debut->toDateString())->toBe('2025-09-01');
     expect($adhesion->date_fin->toDateString())->toBe('2025-09-10');
+    expect($adhesion->exercice)->toBe(2025);
 });
 
 it('régression : mode duree_mois=12, dateDebut=2025-10-15 → date_fin=2026-10-14 (inchangé)', function (): void {
@@ -439,4 +440,51 @@ it('D6 · le compte bancaire HelloAsso reste exclu de la saisie manuelle, même 
         ->html();
 
     expect($html)->toContain($this->compte->nom)->and($html)->not->toContain('HelloAsso SVS');
+});
+
+it('doublon · une formule à dates fixes sans fin saisie deux fois affiche un refus lisible, pas une erreur SQL', function (): void {
+    $sansFin = formuleSaisonHelloAssoModale($this->sc, null);
+
+    $saisie = fn () => Livewire::actingAs($this->user)
+        ->test(NouvelleAdhesionModal::class)
+        ->dispatch('nouvelle-adhesion', gratuite: true)
+        ->set('tiersId', $this->tiers->id)
+        ->set('formuleId', $sansFin->id)
+        ->set('montant', 0.0)
+        ->call('submit');
+
+    $saisie()->assertSet('visible', false);
+
+    $saisie()
+        ->assertSet('visible', true)
+        ->assertSet('errorMessage', 'Ce tiers a déjà une adhésion sur cette période.')
+        ->assertSee('déjà une adhésion sur cette période');
+
+    expect(Adhesion::count())->toBe(1);
+});
+
+it('doublon · une adhésion « par exercice » sur une saison déjà couverte par la formule HelloAsso est refusée lisiblement', function (): void {
+    $saison = formuleSaisonHelloAssoModale($this->sc);
+
+    Livewire::actingAs($this->user)
+        ->test(NouvelleAdhesionModal::class)
+        ->dispatch('nouvelle-adhesion', gratuite: true)
+        ->set('tiersId', $this->tiers->id)
+        ->set('formuleId', $saison->id)
+        ->set('montant', 0.0)
+        ->call('submit')
+        ->assertSet('visible', false);
+
+    Livewire::actingAs($this->user)
+        ->test(NouvelleAdhesionModal::class)
+        ->dispatch('nouvelle-adhesion', gratuite: true)
+        ->set('tiersId', $this->tiers->id)
+        ->set('formuleId', $this->formuleExercice->id)
+        ->set('exercice', 2026)
+        ->set('montant', 0.0)
+        ->call('submit')
+        ->assertSet('visible', true)
+        ->assertSee('déjà une adhésion');
+
+    expect(Adhesion::count())->toBe(1);
 });

@@ -114,13 +114,13 @@ it('D4 · à date de fin égale, l\'exercice départage', function (): void {
     expect(adherentDerniereAdhesion($this->user, $tiers)->exercice)->toBe(2025);
 });
 
-it('D4 · à date de fin égale et exercice nul égal, l\'identifiant le plus récent l\'emporte', function (): void {
-    // L'unicité (tiers, exercice) interdit deux exercices égaux non nuls : seul le NULL
-    // — c'est-à-dire l'adhésion en durée d'avant la reprise — peut encore ex-aequo.
+it('D4 · à date de fin et exercice égaux, l\'identifiant le plus récent l\'emporte', function (): void {
+    // Deux adhésions de même exercice et de même fin ne se distinguent que par leur début :
+    // la clé unique (tiers, exercice, date_debut) les autorise.
     $tiers = adherentAvec(
         'Ex-aequo',
-        ['exercice' => null, 'date_debut' => '2025-09-01', 'date_fin' => '2026-08-31', 'notes' => 'ancienne'],
-        ['exercice' => null, 'date_debut' => '2025-09-01', 'date_fin' => '2026-08-31', 'notes' => 'recente'],
+        ['exercice' => 2025, 'date_debut' => '2025-09-01', 'date_fin' => '2026-08-31', 'notes' => 'ancienne'],
+        ['exercice' => 2025, 'date_debut' => '2025-12-01', 'date_fin' => '2026-08-31', 'notes' => 'recente'],
     );
 
     expect(adherentDerniereAdhesion($this->user, $tiers)->notes)->toBe('recente');

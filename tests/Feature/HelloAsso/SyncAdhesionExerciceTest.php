@@ -15,6 +15,7 @@ use App\Models\Tiers;
 use App\Models\User;
 use App\Services\Adhesion\NouvelleAdhesionDTO;
 use App\Services\AdhesionService;
+use App\Services\HelloAssoSyncResult;
 use App\Services\HelloAssoSyncService;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\DB;
@@ -31,6 +32,17 @@ use Illuminate\Support\Facades\Http;
 function syncExerciceReprise(): object
 {
     return require database_path('migrations/2026_10_03_100001_reprendre_exercice_des_adhesions.php');
+}
+
+/**
+ * La synchro AVALE les erreurs par commande (`ordersSkipped`, `errors`) : un test qui
+ * ne regarde que le nombre d'adhésions passe à vide quand la commande échoue sur l'index
+ * unique au lieu d'être dédupliquée. On exige donc une synchro sans erreur ni commande écartée.
+ */
+function syncExerciceSansErreur(HelloAssoSyncResult $resultat): void
+{
+    expect($resultat->hasErrors())->toBeFalse($resultat->hasErrors() ? implode(' | ', $resultat->errors) : '')
+        ->and($resultat->ordersSkipped)->toBe(0);
 }
 
 /** @return array<string, mixed> */
@@ -95,8 +107,8 @@ beforeEach(function (): void {
 });
 
 it('AC-2 · la synchro et la saisie manuelle produisent la même adhésion sur la formule de la saison', function (): void {
-    (new HelloAssoSyncService($this->parametres))
-        ->synchroniser([syncExerciceCommande(9101, '2026-09-05T10:00:00Z', 'Anne', 'KOHL')], 2026);
+    syncExerciceSansErreur((new HelloAssoSyncService($this->parametres))
+        ->synchroniser([syncExerciceCommande(9101, '2026-09-05T10:00:00Z', 'Anne', 'KOHL')], 2026));
 
     $formule = FormuleAdhesion::firstOrFail();
     // La forme décrite par la spec : durée, dates fixes, aucune unité.
@@ -134,10 +146,10 @@ it('AC-5 · une resynchro d\'une commande déjà importée ne crée pas de doubl
     $service = new HelloAssoSyncService($this->parametres);
     $commande = syncExerciceCommande(9101, '2026-09-05T10:00:00Z', 'Anne', 'KOHL');
 
-    $service->synchroniser([$commande], 2026);
+    syncExerciceSansErreur($service->synchroniser([$commande], 2026));
     $premiere = Adhesion::where('tiers_id', $this->kohl->id)->firstOrFail();
 
-    $service->synchroniser([$commande], 2026);
+    syncExerciceSansErreur($service->synchroniser([$commande], 2026));
 
     expect(Adhesion::where('tiers_id', $this->kohl->id)->count())->toBe(1)
         ->and(Adhesion::where('tiers_id', $this->kohl->id)->first()->id)->toBe($premiere->id);
@@ -147,7 +159,7 @@ it('AC-5 · après la reprise d\'une adhésion historique à exercice nul, la re
     $service = new HelloAssoSyncService($this->parametres);
     $commande = syncExerciceCommande(9101, '2026-09-05T10:00:00Z', 'Anne', 'KOHL');
 
-    $service->synchroniser([$commande], 2026);
+    syncExerciceSansErreur($service->synchroniser([$commande], 2026));
     $historique = Adhesion::where('tiers_id', $this->kohl->id)->firstOrFail();
 
     // État de production avant le correctif : exercice jamais renseigné.
@@ -156,7 +168,9 @@ it('AC-5 · après la reprise d\'une adhésion historique à exercice nul, la re
     $bilan = syncExerciceReprise()->reprendre();
     expect($bilan['reprises'])->toBe(1);
 
-    $service->synchroniser([$commande], 2026);
+    syncExerciceSansErreur($service->synchroniser([$commande], 2026));
+    // Une seconde commande du même tiers retrouve l'adhésion reprise par ses dates.
+    syncExerciceSansErreur($service->synchroniser([syncExerciceCommande(9102, '2026-09-20T10:00:00Z', 'Anne', 'KOHL')], 2026));
 
     $adhesions = Adhesion::where('tiers_id', $this->kohl->id)->get();
     expect($adhesions)->toHaveCount(1)
@@ -167,8 +181,8 @@ it('AC-5 · après la reprise d\'une adhésion historique à exercice nul, la re
 it('AC-5 · une seconde commande du même tiers sur la même saison reste dédupliquée par les dates', function (): void {
     $service = new HelloAssoSyncService($this->parametres);
 
-    $service->synchroniser([syncExerciceCommande(9101, '2026-09-05T10:00:00Z', 'Anne', 'KOHL')], 2026);
-    $service->synchroniser([syncExerciceCommande(9102, '2026-09-20T10:00:00Z', 'Anne', 'KOHL')], 2026);
+    syncExerciceSansErreur($service->synchroniser([syncExerciceCommande(9101, '2026-09-05T10:00:00Z', 'Anne', 'KOHL')], 2026));
+    syncExerciceSansErreur($service->synchroniser([syncExerciceCommande(9102, '2026-09-20T10:00:00Z', 'Anne', 'KOHL')], 2026));
 
     expect(Adhesion::where('tiers_id', $this->kohl->id)->count())->toBe(1);
 });

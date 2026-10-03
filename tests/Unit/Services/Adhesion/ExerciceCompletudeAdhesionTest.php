@@ -225,7 +225,10 @@ it('AC-3 · wizard, mode exercice : l\'exercice demandé est conservé', functio
 
 // ─── AC-4 : l'exercice est une information, pas une clé (D2) ─────────────────
 
-it('AC-4 · deux règlements successifs sur une même saison, formule en durée, restent deux adhésions', function (): void {
+// Ce test garantit la COEXISTENCE : l'exercice n'est pas une clé de fusion, et la clé unique en
+// base laisse passer deux débuts différents. Que la recherche de doublon se fasse bien par les
+// dates, c'est « D2 · la déduplication d'une formule en durée reste fondée sur les dates ».
+it('AC-4 · deux règlements successifs d\'une même saison, formule en durée, coexistent : l\'exercice n\'est pas une clé de fusion', function (): void {
     FormuleAdhesion::factory()->modeDuree(3)->create(['compte_id' => $this->compte->id]);
 
     // Formule trimestrielle renouvelée : même tiers, même exercice 2026.
@@ -258,35 +261,134 @@ it('AC-4 · deux saisies successives sur une même saison, formule en durée, ne
         ->toThrow(DomainException::class, 'chevauche');
 });
 
-it('D2 · une adhésion en durée n\'est pas fusionnée avec un règlement « par exercice » de la même saison', function (): void {
-    // Avant le correctif, l'adhésion en durée avait un exercice nul et ne participait
-    // jamais à la clé (tiers, exercice). Renseigner l'exercice ne doit pas l'y faire
-    // entrer : deux adhésions légitimes, deux lignes.
-    $compteAnnuel = completudeCompteCotisation('756C2');
-    $formuleDuree = FormuleAdhesion::factory()->modeDuree(12)->create(['compte_id' => $this->compte->id]);
-    FormuleAdhesion::factory()->create(['compte_id' => $compteAnnuel->id, 'mode' => 'exercice']);
+// ─── Une seule adhésion par tiers et par saison, quelle que soit la formule ──
+//
+// Une formule HelloAsso du 1er septembre et une formule « par exercice » donnent la même
+// clé (tiers, exercice, date_debut). Le refus doit venir des DEUX côtés, avec un message
+// lisible — jamais une erreur SQL brute.
 
-    $this->service->creerDepuisWizard(completudeDto($this->tiers, $formuleDuree, '2026-10-01'), $this->user);
+function completudeFormuleAnnuelle(): FormuleAdhesion
+{
+    return FormuleAdhesion::factory()->create([
+        'compte_id' => completudeCompteCotisation('756C2')->id,
+        'mode' => 'exercice',
+    ]);
+}
 
-    // Chemin transaction (observer, « marquer reçu », synchro) : pas de fusion.
-    $tx = completudeTransaction($this->tiers, $compteAnnuel, '2026-11-05');
-    $parTransaction = $this->service->creerDepuisTransaction($tx);
+it('doublon inter-modes · wizard : HelloAsso du 1er septembre puis « par exercice » est refusé lisiblement', function (): void {
+    $saison = completudeFormuleSaisonHelloAsso($this->compte);
+    $annuelle = completudeFormuleAnnuelle();
 
-    expect($parTransaction->mode)->toBe('exercice')
-        ->and((int) $parTransaction->transaction_id)->toBe((int) $tx->id)
-        ->and(Adhesion::where('tiers_id', $this->tiers->id)->count())->toBe(2);
+    $this->service->creerDepuisWizard(completudeDto($this->tiers, $saison), $this->user);
+
+    expect(fn () => $this->service->creerDepuisWizard(completudeDto($this->tiers, $annuelle, null, 2026), $this->user))
+        ->toThrow(DomainException::class, 'déjà une adhésion');
+    expect(Adhesion::where('tiers_id', $this->tiers->id)->count())->toBe(1);
 });
 
-it('D2 · une adhésion en durée ne fait pas refuser une saisie « par exercice » de la même saison', function (): void {
-    $compteAnnuel = completudeCompteCotisation('756C2');
-    $formuleDuree = FormuleAdhesion::factory()->modeDuree(12)->create(['compte_id' => $this->compte->id]);
-    $formuleAnnuelle = FormuleAdhesion::factory()->create(['compte_id' => $compteAnnuel->id, 'mode' => 'exercice']);
+it('doublon inter-modes · wizard : « par exercice » puis HelloAsso du 1er septembre est refusé lisiblement', function (): void {
+    $saison = completudeFormuleSaisonHelloAsso($this->compte);
+    $annuelle = completudeFormuleAnnuelle();
 
-    $this->service->creerDepuisWizard(completudeDto($this->tiers, $formuleDuree, '2026-10-01'), $this->user);
-    // Chemin wizard : la garde « exercice » ne voit pas l'adhésion en durée.
-    $this->service->creerDepuisWizard(completudeDto($this->tiers, $formuleAnnuelle, null, 2026), $this->user);
+    $this->service->creerDepuisWizard(completudeDto($this->tiers, $annuelle, null, 2026), $this->user);
 
-    expect(Adhesion::where('tiers_id', $this->tiers->id)->count())->toBe(2);
+    expect(fn () => $this->service->creerDepuisWizard(completudeDto($this->tiers, $saison), $this->user))
+        ->toThrow(DomainException::class, 'chevauche');
+    expect(Adhesion::where('tiers_id', $this->tiers->id)->count())->toBe(1);
+});
+
+it('doublon inter-modes · transaction : un règlement « par exercice » ne crée pas de seconde adhésion sur une saison HelloAsso', function (): void {
+    completudeFormuleSaisonHelloAsso($this->compte);
+    $compteAnnuel = completudeFormuleAnnuelle()->compte;
+
+    $parSaison = $this->service->creerDepuisTransaction(completudeTransaction($this->tiers, $this->compte, '2026-09-05', 'cotisation-saison', 7));
+    $parExercice = $this->service->creerDepuisTransaction(completudeTransaction($this->tiers, $compteAnnuel, '2026-10-02'));
+
+    expect($parExercice->id)->toBe($parSaison->id)
+        ->and(Adhesion::where('tiers_id', $this->tiers->id)->count())->toBe(1);
+});
+
+it('doublon inter-modes · transaction : une formule en durée commençant le même jour qu\'une adhésion « par exercice » est refusée lisiblement', function (): void {
+    $annuelle = completudeFormuleAnnuelle();
+    FormuleAdhesion::factory()->modeDuree(3)->create(['compte_id' => $this->compte->id]);
+
+    $this->service->creerDepuisTransaction(completudeTransaction($this->tiers, $annuelle->compte, '2026-09-01'));
+
+    // Même début (1er septembre), fin différente : la recherche par dates ne la retrouve pas,
+    // la clé unique la refuse — traduite en message lisible.
+    $tx = completudeTransaction($this->tiers, $this->compte, '2026-09-01');
+    expect(fn () => $this->service->creerDepuisTransaction($tx))
+        ->toThrow(DomainException::class, 'déjà une adhésion sur cette période');
+    expect(Adhesion::where('tiers_id', $this->tiers->id)->count())->toBe(1);
+});
+
+it('doublon inter-modes · le refus ne laisse ni adhésion ni transaction orphelines côté wizard', function (): void {
+    $saison = completudeFormuleSaisonHelloAsso($this->compte);
+    $annuelle = completudeFormuleAnnuelle();
+    $this->service->creerDepuisWizard(completudeDto($this->tiers, $saison), $this->user);
+    $avant = Transaction::count();
+
+    expect(fn () => $this->service->creerDepuisWizard(completudeDto($this->tiers, $annuelle, null, 2026), $this->user))
+        ->toThrow(DomainException::class);
+
+    expect(Transaction::count())->toBe($avant)
+        ->and(Adhesion::count())->toBe(1);
+});
+
+it('doublon · formule à dates fixes sans date de fin : une seconde saisie est refusée lisiblement', function (): void {
+    $sansFin = FormuleAdhesion::factory()->helloasso('cotisation-sans-fin', 8)->create([
+        'compte_id' => $this->compte->id,
+        'mode' => 'duree',
+        'duree_mois' => null,
+        'duree_jours' => null,
+        'helloasso_start_date' => '2026-09-01',
+        'helloasso_end_date' => null,
+    ]);
+
+    $premiere = $this->service->creerDepuisWizard(completudeDto($this->tiers, $sansFin), $this->user);
+
+    expect($premiere->date_fin)->toBeNull();
+    // La garde de chevauchement ne s'applique pas sans date de fin : c'est la clé unique qui refuse.
+    expect(fn () => $this->service->creerDepuisWizard(completudeDto($this->tiers, $sansFin), $this->user))
+        ->toThrow(DomainException::class, 'déjà une adhésion sur cette période');
+    expect(Adhesion::where('tiers_id', $this->tiers->id)->count())->toBe(1);
+});
+
+it('doublon · formule à dates fixes sans date de fin : un second règlement retrouve l\'adhésion, par ses dates', function (): void {
+    FormuleAdhesion::factory()->helloasso('cotisation-sans-fin', 8)->create([
+        'compte_id' => $this->compte->id,
+        'mode' => 'duree',
+        'duree_mois' => null,
+        'duree_jours' => null,
+        'helloasso_start_date' => '2026-09-01',
+        'helloasso_end_date' => null,
+    ]);
+
+    $a1 = $this->service->creerDepuisTransaction(completudeTransaction($this->tiers, $this->compte, '2026-09-05', 'cotisation-sans-fin', 8));
+    $a2 = $this->service->creerDepuisTransaction(completudeTransaction($this->tiers, $this->compte, '2026-09-20', 'cotisation-sans-fin', 8));
+
+    expect($a2->id)->toBe($a1->id)
+        ->and(Adhesion::where('tiers_id', $this->tiers->id)->count())->toBe(1);
+});
+
+it('doublon · une seule adhésion permanente par tiers, quelle que soit la date de début', function (): void {
+    FormuleAdhesion::factory()->modeIllimite()->create(['compte_id' => $this->compte->id]);
+
+    $a1 = $this->service->creerDepuisTransaction(completudeTransaction($this->tiers, $this->compte, '2026-10-02'));
+    $a2 = $this->service->creerDepuisTransaction(completudeTransaction($this->tiers, $this->compte, '2026-11-05'));
+
+    expect($a2->id)->toBe($a1->id)
+        ->and(Adhesion::where('tiers_id', $this->tiers->id)->count())->toBe(1);
+});
+
+it('doublon · adhésion illimitée saisie deux fois le même jour : refus lisible', function (): void {
+    $illimitee = FormuleAdhesion::factory()->modeIllimite()->create(['compte_id' => $this->compte->id]);
+
+    $this->service->creerDepuisWizard(completudeDto($this->tiers, $illimitee, '2026-10-02'), $this->user);
+
+    expect(fn () => $this->service->creerDepuisWizard(completudeDto($this->tiers, $illimitee, '2026-10-02'), $this->user))
+        ->toThrow(DomainException::class, 'déjà une adhésion sur cette période');
+    expect(Adhesion::where('tiers_id', $this->tiers->id)->count())->toBe(1);
 });
 
 it('D2 · la clé « exercice » retrouve une adhésion offerte sans dates, que la clé des dates ne verrait pas', function (): void {

@@ -141,8 +141,7 @@ final class NouvelleAdhesionModal extends Component
             tiersId: (int) $this->tiersId,
             formuleId: (int) $this->formuleId,
             exercice: $formule->isModeExercice() ? ($this->exercice ?? app(ExerciceService::class)->current()) : null,
-            // Une formule à dates fixes impose sa période : on ne transmet pas une date qui n'aurait aucun effet.
-            dateDebut: $formule->isModeDuree() && ! $formule->aDatesFixes() && $this->dateDebut !== null ? Carbon::parse($this->dateDebut) : null,
+            dateDebut: $formule->isModeDuree() && $this->dateDebut !== null ? Carbon::parse($this->dateDebut) : null,
             montant: $this->montant,
             notes: $this->notes,
             datePaiement: $this->montant > 0 ? $this->datePaiement : null,

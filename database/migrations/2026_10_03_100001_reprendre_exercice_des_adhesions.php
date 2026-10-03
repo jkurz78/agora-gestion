@@ -30,6 +30,10 @@ return new class extends Migration
     {
         $bilan = $this->reprendre();
 
+        // Le journal de déploiement n'affiche que « DONE » : sans cet écho, le compte-rendu
+        // de la reprise n'existerait que dans storage/logs/laravel.log.
+        echo "  [adhesions] Reprise de l'exercice : {$bilan['reprises']} adhésion(s) reprise(s), {$bilan['laissees_intactes']} laissée(s) intacte(s) faute de date de début.\n";
+
         Log::info('[migration] Exercice des adhésions repris', $bilan);
 
         if ($bilan['laissees_intactes'] > 0) {
