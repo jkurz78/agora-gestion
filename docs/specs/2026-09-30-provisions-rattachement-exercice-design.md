@@ -130,6 +130,8 @@ Deux conséquences supplémentaires :
 | D10 | Livraison en deux lots : CCA/PCA d'abord, FNP/PAR ensuite | Le premier couvre le besoin mesuré et n'exige aucun nouveau compte. Le second demande de seeder 408 et 418. |
 | D11 | Vocabulaire comptable à l'écran : « écritures de rattachement », « charge / produit constaté d'avance » | CCA/PCA/FNP/PAR sont des comptes de régularisation (classe 48), pas des provisions (15/29/39/49/59). Les noms **physiques** `provisions` / `Provision` sont conservés — même arbitrage que `code_cerfa`, relibellé « Compte comptable » sans renommer la colonne. |
 | D12 | Le rattachement est **tout ou rien** : le montant est celui de l'origine, jamais saisi | Aucun cas mesuré n'appelle un décalage partiel — l'opération 8 démarre entièrement dans l'exercice suivant. Supprime d'un coup le plafond, le cumul par origine, le verrou de concurrence et la notion de reste à décaler. |
+| D13 | Une ligne d'une pièce **extournée**, ou d'une **extourne**, est refusée | Ajoutée le 2026-10-03. Rattacher le produit d'une recette déjà annulée le retirerait deux fois de N (−175 au lieu de 0). Même test que `ReclassementLigneService` : `extournee_at`, `type_ecriture = 'extourne'`, ou présence dans `extournes`. C'est la réciproque du verrou du § 7, qui refuse d'extourner une pièce rattachée. |
+| D14 | Une ligne du **journal OD** est refusée | Ajoutée le 2026-10-03. Une écriture d'inventaire ne se rattache pas : seule une pièce d'achat, de vente ou de banque a un exercice de rattachement à corriger. Dans le code, les seules OD portant une ligne 6/7 sont les dotations aux amortissements (681 au débit), que D9 laisserait passer, et dont l'annulation par `DotationService` contourne les gardes de `TransactionService`. Une condition sur une colonne, reprise telle quelle par la détection. |
 
 ## 4. Modèle de données
 
@@ -146,6 +148,7 @@ sans reprise de données.
 | `notes`, `piece_jointe_*`, `saisi_par` | conservées | Inchangées. |
 | `type` | **supprimée** | Remplacée par le cas déduit. |
 | `date` | **supprimée** | Dérivable de `exercice` ; la date qui fait foi est celle de l'écriture, immuable. |
+| `deleted_at` | **supprimée** | Le retrait est physique (§ 6.4) ; le modèle `Provision` n'a plus de suppression logique. |
 
 **Invariant** : exactement **une** de ces deux colonnes est renseignée —
 `transaction_ligne_id` (lot 1) ou `compte_id` (lot 2).
@@ -220,6 +223,8 @@ postérieur à la fin de l'exercice. **Une seule requête** — la ventilation e
 - ligne de **sens inverse** — classe 6 au crédit, classe 7 au débit (D9) ;
 - ligne **porteuse d'affectations** (D4). Elle n'a pas d'opération propre à hériter ; elle est
   listée comme **écartée, avec son motif**, jamais omise en silence ;
+- ligne d'une pièce **extournée** ou d'une **extourne** (D13) ;
+- ligne du **journal OD** (D14) ;
 - ligne appartenant à une transaction de rattachement : `transactions.provision_id IS NOT NULL`.
   Sans cette exclusion, l'extourne de notre PCA — un crédit sur 706B en N+1 — se présenterait
   elle-même comme candidate à la recherche libre. La règle de sens écarte déjà la dotation, qui
@@ -260,14 +265,16 @@ jamais été regardée. C'est la seule barrière qui ne dépende ni d'un test ni
 
 Supprime les deux écritures et libère le verrou. Refusé si N ou N+1 est clôturé.
 
-**Le retrait supprime physiquement la ligne de `provisions`** (`forceDelete`), il ne la
-soft-delete pas. Un seul invariant en découle, et il est vrai des deux côtés :
+**Le retrait supprime physiquement la ligne de `provisions`.** Le modèle `Provision` n'a plus de
+suppression logique et la colonne `deleted_at` a disparu (révisé le 2026-10-03, voir plus bas).
+Un seul invariant en découle, et il est vrai des deux côtés :
 
 > une ligne de `provisions` existe ⟺ la ligne d'origine est verrouillée.
 
-Révisé le 2026-10-01, pendant l'exécution. Le soft-delete créait une **contradiction entre
-l'application et la base** : `TransactionLigne::estRattachee()` lit `provisions()->exists()`, qui
-exclut les lignes soft-deletées, tandis que la FK `restrictOnDelete()` les compte. Après un
+Révisé une première fois le 2026-10-01, pendant l'exécution. Le soft-delete créait une
+**contradiction entre l'application et la base** : `TransactionLigne::estRattachee()` lisait alors
+`provisions()->exists()`, qui excluait les lignes soft-deletées, tandis que la FK
+`restrictOnDelete()` les compte. Après un
 retrait, l'application considérait la ligne libre et la base continuait de bloquer le
 `forceDelete()` des lignes que fait `TransactionService::update()` — soit précisément l'erreur SQL
 brute que l'AC‑8 interdit, sur le chemin même que le § 7 recommande (« retirez-le, corrigez,
@@ -285,6 +292,20 @@ demi-trace. La trace vit dans le journal applicatif : `Log::info('[Rattachement]
 la provision, la ligne d'origine, l'exercice, et — automatiquement, via `App\Support\LogContext` —
 l'`association_id` et l'`user_id`. Si un historique consultable à l'écran devient nécessaire, il
 appellera une table d'audit dédiée, pas un `deleted_at` détourné.
+
+**Révisé le 2026-10-03 : `SoftDeletes` retiré du modèle.** La première révision faisait retirer par
+`forceDelete()` mais laissait au modèle sa suppression logique : un `delete()` venu d'un autre
+chemin aurait produit un rattachement soft-deleté, toujours compté par la FK, donc une ligne
+**verrouillée pour toujours** — et invisible à l'écran, qui lit sous le scope par défaut, si bien
+que la sortie annoncée par le refus (« retirez-le ») devenait introuvable. Le plan en tirait trois
+définitions divergentes de « ligne rattachée ». L'état est désormais impossible : `delete()` est
+physique, la colonne est supprimée par la migration de refonte, jamais déployée avant ce choix.
+
+`estRattachee()` lit `provisions()->withoutGlobalScopes()->exists()` : elle compte exactement ce
+que compte la FK. Lever **tous** les scopes globaux reste nécessaire sans soft-delete, parce que
+`TenantScope` est *fail-closed* en lecture (`WHERE 1 = 0` hors contexte booté) — ce qui, pour un
+verrou, le rendrait *fail-open*. La contrainte de relation n'est pas un scope : seule la ligne
+interrogée est lue.
 
 ### 6.5 Wizard de clôture
 
@@ -405,8 +426,11 @@ endroits (D9).
 15. **AC‑15** — Aucune écriture de rattachement ne porte de débit ou de crédit négatif.
 16. **AC‑16** — Suite **complète** verte — pas un sous-ensemble : le garde du lot budget 2a vivait
     à la racine de `tests/Feature/` et deux revues ciblées l'avaient manqué. Plus
-    `pest -c phpunit.mysql.xml` dans le conteneur sur le périmètre : la détection fait des
+    `pest -c phpunit.mariadb.xml` dans le conteneur sur le périmètre : la détection fait des
     jointures et un `GROUP BY`, la production tourne sur MariaDB.
+17. **AC‑17** — Une ligne d'une pièce extournée, une ligne d'extourne (D13) et une ligne du
+    journal OD (D14) sont refusées aux trois endroits — détection, recherche libre, appel direct —
+    avec un motif lisible.
 
 ## 11. Lots
 
