@@ -24,7 +24,16 @@ services:
         depends_on:
             - mysql
     mysql:
-        image: 'mysql:8.4'
+        # MariaDB et non MySQL : c'est le moteur de la PRODUCTION (O2Switch).
+        # Avant le 2026-10-03 ce service tournait en mysql:8.4, ce qui a produit
+        # deux classes de pannes — des bugs révélés seulement en production
+        # (identifiant inconnu lu comme un littéral, DATE_FORMAT refusé dans une
+        # colonne générée), et l'impossibilité d'importer un dump de production,
+        # MariaDB exportant les colonnes générées que MySQL refuse en entrée.
+        #
+        # Le service garde le nom `mysql` : le renommer toucherait DB_HOST, les
+        # configurations de test et toutes les commandes `docker compose exec`.
+        image: 'mariadb:11.4'
         ports:
             - '${FORWARD_DB_PORT:-3306}:3306'
         environment:
@@ -36,14 +45,14 @@ services:
             MYSQL_ALLOW_EMPTY_PASSWORD: 1
             MYSQL_EXTRA_OPTIONS: '${MYSQL_EXTRA_OPTIONS:-}'
         volumes:
-            - 'sail-mysql:/var/lib/mysql'
-            - './vendor/laravel/sail/database/mysql/create-testing-database.sh:/docker-entrypoint-initdb.d/10-create-testing-database.sh'
+            - 'sail-mariadb:/var/lib/mysql'
+            - './docker/mariadb/create-testing-database.sh:/docker-entrypoint-initdb.d/10-create-testing-database.sh'
         networks:
             - sail
         healthcheck:
             test:
                 - CMD
-                - mysqladmin
+                - mariadb-admin
                 - ping
                 - '-p${DB_PASSWORD}'
             retries: 3
@@ -52,5 +61,10 @@ networks:
     sail:
         driver: bridge
 volumes:
+    # L'ancien volume `sail-mysql` est conservé volontairement : les fichiers de
+    # données MySQL sont illisibles par MariaDB, mais les garder rend la bascule
+    # réversible — il suffit de remettre l'image et le volume d'origine.
     sail-mysql:
+        driver: local
+    sail-mariadb:
         driver: local
