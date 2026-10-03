@@ -159,6 +159,37 @@ final class TransactionLigne extends Model
         return $this->reclassee_at !== null;
     }
 
+    /** @return HasMany<Provision, $this> */
+    public function provisions(): HasMany
+    {
+        return $this->hasMany(Provision::class, 'transaction_ligne_id');
+    }
+
+    /**
+     * Vrai quand un rattachement à l'exercice (CCA/PCA) porte cette ligne.
+     *
+     * Une ligne rattachée est verrouillée : ni reclassement, ni suppression, ni
+     * changement de montant ou de ventilation tant que le rattachement existe.
+     *
+     * Elle compte tout ce que compte la clé étrangère restrictOnDelete() de
+     * provisions.transaction_ligne_id, pas seulement ce que l'application voit :
+     *  - les rattachements supprimés logiquement. Le retrait (spec § 6.4) supprime
+     *    physiquement, mais une ligne laissée en soft-delete par un autre chemin
+     *    bloquerait encore le forceDelete() des lignes de TransactionService::update() ;
+     *    la garde doit donc refuser avant, en clair, plutôt que laisser la base lever
+     *    une erreur SQL brute ;
+     *  - quel que soit le contexte d'association. Le scope tenant est fail-closed en
+     *    lecture (WHERE 1 = 0 hors contexte) : c'est la sécurité d'une lecture, mais
+     *    pour un verrou c'est l'inverse, la ligne paraîtrait libre et le verrou s'ouvrirait.
+     *
+     * Seuls les scopes globaux de Provision sont levés : la relation reste limitée
+     * aux rattachements de CETTE ligne.
+     */
+    public function estRattachee(): bool
+    {
+        return $this->provisions()->withoutGlobalScopes()->exists();
+    }
+
     /**
      * Retourne le montant signé : debit - credit.
      * Positif pour une écriture débit, négatif pour une écriture crédit.
