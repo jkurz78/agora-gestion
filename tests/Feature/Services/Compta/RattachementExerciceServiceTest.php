@@ -24,6 +24,7 @@ use App\Services\Compta\RattachementExerciceService;
 use App\Services\TransactionExtourneService;
 use App\Services\TransactionService;
 use App\Tenant\TenantContext;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -1011,14 +1012,14 @@ describe('RattachementExerciceService : retrait', function () {
         expect($ligne->fresh()->estRattachee())->toBeTrue();
     })->with('rattachement_pca_cca');
 
-    test('AC-10 — après un retrait, TransactionService::update() sur la pièce d’origine réussit ; avant, il échoue sans rien changer', function (int $classe, float $montant) {
+    test('AC-10 — après un retrait, TransactionService::update() sur la pièce d’origine réussit ; avant, il est refusé sans rien changer', function (int $classe, float $montant) {
         $ligne = $this->ligneOrigine($classe, $montant);
         $provision = serviceRattachementRattachee($ligne);
         $ecritureIds = serviceRattachementEcritureIds($provision);
 
         // Le geste réel : corriger le libellé de la pièce. update() détruit puis recrée toutes
-        // les lignes de la pièce (forceDelete), ce que la clé étrangère refuse tant qu'un
-        // rattachement les référence.
+        // les lignes de la pièce (forceDelete), ce que la clé étrangère refuserait tant qu'un
+        // rattachement les référence : le verrou de la pièce le refuse avant, lisiblement.
         $donnees = [
             'type' => $classe === 7 ? 'recette' : 'depense',
             'date' => '2026-04-08',
@@ -1042,9 +1043,9 @@ describe('RattachementExerciceService : retrait', function () {
             $lignes,
         );
 
-        // Témoin : AVANT le retrait, update() échoue — aujourd'hui sur l'erreur de clé étrangère
-        // de la base. La Task 8 en fera un refus lisible (AC-8) et resserrera cette assertion ;
-        // ici on ne fige pas le type d'exception, seulement l'échec et l'absence d'effet.
+        // Témoin : AVANT le retrait, update() est refusé par le verrou de la pièce (AC-8) : un refus
+        // métier, au message du verrou, et non l'erreur de clé étrangère de la base, que la
+        // réécriture des lignes aurait levée sans cette garde.
         // Pas de toThrow(Throwable::class) : Pest ne reconnaît que des classes, et prendrait
         // l'interface pour un fragment de message attendu.
         $echec = null;
@@ -1055,7 +1056,10 @@ describe('RattachementExerciceService : retrait', function () {
             $echec = $e;
         }
 
-        expect($echec)->toBeInstanceOf(Throwable::class);
+        expect($echec)->not->toBeNull()
+            ->toBeInstanceOf(RuntimeException::class)
+            ->not->toBeInstanceOf(QueryException::class);
+        expect($echec->getMessage())->toBe(RattachementExerciceService::MOTIF_PIECE_GELEE);
 
         expect(Transaction::findOrFail($ligne->transaction_id)->libelle)->toBe('Pièce d’origine');
         expect(TransactionLigne::find($ligne->id))->not->toBeNull();

@@ -25,3 +25,13 @@ dataset('rattachement_classes', [
     'charge (classe 6, CCA)' => [6],
     'produit (classe 7, PCA)' => [7],
 ]);
+
+/*
+| Les gestes de TransactionService qui réécrivent une pièce (Task 8a) : verrouGeste() les traduit.
+*/
+
+dataset('rattachement_gestes', [
+    'update()' => ['update'],
+    'delete()' => ['delete'],
+    'annuler()' => ['annuler'],
+]);

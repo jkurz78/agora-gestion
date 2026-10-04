@@ -8,7 +8,9 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\Compta\RattachementExerciceService;
 use App\Services\Compta\ReclassementLigneService;
+use App\Services\TransactionService;
 use App\Tenant\TenantContext;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Livewire\Features\SupportTesting\Testable;
 use Tests\TestCase;
@@ -27,6 +29,13 @@ use Tests\TestCase;
 /** Le message unique du verrou, mot pour mot : ce que l'utilisateur lit. */
 const VERROU_MESSAGE = 'Cette pièce porte un rattachement à l’exercice suivant : pour la modifier, retirez d’abord le rattachement '
     .'depuis Exercices > Écritures de rattachement, corrigez, puis repassez-le.';
+
+/**
+ * Le message de l'écriture de rattachement (dotation ou extourne générée), mot pour mot : elle ne se
+ * modifie, ne se supprime et ne s'annule pas par les écrans ordinaires, elle se retire avec son rattachement.
+ */
+const VERROU_MESSAGE_ECRITURE = 'Cette écriture a été générée par un rattachement à l’exercice suivant : elle ne se modifie, ne se supprime '
+    .'et ne s’annule pas ici. Pour la défaire, retirez le rattachement depuis Exercices > Écritures de rattachement.';
 
 /** Un compte actif de la même classe que la ligne d'origine, vers lequel la reclasser. */
 function verrouAutreCompte(int $classe): Compte
@@ -97,10 +106,12 @@ function verrouEmpreinte(TransactionLigne $ligne, Provision $provision): array
 }
 
 /**
- * Le geste d'un site du verrou est REFUSÉ : par le message exact du verrou, et sans que rien n'ait
- * bougé (verrouEmpreinte() à l'identique). $ligne est la ligne rattachée, $provision son rattachement.
+ * Le geste d'un site du verrou est REFUSÉ : par un refus métier (une RuntimeException, jamais une
+ * erreur SQL de la base : une clé étrangère qui s'en chargerait ne serait pas un refus lisible), au
+ * message exact (celui du verrou, sauf $message), et sans que rien n'ait bougé (verrouEmpreinte() à
+ * l'identique). $ligne est la ligne rattachée, $provision son rattachement.
  */
-function verrouAssertRefuse(Closure $geste, TransactionLigne $ligne, Provision $provision): void
+function verrouAssertRefuse(Closure $geste, TransactionLigne $ligne, Provision $provision, string $message = VERROU_MESSAGE): void
 {
     $avant = verrouEmpreinte($ligne, $provision);
 
@@ -109,8 +120,23 @@ function verrouAssertRefuse(Closure $geste, TransactionLigne $ligne, Provision $
         ->and($avant['ecritures'])->toHaveCount(2)
         ->and($avant['lignes'])->toHaveCount(4);
 
-    expect(verrouMessageDuRefus($geste))->toBe(VERROU_MESSAGE)
-        ->and(RattachementExerciceService::MOTIF_PIECE_GELEE)->toBe(VERROU_MESSAGE);
+    // Pas de toThrow(Throwable::class) : Pest ne reconnaît que des classes, et prendrait l'interface
+    // pour un fragment de message attendu.
+    $refus = null;
+
+    try {
+        $geste();
+    } catch (Throwable $e) {
+        $refus = $e;
+    }
+
+    expect($refus)->not->toBeNull()
+        ->toBeInstanceOf(RuntimeException::class)
+        ->not->toBeInstanceOf(QueryException::class);
+    expect($refus->getMessage())->toBe($message);
+
+    expect(RattachementExerciceService::MOTIF_PIECE_GELEE)->toBe(VERROU_MESSAGE)
+        ->and(RattachementExerciceService::MOTIF_ECRITURE_DE_RATTACHEMENT)->toBe(VERROU_MESSAGE_ECRITURE);
 
     expect(verrouEmpreinte($ligne, $provision))->toBe($avant);
 }
@@ -172,4 +198,132 @@ function verrouReclasser(TestCase $test, TransactionLigne $ligne, Compte $compte
 function verrouIdsAffiches(Testable $formulaire): array
 {
     return collect($formulaire->get('lignes'))->pluck('id')->map(fn ($id): int => (int) $id)->all();
+}
+
+/**
+ * Les données d'édition d'une pièce telle qu'elle est en base, pour TransactionService::update() : son
+ * libellé change, tout le reste est repris. Les lignes sont celles de produit ou de charge (classes 6 et 7) :
+ * le formulaire ne porte pas les contreparties 411/401, update() les régénère.
+ *
+ * @return array{0: array<string, mixed>, 1: list<array<string, mixed>>} les données de la pièce, ses lignes
+ */
+function verrouDonneesDEdition(Transaction $piece, string $libelle = 'Pièce corrigée'): array
+{
+    $lignes = TransactionLigne::where('transaction_id', (int) $piece->id)
+        ->with('compte')
+        ->orderBy('id')
+        ->get()
+        ->filter(fn (TransactionLigne $ligne): bool => in_array((int) $ligne->compte->classe, [6, 7], true))
+        ->values();
+
+    $donnees = [
+        'type' => $piece->type->value,
+        'date' => $piece->date->toDateString(),
+        'libelle' => $libelle,
+        'montant_total' => number_format((float) $lignes->sum('montant'), 2, '.', ''),
+        'mode_paiement' => null,
+        'tiers_id' => null,
+        'compte_id' => null,
+    ];
+
+    return [$donnees, $lignes->map(fn (TransactionLigne $ligne): array => [
+        'id' => (int) $ligne->id,
+        'compte_id' => (int) $ligne->compte_id,
+        'montant' => (float) $ligne->montant,
+        'operation_id' => $ligne->operation_id,
+        'seance' => $ligne->seance,
+        'notes' => null,
+    ])->all()];
+}
+
+/**
+ * Le geste de TransactionService qui réécrit la pièce : « update » (son libellé change), « delete » ou
+ * « annuler ». Les trois sites de la Task 8a ; l'extourne (8b) a ses propres tests.
+ */
+function verrouGeste(string $nom, Transaction $piece): Closure
+{
+    $service = app(TransactionService::class);
+
+    return match ($nom) {
+        'update' => fn (): Transaction => $service->update($piece, ...verrouDonneesDEdition($piece)),
+        'delete' => fn () => $service->delete($piece),
+        'annuler' => fn () => $service->annuler($piece, 'Motif d’annulation'),
+    };
+}
+
+/**
+ * L'effet d'un des gestes de verrouGeste() qui a PASSÉ sur la pièce $pieceId : le libellé corrigé,
+ * ou la pièce et toutes ses lignes supprimées logiquement. Relu sans aucun filtre.
+ */
+function verrouAssertEffet(string $nom, int $pieceId): void
+{
+    $piece = (array) DB::table('transactions')->where('id', $pieceId)->first();
+    $lignes = DB::table('transaction_lignes')->where('transaction_id', $pieceId)->get();
+
+    expect($piece)->not->toBeEmpty();
+
+    if ($nom === 'update') {
+        expect($piece['libelle'])->toBe('Pièce corrigée')
+            ->and($piece['deleted_at'])->toBeNull();
+
+        return;
+    }
+
+    expect($piece['deleted_at'])->not->toBeNull()
+        ->and($lignes)->not->toBeEmpty()
+        ->and($lignes->whereNull('deleted_at'))->toBeEmpty();
+
+    if ($nom === 'annuler') {
+        expect($piece['motif_suppression'])->toBe('Motif d’annulation');
+    }
+}
+
+/**
+ * L'état d'une pièce et de toutes ses lignes en base, sans aucun filtre (suppressions logiques comprises) :
+ * pour les gestes refusés sur une pièce qui n'a pas de rattachement à relever.
+ *
+ * @return array{piece: array<string, mixed>, lignes: list<array<string, mixed>>}
+ */
+function verrouEmpreinteDeLaPiece(int $pieceId): array
+{
+    return [
+        'piece' => (array) DB::table('transactions')->where('id', $pieceId)->first(),
+        'lignes' => DB::table('transaction_lignes')->where('transaction_id', $pieceId)->orderBy('id')->get()
+            ->map(fn (object $l): array => (array) $l)->all(),
+    ];
+}
+
+/**
+ * Classe les requêtes émises par la garde de la pièce (assertPieceNonGelee()) : la liste des lots 401/411,
+ * leur verrou, le verrou de la pièce, celui de ses lignes, la lecture verrouillante des rattachements. Chacune
+ * doit se trouver EXACTEMENT UNE fois : une lecture en double (la pièce verrouillée deux fois) ou manquante
+ * fait échouer, avec l'inventaire des requêtes. Rend nom => indice, dans l'ordre où elles ont été émises.
+ *
+ * @param  list<object>  $requetes
+ * @return array<string, int>
+ */
+function verrouIndicesDesVerrous(array $requetes): array
+{
+    $motifs = [
+        'liste des lots' => '/^select\s+[`"]id[`"],\s*[`"]poste_tiers_parent_id[`"]\s+from\s+[`"]transaction_lignes[`"]/i',
+        'lots' => '/from\s+[`"]transaction_lignes[`"]\s+where\s*\(\s*[`"]transaction_lignes[`"]\.[`"]id[`"]\s*=\s*\?\s+or\s+[`"]poste_tiers_parent_id[`"]\s*=\s*\?/i',
+        'pièce' => '/from\s+[`"]transactions[`"]\s+where\s+[`"]transactions[`"]\.[`"]id[`"]\s*=\s*\?\s+limit\s+1/i',
+        'lignes' => '/^select\s+[`"]id[`"]\s+from\s+[`"]transaction_lignes[`"]\s+where\s+[`"]transaction_id[`"]\s*=\s*\?\s+order\s+by/i',
+        'rattachements' => '/from\s+[`"]provisions[`"]\s+where\s+[`"]transaction_ligne_id[`"]\s+in\s*\(/i',
+    ];
+
+    $inventaire = implode("\n", array_map(fn (object $r, int $i): string => "#{$i} {$r->sql}", $requetes, array_keys($requetes)));
+    $indices = [];
+
+    foreach ($motifs as $nom => $motif) {
+        $trouvees = array_keys(array_filter($requetes, fn (object $r): bool => preg_match($motif, $r->sql) === 1));
+
+        expect($trouvees)->toHaveCount(1, "« {$nom} » doit être lu une fois et une seule. Requêtes :\n{$inventaire}");
+
+        $indices[$nom] = $trouvees[0];
+    }
+
+    asort($indices);
+
+    return $indices;
 }

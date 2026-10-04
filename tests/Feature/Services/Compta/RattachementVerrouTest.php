@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Livewire\TransactionForm;
+use App\Models\Association;
 use App\Models\Compte;
 use App\Models\Provision;
 use App\Models\Transaction;
@@ -10,7 +11,10 @@ use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\Compta\RattachementExerciceService;
+use App\Services\Compta\VerrouLotsCanoniques;
+use App\Services\TransactionService;
 use App\Tenant\TenantContext;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
@@ -23,9 +27,10 @@ use Livewire\Livewire;
 | Une ligne portée par un rattachement gèle sa pièce entière (spec § 7).
 | TransactionLigne::estRattachee() est la source de vérité de ce verrou, lue sous verrou par
 | estRattacheeSousVerrou() : la garde vit au service, dans assertLigneNonGelee() (un geste qui
-| écrit sur une ligne) et assertPieceNonGelee() (un geste qui écrit sur la pièce entière), que
-| les sites appellent (Task 7 : reclassement ; Tasks 8 et 9 : les autres). Ce fichier éprouve
-| ces deux gardes, puis un test par site, à mesure qu'ils sont posés.
+| écrit sur une ligne) et assertPieceNonGelee() (un geste qui réécrit la pièce entière), que les
+| sites appellent (Task 7 : reclassement ; Task 8a : édition, suppression, annulation ; Tasks 8b,
+| 8c et 9 : les autres). Ce fichier éprouve ces deux gardes, puis un test par site, à mesure
+| qu'ils sont posés.
 |
 | Spec : docs/specs/2026-09-30-provisions-rattachement-exercice-design.md (§ 6.4, § 7).
 */
@@ -444,7 +449,7 @@ describe('RattachementExerciceService::assertPieceNonGelee()', function () {
         TenantContext::boot($association);
     });
 
-    test('verrouille la pièce, puis ses lignes, tous scopes levés, puis lit les rattachements en UNE lecture : « for update » dans cet ordre (MariaDB)', function () {
+    test('verrouille les lots 401/411, puis la pièce, puis ses lignes, puis lit les rattachements en UNE lecture : « for update » dans cet ordre (MariaDB)', function () {
         ['soeur' => $soeur, 'provision' => $provision, 'piece' => $piece] = verrouPieceDontLaSoeurEstRattachee($this, 7);
         $service = app(RattachementExerciceService::class);
 
@@ -453,29 +458,26 @@ describe('RattachementExerciceService::assertPieceNonGelee()', function () {
                 ->toThrow(RuntimeException::class, VERROU_MESSAGE))
         );
 
-        $indices = [
-            'pièce' => rattachementIndiceDeLaPremiere($requetes, 'transactions'),
-            'lignes' => rattachementIndiceDeLaPremiere($requetes, 'transaction_lignes'),
-            'rattachements' => rattachementIndiceDeLaPremiere($requetes, 'provisions'),
-        ];
+        // Chaque verrou une fois et une seule, dans l'ordre de TransactionService::update() prolongé :
+        // les lots, la pièce, les lignes, les rattachements. Le refus est la dernière requête : rien après.
+        $indices = verrouIndicesDesVerrous($requetes);
+        expect(array_keys($indices))->toBe(['liste des lots', 'lots', 'pièce', 'lignes', 'rattachements'])
+            ->and(array_values($indices))->toBe(collect($indices)->sort()->values()->all())
+            ->and(array_key_last($requetes))->toBe($indices['rattachements']);
 
-        // Strictement croissants : chaque verrou est pris après le précédent.
-        expect(array_values($indices))->toBe(collect($indices)->sort()->values()->all())
-            ->and(count(array_unique($indices)))->toBe(3);
-
-        // Une lecture par table, toutes directes : pas d'EXISTS, pas une lecture par ligne.
-        foreach (['transactions', 'transaction_lignes', 'provisions'] as $table) {
-            expect(array_filter($requetes, fn (object $r): bool => str_contains($r->sql, $table)))->toHaveCount(1);
-        }
+        // Une lecture directe des rattachements : pas d'EXISTS, pas une lecture par ligne.
         expect(mb_strtolower($requetes[$indices['rattachements']]->sql))->not->toContain('exists');
 
         // Les lignes se verrouillent dans l'ordre de leur identifiant : deux appelants qui verrouillent
         // les mêmes lignes ne s'attendent pas l'un l'autre en sens inverse.
         expect(mb_strtolower($requetes[$indices['lignes']]->sql))->toContain('order by');
 
-        // Aucune des trois ne porte de scope.
-        foreach ($indices as $i) {
-            verrouAssertSansScope($requetes[$i]);
+        // Les lots désignent le poste tiers de la pièce (la contrepartie 411) ; la pièce, ses lignes et
+        // les rattachements ne portent AUCUN scope : seul le préfixe canonique se lit sous le scope tenant.
+        $contrepartie = (int) DB::table('transaction_lignes')->where('transaction_id', $piece->id)->orderBy('id')->skip(1)->value('id');
+        expect($requetes[$indices['lots']]->bindings)->toContain($contrepartie);
+        foreach (['pièce', 'lignes', 'rattachements'] as $nom) {
+            verrouAssertSansScope($requetes[$indices[$nom]]);
         }
 
         // Les rattachements sont lus pour TOUTES les lignes de la pièce, la sœur rattachée comprise.
@@ -487,13 +489,94 @@ describe('RattachementExerciceService::assertPieceNonGelee()', function () {
 
         // SQLite n'écrit pas « for update » : seuls MySQL et MariaDB prouvent que ces lectures verrouillent.
         if (DB::getDriverName() !== 'sqlite') {
-            foreach ($indices as $i) {
-                expect($requetes[$i]->sql)->toContain('for update');
+            foreach (['lots', 'pièce', 'lignes', 'rattachements'] as $nom) {
+                expect($requetes[$indices[$nom]]->sql)->toContain('for update');
             }
+            // La liste des lots n'est qu'une lecture : c'est ce qui la distingue des verrous.
+            expect($requetes[$indices['liste des lots']]->sql)->not->toContain('for update');
         }
 
         // Garde anti-test-vide : le rattachement lu existe.
         expect(DB::table('provisions')->where('id', $provision->id)->exists())->toBeTrue();
+    });
+
+    test('rend la pièce relue sous verrou, et lève une ModelNotFoundException quand elle n\'existe plus', function () {
+        $ligne = $this->ligneOrigineEquilibree(7);
+        $piece = Transaction::findOrFail($ligne->transaction_id);
+        $service = app(RattachementExerciceService::class);
+
+        // L'instance de l'appelant est périmée : la pièce rendue est celle de la base, sous verrou.
+        DB::table('transactions')->where('id', $piece->id)->update(['libelle' => 'Libellé de la base']);
+        expect($piece->libelle)->not->toBe('Libellé de la base');
+
+        $rendue = $service->assertPieceNonGelee($piece);
+
+        expect($rendue)->toBeInstanceOf(Transaction::class)
+            ->and((int) $rendue->id)->toBe((int) $piece->id)
+            ->and($rendue->libelle)->toBe('Libellé de la base')
+            ->and($rendue)->not->toBe($piece);
+
+        // Une pièce qui n'existe plus (supprimée physiquement) ne se rend pas : un refus, pas un passage.
+        DB::table('transaction_lignes')->where('transaction_id', $piece->id)->delete();
+        DB::table('transactions')->where('id', $piece->id)->delete();
+
+        expect(fn () => $service->assertPieceNonGelee($piece))->toThrow(ModelNotFoundException::class);
+    });
+
+    test('verrouille chaque lot canonique de la pièce, une fois, dans l\'ordre croissant de la ligne canonique : la ligne de tiers elle-même ou son parent', function () {
+        $ligne = $this->ligneOrigineEquilibree(7);
+        $piece = Transaction::findOrFail($ligne->transaction_id);
+        $enfant = TransactionLigne::where('transaction_id', $piece->id)->orderBy('id')->skip(1)->firstOrFail();
+
+        // Un poste seul, puis un poste parent créé APRÈS le fils : le premier fils de la liste (par
+        // identifiant) pointe vers un parent d'identifiant supérieur. Les lots se prennent dans l'ordre de
+        // la ligne canonique, pas dans celui de la liste des lignes de tiers.
+        $seul = TransactionLigne::create([
+            'transaction_id' => $piece->id,
+            'compte_id' => $enfant->compte_id,
+            'debit' => 5,
+            'credit' => 0,
+            'montant' => 0,
+            'libelle' => 'Poste seul',
+        ]);
+        $parent = TransactionLigne::create([
+            'transaction_id' => $piece->id,
+            'compte_id' => $enfant->compte_id,
+            'debit' => 10,
+            'credit' => 0,
+            'montant' => 0,
+            'libelle' => 'Poste parent',
+        ]);
+        $enfant->forceFill(['poste_tiers_parent_id' => $parent->id])->save();
+
+        // Garde anti-test-vide : le fils précède son parent par l'identifiant, avec le poste seul entre les deux.
+        expect((int) $enfant->id)->toBeLessThan((int) $seul->id)
+            ->and((int) $seul->id)->toBeLessThan((int) $parent->id);
+
+        $requetes = rattachementRequetesDeLaTransaction(
+            fn () => DB::transaction(fn () => app(VerrouLotsCanoniques::class)->verrouillerLotsDeLaPiece((int) $piece->id))
+        );
+
+        $lots = array_values(array_filter(
+            $requetes,
+            fn (object $r): bool => preg_match('/or\s+[`"]poste_tiers_parent_id[`"]\s*=\s*\?/i', $r->sql) === 1
+        ));
+
+        // Le fils se ramène à son parent : deux lots, pas trois, par ordre croissant de ligne canonique (le
+        // poste seul, puis le parent), alors que la liste commence par le fils. Les deux premiers paramètres
+        // de chaque verrou sont la ligne canonique (la ligne, puis ses fils) : le troisième est l'association,
+        // que rien n'empêche de valoir l'identifiant d'une ligne.
+        expect($lots)->toHaveCount(2)
+            ->and(array_slice($lots[0]->bindings, 0, 2))->toBe([(int) $seul->id, (int) $seul->id])
+            ->and(array_slice($lots[1]->bindings, 0, 2))->toBe([(int) $parent->id, (int) $parent->id]);
+
+        // Un verrou par lot, tous les lots (supprimés logiquement compris) : aucun filtre de suppression sur le verrou.
+        expect($lots[0]->sql)->not->toContain('deleted_at');
+
+        if (DB::getDriverName() !== 'sqlite') {
+            expect($lots[0]->sql)->toContain('for update')
+                ->and($lots[1]->sql)->toContain('for update');
+        }
     });
 });
 
@@ -605,8 +688,8 @@ describe('ReclassementLigneService::reclasser() : une ligne rattachée n\'est pa
 
 describe('TransactionForm::removeLigne() : retour immédiat sur une ligne rattachée', function () {
     // removeLigne() ne touche jamais la base : la suppression réelle a lieu à l'enregistrement
-    // (TransactionService::update(), que la Task 8 gardera). Ces tests lisent donc l'ÉTAT DU
-    // COMPOSANT : une assertion sur la base passerait même sans garde.
+    // (TransactionService::update(), que la garde de la pièce protège, Task 8a). Ces tests lisent
+    // donc l'ÉTAT DU COMPOSANT : une assertion sur la base passerait même sans garde.
 
     test('refuse de retirer du formulaire une ligne rattachée : elle reste affichée, et le message s\'affiche', function (int $classe) {
         $ligne = $this->ligneOrigineEquilibree($classe);
@@ -691,5 +774,169 @@ describe('TransactionForm::removeLigne() : retour immédiat sur une ligne rattac
         $formulaire->call('addLigne')
             ->assertHasNoErrors('lignes')
             ->assertDontSee(RattachementExerciceService::MOTIF_PIECE_GELEE);
+    });
+});
+
+// ── TransactionService : édition, suppression, annulation (Task 8a) ──────────
+//
+// Ces trois gestes réécrivent la pièce entière : update() détruit puis recrée toutes ses lignes,
+// delete() et annuler() les suppriment logiquement avec elle. Une ligne rattachée gèle donc la pièce
+// (spec § 7), par assertPieceNonGelee(), appelée à la place de l'ancien verrouillage de la pièce.
+// Sans elle, update() butait sur la clé étrangère de `provisions` (une erreur SQL brute, AC-8), et
+// delete() comme annuler() supprimaient sans broncher une pièce portant un rattachement.
+
+describe('TransactionService : update(), delete() et annuler() refusent une pièce rattachée', function () {
+    test('refusent une pièce dont une ligne est rattachée, même si ce n\'est pas la première : le message exact, un refus métier et non une erreur SQL, et rien n\'a bougé', function (int $classe, string $geste) {
+        ['libre' => $libre, 'soeur' => $soeur, 'provision' => $provision, 'piece' => $piece] = verrouPieceDontLaSoeurEstRattachee($this, $classe);
+
+        // Garde anti-test-vide : c'est bien la sœur qui est rattachée, pas la ligne d'origine.
+        expect($libre->estRattachee())->toBeFalse()
+            ->and($soeur->estRattachee())->toBeTrue();
+
+        verrouAssertRefuse(verrouGeste($geste, $piece), $soeur, $provision);
+    })->with('rattachement_classes')->with('rattachement_gestes');
+
+    test('refusent aussi quand la ligne rattachée est supprimée logiquement : le gel ne dépend pas de ce qu\'un filtre masque', function (int $classe, string $geste) {
+        ['soeur' => $soeur, 'provision' => $provision, 'piece' => $piece] = verrouPieceDontLaSoeurEstRattachee($this, $classe);
+        $soeur->delete();
+
+        // Prémisse : la ligne est masquée par sa suppression logique, mais son rattachement tient.
+        expect(TransactionLigne::find($soeur->id))->toBeNull()
+            ->and(DB::table('provisions')->where('id', $provision->id)->exists())->toBeTrue();
+
+        verrouAssertRefuse(verrouGeste($geste, $piece), $soeur, $provision);
+    })->with('rattachement_classes')->with('rattachement_gestes');
+
+    test('laissent passer une pièce libre, alors qu\'un rattachement existe sur une autre pièce : la garde regarde cette pièce', function (int $classe, string $geste) {
+        verrouRattacherAvecEcritures($this, $this->ligneOrigineEquilibree($classe));
+
+        $libre = $this->ligneOrigineEquilibree($classe);
+        $piece = Transaction::findOrFail($libre->transaction_id);
+
+        verrouAssertPasse(verrouGeste($geste, $piece), $libre);
+        verrouAssertEffet($geste, (int) $piece->id);
+    })->with('rattachement_classes')->with('rattachement_gestes');
+
+    test('laissent passer la pièce dont le rattachement a été retiré : la sortie annoncée par le refus fonctionne', function (int $classe, string $geste) {
+        $ligne = $this->ligneOrigineEquilibree($classe);
+        $provision = verrouRattacherAvecEcritures($this, $ligne);
+        $piece = Transaction::findOrFail($ligne->transaction_id);
+
+        // Rattachée, elle est refusée (garde anti-test-vide : c'est bien le retrait qui la libère).
+        verrouAssertRefuse(verrouGeste($geste, $piece), $ligne, $provision);
+
+        app(RattachementExerciceService::class)->retirer($provision);
+
+        verrouAssertPasse(verrouGeste($geste, $piece), $ligne);
+        verrouAssertEffet($geste, (int) $piece->id);
+    })->with('rattachement_classes')->with('rattachement_gestes');
+
+    test('verrouillent l\'exercice de la pièce, puis ses lots 401/411, la pièce, ses lignes et les rattachements : « for update » dans cet ordre, et la pièce UNE seule fois (MariaDB)', function (string $geste) {
+        ['provision' => $provision, 'piece' => $piece] = verrouPieceDontLaSoeurEstRattachee($this, 7);
+        $action = verrouGeste($geste, $piece);
+
+        // Le refus est jugé à l'intérieur de la transaction du geste : toutes ses requêtes sont relevées.
+        $requetes = rattachementRequetesDeLaTransaction(
+            fn () => expect($action)->toThrow(RuntimeException::class, VERROU_MESSAGE)
+        );
+
+        // Le même ordre aux trois sites, et celui de la garde : exercice, lots, pièce, lignes, rattachements.
+        // Chaque verrou une seule fois : update() ne reprend pas la pièce que la garde a prise, et le refus
+        // est la dernière requête, rien n'est lu ni écrit après.
+        $indices = ['exercice' => rattachementIndiceDeLaPremiere($requetes, 'exercices', 2025)] + verrouIndicesDesVerrous($requetes);
+        expect(array_keys($indices))->toBe(['exercice', 'liste des lots', 'lots', 'pièce', 'lignes', 'rattachements'])
+            ->and(array_values($indices))->toBe(collect($indices)->sort()->values()->all())
+            ->and(array_key_last($requetes))->toBe($indices['rattachements']);
+
+        // L'exercice, lui, n'est lu qu'une fois (le verrou) ; aucune lecture de la pièce n'a précédé les lots.
+        expect(array_filter($requetes, fn (object $r): bool => str_contains($r->sql, 'exercices')))->toHaveCount(1);
+
+        // SQLite n'écrit pas « for update » : seuls MySQL et MariaDB prouvent que ces lectures verrouillent.
+        if (DB::getDriverName() !== 'sqlite') {
+            foreach (['exercice', 'lots', 'pièce', 'lignes', 'rattachements'] as $nom) {
+                expect($requetes[$indices[$nom]]->sql)->toContain('for update');
+            }
+        }
+
+        // Garde anti-test-vide : le rattachement qui a motivé le refus existe.
+        expect(DB::table('provisions')->where('id', $provision->id)->exists())->toBeTrue();
+    })->with('rattachement_gestes');
+
+    test('refusent une écriture de rattachement (dotation ou extourne générée) : son propre message, et rien n\'a bougé', function (int $classe, string $geste, string $ecriture) {
+        $ligne = $this->ligneOrigineEquilibree($classe);
+        $provision = verrouRattacherAvecEcritures($this, $ligne);
+        $piece = Transaction::where('provision_id', (int) $provision->id)->where('type_ecriture', $ecriture)->sole();
+
+        // Garde anti-test-vide : l'écriture visée porte bien le rattachement, et ce n'est pas la pièce d'origine.
+        expect((int) $piece->provision_id)->toBe((int) $provision->id)
+            ->and((int) $piece->id)->not->toBe((int) $ligne->transaction_id);
+
+        verrouAssertRefuse(verrouGeste($geste, $piece), $ligne, $provision, VERROU_MESSAGE_ECRITURE);
+    })->with('rattachement_classes')->with('rattachement_gestes')->with([
+        'la dotation' => ['normale'],
+        'l\'extourne' => ['extourne'],
+    ]);
+
+    test('refusent une écriture de rattachement même par une instance périmée qui ne porte plus son rattachement : la garde lit la pièce verrouillée', function (string $geste) {
+        $ligne = $this->ligneOrigineEquilibree(7);
+        $provision = verrouRattacherAvecEcritures($this, $ligne);
+        $piece = Transaction::where('provision_id', (int) $provision->id)->where('type_ecriture', 'normale')->sole();
+
+        // L'instance de l'appelant, lue avant : elle ne sait rien du rattachement. La base, elle, le porte.
+        $piece->setRawAttributes(array_merge($piece->getAttributes(), ['provision_id' => null]), true);
+        expect($piece->provision_id)->toBeNull()
+            ->and((int) DB::table('transactions')->where('id', $piece->id)->value('provision_id'))->toBe((int) $provision->id);
+
+        verrouAssertRefuse(verrouGeste($geste, $piece), $ligne, $provision, VERROU_MESSAGE_ECRITURE);
+    })->with('rattachement_gestes');
+});
+
+describe('TransactionService::update() : il poursuit sur la pièce que la garde rend', function () {
+    // update() verrouille la pièce par la garde du rattachement, qui lit tous scopes levés (une pièce
+    // supprimée porte encore ses rattachements). L'ancien verrouillage, sous scope, refusait par une
+    // ModelNotFoundException la pièce supprimée entre-temps ou d'une autre association : update() garde
+    // ce refus. Sans lui, il réécrirait les lignes d'une pièce supprimée.
+    test('refuse par une ModelNotFoundException une pièce supprimée entre-temps ou d\'une autre association, et ne touche à rien', function (string $cas) {
+        $ligne = $this->ligneOrigineEquilibree(7);
+        $piece = Transaction::findOrFail($ligne->transaction_id);
+
+        if ($cas === 'supprimée') {
+            $piece->delete();
+        } else {
+            DB::table('transactions')->where('id', $piece->id)->update(['association_id' => Association::factory()->create()->id]);
+            $piece->refresh();
+        }
+
+        $avant = verrouEmpreinteDeLaPiece((int) $piece->id);
+
+        expect(fn () => verrouGeste('update', $piece)())
+            ->toThrow(ModelNotFoundException::class);
+
+        expect(verrouEmpreinteDeLaPiece((int) $piece->id))->toBe($avant);
+    })->with([
+        'pièce supprimée' => ['supprimée'],
+        'pièce d\'une autre association' => ['autre association'],
+    ]);
+
+    // Les contrôles qui suivent la garde (pièce pointée, réglée, facturée) lisent l'instance : celle de
+    // l'appelant a pu être lue avant qu'un pointage ne l'atteigne. La garde rend la pièce relue sous
+    // verrou, et update() poursuit avec elle, comme son ancien verrouillage le faisait.
+    test('juge la pièce telle que la base la porte : un pointage arrivé depuis la lecture de l\'instance verrouille sa date', function () {
+        $ligne = $this->ligneOrigineEquilibree(7);
+        $piece = Transaction::findOrFail($ligne->transaction_id);
+
+        DB::table('transactions')->where('id', $piece->id)->update(['statut_reglement' => 'pointe']);
+
+        // Garde anti-test-vide : l'instance de l'appelant l'ignore, la base non.
+        expect($piece->isLockedByRapprochement())->toBeFalse()
+            ->and(Transaction::findOrFail($piece->id)->isLockedByRapprochement())->toBeTrue();
+
+        [$donnees, $lignes] = verrouDonneesDEdition($piece);
+        $donnees['date'] = '2026-04-09';
+
+        expect(fn () => app(TransactionService::class)->update($piece, $donnees, $lignes))
+            ->toThrow(RuntimeException::class, 'La date ne peut pas être modifiée sur une transaction rapprochée.');
+
+        expect(Transaction::findOrFail($piece->id)->date->toDateString())->toBe('2026-04-08');
     });
 });

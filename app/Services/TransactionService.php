@@ -18,10 +18,12 @@ use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\EtatReglementResolver;
 use App\Services\Compta\LettrageService;
 use App\Services\Compta\PartieDoubleGuard;
+use App\Services\Compta\RattachementExerciceService;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -49,6 +51,7 @@ final class TransactionService
         private readonly EcritureGenerator $ecritureGenerator,
         private readonly LettrageService $lettrageService,
         private readonly EtatReglementResolver $etatReglementResolver,
+        private readonly RattachementExerciceService $rattachement,
     ) {}
 
     public function create(array $data, array $lignes): Transaction
@@ -369,7 +372,22 @@ final class TransactionService
             $this->exerciceService->assertOuvertVerrouille(
                 $this->exerciceService->anneeForDate(CarbonImmutable::parse($transaction->date))
             );
-            $transaction = $this->verrouillerPostesTiersEtTransaction($transaction);
+
+            // L'unique chemin de verrouillage de la pièce : la garde du rattachement prend les lots
+            // 401/411, puis la pièce, puis ses lignes et leurs rattachements (voir
+            // RattachementExerciceService::assertPieceNonGelee()), et refuse une pièce dont une ligne est
+            // rattachée à l'exercice suivant : update() détruit puis recrée toutes les lignes, ce que la
+            // clé étrangère des rattachements refuserait par une erreur SQL brute. Elle rend la pièce
+            // verrouillée, sur laquelle on poursuit.
+            $transaction = $this->rattachement->assertPieceNonGelee($transaction);
+
+            // La garde verrouille la pièce tous scopes levés (une pièce supprimée porte encore ses
+            // rattachements) ; l'édition ne vaut que pour une pièce vivante de l'association. L'ancien
+            // verrouillage, sous scope, la refusait par cette même exception.
+            if ($transaction->trashed() || (int) $transaction->association_id !== (int) TenantContext::currentId()) {
+                throw (new ModelNotFoundException)->setModel(Transaction::class, [(int) $transaction->id]);
+            }
+
             $transaction->load(['rapprochement' => fn ($q) => $q->lockForUpdate()]);
 
             if ($transaction->isLockedByRemise()) {
@@ -792,6 +810,25 @@ final class TransactionService
             throw new \RuntimeException('Cette transaction provient d’une immobilisation et ne peut pas être supprimée : supprimez la fiche.');
         }
         DB::transaction(function () use ($transaction) {
+            // Mêmes premiers verrous que update() : l'exercice de la pièce (une clôture concurrente ne
+            // s'intercale pas entre les contrôles ci-dessus et l'écriture), puis la garde du rattachement,
+            // qui prend les lots 401/411, la pièce, ses lignes et leurs rattachements. Une pièce dont une
+            // ligne est rattachée, ou qui est elle-même une écriture de rattachement, n'est pas supprimée.
+            //
+            // Ordre complet : exercice, lots, pièce, lignes, rattachements (la garde) ; puis la T2, pièce
+            // et lignes (supprimerT2SiExiste()) ; puis les affectations et les lignes de la pièce
+            // (purgerLignesEtAffectations() : lignes et pièce sont déjà tenues, il n'en prend plus de
+            // nouvelle), enfin la suppression de la pièce. C'est la suite d'update() : exercice, lot, pièce,
+            // T2, lignes. Une seule différence avec l'état d'avant : les affectations sont prises APRÈS les
+            // lignes. La ventilation (affecterLigne(), supprimerAffectations()) prend les siennes sans
+            // verrouiller la ligne d'abord : si elle s'exécute en même temps sur la même pièce, le moteur
+            // interrompt l'une des deux transactions (sans incohérence). La garde de la ventilation
+            // (Task 8c) lui donnera l'ordre ligne puis affectations, et supprimera cet écart.
+            $this->exerciceService->assertOuvertVerrouille(
+                $this->exerciceService->anneeForDate(CarbonImmutable::parse($transaction->date))
+            );
+            $this->rattachement->assertPieceNonGelee($transaction);
+
             // Nettoyage T2 (encaissement/règlement séparé) si elle existe — symétrique
             // avec annuler() : sans ça, supprimer une transaction réglée laisserait une
             // T2 orpheline et un lettrage pendant dans le grand livre.
@@ -839,6 +876,15 @@ final class TransactionService
         }
 
         DB::transaction(function () use ($transaction, $motif) {
+            // 0. Mêmes premiers verrous que update() et delete() : l'exercice de la pièce, puis la garde du
+            // rattachement (lots 401/411, pièce, lignes, rattachements). Une pièce dont une ligne est
+            // rattachée, ou qui est elle-même une écriture de rattachement, n'est pas annulée. La suite
+            // des verrous est celle de delete() (voir son commentaire).
+            $this->exerciceService->assertOuvertVerrouille(
+                $this->exerciceService->anneeForDate(CarbonImmutable::parse($transaction->date))
+            );
+            $this->rattachement->assertPieceNonGelee($transaction);
+
             // 1. Nettoyage T2 (encaissement/règlement séparé) si elle existe
             $this->supprimerT2SiExiste($transaction);
 
@@ -1238,46 +1284,5 @@ final class TransactionService
     {
         $motif = "Auto-délettrage suite à update de TX#{$transaction->id}";
         $this->lettrageService->autoDelettrerLignesDe($transaction, $motif);
-    }
-
-    /**
-     * Verrouille les lots canoniques 401/411 de la T1 avant de verrouiller son
-     * en-tête, conformément à l'ordre utilisé par les règlements tiers.
-     */
-    private function verrouillerPostesTiersEtTransaction(Transaction $transaction): Transaction
-    {
-        $lignesTiers = TransactionLigne::query()
-            ->where('transaction_id', (int) $transaction->id)
-            ->whereHas('compte', fn ($query) => $query->whereIn('numero_pcg', ['401', '411']))
-            ->orderBy('id')
-            ->get(['id', 'poste_tiers_parent_id']);
-
-        $lignesCanoniquesIds = $lignesTiers
-            ->map(
-                static fn (TransactionLigne $ligne): int => (int) (
-                    $ligne->poste_tiers_parent_id ?? $ligne->id
-                )
-            )
-            ->unique()
-            ->sort()
-            ->values();
-
-        foreach ($lignesCanoniquesIds as $ligneCanoniqueId) {
-            TransactionLigne::query()
-                ->withTrashed()
-                ->where(function ($query) use ($ligneCanoniqueId): void {
-                    $query
-                        ->whereKey((int) $ligneCanoniqueId)
-                        ->orWhere('poste_tiers_parent_id', (int) $ligneCanoniqueId);
-                })
-                ->orderBy('id')
-                ->lockForUpdate()
-                ->get();
-        }
-
-        return Transaction::query()
-            ->whereKey((int) $transaction->id)
-            ->lockForUpdate()
-            ->firstOrFail();
     }
 }
