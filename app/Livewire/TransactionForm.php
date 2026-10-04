@@ -390,6 +390,9 @@ final class TransactionForm extends Component
 
     public function addLigne(): void
     {
+        // Le message d'un refus précédent (removeLigne) ne doit pas rester affiché après un autre geste.
+        $this->resetErrorBag('lignes');
+
         $this->lignes[] = [
             'id' => null,
             'compte_id' => '',
@@ -407,10 +410,13 @@ final class TransactionForm extends Component
 
     public function removeLigne(int $index): void
     {
+        // Le message d'un refus précédent ne doit pas rester affiché après un autre geste.
+        $this->resetErrorBag('lignes');
+
         // Retour immédiat, pas la garde : retirer une ligne du formulaire ne touche pas la base,
-        // la suppression réelle n'a lieu qu'à l'enregistrement (TransactionService::update(), gardé
-        // à part). Une lecture simple, hors transaction, suffit donc à prévenir tout de suite.
-        // Seule la ligne rattachée est refusée ici, non ses lignes sœurs : l'enregistrement
+        // la suppression réelle n'a lieu qu'à l'enregistrement (TransactionService::update(), que
+        // la Task 8 gardera). Une lecture simple, hors transaction, suffit donc à prévenir tout de
+        // suite. Seule la ligne rattachée est refusée ici, non ses lignes sœurs : l'enregistrement
         // refusera de toute façon une pièce dont une ligne est rattachée (spec § 7).
         $ligneId = $this->lignes[$index]['id'] ?? null;
 

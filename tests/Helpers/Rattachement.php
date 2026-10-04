@@ -69,7 +69,7 @@ function impactSurLeResultat(Transaction $ecriture): float
  *
  * @return list<object>
  */
-function verrouRequetesDeLaTransaction(Closure $action): array
+function rattachementRequetesDeLaTransaction(Closure $action): array
 {
     $niveauAvant = DB::transactionLevel();
     $requetes = [];
@@ -91,9 +91,9 @@ function verrouRequetesDeLaTransaction(Closure $action): array
  *
  * @return list<object>
  */
-function serviceRattachementRequetesAvantEcriture(Closure $action): array
+function rattachementRequetesAvantEcriture(Closure $action): array
 {
-    $requetes = verrouRequetesDeLaTransaction($action);
+    $requetes = rattachementRequetesDeLaTransaction($action);
 
     $premiereEcriture = collect($requetes)->search(
         fn ($requete) => preg_match('/^\s*(insert|update|delete)\b/i', $requete->sql) === 1
@@ -105,12 +105,13 @@ function serviceRattachementRequetesAvantEcriture(Closure $action): array
 
 /**
  * L'indice de la première requête qui lit $table (et, si $annee est donné, la porte dans ses
- * paramètres). Lève si aucune ne le fait : un verrou absent ne doit pas passer pour un verrou
- * tardif.
+ * paramètres). Lève si aucune ne le fait : une lecture absente ne doit pas passer pour une lecture
+ * tardive. Les requêtes examinées sont celles reçues : tronquées à la première écriture par
+ * rattachementRequetesAvantEcriture(), ou non.
  *
  * @param  list<object>  $requetes
  */
-function serviceRattachementIndiceDeLaPremiere(array $requetes, string $table, ?int $annee = null): int
+function rattachementIndiceDeLaPremiere(array $requetes, string $table, ?int $annee = null): int
 {
     foreach ($requetes as $i => $requete) {
         $cible = preg_match('/from\s+[`"]?(\w+)[`"]?/i', $requete->sql, $m) === 1 ? $m[1] : '?';
@@ -120,5 +121,7 @@ function serviceRattachementIndiceDeLaPremiere(array $requetes, string $table, ?
         }
     }
 
-    throw new RuntimeException("Aucun verrou sur {$table}".($annee !== null ? " ({$annee})" : '').' avant la première écriture.');
+    throw new RuntimeException(
+        "Aucune requête sur {$table}".($annee !== null ? " ({$annee})" : '').' parmi les '.count($requetes).' requêtes examinées.'
+    );
 }

@@ -108,50 +108,17 @@ function serviceRattachementAssertRefusee(TransactionLigne $ligne, string $fragm
 
 /**
  * Une pièce équilibrée, prête à être annulée : une ligne de produit au crédit et un 411 au
- * débit (classe 7), ou une ligne de charge au débit et un 401 au crédit (classe 6). Datée
- * du 2026-04-08, avec un mode de paiement (l'annulation en exige un).
+ * débit (classe 7, 175 €), ou une ligne de charge au débit et un 401 au crédit (classe 6, 90 €).
+ * Datée du 2026-04-08, avec un mode de paiement (l'annulation en exige un). Fabriquée par
+ * LigneOrigineHelper::ligneOrigineEquilibree().
  *
  * @return array{origine: TransactionLigne, piece: Transaction} la ligne 6/7 et sa pièce
  */
-function serviceRattachementPieceAAnnuler(int $classe): array
+function serviceRattachementPieceAAnnuler(object $test, int $classe): array
 {
-    $assocId = (int) TenantContext::currentId();
-    $estProduit = $classe === 7;
-    $montant = $estProduit ? 175.0 : 90.0;
-    $compteResultat = ($estProduit ? Compte::factory()->recette() : Compte::factory()->depense())
-        ->create(['association_id' => $assocId, 'actif' => true]);
-    $compteTiers = Compte::where('numero_pcg', $estProduit ? '411' : '401')->firstOrFail();
+    $origine = $test->ligneOrigineEquilibree($classe, $classe === 7 ? 175.0 : 90.0, ModePaiement::Virement);
 
-    $piece = Transaction::create([
-        'association_id' => $assocId,
-        'type' => $estProduit ? TypeTransaction::Recette : TypeTransaction::Depense,
-        'date' => '2026-04-08',
-        'libelle' => 'Pièce à annuler',
-        'montant_total' => $montant,
-        'mode_paiement' => ModePaiement::Virement,
-        'saisi_par' => auth()->id(),
-        'equilibree' => true,
-        'type_ecriture' => 'normale',
-        'journal' => $estProduit ? JournalComptable::Vente : JournalComptable::Achat,
-    ]);
-    $ligneResultat = TransactionLigne::create([
-        'transaction_id' => $piece->id,
-        'compte_id' => $compteResultat->id,
-        'debit' => $estProduit ? 0 : $montant,
-        'credit' => $estProduit ? $montant : 0,
-        'montant' => $montant,
-        'libelle' => 'Ligne d’origine',
-    ]);
-    TransactionLigne::create([
-        'transaction_id' => $piece->id,
-        'compte_id' => $compteTiers->id,
-        'debit' => $estProduit ? $montant : 0,
-        'credit' => $estProduit ? 0 : $montant,
-        'montant' => $montant,
-        'libelle' => 'Contrepartie',
-    ]);
-
-    return ['origine' => $ligneResultat, 'piece' => $piece];
+    return ['origine' => $origine, 'piece' => Transaction::findOrFail($origine->transaction_id)];
 }
 
 /**
@@ -174,9 +141,9 @@ function serviceRattachementAnnuler(Transaction $piece, string $dateAnnulation):
  * @return array{origine: TransactionLigne, miroir: TransactionLigne, extourne: Extourne} la ligne
  *                                                                                        6/7 de la pièce annulée, celle de l'annulation, et l'enregistrement
  */
-function serviceRattachementPieceAnnulee(int $classe, string $dateAnnulation): array
+function serviceRattachementPieceAnnulee(object $test, int $classe, string $dateAnnulation): array
 {
-    ['origine' => $origine, 'piece' => $piece] = serviceRattachementPieceAAnnuler($classe);
+    ['origine' => $origine, 'piece' => $piece] = serviceRattachementPieceAAnnuler($test, $classe);
     $extourne = serviceRattachementAnnuler($piece, $dateAnnulation);
 
     $miroir = TransactionLigne::where('transaction_id', $extourne->transaction_extourne_id)
@@ -357,7 +324,7 @@ describe('RattachementExerciceService : éligibilité (motifDeRefus)', function 
     })->with('rattachement_pca_cca');
 
     test('D13 — la pièce annulée au plus tard le dernier jour de N, même avant sa propre date, est refusée', function (int $classe, string $dateAnnulation) {
-        ['origine' => $ligneOrigine] = serviceRattachementPieceAnnulee($classe, $dateAnnulation);
+        ['origine' => $ligneOrigine] = serviceRattachementPieceAnnulee($this, $classe, $dateAnnulation);
 
         serviceRattachementAssertRefusee($ligneOrigine, 'annulée avant la fin de son exercice');
     })->with([
@@ -368,7 +335,7 @@ describe('RattachementExerciceService : éligibilité (motifDeRefus)', function 
     ]);
 
     test('D13 — la pièce annulée dans l’exercice N+1 reste rattachable : motif nul, et rattacher() réussit', function (int $classe, string $dateAnnulation) {
-        ['origine' => $ligneOrigine] = serviceRattachementPieceAnnulee($classe, $dateAnnulation);
+        ['origine' => $ligneOrigine] = serviceRattachementPieceAnnulee($this, $classe, $dateAnnulation);
         $service = app(RattachementExerciceService::class);
 
         // La prémisse : la pièce est bien annulée, extournee_at est posé (à now(), dans N).
@@ -389,7 +356,7 @@ describe('RattachementExerciceService : éligibilité (motifDeRefus)', function 
     ]);
 
     test('D13 — la ligne de l’annulation elle-même est refusée, quelle que soit la date de l’annulation', function (int $classe, string $dateAnnulation) {
-        ['miroir' => $ligneMiroir] = serviceRattachementPieceAnnulee($classe, $dateAnnulation);
+        ['miroir' => $ligneMiroir] = serviceRattachementPieceAnnulee($this, $classe, $dateAnnulation);
 
         // La prémisse : le miroir est bien une annulation, sur le même compte de produit ou de charge.
         expect($ligneMiroir->transaction->type_ecriture)->toBe('extourne');
@@ -409,7 +376,7 @@ describe('RattachementExerciceService : éligibilité (motifDeRefus)', function 
             expect(Extourne::count())->toBe(0);
         } else {
             // L'enregistrement existe, mais la pièce miroir a été supprimée.
-            ['origine' => $ligne, 'miroir' => $ligneMiroir] = serviceRattachementPieceAnnulee(7, '2026-09-01');
+            ['origine' => $ligne, 'miroir' => $ligneMiroir] = serviceRattachementPieceAnnulee($this, 7, '2026-09-01');
             $ligneMiroir->transaction->delete();
             expect(Extourne::count())->toBe(1);
         }
@@ -436,7 +403,7 @@ describe('RattachementExerciceService : éligibilité (motifDeRefus)', function 
             $compte = Compte::where('numero_pcg', '411')->firstOrFail();
             $ligne = serviceRattachementLigne($compte, 175.0, 0.0, TypeTransaction::Recette, JournalComptable::Od);
         } else {
-            ['origine' => $ligneProduit] = serviceRattachementPieceAnnulee(7, '2026-04-20');
+            ['origine' => $ligneProduit] = serviceRattachementPieceAnnulee($this, 7, '2026-04-20');
             $ligne = TransactionLigne::where('transaction_id', $ligneProduit->transaction_id)
                 ->where('id', '!=', $ligneProduit->id)
                 ->sole();
@@ -638,21 +605,21 @@ describe('RattachementExerciceService : création', function () {
 
         // Seules comptent les requêtes qui précèdent la première écriture : les verrous
         // sont posés avant que l'écriture de rattachement ne commence.
-        $avantEcriture = serviceRattachementRequetesAvantEcriture(
+        $avantEcriture = rattachementRequetesAvantEcriture(
             fn () => app(RattachementExerciceService::class)->rattacher($ligne, null, $this->user)
         );
 
         $indices = [
-            'association' => serviceRattachementIndiceDeLaPremiere($avantEcriture, 'association'),
-            'exercice N' => serviceRattachementIndiceDeLaPremiere($avantEcriture, 'exercices', 2025),
-            'exercice N+1' => serviceRattachementIndiceDeLaPremiere($avantEcriture, 'exercices', 2026),
-            'pièce' => serviceRattachementIndiceDeLaPremiere($avantEcriture, 'transactions'),
-            'ligne' => serviceRattachementIndiceDeLaPremiere($avantEcriture, 'transaction_lignes'),
+            'association' => rattachementIndiceDeLaPremiere($avantEcriture, 'association'),
+            'exercice N' => rattachementIndiceDeLaPremiere($avantEcriture, 'exercices', 2025),
+            'exercice N+1' => rattachementIndiceDeLaPremiere($avantEcriture, 'exercices', 2026),
+            'pièce' => rattachementIndiceDeLaPremiere($avantEcriture, 'transactions'),
+            'ligne' => rattachementIndiceDeLaPremiere($avantEcriture, 'transaction_lignes'),
             // L'éligibilité est rejugée sous verrou : les affectations, que ni la pièce ni la
             // ligne ne protègent, se lisent elles aussi sous verrou, puis « déjà rattachée ».
-            'affectations' => serviceRattachementIndiceDeLaPremiere($avantEcriture, 'transaction_ligne_affectations'),
+            'affectations' => rattachementIndiceDeLaPremiere($avantEcriture, 'transaction_ligne_affectations'),
             // « Déjà rattachée », relu sous les verrous : après la ligne, avant l'écriture.
-            'recontrôle' => serviceRattachementIndiceDeLaPremiere($avantEcriture, 'provisions'),
+            'recontrôle' => rattachementIndiceDeLaPremiere($avantEcriture, 'provisions'),
         ];
 
         // Strictement croissants : chaque verrou est pris après le précédent.
@@ -772,7 +739,7 @@ describe('RattachementExerciceService : création', function () {
     });
 
     test('I1 — l’éligibilité est rejugée sur la pièce verrouillée : annulée (vraie annulation, ou date introuvable), ou passée en journal d’opérations diverses, entre-temps', function (string $cas, string $fragment) {
-        ['origine' => $ligne, 'piece' => $piece] = serviceRattachementPieceAAnnuler(7);
+        ['origine' => $ligne, 'piece' => $piece] = serviceRattachementPieceAAnnuler($this, 7);
         $transactionsAvant = DB::table('transactions')->count();
 
         // Prémisse : avant le changement, la ligne est rattachable.
@@ -1176,7 +1143,7 @@ describe('RattachementExerciceService : retrait', function () {
         // sous le scope tenant, avant tout verrou. Sans cette assertion, le test passerait aussi
         // quand la résolution ne filtre pas : retirer() relit alors le rattachement sous le même
         // scope et lève le même message, après avoir ouvert une transaction et pris des verrous.
-        $requetes = verrouRequetesDeLaTransaction(
+        $requetes = rattachementRequetesDeLaTransaction(
             fn () => expect(fn () => app(RattachementExerciceService::class)->retirerParId((int) $provision->id))
                 ->toThrow(RuntimeException::class, 'Ce rattachement n’existe plus : il a peut-être déjà été retiré. Rechargez la page.')
         );
@@ -1260,20 +1227,20 @@ describe('RattachementExerciceService : retrait', function () {
         $ligne = $this->ligneOrigine(7, 175.0);
         $provision = serviceRattachementRattachee($ligne);
 
-        $avantEcriture = serviceRattachementRequetesAvantEcriture(
+        $avantEcriture = rattachementRequetesAvantEcriture(
             fn () => app(RattachementExerciceService::class)->retirer($provision)
         );
 
         $indices = [
-            'association' => serviceRattachementIndiceDeLaPremiere($avantEcriture, 'association'),
-            'exercice N' => serviceRattachementIndiceDeLaPremiere($avantEcriture, 'exercices', 2025),
-            'exercice N+1' => serviceRattachementIndiceDeLaPremiere($avantEcriture, 'exercices', 2026),
-            'pièce' => serviceRattachementIndiceDeLaPremiere($avantEcriture, 'transactions'),
-            'ligne' => serviceRattachementIndiceDeLaPremiere($avantEcriture, 'transaction_lignes'),
+            'association' => rattachementIndiceDeLaPremiere($avantEcriture, 'association'),
+            'exercice N' => rattachementIndiceDeLaPremiere($avantEcriture, 'exercices', 2025),
+            'exercice N+1' => rattachementIndiceDeLaPremiere($avantEcriture, 'exercices', 2026),
+            'pièce' => rattachementIndiceDeLaPremiere($avantEcriture, 'transactions'),
+            'ligne' => rattachementIndiceDeLaPremiere($avantEcriture, 'transaction_lignes'),
             // Le rattachement en dernier, comme rattacher() et les gardes des Tasks 7 à 9, qui
             // lisent `provisions` après la pièce et la ligne : le verrouiller d'abord
             // s'inter-bloquerait avec elles.
-            'rattachement' => serviceRattachementIndiceDeLaPremiere($avantEcriture, 'provisions'),
+            'rattachement' => rattachementIndiceDeLaPremiere($avantEcriture, 'provisions'),
         ];
 
         // Strictement croissants : chaque verrou est pris après le précédent.
@@ -1298,14 +1265,14 @@ describe('RattachementExerciceService : retrait', function () {
         Transaction::findOrFail($pieceId)->delete();
         $ligne->delete();
 
-        $avantEcriture = serviceRattachementRequetesAvantEcriture(
+        $avantEcriture = rattachementRequetesAvantEcriture(
             fn () => app(RattachementExerciceService::class)->retirer($provision)
         );
 
         $indices = [
-            'pièce' => serviceRattachementIndiceDeLaPremiere($avantEcriture, 'transactions'),
-            'ligne' => serviceRattachementIndiceDeLaPremiere($avantEcriture, 'transaction_lignes'),
-            'rattachement' => serviceRattachementIndiceDeLaPremiere($avantEcriture, 'provisions'),
+            'pièce' => rattachementIndiceDeLaPremiere($avantEcriture, 'transactions'),
+            'ligne' => rattachementIndiceDeLaPremiere($avantEcriture, 'transaction_lignes'),
+            'rattachement' => rattachementIndiceDeLaPremiere($avantEcriture, 'provisions'),
         ];
 
         // Même ordre qu'avec une origine intacte. Une pièce que la lecture hors transaction n'aurait

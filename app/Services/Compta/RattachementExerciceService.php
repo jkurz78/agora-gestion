@@ -32,9 +32,14 @@ use RuntimeException;
  * dont l'exercice, ou le suivant, est clôturé est donc refusée par rattacher() sans que
  * motifDeRefus() l'ait écartée.
  *
+ * Le VERROU d'une ligne rattachée (§ 7) vit ici aussi : les gestes qui écrivent sur une pièce
+ * dont une ligne est rattachée s'y réfèrent par assertLigneNonGelee() (une ligne) et
+ * assertPieceNonGelee() (la pièce entière), plutôt que de relire eux-mêmes les rattachements.
+ * Elles refusent par défaut et partagent le message MOTIF_PIECE_GELEE.
+ *
  * Référence : docs/specs/2026-09-30-provisions-rattachement-exercice-design.md
  * (D4, D9, D13, D14 pour les gardes ; § 5 pour les verrous d'exercice ; § 7 pour
- * la résolution de la ligne).
+ * la résolution de la ligne et le verrou).
  */
 final class RattachementExerciceService
 {
@@ -42,9 +47,10 @@ final class RattachementExerciceService
     public const MOTIF_AFFECTATIONS = 'Cette ligne est ventilée sur des opérations : son rattachement n’est pas encore pris en charge.';
 
     /**
-     * Le message unique du verrou (spec § 7), partagé par TOUS les sites qui refusent d'écrire
-     * sur une pièce dont une ligne est rattachée : reclassement, retrait de ligne, édition,
-     * suppression, annulation, extourne, ventilation, synchronisation HelloAsso. Il nomme le
+     * Le message unique du verrou (spec § 7), destiné à TOUS les sites qui refusent d'écrire sur
+     * une pièce dont une ligne est rattachée : reclassement, retrait de ligne, édition, suppression,
+     * annulation, extourne, ventilation, synchronisation HelloAsso. Posé aujourd'hui sur le
+     * reclassement et le retrait de ligne ; les autres sites suivent (Tasks 8 et 9). Il nomme le
      * constat, l'écran où se défait le rattachement et la sortie : le retirer, corriger, le
      * repasser. Un site qui en formulerait un autre rendrait le refus illisible d'un écran à l'autre.
      */
@@ -66,7 +72,7 @@ final class RattachementExerciceService
 
     private const MOTIF_PIECE_REDATEE = 'La date de la pièce a changé entre-temps : elle n’appartient plus au même exercice. Rechargez la page.';
 
-    private const MOTIF_DEJA_RETIRE = 'Ce rattachement n’existe plus : il a peut-être déjà été retiré. Rechargez la page.';
+    private const MOTIF_RATTACHEMENT_INTROUVABLE = 'Ce rattachement n’existe plus : il a peut-être déjà été retiré. Rechargez la page.';
 
     private const MOTIF_RETRAIT_SAISIE_LIBRE = 'Ce rattachement est une saisie libre : son retrait n’est pas encore pris en charge.';
 
@@ -325,7 +331,7 @@ final class RattachementExerciceService
         $provision = Provision::find($provisionId);
 
         if ($provision === null) {
-            throw new RuntimeException(self::MOTIF_DEJA_RETIRE);
+            throw new RuntimeException(self::MOTIF_RATTACHEMENT_INTROUVABLE);
         }
 
         $this->retirer($provision);
@@ -403,7 +409,7 @@ final class RattachementExerciceService
             $verrouille = Provision::query()->whereKey($provisionId)->lockForUpdate()->first();
 
             if ($verrouille === null) {
-                throw new RuntimeException(self::MOTIF_DEJA_RETIRE);
+                throw new RuntimeException(self::MOTIF_RATTACHEMENT_INTROUVABLE);
             }
 
             // Les écritures d'abord : transactions.provision_id étant en nullOnDelete, supprimer le
@@ -423,6 +429,107 @@ final class RattachementExerciceService
             'exercice' => $exercice,
             'montant' => $montant,
         ]);
+    }
+
+    /**
+     * Garde du verrou (spec § 7) pour un geste qui écrit sur UNE ligne : refuse, par le message
+     * unique MOTIF_PIECE_GELEE, si cette ligne porte un rattachement. Les gestes qui touchent la
+     * pièce entière appellent assertPieceNonGelee(). Sites : le reclassement (Task 7) ; la
+     * synchronisation HelloAsso (Task 9).
+     *
+     * À appeler DANS la transaction de l'appelant, APRÈS ses verrous d'exercice : les verrous
+     * pris ici tiennent jusqu'à son commit, et c'est ce qui rend la lecture vraie au moment d'écrire.
+     * Hors transaction, ils se relâchent aussitôt et la garde n'exclut plus rien.
+     *
+     * Ordre des verrous : la ligne, puis les rattachements en lecture verrouillante directe. C'est
+     * une sous-suite de celui de rattacher() et de retirer() (association, N, N+1, pièce, ligne,
+     * rattachements) : pas de cycle possible avec eux. Le verrou de ligne les exclut : un
+     * rattachement validé pendant l'attente est lu au déverrouillage, et un rattachement concurrent
+     * attend la fin de l'appelant.
+     *
+     * REFUSE PAR DÉFAUT : la décision ne dépend que de l'identifiant de l'instance reçue, jamais
+     * d'une relecture de la ligne. Une ligne supprimée logiquement, ou lue hors du contexte
+     * d'association, est introuvable par une lecture ordinaire (suppression logique, scope tenant
+     * fail-closed) : lire la ligne sous verrou et « ne rien trouver » ferait passer la garde, alors
+     * que la clé étrangère du rattachement, elle, ignore tout scope. Les deux lectures lèvent donc
+     * tous les scopes. Le verrou de ligne ne décide de rien : il exclut, et s'il ne trouvait rien,
+     * la lecture des rattachements décide quand même.
+     *
+     * @throws RuntimeException MOTIF_PIECE_GELEE si la ligne porte un rattachement
+     */
+    public function assertLigneNonGelee(TransactionLigne $ligne): void
+    {
+        // Tous scopes levés (suppression logique ET scope tenant) : cette lecture n'en tire aucune
+        // donnée, elle pose le verrou. Un verrou qui ne s'appliquerait pas hors contexte
+        // d'association laisserait rattacher() s'intercaler.
+        TransactionLigne::withoutGlobalScopes()->whereKey((int) $ligne->id)->lockForUpdate()->value('id');
+
+        if ($ligne->estRattacheeSousVerrou()) {
+            throw new RuntimeException(self::MOTIF_PIECE_GELEE);
+        }
+    }
+
+    /**
+     * Garde du verrou (spec § 7) pour un geste qui écrit sur la PIÈCE ENTIÈRE : refuse, par le
+     * message unique MOTIF_PIECE_GELEE, si l'une de ses lignes, supprimée logiquement ou non, porte
+     * un rattachement (une ligne rattachée gèle sa transaction entière). Sites : édition,
+     * suppression, annulation, extourne (Task 8). L'extourne aura une variante datée (D13 : une
+     * annulation datée après N reste permise) : cette garde-ci refuse sans condition de date, et la
+     * Task 8 en décidera.
+     *
+     * À appeler DANS la transaction de l'appelant, APRÈS ses verrous d'exercice (voir
+     * assertLigneNonGelee()).
+     *
+     * Ordre des verrous : la pièce, ses lignes dans l'ordre de leur identifiant, puis UNE lecture
+     * verrouillante directe des rattachements de ces lignes. rattacher() et retirer() prennent la
+     * pièce, puis leur seule ligne, puis les rattachements : même ordre, pas de cycle possible avec
+     * eux, qui attendent en outre la fin de l'appelant dès la pièce. Avec
+     * TransactionService::update(), qui verrouille d'abord le lot 401/411 de la pièce, puis la
+     * pièce (verrouillerPostesTiersEtTransaction()), puis ses lignes : appelée de là, la garde
+     * retrouve le lot et la pièce déjà tenus et enchaîne sur les mêmes ressources dans le même
+     * ordre. RÉSERVE : elle verrouille TOUTES les lignes de la pièce, 401/411 comprises. Un appelant
+     * qui prendrait la pièce SEUL puis appellerait la garde s'inter-bloquerait avec update(), qui
+     * tient le lot et attend la pièce : MySQL interrompt alors l'une des deux transactions, sans
+     * aucune incohérence. Un site de la Task 8 qui prend un lot (règlement tiers) le prend avant la
+     * pièce, comme update().
+     *
+     * REFUSE PAR DÉFAUT : la décision ne dépend que de l'identifiant de l'instance reçue. La
+     * pièce, ses lignes (suppression logique comprise) et les rattachements sont lus tous scopes
+     * levés. Les identifiants des lignes viennent de la lecture verrouillante des lignes, sans aucun
+     * scope : elle lit le dernier état validé, et non le cliché de la transaction, qui peut
+     * précéder une ligne recréée. Tant que l'appelant tient la pièce, aucun rattachement de ses
+     * lignes ne peut être créé ni retiré : rattacher() et retirer() l'attendent.
+     *
+     * @throws RuntimeException MOTIF_PIECE_GELEE si l'une des lignes de la pièce porte un rattachement
+     */
+    public function assertPieceNonGelee(Transaction $piece): void
+    {
+        $pieceId = (int) $piece->id;
+
+        // Tous scopes levés, comme assertLigneNonGelee() : une pièce supprimée logiquement porte
+        // encore ses rattachements, et le verrou doit l'exclure de rattacher() et de retirer().
+        Transaction::withoutGlobalScopes()->whereKey($pieceId)->lockForUpdate()->value('id');
+
+        // Les lignes, supprimées logiquement comprises, dans l'ordre de leur identifiant : deux
+        // appelants qui verrouillent les mêmes lignes ne s'attendent pas l'un l'autre en sens inverse.
+        $ligneIds = TransactionLigne::withoutGlobalScopes()
+            ->where('transaction_id', $pieceId)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->pluck('id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
+
+        // Une pièce sans ligne ne porte aucun rattachement : rien à lire.
+        if ($ligneIds === []) {
+            return;
+        }
+
+        // UNE lecture verrouillante directe, comme estRattacheeSousVerrou() : ni EXISTS, ni une
+        // lecture par ligne.
+        if (Provision::withoutGlobalScopes()->whereIn('transaction_ligne_id', $ligneIds)->lockForUpdate()->value('id') !== null) {
+            throw new RuntimeException(self::MOTIF_PIECE_GELEE);
+        }
     }
 
     /**

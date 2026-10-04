@@ -43,7 +43,10 @@ final class ReclassementLigneService
 
     private const MOTIF_MAX = 255;
 
-    public function __construct(private readonly ExerciceService $exerciceService) {}
+    public function __construct(
+        private readonly ExerciceService $exerciceService,
+        private readonly RattachementExerciceService $rattachement,
+    ) {}
 
     public function reclasser(
         TransactionLigne $ligne,
@@ -127,18 +130,11 @@ final class ReclassementLigneService
             }
 
             // Une ligne rattachée à l'exercice suivant ne se reclasse pas : l'écriture de dotation
-            // porte le compte et l'opération de la ligne, et reclasser ici la laisserait sur
-            // l'ancien compte, donc le compte de résultat divergerait. Même grammaire que le reçu
-            // fiscal : le refus nomme la sortie. La ligne est verrouillée d'abord, puis les
-            // rattachements lus par une lecture verrouillante : une lecture simple lirait le cliché
-            // de la transaction, qui peut précéder un rattachement validé entre-temps. Ordre des
-            // verrous (exercice, ligne, rattachements) : sous-suite de celui de rattacher(), donc
-            // pas de cycle possible entre eux.
-            $ligneVerrouillee = TransactionLigne::whereKey((int) $ligne->id)->lockForUpdate()->first();
-
-            if ($ligneVerrouillee?->estRattacheeSousVerrou()) {
-                throw new RuntimeException(RattachementExerciceService::MOTIF_PIECE_GELEE);
-            }
+            // recopie son compte et son opération, et reclasser ici la laisserait sur l'ancien
+            // compte, donc le compte de résultat divergerait. Même grammaire que le reçu fiscal : le
+            // refus nomme la sortie. La garde (verrou de la ligne, rattachements lus sous verrou,
+            // refus par défaut) vit au service du rattachement.
+            $this->rattachement->assertLigneNonGelee($ligne);
 
             $comptePrecedent = $compteActuel->numero_pcg;
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Support;
 
 use App\Enums\JournalComptable;
+use App\Enums\ModePaiement;
 use App\Enums\TypeTransaction;
 use App\Models\Compte;
 use App\Models\Transaction;
@@ -59,5 +60,43 @@ trait LigneOrigineHelper
             'seance' => $seance,
             'libelle' => 'Ligne d’origine',
         ]);
+    }
+
+    /**
+     * Comme ligneOrigine(), sur une pièce ÉQUILIBRÉE : la ligne d'origine (produit au crédit, classe 7 ;
+     * charge au débit, classe 6) et sa contrepartie, 411 au débit ou 401 au crédit, du même montant.
+     * Une écriture qui vérifie l'équilibre de la pièce (reclassement, annulation) l'exige ; le
+     * rattachement ne l'exige pas.
+     *
+     * La contrepartie est celle de EcritureGenerator : le montant est dans debit / credit, `montant`
+     * vaut 0. Les comptes 411 et 401 sont ceux du seeder système : à poser avant l'appel
+     * (SystemeSeeder::seed()). $mode renseigne le mode de paiement de la pièce (l'annulation en exige un).
+     *
+     * Retourne la ligne d'origine ; sa pièce est `$ligne->transaction`.
+     */
+    public function ligneOrigineEquilibree(
+        int $classe,
+        float $montant = 175.0,
+        ?ModePaiement $mode = null,
+        ?int $operationId = null,
+        ?int $seance = null,
+    ): TransactionLigne {
+        $ligne = $this->ligneOrigine($classe, $montant, $operationId, $seance);
+
+        if ($mode !== null) {
+            Transaction::whereKey((int) $ligne->transaction_id)->firstOrFail()
+                ->forceFill(['mode_paiement' => $mode])->save();
+        }
+
+        TransactionLigne::create([
+            'transaction_id' => $ligne->transaction_id,
+            'compte_id' => Compte::where('numero_pcg', $classe === 7 ? '411' : '401')->firstOrFail()->id,
+            'debit' => $classe === 7 ? $montant : 0,
+            'credit' => $classe === 6 ? $montant : 0,
+            'montant' => 0,
+            'libelle' => 'Contrepartie',
+        ]);
+
+        return $ligne;
     }
 }
