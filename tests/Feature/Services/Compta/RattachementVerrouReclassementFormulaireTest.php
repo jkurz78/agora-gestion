@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Enums\ModePaiement;
+use App\Enums\StatutOperation;
 use App\Livewire\TransactionForm;
+use App\Models\Operation;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -12,6 +15,7 @@ use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\Compta\RattachementExerciceService;
 use App\Services\TransactionService;
 use App\Tenant\TenantContext;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
@@ -307,7 +311,7 @@ describe('TransactionForm::edit() : une pièce rattachée s\'ouvre gelée', func
     // Le gel de l'ouverture est une PRÉVENTION : il épargne à l'utilisateur de saisir ce que l'enregistrement
     // refusera. L'autorité reste au service (verrouillerPieceNonGelee(), sous verrou) ; le formulaire, lui, lit
     // sans verrou. Il porte sur la pièce entière, comme l'enregistrement qu'il prévient.
-    test('affiche le motif dès l\'ouverture d\'une pièce dont une ligne est rattachée, et désactive l\'enregistrement', function (int $classe) {
+    test('affiche le motif dès l\'ouverture d\'une pièce dont une ligne est rattachée, et passe en lecture seule : plus de bouton d\'enregistrement', function (int $classe) {
         $ligne = $this->ligneOrigineEquilibree($classe);
         verrouRattacherAvecEcritures($this, $ligne);
 
@@ -317,8 +321,8 @@ describe('TransactionForm::edit() : une pièce rattachée s\'ouvre gelée', func
             ->assertSee(GelRattachement::MOTIF_PIECE_GELEE)
             ->assertDontSee(GelRattachement::MOTIF_ECRITURE_DE_RATTACHEMENT);
 
-        expect(verrouOccurrencesDuMotif($formulaire, GelRattachement::MOTIF_PIECE_GELEE))->toBe(1)
-            ->and(verrouBoutonEnregistrer($formulaire))->toContain('disabled');
+        expect(verrouOccurrencesDuMotif($formulaire, GelRattachement::MOTIF_PIECE_GELEE))->toBe(1);
+        verrouAssertLectureSeule($formulaire);
     })->with('rattachement_classes');
 
     test('gèle la pièce entière : la ligne sœur d\'une ligne rattachée ne rend pas la pièce libre', function () {
@@ -327,7 +331,7 @@ describe('TransactionForm::edit() : une pièce rattachée s\'ouvre gelée', func
         $formulaire = Livewire::test(TransactionForm::class)->call('edit', (int) $piece->id)
             ->assertSee(GelRattachement::MOTIF_PIECE_GELEE);
 
-        expect(verrouBoutonEnregistrer($formulaire))->toContain('disabled');
+        verrouAssertLectureSeule($formulaire);
     });
 
     test('gèle une écriture de rattachement, dotation ou extourne générée : son propre motif', function (int $classe, string $ecriture) {
@@ -337,13 +341,13 @@ describe('TransactionForm::edit() : une pièce rattachée s\'ouvre gelée', func
             ->assertSee(GelRattachement::MOTIF_ECRITURE_DE_RATTACHEMENT)
             ->assertDontSee(GelRattachement::MOTIF_PIECE_GELEE);
 
-        expect(verrouBoutonEnregistrer($formulaire))->toContain('disabled');
+        verrouAssertLectureSeule($formulaire);
     })->with('rattachement_classes')->with([
         'la dotation' => ['normale'],
         'l\'extourne' => ['extourne'],
     ]);
 
-    test('save() refuse côté serveur, avant toute validation, et sans rien écrire : le bouton désactivé ne suffit pas', function (int $classe) {
+    test('save() refuse côté serveur, avant toute validation, et sans rien écrire : l\'absence du bouton ne suffit pas', function (int $classe) {
         $ligne = $this->ligneOrigineEquilibree($classe);
         $provision = verrouRattacherAvecEcritures($this, $ligne);
         $avant = verrouEmpreinte($ligne, $provision);
@@ -375,7 +379,7 @@ describe('TransactionForm::edit() : une pièce rattachée s\'ouvre gelée', func
             ->and(verrouEmpreinte($origine, $provision))->toBe($avant);
     });
 
-    test('ne gèle pas une pièce libre, alors qu\'un rattachement existe sur une autre pièce : ni motif, ni bouton désactivé', function () {
+    test('ne gèle pas une pièce libre, alors qu\'un rattachement existe sur une autre pièce : ni motif, ni lecture seule', function () {
         verrouRattacherAvecEcritures($this, $this->ligneOrigineEquilibree(7));
         $libre = $this->ligneOrigineEquilibree(7);
 
@@ -383,7 +387,7 @@ describe('TransactionForm::edit() : une pièce rattachée s\'ouvre gelée', func
             ->assertDontSee(GelRattachement::MOTIF_PIECE_GELEE)
             ->assertDontSee(GelRattachement::MOTIF_ECRITURE_DE_RATTACHEMENT);
 
-        expect(verrouBoutonEnregistrer($formulaire))->not->toContain('disabled');
+        verrouAssertEditable($formulaire);
     });
 
     test('enregistre une pièce libre : le refus préalable ne bloque que la pièce gelée', function () {
@@ -406,13 +410,13 @@ describe('TransactionForm::edit() : une pièce rattachée s\'ouvre gelée', func
 
         $formulaire = Livewire::test(TransactionForm::class)->call('edit', (int) $ligne->transaction_id)
             ->assertSee(GelRattachement::MOTIF_PIECE_GELEE);
-        expect(verrouBoutonEnregistrer($formulaire))->toContain('disabled');
+        verrouAssertLectureSeule($formulaire);
 
         app(RattachementExerciceService::class)->retirer($provision);
 
         $formulaire->call('edit', (int) $ligne->transaction_id)
             ->assertDontSee(GelRattachement::MOTIF_PIECE_GELEE);
-        expect(verrouBoutonEnregistrer($formulaire))->not->toContain('disabled');
+        verrouAssertEditable($formulaire);
     });
 
     test('save() relit le gel : un rattachement posé depuis l\'ouverture refuse, un rattachement retiré depuis l\'ouverture ne bloque plus', function () {
@@ -424,7 +428,7 @@ describe('TransactionForm::edit() : une pièce rattachée s\'ouvre gelée', func
 
         $formulaire->set('tiers_id', null)->call('save')->assertHasNoErrors('tiers_id');
         expect($formulaire->errors()->get('lignes'))->toBe([GelRattachement::MOTIF_PIECE_GELEE]);
-        expect(verrouBoutonEnregistrer($formulaire))->toContain('disabled');
+        verrouAssertLectureSeule($formulaire);
 
         // Retiré après l'ouverture : le motif affiché est périmé, save() ne s'y fie pas et enregistre.
         app(RattachementExerciceService::class)->retirer($provision);
@@ -455,7 +459,7 @@ describe('TransactionForm::edit() : une pièce rattachée s\'ouvre gelée', func
             $libre = $this->ligneOrigineEquilibree(7);
             $formulaire->call('edit', (int) $libre->transaction_id)->assertDontSee(GelRattachement::MOTIF_PIECE_GELEE);
         } else {
-            expect(verrouBoutonEnregistrer($formulaire))->not->toContain('disabled');
+            verrouAssertEditable($formulaire);
         }
     })->with([
         'une nouvelle saisie' => ['showNewForm'],
@@ -502,5 +506,184 @@ describe('TransactionForm : la ventilation d\'une pièce gelée ne refuse que la
 
         expect($formulaire->errors()->get('affectations'))->toBe([GelRattachement::MOTIF_PIECE_GELEE])
             ->and(verrouEmpreinte($ligne, $provision))->toBe($avant);
+    });
+});
+
+/**
+ * Une pièce à une ligne (produit, sur une opération de trois séances), rattachée si $gelee. Le formulaire est ouvert
+ * dessus, avec un règlement « reçu » pour que les champs de règlement soient rendus.
+ */
+function verrouFormulaireDeLaPiece(object $test, bool $gelee): array
+{
+    $operation = Operation::factory()->create(['nombre_seances' => 3, 'statut' => StatutOperation::EnCours]);
+    $ligne = $test->ligneOrigineEquilibree(7, 175.0, ModePaiement::Virement, (int) $operation->id);
+
+    if ($gelee) {
+        verrouRattacherAvecEcritures($test, $ligne);
+    }
+
+    $formulaire = Livewire::test(TransactionForm::class)
+        ->call('edit', (int) $ligne->transaction_id)
+        ->set('paiementRecu', true);
+
+    return [$formulaire, $ligne];
+}
+
+describe('TransactionForm : une pièce gelée s\'affiche en LECTURE SEULE, comme un exercice clôturé', function () {
+    // Rien ne s'enregistrera sur une pièce gelée : le formulaire ne propose donc rien à saisir. Seuls restent offerts les
+    // gestes sur UNE ligne (« Ventiler »), que le gel laisse ouverts sur les lignes sœurs (spec § 7). Ces tests lisent le
+    // HTML rendu : c'est ce que l'utilisateur voit, et la seule façon de savoir ce qu'il peut atteindre.
+
+    $champs = [
+        'référence' => 'reference',
+        'libellé' => 'libelle',
+        'notes' => 'notes',
+        'paiement reçu (oui / non)' => 'paiementRecu',
+        'mode de paiement' => 'mode_paiement',
+        'compte bancaire' => 'compte_id',
+        'opération de la ligne' => 'lignes.0.operation_id',
+        'séance de la ligne' => 'lignes.0.seance',
+        'montant de la ligne' => 'lignes.0.montant',
+        'notes de la ligne' => 'lignes.0.notes',
+    ];
+
+    test('désactive chaque champ de la pièce gelée, et aucun d\'une pièce libre', function (string $propriete) {
+        [$gelee] = verrouFormulaireDeLaPiece($this, true);
+        [$libre] = verrouFormulaireDeLaPiece($this, false);
+
+        expect(verrouChampDesactive($gelee, $propriete))->toBeTrue()
+            ->and(verrouChampDesactive($libre, $propriete))->toBeFalse();
+    })->with($champs);
+
+    test('rend les deux dates en lecture seule sur une pièce gelée, et choisissables sur une pièce libre', function () {
+        [$gelee] = verrouFormulaireDeLaPiece($this, true);
+        [$libre] = verrouFormulaireDeLaPiece($this, false);
+
+        $dateReglement = Carbon::parse($gelee->get('dateReglement'))->format('d/m/Y');
+        // Le champ rendu pour une date désactivée (composant x-date-input), sur plusieurs lignes.
+        $champDate = fn (string $valeur): string => '/<input type="text"\s+value="'.preg_quote($valeur, '/').'"\s+class="form-control bg-light" disabled>/';
+
+        // La date de la pièce (08/04/2026) et celle du règlement : des champs désactivés, non des sélecteurs de date.
+        expect(preg_match($champDate('08/04/2026'), $gelee->html()))->toBe(1)
+            ->and(preg_match($champDate($dateReglement), $gelee->html()))->toBe(1)
+            ->and($gelee->html())->not->toContain('class="input-group" wire:ignore');
+        expect(preg_match($champDate('08/04/2026'), $libre->html()))->toBe(0)
+            ->and(preg_match($champDate($dateReglement), $libre->html()))->toBe(0)
+            ->and(substr_count($libre->html(), 'class="input-group" wire:ignore'))->toBe(2);
+    });
+
+    test('ne propose ni le tiers ni le compte de la ligne à la saisie : leur sélecteur est remplacé par leur valeur', function () {
+        [$gelee] = verrouFormulaireDeLaPiece($this, true);
+        [$libre] = verrouFormulaireDeLaPiece($this, false);
+
+        // Les sélecteurs sont des composants enfants : on lit leur présence dans le rendu.
+        expect($gelee->html())->not->toContain('wire:name="tiers-autocomplete"')
+            ->not->toContain('wire:name="compte-autocomplete"');
+        expect($libre->html())->toContain('wire:name="tiers-autocomplete"')
+            ->toContain('wire:name="compte-autocomplete"');
+
+        // Le tiers porte le cadenas des champs verrouillés, la pièce libre non.
+        $cadenasDuTiers = '/Tiers <span class="text-danger">\*<\/span>(?:\s|<!--\[if (?:END)?BLOCK\]><!\[endif\]-->)*<i class="bi bi-lock text-warning"/';
+        expect(preg_match($cadenasDuTiers, $gelee->html()))->toBe(1)
+            ->and(preg_match($cadenasDuTiers, $libre->html()))->toBe(0);
+    });
+
+    test('ne propose ni « Ajouter une ligne » ni le retrait d\'une ligne, alors qu\'une pièce libre les offre', function () {
+        [$gelee] = verrouFormulaireDeLaPiece($this, true);
+        [$libre] = verrouFormulaireDeLaPiece($this, false);
+
+        $gelee->assertDontSee('Ajouter une ligne');
+        expect($gelee->html())->not->toContain('wire:click="removeLigne(');
+
+        $libre->assertSee('Ajouter une ligne');
+        expect($libre->html())->toContain('wire:click="removeLigne(0)"');
+    });
+
+    test('propose « Ventiler » sur les lignes de la pièce gelée, dont la ligne sœur : atteinte par le chemin de l\'écran, elle se ventile', function () {
+        ['libre' => $soeur, 'soeur' => $rattachee, 'piece' => $piece] = verrouPieceDontLaSoeurEstRattachee($this, 7);
+        // Les deux lignes de la pièce ($soeur est la ligne d'origine, libre ; $rattachee la ligne ajoutée, rattachée).
+
+        $formulaire = Livewire::test(TransactionForm::class)->call('edit', (int) $piece->id);
+
+        // Ce que l'écran offre : « Ventiler » sur CHAQUE ligne de la pièce.
+        expect(verrouLignesVentilables($formulaire))->toBe([(int) $soeur->id, (int) $rattachee->id]);
+
+        // Le clic de l'écran : wire:click="ouvrirVentilation(<id>)", puis « Enregistrer » (saveVentilation).
+        $formulaire->call('ouvrirVentilation', verrouLignesVentilables($formulaire)[0])
+            ->call('saveVentilation')
+            ->assertHasNoErrors();
+
+        expect(DB::table('transaction_ligne_affectations')->where('transaction_ligne_id', $soeur->id)->count())->toBe(1);
+    });
+
+    test('affiche le refus du service quand on ventile la ligne rattachée depuis le bouton de l\'écran', function () {
+        ['soeur' => $rattachee, 'provision' => $provision, 'piece' => $piece] = verrouPieceDontLaSoeurEstRattachee($this, 7);
+        $avant = verrouEmpreinte($rattachee, $provision);
+
+        $formulaire = Livewire::test(TransactionForm::class)->call('edit', (int) $piece->id);
+        $ids = verrouLignesVentilables($formulaire);
+        expect($ids)->toContain((int) $rattachee->id);
+
+        $formulaire->call('ouvrirVentilation', (int) $rattachee->id)->call('saveVentilation');
+
+        expect($formulaire->errors()->get('affectations'))->toBe([GelRattachement::MOTIF_PIECE_GELEE])
+            ->and(verrouEmpreinte($rattachee, $provision))->toBe($avant);
+    });
+
+    test('n\'offre « Ventiler » sur aucune ligne d\'une pièce libre : le gel n\'ajoute le bouton qu\'à la pièce gelée', function () {
+        [$libre] = verrouFormulaireDeLaPiece($this, false);
+
+        expect(verrouLignesVentilables($libre))->toBe([]);
+    });
+
+    test('garde le justificatif de la pièce consultable, sans proposer de le retirer, de le remplacer ni d\'en joindre un', function () {
+        [$gelee, $ligne] = verrouFormulaireDeLaPiece($this, true);
+        [$libre, $ligneLibre] = verrouFormulaireDeLaPiece($this, false);
+
+        // Un justificatif existant sur chacune des deux pièces, au niveau de la pièce et de sa ligne.
+        foreach ([$ligne, $ligneLibre] as $l) {
+            DB::table('transactions')->where('id', $l->transaction_id)->update([
+                'piece_jointe_path' => 'justificatif.pdf',
+                'piece_jointe_nom' => 'facture-de-test.pdf',
+                'piece_jointe_mime' => 'application/pdf',
+            ]);
+            DB::table('transaction_lignes')->where('id', $l->id)->update(['piece_jointe_path' => 'lignes/justificatif-ligne.pdf']);
+        }
+        $gelee->call('edit', (int) $ligne->transaction_id);
+        $libre->call('edit', (int) $ligneLibre->transaction_id);
+
+        // La pièce gelée : le nom du justificatif et le lien de consultation restent ; plus de suppression, de remplacement ni de dépôt.
+        $gelee->assertSee('facture-de-test.pdf');
+        expect($gelee->html())->toContain('title="Consulter"')
+            ->not->toContain('wire:click="deletePieceJointe"')
+            ->not->toContain('title="Remplacer"')
+            ->not->toContain('lignes.0.piece_jointe_upload')
+            ->not->toContain('piece_jointe_remove');
+
+        // La pièce libre offre tout cela.
+        expect($libre->html())->toContain('wire:click="deletePieceJointe"')
+            ->toContain('title="Remplacer"')
+            ->toContain('piece_jointe_remove');
+    });
+
+    test('n\'offre pas de dépôt de justificatif sur une pièce gelée qui n\'en a pas', function () {
+        [$gelee] = verrouFormulaireDeLaPiece($this, true);
+        [$libre] = verrouFormulaireDeLaPiece($this, false);
+
+        $gelee->assertDontSee('Joindre un justificatif');
+        expect($gelee->html())->not->toContain('wire:model="pieceJointe"')
+            ->not->toContain('lignes.0.piece_jointe_upload');
+
+        $libre->assertSee('Joindre un justificatif');
+        expect($libre->html())->toContain('wire:model="pieceJointe"')
+            ->toContain('lignes.0.piece_jointe_upload');
+    });
+
+    test('se titre « Visualiser » comme un exercice clôturé, la pièce libre « Modifier »', function () {
+        [$gelee] = verrouFormulaireDeLaPiece($this, true);
+        [$libre] = verrouFormulaireDeLaPiece($this, false);
+
+        $gelee->assertSee('Visualiser la recette')->assertDontSee('Modifier la recette');
+        $libre->assertSee('Modifier la recette')->assertDontSee('Visualiser la recette');
     });
 });

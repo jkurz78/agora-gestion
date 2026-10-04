@@ -138,8 +138,10 @@ final class TransactionForm extends Component
      * Le motif pour lequel la pièce OUVERTE est gelée par un rattachement à l'exercice suivant (CCA/PCA, spec § 7),
      * ou null : GelRattachement::MOTIF_PIECE_GELEE si l'une de ses lignes est rattachée,
      * MOTIF_ECRITURE_DE_RATTACHEMENT si la pièce EST une écriture de rattachement. Posé par edit(), à l'ouverture :
-     * le formulaire affiche le motif en tête et désactive l'enregistrement, pour épargner à l'utilisateur de saisir
-     * ce que l'enregistrement refuserait.
+     * le formulaire affiche le motif en tête et passe en LECTURE SEULE (champs désactivés, ni ajout ni retrait de
+     * ligne, pas de bouton d'enregistrement : la vue le traite comme un exercice clôturé), pour épargner à
+     * l'utilisateur de saisir ce que l'enregistrement refuserait. Seuls restent ouverts les gestes sur une ligne,
+     * dont « Ventiler ».
      *
      * Propriété dédiée, et non canEdit : canEdit répond « cet utilisateur peut-il écrire en compta », une question
      * de rôle, vraie pour toutes les pièces ; le gel est un état de CETTE pièce. canEdit commande aussi la

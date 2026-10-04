@@ -532,11 +532,58 @@ function verrouOccurrencesDuMotif(Testable $formulaire, string $motif): int
 
 /**
  * Le bouton d'enregistrement du formulaire de transaction, tel qu'il est rendu : son HTML d'ouverture, avec ses
- * attributs. C'est le seul bouton de type « submit » du formulaire.
+ * attributs, ou null s'il n'est pas rendu (formulaire en lecture seule). C'est le seul bouton de type « submit ».
  */
-function verrouBoutonEnregistrer(Testable $formulaire): string
+function verrouBoutonEnregistrer(Testable $formulaire): ?string
 {
-    expect(preg_match_all('/<button\b[^>]*type="submit"[^>]*>/', $formulaire->html(), $trouves))->toBe(1);
+    $nombre = preg_match_all('/<button\b[^>]*type="submit"[^>]*>/', $formulaire->html(), $trouves);
 
-    return $trouves[0][0];
+    expect($nombre)->toBeLessThanOrEqual(1);
+
+    return $trouves[0][0] ?? null;
+}
+
+/**
+ * Le formulaire est en LECTURE SEULE, comme pour un exercice clôturé : aucun bouton d'enregistrement, et « Fermer »
+ * à la place d'« Annuler » (il n'y a rien à annuler : rien ne s'enregistrera).
+ */
+function verrouAssertLectureSeule(Testable $formulaire): void
+{
+    expect(verrouBoutonEnregistrer($formulaire))->toBeNull()
+        ->and($formulaire->html())->toContain('class="btn btn-secondary">Fermer</button>')
+        ->and($formulaire->html())->not->toContain('class="btn btn-secondary">Annuler</button>');
+}
+
+/** Le formulaire est ÉDITABLE : un bouton d'enregistrement actif, et « Annuler ». */
+function verrouAssertEditable(Testable $formulaire): void
+{
+    expect(verrouBoutonEnregistrer($formulaire))->not->toBeNull()->not->toContain('disabled')
+        ->and($formulaire->html())->toContain('class="btn btn-secondary">Annuler</button>');
+}
+
+/**
+ * Tous les champs du formulaire liés à $propriete (wire:model, avec ou sans .live) sont-ils désactivés ? Un champ
+ * absent du rendu fait échouer : « désactivé » ne veut pas dire « pas là ».
+ */
+function verrouChampDesactive(Testable $formulaire, string $propriete): bool
+{
+    $motif = '/<(?:input|select|textarea)\b[^>]*\bwire:model(?:\.live)?="'.preg_quote($propriete, '/').'"[^>]*>/';
+
+    expect(preg_match_all($motif, $formulaire->html(), $trouves))->toBeGreaterThan(0, "Le champ « {$propriete} » n'est pas rendu.");
+
+    foreach ($trouves[0] as $balise) {
+        if (preg_match('/\sdisabled\b/', $balise) !== 1) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/** @return list<int> les lignes pour lesquelles le formulaire offre « Ventiler » / « Modifier la ventilation » */
+function verrouLignesVentilables(Testable $formulaire): array
+{
+    preg_match_all('/wire:click="ouvrirVentilation\((\d+)\)"/', $formulaire->html(), $trouves);
+
+    return array_map('intval', $trouves[1]);
 }

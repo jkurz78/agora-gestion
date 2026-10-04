@@ -361,8 +361,15 @@ Sites à garder :
 | Extourne de la transaction porteuse | **Datée au plus tard le dernier jour de N** seulement (D13) : elle retirerait deux fois le montant de N. Datée dans N+1 ou après, elle est juste et reste permise — sinon, N une fois clôturé, la pièce ne pourrait plus jamais être annulée, et un remboursement deviendrait impossible par extourne. |
 | [`ReclassementLigneService::reclasser()`](../../app/Services/Compta/ReclassementLigneService.php#L46) | Reclasser la ligne — même grammaire que la garde du reçu fiscal. |
 | [`TransactionForm::removeLigne()`](../../app/Livewire/TransactionForm.php#L407) | Retirer la ligne. |
-| `TransactionForm::edit()` / `save()` | **Prévention, pas garde** : une pièce dont une ligne est rattachée, ou qui est une écriture de rattachement, s'ouvre **gelée** — le motif s'affiche en tête du formulaire et l'enregistrement est désactivé ; `save()` refuse aussi côté serveur, avant toute validation, après avoir relu le gel (`GelRattachement::motifDeGel()`, lecture sans verrou). La ventilation d'une ligne sœur reste ouverte : seul le service refuse la ligne rattachée, et le formulaire affiche son refus. |
 | Synchronisation HelloAsso | **Modifier le montant** d'une ligne rattachée. Le refus est journalisé et ne fait pas échouer la synchronisation des autres commandes. Les libellés restent synchronisés. |
+
+**Le formulaire prévient, il ne garde pas.** `TransactionForm::edit()` ouvre une pièce dont une ligne est
+rattachée, ou qui est une écriture de rattachement, en **lecture seule**, comme un exercice clôturé : le motif en
+tête, aucun champ à saisir, ni « Ajouter une ligne » ni retrait de ligne, ni bouton d'enregistrement (« Fermer »
+à la place d'« Annuler »). Restent offerts les gestes sur une ligne : « Ventiler » sur chaque ligne de la pièce,
+dont les lignes sœurs ; le service refuse la ligne rattachée elle-même, et le formulaire affiche son refus.
+`save()` refuse en outre côté serveur, avant toute validation, après avoir relu le gel
+(`GelRattachement::motifDeGel()`, lecture sans verrou) ; l'autorité reste aux gardes du service, sous verrou.
 
 Le **reçu fiscal ne bloque pas** : un rattachement ne change ni le compte, ni le tiers, ni la date
 du don, seulement l'exercice de reconnaissance du produit.
