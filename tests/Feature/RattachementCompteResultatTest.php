@@ -55,7 +55,7 @@ use Illuminate\Support\Facades\DB;
  * l'assertion de l'exercice suivant) et l'effet sur le résultat. Il ne garde PAS
  * l'operation_id de la ligne 6/7 (D8) ni le compte de la jambe résultat : le bilan ignore
  * l'opération et somme toutes les lignes de classe 6 et 7. Sous SQLite, ceux-là sont
- * couverts par Services/Compta/RattachementExerciceServiceTest. Ce qui rend ce fichier
+ * couverts par Services/Compta/RattachementEcrituresTest. Ce qui rend ce fichier
  * non redondant avec lui : ici on lit les RAPPORTS (comptes de résultat, bilan), là-bas
  * on calcule l'impact sur l'ÉCRITURE.
  *
@@ -80,7 +80,7 @@ use Illuminate\Support\Facades\DB;
  *  - 2026-10-03, MariaDB 11.4, D8 retiré (`'operation_id' => null` sur la ligne 6/7) :
  *    les 2 AC-1 tombent au CR opération 2025 (175 et 90 au lieu de 0), les 2 AC-3 passent
  *    (le bilan ignore l'opération). Sous SQLite ce fichier passe : c'est
- *    RattachementExerciceServiceTest qui tombe (PCA et CCA).
+ *    RattachementEcrituresTest qui tombe (PCA et CCA).
  */
 const RATTACHEMENT_SQLITE_SKIP_RAISON = 'La dotation est datée du dernier jour de l’exercice (31/08/2026) : '
     .'SQLite compare « 2026-08-31 00:00:00 » à la borne « 2026-08-31 » et l’exclut du whereBetween '
@@ -354,7 +354,7 @@ test('AC-3 — le 487 sort au passif en « Produits constatés d’avance » au 
  * CasProvision::dotationDebiteLeResultat() dit, pour chaque cas, si la dotation débite ou
  * crédite le résultat. Une inversion de la seule CCA laisse les tests PCA verts (mesuré le
  * 2026-10-01) : sans la paire ci-dessous, ce fichier la laisserait passer, et seul
- * RattachementExerciceServiceTest la verrait, sur l'écriture et non sur les rapports.
+ * RattachementEcrituresTest la verrait, sur l'écriture et non sur les rapports.
  * Ne pas supprimer les tests CCA parce qu'ils « répètent » les PCA.
  */
 
