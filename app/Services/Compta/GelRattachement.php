@@ -30,7 +30,8 @@ use RuntimeException;
  * synchronisation HelloAsso) la reçoivent sans atteindre ProvisionPDService ni EcritureGenerator, qui ne
  * servent qu'à créer et défaire un rattachement : le risque d'un cycle d'injection disparaît par
  * construction, et non parce qu'un test le surveille. Le test des constructeurs le vérifie quand même.
- * Le gel lit les rattachements ; il n'en écrit jamais.
+ * Le gel lit les rattachements ; il n'en écrit jamais. motifDeGel() en est la lecture SANS verrou, pour prévenir
+ * l'écran (le formulaire s'ouvre gelé) : elle ne garde rien.
  *
  * Référence : docs/specs/2026-09-30-provisions-rattachement-exercice-design.md (§ 7, D13).
  */
@@ -40,8 +41,8 @@ final class GelRattachement
      * Le message unique du verrou (spec § 7), destiné à TOUS les sites qui refusent d'écrire sur
      * une pièce dont une ligne est rattachée : reclassement, retrait de ligne, édition, suppression,
      * annulation, ventilation, synchronisation HelloAsso. Posé aujourd'hui sur le reclassement, le
-     * retrait de ligne, l'édition, la suppression et l'annulation ; les autres sites suivent (Tasks 8c
-     * et 9). Il nomme le constat, l'écran où se défait le rattachement et la sortie : le retirer,
+     * retrait de ligne, l'édition, la suppression, l'annulation et la ventilation ; reste la
+     * synchronisation HelloAsso (Task 9). Il nomme le constat, l'écran où se défait le rattachement et la sortie : le retirer,
      * corriger, le repasser. Un site qui en formulerait un autre rendrait le refus illisible d'un écran
      * à l'autre. Seule l'annulation par extourne a le sien (motifExtournePrecoce()) : elle n'est refusée
      * que selon sa date, et sa sortie n'est pas « corriger, puis repasser ».
@@ -86,6 +87,11 @@ final class GelRattachement
      * rattachement validé pendant l'attente est lu au déverrouillage, et un rattachement concurrent
      * attend la fin de l'appelant.
      *
+     * Un geste qui écrit les AFFECTATIONS d'une ligne (la ventilation) appelle cette garde AVANT de les lire ou
+     * de les écrire : l'ordre est alors l'exercice, la ligne, ses rattachements, puis ses affectations. C'est
+     * celui de delete() et d'annuler() (la garde de la pièce verrouille toutes les lignes, puis ils purgent
+     * les affectations) : la ventilation et eux prennent les lignes avant les affectations, jamais l'inverse.
+     *
      * Une ligne d'écriture de rattachement ne porte jamais de rattachement (elle n'est l'origine
      * d'aucun) : sans le premier refus ci-dessous, tout geste sur une ligne la laisserait passer. La
      * ligne de charge de la dotation d'une CCA, par exemple, est une ligne de pièce de type Dépense que
@@ -125,6 +131,32 @@ final class GelRattachement
         if ($ligne->estRattacheeSousVerrou()) {
             throw new RuntimeException(self::MOTIF_PIECE_GELEE);
         }
+    }
+
+    /**
+     * Le motif pour lequel une pièce est GELÉE, ou null : une lecture SIMPLE, sans verrou ni transaction, pour
+     * PRÉVENIR l'écran (le formulaire s'ouvre gelé) avant que l'utilisateur ne saisisse ce que l'enregistrement
+     * refuserait. Ce n'est PAS une garde : un état lu sans verrou est périmé dès qu'il est lu, et rien ne s'écrit
+     * sur sa foi. Les gestes qui écrivent passent par assertLigneNonGelee() et verrouillerPieceNonGelee(), sous
+     * verrou, qui décident seules.
+     *
+     * Même question, même réponse que verrouillerPieceNonGelee(), dans le même ordre : une écriture de
+     * rattachement (`provision_id`) reçoit MOTIF_ECRITURE_DE_RATTACHEMENT ; sinon une pièce dont l'une des lignes,
+     * supprimée logiquement ou non, porte un rattachement reçoit MOTIF_PIECE_GELEE. Tous scopes levés, comme les
+     * gardes : la clé étrangère du rattachement, elle, n'en connaît aucun. L'appelant a déjà résolu la pièce dans son
+     * association ; cette lecture n'en révèle rien d'autre que le motif.
+     */
+    public function motifDeGel(int $pieceId): ?string
+    {
+        if (Transaction::withoutGlobalScopes()->whereKey($pieceId)->value('provision_id') !== null) {
+            return self::MOTIF_ECRITURE_DE_RATTACHEMENT;
+        }
+
+        $rattachee = Provision::withoutGlobalScopes()
+            ->whereIn('transaction_ligne_id', TransactionLigne::withoutGlobalScopes()->where('transaction_id', $pieceId)->select('id'))
+            ->exists();
+
+        return $rattachee ? self::MOTIF_PIECE_GELEE : null;
     }
 
     /**

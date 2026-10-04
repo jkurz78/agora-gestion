@@ -9,6 +9,7 @@ use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Services\Compta\GelRattachement;
 use App\Services\Compta\Migrations\SystemeSeeder;
+use App\Services\Compta\RattachementExerciceService;
 use App\Services\Compta\VerrouLotsCanoniques;
 use App\Services\TransactionService;
 use App\Tenant\TenantContext;
@@ -27,9 +28,10 @@ use Illuminate\Support\Facades\DB;
 | qui écrit sur une ligne) et verrouillerPieceNonGelee() (un geste qui réécrit la pièce entière). Ce
 | fichier éprouve ces deux gardes appelées directement ; les tests des SITES qui les appellent sont
 | un fichier par famille : RattachementVerrouTransactionTest.php (édition, suppression, annulation),
-| RattachementVerrouReclassementFormulaireTest.php (reclassement, retrait de ligne), et
-| RattachementVerrouExtourneTest.php (l'annulation par extourne, seule à dépendre d'une date, avec le
-| graphe d'injection du gel).
+| RattachementVerrouReclassementFormulaireTest.php (reclassement, retrait de ligne, ouverture gelée du
+| formulaire), RattachementVerrouVentilationTest.php (ventilation) et RattachementVerrouExtourneTest.php
+| (l'annulation par extourne, seule à dépendre d'une date, avec le graphe d'injection du gel). Le motif de
+| gel lu sans verrou pour prévenir l'écran, motifDeGel(), s'éprouve ici aussi.
 |
 | Spec : docs/specs/2026-09-30-provisions-rattachement-exercice-design.md (§ 6.4, § 7).
 */
@@ -631,6 +633,86 @@ describe('GelRattachement::verrouillerPieceNonGelee()', function () {
         if (DB::getDriverName() !== 'sqlite') {
             expect($lots[0]->sql)->toContain('for update')
                 ->and($lots[1]->sql)->toContain('for update');
+        }
+    });
+});
+
+describe('GelRattachement::motifDeGel()', function () {
+    // La lecture SANS verrou qui prévient l'écran : même question que les gardes, mêmes réponses, sans rien verrouiller.
+    // Les gardes, elles, décident sous verrou ; ces tests n'éprouvent que ce que l'écran en lit.
+    test('rend le motif du gel pour une pièce dont une ligne est rattachée, même si ce n\'est pas la première, et null pour une pièce libre', function (int $classe) {
+        ['soeur' => $soeur, 'libre' => $libre, 'piece' => $piece] = verrouPieceDontLaSoeurEstRattachee($this, $classe);
+        $autre = $this->ligneOrigineEquilibree($classe);
+        $service = app(GelRattachement::class);
+
+        expect($service->motifDeGel((int) $piece->id))->toBe(GelRattachement::MOTIF_PIECE_GELEE)
+            ->and($service->motifDeGel((int) $autre->transaction_id))->toBeNull();
+
+        // Garde anti-test-vide : la ligne libre de la pièce gelée n'est pas elle-même rattachée.
+        expect($libre->estRattachee())->toBeFalse()
+            ->and($soeur->estRattachee())->toBeTrue();
+    })->with('rattachement_classes');
+
+    test('rend le motif propre à l\'écriture de rattachement, dotation ou extourne générée', function (string $ecriture) {
+        ['piece' => $piece] = verrouEcritureDeRattachement($this, 7, $ecriture);
+
+        expect(app(GelRattachement::class)->motifDeGel((int) $piece->id))->toBe(GelRattachement::MOTIF_ECRITURE_DE_RATTACHEMENT);
+    })->with([
+        'la dotation' => ['normale'],
+        'l\'extourne' => ['extourne'],
+    ]);
+
+    test('ne rend plus de motif une fois le rattachement retiré', function () {
+        $ligne = $this->ligneOrigineEquilibree(7);
+        $provision = verrouRattacherAvecEcritures($this, $ligne);
+        $service = app(GelRattachement::class);
+
+        expect($service->motifDeGel((int) $ligne->transaction_id))->toBe(GelRattachement::MOTIF_PIECE_GELEE);
+
+        app(RattachementExerciceService::class)->retirer($provision);
+
+        expect($service->motifDeGel((int) $ligne->transaction_id))->toBeNull();
+    });
+
+    test('rend le motif quand la ligne rattachée, la pièce, ou les deux, sont supprimées logiquement, ou hors du contexte d\'association : aucun scope ne dégèle', function (string $cas) {
+        ['soeur' => $soeur, 'piece' => $piece] = verrouPieceDontLaSoeurEstRattachee($this, 7);
+        $service = app(GelRattachement::class);
+        $association = TenantContext::current();
+
+        match ($cas) {
+            'ligne supprimée' => $soeur->delete(),
+            'pièce supprimée' => $piece->delete(),
+            'hors contexte' => TenantContext::clear(),
+        };
+
+        expect($service->motifDeGel((int) $piece->id))->toBe(GelRattachement::MOTIF_PIECE_GELEE);
+
+        TenantContext::boot($association);
+    })->with([
+        'ligne supprimée' => ['ligne supprimée'],
+        'pièce supprimée' => ['pièce supprimée'],
+        'hors contexte d\'association' => ['hors contexte'],
+    ]);
+
+    test('ne verrouille rien et n\'ouvre aucune transaction : une lecture simple, qui peut être périmée', function () {
+        ['piece' => $piece] = verrouPieceDontLaSoeurEstRattachee($this, 7);
+        $service = app(GelRattachement::class);
+
+        $requetes = rattachementRequetesDeLaTransaction(fn () => $service->motifDeGel((int) $piece->id));
+
+        // Aucune requête DANS une transaction qu'elle aurait ouverte : elle n'en ouvre pas.
+        expect($requetes)->toBe([]);
+
+        // Et aucune ne verrouille, même hors transaction (MariaDB écrirait « for update »).
+        $sql = [];
+        DB::listen(function ($requete) use (&$sql): void {
+            $sql[] = $requete->sql;
+        });
+        $service->motifDeGel((int) $piece->id);
+
+        expect($sql)->not->toBeEmpty();
+        foreach ($sql as $requete) {
+            expect($requete)->not->toContain('for update');
         }
     });
 });

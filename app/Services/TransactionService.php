@@ -824,12 +824,10 @@ final class TransactionService
             // sur ce qu'ils ont en commun (exercice, pièce, ligne, rattachements), rattacher() et retirer()
             // prennent leurs verrous dans le même ordre : pas de cycle possible avec eux.
             //
-            // La seule inversion qui expose à un inter-blocage est celle des lignes et des affectations :
-            // la garde tient toutes les lignes avant que les affectations ne soient prises, alors que la
-            // ventilation (affecterLigne(), supprimerAffectations()) prend les siennes sans verrouiller la
-            // ligne d'abord. Si elles s'exécutent en même temps sur la même pièce, le moteur interrompt l'une
-            // des deux transactions (sans incohérence). La garde de la ventilation (Task 8c) lui donnera
-            // l'ordre ligne puis affectations, et supprimera cet écart.
+            // Aucune inversion avec la ventilation : affecterLigne() et supprimerAffectations() prennent, après le
+            // verrou de l'exercice, la garde de la ligne (assertLigneNonGelee() : le verrou de la ligne, puis ses
+            // rattachements), et SEULEMENT ENSUITE ses affectations. Même ordre ici : toutes les lignes avec la
+            // garde, puis les affectations. Les deux ne se croisent jamais en sens inverse sur une même pièce.
             $this->exerciceService->assertOuvertVerrouille(
                 $this->exerciceService->anneeForDate(CarbonImmutable::parse($transaction->date))
             );
@@ -1053,7 +1051,24 @@ final class TransactionService
         // transaction réglée (compte, montant, opération portés par la ligne) est
         // gardé par assertReglementTiersInvariants() dans update().
 
-        DB::transaction(function () use ($ligne, $affectations) {
+        DB::transaction(function () use ($ligne, $transaction, $affectations) {
+            // Les premiers verrous, AVANT toute lecture ou écriture des affectations : l'exercice de la pièce
+            // (comme update() et delete()), puis la garde du rattachement sur CETTE ligne (le verrou de la ligne,
+            // puis les rattachements en lecture verrouillante). Une ligne rattachée, ou celle d'une écriture de
+            // rattachement, n'est pas ventilée. Geste sur UNE ligne (spec § 7) : la ligne sœur d'une ligne
+            // rattachée reste ventilable, la pièce n'est pas verrouillée.
+            //
+            // L'ordre est exercice, ligne, rattachements, PUIS affectations : celui de delete() et d'annuler(),
+            // dont la garde de la pièce verrouille toutes les lignes avant que purgerLignesEtAffectations() ne
+            // touche aux affectations. Ils ne se croisent donc jamais en sens inverse. Le même verrou de ligne
+            // exclut rattacher() et retirer(), qui le prennent avant de juger la ligne. Posée après l'écriture, la
+            // garde refuserait encore, mais l'inversion reviendrait. L'exercice est celui de la date de la pièce
+            // lue avant la transaction, comme update() et delete().
+            $this->exerciceService->assertOuvertVerrouille(
+                $this->exerciceService->anneeForDate(CarbonImmutable::parse($transaction->date))
+            );
+            $this->gel->assertLigneNonGelee($ligne);
+
             if (count($affectations) === 0) {
                 throw new \RuntimeException('La liste des affectations ne peut pas être vide.');
             }
@@ -1093,7 +1108,16 @@ final class TransactionService
             throw new \RuntimeException('Cette transaction est liée à une facture validée. La ventilation ne peut pas être modifiée.');
         }
 
-        DB::transaction(fn () => $ligne->affectations()->delete());
+        DB::transaction(function () use ($ligne, $transaction) {
+            // Les mêmes premiers verrous qu'affecterLigne(), dans le même ordre (voir son commentaire) : l'exercice
+            // de la pièce, la garde de la ligne, PUIS les affectations.
+            $this->exerciceService->assertOuvertVerrouille(
+                $this->exerciceService->anneeForDate(CarbonImmutable::parse($transaction->date))
+            );
+            $this->gel->assertLigneNonGelee($ligne);
+
+            $ligne->affectations()->delete();
+        });
     }
 
     public function storePieceJointe(Transaction $transaction, UploadedFile $file): void

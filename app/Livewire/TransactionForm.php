@@ -134,6 +134,23 @@ final class TransactionForm extends Component
     #[Locked]
     public bool $isLockedByImmobilisation = false;
 
+    /**
+     * Le motif pour lequel la pièce OUVERTE est gelée par un rattachement à l'exercice suivant (CCA/PCA, spec § 7),
+     * ou null : GelRattachement::MOTIF_PIECE_GELEE si l'une de ses lignes est rattachée,
+     * MOTIF_ECRITURE_DE_RATTACHEMENT si la pièce EST une écriture de rattachement. Posé par edit(), à l'ouverture :
+     * le formulaire affiche le motif en tête et désactive l'enregistrement, pour épargner à l'utilisateur de saisir
+     * ce que l'enregistrement refuserait.
+     *
+     * Propriété dédiée, et non canEdit : canEdit répond « cet utilisateur peut-il écrire en compta », une question
+     * de rôle, vraie pour toutes les pièces ; le gel est un état de CETTE pièce. canEdit commande aussi la
+     * ventilation et le reclassement, qui restent ouverts sur une pièce gelée (gestes sur une ligne, spec § 7).
+     *
+     * Prévention, pas garde : lue sans verrou. save() la relit avant de refuser, et l'autorité est le service
+     * (GelRattachement, sous verrou). #[Locked] : un client ne la fait pas taire.
+     */
+    #[Locked]
+    public ?string $motifGel = null;
+
     /** True quand la transaction verrouillée est une dotation, false quand c'est l'acquisition elle-même. */
     public bool $isImmobilisationDotation = false;
 
@@ -264,6 +281,7 @@ final class TransactionForm extends Component
         $this->isLocked = false;
         $this->isLockedByHelloAsso = false;
         $this->isLockedByImmobilisation = false;
+        $this->motifGel = null;
         $this->isImmobilisationDotation = false;
         $this->immobilisationId = null;
         $this->immobilisationLibelle = '';
@@ -534,10 +552,12 @@ final class TransactionForm extends Component
                     'notes' => $a['notes'] ?: null,
                 ])->toArray()
             );
-        } catch (ExerciceCloturedException $e) {
-            // Pas de champ « date » dans ce panneau : la date en cause est celle
-            // de la transaction parente, non éditable ici. Même clé que le
-            // refus « somme des affectations » ci-dessus, pour rester cohérent.
+        } catch (\RuntimeException $e) {
+            // Les refus du service s'affichent dans ce panneau, qui reste ouvert : l'exercice clôturé
+            // (ExerciceCloturedException, une RuntimeException : pas de champ « date » ici, la date en cause est
+            // celle de la transaction parente, non éditable ici), la facture validée, et la ligne rattachée à
+            // l'exercice suivant (spec § 7 : seule cette ligne est refusée, ses sœurs se ventilent). Même clé que
+            // le refus « somme des affectations » ci-dessus, pour rester cohérent.
             $this->addError('affectations', $e->getMessage());
 
             return;
@@ -559,7 +579,16 @@ final class TransactionForm extends Component
         }
 
         $ligne = TransactionLigne::findOrFail($this->ventilationLigneId);
-        app(TransactionService::class)->supprimerAffectations($ligne);
+
+        try {
+            app(TransactionService::class)->supprimerAffectations($ligne);
+        } catch (\RuntimeException $e) {
+            // Même affichage que saveVentilation() : le refus du service reste dans le panneau.
+            $this->addError('affectations', $e->getMessage());
+
+            return;
+        }
+
         $this->fermerVentilation();
         $this->dispatch('transaction-saved');
     }
@@ -756,6 +785,10 @@ final class TransactionForm extends Component
         $this->isLockedByFacture = $transaction->isLockedByFacture();
         $this->isLockedByHelloAsso = $transaction->helloasso_order_id !== null;
 
+        // Toujours réaffecté, nul compris : une pièce libre rouverte dans le même composant ne garde pas le motif
+        // de la précédente.
+        $this->motifGel = app(GelRattachement::class)->motifDeGel((int) $transaction->id);
+
         $this->isLockedByImmobilisation = $transaction->isLockedByImmobilisation();
         $this->isImmobilisationDotation = false;
         $immobilisation = null;
@@ -791,7 +824,7 @@ final class TransactionForm extends Component
     {
         $this->reset([
             'transactionId', 'type', 'date', 'libelle', 'mode_paiement', 'dateReglement', 'paiementRecu', 'paiementModifiable',
-            'tiers_id', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked', 'isLockedByFacture', 'isLockedByHelloAsso', 'isLockedByImmobilisation', 'isImmobilisationDotation', 'immobilisationId', 'immobilisationLibelle', 'isLockedByReglement', 'isExtourneMiroir', 'sensTresorerie',
+            'tiers_id', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked', 'isLockedByFacture', 'isLockedByHelloAsso', 'isLockedByImmobilisation', 'motifGel', 'isImmobilisationDotation', 'immobilisationId', 'immobilisationLibelle', 'isLockedByReglement', 'isExtourneMiroir', 'sensTresorerie',
             'etatPaiement', 'soldeRestantCentimes', 'reglementsEnregistres', 'posteTiersLigneId',
             'ventilationLigneId', 'ventilationLigneCompteLabel', 'ventilationLigneMontant', 'affectations',
             'ventilationHasAffectations',
@@ -807,6 +840,20 @@ final class TransactionForm extends Component
     {
         if (! $this->canEdit) {
             return;
+        }
+
+        // Une pièce gelée par un rattachement ne s'enregistre pas (spec § 7) : le bouton est désactivé, mais un
+        // bouton n'est pas une garde. Ce refus vient AVANT toute validation et toute écriture ; le service refuse
+        // ensuite, sous verrou, ce que celui-ci aurait laissé passer. Relu ici : le rattachement a pu être posé
+        // ou retiré depuis l'ouverture, et l'affichage suit.
+        if ($this->transactionId !== null) {
+            $this->motifGel = app(GelRattachement::class)->motifDeGel($this->transactionId);
+
+            if ($this->motifGel !== null) {
+                $this->addError('lignes', $this->motifGel);
+
+                return;
+            }
         }
 
         if ($this->isLockedByImmobilisation) {

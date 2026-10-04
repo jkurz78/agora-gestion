@@ -6,9 +6,11 @@ use App\DataTransferObjects\ExtournePayload;
 use App\Enums\ModePaiement;
 use App\Models\Compte;
 use App\Models\Extourne;
+use App\Models\Operation;
 use App\Models\Provision;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Models\TransactionLigneAffectation;
 use App\Services\Compta\GelRattachement;
 use App\Services\Compta\RattachementExerciceService;
 use App\Services\Compta\ReclassementLigneService;
@@ -103,11 +105,11 @@ function verrouMessageDuRefus(Closure $action): ?string
 
 /**
  * Ce qu'un geste refusé n'a pas le droit de toucher : la pièce de la ligne et TOUTES ses lignes
- * (les gestes des Tasks 8 et 9 touchent la pièce entière), le rattachement, et les deux écritures
- * du rattachement avec leurs lignes. Lignes complètes, relevées sans aucun filtre : suppressions
- * logiques comprises.
+ * (les gestes des Tasks 8 et 9 touchent la pièce entière), les affectations de ces lignes et de celles des
+ * écritures (la ventilation, Task 8c), le rattachement, et les deux écritures du rattachement avec leurs lignes.
+ * Lignes complètes, relevées sans aucun filtre : suppressions logiques comprises.
  *
- * @return array{piece: array<string, mixed>, lignes_de_la_piece: list<array<string, mixed>>, provision: array<string, mixed>, ecritures: list<array<string, mixed>>, lignes: list<array<string, mixed>>}
+ * @return array{piece: array<string, mixed>, lignes_de_la_piece: list<array<string, mixed>>, affectations: list<array<string, mixed>>, provision: array<string, mixed>, ecritures: list<array<string, mixed>>, lignes: list<array<string, mixed>>}
  */
 function verrouEmpreinte(TransactionLigne $ligne, Provision $provision): array
 {
@@ -118,6 +120,9 @@ function verrouEmpreinte(TransactionLigne $ligne, Provision $provision): array
         'piece' => (array) DB::table('transactions')->where('id', $pieceId)->first(),
         'lignes_de_la_piece' => DB::table('transaction_lignes')->where('transaction_id', $pieceId)->orderBy('id')->get()
             ->map(fn (object $l): array => (array) $l)->all(),
+        'affectations' => DB::table('transaction_ligne_affectations')
+            ->whereIn('transaction_ligne_id', DB::table('transaction_lignes')->whereIn('transaction_id', [$pieceId, ...$ecritureIds])->select('id'))
+            ->orderBy('id')->get()->map(fn (object $a): array => (array) $a)->all(),
         'provision' => (array) DB::table('provisions')->where('id', (int) $provision->id)->first(),
         'ecritures' => DB::table('transactions')->whereIn('id', $ecritureIds)->orderBy('id')->get()
             ->map(fn (object $ecriture): array => (array) $ecriture)->all(),
@@ -279,6 +284,61 @@ function verrouDonneesDEdition(Transaction $piece, string $libelle = 'Pièce cor
         'seance' => $ligne->seance,
         'notes' => null,
     ])->all()];
+}
+
+/**
+ * Une affectation déjà posée sur $ligne (le montant entier, sur une opération créée pour l'occasion) : ce que
+ * « Supprimer la ventilation » doit défaire, et ce que « Ventiler » remplace. Une ligne rattachée n'a jamais
+ * d'affectation (elle serait refusée à la détection) : sur elle, c'est un état forgé après coup, seule façon de
+ * prouver qu'un geste refusé n'a rien effacé.
+ */
+function verrouSemerAffectation(TransactionLigne $ligne): TransactionLigneAffectation
+{
+    return TransactionLigneAffectation::create([
+        'transaction_ligne_id' => (int) $ligne->id,
+        'operation_id' => Operation::factory()->create()->id,
+        'seance' => null,
+        'montant' => (string) $ligne->montant,
+        'notes' => 'Affectation d’avant',
+    ]);
+}
+
+/**
+ * Le geste des sites de la ventilation (Task 8c) sur $ligne : « affecter » (affecterLigne(), le montant entier
+ * sur une NOUVELLE opération, créée ici, avant le geste) ou « supprimer » (supprimerAffectations()).
+ */
+function verrouVentiler(string $nom, TransactionLigne $ligne): Closure
+{
+    $service = app(TransactionService::class);
+    $operation = Operation::factory()->create();
+
+    return match ($nom) {
+        'affecter' => fn () => $service->affecterLigne($ligne, [[
+            'operation_id' => (int) $operation->id,
+            'seance' => null,
+            'montant' => (string) $ligne->montant,
+            'notes' => null,
+        ]]),
+        'supprimer' => fn () => $service->supprimerAffectations($ligne),
+    };
+}
+
+/**
+ * L'effet d'un des gestes de verrouVentiler() qui a PASSÉ sur $ligne : « affecter » laisse une seule affectation,
+ * celle du geste (l'ancienne, semée, est remplacée) ; « supprimer » n'en laisse aucune. Relu sans aucun filtre.
+ */
+function verrouAssertEffetVentilation(string $nom, TransactionLigne $ligne, ?int $ancienneId): void
+{
+    $affectations = DB::table('transaction_ligne_affectations')->where('transaction_ligne_id', (int) $ligne->id)->get();
+
+    if ($nom === 'supprimer') {
+        expect($affectations)->toBeEmpty();
+
+        return;
+    }
+
+    expect($affectations)->toHaveCount(1)
+        ->and((int) $affectations->first()->id)->not->toBe($ancienneId);
 }
 
 /**
@@ -458,4 +518,25 @@ function verrouDependancesDuConstructeur(string $classe, array &$vues = []): arr
     }
 
     return $vues;
+}
+
+/**
+ * Combien de fois le formulaire affiche $motif, tel que le rendu l'écrit (échappé). Une pièce gelée l'affiche
+ * déjà en tête, à l'ouverture : un refus qui s'y ajoute le fait paraître une seconde fois, et ne reste pas
+ * affiché après le geste suivant.
+ */
+function verrouOccurrencesDuMotif(Testable $formulaire, string $motif): int
+{
+    return substr_count($formulaire->html(), e($motif));
+}
+
+/**
+ * Le bouton d'enregistrement du formulaire de transaction, tel qu'il est rendu : son HTML d'ouverture, avec ses
+ * attributs. C'est le seul bouton de type « submit » du formulaire.
+ */
+function verrouBoutonEnregistrer(Testable $formulaire): string
+{
+    expect(preg_match_all('/<button\b[^>]*type="submit"[^>]*>/', $formulaire->html(), $trouves))->toBe(1);
+
+    return $trouves[0][0];
 }

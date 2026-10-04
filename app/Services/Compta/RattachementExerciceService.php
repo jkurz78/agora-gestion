@@ -144,11 +144,13 @@ final class RattachementExerciceService
         }
 
         // D4 : la ventilation vit dans les affectations, la ligne n'a pas
-        // d'opération propre à hériter. Sous verrou, la lecture est verrouillante : c'est la
-        // seule donnée de l'éligibilité que ni le verrou de la pièce ni celui de la ligne
-        // ne protègent (affecterLigne() n'écrit que dans transaction_ligne_affectations), et
-        // une affectation validée pendant l'attente du verrou serait invisible du cliché. Lecture
-        // verrouillante directe, comme estRattacheeSousVerrou() : pas de FOR UPDATE dans un EXISTS.
+        // d'opération propre à hériter. Sous verrou, la lecture est verrouillante et directe, comme
+        // estRattacheeSousVerrou() : pas de FOR UPDATE dans un EXISTS. La ventilation (affecterLigne(),
+        // supprimerAffectations()) prend le verrou de CETTE ligne avant de toucher à ses affectations (Task 8c),
+        // et rattacher() le prend aussi avant de juger : ils s'excluent déjà, et une ventilation en cours est
+        // attendue, non devancée. Cette lecture ne sert donc plus à l'attendre ; elle reste pour lire le
+        // dernier état validé, quel que soit le cliché de la transaction, sans supposer que tout autre écrivain
+        // d'affectations respecte le verrou de la ligne.
         if ($sousVerrou ? $ligne->affectations()->lockForUpdate()->value('id') !== null : $ligne->affectations()->exists()) {
             return self::MOTIF_AFFECTATIONS;
         }

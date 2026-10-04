@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Livewire\TransactionForm;
+use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
@@ -270,12 +271,15 @@ describe('TransactionForm::removeLigne() : retour immédiat sur une ligne rattac
             ->assertHasErrors('lignes')
             ->assertSee(GelRattachement::MOTIF_PIECE_GELEE);
 
-        // Le geste suivant réussit : le message du précédent refus disparaît.
-        $formulaire->call('removeLigne', 1)
-            ->assertHasNoErrors('lignes')
-            ->assertDontSee(GelRattachement::MOTIF_PIECE_GELEE);
+        // Le geste suivant réussit : le message du précédent refus disparaît. La pièce est gelée, donc son
+        // motif reste affiché en tête du formulaire, une fois : c'est le refus, et lui seul, qui disparaît.
+        expect(verrouOccurrencesDuMotif($formulaire, GelRattachement::MOTIF_PIECE_GELEE))->toBe(2);
 
-        expect(verrouIdsAffiches($formulaire))->toBe([(int) $rattachee->id]);
+        $formulaire->call('removeLigne', 1)
+            ->assertHasNoErrors('lignes');
+
+        expect(verrouOccurrencesDuMotif($formulaire, GelRattachement::MOTIF_PIECE_GELEE))->toBe(1)
+            ->and(verrouIdsAffiches($formulaire))->toBe([(int) $rattachee->id]);
     });
 
     test('efface le message du refus quand on ajoute ensuite une ligne', function () {
@@ -288,8 +292,215 @@ describe('TransactionForm::removeLigne() : retour immédiat sur une ligne rattac
             ->assertHasErrors('lignes')
             ->assertSee(GelRattachement::MOTIF_PIECE_GELEE);
 
+        // Même remarque : la pièce est gelée, son motif reste affiché en tête du formulaire (une fois) ;
+        // le refus, lui, ne s'ajoute plus à lui.
+        expect(verrouOccurrencesDuMotif($formulaire, GelRattachement::MOTIF_PIECE_GELEE))->toBe(2);
+
         $formulaire->call('addLigne')
-            ->assertHasNoErrors('lignes')
+            ->assertHasNoErrors('lignes');
+
+        expect(verrouOccurrencesDuMotif($formulaire, GelRattachement::MOTIF_PIECE_GELEE))->toBe(1);
+    });
+});
+
+describe('TransactionForm::edit() : une pièce rattachée s\'ouvre gelée', function () {
+    // Le gel de l'ouverture est une PRÉVENTION : il épargne à l'utilisateur de saisir ce que l'enregistrement
+    // refusera. L'autorité reste au service (verrouillerPieceNonGelee(), sous verrou) ; le formulaire, lui, lit
+    // sans verrou. Il porte sur la pièce entière, comme l'enregistrement qu'il prévient.
+    test('affiche le motif dès l\'ouverture d\'une pièce dont une ligne est rattachée, et désactive l\'enregistrement', function (int $classe) {
+        $ligne = $this->ligneOrigineEquilibree($classe);
+        verrouRattacherAvecEcritures($this, $ligne);
+
+        // Aucun geste, aucun refus : le motif est là parce que la pièce est gelée.
+        $formulaire = Livewire::test(TransactionForm::class)->call('edit', (int) $ligne->transaction_id)
+            ->assertHasNoErrors()
+            ->assertSee(GelRattachement::MOTIF_PIECE_GELEE)
+            ->assertDontSee(GelRattachement::MOTIF_ECRITURE_DE_RATTACHEMENT);
+
+        expect(verrouOccurrencesDuMotif($formulaire, GelRattachement::MOTIF_PIECE_GELEE))->toBe(1)
+            ->and(verrouBoutonEnregistrer($formulaire))->toContain('disabled');
+    })->with('rattachement_classes');
+
+    test('gèle la pièce entière : la ligne sœur d\'une ligne rattachée ne rend pas la pièce libre', function () {
+        ['piece' => $piece] = verrouPieceDontLaSoeurEstRattachee($this, 7);
+
+        $formulaire = Livewire::test(TransactionForm::class)->call('edit', (int) $piece->id)
+            ->assertSee(GelRattachement::MOTIF_PIECE_GELEE);
+
+        expect(verrouBoutonEnregistrer($formulaire))->toContain('disabled');
+    });
+
+    test('gèle une écriture de rattachement, dotation ou extourne générée : son propre motif', function (int $classe, string $ecriture) {
+        ['piece' => $piece] = verrouEcritureDeRattachement($this, $classe, $ecriture);
+
+        $formulaire = Livewire::test(TransactionForm::class)->call('edit', (int) $piece->id)
+            ->assertSee(GelRattachement::MOTIF_ECRITURE_DE_RATTACHEMENT)
             ->assertDontSee(GelRattachement::MOTIF_PIECE_GELEE);
+
+        expect(verrouBoutonEnregistrer($formulaire))->toContain('disabled');
+    })->with('rattachement_classes')->with([
+        'la dotation' => ['normale'],
+        'l\'extourne' => ['extourne'],
+    ]);
+
+    test('save() refuse côté serveur, avant toute validation, et sans rien écrire : le bouton désactivé ne suffit pas', function (int $classe) {
+        $ligne = $this->ligneOrigineEquilibree($classe);
+        $provision = verrouRattacherAvecEcritures($this, $ligne);
+        $avant = verrouEmpreinte($ligne, $provision);
+
+        // Un formulaire INVALIDE (aucun tiers) : sans refus préalable, la validation parlerait d'abord. C'est ce
+        // qui distingue le refus du formulaire de celui du service, que save() atteindrait de toute façon ensuite.
+        $formulaire = Livewire::test(TransactionForm::class)->call('edit', (int) $ligne->transaction_id)
+            ->set('libelle', 'Libellé modifié')
+            ->set('tiers_id', null)
+            ->call('save')
+            ->assertHasErrors('lignes')
+            ->assertHasNoErrors('tiers_id');
+
+        expect($formulaire->errors()->get('lignes'))->toBe([GelRattachement::MOTIF_PIECE_GELEE])
+            ->and(verrouEmpreinte($ligne, $provision))->toBe($avant);
+    })->with('rattachement_classes');
+
+    test('save() refuse aussi une écriture de rattachement, avec son propre motif, et sans rien écrire', function () {
+        ['ligne' => $origine, 'provision' => $provision, 'piece' => $piece] = verrouEcritureDeRattachement($this, 7, 'normale');
+        $avant = verrouEmpreinte($origine, $provision);
+
+        $formulaire = Livewire::test(TransactionForm::class)->call('edit', (int) $piece->id)
+            ->set('libelle', 'Libellé modifié')
+            ->set('tiers_id', null)
+            ->call('save')
+            ->assertHasNoErrors('tiers_id');
+
+        expect($formulaire->errors()->get('lignes'))->toBe([GelRattachement::MOTIF_ECRITURE_DE_RATTACHEMENT])
+            ->and(verrouEmpreinte($origine, $provision))->toBe($avant);
+    });
+
+    test('ne gèle pas une pièce libre, alors qu\'un rattachement existe sur une autre pièce : ni motif, ni bouton désactivé', function () {
+        verrouRattacherAvecEcritures($this, $this->ligneOrigineEquilibree(7));
+        $libre = $this->ligneOrigineEquilibree(7);
+
+        $formulaire = Livewire::test(TransactionForm::class)->call('edit', (int) $libre->transaction_id)
+            ->assertDontSee(GelRattachement::MOTIF_PIECE_GELEE)
+            ->assertDontSee(GelRattachement::MOTIF_ECRITURE_DE_RATTACHEMENT);
+
+        expect(verrouBoutonEnregistrer($formulaire))->not->toContain('disabled');
+    });
+
+    test('enregistre une pièce libre : le refus préalable ne bloque que la pièce gelée', function () {
+        verrouRattacherAvecEcritures($this, $this->ligneOrigineEquilibree(7));
+        $libre = $this->ligneOrigineEquilibree(7);
+
+        Livewire::test(TransactionForm::class)->call('edit', (int) $libre->transaction_id)
+            ->set('libelle', 'Libellé corrigé')
+            ->set('tiers_id', Tiers::factory()->create()->id)
+            ->set('paiementRecu', false)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        expect(Transaction::findOrFail($libre->transaction_id)->libelle)->toBe('Libellé corrigé');
+    });
+
+    test('ne gèle plus la pièce dont le rattachement a été retiré : le motif disparaît à la réouverture, dans le même composant', function () {
+        $ligne = $this->ligneOrigineEquilibree(7);
+        $provision = verrouRattacherAvecEcritures($this, $ligne);
+
+        $formulaire = Livewire::test(TransactionForm::class)->call('edit', (int) $ligne->transaction_id)
+            ->assertSee(GelRattachement::MOTIF_PIECE_GELEE);
+        expect(verrouBoutonEnregistrer($formulaire))->toContain('disabled');
+
+        app(RattachementExerciceService::class)->retirer($provision);
+
+        $formulaire->call('edit', (int) $ligne->transaction_id)
+            ->assertDontSee(GelRattachement::MOTIF_PIECE_GELEE);
+        expect(verrouBoutonEnregistrer($formulaire))->not->toContain('disabled');
+    });
+
+    test('save() relit le gel : un rattachement posé depuis l\'ouverture refuse, un rattachement retiré depuis l\'ouverture ne bloque plus', function () {
+        // Posé après l'ouverture d'une pièce libre : le formulaire ne le sait pas, save() le relit (et refuse avant toute validation).
+        $ligne = $this->ligneOrigineEquilibree(7);
+        $formulaire = Livewire::test(TransactionForm::class)->call('edit', (int) $ligne->transaction_id)
+            ->assertDontSee(GelRattachement::MOTIF_PIECE_GELEE);
+        $provision = verrouRattacherAvecEcritures($this, $ligne);
+
+        $formulaire->set('tiers_id', null)->call('save')->assertHasNoErrors('tiers_id');
+        expect($formulaire->errors()->get('lignes'))->toBe([GelRattachement::MOTIF_PIECE_GELEE]);
+        expect(verrouBoutonEnregistrer($formulaire))->toContain('disabled');
+
+        // Retiré après l'ouverture : le motif affiché est périmé, save() ne s'y fie pas et enregistre.
+        app(RattachementExerciceService::class)->retirer($provision);
+
+        $formulaire->set('tiers_id', Tiers::factory()->create()->id)
+            ->set('libelle', 'Libellé après retrait')
+            ->set('paiementRecu', false)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        expect(Transaction::findOrFail($ligne->transaction_id)->libelle)->toBe('Libellé après retrait');
+    });
+
+    test('ne garde pas le gel d\'une pièce pour la suivante : une nouvelle saisie, ou la fermeture, le lèvent', function (string $geste) {
+        $ligne = $this->ligneOrigineEquilibree(7);
+        verrouRattacherAvecEcritures($this, $ligne);
+
+        $formulaire = Livewire::test(TransactionForm::class)->call('edit', (int) $ligne->transaction_id)
+            ->assertSee(GelRattachement::MOTIF_PIECE_GELEE);
+
+        // Le motif lui-même est remis à zéro, qu'il soit rendu ou non : après la fermeture, le formulaire n'est plus affiché.
+        $formulaire->call($geste, ...($geste === 'showNewForm' ? ['depense'] : []))
+            ->assertDontSee(GelRattachement::MOTIF_PIECE_GELEE)
+            ->assertSet('motifGel', null);
+
+        // Rouvert sur une pièce libre dans le même composant : toujours pas gelé.
+        if ($geste === 'resetForm') {
+            $libre = $this->ligneOrigineEquilibree(7);
+            $formulaire->call('edit', (int) $libre->transaction_id)->assertDontSee(GelRattachement::MOTIF_PIECE_GELEE);
+        } else {
+            expect(verrouBoutonEnregistrer($formulaire))->not->toContain('disabled');
+        }
+    })->with([
+        'une nouvelle saisie' => ['showNewForm'],
+        'la fermeture du formulaire' => ['resetForm'],
+    ]);
+});
+
+describe('TransactionForm : la ventilation d\'une pièce gelée ne refuse que la ligne rattachée', function () {
+    // Le formulaire gelé n'enregistre plus la pièce, mais la ventilation est un geste sur UNE ligne (spec § 7) :
+    // le formulaire ne la bloque pas, c'est le service qui refuse la ligne rattachée, et le refus s'affiche.
+    test('ventile la ligne sœur d\'une ligne rattachée', function () {
+        ['libre' => $libre, 'piece' => $piece] = verrouPieceDontLaSoeurEstRattachee($this, 7);
+
+        Livewire::test(TransactionForm::class)->call('edit', (int) $piece->id)
+            ->call('ouvrirVentilation', (int) $libre->id)
+            ->call('saveVentilation')
+            ->assertHasNoErrors();
+
+        expect(DB::table('transaction_ligne_affectations')->where('transaction_ligne_id', $libre->id)->count())->toBe(1);
+    });
+
+    test('refuse la ligne rattachée, et affiche le refus dans le panneau de ventilation : rien n\'est écrit', function () {
+        $ligne = $this->ligneOrigineEquilibree(7);
+        $provision = verrouRattacherAvecEcritures($this, $ligne);
+        $avant = verrouEmpreinte($ligne, $provision);
+
+        $formulaire = Livewire::test(TransactionForm::class)->call('edit', (int) $ligne->transaction_id)
+            ->call('ouvrirVentilation', (int) $ligne->id)
+            ->call('saveVentilation');
+
+        expect($formulaire->errors()->get('affectations'))->toBe([GelRattachement::MOTIF_PIECE_GELEE])
+            ->and(verrouEmpreinte($ligne, $provision))->toBe($avant);
+    });
+
+    test('refuse la suppression de la ventilation de la ligne rattachée, avec le même refus affiché', function () {
+        $ligne = $this->ligneOrigineEquilibree(7);
+        $provision = verrouRattacherAvecEcritures($this, $ligne);
+        verrouSemerAffectation($ligne->fresh());
+        $avant = verrouEmpreinte($ligne, $provision);
+
+        $formulaire = Livewire::test(TransactionForm::class)->call('edit', (int) $ligne->transaction_id)
+            ->call('ouvrirVentilation', (int) $ligne->id)
+            ->call('supprimerVentilation');
+
+        expect($formulaire->errors()->get('affectations'))->toBe([GelRattachement::MOTIF_PIECE_GELEE])
+            ->and(verrouEmpreinte($ligne, $provision))->toBe($avant);
     });
 });

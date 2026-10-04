@@ -111,6 +111,14 @@
                 @endif
 
                 <form wire:submit="save">
+                    @if ($motifGel !== null)
+                        {{-- Pièce gelée par un rattachement à l'exercice suivant : le motif dès l'ouverture, avant toute saisie.
+                             L'enregistrement est désactivé plus bas ; la ventilation d'une ligne, elle, reste ouverte (le
+                             service ne refuse que la ligne rattachée). --}}
+                        <div class="alert alert-warning small py-2 mb-3" role="alert">
+                            <i class="bi bi-lock"></i> {{ $motifGel }}
+                        </div>
+                    @endif
                     @if ($isExtourneMiroir)
                         <div class="alert alert-info small py-2 mb-3">
                             <i class="bi bi-arrow-repeat"></i> Transaction de remboursement — les montants et catégories sont figés. Vous pouvez renseigner le mode de paiement, le compte bancaire et la date.
@@ -727,8 +735,8 @@
                             <button type="button" wire:click="resetForm" class="btn btn-secondary">{{ $exerciceCloture || ! $this->canEdit ? 'Fermer' : 'Annuler' }}</button>
                             @if (! $exerciceCloture && $this->canEdit)
                             <button type="submit" class="btn btn-success"
-                                    {{ $isLockedByImmobilisation ? 'disabled' : '' }}
-                                    @if ($isLockedByImmobilisation) title="Cette transaction est pilotée par la fiche d’immobilisation : ventilez sans modifier la comptabilité." @elseif ($isLocked || $isLockedByFacture) title="Certains champs sont verrouillés (facture validée ou rapprochement)." @endif>
+                                    {{ $isLockedByImmobilisation || $motifGel !== null ? 'disabled' : '' }}
+                                    @if ($motifGel !== null) title="Pièce gelée par un rattachement : voir le message en haut du formulaire." @elseif ($isLockedByImmobilisation) title="Cette transaction est pilotée par la fiche d’immobilisation : ventilez sans modifier la comptabilité." @elseif ($isLocked || $isLockedByFacture) title="Certains champs sont verrouillés (facture validée ou rapprochement)." @endif>
                                 {{ $transactionId ? 'Mettre à jour' : 'Enregistrer' }}
                             </button>
                             @endif

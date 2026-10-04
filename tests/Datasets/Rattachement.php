@@ -35,3 +35,13 @@ dataset('rattachement_gestes', [
     'delete()' => ['delete'],
     'annuler()' => ['annuler'],
 ]);
+
+/*
+| Les gestes de TransactionService qui écrivent les affectations d'une ligne (Task 8c) : verrouVentiler()
+| les traduit.
+*/
+
+dataset('rattachement_gestes_ventilation', [
+    'affecterLigne()' => ['affecter'],
+    'supprimerAffectations()' => ['supprimer'],
+]);
