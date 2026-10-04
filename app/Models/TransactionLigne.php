@@ -161,7 +161,8 @@ final class TransactionLigne extends Model
 
     /**
      * Les rattachements de cette ligne, sous le scope tenant : bon pour afficher,
-     * pas pour verrouiller — le verrou se lit par estRattachee().
+     * pas pour verrouiller — le verrou se lit par estRattacheeSousVerrou() et par
+     * les gardes de RattachementExerciceService.
      *
      * @return HasMany<Provision, $this>
      */
@@ -172,8 +173,10 @@ final class TransactionLigne extends Model
 
     /**
      * Vrai dès qu'une ligne de provisions référence cette ligne-ci. C'est un fait de
-     * la ligne ; le gel qu'il entraîne porte sur sa transaction entière (spec § 7) :
-     * une garde de transaction interroge donc chacune de ses lignes.
+     * la ligne ; le gel qu'il entraîne porte sur sa transaction entière pour les
+     * gestes qui réécrivent la pièce (spec § 7) — question que
+     * RattachementExerciceService::assertPieceNonGelee() pose pour toutes ses lignes
+     * en une seule lecture.
      *
      * Compte exactement ce que compte la FK restrictOnDelete(), d'où
      * withoutGlobalScopes() SANS argument, délibérément : la FK ignore tout scope,
@@ -188,7 +191,7 @@ final class TransactionLigne extends Model
 
     /**
      * Jumelle d'estRattachee() qui lit SOUS VERROU : à utiliser dans une transaction, par
-     * les gardes qui écrivent ensuite (rattacher(), et les gardes d'écriture des Tasks 7 à 9).
+     * les gardes qui écrivent ensuite (rattacher(), assertLigneNonGelee() du service).
      * C'est une lecture verrouillante DIRECTE (SELECT … FOR UPDATE), et non un EXISTS : on ne
      * s'en remet pas au comportement du moteur sur un FOR UPDATE placé dans une sous-requête.
      * Elle lit le dernier état validé quel que soit le cliché de la transaction et verrouille

@@ -324,6 +324,13 @@ Une ligne rattachée gèle **sa transaction entière** : il n'existe aucun chemi
 exempter, `update()` reconstruisant toutes les lignes. Le refus nomme le rattachement et la
 sortie : le retirer, corriger, le repasser.
 
+Précisé le 2026-10-04 : le gel de la pièce entière vaut pour les gestes qui **réécrivent la
+pièce** — `update()`, `delete()`, `annuler()`, extourne. Les gestes **sur une ligne** —
+reclasser, retirer du formulaire, ventiler, modifier le montant par la synchronisation — ne
+refusent que la ligne rattachée : reclasser une ligne sœur ne touche pas la cohérence du
+rattachement, dont l'écriture ne recopie que la ligne d'origine. Deux gardes au service :
+`assertPieceNonGelee()` et `assertLigneNonGelee()`, qui refusent par défaut.
+
 Sites à garder :
 
 | Site | Geste refusé |
