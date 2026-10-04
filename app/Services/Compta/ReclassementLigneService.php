@@ -126,6 +126,20 @@ final class ReclassementLigneService
                 throw new RuntimeException('Un reçu fiscal a été émis pour cette ligne — annulez-le avant de la reclasser.');
             }
 
+            // Une ligne rattachée à l'exercice suivant ne se reclasse pas : l'écriture de dotation
+            // porte le compte et l'opération de la ligne, et reclasser ici la laisserait sur
+            // l'ancien compte, donc le compte de résultat divergerait. Même grammaire que le reçu
+            // fiscal : le refus nomme la sortie. La ligne est verrouillée d'abord, puis les
+            // rattachements lus par une lecture verrouillante : une lecture simple lirait le cliché
+            // de la transaction, qui peut précéder un rattachement validé entre-temps. Ordre des
+            // verrous (exercice, ligne, rattachements) : sous-suite de celui de rattacher(), donc
+            // pas de cycle possible entre eux.
+            $ligneVerrouillee = TransactionLigne::whereKey((int) $ligne->id)->lockForUpdate()->first();
+
+            if ($ligneVerrouillee?->estRattacheeSousVerrou()) {
+                throw new RuntimeException(RattachementExerciceService::MOTIF_PIECE_GELEE);
+            }
+
             $comptePrecedent = $compteActuel->numero_pcg;
 
             // Le compte d'origine est celui d'avant le PREMIER reclassement :

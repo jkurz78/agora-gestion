@@ -41,6 +41,16 @@ final class RattachementExerciceService
     /** Formulation unique du refus, qui sera partagée avec la détection (Task 10). */
     public const MOTIF_AFFECTATIONS = 'Cette ligne est ventilée sur des opérations : son rattachement n’est pas encore pris en charge.';
 
+    /**
+     * Le message unique du verrou (spec § 7), partagé par TOUS les sites qui refusent d'écrire
+     * sur une pièce dont une ligne est rattachée : reclassement, retrait de ligne, édition,
+     * suppression, annulation, extourne, ventilation, synchronisation HelloAsso. Il nomme le
+     * constat, l'écran où se défait le rattachement et la sortie : le retirer, corriger, le
+     * repasser. Un site qui en formulerait un autre rendrait le refus illisible d'un écran à l'autre.
+     */
+    public const MOTIF_PIECE_GELEE = 'Cette pièce porte un rattachement à l’exercice suivant : pour la modifier, retirez d’abord le rattachement '
+        .'depuis Exercices > Écritures de rattachement, corrigez, puis repassez-le.';
+
     private const MOTIF_DEJA_RATTACHEE = 'Cette ligne est déjà rattachée à l’exercice suivant : retirez son rattachement avant de le refaire.';
 
     private const MOTIF_ANNULATION = 'Cette pièce annule une autre pièce : elle ne peut pas être rattachée à l’exercice suivant.';

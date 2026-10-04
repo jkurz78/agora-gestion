@@ -30,6 +30,7 @@ use App\Models\TransactionLigne;
 use App\Models\TransactionLigneAffectation;
 use App\Services\Compta\PlanComptableSelecteur;
 use App\Services\Compta\PostesTiersOuvertsService;
+use App\Services\Compta\RattachementExerciceService;
 use App\Services\Compta\ReclassementLigneService;
 use App\Services\Compta\TransactionAvecReglementService;
 use App\Services\ExerciceService;
@@ -406,6 +407,19 @@ final class TransactionForm extends Component
 
     public function removeLigne(int $index): void
     {
+        // Retour immédiat, pas la garde : retirer une ligne du formulaire ne touche pas la base,
+        // la suppression réelle n'a lieu qu'à l'enregistrement (TransactionService::update(), gardé
+        // à part). Une lecture simple, hors transaction, suffit donc à prévenir tout de suite.
+        // Seule la ligne rattachée est refusée ici, non ses lignes sœurs : l'enregistrement
+        // refusera de toute façon une pièce dont une ligne est rattachée (spec § 7).
+        $ligneId = $this->lignes[$index]['id'] ?? null;
+
+        if (! empty($ligneId) && TransactionLigne::find((int) $ligneId)?->estRattachee()) {
+            $this->addError('lignes', RattachementExerciceService::MOTIF_PIECE_GELEE);
+
+            return;
+        }
+
         unset($this->lignes[$index]);
         $this->lignes = array_values($this->lignes);
     }
