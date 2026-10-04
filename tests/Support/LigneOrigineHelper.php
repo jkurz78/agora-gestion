@@ -25,13 +25,16 @@ trait LigneOrigineHelper
      * Le tenant courant et l'utilisateur authentifié doivent être posés.
      *
      * Publique, contrairement à LigneDonHelper, pour qu'un helper global d'un fichier
-     * de test puisse la rappeler : `$test->ligneOrigine(7)`.
+     * de test puisse la rappeler : `$test->ligneOrigine(7)`. $mode renseigne le mode de paiement de
+     * la pièce dès sa création ; il est en dernière position pour ne pas déplacer les appels
+     * positionnels existants.
      */
     public function ligneOrigine(
         int $classe,
         float $montant = 175.0,
         ?int $operationId = null,
         ?int $seance = null,
+        ?ModePaiement $mode = null,
     ): TransactionLigne {
         $assocId = (int) TenantContext::currentId();
 
@@ -44,6 +47,7 @@ trait LigneOrigineHelper
             'date' => '2026-04-08',
             'libelle' => 'Pièce d’origine',
             'montant_total' => $montant,
+            'mode_paiement' => $mode,
             'saisi_par' => auth()->id(),
             'equilibree' => true,
             'type_ecriture' => 'normale',
@@ -81,12 +85,7 @@ trait LigneOrigineHelper
         ?int $operationId = null,
         ?int $seance = null,
     ): TransactionLigne {
-        $ligne = $this->ligneOrigine($classe, $montant, $operationId, $seance);
-
-        if ($mode !== null) {
-            Transaction::whereKey((int) $ligne->transaction_id)->firstOrFail()
-                ->forceFill(['mode_paiement' => $mode])->save();
-        }
+        $ligne = $this->ligneOrigine($classe, $montant, $operationId, $seance, $mode);
 
         TransactionLigne::create([
             'transaction_id' => $ligne->transaction_id,
