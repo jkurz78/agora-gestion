@@ -9,6 +9,7 @@ use App\Models\Extourne;
 use App\Models\Provision;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Services\Compta\GelRattachement;
 use App\Services\Compta\RattachementExerciceService;
 use App\Services\Compta\ReclassementLigneService;
 use App\Services\TransactionExtourneService;
@@ -155,8 +156,8 @@ function verrouAssertRefuse(Closure $geste, TransactionLigne $ligne, Provision $
         ->not->toBeInstanceOf(QueryException::class);
     expect($refus->getMessage())->toBe($message);
 
-    expect(RattachementExerciceService::MOTIF_PIECE_GELEE)->toBe(VERROU_MESSAGE)
-        ->and(RattachementExerciceService::MOTIF_ECRITURE_DE_RATTACHEMENT)->toBe(VERROU_MESSAGE_ECRITURE);
+    expect(GelRattachement::MOTIF_PIECE_GELEE)->toBe(VERROU_MESSAGE)
+        ->and(GelRattachement::MOTIF_ECRITURE_DE_RATTACHEMENT)->toBe(VERROU_MESSAGE_ECRITURE);
 
     expect(verrouEmpreinte($ligne, $provision))->toBe($avant);
 }

@@ -19,6 +19,7 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\TransactionLigneAffectation;
 use App\Models\User;
+use App\Services\Compta\GelRattachement;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\Compta\RattachementExerciceService;
 use App\Services\TransactionExtourneService;
@@ -1059,7 +1060,7 @@ describe('RattachementExerciceService : retrait', function () {
         expect($echec)->not->toBeNull()
             ->toBeInstanceOf(RuntimeException::class)
             ->not->toBeInstanceOf(QueryException::class);
-        expect($echec->getMessage())->toBe(RattachementExerciceService::MOTIF_PIECE_GELEE);
+        expect($echec->getMessage())->toBe(GelRattachement::MOTIF_PIECE_GELEE);
 
         expect(Transaction::findOrFail($ligne->transaction_id)->libelle)->toBe('Pièce d’origine');
         expect(TransactionLigne::find($ligne->id))->not->toBeNull();

@@ -17,6 +17,7 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Services\Compta\GelRattachement;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\Compta\RattachementExerciceService;
 use App\Services\Compta\VerrouLotsCanoniques;
@@ -268,17 +269,17 @@ describe('TransactionLigne::estRattacheeSousVerrou()', function () {
 // directement ; ensuite un test par SITE tue l'appel posé à ce site, et celui-là seulement : retirer
 // l'appel de reclasser() ne fait tomber que les tests de reclasser(), alors que casser la garde du
 // service fait tomber les siens. Tous les sites refusent avec le même message
-// (RattachementExerciceService::MOTIF_PIECE_GELEE), que ce fichier épingle au mot près : les
+// (GelRattachement::MOTIF_PIECE_GELEE), que ce fichier épingle au mot près : les
 // tests le comparent à VERROU_MESSAGE. Les helpers de ces tests (VERROU_MESSAGE, verrou…()) vivent
 // dans tests/Helpers/RattachementVerrou.php : les tests des sites suivants s'en servent aussi.
 
-describe('RattachementExerciceService::assertLigneNonGelee()', function () {
+describe('GelRattachement::assertLigneNonGelee()', function () {
     test('refuse une ligne rattachée : le message exact, et rien n\'a bougé', function (int $classe) {
         $ligne = $this->ligneOrigineEquilibree($classe);
         $provision = verrouRattacherAvecEcritures($this, $ligne);
 
         verrouAssertRefuse(
-            fn () => app(RattachementExerciceService::class)->assertLigneNonGelee($ligne),
+            fn () => app(GelRattachement::class)->assertLigneNonGelee($ligne),
             $ligne,
             $provision,
         );
@@ -293,7 +294,7 @@ describe('RattachementExerciceService::assertLigneNonGelee()', function () {
         // Garde anti-test-vide : la sœur est bien rattachée, et la ligne libre l'est bien pas.
         expect($soeur->fresh()->estRattachee())->toBeTrue();
 
-        verrouAssertPasse(fn () => app(RattachementExerciceService::class)->assertLigneNonGelee($libre), $libre);
+        verrouAssertPasse(fn () => app(GelRattachement::class)->assertLigneNonGelee($libre), $libre);
     })->with('rattachement_classes');
 
     test('refuse une ligne rattachée PUIS supprimée logiquement : lire la ligne sous verrou ne la trouverait plus, et laisserait passer', function (int $classe) {
@@ -309,12 +310,12 @@ describe('RattachementExerciceService::assertLigneNonGelee()', function () {
         // L'instance qu'on a déjà, et une instance relue avec ses suppressions logiques : la garde ne
         // dépend que de l'identifiant.
         verrouAssertRefuse(
-            fn () => app(RattachementExerciceService::class)->assertLigneNonGelee($ligne),
+            fn () => app(GelRattachement::class)->assertLigneNonGelee($ligne),
             $ligne,
             $provision,
         );
         verrouAssertRefuse(
-            fn () => app(RattachementExerciceService::class)->assertLigneNonGelee(TransactionLigne::withTrashed()->findOrFail($ligne->id)),
+            fn () => app(GelRattachement::class)->assertLigneNonGelee(TransactionLigne::withTrashed()->findOrFail($ligne->id)),
             $ligne,
             $provision,
         );
@@ -333,7 +334,7 @@ describe('RattachementExerciceService::assertLigneNonGelee()', function () {
         expect(Provision::count())->toBe(0)
             ->and(TransactionLigne::find($ligne->id))->toBeNull();
 
-        $service = app(RattachementExerciceService::class);
+        $service = app(GelRattachement::class);
 
         expect(verrouMessageDuRefus(fn () => $service->assertLigneNonGelee($ligne)))->toBe(VERROU_MESSAGE);
 
@@ -353,7 +354,7 @@ describe('RattachementExerciceService::assertLigneNonGelee()', function () {
             ->and((int) $ligneDeLEcriture->transaction->provision_id)->toBe((int) $provision->id);
 
         verrouAssertRefuse(
-            fn () => app(RattachementExerciceService::class)->assertLigneNonGelee($ligneDeLEcriture),
+            fn () => app(GelRattachement::class)->assertLigneNonGelee($ligneDeLEcriture),
             $ligne,
             $provision,
             VERROU_MESSAGE_ECRITURE,
@@ -381,7 +382,7 @@ describe('RattachementExerciceService::assertLigneNonGelee()', function () {
         expect(TransactionLigne::withoutGlobalScopes()->whereKey($ligneDeLEcriture->id)->exists())->toBeTrue()
             ->and(Transaction::query()->whereKey($ligneDeLEcriture->transaction_id)->exists())->toBe($cas === 'ligne supprimée');
 
-        $service = app(RattachementExerciceService::class);
+        $service = app(GelRattachement::class);
 
         expect(verrouMessageDuRefus(fn () => $service->assertLigneNonGelee($ligneDeLEcriture)))->toBe(VERROU_MESSAGE_ECRITURE);
 
@@ -402,7 +403,7 @@ describe('RattachementExerciceService::assertLigneNonGelee()', function () {
     test('verrouille la ligne, tous scopes levés, puis lit les rattachements : « for update » dans cet ordre, sans EXISTS (MariaDB)', function () {
         $ligne = $this->ligneOrigineEquilibree(7);
         $provision = verrouRattacherAvecEcritures($this, $ligne);
-        $service = app(RattachementExerciceService::class);
+        $service = app(GelRattachement::class);
 
         $requetes = rattachementRequetesDeLaTransaction(
             fn () => DB::transaction(fn () => expect(fn () => $service->assertLigneNonGelee($ligne))
@@ -443,7 +444,7 @@ describe('RattachementExerciceService::assertLigneNonGelee()', function () {
     });
 });
 
-describe('RattachementExerciceService::verrouillerPieceNonGelee()', function () {
+describe('GelRattachement::verrouillerPieceNonGelee()', function () {
     test('refuse une pièce dont une ligne est rattachée, même si ce n\'est pas la première : le message exact, et rien n\'a bougé', function (int $classe) {
         ['libre' => $libre, 'soeur' => $soeur, 'provision' => $provision, 'piece' => $piece] = verrouPieceDontLaSoeurEstRattachee($this, $classe);
 
@@ -453,7 +454,7 @@ describe('RattachementExerciceService::verrouillerPieceNonGelee()', function () 
             ->and((int) $soeur->id)->toBeGreaterThan((int) $libre->id);
 
         verrouAssertRefuse(
-            fn () => app(RattachementExerciceService::class)->verrouillerPieceNonGelee($piece),
+            fn () => app(GelRattachement::class)->verrouillerPieceNonGelee($piece),
             $soeur,
             $provision,
         );
@@ -465,7 +466,7 @@ describe('RattachementExerciceService::verrouillerPieceNonGelee()', function () 
         $libre = $this->ligneOrigineEquilibree($classe);
         $piece = Transaction::findOrFail($libre->transaction_id);
 
-        verrouAssertPasse(fn () => app(RattachementExerciceService::class)->verrouillerPieceNonGelee($piece), $libre);
+        verrouAssertPasse(fn () => app(GelRattachement::class)->verrouillerPieceNonGelee($piece), $libre);
     })->with('rattachement_classes');
 
     test('refuse quand la ligne rattachée, la pièce, ou les deux, sont supprimées logiquement : les suppressions logiques ne dégèlent rien', function (bool $ligneSupprimee, bool $pieceSupprimee) {
@@ -484,7 +485,7 @@ describe('RattachementExerciceService::verrouillerPieceNonGelee()', function () 
             ->and(DB::table('provisions')->where('id', $provision->id)->exists())->toBeTrue();
 
         verrouAssertRefuse(
-            fn () => app(RattachementExerciceService::class)->verrouillerPieceNonGelee($piece),
+            fn () => app(GelRattachement::class)->verrouillerPieceNonGelee($piece),
             $soeur,
             $provision,
         );
@@ -505,7 +506,7 @@ describe('RattachementExerciceService::verrouillerPieceNonGelee()', function () 
         expect(Provision::count())->toBe(0)
             ->and(TransactionLigne::where('transaction_id', $piece->id)->count())->toBe(0);
 
-        $service = app(RattachementExerciceService::class);
+        $service = app(GelRattachement::class);
 
         expect(verrouMessageDuRefus(fn () => $service->verrouillerPieceNonGelee($piece)))->toBe(VERROU_MESSAGE);
 
@@ -517,7 +518,7 @@ describe('RattachementExerciceService::verrouillerPieceNonGelee()', function () 
 
     test('verrouille les lots 401/411, puis la pièce, puis ses lignes, puis lit les rattachements en UNE lecture : « for update » dans cet ordre (MariaDB)', function () {
         ['soeur' => $soeur, 'provision' => $provision, 'piece' => $piece] = verrouPieceDontLaSoeurEstRattachee($this, 7);
-        $service = app(RattachementExerciceService::class);
+        $service = app(GelRattachement::class);
 
         $requetes = rattachementRequetesDeLaTransaction(
             fn () => DB::transaction(fn () => expect(fn () => $service->verrouillerPieceNonGelee($piece))
@@ -569,7 +570,7 @@ describe('RattachementExerciceService::verrouillerPieceNonGelee()', function () 
     test('rend la pièce relue sous verrou, et lève une ModelNotFoundException quand elle n\'existe plus', function () {
         $ligne = $this->ligneOrigineEquilibree(7);
         $piece = Transaction::findOrFail($ligne->transaction_id);
-        $service = app(RattachementExerciceService::class);
+        $service = app(GelRattachement::class);
 
         // L'instance de l'appelant est périmée : la pièce rendue est celle de la base, sous verrou.
         DB::table('transactions')->where('id', $piece->id)->update(['libelle' => 'Libellé de la base']);
@@ -825,7 +826,7 @@ describe('TransactionForm::removeLigne() : retour immédiat sur une ligne rattac
 
         $formulaire->call('removeLigne', $index)
             ->assertHasErrors('lignes')
-            ->assertSee(RattachementExerciceService::MOTIF_PIECE_GELEE);
+            ->assertSee(GelRattachement::MOTIF_PIECE_GELEE);
 
         expect(verrouIdsAffiches($formulaire))->toContain((int) $ligne->id);
     })->with('rattachement_classes');
@@ -873,12 +874,12 @@ describe('TransactionForm::removeLigne() : retour immédiat sur une ligne rattac
 
         $formulaire->call('removeLigne', 0)
             ->assertHasErrors('lignes')
-            ->assertSee(RattachementExerciceService::MOTIF_PIECE_GELEE);
+            ->assertSee(GelRattachement::MOTIF_PIECE_GELEE);
 
         // Le geste suivant réussit : le message du précédent refus disparaît.
         $formulaire->call('removeLigne', 1)
             ->assertHasNoErrors('lignes')
-            ->assertDontSee(RattachementExerciceService::MOTIF_PIECE_GELEE);
+            ->assertDontSee(GelRattachement::MOTIF_PIECE_GELEE);
 
         expect(verrouIdsAffiches($formulaire))->toBe([(int) $rattachee->id]);
     });
@@ -891,11 +892,11 @@ describe('TransactionForm::removeLigne() : retour immédiat sur une ligne rattac
 
         $formulaire->call('removeLigne', 0)
             ->assertHasErrors('lignes')
-            ->assertSee(RattachementExerciceService::MOTIF_PIECE_GELEE);
+            ->assertSee(GelRattachement::MOTIF_PIECE_GELEE);
 
         $formulaire->call('addLigne')
             ->assertHasNoErrors('lignes')
-            ->assertDontSee(RattachementExerciceService::MOTIF_PIECE_GELEE);
+            ->assertDontSee(GelRattachement::MOTIF_PIECE_GELEE);
     });
 });
 

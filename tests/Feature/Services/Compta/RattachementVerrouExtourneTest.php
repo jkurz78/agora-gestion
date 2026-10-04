@@ -16,10 +16,17 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Services\Compta\EcritureGenerator;
+use App\Services\Compta\GelRattachement;
 use App\Services\Compta\Migrations\SystemeSeeder;
+use App\Services\Compta\ProvisionPDService;
 use App\Services\Compta\RattachementExerciceService;
+use App\Services\Compta\ReclassementLigneService;
+use App\Services\Compta\VerrouLotsCanoniques;
+use App\Services\ExerciceService;
 use App\Services\FactureService;
 use App\Services\TransactionExtourneService;
+use App\Services\TransactionService;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -36,7 +43,7 @@ use Livewire\Livewire;
 | le dernier jour de N (elle retirerait deux fois le même montant de N), permise après (elle est juste,
 | et sans elle la pièce ne pourrait plus jamais être annulée une fois N clôturé). Une écriture de
 | rattachement, elle, ne s'annule jamais ici, à aucune date. La garde vit au service,
-| RattachementExerciceService::verrouillerPieceExtournable(), que TransactionExtourneService::extourner()
+| GelRattachement::verrouillerPieceExtournable(), que TransactionExtourneService::extourner()
 | appelle dans sa transaction, avant de numéroter le miroir. Les helpers (verrouExtourner(),
 | verrouAssertExtourneRefusee()…) vivent dans tests/Helpers/RattachementVerrou.php.
 |
@@ -148,7 +155,7 @@ describe('TransactionExtourneService::extourner() : une pièce rattachée à N',
     })->with('rattachement_classes');
 });
 
-describe('RattachementExerciceService::verrouillerPieceExtournable()', function () {
+describe('GelRattachement::verrouillerPieceExtournable()', function () {
     // Une pièce est dans un seul exercice, donc ses rattachements sont tous du même : ce cas n'arrive pas par les
     // écrans. La garde ne le suppose pourtant pas : elle refuse dès que l'annulation tombe dans l'un d'eux, c'est-à-dire
     // qu'elle compare la date à la fin du plus récent.
@@ -167,7 +174,7 @@ describe('RattachementExerciceService::verrouillerPieceExtournable()', function 
         }
 
         $piece = Transaction::findOrFail($premiere->transaction_id);
-        $service = app(RattachementExerciceService::class);
+        $service = app(GelRattachement::class);
         $garde = fn (string $date): ?string => verrouMessageDuRefus(
             fn () => DB::transaction(fn () => $service->verrouillerPieceExtournable($piece, Carbon::parse($date)))
         );
@@ -181,7 +188,7 @@ describe('RattachementExerciceService::verrouillerPieceExtournable()', function 
     test('rend la pièce relue sous verrou, et lève une ModelNotFoundException quand elle n\'existe plus', function () {
         $ligne = $this->ligneOrigineEquilibree(7, 175.0, ModePaiement::Virement);
         $piece = Transaction::findOrFail($ligne->transaction_id);
-        $service = app(RattachementExerciceService::class);
+        $service = app(GelRattachement::class);
 
         // L'instance de l'appelant est périmée : la pièce rendue est celle de la base.
         DB::table('transactions')->where('id', $piece->id)->update(['libelle' => 'Libellé de la base']);
@@ -285,6 +292,44 @@ describe('TransactionExtourneService::extourner() : l\'ordre des verrous', funct
                 ->and($verrouNumero[0])->toBeGreaterThan($indices['rattachements']);
         }
     });
+});
+
+describe('GelRattachement : le graphe d\'injection', function () {
+    // Le gel est reçu par les gestes qu'il protège : il ne doit atteindre, par son constructeur, aucun
+    // d'eux, ni ce qui crée ou défait un rattachement. Sans cela, un cycle d'injection est possible, et
+    // l'écriture comptable entre dans la chaîne de construction d'un geste qui ne fait que se protéger.
+    test('GelRattachement ne dépend que d\'ExerciceService et de VerrouLotsCanoniques : ni ProvisionPDService, ni EcritureGenerator, ni aucun geste protégé', function () {
+        $dependances = verrouDependancesDuConstructeur(GelRattachement::class);
+
+        // Garde anti-test-vide : le parcours atteint bien ses deux dépendances, et elles seules.
+        expect($dependances)->toEqualCanonicalizing([ExerciceService::class, VerrouLotsCanoniques::class]);
+
+        foreach ([
+            ProvisionPDService::class,
+            EcritureGenerator::class,
+            RattachementExerciceService::class,
+            TransactionService::class,
+            TransactionExtourneService::class,
+            ReclassementLigneService::class,
+        ] as $interdite) {
+            expect($dependances)->not->toContain($interdite);
+        }
+    });
+
+    test('chaque geste protégé reçoit le gel, et n\'atteint ni le service de rattachement ni ProvisionPDService : pas de cycle d\'injection', function (string $geste) {
+        $dependances = verrouDependancesDuConstructeur($geste);
+
+        expect($dependances)->toContain(GelRattachement::class)
+            ->and($dependances)->not->toContain(RattachementExerciceService::class)
+            ->and($dependances)->not->toContain(ProvisionPDService::class);
+
+        // Il se résout.
+        expect(app($geste))->toBeInstanceOf($geste);
+    })->with([
+        'TransactionService' => [TransactionService::class],
+        'TransactionExtourneService' => [TransactionExtourneService::class],
+        'ReclassementLigneService' => [ReclassementLigneService::class],
+    ]);
 
     test('RattachementExerciceService n\'atteint jamais TransactionExtourneService par son constructeur : pas de cycle d\'injection', function () {
         $dependances = verrouDependancesDuConstructeur(RattachementExerciceService::class);
@@ -293,11 +338,8 @@ describe('TransactionExtourneService::extourner() : l\'ordre des verrous', funct
         expect($dependances)->not->toBeEmpty()
             ->and($dependances)->not->toContain(TransactionExtourneService::class);
 
-        // Et le sens inverse existe bien : l'extourne dépend du rattachement.
-        expect(verrouDependancesDuConstructeur(TransactionExtourneService::class))->toContain(RattachementExerciceService::class);
-
-        // Les deux se résolvent.
-        expect(app(TransactionExtourneService::class))->toBeInstanceOf(TransactionExtourneService::class);
+        // Il se résout.
+        expect(app(RattachementExerciceService::class))->toBeInstanceOf(RattachementExerciceService::class);
     });
 });
 

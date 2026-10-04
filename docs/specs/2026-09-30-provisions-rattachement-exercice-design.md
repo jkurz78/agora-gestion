@@ -329,7 +329,10 @@ pièce** — `update()`, `delete()`, `annuler()`, extourne. Les gestes **sur une
 reclasser, retirer du formulaire, ventiler, modifier le montant par la synchronisation — ne
 refusent que la ligne rattachée : reclasser une ligne sœur ne touche pas la cohérence du
 rattachement, dont l'écriture ne recopie que la ligne d'origine. Deux gardes au service :
-`verrouillerPieceNonGelee()` et `assertLigneNonGelee()`, qui refusent par défaut.
+`verrouillerPieceNonGelee()` et `assertLigneNonGelee()`, qui refusent par défaut. Elles vivent dans
+`GelRattachement`, classe à part du service de rattachement : elle ne dépend d'aucune écriture
+comptable (ni `ProvisionPDService` ni `EcritureGenerator`), pour que les gestes qu'elle protège la
+reçoivent sans cycle d'injection possible.
 
 **Les écritures de rattachement elles-mêmes** (dotation et extourne, `transactions.provision_id`
 renseigné) ne se modifient, ne se suppriment et ne s'annulent **que par le retrait du

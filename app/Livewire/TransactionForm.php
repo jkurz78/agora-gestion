@@ -28,9 +28,9 @@ use App\Models\Operation;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\TransactionLigneAffectation;
+use App\Services\Compta\GelRattachement;
 use App\Services\Compta\PlanComptableSelecteur;
 use App\Services\Compta\PostesTiersOuvertsService;
-use App\Services\Compta\RattachementExerciceService;
 use App\Services\Compta\ReclassementLigneService;
 use App\Services\Compta\TransactionAvecReglementService;
 use App\Services\ExerciceService;
@@ -421,7 +421,7 @@ final class TransactionForm extends Component
         $ligneId = $this->lignes[$index]['id'] ?? null;
 
         if (! empty($ligneId) && TransactionLigne::find((int) $ligneId)?->estRattachee()) {
-            $this->addError('lignes', RattachementExerciceService::MOTIF_PIECE_GELEE);
+            $this->addError('lignes', GelRattachement::MOTIF_PIECE_GELEE);
 
             return;
         }

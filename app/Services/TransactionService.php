@@ -16,9 +16,9 @@ use App\Models\TransactionLigne;
 use App\Services\Compta\CompteTresorerieResolver;
 use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\EtatReglementResolver;
+use App\Services\Compta\GelRattachement;
 use App\Services\Compta\LettrageService;
 use App\Services\Compta\PartieDoubleGuard;
-use App\Services\Compta\RattachementExerciceService;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
@@ -51,7 +51,7 @@ final class TransactionService
         private readonly EcritureGenerator $ecritureGenerator,
         private readonly LettrageService $lettrageService,
         private readonly EtatReglementResolver $etatReglementResolver,
-        private readonly RattachementExerciceService $rattachement,
+        private readonly GelRattachement $gel,
     ) {}
 
     public function create(array $data, array $lignes): Transaction
@@ -382,7 +382,7 @@ final class TransactionService
 
             // L'unique chemin de verrouillage de la pièce : la garde du rattachement prend les lots
             // 401/411, puis la pièce, puis ses lignes et leurs rattachements (voir
-            // RattachementExerciceService::verrouillerPieceNonGelee()), et refuse une pièce dont une ligne est
+            // GelRattachement::verrouillerPieceNonGelee()), et refuse une pièce dont une ligne est
             // rattachée à l'exercice suivant : update() détruit puis recrée toutes les lignes, ce que la
             // clé étrangère des rattachements refuserait par une erreur SQL brute. Elle rend la pièce
             // verrouillée, sur laquelle on poursuit.
@@ -391,7 +391,7 @@ final class TransactionService
             // garde, dans cet ordre) ; puis le rapprochement ; puis la T2 d'encaissement ou de règlement (sa
             // pièce, ses lignes) ; puis la suppression des lignes, déjà tenues. Les lignes sont donc prises
             // AVANT la T2, par la garde, et non plus à la fin, par leur suppression.
-            $transaction = $this->rattachement->verrouillerPieceNonGelee($transaction);
+            $transaction = $this->gel->verrouillerPieceNonGelee($transaction);
 
             // La garde verrouille la pièce tous scopes levés (une pièce supprimée porte encore ses
             // rattachements) ; l'édition ne vaut que pour une pièce vivante. L'ancien verrouillage, sous
@@ -835,7 +835,7 @@ final class TransactionService
             $this->exerciceService->assertOuvertVerrouille(
                 $this->exerciceService->anneeForDate(CarbonImmutable::parse($transaction->date))
             );
-            $transaction = $this->rattachement->verrouillerPieceNonGelee($transaction);
+            $transaction = $this->gel->verrouillerPieceNonGelee($transaction);
 
             // Les contrôles faits plus haut sur l'instance reçue, refaits sur la pièce verrouillée : un
             // pointage, une remise ou une facture arrivés depuis la lecture de l'instance ne doivent pas
@@ -884,7 +884,7 @@ final class TransactionService
             $this->exerciceService->assertOuvertVerrouille(
                 $this->exerciceService->anneeForDate(CarbonImmutable::parse($transaction->date))
             );
-            $transaction = $this->rattachement->verrouillerPieceNonGelee($transaction);
+            $transaction = $this->gel->verrouillerPieceNonGelee($transaction);
 
             // Les contrôles faits plus haut sur l'instance reçue, refaits sur la pièce verrouillée. Surtout
             // l'extourne : une annulation par extourne (TransactionExtourneService::extourner()) qui validerait

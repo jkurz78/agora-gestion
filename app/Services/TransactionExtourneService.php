@@ -12,8 +12,8 @@ use App\Models\Extourne;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\Compta\EcritureGenerator;
+use App\Services\Compta\GelRattachement;
 use App\Services\Compta\PartieDoubleGuard;
-use App\Services\Compta\RattachementExerciceService;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -34,7 +34,7 @@ final class TransactionExtourneService
     public function __construct(
         private readonly NumeroPieceService $numeroPiece,
         private readonly ExerciceService $exerciceService,
-        private readonly RattachementExerciceService $rattachement,
+        private readonly GelRattachement $gel,
     ) {}
 
     /**
@@ -46,7 +46,7 @@ final class TransactionExtourneService
      *
      * Une pièce portée par un rattachement à l'exercice suivant (CCA/PCA) ne s'annule que si l'annulation
      * est datée APRÈS le dernier jour de l'exercice rattaché (D13) ; une écriture de rattachement ne
-     * s'annule jamais ici : voir RattachementExerciceService::verrouillerPieceExtournable().
+     * s'annule jamais ici : voir GelRattachement::verrouillerPieceExtournable().
      */
     public function extourner(Transaction $origine, ExtournePayload $payload): Extourne
     {
@@ -85,7 +85,7 @@ final class TransactionExtourneService
 
             // Seule garde datée : l'annulation d'une pièce rattachée n'est refusée que si elle est datée au
             // plus tard le dernier jour de N. Elle rend la pièce relue sous verrou.
-            $origine = $this->rattachement->verrouillerPieceExtournable($origine, $payload->date, $payload->dateImposee);
+            $origine = $this->gel->verrouillerPieceExtournable($origine, $payload->date, $payload->dateImposee);
 
             // Les contrôles faits plus haut sur l'instance reçue, refaits sur la pièce verrouillée : son
             // état a pu changer entre la lecture et le verrou. Surtout `extournee_at` : une extourne

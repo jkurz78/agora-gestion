@@ -18,7 +18,7 @@ final class ExtournePayload
         /**
          * Vrai quand la date n'a pas été choisie : c'est celle du jour, que l'appelant impose parce que
          * personne ne la saisit (annulation d'une facture). Un refus qui tient à la date ne doit alors pas
-         * proposer de « dater l'annulation » autrement (RattachementExerciceService::verrouillerPieceExtournable()).
+         * proposer de « dater l'annulation » autrement (GelRattachement::verrouillerPieceExtournable()).
          * Faux pour toute date donnée, même égale à celle du jour : la fenêtre d'annulation la pré-remplit
          * et l'utilisateur peut la changer.
          */

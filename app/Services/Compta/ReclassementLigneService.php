@@ -45,7 +45,7 @@ final class ReclassementLigneService
 
     public function __construct(
         private readonly ExerciceService $exerciceService,
-        private readonly RattachementExerciceService $rattachement,
+        private readonly GelRattachement $gel,
     ) {}
 
     public function reclasser(
@@ -133,8 +133,8 @@ final class ReclassementLigneService
             // recopie son compte et son opération, et reclasser ici la laisserait sur l'ancien
             // compte, donc le compte de résultat divergerait. Même grammaire que le reçu fiscal : le
             // refus nomme la sortie. La garde (verrou de la ligne, rattachements lus sous verrou,
-            // refus par défaut) vit au service du rattachement.
-            $this->rattachement->assertLigneNonGelee($ligne);
+            // refus par défaut) vit dans GelRattachement.
+            $this->gel->assertLigneNonGelee($ligne);
 
             $comptePrecedent = $compteActuel->numero_pcg;
 
