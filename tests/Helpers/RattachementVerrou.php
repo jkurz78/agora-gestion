@@ -186,6 +186,30 @@ function verrouPieceDontLaSoeurEstRattachee(TestCase $test, int $classe): array
     ];
 }
 
+/**
+ * Rattache une ligne d'origine de la classe $classe, et rend, avec elle et son rattachement, la ligne de
+ * RÉSULTAT (classe 6 ou 7) de l'écriture de rattachement $ecriture : « normale » (la dotation) ou
+ * « extourne » (le miroir). Cette ligne ne porte aucun rattachement : c'est sa pièce qui en est une.
+ *
+ * @return array{ligne: TransactionLigne, provision: Provision, piece: Transaction, ecriture: TransactionLigne}
+ *                                                                                                              la ligne d'origine,
+ *                                                                                                              son rattachement, la pièce de
+ *                                                                                                              l'écriture, sa ligne de résultat
+ */
+function verrouEcritureDeRattachement(TestCase $test, int $classe, string $ecriture): array
+{
+    $ligne = $test->ligneOrigineEquilibree($classe);
+    $provision = verrouRattacherAvecEcritures($test, $ligne);
+    $piece = Transaction::where('provision_id', (int) $provision->id)->where('type_ecriture', $ecriture)->sole();
+
+    return [
+        'ligne' => $ligne,
+        'provision' => $provision,
+        'piece' => $piece,
+        'ecriture' => $piece->lignes()->whereHas('compte', fn ($q) => $q->whereIn('classe', [6, 7]))->sole(),
+    ];
+}
+
 /** Le geste du site de ReclassementLigneService : reclasser $ligne vers $compte, avec un motif suffisant. */
 function verrouReclasser(TestCase $test, TransactionLigne $ligne, Compte $compte): TransactionLigne
 {
@@ -294,7 +318,7 @@ function verrouEmpreinteDeLaPiece(int $pieceId): array
 }
 
 /**
- * Classe les requêtes émises par la garde de la pièce (assertPieceNonGelee()) : la liste des lots 401/411,
+ * Classe les requêtes émises par la garde de la pièce (verrouillerPieceNonGelee()) : la liste des lots 401/411,
  * leur verrou, le verrou de la pièce, celui de ses lignes, la lecture verrouillante des rattachements. Chacune
  * doit se trouver EXACTEMENT UNE fois : une lecture en double (la pièce verrouillée deux fois) ou manquante
  * fait échouer, avec l'inventaire des requêtes. Rend nom => indice, dans l'ordre où elles ont été émises.

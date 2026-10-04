@@ -35,7 +35,7 @@ use RuntimeException;
  *
  * Le VERROU d'une ligne rattachée (§ 7) vit ici aussi : les gestes qui écrivent sur une pièce
  * dont une ligne est rattachée s'y réfèrent par assertLigneNonGelee() (une ligne) et
- * assertPieceNonGelee() (la pièce entière), plutôt que de relire eux-mêmes les rattachements.
+ * verrouillerPieceNonGelee() (la pièce entière), plutôt que de relire eux-mêmes les rattachements.
  * Elles refusent par défaut et partagent le message MOTIF_PIECE_GELEE.
  *
  * Référence : docs/specs/2026-09-30-provisions-rattachement-exercice-design.md
@@ -449,10 +449,11 @@ final class RattachementExerciceService
 
     /**
      * Garde du verrou (spec § 7) pour un geste qui écrit sur UNE ligne : refuse, par le message
-     * unique MOTIF_PIECE_GELEE, si cette ligne porte un rattachement. Les gestes qui touchent la
-     * pièce entière appellent assertPieceNonGelee(). Sites : le reclassement (Task 7) ; la
-     * ventilation, affecterLigne() et supprimerAffectations() (Task 8c) ; la synchronisation HelloAsso
-     * (Task 9).
+     * unique MOTIF_PIECE_GELEE, si cette ligne porte un rattachement, et par MOTIF_ECRITURE_DE_RATTACHEMENT
+     * si la ligne appartient à une écriture de rattachement (dotation ou extourne générée). Les gestes
+     * qui réécrivent la pièce entière appellent verrouillerPieceNonGelee(). Sites : le reclassement
+     * (Task 7) ; la ventilation, affecterLigne() et supprimerAffectations() (Task 8c) ; la
+     * synchronisation HelloAsso (Task 9).
      *
      * À appeler DANS la transaction de l'appelant, APRÈS ses verrous d'exercice : les verrous
      * pris ici tiennent jusqu'à son commit, et c'est ce qui rend la lecture vraie au moment d'écrire.
@@ -464,6 +465,18 @@ final class RattachementExerciceService
      * rattachement validé pendant l'attente est lu au déverrouillage, et un rattachement concurrent
      * attend la fin de l'appelant.
      *
+     * Une ligne d'écriture de rattachement ne porte jamais de rattachement (elle n'est l'origine
+     * d'aucun) : sans le premier refus ci-dessous, tout geste sur une ligne la laisserait passer. La
+     * ligne de charge de la dotation d'une CCA, par exemple, est une ligne de pièce de type Dépense que
+     * le reclassement accepte : reclassée, elle porterait la dotation sur un compte et l'extourne sur
+     * l'autre, et le résultat de N et de N+1 serait faux. Cette lecture ne verrouille pas, et n'inverse
+     * donc pas l'ordre ligne / pièce : `provision_id` d'une écriture vivante ne change jamais. Il est
+     * posé à la création de l'écriture, et ne repasse à nul que par la suppression du rattachement
+     * (clé étrangère en nullOnDelete), qui suit la suppression physique de ses écritures
+     * (ProvisionPDService::supprimer()) : une écriture vivante ne perd donc pas son marqueur, et une
+     * pièce ordinaire n'en reçoit jamais. Tous scopes levés, comme le reste de la garde : une pièce
+     * supprimée logiquement ou hors du contexte d'association garde son marqueur.
+     *
      * REFUSE PAR DÉFAUT : la décision ne dépend que de l'identifiant de l'instance reçue, jamais
      * d'une relecture de la ligne. Une ligne supprimée logiquement, ou lue hors du contexte
      * d'association, est introuvable par une lecture ordinaire (suppression logique, scope tenant
@@ -472,10 +485,17 @@ final class RattachementExerciceService
      * tous les scopes. Le verrou de ligne ne décide de rien : il exclut, et s'il ne trouvait rien,
      * la lecture des rattachements décide quand même.
      *
-     * @throws RuntimeException MOTIF_PIECE_GELEE si la ligne porte un rattachement
+     * @throws RuntimeException MOTIF_PIECE_GELEE si la ligne porte un rattachement ;
+     *                          MOTIF_ECRITURE_DE_RATTACHEMENT si sa pièce est une écriture de rattachement
      */
     public function assertLigneNonGelee(TransactionLigne $ligne): void
     {
+        // Avant tout verrou : une écriture de rattachement n'est l'origine d'aucun rattachement, il n'y a
+        // rien d'autre à lire ni à exclure. Voir la justification de la lecture sans verrou, plus haut.
+        if (Transaction::withoutGlobalScopes()->whereKey((int) $ligne->transaction_id)->value('provision_id') !== null) {
+            throw new RuntimeException(self::MOTIF_ECRITURE_DE_RATTACHEMENT);
+        }
+
         // Tous scopes levés (suppression logique ET scope tenant) : cette lecture n'en tire aucune
         // donnée, elle pose le verrou. Un verrou qui ne s'appliquerait pas hors contexte
         // d'association laisserait rattacher() s'intercaler.
@@ -530,7 +550,7 @@ final class RattachementExerciceService
      *                          MOTIF_ECRITURE_DE_RATTACHEMENT si la pièce est une écriture de rattachement
      * @throws ModelNotFoundException la pièce n'existe plus en base (supprimée physiquement)
      */
-    public function assertPieceNonGelee(Transaction $piece): Transaction
+    public function verrouillerPieceNonGelee(Transaction $piece): Transaction
     {
         $pieceId = (int) $piece->id;
 

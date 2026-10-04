@@ -329,13 +329,13 @@ pièce** — `update()`, `delete()`, `annuler()`, extourne. Les gestes **sur une
 reclasser, retirer du formulaire, ventiler, modifier le montant par la synchronisation — ne
 refusent que la ligne rattachée : reclasser une ligne sœur ne touche pas la cohérence du
 rattachement, dont l'écriture ne recopie que la ligne d'origine. Deux gardes au service :
-`assertPieceNonGelee()` et `assertLigneNonGelee()`, qui refusent par défaut.
+`verrouillerPieceNonGelee()` et `assertLigneNonGelee()`, qui refusent par défaut.
 
 **Les écritures de rattachement elles-mêmes** (dotation et extourne, `transactions.provision_id`
 renseigné) ne se modifient, ne se suppriment et ne s'annulent **que par le retrait du
 rattachement** (§ 6.4). Par tout autre chemin, elles survivraient au retrait, détachées :
 `provision_id` est en `nullOnDelete`, et le retrait ignore les écritures supprimées logiquement.
-`assertPieceNonGelee()` les refuse avec leur propre message.
+`verrouillerPieceNonGelee()` les refuse avec leur propre message.
 
 Sites à garder :
 

@@ -365,26 +365,38 @@ final class TransactionService
         $this->validateInscriptionRequiresOperation($lignes);
 
         return DB::transaction(function () use ($transaction, $data, $lignes) {
-            // Même ordre que PosteTiersReglementService::regler() : exercice,
-            // lot canonique, puis transaction source. Ainsi, un règlement T2 ne
-            // peut pas s'intercaler entre le contrôle aUnReglementTiers() et la
-            // réécriture destructive des lignes de la T1.
+            // Une pièce d'une autre association n'est ni verrouillée ni jugée : on ne révèle rien de son
+            // état. Lu sur l'instance reçue, avant tout verrou : `association_id` ne change jamais, et la
+            // garde ci-dessous lève tous les scopes, elle ne ferait pas ce tri. Défense en profondeur :
+            // l'instance vient déjà de l'association courante en fonctionnement normal.
+            if ((int) $transaction->association_id !== (int) TenantContext::currentId()) {
+                throw (new ModelNotFoundException)->setModel(Transaction::class, [(int) $transaction->id]);
+            }
+
+            // Même début que PosteTiersReglementService::regler() : exercice, lot canonique, puis transaction
+            // source. Ainsi, un règlement T2 ne peut pas s'intercaler entre le contrôle aUnReglementTiers()
+            // et la réécriture destructive des lignes de la T1.
             $this->exerciceService->assertOuvertVerrouille(
                 $this->exerciceService->anneeForDate(CarbonImmutable::parse($transaction->date))
             );
 
             // L'unique chemin de verrouillage de la pièce : la garde du rattachement prend les lots
             // 401/411, puis la pièce, puis ses lignes et leurs rattachements (voir
-            // RattachementExerciceService::assertPieceNonGelee()), et refuse une pièce dont une ligne est
+            // RattachementExerciceService::verrouillerPieceNonGelee()), et refuse une pièce dont une ligne est
             // rattachée à l'exercice suivant : update() détruit puis recrée toutes les lignes, ce que la
             // clé étrangère des rattachements refuserait par une erreur SQL brute. Elle rend la pièce
             // verrouillée, sur laquelle on poursuit.
-            $transaction = $this->rattachement->assertPieceNonGelee($transaction);
+            //
+            // Ordre réel des verrous d'update() : exercice, lots 401/411, pièce, lignes, rattachements (la
+            // garde, dans cet ordre) ; puis le rapprochement ; puis la T2 d'encaissement ou de règlement (sa
+            // pièce, ses lignes) ; puis la suppression des lignes, déjà tenues. Les lignes sont donc prises
+            // AVANT la T2, par la garde, et non plus à la fin, par leur suppression.
+            $transaction = $this->rattachement->verrouillerPieceNonGelee($transaction);
 
             // La garde verrouille la pièce tous scopes levés (une pièce supprimée porte encore ses
-            // rattachements) ; l'édition ne vaut que pour une pièce vivante de l'association. L'ancien
-            // verrouillage, sous scope, la refusait par cette même exception.
-            if ($transaction->trashed() || (int) $transaction->association_id !== (int) TenantContext::currentId()) {
+            // rattachements) ; l'édition ne vaut que pour une pièce vivante. L'ancien verrouillage, sous
+            // scope, la refusait par cette même exception.
+            if ($transaction->trashed()) {
                 throw (new ModelNotFoundException)->setModel(Transaction::class, [(int) $transaction->id]);
             }
 
@@ -815,19 +827,24 @@ final class TransactionService
             // qui prend les lots 401/411, la pièce, ses lignes et leurs rattachements. Une pièce dont une
             // ligne est rattachée, ou qui est elle-même une écriture de rattachement, n'est pas supprimée.
             //
-            // Ordre complet : exercice, lots, pièce, lignes, rattachements (la garde) ; puis la T2, pièce
-            // et lignes (supprimerT2SiExiste()) ; puis les affectations et les lignes de la pièce
-            // (purgerLignesEtAffectations() : lignes et pièce sont déjà tenues, il n'en prend plus de
-            // nouvelle), enfin la suppression de la pièce. C'est la suite d'update() : exercice, lot, pièce,
-            // T2, lignes. Une seule différence avec l'état d'avant : les affectations sont prises APRÈS les
-            // lignes. La ventilation (affecterLigne(), supprimerAffectations()) prend les siennes sans
-            // verrouiller la ligne d'abord : si elle s'exécute en même temps sur la même pièce, le moteur
-            // interrompt l'une des deux transactions (sans incohérence). La garde de la ventilation
-            // (Task 8c) lui donnera l'ordre ligne puis affectations, et supprimera cet écart.
+            // Ordre réel des verrous : exercice, lots 401/411, pièce, lignes, rattachements (la garde, dans
+            // cet ordre) ; puis la T2, sa pièce et ses lignes (supprimerT2SiExiste()) ; puis les affectations
+            // des lignes de la pièce (purgerLignesEtAffectations() : lignes et pièce sont déjà tenues, il
+            // n'en prend plus de nouvelle) ; enfin la suppression de la pièce. update() suit le même début,
+            // garde comprise, puis la T2. Les lots avant la pièce sont l'ordre de PosteTiersReglementService::regler() ;
+            // sur ce qu'ils ont en commun (exercice, pièce, ligne, rattachements), rattacher() et retirer()
+            // prennent leurs verrous dans le même ordre : pas de cycle possible avec eux.
+            //
+            // La seule inversion qui expose à un inter-blocage est celle des lignes et des affectations :
+            // la garde tient toutes les lignes avant que les affectations ne soient prises, alors que la
+            // ventilation (affecterLigne(), supprimerAffectations()) prend les siennes sans verrouiller la
+            // ligne d'abord. Si elles s'exécutent en même temps sur la même pièce, le moteur interrompt l'une
+            // des deux transactions (sans incohérence). La garde de la ventilation (Task 8c) lui donnera
+            // l'ordre ligne puis affectations, et supprimera cet écart.
             $this->exerciceService->assertOuvertVerrouille(
                 $this->exerciceService->anneeForDate(CarbonImmutable::parse($transaction->date))
             );
-            $this->rattachement->assertPieceNonGelee($transaction);
+            $this->rattachement->verrouillerPieceNonGelee($transaction);
 
             // Nettoyage T2 (encaissement/règlement séparé) si elle existe — symétrique
             // avec annuler() : sans ça, supprimer une transaction réglée laisserait une
@@ -883,7 +900,7 @@ final class TransactionService
             $this->exerciceService->assertOuvertVerrouille(
                 $this->exerciceService->anneeForDate(CarbonImmutable::parse($transaction->date))
             );
-            $this->rattachement->assertPieceNonGelee($transaction);
+            $this->rattachement->verrouillerPieceNonGelee($transaction);
 
             // 1. Nettoyage T2 (encaissement/règlement séparé) si elle existe
             $this->supprimerT2SiExiste($transaction);

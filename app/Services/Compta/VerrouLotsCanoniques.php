@@ -14,7 +14,7 @@ use App\Models\TransactionLigne;
  * tiers doit donc prendre ses lots avant la pièce, dans le même ordre : sans quoi un règlement
  * qui tient le lot et attend la pièce s'inter-bloque avec un geste qui tient la pièce et attend
  * le lot. C'est l'ordre de TransactionService::update() depuis l'origine, repris à l'identique
- * ici pour que la garde du rattachement (RattachementExerciceService::assertPieceNonGelee()), qui
+ * ici pour que la garde du rattachement (RattachementExerciceService::verrouillerPieceNonGelee()), qui
  * verrouille la pièce entière, ne l'inverse pas : update() passe par elle, et c'est elle qui
  * appelle cette classe.
  *

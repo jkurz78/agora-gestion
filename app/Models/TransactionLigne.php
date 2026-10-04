@@ -175,7 +175,7 @@ final class TransactionLigne extends Model
      * Vrai dès qu'une ligne de provisions référence cette ligne-ci. C'est un fait de
      * la ligne ; le gel qu'il entraîne porte sur sa transaction entière pour les
      * gestes qui réécrivent la pièce (spec § 7) — question que
-     * RattachementExerciceService::assertPieceNonGelee() pose pour toutes ses lignes
+     * RattachementExerciceService::verrouillerPieceNonGelee() pose pour toutes ses lignes
      * en une seule lecture.
      *
      * Compte exactement ce que compte la FK restrictOnDelete(), d'où
