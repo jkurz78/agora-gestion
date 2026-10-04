@@ -6,6 +6,7 @@ use App\Models\Provision;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Tenant\TenantContext;
+use Illuminate\Support\Facades\DB;
 
 /*
 |--------------------------------------------------------------------------
@@ -14,9 +15,10 @@ use App\Tenant\TenantContext;
 |
 | Pest charge tests/Helpers pour toute exécution, d'un seul fichier comme de la suite
 | complète. RattachementEcrituresTest (le générateur et ProvisionPDService) et
-| RattachementExerciceServiceTest (le service) s'en servent tous deux : déclarées dans
-| l'un des deux, ces fonctions manqueraient à l'autre lancé seul, et déclarées dans les
-| deux, elles se redéclareraient en suite complète.
+| RattachementExerciceServiceTest (le service) s'en servent tous deux, ainsi que
+| RattachementVerrouTest pour l'inspection des verrous : déclarées dans l'un d'eux, ces
+| fonctions manqueraient aux autres lancés seuls, et déclarées dans plusieurs, elles se
+| redéclareraient en suite complète.
 */
 
 /**
@@ -57,4 +59,66 @@ function impactSurLeResultat(Transaction $ecriture): float
     }
 
     return round($impact, 2);
+}
+
+/**
+ * Exécute $action et rend toutes les requêtes émises dans une transaction qu'elle ouvre (au-dessus
+ * du niveau d'avant l'appel), dans l'ordre où elles ont été émises. Une action censée être refusée
+ * s'enveloppe elle-même dans son `expect(...)->toThrow()` : l'exception ne doit pas sortir, ou les
+ * requêtes seraient perdues avec elle.
+ *
+ * @return list<object>
+ */
+function verrouRequetesDeLaTransaction(Closure $action): array
+{
+    $niveauAvant = DB::transactionLevel();
+    $requetes = [];
+
+    DB::listen(function ($requete) use (&$requetes, $niveauAvant): void {
+        if (DB::transactionLevel() > $niveauAvant) {
+            $requetes[] = $requete;
+        }
+    });
+
+    $action();
+
+    return $requetes;
+}
+
+/**
+ * Exécute $action et rend les requêtes de sa transaction qui précèdent la première écriture
+ * (insert, update ou delete) : les verrous, dans l'ordre où ils ont été pris.
+ *
+ * @return list<object>
+ */
+function serviceRattachementRequetesAvantEcriture(Closure $action): array
+{
+    $requetes = verrouRequetesDeLaTransaction($action);
+
+    $premiereEcriture = collect($requetes)->search(
+        fn ($requete) => preg_match('/^\s*(insert|update|delete)\b/i', $requete->sql) === 1
+    );
+    expect($premiereEcriture)->toBeInt();
+
+    return array_slice($requetes, 0, $premiereEcriture);
+}
+
+/**
+ * L'indice de la première requête qui lit $table (et, si $annee est donné, la porte dans ses
+ * paramètres). Lève si aucune ne le fait : un verrou absent ne doit pas passer pour un verrou
+ * tardif.
+ *
+ * @param  list<object>  $requetes
+ */
+function serviceRattachementIndiceDeLaPremiere(array $requetes, string $table, ?int $annee = null): int
+{
+    foreach ($requetes as $i => $requete) {
+        $cible = preg_match('/from\s+[`"]?(\w+)[`"]?/i', $requete->sql, $m) === 1 ? $m[1] : '?';
+
+        if ($cible === $table && ($annee === null || in_array($annee, $requete->bindings, true))) {
+            return $i;
+        }
+    }
+
+    throw new RuntimeException("Aucun verrou sur {$table}".($annee !== null ? " ({$annee})" : '').' avant la première écriture.');
 }

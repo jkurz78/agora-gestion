@@ -56,7 +56,7 @@ final class RattachementExerciceService
 
     private const MOTIF_PIECE_REDATEE = 'La date de la pièce a changé entre-temps : elle n’appartient plus au même exercice. Rechargez la page.';
 
-    private const MOTIF_DEJA_RETIRE = 'Ce rattachement a déjà été retiré. Rechargez la page.';
+    private const MOTIF_DEJA_RETIRE = 'Ce rattachement n’existe plus : il a peut-être déjà été retiré. Rechargez la page.';
 
     private const MOTIF_RETRAIT_SAISIE_LIBRE = 'Ce rattachement est une saisie libre : son retrait n’est pas encore pris en charge.';
 
@@ -301,6 +301,27 @@ final class RattachementExerciceService
     }
 
     /**
+     * Variante par identifiant, symétrique de rattacherParId() : le rattachement est résolu
+     * dans l'association courante.
+     *
+     * @throws RuntimeException voir retirer() ; « Ce rattachement n’existe plus » pour un
+     *                          identifiant inconnu, déjà retiré ou d'une autre association
+     */
+    public function retirerParId(int $provisionId): void
+    {
+        // Résolution sous le scope tenant, volontairement : un identifiant forgé d'une autre
+        // association est traité comme inexistant, avant même d'ouvrir une transaction.
+        // retirer() relit le rattachement sous verrou et sous le même scope : deux filets.
+        $provision = Provision::find($provisionId);
+
+        if ($provision === null) {
+            throw new RuntimeException(self::MOTIF_DEJA_RETIRE);
+        }
+
+        $this->retirer($provision);
+    }
+
+    /**
      * Retire le rattachement : supprime ses deux écritures (dotation et extourne), puis
      * supprime PHYSIQUEMENT sa ligne de `provisions`, ce qui libère la ligne d'origine. Le
      * modèle n'a pas de suppression logique : une ligne de `provisions` existe si et seulement
@@ -349,9 +370,9 @@ final class RattachementExerciceService
         // d'autres identifiants, et aucun chemin ne réécrit transaction_lignes.transaction_id. Tant
         // que le rattachement existe, la clé étrangère RESTRICT interdit en outre de supprimer
         // physiquement la ligne. Supprimée logiquement, elle reste lisible (withTrashed() lève le
-        // seul filtre de suppression logique, pas le scope tenant). Absente, c'est que le
-        // rattachement a été retiré entre-temps : rien à verrouiller côté pièce, et le
-        // rattachement, introuvable sous verrou, donne le refus « déjà retiré ».
+        // seul filtre de suppression logique, pas le scope tenant). Absente : détruite par une
+        // édition après un retrait, ou d'une autre association ; dans les deux cas le
+        // rattachement est introuvable sous verrou, et rien n'est à verrouiller côté pièce.
         $pieceId = TransactionLigne::withTrashed()->whereKey($ligneId)->value('transaction_id');
         $pieceId = $pieceId !== null ? (int) $pieceId : null;
 
@@ -362,7 +383,7 @@ final class RattachementExerciceService
             $this->exerciceService->assertOuvertPourEcriture($exercice);
             $this->exerciceService->assertOuvertVerrouille($exercice + 1);
 
-            $this->verrouillerPieceEtLigne($pieceId, $ligneId, true);
+            $this->verrouillerPieceEtLigne($pieceId, $ligneId, inclureSupprimees: true);
 
             // Le rattachement en dernier. Sous le scope tenant, volontairement : une instance
             // d'une autre association n'est pas trouvée, au lieu d'être supprimée alors que ses
@@ -399,11 +420,6 @@ final class RattachementExerciceService
      * celui sur lequel l'éligibilité se rejuge et le montant se calcule. À appeler dans une
      * transaction, après les verrous d'exercice ; ils tiennent jusqu'au commit.
      *
-     * L'ordre est celui de TransactionService::update() (exercice, pièce, puis suppression des
-     * lignes). Parmi les écritures qui touchent la pièce ou la ligne, seuls rattacher() et
-     * retirer() prennent le verrou d'association : les autres (édition, annulation,
-     * synchronisation HelloAsso) ne s'excluent que par ces deux verrous.
-     *
      * Les refus ci-dessous sont ceux d'une CRÉATION : retirer() n'en reprend aucun, pour qu'un
      * rattachement dont l'origine a disparu reste retirable.
      *
@@ -420,7 +436,7 @@ final class RattachementExerciceService
         ['piece' => $piece, 'ligne' => $ligneVerrouillee] = $this->verrouillerPieceEtLigne(
             (int) $ligne->transaction_id,
             (int) $ligne->id,
-            false,
+            inclureSupprimees: false,
         );
 
         if ($piece === null) {
@@ -448,8 +464,14 @@ final class RattachementExerciceService
      * Ne refuse jamais : une pièce ou une ligne introuvable est rendue nulle, et c'est à
      * l'appelant d'en décider.
      *
-     * @param  int|null  $pieceId  nul : rien à verrouiller côté pièce (retirer() sur une ligne
-     *                             que la base ne peut plus avoir perdue)
+     * L'ordre est celui de TransactionService::update() (exercice, pièce, puis suppression des
+     * lignes). Parmi les écritures qui touchent la pièce ou la ligne, seuls rattacher() et
+     * retirer() prennent le verrou d'association : les autres (édition, annulation,
+     * synchronisation HelloAsso) ne s'excluent que par ces deux verrous.
+     *
+     * @param  int|null  $pieceId  nul : la lecture préalable n'a pas trouvé la ligne (retirer()),
+     *                             donc aucune pièce à verrouiller ; la ligne, elle, est quand même
+     *                             cherchée sous verrou, et son absence est rendue nulle
      * @param  bool  $inclureSupprimees  vrai : lire aussi les pièces et lignes supprimées
      *                                   logiquement (withTrashed()). Le scope tenant reste appliqué.
      * @return array{piece: ?Transaction, ligne: ?TransactionLigne}
