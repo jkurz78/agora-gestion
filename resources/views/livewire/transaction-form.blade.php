@@ -16,6 +16,9 @@
                 // (spec § 7). Ne vaut PAS pour les gestes sur UNE ligne (« Ventiler », « Reclasser »), que le gel laisse
                 // ouverts sur les lignes sœurs : ceux-là gardent leurs propres conditions.
                 $lectureSeule = $exerciceCloture || $motifGel !== null;
+                // Les lignes se retirent et s'ajoutent : ni verrouillées par la pièce (rapprochement, remise, facture,
+                // HelloAsso, immobilisation, miroir d'annulation), ni en lecture seule.
+                $lignesModifiables = ! $isLocked && ! $isLockedByFacture && ! $isLockedByHelloAsso && ! $isLockedByImmobilisation && ! $isExtourneMiroir && ! $lectureSeule;
             @endphp
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
@@ -114,7 +117,7 @@
                 </div>
                 @endif
 
-                <form wire:submit="save">
+                <form wire:submit="save" @if ($lectureSeule) data-lecture-seule @endif>
                     @if ($motifGel !== null)
                         {{-- Pièce gelée par un rattachement à l'exercice suivant : le motif dès l'ouverture, avant toute saisie.
                              Le formulaire est en lecture seule ($lectureSeule) ; la ventilation d'une ligne, elle, reste
@@ -600,14 +603,14 @@
                                             @error("lignes.{$index}.piece_jointe_upload") <div class="text-danger small">{{ $message }}</div> @enderror
                                         </td>
                                         <td class="text-center">
-                                            @if (! $isLocked && ! $isLockedByFacture && ! $isLockedByHelloAsso && ! $isLockedByImmobilisation && ! $isExtourneMiroir && ! $lectureSeule)
+                                            @if ($lignesModifiables)
                                                 <button type="button" wire:click="removeLigne({{ $index }})"
                                                         class="btn btn-sm btn-outline-danger">
                                                     <i class="bi bi-trash"></i>
                                                 </button>
                                             @endif
-                                            {{-- Sur une pièce gelée par un rattachement, la ventilation d'une ligne sœur reste ouverte (spec § 7) ; le service refuse la ligne rattachée elle-même, et le panneau affiche son refus. --}}
-                                            @if (($isLocked || $isLockedByImmobilisation || $motifGel !== null) && ! $isLockedByFacture && ! $exerciceCloture && ($ligne['id'] ?? null) !== null)
+                                            {{-- Sur une pièce gelée par un rattachement, la ventilation d'une ligne sœur reste ouverte (spec § 7). Elle n'est pas offerte là où le service la refuserait ($lignesGelees : la ligne rattachée, ou toute ligne d'une écriture de rattachement). --}}
+                                            @if (($isLocked || $isLockedByImmobilisation || $motifGel !== null) && ! $isLockedByFacture && ! $exerciceCloture && ($ligne['id'] ?? null) !== null && ! in_array((int) $ligne['id'], $lignesGelees, true))
                                                 <button type="button"
                                                         wire:click="ouvrirVentilation({{ $ligne['id'] }})"
                                                         class="btn btn-sm btn-outline-warning ms-1">
@@ -735,7 +738,7 @@
                     @endif
 
                     <div class="d-flex gap-2">
-                        @if (! $isLocked && ! $isLockedByFacture && ! $isLockedByHelloAsso && ! $isLockedByImmobilisation && ! $isExtourneMiroir && ! $lectureSeule && $this->canEdit)
+                        @if ($lignesModifiables && $this->canEdit)
                             <button type="button" wire:click="addLigne" class="btn btn-sm btn-outline-secondary">
                                 <i class="bi bi-plus-lg"></i> Ajouter une ligne
                             </button>

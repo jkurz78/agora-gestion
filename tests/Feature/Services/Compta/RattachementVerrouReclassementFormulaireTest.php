@@ -16,7 +16,10 @@ use App\Services\Compta\RattachementExerciceService;
 use App\Services\TransactionService;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 /*
@@ -415,7 +418,8 @@ describe('TransactionForm::edit() : une pièce rattachée s\'ouvre gelée', func
         app(RattachementExerciceService::class)->retirer($provision);
 
         $formulaire->call('edit', (int) $ligne->transaction_id)
-            ->assertDontSee(GelRattachement::MOTIF_PIECE_GELEE);
+            ->assertDontSee(GelRattachement::MOTIF_PIECE_GELEE)
+            ->assertSet('lignesGelees', []);
         verrouAssertEditable($formulaire);
     });
 
@@ -452,7 +456,8 @@ describe('TransactionForm::edit() : une pièce rattachée s\'ouvre gelée', func
         // Le motif lui-même est remis à zéro, qu'il soit rendu ou non : après la fermeture, le formulaire n'est plus affiché.
         $formulaire->call($geste, ...($geste === 'showNewForm' ? ['depense'] : []))
             ->assertDontSee(GelRattachement::MOTIF_PIECE_GELEE)
-            ->assertSet('motifGel', null);
+            ->assertSet('motifGel', null)
+            ->assertSet('lignesGelees', []);
 
         // Rouvert sur une pièce libre dans le même composant : toujours pas gelé.
         if ($geste === 'resetForm') {
@@ -599,14 +604,16 @@ describe('TransactionForm : une pièce gelée s\'affiche en LECTURE SEULE, comme
         expect($libre->html())->toContain('wire:click="removeLigne(0)"');
     });
 
-    test('propose « Ventiler » sur les lignes de la pièce gelée, dont la ligne sœur : atteinte par le chemin de l\'écran, elle se ventile', function () {
+    test('propose « Ventiler » sur la ligne sœur de la pièce gelée, et pas sur la ligne rattachée : atteinte par le chemin de l\'écran, la sœur se ventile', function () {
+        // $soeur est la ligne d'origine, libre ; $rattachee la ligne ajoutée, rattachée.
         ['libre' => $soeur, 'soeur' => $rattachee, 'piece' => $piece] = verrouPieceDontLaSoeurEstRattachee($this, 7);
-        // Les deux lignes de la pièce ($soeur est la ligne d'origine, libre ; $rattachee la ligne ajoutée, rattachée).
 
         $formulaire = Livewire::test(TransactionForm::class)->call('edit', (int) $piece->id);
 
-        // Ce que l'écran offre : « Ventiler » sur CHAQUE ligne de la pièce.
-        expect(verrouLignesVentilables($formulaire))->toBe([(int) $soeur->id, (int) $rattachee->id]);
+        // Ce que l'écran offre : « Ventiler » sur la ligne libre seule. Sur la ligne rattachée, le service refuserait :
+        // le bouton n'y est pas (le refus serveur reste testé au niveau du service et par un appel forgé, plus bas).
+        expect(verrouLignesVentilables($formulaire))->toBe([(int) $soeur->id])
+            ->and($formulaire->get('lignesGelees'))->toBe([(int) $rattachee->id]);
 
         // Le clic de l'écran : wire:click="ouvrirVentilation(<id>)", puis « Enregistrer » (saveVentilation).
         $formulaire->call('ouvrirVentilation', verrouLignesVentilables($formulaire)[0])
@@ -616,19 +623,68 @@ describe('TransactionForm : une pièce gelée s\'affiche en LECTURE SEULE, comme
         expect(DB::table('transaction_ligne_affectations')->where('transaction_ligne_id', $soeur->id)->count())->toBe(1);
     });
 
-    test('affiche le refus du service quand on ventile la ligne rattachée depuis le bouton de l\'écran', function () {
+    test('n\'offre « Ventiler » sur aucune ligne d\'une écriture de rattachement, dotation ou extourne : toutes seraient refusées', function (string $ecriture) {
+        ['piece' => $piece] = verrouEcritureDeRattachement($this, 7, $ecriture);
+        $lignes = DB::table('transaction_lignes')->where('transaction_id', $piece->id)->pluck('id')->map(fn ($id): int => (int) $id)->all();
+
+        $formulaire = Livewire::test(TransactionForm::class)->call('edit', (int) $piece->id);
+
+        // Garde anti-test-vide : la pièce a des lignes, et le formulaire en connaît le gel pour chacune.
+        expect($lignes)->not->toBeEmpty()
+            ->and($formulaire->get('lignesGelees'))->toBe($lignes)
+            ->and(verrouLignesVentilables($formulaire))->toBe([]);
+    })->with([
+        'la dotation' => ['normale'],
+        'l\'extourne' => ['extourne'],
+    ]);
+
+    test('affiche encore le refus du service quand un appel forgé ventile la ligne rattachée : rien n\'est écrit', function () {
         ['soeur' => $rattachee, 'provision' => $provision, 'piece' => $piece] = verrouPieceDontLaSoeurEstRattachee($this, 7);
         $avant = verrouEmpreinte($rattachee, $provision);
 
         $formulaire = Livewire::test(TransactionForm::class)->call('edit', (int) $piece->id);
-        $ids = verrouLignesVentilables($formulaire);
-        expect($ids)->toContain((int) $rattachee->id);
+        // Le bouton n'est pas rendu sur cette ligne : l'appel ne vient pas de l'écran.
+        expect(verrouLignesVentilables($formulaire))->not->toContain((int) $rattachee->id);
 
         $formulaire->call('ouvrirVentilation', (int) $rattachee->id)->call('saveVentilation');
 
         expect($formulaire->errors()->get('affectations'))->toBe([GelRattachement::MOTIF_PIECE_GELEE])
             ->and(verrouEmpreinte($rattachee, $provision))->toBe($avant);
     });
+
+    test('laisse passer une ModelNotFoundException du service au lieu d\'afficher son texte technique, et affiche tout autre refus', function (string $action) {
+        ['libre' => $libre, 'piece' => $piece] = verrouPieceDontLaSoeurEstRattachee($this, 7);
+        $formulaire = Livewire::test(TransactionForm::class)->call('edit', (int) $piece->id)
+            ->call('ouvrirVentilation', (int) $libre->id);
+
+        // TransactionService est final : un double sans héritage, qui ne sait faire que ces deux gestes.
+        $double = fn (Throwable $echec): object => new class($echec)
+        {
+            public function __construct(private readonly Throwable $echec) {}
+
+            public function affecterLigne(TransactionLigne $ligne, array $affectations): void
+            {
+                throw $this->echec;
+            }
+
+            public function supprimerAffectations(TransactionLigne $ligne): void
+            {
+                throw $this->echec;
+            }
+        };
+
+        // Un refus métier (RuntimeException) s'affiche dans le panneau.
+        app()->instance(TransactionService::class, $double(new RuntimeException('Refus de test')));
+        $formulaire->call($action);
+        expect($formulaire->errors()->get('affectations'))->toBe(['Refus de test']);
+
+        // Une ligne ou une pièce qui n'existe plus n'est pas un message pour l'utilisateur : elle remonte.
+        app()->instance(TransactionService::class, $double((new ModelNotFoundException)->setModel(TransactionLigne::class, [(int) $libre->id])));
+        expect(fn () => $formulaire->call($action))->toThrow(ModelNotFoundException::class);
+    })->with([
+        'saveVentilation()' => ['saveVentilation'],
+        'supprimerVentilation()' => ['supprimerVentilation'],
+    ]);
 
     test('n\'offre « Ventiler » sur aucune ligne d\'une pièce libre : le gel n\'ajoute le bouton qu\'à la pièce gelée', function () {
         [$libre] = verrouFormulaireDeLaPiece($this, false);
@@ -664,6 +720,65 @@ describe('TransactionForm : une pièce gelée s\'affiche en LECTURE SEULE, comme
         expect($libre->html())->toContain('wire:click="deletePieceJointe"')
             ->toContain('title="Remplacer"')
             ->toContain('piece_jointe_remove');
+    });
+
+    // Un exercice clôturé, lui, ne masque ces contrôles que dans la vue : deletePieceJointe() n'y regarde que canEdit, et
+    // le service ne regarde pas l'exercice (constaté, non corrigé ici). La pièce gelée, elle, est refusée côté serveur.
+    test('deletePieceJointe() refuse côté serveur le justificatif d\'une pièce gelée : le fichier et la pièce sont intacts', function () {
+        Storage::fake('local');
+        [$gelee, $ligne] = verrouFormulaireDeLaPiece($this, true);
+        [$libre, $ligneLibre] = verrouFormulaireDeLaPiece($this, false);
+
+        $fichiers = [];
+        foreach ([$ligne, $ligneLibre] as $l) {
+            $piece = Transaction::findOrFail($l->transaction_id);
+            $fichiers[$l->id] = $piece->storagePath('transactions/'.$piece->id).'/justificatif.pdf';
+            Storage::disk('local')->put($fichiers[$l->id], 'contenu');
+            DB::table('transactions')->where('id', $piece->id)->update([
+                'piece_jointe_path' => 'justificatif.pdf',
+                'piece_jointe_nom' => 'facture-de-test.pdf',
+                'piece_jointe_mime' => 'application/pdf',
+            ]);
+        }
+        $gelee->call('edit', (int) $ligne->transaction_id);
+        $libre->call('edit', (int) $ligneLibre->transaction_id);
+        $avant = (array) DB::table('transactions')->where('id', $ligne->transaction_id)->first();
+
+        $gelee->call('deletePieceJointe');
+
+        expect($gelee->errors()->get('pieceJointe'))->toBe([GelRattachement::MOTIF_PIECE_GELEE])
+            ->and(Storage::disk('local')->exists($fichiers[$ligne->id]))->toBeTrue()
+            ->and((array) DB::table('transactions')->where('id', $ligne->transaction_id)->first())->toBe($avant)
+            ->and($gelee->get('existingPieceJointeNom'))->toBe('facture-de-test.pdf');
+
+        // Garde anti-test-vide : sur une pièce libre, le même geste supprime bien le justificatif.
+        $libre->call('deletePieceJointe')->assertHasNoErrors();
+        expect(Storage::disk('local')->exists($fichiers[$ligneLibre->id]))->toBeFalse()
+            ->and(DB::table('transactions')->where('id', $ligneLibre->transaction_id)->value('piece_jointe_path'))->toBeNull();
+    });
+
+    test('refuse côté serveur l\'envoi d\'un justificatif sur une pièce gelée : le fichier temporaire est abandonné, le justificatif existant est intact', function () {
+        Storage::fake('local');
+        [$gelee, $ligne] = verrouFormulaireDeLaPiece($this, true);
+        [$libre] = verrouFormulaireDeLaPiece($this, false);
+
+        $piece = Transaction::findOrFail($ligne->transaction_id);
+        $fichier = $piece->storagePath('transactions/'.$piece->id).'/justificatif.pdf';
+        Storage::disk('local')->put($fichier, 'contenu');
+        DB::table('transactions')->where('id', $piece->id)->update(['piece_jointe_path' => 'justificatif.pdf', 'piece_jointe_nom' => 'facture-de-test.pdf']);
+        $gelee->call('edit', (int) $piece->id);
+        $avant = (array) DB::table('transactions')->where('id', $piece->id)->first();
+
+        $gelee->set('pieceJointe', UploadedFile::fake()->create('remplacement.pdf', 20, 'application/pdf'));
+
+        expect($gelee->errors()->get('pieceJointe'))->toBe([GelRattachement::MOTIF_PIECE_GELEE])
+            ->and($gelee->get('pieceJointe'))->toBeNull()
+            ->and(Storage::disk('local')->get($fichier))->toBe('contenu')
+            ->and((array) DB::table('transactions')->where('id', $piece->id)->first())->toBe($avant);
+
+        // Garde anti-test-vide : sur une pièce libre, le même envoi est accepté.
+        $libre->set('pieceJointe', UploadedFile::fake()->create('nouveau.pdf', 20, 'application/pdf'))->assertHasNoErrors();
+        expect($libre->get('pieceJointe'))->not->toBeNull();
     });
 
     test('n\'offre pas de dépôt de justificatif sur une pièce gelée qui n\'en a pas', function () {

@@ -52,7 +52,7 @@ final class GelRattachement
 
     /**
      * Le refus des gestes qui réécrivent une pièce (édition, suppression, annulation, annulation par
-     * extourne) ou écrivent sur une de ses lignes (reclassement) quand cette pièce EST une écriture de
+     * extourne) ou écrivent sur une de ses lignes (reclassement, ventilation) quand cette pièce EST une écriture de
      * rattachement, dotation ou extourne générée. Distinct de
      * MOTIF_PIECE_GELEE : il n'y a rien à retirer puis repasser sur cette pièce, c'est le
      * rattachement qui la porte, et lui seul la défait avec sa jumelle. La supprimer ou l'annuler ici
@@ -134,29 +134,58 @@ final class GelRattachement
     }
 
     /**
-     * Le motif pour lequel une pièce est GELÉE, ou null : une lecture SIMPLE, sans verrou ni transaction, pour
-     * PRÉVENIR l'écran (le formulaire s'ouvre gelé) avant que l'utilisateur ne saisisse ce que l'enregistrement
-     * refuserait. Ce n'est PAS une garde : un état lu sans verrou est périmé dès qu'il est lu, et rien ne s'écrit
-     * sur sa foi. Les gestes qui écrivent passent par assertLigneNonGelee() et verrouillerPieceNonGelee(), sous
-     * verrou, qui décident seules.
-     *
-     * Même question, même réponse que verrouillerPieceNonGelee(), dans le même ordre : une écriture de
-     * rattachement (`provision_id`) reçoit MOTIF_ECRITURE_DE_RATTACHEMENT ; sinon une pièce dont l'une des lignes,
-     * supprimée logiquement ou non, porte un rattachement reçoit MOTIF_PIECE_GELEE. Tous scopes levés, comme les
-     * gardes : la clé étrangère du rattachement, elle, n'en connaît aucun. L'appelant a déjà résolu la pièce dans son
-     * association ; cette lecture n'en révèle rien d'autre que le motif.
+     * Le motif pour lequel une pièce est GELÉE, ou null : voir etatDeGel(), dont c'est le premier terme.
      */
     public function motifDeGel(int $pieceId): ?string
     {
+        return $this->etatDeGel($pieceId)['motif'];
+    }
+
+    /**
+     * L'état de gel d'une pièce, en une lecture SIMPLE, sans verrou ni transaction, pour PRÉVENIR l'écran (le
+     * formulaire s'ouvre en lecture seule) avant que l'utilisateur ne saisisse ce que l'enregistrement refuserait.
+     * Ce n'est PAS une garde : un état lu sans verrou est périmé dès qu'il est lu, et rien ne s'écrit sur sa foi.
+     * Les gestes qui écrivent passent par assertLigneNonGelee() et verrouillerPieceNonGelee(), sous verrou, qui
+     * décident seules. Source UNIQUE de ce que l'écran sait du gel : un second calcul ailleurs finirait par diverger.
+     *
+     * - `motif` : même question, même réponse que verrouillerPieceNonGelee(), dans le même ordre. Une écriture de
+     *   rattachement (`provision_id`) reçoit MOTIF_ECRITURE_DE_RATTACHEMENT ; sinon une pièce dont l'une des lignes,
+     *   supprimée logiquement ou non, porte un rattachement reçoit MOTIF_PIECE_GELEE ; sinon null.
+     * - `lignes` : les identifiants des lignes de la pièce sur lesquelles assertLigneNonGelee() REFUSERAIT un geste
+     *   sur une ligne (ventilation, reclassement) : celle qui porte un rattachement, et TOUTES celles d'une écriture
+     *   de rattachement. Une ligne sœur d'une ligne rattachée n'y figure pas : le gel de la pièce entière ne vaut que
+     *   pour les gestes qui la réécrivent. L'écran s'en sert pour ne pas offrir un geste voué au refus.
+     *
+     * Tous scopes levés, comme les gardes : la clé étrangère du rattachement, elle, n'en connaît aucun. L'appelant a
+     * déjà résolu la pièce dans son association ; cette lecture n'en révèle rien d'autre que ce qu'il affiche.
+     *
+     * @return array{motif: ?string, lignes: list<int>}
+     */
+    public function etatDeGel(int $pieceId): array
+    {
+        $ligneIds = TransactionLigne::withoutGlobalScopes()
+            ->where('transaction_id', $pieceId)
+            ->orderBy('id')
+            ->pluck('id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
+
         if (Transaction::withoutGlobalScopes()->whereKey($pieceId)->value('provision_id') !== null) {
-            return self::MOTIF_ECRITURE_DE_RATTACHEMENT;
+            return ['motif' => self::MOTIF_ECRITURE_DE_RATTACHEMENT, 'lignes' => $ligneIds];
         }
 
-        $rattachee = Provision::withoutGlobalScopes()
-            ->whereIn('transaction_ligne_id', TransactionLigne::withoutGlobalScopes()->where('transaction_id', $pieceId)->select('id'))
-            ->exists();
+        $rattachees = $ligneIds === []
+            ? []
+            : Provision::withoutGlobalScopes()
+                ->whereIn('transaction_ligne_id', $ligneIds)
+                ->pluck('transaction_ligne_id')
+                ->map(fn (mixed $id): int => (int) $id)
+                ->unique()
+                ->sort()
+                ->values()
+                ->all();
 
-        return $rattachee ? self::MOTIF_PIECE_GELEE : null;
+        return ['motif' => $rattachees === [] ? null : self::MOTIF_PIECE_GELEE, 'lignes' => $rattachees];
     }
 
     /**

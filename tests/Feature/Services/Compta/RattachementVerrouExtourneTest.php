@@ -16,17 +16,11 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
-use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\GelRattachement;
 use App\Services\Compta\Migrations\SystemeSeeder;
-use App\Services\Compta\ProvisionPDService;
 use App\Services\Compta\RattachementExerciceService;
-use App\Services\Compta\ReclassementLigneService;
-use App\Services\Compta\VerrouLotsCanoniques;
-use App\Services\ExerciceService;
 use App\Services\FactureService;
 use App\Services\TransactionExtourneService;
-use App\Services\TransactionService;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -291,55 +285,6 @@ describe('TransactionExtourneService::extourner() : l\'ordre des verrous', funct
             expect($verrouNumero)->not->toBeEmpty()
                 ->and($verrouNumero[0])->toBeGreaterThan($indices['rattachements']);
         }
-    });
-});
-
-describe('GelRattachement : le graphe d\'injection', function () {
-    // Le gel est reçu par les gestes qu'il protège : il ne doit atteindre, par son constructeur, aucun
-    // d'eux, ni ce qui crée ou défait un rattachement. Sans cela, un cycle d'injection est possible, et
-    // l'écriture comptable entre dans la chaîne de construction d'un geste qui ne fait que se protéger.
-    test('GelRattachement ne dépend que d\'ExerciceService et de VerrouLotsCanoniques : ni ProvisionPDService, ni EcritureGenerator, ni aucun geste protégé', function () {
-        $dependances = verrouDependancesDuConstructeur(GelRattachement::class);
-
-        // Garde anti-test-vide : le parcours atteint bien ses deux dépendances, et elles seules.
-        expect($dependances)->toEqualCanonicalizing([ExerciceService::class, VerrouLotsCanoniques::class]);
-
-        foreach ([
-            ProvisionPDService::class,
-            EcritureGenerator::class,
-            RattachementExerciceService::class,
-            TransactionService::class,
-            TransactionExtourneService::class,
-            ReclassementLigneService::class,
-        ] as $interdite) {
-            expect($dependances)->not->toContain($interdite);
-        }
-    });
-
-    test('chaque geste protégé reçoit le gel, et n\'atteint ni le service de rattachement ni ProvisionPDService : pas de cycle d\'injection', function (string $geste) {
-        $dependances = verrouDependancesDuConstructeur($geste);
-
-        expect($dependances)->toContain(GelRattachement::class)
-            ->and($dependances)->not->toContain(RattachementExerciceService::class)
-            ->and($dependances)->not->toContain(ProvisionPDService::class);
-
-        // Il se résout.
-        expect(app($geste))->toBeInstanceOf($geste);
-    })->with([
-        'TransactionService' => [TransactionService::class],
-        'TransactionExtourneService' => [TransactionExtourneService::class],
-        'ReclassementLigneService' => [ReclassementLigneService::class],
-    ]);
-
-    test('RattachementExerciceService n\'atteint jamais TransactionExtourneService par son constructeur : pas de cycle d\'injection', function () {
-        $dependances = verrouDependancesDuConstructeur(RattachementExerciceService::class);
-
-        // Garde anti-test-vide : le parcours atteint bien des dépendances.
-        expect($dependances)->not->toBeEmpty()
-            ->and($dependances)->not->toContain(TransactionExtourneService::class);
-
-        // Il se résout.
-        expect(app(RattachementExerciceService::class))->toBeInstanceOf(RattachementExerciceService::class);
     });
 });
 

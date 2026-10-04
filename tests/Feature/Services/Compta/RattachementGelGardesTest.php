@@ -7,10 +7,15 @@ use App\Models\Provision;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\GelRattachement;
 use App\Services\Compta\Migrations\SystemeSeeder;
+use App\Services\Compta\ProvisionPDService;
 use App\Services\Compta\RattachementExerciceService;
+use App\Services\Compta\ReclassementLigneService;
 use App\Services\Compta\VerrouLotsCanoniques;
+use App\Services\ExerciceService;
+use App\Services\TransactionExtourneService;
 use App\Services\TransactionService;
 use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -30,8 +35,9 @@ use Illuminate\Support\Facades\DB;
 | un fichier par famille : RattachementVerrouTransactionTest.php (édition, suppression, annulation),
 | RattachementVerrouReclassementFormulaireTest.php (reclassement, retrait de ligne, ouverture gelée du
 | formulaire), RattachementVerrouVentilationTest.php (ventilation) et RattachementVerrouExtourneTest.php
-| (l'annulation par extourne, seule à dépendre d'une date, avec le graphe d'injection du gel). Le motif de
-| gel lu sans verrou pour prévenir l'écran, motifDeGel(), s'éprouve ici aussi.
+| (l'annulation par extourne, seule à dépendre d'une date). Ce fichier éprouve aussi le graphe d'injection du gel
+| (pas de cycle, pas d'écriture comptable dans la chaîne de construction des gestes protégés) et le motif de
+| gel lu sans verrou pour prévenir l'écran, motifDeGel().
 |
 | Spec : docs/specs/2026-09-30-provisions-rattachement-exercice-design.md (§ 6.4, § 7).
 */
@@ -694,6 +700,86 @@ describe('GelRattachement::motifDeGel()', function () {
         'hors contexte d\'association' => ['hors contexte'],
     ]);
 
+    // L'écran se fie à cette lecture : elle ne doit pas diverger des gardes qui, elles, décident. Sur chaque forme de
+    // pièce, le motif lu vaut EXACTEMENT le message que verrouillerPieceNonGelee() lève (ou null si elle passe), et les
+    // lignes que l'écran dit gelées sont EXACTEMENT celles sur lesquelles assertLigneNonGelee() lève.
+    test('motifDeGel() et etatDeGel() s\'accordent avec les gardes sur chaque forme de pièce', function (string $cas, string $attendu) {
+        $piece = match ($cas) {
+            'pièce libre' => Transaction::findOrFail($this->ligneOrigineEquilibree(7)->transaction_id),
+            'ligne rattachée', 'hors contexte d\'association' => (function () {
+                $ligne = $this->ligneOrigineEquilibree(7);
+                verrouRattacherAvecEcritures($this, $ligne);
+
+                return Transaction::findOrFail($ligne->transaction_id);
+            })(),
+            'sœur d\'une ligne rattachée' => verrouPieceDontLaSoeurEstRattachee($this, 7)['piece'],
+            'ligne rattachée supprimée logiquement' => (function () {
+                $ligne = $this->ligneOrigineEquilibree(7);
+                verrouRattacherAvecEcritures($this, $ligne);
+                $ligne->delete();
+
+                return Transaction::findOrFail($ligne->transaction_id);
+            })(),
+            'pièce supprimée logiquement' => (function () {
+                $ligne = $this->ligneOrigineEquilibree(7);
+                verrouRattacherAvecEcritures($this, $ligne);
+                $piece = Transaction::findOrFail($ligne->transaction_id);
+                $piece->delete();
+
+                return $piece;
+            })(),
+            'dotation', 'dotation hors contexte d\'association' => verrouEcritureDeRattachement($this, 7, 'normale')['piece'],
+            'extourne' => verrouEcritureDeRattachement($this, 7, 'extourne')['piece'],
+            'dotation supprimée logiquement' => (function () {
+                $piece = verrouEcritureDeRattachement($this, 7, 'normale')['piece'];
+                $piece->delete();
+
+                return $piece;
+            })(),
+        };
+        $association = TenantContext::current();
+
+        if (in_array($cas, ['hors contexte d\'association', 'dotation hors contexte d\'association'], true)) {
+            TenantContext::clear();
+        }
+
+        $gel = app(GelRattachement::class);
+        $attenduMotif = match ($attendu) {
+            'aucun' => null,
+            'pièce' => GelRattachement::MOTIF_PIECE_GELEE,
+            'écriture' => GelRattachement::MOTIF_ECRITURE_DE_RATTACHEMENT,
+        };
+
+        // La pièce : le motif lu est le refus de la garde de pièce.
+        $refus = verrouMessageDuRefus(fn () => DB::transaction(fn () => $gel->verrouillerPieceNonGelee($piece)));
+        expect($refus)->toBe($attenduMotif)
+            ->and($gel->motifDeGel((int) $piece->id))->toBe($refus);
+
+        // Les lignes (supprimées logiquement comprises) : celles que l'écran dit gelées sont celles que la garde de ligne refuse.
+        $ligneIds = DB::table('transaction_lignes')->where('transaction_id', $piece->id)->orderBy('id')->pluck('id')->map(fn ($id): int => (int) $id)->all();
+        $refusees = array_values(array_filter($ligneIds, fn (int $id): bool => verrouMessageDuRefus(
+            fn () => DB::transaction(fn () => $gel->assertLigneNonGelee(TransactionLigne::withoutGlobalScopes()->findOrFail($id)))
+        ) !== null));
+
+        // Garde anti-test-vide : la pièce a des lignes, et la garde de ligne en refuse exactement quand la pièce l'est.
+        expect($ligneIds)->not->toBeEmpty()
+            ->and($gel->etatDeGel((int) $piece->id)['lignes'])->toBe($refusees)
+            ->and($refusees !== [])->toBe($attendu !== 'aucun');
+
+        TenantContext::boot($association);
+    })->with([
+        'pièce libre' => ['pièce libre', 'aucun'],
+        'ligne rattachée' => ['ligne rattachée', 'pièce'],
+        'sœur d\'une ligne rattachée' => ['sœur d\'une ligne rattachée', 'pièce'],
+        'ligne rattachée supprimée logiquement' => ['ligne rattachée supprimée logiquement', 'pièce'],
+        'pièce supprimée logiquement' => ['pièce supprimée logiquement', 'pièce'],
+        'dotation' => ['dotation', 'écriture'],
+        'extourne' => ['extourne', 'écriture'],
+        'hors contexte d\'association' => ['hors contexte d\'association', 'pièce'],
+        'dotation supprimée logiquement' => ['dotation supprimée logiquement', 'écriture'],
+        'dotation hors contexte d\'association' => ['dotation hors contexte d\'association', 'écriture'],
+    ]);
+
     test('ne verrouille rien et n\'ouvre aucune transaction : une lecture simple, qui peut être périmée', function () {
         ['piece' => $piece] = verrouPieceDontLaSoeurEstRattachee($this, 7);
         $service = app(GelRattachement::class);
@@ -714,5 +800,54 @@ describe('GelRattachement::motifDeGel()', function () {
         foreach ($sql as $requete) {
             expect($requete)->not->toContain('for update');
         }
+    });
+});
+
+describe('GelRattachement : le graphe d\'injection', function () {
+    // Le gel est reçu par les gestes qu'il protège : il ne doit atteindre, par son constructeur, aucun
+    // d'eux, ni ce qui crée ou défait un rattachement. Sans cela, un cycle d'injection est possible, et
+    // l'écriture comptable entre dans la chaîne de construction d'un geste qui ne fait que se protéger.
+    test('GelRattachement ne dépend que d\'ExerciceService et de VerrouLotsCanoniques : ni ProvisionPDService, ni EcritureGenerator, ni aucun geste protégé', function () {
+        $dependances = verrouDependancesDuConstructeur(GelRattachement::class);
+
+        // Garde anti-test-vide : le parcours atteint bien ses deux dépendances, et elles seules.
+        expect($dependances)->toEqualCanonicalizing([ExerciceService::class, VerrouLotsCanoniques::class]);
+
+        foreach ([
+            ProvisionPDService::class,
+            EcritureGenerator::class,
+            RattachementExerciceService::class,
+            TransactionService::class,
+            TransactionExtourneService::class,
+            ReclassementLigneService::class,
+        ] as $interdite) {
+            expect($dependances)->not->toContain($interdite);
+        }
+    });
+
+    test('chaque geste protégé reçoit le gel, et n\'atteint ni le service de rattachement ni ProvisionPDService : pas de cycle d\'injection', function (string $geste) {
+        $dependances = verrouDependancesDuConstructeur($geste);
+
+        expect($dependances)->toContain(GelRattachement::class)
+            ->and($dependances)->not->toContain(RattachementExerciceService::class)
+            ->and($dependances)->not->toContain(ProvisionPDService::class);
+
+        // Il se résout.
+        expect(app($geste))->toBeInstanceOf($geste);
+    })->with([
+        'TransactionService' => [TransactionService::class],
+        'TransactionExtourneService' => [TransactionExtourneService::class],
+        'ReclassementLigneService' => [ReclassementLigneService::class],
+    ]);
+
+    test('RattachementExerciceService n\'atteint jamais TransactionExtourneService par son constructeur : pas de cycle d\'injection', function () {
+        $dependances = verrouDependancesDuConstructeur(RattachementExerciceService::class);
+
+        // Garde anti-test-vide : le parcours atteint bien des dépendances.
+        expect($dependances)->not->toBeEmpty()
+            ->and($dependances)->not->toContain(TransactionExtourneService::class);
+
+        // Il se résout.
+        expect(app(RattachementExerciceService::class))->toBeInstanceOf(RattachementExerciceService::class);
     });
 });

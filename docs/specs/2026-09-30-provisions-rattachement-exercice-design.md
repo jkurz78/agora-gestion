@@ -366,10 +366,12 @@ Sites à garder :
 **Le formulaire prévient, il ne garde pas.** `TransactionForm::edit()` ouvre une pièce dont une ligne est
 rattachée, ou qui est une écriture de rattachement, en **lecture seule**, comme un exercice clôturé : le motif en
 tête, aucun champ à saisir, ni « Ajouter une ligne » ni retrait de ligne, ni bouton d'enregistrement (« Fermer »
-à la place d'« Annuler »). Restent offerts les gestes sur une ligne : « Ventiler » sur chaque ligne de la pièce,
-dont les lignes sœurs ; le service refuse la ligne rattachée elle-même, et le formulaire affiche son refus.
-`save()` refuse en outre côté serveur, avant toute validation, après avoir relu le gel
-(`GelRattachement::motifDeGel()`, lecture sans verrou) ; l'autorité reste aux gardes du service, sous verrou.
+à la place d'« Annuler »). Restent offerts les gestes sur une ligne là où ils aboutissent : « Ventiler » sur les
+lignes sœurs, ni sur la ligne rattachée ni sur aucune ligne d'une écriture de rattachement, que le service
+refuserait (`GelRattachement::etatDeGel()`, source unique de ce que l'écran sait du gel). Le justificatif reste
+consultable, mais ne se retire, ne se remplace ni ne s'envoie. `save()`, `deletePieceJointe()` et l'envoi d'un
+justificatif refusent en outre côté serveur après avoir relu le gel (`motifDeGel()`, lecture sans verrou) ;
+l'autorité reste aux gardes du service, sous verrou.
 
 Le **reçu fiscal ne bloque pas** : un rattachement ne change ni le compte, ni le tiers, ni la date
 du don, seulement l'exercice de reconnaissance du produit.

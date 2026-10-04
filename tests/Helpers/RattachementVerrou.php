@@ -544,21 +544,31 @@ function verrouBoutonEnregistrer(Testable $formulaire): ?string
 }
 
 /**
- * Le formulaire est en LECTURE SEULE, comme pour un exercice clôturé : aucun bouton d'enregistrement, et « Fermer »
- * à la place d'« Annuler » (il n'y a rien à annuler : rien ne s'enregistrera).
+ * Le <form> porte-t-il le repère de lecture seule (attribut data-lecture-seule, posé par la vue) ? Un repère stable,
+ * qui ne dépend ni d'un libellé ni d'une classe de bouton.
+ */
+function verrouFormulaireEnLectureSeule(Testable $formulaire): bool
+{
+    return preg_match('/<form\b[^>]*\bdata-lecture-seule\b/', $formulaire->html()) === 1;
+}
+
+/**
+ * Le formulaire est en LECTURE SEULE, comme pour un exercice clôturé : le repère de la vue, aucun bouton
+ * d'enregistrement, et, pour une pièce gelée, le motif du gel dans l'état du composant.
  */
 function verrouAssertLectureSeule(Testable $formulaire): void
 {
-    expect(verrouBoutonEnregistrer($formulaire))->toBeNull()
-        ->and($formulaire->html())->toContain('class="btn btn-secondary">Fermer</button>')
-        ->and($formulaire->html())->not->toContain('class="btn btn-secondary">Annuler</button>');
+    expect(verrouFormulaireEnLectureSeule($formulaire))->toBeTrue()
+        ->and(verrouBoutonEnregistrer($formulaire))->toBeNull()
+        ->and($formulaire->get('motifGel'))->not->toBeNull();
 }
 
-/** Le formulaire est ÉDITABLE : un bouton d'enregistrement actif, et « Annuler ». */
+/** Le formulaire est ÉDITABLE : pas de repère de lecture seule, un bouton d'enregistrement actif, aucun motif de gel. */
 function verrouAssertEditable(Testable $formulaire): void
 {
-    expect(verrouBoutonEnregistrer($formulaire))->not->toBeNull()->not->toContain('disabled')
-        ->and($formulaire->html())->toContain('class="btn btn-secondary">Annuler</button>');
+    expect(verrouFormulaireEnLectureSeule($formulaire))->toBeFalse()
+        ->and(verrouBoutonEnregistrer($formulaire))->not->toBeNull()->not->toContain('disabled')
+        ->and($formulaire->get('motifGel'))->toBeNull();
 }
 
 /**

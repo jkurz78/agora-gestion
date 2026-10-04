@@ -40,6 +40,7 @@ use App\Services\TransactionService;
 use App\Tenant\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -152,6 +153,18 @@ final class TransactionForm extends Component
      */
     #[Locked]
     public ?string $motifGel = null;
+
+    /**
+     * Les lignes de la pièce OUVERTE sur lesquelles le service refuserait un geste sur une ligne (ventilation,
+     * reclassement) : celle qui porte un rattachement, et toutes celles d'une écriture de rattachement. Posé par
+     * edit() avec $motifGel, par la même lecture (GelRattachement::etatDeGel(), source unique), pour que la vue
+     * n'offre pas « Ventiler » là où il aboutirait à un refus. Une ligne sœur n'y figure pas. #[Locked], comme
+     * $motifGel : une aide d'affichage, jamais une garde.
+     *
+     * @var list<int>
+     */
+    #[Locked]
+    public array $lignesGelees = [];
 
     /** True quand la transaction verrouillée est une dotation, false quand c'est l'acquisition elle-même. */
     public bool $isImmobilisationDotation = false;
@@ -284,6 +297,7 @@ final class TransactionForm extends Component
         $this->isLockedByHelloAsso = false;
         $this->isLockedByImmobilisation = false;
         $this->motifGel = null;
+        $this->lignesGelees = [];
         $this->isImmobilisationDotation = false;
         $this->immobilisationId = null;
         $this->immobilisationLibelle = '';
@@ -554,6 +568,10 @@ final class TransactionForm extends Component
                     'notes' => $a['notes'] ?: null,
                 ])->toArray()
             );
+        } catch (ModelNotFoundException $e) {
+            // Ni un refus métier ni un message pour l'utilisateur : une ligne ou une pièce qui n'existe plus. Elle
+            // remonte à Laravel (une page « introuvable »), comme partout ailleurs, au lieu d'afficher son texte technique.
+            throw $e;
         } catch (\RuntimeException $e) {
             // Les refus du service s'affichent dans ce panneau, qui reste ouvert : l'exercice clôturé
             // (ExerciceCloturedException, une RuntimeException : pas de champ « date » ici, la date en cause est
@@ -584,6 +602,9 @@ final class TransactionForm extends Component
 
         try {
             app(TransactionService::class)->supprimerAffectations($ligne);
+        } catch (ModelNotFoundException $e) {
+            // Voir saveVentilation() : ce n'est pas un refus à afficher.
+            throw $e;
         } catch (\RuntimeException $e) {
             // Même affichage que saveVentilation() : le refus du service reste dans le panneau.
             $this->addError('affectations', $e->getMessage());
@@ -788,8 +809,8 @@ final class TransactionForm extends Component
         $this->isLockedByHelloAsso = $transaction->helloasso_order_id !== null;
 
         // Toujours réaffecté, nul compris : une pièce libre rouverte dans le même composant ne garde pas le motif
-        // de la précédente.
-        $this->motifGel = app(GelRattachement::class)->motifDeGel((int) $transaction->id);
+        // de la précédente, ni ses lignes gelées.
+        ['motif' => $this->motifGel, 'lignes' => $this->lignesGelees] = app(GelRattachement::class)->etatDeGel((int) $transaction->id);
 
         $this->isLockedByImmobilisation = $transaction->isLockedByImmobilisation();
         $this->isImmobilisationDotation = false;
@@ -826,7 +847,7 @@ final class TransactionForm extends Component
     {
         $this->reset([
             'transactionId', 'type', 'date', 'libelle', 'mode_paiement', 'dateReglement', 'paiementRecu', 'paiementModifiable',
-            'tiers_id', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked', 'isLockedByFacture', 'isLockedByHelloAsso', 'isLockedByImmobilisation', 'motifGel', 'isImmobilisationDotation', 'immobilisationId', 'immobilisationLibelle', 'isLockedByReglement', 'isExtourneMiroir', 'sensTresorerie',
+            'tiers_id', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked', 'isLockedByFacture', 'isLockedByHelloAsso', 'isLockedByImmobilisation', 'motifGel', 'lignesGelees', 'isImmobilisationDotation', 'immobilisationId', 'immobilisationLibelle', 'isLockedByReglement', 'isExtourneMiroir', 'sensTresorerie',
             'etatPaiement', 'soldeRestantCentimes', 'reglementsEnregistres', 'posteTiersLigneId',
             'ventilationLigneId', 'ventilationLigneCompteLabel', 'ventilationLigneMontant', 'affectations',
             'ventilationHasAffectations',
@@ -844,18 +865,11 @@ final class TransactionForm extends Component
             return;
         }
 
-        // Une pièce gelée par un rattachement ne s'enregistre pas (spec § 7) : le bouton est désactivé, mais un
-        // bouton n'est pas une garde. Ce refus vient AVANT toute validation et toute écriture ; le service refuse
-        // ensuite, sous verrou, ce que celui-ci aurait laissé passer. Relu ici : le rattachement a pu être posé
-        // ou retiré depuis l'ouverture, et l'affichage suit.
-        if ($this->transactionId !== null) {
-            $this->motifGel = app(GelRattachement::class)->motifDeGel($this->transactionId);
-
-            if ($this->motifGel !== null) {
-                $this->addError('lignes', $this->motifGel);
-
-                return;
-            }
+        // Une pièce gelée par un rattachement ne s'enregistre pas (spec § 7) : le bouton n'est plus rendu, mais
+        // l'absence d'un bouton n'est pas une garde. Ce refus vient AVANT toute validation et toute écriture ; le
+        // service refuse ensuite, sous verrou, ce que celui-ci aurait laissé passer.
+        if ($this->refuserSiGelee('lignes')) {
+            return;
         }
 
         if ($this->isLockedByImmobilisation) {
@@ -1255,9 +1269,38 @@ final class TransactionForm extends Component
         $this->resetForm();
     }
 
+    /**
+     * Refus préalable, côté serveur, d'un geste qui écrirait sur la pièce OUVERTE alors qu'elle est gelée par un
+     * rattachement (spec § 7) : relit le gel (GelRattachement::motifDeGel(), sans verrou), affiche son motif sous
+     * $cle et rend vrai. Relu à chaque appel, non lu sur $motifGel : le rattachement a pu être posé ou retiré depuis
+     * l'ouverture, et l'affichage suit. Une prévention : sous verrou, le service refuse de toute façon.
+     */
+    private function refuserSiGelee(string $cle): bool
+    {
+        if ($this->transactionId === null) {
+            return false;
+        }
+
+        $this->motifGel = app(GelRattachement::class)->motifDeGel($this->transactionId);
+
+        if ($this->motifGel === null) {
+            return false;
+        }
+
+        $this->addError($cle, $this->motifGel);
+
+        return true;
+    }
+
     public function deletePieceJointe(): void
     {
         if (! $this->canEdit || $this->transactionId === null) {
+            return;
+        }
+
+        // La suppression du justificatif d'une pièce gelée est un geste de la pièce, et il écrit tout de suite :
+        // rien ne la gardait que l'absence du bouton.
+        if ($this->refuserSiGelee('pieceJointe')) {
             return;
         }
 
@@ -1269,6 +1312,14 @@ final class TransactionForm extends Component
 
     public function updatedPieceJointe(): void
     {
+        // Un justificatif envoyé ou remplacé sur une pièce gelée : l'enregistrement le refuserait (il est seul à
+        // l'écrire), mais l'envoi n'a pas à être accepté pour rien. Le fichier temporaire est abandonné.
+        if ($this->pieceJointe !== null && $this->refuserSiGelee('pieceJointe')) {
+            $this->pieceJointe = null;
+
+            return;
+        }
+
         if ($this->ocrWaitingForFile) {
             $this->ocrWaitingForFile = false;
         }
