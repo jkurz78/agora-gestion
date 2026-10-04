@@ -365,13 +365,8 @@ final class TransactionService
         $this->validateInscriptionRequiresOperation($lignes);
 
         return DB::transaction(function () use ($transaction, $data, $lignes) {
-            // Une pièce d'une autre association n'est ni verrouillée ni jugée : on ne révèle rien de son
-            // état. Lu sur l'instance reçue, avant tout verrou : `association_id` ne change jamais, et la
-            // garde ci-dessous lève tous les scopes, elle ne ferait pas ce tri. Défense en profondeur :
-            // l'instance vient déjà de l'association courante en fonctionnement normal.
-            if ((int) $transaction->association_id !== (int) TenantContext::currentId()) {
-                throw (new ModelNotFoundException)->setModel(Transaction::class, [(int) $transaction->id]);
-            }
+            // Avant tout verrou, et avant la garde du rattachement qui lève tous les scopes.
+            $this->assertPieceDeLAssociationCourante($transaction);
 
             // Même début que PosteTiersReglementService::regler() : exercice, lot canonique, puis transaction
             // source. Ainsi, un règlement T2 ne peut pas s'intercaler entre le contrôle aUnReglementTiers()
@@ -813,6 +808,9 @@ final class TransactionService
         $this->assertNiPointeeNiPilotee($transaction, 'supprimée');
 
         DB::transaction(function () use ($transaction) {
+            // Avant tout verrou, et avant la garde du rattachement qui lève tous les scopes (comme update()).
+            $this->assertPieceDeLAssociationCourante($transaction);
+
             // Mêmes premiers verrous que update() : l'exercice de la pièce (une clôture concurrente ne
             // s'intercale pas entre les contrôles ci-dessus et l'écriture), puis la garde du rattachement,
             // qui prend les lots 401/411, la pièce, ses lignes et leurs rattachements. Une pièce dont une
@@ -877,6 +875,9 @@ final class TransactionService
         $this->assertNonExtournee($transaction);
 
         DB::transaction(function () use ($transaction, $motif) {
+            // Avant tout verrou, et avant la garde du rattachement qui lève tous les scopes (comme update()).
+            $this->assertPieceDeLAssociationCourante($transaction);
+
             // 0. Mêmes premiers verrous que update() et delete() : l'exercice de la pièce, puis la garde du
             // rattachement (lots 401/411, pièce, lignes, rattachements). Une pièce dont une ligne est
             // rattachée, ou qui est elle-même une écriture de rattachement, n'est pas annulée. La suite
@@ -920,6 +921,22 @@ final class TransactionService
     }
 
     /**
+     * Une pièce d'une autre association n'est ni verrouillée ni jugée : on ne révèle rien de son état, et
+     * on ne l'écrit pas. Lu sur l'instance reçue, AVANT tout verrou : `association_id` ne change jamais, et
+     * la garde du rattachement (GelRattachement) lève tous les scopes, elle ne ferait pas ce tri. Défense
+     * en profondeur : l'instance vient déjà de l'association courante en fonctionnement normal. Sites :
+     * update(), delete() et annuler(), à l'ouverture de leur transaction.
+     *
+     * @throws ModelNotFoundException la pièce n'est pas celle de l'association courante
+     */
+    private function assertPieceDeLAssociationCourante(Transaction $transaction): void
+    {
+        if ((int) $transaction->association_id !== (int) TenantContext::currentId()) {
+            throw (new ModelNotFoundException)->setModel(Transaction::class, [(int) $transaction->id]);
+        }
+    }
+
+    /**
      * Les contrôles métier communs à delete() et annuler() : la pièce n'est ni pointée dans un
      * rapprochement, ni liée à une remise bancaire ou à une facture validée, ni pilotée par une fiche
      * d'immobilisation. Faits deux fois : sur l'instance reçue (refus rapide, hors transaction), puis
@@ -947,7 +964,7 @@ final class TransactionService
     private function assertNonExtournee(Transaction $transaction): void
     {
         if ($transaction->extournee_at !== null) {
-            throw new \RuntimeException('Cette transaction a déjà été extournée.');
+            throw new \RuntimeException('Cette transaction a déjà été annulée.');
         }
     }
 

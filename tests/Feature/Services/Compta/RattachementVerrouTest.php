@@ -1064,7 +1064,7 @@ describe('TransactionService : delete() et annuler() poursuivent sur la pièce q
         expect(DB::table('transactions')->where('id', $piece->id)->value('deleted_at'))->toBeNull()
             ->and(DB::table('transaction_lignes')->where('transaction_id', $piece->id)->whereNotNull('deleted_at')->count())->toBe(0);
     })->with([
-        'annuler() : déjà extournée' => ['annuler', 'annulée', 'Cette transaction a déjà été extournée.'],
+        'annuler() : déjà annulée' => ['annuler', 'annulée', 'Cette transaction a déjà été annulée.'],
         'annuler() : pointée' => ['annuler', 'pointée', 'Cette transaction est pointée dans un rapprochement et ne peut pas être annulée.'],
         'annuler() : en remise' => ['annuler', 'remise', 'Cette transaction est liée à une remise bancaire et ne peut pas être annulée.'],
         'annuler() : facturée' => ['annuler', 'facturée', 'Cette transaction est liée à une facture validée et ne peut pas être annulée.'],
@@ -1101,6 +1101,53 @@ describe('TransactionService : delete() et annuler() poursuivent sur la pièce q
         $apres = (array) DB::table('transactions')->where('id', $piece->id)->first();
         expect($apres['deleted_at'])->not->toBeNull()
             ->and($apres['piece_jointe_path'])->toBeNull();
+    })->with([
+        'delete()' => ['delete'],
+        'annuler()' => ['annuler'],
+    ]);
+});
+
+describe('TransactionService : delete() et annuler() écartent une pièce d\'une autre association avant la garde', function () {
+    // Même défense en profondeur qu'update() : la garde du rattachement lève tous les scopes, elle verrouillerait
+    // (et jugerait) une pièce que l'appelant n'a pas à connaître. Sans ce tri, delete() et annuler() supprimeraient
+    // la pièce d'une autre association. Lu sur l'instance reçue, AVANT la garde et avant tout verrou de la pièce.
+    test('refusent par une ModelNotFoundException une pièce d\'une autre association, et ne touchent à rien', function (string $geste) {
+        $piece = Transaction::findOrFail($this->ligneOrigineEquilibree(7)->transaction_id);
+        DB::table('transactions')->where('id', $piece->id)->update(['association_id' => Association::factory()->create()->id]);
+        $piece->refresh();
+
+        $avant = verrouEmpreinteDeLaPiece((int) $piece->id);
+
+        expect(fn () => verrouGeste($geste, $piece)())
+            ->toThrow(ModelNotFoundException::class);
+
+        expect(verrouEmpreinteDeLaPiece((int) $piece->id))->toBe($avant);
+    })->with([
+        'delete()' => ['delete'],
+        'annuler()' => ['annuler'],
+    ]);
+
+    test('ne verrouillent ni ne lisent la pièce d\'une autre association : le refus précède la garde', function (string $geste) {
+        $piece = Transaction::findOrFail($this->ligneOrigineEquilibree(7)->transaction_id);
+        DB::table('transactions')->where('id', $piece->id)->update(['association_id' => Association::factory()->create()->id]);
+        $piece->refresh();
+
+        $requetes = rattachementRequetesDeLaTransaction(
+            fn () => expect(fn () => verrouGeste($geste, $piece)())->toThrow(ModelNotFoundException::class)
+        );
+
+        // Les requêtes de la garde (lots, pièce, lignes, rattachements), en texte : une comparaison qui échoue
+        // ne doit pas avoir à exporter les objets de requête.
+        $deLaGarde = fn (array $requetes): array => array_values(array_filter(
+            array_map(fn (object $r): string => $r->sql, $requetes),
+            fn (string $sql): bool => preg_match('/from\s+[`"]?(transactions|transaction_lignes|provisions)[`"]?/i', $sql) === 1,
+        ));
+        expect($deLaGarde($requetes))->toBe([]);
+
+        // Garde anti-test-vide : sur une pièce de l'association, les mêmes tables sont bien lues dans la transaction.
+        $libre = Transaction::findOrFail($this->ligneOrigineEquilibree(7)->transaction_id);
+        $requetes = rattachementRequetesDeLaTransaction(fn () => verrouGeste($geste, $libre)());
+        expect($deLaGarde($requetes))->not->toBe([]);
     })->with([
         'delete()' => ['delete'],
         'annuler()' => ['annuler'],
