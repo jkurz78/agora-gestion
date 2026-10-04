@@ -49,6 +49,14 @@ const VERROU_MESSAGE_EXTOURNE_PRECOCE = 'Cette pièce porte un rattachement à l
     .'retirerait deux fois le même montant de l’exercice 2025-2026. Datez l’annulation après le 31/08/2026, '
     .'ou retirez d’abord le rattachement depuis Exercices > Écritures de rattachement.';
 
+/**
+ * Le même refus quand la date de l'annulation est imposée (l'annulation d'une facture a lieu aujourd'hui) :
+ * pas de « Datez l'annulation », sortie que ce parcours n'a pas ; la sortie est d'attendre le premier jour de N+1.
+ */
+const VERROU_MESSAGE_EXTOURNE_DATE_IMPOSEE = 'Cette pièce porte un rattachement à l’exercice suivant : l’annuler aujourd’hui '
+    .'retirerait deux fois le même montant de l’exercice 2025-2026. Retirez d’abord le rattachement depuis '
+    .'Exercices > Écritures de rattachement, ou attendez le 01/09/2026 pour l’annuler.';
+
 /** Un compte actif de la même classe que la ligne d'origine, vers lequel la reclasser. */
 function verrouAutreCompte(int $classe): Compte
 {

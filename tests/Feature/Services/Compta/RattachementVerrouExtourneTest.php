@@ -2,18 +2,29 @@
 
 declare(strict_types=1);
 
+use App\DataTransferObjects\ExtournePayload;
 use App\Enums\ModePaiement;
+use App\Enums\StatutFacture;
+use App\Enums\StatutReglement;
+use App\Enums\TypeLigneFacture;
+use App\Livewire\Extournes\AnnulerTransactionModal;
 use App\Models\Extourne;
+use App\Models\Facture;
+use App\Models\FactureLigne;
 use App\Models\Provision;
+use App\Models\Tiers;
 use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\Compta\RattachementExerciceService;
+use App\Services\FactureService;
 use App\Services\TransactionExtourneService;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
+use Livewire\Livewire;
 
 /*
 |--------------------------------------------------------------------------
@@ -327,4 +338,121 @@ describe('TransactionExtourneService::extourner() : il rejuge la pièce sous ver
         'supprimée entre-temps' => ['supprimée', 'Cette transaction a été supprimée et ne peut pas être annulée.'],
         'venue de HelloAsso entre-temps' => ['HelloAsso', 'Les transactions issues de HelloAsso ne peuvent pas être annulées manuellement.'],
     ]);
+});
+
+// ── Les deux appelants : la fenêtre d'annulation choisit la date, l'annulation d'une facture l'impose ──────────
+//
+// Le refus d'une annulation trop tôt nomme sa sortie (spec § 7). La fenêtre d'annulation saisit sa date : « datez
+// l'annulation après N » est une sortie. FactureService::annuler() extourne ses pièces À LA DATE DU JOUR, que personne ne
+// saisit : le même conseil n'y a pas de sortie, et le refus dit d'attendre le premier jour de N+1. La différence
+// vient d'ExtournePayload::$dateImposee, que fromOrigine() pose quand aucune date n'est donnée.
+
+/**
+ * Une facture validée qui porte la pièce rattachée par une ligne manuelle : FactureService::annuler() l'extourne d'office.
+ */
+function verrouFactureValideePortant(Transaction $piece, TransactionLigne $ligne): Facture
+{
+    $facture = Facture::create([
+        'date' => '2026-01-10',
+        'statut' => StatutFacture::Validee,
+        'tiers_id' => Tiers::factory()->create()->id,
+        'montant_total' => 175,
+        'saisi_par' => auth()->id(),
+        'exercice' => 2025,
+    ]);
+    $facture->transactions()->attach($piece->id);
+    FactureLigne::create([
+        'facture_id' => $facture->id,
+        'type' => TypeLigneFacture::MontantManuel,
+        'libelle' => 'Stage',
+        'prix_unitaire' => 175,
+        'quantite' => 1,
+        'montant' => 175,
+        'transaction_ligne_id' => $ligne->id,
+        'compte_id' => $ligne->compte_id,
+        'ordre' => 1,
+    ]);
+
+    return $facture->fresh();
+}
+
+describe('ExtournePayload::fromOrigine() : la date est-elle imposée ?', function () {
+    test('l\'est quand aucune date n\'est donnée, ne l\'est pas dès qu\'une date l\'est, même celle du jour', function () {
+        $piece = Transaction::findOrFail($this->ligneOrigineEquilibree(7, 175.0, ModePaiement::Virement)->transaction_id);
+
+        expect(ExtournePayload::fromOrigine($piece)->dateImposee)->toBeTrue()
+            ->and(ExtournePayload::fromOrigine($piece, ['date' => null])->dateImposee)->toBeTrue()
+            ->and(ExtournePayload::fromOrigine($piece, ['date' => now()->toDateString()])->dateImposee)->toBeFalse()
+            ->and(ExtournePayload::fromOrigine($piece, ['date' => '2026-09-01'])->dateImposee)->toBeFalse();
+    });
+});
+
+describe('FactureService::annuler() : une pièce rattachée à N, annulée aujourd\'hui', function () {
+    test('est refusée tant qu\'aujourd\'hui tombe dans N : le motif sans « Datez », la facture reste validée, rien n\'a bougé', function (int $classe) {
+        ['ligne' => $ligne, 'provision' => $provision, 'piece' => $piece] = verrouPieceRattacheeAExtourner($this, $classe);
+        $facture = verrouFactureValideePortant($piece, $ligne);
+
+        // Garde anti-test-vide : aujourd'hui (15/01/2026, figé) est dans N, la facture est validée.
+        expect(now()->toDateString())->toBe('2026-01-15')
+            ->and($facture->statut)->toBe(StatutFacture::Validee)
+            ->and($facture->transactionsGenereesParLignesManuelles()->pluck('id')->all())->toBe([(int) $piece->id]);
+
+        verrouAssertExtourneRefusee(
+            fn () => app(FactureService::class)->annuler($facture),
+            $ligne,
+            $provision,
+            VERROU_MESSAGE_EXTOURNE_DATE_IMPOSEE,
+        );
+
+        // Le refus ne propose pas une sortie que ce parcours n'a pas.
+        expect(VERROU_MESSAGE_EXTOURNE_DATE_IMPOSEE)->not->toContain('Datez');
+
+        // La facture est restée validée, sans avoir ni date d'annulation : le refus annule tout.
+        $apres = $facture->fresh();
+        expect($apres->statut)->toBe(StatutFacture::Validee)
+            ->and($apres->numero_avoir)->toBeNull()
+            ->and($apres->date_annulation)->toBeNull()
+            ->and($piece->fresh()->extournee_at)->toBeNull()
+            ->and(Extourne::count())->toBe(0);
+    })->with('rattachement_classes');
+
+    test('passe quand aujourd\'hui est après N : la facture est annulée, la pièce miroir est datée du jour', function () {
+        ['ligne' => $ligne, 'provision' => $provision, 'piece' => $piece] = verrouPieceRattacheeAExtourner($this, 7);
+        $facture = verrouFactureValideePortant($piece, $ligne);
+        $avant = verrouEmpreinte($ligne, $provision);
+
+        $this->travelTo('2026-09-15');
+        app(FactureService::class)->annuler($facture);
+
+        expect($facture->fresh()->statut)->toBe(StatutFacture::Annulee)
+            ->and(Extourne::count())->toBe(1)
+            ->and(Extourne::sole()->extourne->date->toDateString())->toBe('2026-09-15')
+            ->and($piece->fresh()->extournee_at)->not->toBeNull();
+
+        // Le rattachement n'a pas bougé.
+        $apres = verrouEmpreinte($ligne, $provision);
+        expect($apres['provision'])->toBe($avant['provision'])
+            ->and($apres['ecritures'])->toBe($avant['ecritures']);
+    });
+});
+
+describe('AnnulerTransactionModal : la fenêtre d\'annulation choisit sa date, elle garde le motif qui propose de la changer', function () {
+    test('refuse avec « Datez l\'annulation après le 31/08/2026 », même quand la date saisie est celle du jour', function () {
+        ['piece' => $piece] = verrouPieceRattacheeAExtourner($this, 7);
+
+        // La fenêtre ne propose l'annulation par extourne qu'une fois la pièce encaissée.
+        DB::table('transactions')->where('id', $piece->id)->update(['statut_reglement' => StatutReglement::Recu->value]);
+
+        // Prémisse : la date que la fenêtre pré-remplit est celle du jour, dans N.
+        Livewire::test(AnnulerTransactionModal::class)
+            ->call('open', (int) $piece->id)
+            ->assertSet('mode', 'extourne')
+            ->assertSet('date', '2026-01-15')
+            ->call('submit')
+            ->assertSet('isOpen', true)
+            ->assertSet('errorMessage', VERROU_MESSAGE_EXTOURNE_PRECOCE);
+
+        expect(VERROU_MESSAGE_EXTOURNE_PRECOCE)->toContain('Datez l’annulation après le 31/08/2026')
+            ->and(Extourne::count())->toBe(0);
+    });
 });

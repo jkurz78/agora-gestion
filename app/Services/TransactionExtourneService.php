@@ -85,7 +85,7 @@ final class TransactionExtourneService
 
             // Seule garde datée : l'annulation d'une pièce rattachée n'est refusée que si elle est datée au
             // plus tard le dernier jour de N. Elle rend la pièce relue sous verrou.
-            $origine = $this->rattachement->verrouillerPieceExtournable($origine, $payload->date);
+            $origine = $this->rattachement->verrouillerPieceExtournable($origine, $payload->date, $payload->dateImposee);
 
             // Les contrôles faits plus haut sur l'instance reçue, refaits sur la pièce verrouillée : son
             // état a pu changer entre la lecture et le verrou. Surtout `extournee_at` : une extourne

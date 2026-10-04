@@ -275,8 +275,7 @@ final class RattachementExerciceService
         $notes = $notes !== null && trim($notes) !== '' ? trim($notes) : null;
 
         // 3 tentatives : un inter-blocage est rejoué (la synchronisation HelloAsso modifie la ligne
-        // avant la pièce ; extourner() numérote avant d'écrire la pièce). Sans danger : tout est
-        // relu sous verrou à chaque tentative.
+        // avant la pièce). Sans danger : tout est relu sous verrou à chaque tentative.
         [$provision, $cas] = DB::transaction(function () use ($ligne, $exercice, $notes, $auteur): array {
             // Ordre canonique de cloturer() et du § 5 : association, exercice source,
             // exercice cible, puis écritures. La dotation vit dans N, l'extourne dans
@@ -565,13 +564,16 @@ final class RattachementExerciceService
      * sites, et verrouillerPieceEtRattachements() pour l'ordre des verrous.
      *
      * @param  CarbonInterface  $dateAnnulation  la date comptable de la pièce miroir (ExtournePayload::$date)
+     * @param  bool  $dateImposee  la date n'est pas choisie par l'utilisateur mais imposée par l'appelant
+     *                             (ExtournePayload::$dateImposee) : le refus ne propose alors pas de « dater
+     *                             l'annulation » après N, sortie qu'il n'a pas, mais d'attendre ce jour-là
      *
      * @throws RuntimeException MOTIF_ECRITURE_DE_RATTACHEMENT si la pièce est une écriture de rattachement ;
      *                          le motif de motifExtournePrecoce() si elle porte un rattachement dont
      *                          l'exercice finit à la date de l'annulation ou après elle
      * @throws ModelNotFoundException la pièce n'existe plus en base (supprimée physiquement)
      */
-    public function verrouillerPieceExtournable(Transaction $origine, CarbonInterface $dateAnnulation): Transaction
+    public function verrouillerPieceExtournable(Transaction $origine, CarbonInterface $dateAnnulation, bool $dateImposee = false): Transaction
     {
         ['piece' => $verrouillee, 'exercices' => $exercices] = $this->verrouillerPieceEtRattachements($origine);
 
@@ -584,7 +586,7 @@ final class RattachementExerciceService
 
         // Chaînes Y-m-d : la date de l'annulation peut porter une heure, la fin de N est minuit.
         if ($dateAnnulation->toDateString() <= $finDeN->toDateString()) {
-            throw new RuntimeException($this->motifExtournePrecoce($exercice, $finDeN));
+            throw new RuntimeException($this->motifExtournePrecoce($exercice, $finDeN, $dateImposee));
         }
 
         return $verrouillee;
@@ -592,16 +594,30 @@ final class RattachementExerciceService
 
     /**
      * Le refus d'une annulation par extourne datée au plus tard le dernier jour de N : il dit pourquoi
-     * (le même montant serait retiré deux fois de l'exercice N), et les deux sorties — dater l'annulation
-     * après N, ou retirer d'abord le rattachement. Sans jargon : « annulation », non « extourne ».
+     * (le même montant serait retiré deux fois de l'exercice N), et la sortie — qui dépend de qui choisit
+     * la date. Sans jargon : « annulation », non « extourne ».
+     *
+     * Date choisie (la fenêtre d'annulation) : dater l'annulation après N, ou retirer d'abord le
+     * rattachement. Date imposée (l'annulation d'une facture, qui a lieu aujourd'hui) : « dater » n'y est
+     * pas possible, la sortie est d'attendre le premier jour de N+1, ou de retirer d'abord le rattachement.
      */
-    private function motifExtournePrecoce(int $exercice, CarbonInterface $finDeN): string
+    private function motifExtournePrecoce(int $exercice, CarbonInterface $finDeN, bool $dateImposee): string
     {
+        $retrait = 'retirez d’abord le rattachement depuis Exercices > Écritures de rattachement';
+
+        if ($dateImposee) {
+            $debutDeNSuivant = $this->exerciceService->dateRange($exercice + 1)['start']->format('d/m/Y');
+
+            return 'Cette pièce porte un rattachement à l’exercice suivant : l’annuler aujourd’hui retirerait deux fois le même montant de l’exercice '
+                .$this->exerciceService->label($exercice).'. '
+                .ucfirst($retrait).', ou attendez le '.$debutDeNSuivant.' pour l’annuler.';
+        }
+
         $fin = $finDeN->format('d/m/Y');
 
         return 'Cette pièce porte un rattachement à l’exercice suivant : l’annuler avec une date au plus tard le '.$fin
             .' retirerait deux fois le même montant de l’exercice '.$this->exerciceService->label($exercice).'. '
-            .'Datez l’annulation après le '.$fin.', ou retirez d’abord le rattachement depuis Exercices > Écritures de rattachement.';
+            .'Datez l’annulation après le '.$fin.', ou '.$retrait.'.';
     }
 
     /**
