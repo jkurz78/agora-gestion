@@ -831,8 +831,9 @@ describe('RattachementExerciceService : éligibilité (motifDeRefus)', function 
 
         expect(app(RattachementExerciceService::class)->motifDeRefus($ligne))->toBeNull();
 
-        // Garde anti-test-vide : le motif a bien lu la table des rattachements.
+        // Garde anti-test-vide : le motif a bien lu les rattachements et les affectations.
         expect(array_filter($requetes, fn (string $sql) => str_contains($sql, 'provisions')))->not->toBeEmpty();
+        expect(array_filter($requetes, fn (string $sql) => str_contains($sql, 'transaction_ligne_affectations')))->not->toBeEmpty();
 
         // C'est rattacher() qui verrouille, dans sa transaction ; l'écran et la détection
         // appellent motifDeRefus() hors de toute écriture. (Sous SQLite « for update » n'existe pas.)
@@ -914,12 +915,13 @@ describe('RattachementExerciceService : éligibilité (motifDeRefus)', function 
         serviceRattachementAssertRefusee($ligne, 'annule une autre pièce');
     })->with('rattachement_pca_cca');
 
-    test('D13 — la pièce annulée dans l’exercice N, jusqu’à son dernier jour inclus, est refusée', function (int $classe, string $dateAnnulation) {
+    test('D13 — la pièce annulée au plus tard le dernier jour de N, même avant sa propre date, est refusée', function (int $classe, string $dateAnnulation) {
         [$ligneOrigine] = serviceRattachementPieceAnnulee($classe, $dateAnnulation);
 
-        serviceRattachementAssertRefusee($ligneOrigine, 'annulée dans le même exercice');
+        serviceRattachementAssertRefusee($ligneOrigine, 'annulée avant la fin de son exercice');
     })->with([
         'PCA annulée en cours d’exercice' => [7, '2026-04-20'],
+        'PCA annulée avant l’exercice de la pièce' => [7, '2025-06-01'],
         'PCA annulée le dernier jour de N' => [7, '2026-08-31'],
         'CCA annulée le dernier jour de N' => [6, '2026-08-31'],
     ]);
@@ -1047,7 +1049,7 @@ describe('RattachementExerciceService : éligibilité (motifDeRefus)', function 
 
         // Le vocabulaire de l'écran (« ventiler »), pas le nom de la table.
         expect(RattachementExerciceService::MOTIF_AFFECTATIONS)
-            ->toContain('ventilée entre plusieurs opérations')
+            ->toContain('ventilée sur des opérations')
             ->not->toContain('affectations');
 
         serviceRattachementAssertRefusee($ligne, RattachementExerciceService::MOTIF_AFFECTATIONS);
@@ -1190,7 +1192,7 @@ describe('RattachementExerciceService : création', function () {
         'dernier jour de l’exercice 2025' => ['2026-08-31', 2025],
     ]);
 
-    test('les verrous sont pris dans l’ordre canonique — association, exercice N, exercice N+1, pièce, ligne — puis « déjà rattachée » est relu sous verrou, avant toute écriture', function () {
+    test('les verrous sont pris dans l’ordre canonique — association, exercice N, exercice N+1, pièce, ligne — puis affectations et « déjà rattachée » sont relues sous verrou, avant toute écriture', function () {
         $ligne = $this->ligneOrigine(7, 175.0);
         $niveauAvant = DB::transactionLevel();
         $requetes = [];
@@ -1226,13 +1228,16 @@ describe('RattachementExerciceService : création', function () {
             'exercice N+1' => $indice('exercices', 2026),
             'pièce' => $indice('transactions'),
             'ligne' => $indice('transaction_lignes'),
+            // L'éligibilité est rejugée sous verrou : les affectations, que ni la pièce ni la
+            // ligne ne protègent, se lisent elles aussi sous verrou, puis « déjà rattachée ».
+            'affectations' => $indice('transaction_ligne_affectations'),
             // « Déjà rattachée », relu sous les verrous : après la ligne, avant l'écriture.
             'recontrôle' => $indice('provisions'),
         ];
 
         // Strictement croissants : chaque verrou est pris après le précédent.
         expect(array_values($indices))->toBe(collect($indices)->sort()->values()->all());
-        expect(count(array_unique($indices)))->toBe(6);
+        expect(count(array_unique($indices)))->toBe(7);
 
         // SQLite n'écrit pas « for update » : seul MySQL/MariaDB prouve que ces lectures verrouillent.
         if (DB::getDriverName() !== 'sqlite') {
@@ -1322,7 +1327,7 @@ describe('RattachementExerciceService : création', function () {
             $ligne,
             fn () => DB::table('transactions')->where('id', $ligne->transaction_id)->update(['deleted_at' => now()]),
             $this->user,
-        ))->toThrow(RuntimeException::class, 'Cette ligne n’existe plus');
+        ))->toThrow(RuntimeException::class, 'La pièce de cette ligne a été supprimée entre-temps. Rechargez la page.');
 
         expect(DB::table('provisions')->count())->toBe(0);
     });
@@ -1335,7 +1340,7 @@ describe('RattachementExerciceService : création', function () {
             $ligne,
             fn () => DB::table('transaction_lignes')->where('id', $ligne->id)->update(['transaction_id' => $autrePiece->transaction_id]),
             $this->user,
-        ))->toThrow(RuntimeException::class, 'Cette ligne n’existe plus');
+        ))->toThrow(RuntimeException::class, 'Cette ligne n’existe plus : sa pièce a été modifiée entre-temps. Rechargez la page.');
 
         expect(DB::table('provisions')->count())->toBe(0);
     });

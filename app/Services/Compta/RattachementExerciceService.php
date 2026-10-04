@@ -38,19 +38,21 @@ use RuntimeException;
  */
 final class RattachementExerciceService
 {
-    /** Formulation unique du refus, partagée avec CandidatsRattachementQuery. */
-    public const MOTIF_AFFECTATIONS = 'Cette ligne est ventilée entre plusieurs opérations : son rattachement n’est pas encore pris en charge.';
+    /** Formulation unique du refus, qui sera partagée avec la détection (Task 10). */
+    public const MOTIF_AFFECTATIONS = 'Cette ligne est ventilée sur des opérations : son rattachement n’est pas encore pris en charge.';
 
     private const MOTIF_DEJA_RATTACHEE = 'Cette ligne est déjà rattachée à l’exercice suivant : retirez son rattachement avant de le refaire.';
 
     private const MOTIF_ANNULATION = 'Cette pièce annule une autre pièce : elle ne peut pas être rattachée à l’exercice suivant.';
 
-    private const MOTIF_ANNULEE_MEME_EXERCICE = 'Cette pièce a été annulée dans le même exercice : la rattacher retirerait deux fois le même montant. '
+    private const MOTIF_ANNULEE_MEME_EXERCICE = 'Cette pièce a été annulée avant la fin de son exercice : la rattacher retirerait deux fois le même montant. '
         .'S’il existe une pièce qui la remplace, rattachez celle-là.';
 
     private const MOTIF_ANNULEE_DATE_INTROUVABLE = 'Cette pièce a été annulée, mais la date de son annulation est introuvable : par prudence, elle ne peut pas être rattachée.';
 
     private const MOTIF_LIGNE_DISPARUE = 'Cette ligne n’existe plus : sa pièce a été modifiée entre-temps. Rechargez la page.';
+
+    private const MOTIF_PIECE_SUPPRIMEE_ENTRE_TEMPS = 'La pièce de cette ligne a été supprimée entre-temps. Rechargez la page.';
 
     private const MOTIF_PIECE_REDATEE = 'La date de la pièce a changé entre-temps : elle n’appartient plus au même exercice. Rechargez la page.';
 
@@ -148,8 +150,11 @@ final class RattachementExerciceService
         }
 
         // D4 : la ventilation vit dans les affectations, la ligne n'a pas
-        // d'opération propre à hériter.
-        if ($ligne->affectations()->exists()) {
+        // d'opération propre à hériter. Sous verrou, la lecture est verrouillante : c'est la
+        // seule donnée de l'éligibilité que ni le verrou de la pièce ni celui de la ligne
+        // ne protègent (affecterLigne() n'écrit que dans transaction_ligne_affectations), et
+        // une affectation validée pendant l'attente du verrou serait invisible du cliché.
+        if ($sousVerrou ? $ligne->affectations()->lockForUpdate()->exists() : $ligne->affectations()->exists()) {
             return self::MOTIF_AFFECTATIONS;
         }
 
@@ -224,10 +229,13 @@ final class RattachementExerciceService
             $pieceVerrouillee = Transaction::query()->whereKey((int) $transaction->id)->lockForUpdate()->first();
             $ligneVerrouillee = TransactionLigne::query()->whereKey((int) $ligne->id)->lockForUpdate()->first();
 
-            // Ligne ou pièce disparue, ou ligne passée à une autre pièce : TransactionService::update()
-            // a recréé les lignes, ou la pièce a été supprimée. Refus lisible, pas une erreur technique.
-            if ($pieceVerrouillee === null
-                || $ligneVerrouillee === null
+            // Pièce supprimée, ou ligne disparue ou passée à une autre pièce (TransactionService::update()
+            // a recréé les lignes) : refus lisible, pas une erreur technique.
+            if ($pieceVerrouillee === null) {
+                throw new RuntimeException(self::MOTIF_PIECE_SUPPRIMEE_ENTRE_TEMPS);
+            }
+
+            if ($ligneVerrouillee === null
                 || (int) $ligneVerrouillee->transaction_id !== (int) $pieceVerrouillee->id) {
                 throw new RuntimeException(self::MOTIF_LIGNE_DISPARUE);
             }
