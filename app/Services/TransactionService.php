@@ -809,18 +809,9 @@ final class TransactionService
             $this->exerciceService->anneeForDate(CarbonImmutable::parse($transaction->date))
         );
 
-        if ($transaction->rapprochement_id !== null) {
-            throw new \RuntimeException('Cette transaction est pointée dans un rapprochement et ne peut pas être supprimée.');
-        }
-        if ($transaction->isLockedByRemise()) {
-            throw new \RuntimeException('Cette transaction est liée à une remise bancaire et ne peut pas être supprimée.');
-        }
-        if ($transaction->isLockedByFacture()) {
-            throw new \RuntimeException('Cette transaction est liée à une facture validée et ne peut pas être supprimée.');
-        }
-        if ($transaction->isLockedByImmobilisation()) {
-            throw new \RuntimeException('Cette transaction provient d’une immobilisation et ne peut pas être supprimée : supprimez la fiche.');
-        }
+        // Refus rapide, hors transaction, sur l'instance reçue ; relu sous verrou dans la transaction.
+        $this->assertNiPointeeNiPilotee($transaction, 'supprimée');
+
         DB::transaction(function () use ($transaction) {
             // Mêmes premiers verrous que update() : l'exercice de la pièce (une clôture concurrente ne
             // s'intercale pas entre les contrôles ci-dessus et l'écriture), puis la garde du rattachement,
@@ -844,7 +835,12 @@ final class TransactionService
             $this->exerciceService->assertOuvertVerrouille(
                 $this->exerciceService->anneeForDate(CarbonImmutable::parse($transaction->date))
             );
-            $this->rattachement->verrouillerPieceNonGelee($transaction);
+            $transaction = $this->rattachement->verrouillerPieceNonGelee($transaction);
+
+            // Les contrôles faits plus haut sur l'instance reçue, refaits sur la pièce verrouillée : un
+            // pointage, une remise ou une facture arrivés depuis la lecture de l'instance ne doivent pas
+            // être effacés par une suppression qui ne les aurait pas vus.
+            $this->assertNiPointeeNiPilotee($transaction, 'supprimée');
 
             // Nettoyage T2 (encaissement/règlement séparé) si elle existe — symétrique
             // avec annuler() : sans ça, supprimer une transaction réglée laisserait une
@@ -876,21 +872,9 @@ final class TransactionService
             $this->exerciceService->anneeForDate(CarbonImmutable::parse($transaction->date))
         );
 
-        if ($transaction->rapprochement_id !== null) {
-            throw new \RuntimeException('Cette transaction est pointée dans un rapprochement et ne peut pas être annulée.');
-        }
-        if ($transaction->isLockedByRemise()) {
-            throw new \RuntimeException('Cette transaction est liée à une remise bancaire et ne peut pas être annulée.');
-        }
-        if ($transaction->isLockedByFacture()) {
-            throw new \RuntimeException('Cette transaction est liée à une facture validée et ne peut pas être annulée.');
-        }
-        if ($transaction->isLockedByImmobilisation()) {
-            throw new \RuntimeException('Cette transaction provient d’une immobilisation et ne peut pas être annulée : supprimez la fiche.');
-        }
-        if ($transaction->extournee_at !== null) {
-            throw new \RuntimeException('Cette transaction a déjà été extournée.');
-        }
+        // Refus rapides, hors transaction, sur l'instance reçue ; relus sous verrou dans la transaction.
+        $this->assertNiPointeeNiPilotee($transaction, 'annulée');
+        $this->assertNonExtournee($transaction);
 
         DB::transaction(function () use ($transaction, $motif) {
             // 0. Mêmes premiers verrous que update() et delete() : l'exercice de la pièce, puis la garde du
@@ -900,7 +884,13 @@ final class TransactionService
             $this->exerciceService->assertOuvertVerrouille(
                 $this->exerciceService->anneeForDate(CarbonImmutable::parse($transaction->date))
             );
-            $this->rattachement->verrouillerPieceNonGelee($transaction);
+            $transaction = $this->rattachement->verrouillerPieceNonGelee($transaction);
+
+            // Les contrôles faits plus haut sur l'instance reçue, refaits sur la pièce verrouillée. Surtout
+            // l'extourne : une annulation par extourne (TransactionExtourneService::extourner()) qui validerait
+            // entre la lecture de l'instance et le verrou ferait neutraliser la pièce deux fois.
+            $this->assertNiPointeeNiPilotee($transaction, 'annulée');
+            $this->assertNonExtournee($transaction);
 
             // 1. Nettoyage T2 (encaissement/règlement séparé) si elle existe
             $this->supprimerT2SiExiste($transaction);
@@ -927,6 +917,38 @@ final class TransactionService
                 'motif' => $motif,
             ]);
         });
+    }
+
+    /**
+     * Les contrôles métier communs à delete() et annuler() : la pièce n'est ni pointée dans un
+     * rapprochement, ni liée à une remise bancaire ou à une facture validée, ni pilotée par une fiche
+     * d'immobilisation. Faits deux fois : sur l'instance reçue (refus rapide, hors transaction), puis
+     * sur la pièce relue sous verrou (la garde du rattachement la rend), seule à faire foi.
+     *
+     * @param  string  $participe  « supprimée » ou « annulée » : le geste, tel que le message le nomme
+     */
+    private function assertNiPointeeNiPilotee(Transaction $transaction, string $participe): void
+    {
+        if ($transaction->rapprochement_id !== null) {
+            throw new \RuntimeException("Cette transaction est pointée dans un rapprochement et ne peut pas être {$participe}.");
+        }
+        if ($transaction->isLockedByRemise()) {
+            throw new \RuntimeException("Cette transaction est liée à une remise bancaire et ne peut pas être {$participe}.");
+        }
+        if ($transaction->isLockedByFacture()) {
+            throw new \RuntimeException("Cette transaction est liée à une facture validée et ne peut pas être {$participe}.");
+        }
+        if ($transaction->isLockedByImmobilisation()) {
+            throw new \RuntimeException("Cette transaction provient d’une immobilisation et ne peut pas être {$participe} : supprimez la fiche.");
+        }
+    }
+
+    /** Une pièce déjà annulée par extourne ne s'annule pas une seconde fois (annuler()). */
+    private function assertNonExtournee(Transaction $transaction): void
+    {
+        if ($transaction->extournee_at !== null) {
+            throw new \RuntimeException('Cette transaction a déjà été extournée.');
+        }
     }
 
     /**

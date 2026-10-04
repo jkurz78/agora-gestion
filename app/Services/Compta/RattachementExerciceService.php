@@ -12,6 +12,7 @@ use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Services\ExerciceService;
 use App\Tenant\TenantContext;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
@@ -34,9 +35,11 @@ use RuntimeException;
  * motifDeRefus() l'ait écartée.
  *
  * Le VERROU d'une ligne rattachée (§ 7) vit ici aussi : les gestes qui écrivent sur une pièce
- * dont une ligne est rattachée s'y réfèrent par assertLigneNonGelee() (une ligne) et
- * verrouillerPieceNonGelee() (la pièce entière), plutôt que de relire eux-mêmes les rattachements.
- * Elles refusent par défaut et partagent le message MOTIF_PIECE_GELEE.
+ * dont une ligne est rattachée s'y réfèrent par assertLigneNonGelee() (une ligne),
+ * verrouillerPieceNonGelee() (la pièce entière) et verrouillerPieceExtournable() (l'annulation par
+ * extourne, que seule sa date refuse), plutôt que de relire eux-mêmes les rattachements. Elles
+ * refusent par défaut. Les deux premières partagent le message MOTIF_PIECE_GELEE ; la troisième,
+ * dont le refus dépend d'une date, formule le sien (motifExtournePrecoce()).
  *
  * Référence : docs/specs/2026-09-30-provisions-rattachement-exercice-design.md
  * (D4, D9, D13, D14 pour les gardes ; § 5 pour les verrous d'exercice ; § 7 pour
@@ -50,18 +53,20 @@ final class RattachementExerciceService
     /**
      * Le message unique du verrou (spec § 7), destiné à TOUS les sites qui refusent d'écrire sur
      * une pièce dont une ligne est rattachée : reclassement, retrait de ligne, édition, suppression,
-     * annulation, extourne, ventilation, synchronisation HelloAsso. Posé aujourd'hui sur le
-     * reclassement, le retrait de ligne, l'édition, la suppression et l'annulation ; les autres
-     * sites suivent (Tasks 8b, 8c et 9). Il nomme le constat, l'écran où se défait le rattachement
-     * et la sortie : le retirer, corriger, le repasser. Un site qui en formulerait un autre rendrait
-     * le refus illisible d'un écran à l'autre.
+     * annulation, ventilation, synchronisation HelloAsso. Posé aujourd'hui sur le reclassement, le
+     * retrait de ligne, l'édition, la suppression et l'annulation ; les autres sites suivent (Tasks 8c
+     * et 9). Il nomme le constat, l'écran où se défait le rattachement et la sortie : le retirer,
+     * corriger, le repasser. Un site qui en formulerait un autre rendrait le refus illisible d'un écran
+     * à l'autre. Seule l'annulation par extourne a le sien (motifExtournePrecoce()) : elle n'est refusée
+     * que selon sa date, et sa sortie n'est pas « corriger, puis repasser ».
      */
     public const MOTIF_PIECE_GELEE = 'Cette pièce porte un rattachement à l’exercice suivant : pour la modifier, retirez d’abord le rattachement '
         .'depuis Exercices > Écritures de rattachement, corrigez, puis repassez-le.';
 
     /**
-     * Le refus des gestes qui réécrivent une pièce (édition, suppression, annulation) quand cette
-     * pièce EST une écriture de rattachement, dotation ou extourne générée. Distinct de
+     * Le refus des gestes qui réécrivent une pièce (édition, suppression, annulation, annulation par
+     * extourne) ou écrivent sur une de ses lignes (reclassement) quand cette pièce EST une écriture de
+     * rattachement, dotation ou extourne générée. Distinct de
      * MOTIF_PIECE_GELEE : il n'y a rien à retirer puis repasser sur cette pièce, c'est le
      * rattachement qui la porte, et lui seul la défait avec sa jumelle. La supprimer ou l'annuler ici
      * romprait la paire dotation / extourne : le résultat de N ou de N+1 serait faux, et le retrait ne
@@ -513,14 +518,97 @@ final class RattachementExerciceService
      * si la pièce est elle-même une écriture de rattachement. Rend la pièce verrouillée, relue sous
      * verrou : l'appelant poursuit avec elle, et non avec l'instance qu'il avait reçue.
      *
-     * Sites : l'édition, la suppression et l'annulation de TransactionService (Task 8a) ; l'extourne
-     * (Task 8b). L'extourne aura une variante datée (D13 : une annulation datée après N reste permise) :
-     * cette garde-ci refuse sans condition de date, et la Task 8b en décidera.
+     * Sites : l'édition, la suppression et l'annulation de TransactionService (Task 8a). L'annulation par
+     * extourne a sa variante datée, verrouillerPieceExtournable() (D13 : une annulation datée après N reste
+     * permise) : cette garde-ci refuse sans condition de date.
      *
      * RÈGLE DES SITES : l'appeler juste après le verrou d'exercice, SANS avoir verrouillé la pièce avant.
      * Elle prend elle-même, dans l'ordre canonique, tout ce qu'il faut : l'appelant qui verrouillerait la
-     * pièce avant elle inverserait l'ordre des lots (voir ci-dessous). À appeler DANS la transaction de
-     * l'appelant (voir assertLigneNonGelee()) : les verrous tiennent jusqu'à son commit.
+     * pièce avant elle inverserait l'ordre des lots (voir verrouillerPieceEtRattachements()). À appeler DANS
+     * la transaction de l'appelant (voir assertLigneNonGelee()) : les verrous tiennent jusqu'à son commit.
+     *
+     * La pièce rendue est lue tous scopes levés, comme tout le reste : supprimée logiquement ou d'une autre
+     * association, elle est rendue quand même. Un appelant qui exige une pièce vivante de l'association
+     * (update()) le contrôle lui-même.
+     *
+     * @throws RuntimeException MOTIF_PIECE_GELEE si l'une des lignes de la pièce porte un rattachement ;
+     *                          MOTIF_ECRITURE_DE_RATTACHEMENT si la pièce est une écriture de rattachement
+     * @throws ModelNotFoundException la pièce n'existe plus en base (supprimée physiquement)
+     */
+    public function verrouillerPieceNonGelee(Transaction $piece): Transaction
+    {
+        ['piece' => $verrouillee, 'exercices' => $exercices] = $this->verrouillerPieceEtRattachements($piece);
+
+        if ($exercices !== []) {
+            throw new RuntimeException(self::MOTIF_PIECE_GELEE);
+        }
+
+        return $verrouillee;
+    }
+
+    /**
+     * Garde du verrou (spec § 7, D13) pour l'annulation PAR EXTOURNE d'une pièce : variante datée de
+     * verrouillerPieceNonGelee(). Même préfixe de verrous, même pièce rendue, même refus d'une écriture de
+     * rattachement (MOTIF_ECRITURE_DE_RATTACHEMENT) ; mais une pièce rattachée n'est refusée que si
+     * l'annulation est datée AU PLUS TARD le dernier jour de N, l'exercice du rattachement, antérieure à
+     * N comprise. Datée dans N, elle retirerait deux fois le même montant de N (la dotation du rattachement
+     * le retire déjà). Datée après N, elle est juste : l'extourne du rattachement, datée du premier jour de
+     * N+1, et l'annulation s'y compensent, et c'est le refus qui rendrait la pièce inannulable pour toujours
+     * une fois N clôturé. La date qui compte est celle que prendra la pièce miroir, `$dateAnnulation`.
+     *
+     * Une pièce portant des rattachements d'exercices différents est jugée sur le plus récent, N le plus
+     * grand : refuser dès que l'annulation tombe dans l'un d'eux revient à la comparer à la fin du dernier.
+     *
+     * À appeler DANS la transaction de l'extourne, juste après le verrou de l'exercice de l'annulation et
+     * AVANT la numérotation du miroir : rattacher() tient la pièce puis numérote, une extourne qui
+     * numéroterait d'abord s'inter-bloquerait avec lui. Voir verrouillerPieceNonGelee() pour la règle des
+     * sites, et verrouillerPieceEtRattachements() pour l'ordre des verrous.
+     *
+     * @param  CarbonInterface  $dateAnnulation  la date comptable de la pièce miroir (ExtournePayload::$date)
+     *
+     * @throws RuntimeException MOTIF_ECRITURE_DE_RATTACHEMENT si la pièce est une écriture de rattachement ;
+     *                          le motif de motifExtournePrecoce() si elle porte un rattachement dont
+     *                          l'exercice finit à la date de l'annulation ou après elle
+     * @throws ModelNotFoundException la pièce n'existe plus en base (supprimée physiquement)
+     */
+    public function verrouillerPieceExtournable(Transaction $origine, CarbonInterface $dateAnnulation): Transaction
+    {
+        ['piece' => $verrouillee, 'exercices' => $exercices] = $this->verrouillerPieceEtRattachements($origine);
+
+        if ($exercices === []) {
+            return $verrouillee;
+        }
+
+        $exercice = max($exercices);
+        $finDeN = $this->exerciceService->dateRange($exercice)['end'];
+
+        // Chaînes Y-m-d : la date de l'annulation peut porter une heure, la fin de N est minuit.
+        if ($dateAnnulation->toDateString() <= $finDeN->toDateString()) {
+            throw new RuntimeException($this->motifExtournePrecoce($exercice, $finDeN));
+        }
+
+        return $verrouillee;
+    }
+
+    /**
+     * Le refus d'une annulation par extourne datée au plus tard le dernier jour de N : il dit pourquoi
+     * (le même montant serait retiré deux fois de l'exercice N), et les deux sorties — dater l'annulation
+     * après N, ou retirer d'abord le rattachement. Sans jargon : « annulation », non « extourne ».
+     */
+    private function motifExtournePrecoce(int $exercice, CarbonInterface $finDeN): string
+    {
+        $fin = $finDeN->format('d/m/Y');
+
+        return 'Cette pièce porte un rattachement à l’exercice suivant : l’annuler avec une date au plus tard le '.$fin
+            .' retirerait deux fois le même montant de l’exercice '.$this->exerciceService->label($exercice).'. '
+            .'Datez l’annulation après le '.$fin.', ou retirez d’abord le rattachement depuis Exercices > Écritures de rattachement.';
+    }
+
+    /**
+     * Le préfixe de verrous commun aux gardes de la pièce : verrouille, lit et rend ce qu'il faut pour
+     * en décider, sans décider lui-même, hormis le refus d'une écriture de rattachement, qui ne dépend
+     * d'aucune date. Rend la pièce verrouillée, et les exercices (N) de tous les rattachements de ses
+     * lignes, dans l'ordre où la base les rend : la liste vide dit que la pièce ne porte aucun rattachement.
      *
      * Ordre des verrous : les lots 401/411 de la pièce (VerrouLotsCanoniques), la pièce, ses lignes dans
      * l'ordre de leur identifiant, puis UNE lecture verrouillante directe des rattachements de ces lignes.
@@ -542,15 +630,12 @@ final class RattachementExerciceService
      * que l'appelant tient la pièce, aucun rattachement de ses lignes ne peut être créé ni retiré :
      * rattacher() et retirer() l'attendent.
      *
-     * La pièce rendue est lue tous scopes levés, elle aussi : supprimée logiquement ou d'une autre
-     * association, elle est rendue quand même. Un appelant qui exige une pièce vivante de l'association
-     * (update()) le contrôle lui-même.
+     * @return array{piece: Transaction, exercices: list<int>}
      *
-     * @throws RuntimeException MOTIF_PIECE_GELEE si l'une des lignes de la pièce porte un rattachement ;
-     *                          MOTIF_ECRITURE_DE_RATTACHEMENT si la pièce est une écriture de rattachement
+     * @throws RuntimeException MOTIF_ECRITURE_DE_RATTACHEMENT si la pièce est une écriture de rattachement
      * @throws ModelNotFoundException la pièce n'existe plus en base (supprimée physiquement)
      */
-    public function verrouillerPieceNonGelee(Transaction $piece): Transaction
+    private function verrouillerPieceEtRattachements(Transaction $piece): array
     {
         $pieceId = (int) $piece->id;
 
@@ -565,7 +650,8 @@ final class RattachementExerciceService
             throw (new ModelNotFoundException)->setModel(Transaction::class, [$pieceId]);
         }
 
-        // Une écriture de rattachement ne se réécrit pas ici. Lu sur la pièce verrouillée : refuser sur
+        // Une écriture de rattachement ne se réécrit pas ici, et ne s'annule pas davantage, quelle que
+        // soit la date : elle se défait avec son rattachement. Lu sur la pièce verrouillée : refuser sur
         // l'instance reçue laisserait passer l'appelant dont la copie est périmée. Avant de verrouiller
         // les lignes : une écriture n'est l'origine d'aucun rattachement, il n'y a rien d'autre à lire.
         if ($verrouillee->provision_id !== null) {
@@ -583,13 +669,19 @@ final class RattachementExerciceService
             ->all();
 
         // UNE lecture verrouillante directe, comme estRattacheeSousVerrou() : ni EXISTS, ni une
-        // lecture par ligne. Une pièce sans ligne ne porte aucun rattachement : rien à lire.
-        if ($ligneIds !== []
-            && Provision::withoutGlobalScopes()->whereIn('transaction_ligne_id', $ligneIds)->lockForUpdate()->value('id') !== null) {
-            throw new RuntimeException(self::MOTIF_PIECE_GELEE);
-        }
+        // lecture par ligne. Elle lit TOUS les rattachements de la pièce, et non le premier : le verrou
+        // de chacun exclut son retrait, et l'exercice de chacun décide de la garde datée. Une pièce
+        // sans ligne ne porte aucun rattachement : rien à lire.
+        $exercices = $ligneIds === []
+            ? []
+            : Provision::withoutGlobalScopes()
+                ->whereIn('transaction_ligne_id', $ligneIds)
+                ->lockForUpdate()
+                ->pluck('exercice')
+                ->map(fn (mixed $exercice): int => (int) $exercice)
+                ->all();
 
-        return $verrouillee;
+        return ['piece' => $verrouillee, 'exercices' => $exercices];
     }
 
     /**

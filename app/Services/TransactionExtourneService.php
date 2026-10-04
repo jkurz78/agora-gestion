@@ -13,6 +13,7 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\PartieDoubleGuard;
+use App\Services\Compta\RattachementExerciceService;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -33,6 +34,7 @@ final class TransactionExtourneService
     public function __construct(
         private readonly NumeroPieceService $numeroPiece,
         private readonly ExerciceService $exerciceService,
+        private readonly RattachementExerciceService $rattachement,
     ) {}
 
     /**
@@ -41,6 +43,10 @@ final class TransactionExtourneService
      * Crée une transaction miroir à montant négatif avec D↔C swap sur les lignes PD.
      * Les lettrages existants (T1↔T2, T2↔T4) restent intacts — le 411C du miroir
      * reste ouvert et sera soldé lors du remboursement effectif.
+     *
+     * Une pièce portée par un rattachement à l'exercice suivant (CCA/PCA) ne s'annule que si l'annulation
+     * est datée APRÈS le dernier jour de l'exercice rattaché (D13) ; une écriture de rattachement ne
+     * s'annule jamais ici : voir RattachementExerciceService::verrouillerPieceExtournable().
      */
     public function extourner(Transaction $origine, ExtournePayload $payload): Extourne
     {
@@ -48,15 +54,44 @@ final class TransactionExtourneService
         // par l'utilisateur et peut tomber sur un exercice clos. Le service
         // construit sa transaction miroir sans passer par TransactionService,
         // il porte donc lui-même la garde.
-        $this->exerciceService->assertOuvert(
-            $this->exerciceService->anneeForDate($payload->date)
-        );
+        $anneeAnnulation = $this->exerciceService->anneeForDate($payload->date);
+
+        // Les refus rapides, hors transaction, sur l'instance reçue : ils évitent d'ouvrir une
+        // transaction et de prendre des verrous pour un refus évident. Ils ne tranchent rien : tout ce
+        // qui dépend de l'état de la pièce (annulée, supprimée, rattachée) est relu sous verrou, dans la
+        // transaction, sur la pièce que la garde rend.
+        $this->exerciceService->assertOuvert($anneeAnnulation);
 
         $this->assertSameTenant($origine);
         Gate::authorize('create', [Extourne::class, $origine]);
         $this->assertExtournable($origine);
 
-        return DB::transaction(function () use ($origine, $payload): Extourne {
+        return DB::transaction(function () use ($origine, $payload, $anneeAnnulation): Extourne {
+            // Les verrous d'abord, AVANT la numérotation du miroir (creerTransactionMiroir()) : rattacher()
+            // et retirer() tiennent la pièce puis numérotent leurs écritures. Une extourne qui numéroterait
+            // la première, puis demanderait la pièce, s'inter-bloquerait avec eux.
+            //
+            // Ordre : l'exercice de l'ANNULATION (celui de la date saisie, non celui de la pièce), puis la
+            // garde du rattachement (les lots 401/411, la pièce, ses lignes, leurs rattachements), puis la
+            // numérotation (`sequences`), enfin les écritures. Pas de cycle avec rattacher() et retirer(),
+            // dont l'ordre est : association, exercice N, exercice N+1, pièce, ligne, rattachements, puis
+            // (rattacher() seul) la numérotation de la dotation et de l'extourne. Sur ce que les deux ont
+            // en commun, l'ordre relatif est le même : un exercice avant la pièce, la pièce avant ses lignes,
+            // les lignes avant les rattachements, les rattachements avant la numérotation. L'extourne ne
+            // prend jamais l'association, qui précède toujours un verrou d'exercice, et n'en prend qu'un
+            // seul, celui de l'annulation : aucun exercice n'est demandé après la pièce. (FactureService::annuler()
+            // appelle extourner() dans sa propre transaction : ses verrous précèdent ceux-ci.)
+            $this->exerciceService->assertOuvertVerrouille($anneeAnnulation);
+
+            // Seule garde datée : l'annulation d'une pièce rattachée n'est refusée que si elle est datée au
+            // plus tard le dernier jour de N. Elle rend la pièce relue sous verrou.
+            $origine = $this->rattachement->verrouillerPieceExtournable($origine, $payload->date);
+
+            // Les contrôles faits plus haut sur l'instance reçue, refaits sur la pièce verrouillée : son
+            // état a pu changer entre la lecture et le verrou. Surtout `extournee_at` : une extourne
+            // concurrente qui validerait entre-temps ferait neutraliser la pièce deux fois.
+            $this->assertExtournable($origine);
+
             // Pas de délettrage ni de cross-lettrage :
             //   - Remis/Pointé : les lettrages existants (T1↔T2, T2↔T4) sont réels
             //     et doivent rester intacts. Le 411C du miroir reste ouvert = dette

@@ -2,10 +2,18 @@
 
 declare(strict_types=1);
 
+use App\Enums\ModePaiement;
+use App\Enums\StatutFacture;
 use App\Livewire\TransactionForm;
 use App\Models\Association;
 use App\Models\Compte;
+use App\Models\CompteBancaire;
+use App\Models\Facture;
+use App\Models\Immobilisation;
 use App\Models\Provision;
+use App\Models\RapprochementBancaire;
+use App\Models\RemiseBancaire;
+use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
@@ -17,6 +25,7 @@ use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 /*
@@ -28,9 +37,10 @@ use Livewire\Livewire;
 | TransactionLigne::estRattachee() est la source de vérité de ce verrou, lue sous verrou par
 | estRattacheeSousVerrou() : la garde vit au service, dans assertLigneNonGelee() (un geste qui
 | écrit sur une ligne) et verrouillerPieceNonGelee() (un geste qui réécrit la pièce entière), que les
-| sites appellent (Task 7 : reclassement ; Task 8a : édition, suppression, annulation ; Tasks 8b,
-| 8c et 9 : les autres). Ce fichier éprouve ces deux gardes, puis un test par site, à mesure
-| qu'ils sont posés.
+| sites appellent (Task 7 : reclassement ; Task 8a : édition, suppression, annulation ; Tasks 8c
+| et 9 : les autres). Ce fichier éprouve ces deux gardes, puis un test par site, à mesure
+| qu'ils sont posés. L'annulation par extourne (Task 8b), seule à dépendre d'une date, a son
+| fichier : RattachementVerrouExtourneTest.php.
 |
 | Spec : docs/specs/2026-09-30-provisions-rattachement-exercice-design.md (§ 6.4, § 7).
 */
@@ -1001,6 +1011,99 @@ describe('TransactionService : update(), delete() et annuler() refusent une piè
 
         verrouAssertRefuse(verrouGeste($geste, $piece), $ligne, $provision, VERROU_MESSAGE_ECRITURE);
     })->with('rattachement_gestes');
+});
+
+describe('TransactionService : delete() et annuler() poursuivent sur la pièce que la garde rend', function () {
+    // Les contrôles métier de delete() et d'annuler() (pièce pointée, remise, facture, immobilisation, et pour
+    // annuler() déjà annulée) se font d'abord sur l'instance de l'appelant, hors transaction : un refus rapide.
+    // Ils sont REFAITS sur la pièce que la garde rend, relue sous verrou : l'instance a pu être lue avant qu'un
+    // autre utilisateur ne pointe, ne remette, ne facture ou n'annule la pièce. Le changement est posé juste après
+    // la première requête de la transaction du geste (le verrou de l'exercice), avant les verrous de la pièce.
+    test('refusent une pièce changée entre la lecture de l\'instance et le verrou : le message existant, et la pièce comme ses lignes n\'ont pas bougé', function (string $geste, string $cas, string $message) {
+        $ligne = $this->ligneOrigineEquilibree(7, 175.0, ModePaiement::Virement);
+        $piece = Transaction::findOrFail($ligne->transaction_id);
+
+        $changement = match ($cas) {
+            'annulée' => fn () => DB::table('transactions')->where('id', $piece->id)->update(['extournee_at' => now()]),
+            'pointée' => fn () => DB::table('transactions')->where('id', $piece->id)->update(['rapprochement_id' => RapprochementBancaire::factory()->create()->id]),
+            'remise' => fn () => DB::table('transactions')->where('id', $piece->id)->update(['remise_id' => RemiseBancaire::create([
+                'association_id' => TenantContext::currentId(),
+                'numero' => 1,
+                'date' => '2026-04-09',
+                'mode_paiement' => ModePaiement::Virement->value,
+                'compte_cible_id' => CompteBancaire::factory()->create()->id,
+                'libelle' => 'Remise test',
+                'saisi_par' => $this->user->id,
+            ])->id]),
+            'facturée' => function () use ($piece): void {
+                Facture::create([
+                    'date' => '2026-04-09',
+                    'statut' => StatutFacture::Validee,
+                    'tiers_id' => Tiers::factory()->create()->id,
+                    'montant_total' => 0,
+                    'saisi_par' => auth()->id(),
+                    'exercice' => 2025,
+                ])->transactions()->attach($piece->id);
+            },
+            'immobilisation' => fn () => Immobilisation::factory()->create(['transaction_id' => $piece->id]),
+        };
+
+        // Garde anti-test-vide : l'instance de l'appelant ne sait rien du changement, et le geste passerait.
+        expect($piece->extournee_at)->toBeNull()
+            ->and($piece->rapprochement_id)->toBeNull()
+            ->and($piece->remise_id)->toBeNull();
+
+        // Le changement est posé UNE fois, avant le verrou de la pièce. Il vit dans la transaction du geste, que le refus
+        // annule : l'état d'après n'est donc pas celui du changement. Seul le refus, et son message, le prouvent.
+        verrouChangementApresLaPremiereRequeteDeLaTransaction($changement);
+
+        expect(verrouMessageDuRefus(verrouGeste($geste, $piece)))->toBe($message);
+
+        // La pièce n'est pas supprimée, ni ses lignes.
+        expect(DB::table('transactions')->where('id', $piece->id)->value('deleted_at'))->toBeNull()
+            ->and(DB::table('transaction_lignes')->where('transaction_id', $piece->id)->whereNotNull('deleted_at')->count())->toBe(0);
+    })->with([
+        'annuler() : déjà extournée' => ['annuler', 'annulée', 'Cette transaction a déjà été extournée.'],
+        'annuler() : pointée' => ['annuler', 'pointée', 'Cette transaction est pointée dans un rapprochement et ne peut pas être annulée.'],
+        'annuler() : en remise' => ['annuler', 'remise', 'Cette transaction est liée à une remise bancaire et ne peut pas être annulée.'],
+        'annuler() : facturée' => ['annuler', 'facturée', 'Cette transaction est liée à une facture validée et ne peut pas être annulée.'],
+        'annuler() : immobilisation' => ['annuler', 'immobilisation', 'Cette transaction provient d’une immobilisation et ne peut pas être annulée : supprimez la fiche.'],
+        'delete() : pointée' => ['delete', 'pointée', 'Cette transaction est pointée dans un rapprochement et ne peut pas être supprimée.'],
+        'delete() : en remise' => ['delete', 'remise', 'Cette transaction est liée à une remise bancaire et ne peut pas être supprimée.'],
+        'delete() : facturée' => ['delete', 'facturée', 'Cette transaction est liée à une facture validée et ne peut pas être supprimée.'],
+        'delete() : immobilisation' => ['delete', 'immobilisation', 'Cette transaction provient d’une immobilisation et ne peut pas être supprimée : supprimez la fiche.'],
+    ]);
+
+    test('poursuivent sur la pièce rendue, non sur l\'instance reçue : la pièce jointe ajoutée depuis la lecture de l\'instance est supprimée avec la pièce', function (string $geste) {
+        Storage::fake('local');
+
+        $ligne = $this->ligneOrigineEquilibree(7, 175.0, ModePaiement::Virement);
+        $piece = Transaction::findOrFail($ligne->transaction_id);
+        $fichier = $piece->storagePath('transactions/'.$piece->id).'/justificatif.pdf';
+        Storage::disk('local')->put($fichier, 'contenu');
+
+        // Une pièce jointe arrive après la lecture de l'instance, avant les verrous : seule la pièce relue la connaît.
+        verrouChangementApresLaPremiereRequeteDeLaTransaction(fn () => DB::table('transactions')->where('id', $piece->id)->update([
+            'piece_jointe_path' => 'justificatif.pdf',
+            'piece_jointe_nom' => 'justificatif.pdf',
+            'piece_jointe_mime' => 'application/pdf',
+        ]));
+
+        // Garde anti-test-vide : l'instance reçue ignore la pièce jointe, le fichier existe.
+        expect($piece->hasPieceJointe())->toBeFalse();
+        Storage::disk('local')->assertExists($fichier);
+
+        verrouAssertPasse(verrouGeste($geste, $piece), $ligne);
+
+        // Le fichier est parti avec la pièce, qui est supprimée logiquement, pièce jointe vidée.
+        Storage::disk('local')->assertMissing($fichier);
+        $apres = (array) DB::table('transactions')->where('id', $piece->id)->first();
+        expect($apres['deleted_at'])->not->toBeNull()
+            ->and($apres['piece_jointe_path'])->toBeNull();
+    })->with([
+        'delete()' => ['delete'],
+        'annuler()' => ['annuler'],
+    ]);
 });
 
 describe('TransactionService::update() : il poursuit sur la pièce que la garde rend', function () {

@@ -2,12 +2,16 @@
 
 declare(strict_types=1);
 
+use App\DataTransferObjects\ExtournePayload;
+use App\Enums\ModePaiement;
 use App\Models\Compte;
+use App\Models\Extourne;
 use App\Models\Provision;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\Compta\RattachementExerciceService;
 use App\Services\Compta\ReclassementLigneService;
+use App\Services\TransactionExtourneService;
 use App\Services\TransactionService;
 use App\Tenant\TenantContext;
 use Illuminate\Database\QueryException;
@@ -36,6 +40,14 @@ const VERROU_MESSAGE = 'Cette pièce porte un rattachement à l’exercice suiva
  */
 const VERROU_MESSAGE_ECRITURE = 'Cette écriture a été générée par un rattachement à l’exercice suivant : elle ne se modifie, ne se supprime '
     .'et ne s’annule pas ici. Pour la défaire, retirez le rattachement depuis Exercices > Écritures de rattachement.';
+
+/**
+ * Le message du refus d'une annulation par extourne datée au plus tard le dernier jour de N, mot pour mot.
+ * Les pièces des tests sont rattachées à l'exercice 2025, qui finit le 31/08/2026 (exercice de septembre à août).
+ */
+const VERROU_MESSAGE_EXTOURNE_PRECOCE = 'Cette pièce porte un rattachement à l’exercice suivant : l’annuler avec une date au plus tard le 31/08/2026 '
+    .'retirerait deux fois le même montant de l’exercice 2025-2026. Datez l’annulation après le 31/08/2026, '
+    .'ou retirez d’abord le rattachement depuis Exercices > Écritures de rattachement.';
 
 /** Un compte actif de la même classe que la ligne d'origine, vers lequel la reclasser. */
 function verrouAutreCompte(int $classe): Compte
@@ -350,4 +362,110 @@ function verrouIndicesDesVerrous(array $requetes): array
     asort($indices);
 
     return $indices;
+}
+
+/**
+ * Une pièce prête à être annulée par extourne (équilibrée, avec un mode de paiement), dont la ligne de
+ * résultat est rattachée à l'exercice 2025 (la pièce est datée du 08/04/2026, N finit le 31/08/2026).
+ *
+ * @return array{ligne: TransactionLigne, provision: Provision, piece: Transaction}
+ */
+function verrouPieceRattacheeAExtourner(TestCase $test, int $classe): array
+{
+    $ligne = $test->ligneOrigineEquilibree($classe, $classe === 7 ? 175.0 : 90.0, ModePaiement::Virement);
+
+    return [
+        'ligne' => $ligne,
+        'provision' => verrouRattacherAvecEcritures($test, $ligne),
+        'piece' => Transaction::findOrFail($ligne->transaction_id),
+    ];
+}
+
+/**
+ * Le geste du site de TransactionExtourneService : annuler $piece par extourne, la pièce miroir datée de
+ * $date (Y-m-d). Le mode de paiement est celui du remboursement : il est donné, une écriture de
+ * rattachement n'en porte pas.
+ */
+function verrouExtourner(Transaction $piece, string $date): Closure
+{
+    return fn (): Extourne => app(TransactionExtourneService::class)->extourner(
+        $piece,
+        ExtournePayload::fromOrigine($piece, ['date' => $date, 'mode_paiement' => ModePaiement::Virement]),
+    );
+}
+
+/**
+ * Comme verrouAssertRefuse() pour l'extourne, qui crée une pièce miroir et consomme un numéro : rien de tout
+ * cela n'a eu lieu. Les compteurs (pièces, lignes, annulations) sont ceux de la base entière ; et aucune
+ * requête de la transaction n'a touché à la numérotation, qui n'est prise qu'une fois la garde passée.
+ * Un refus dont la numérotation aurait précédé la garde serait annulé par la transaction, et ne se verrait
+ * plus dans les compteurs : c'est la requête qui le trahit.
+ */
+function verrouAssertExtourneRefusee(Closure $geste, TransactionLigne $ligne, Provision $provision, string $message = VERROU_MESSAGE_EXTOURNE_PRECOCE): void
+{
+    $compteurs = fn (): array => [
+        'pièces' => DB::table('transactions')->count(),
+        'lignes' => DB::table('transaction_lignes')->count(),
+        'annulations' => DB::table('extournes')->count(),
+    ];
+    $avant = $compteurs();
+
+    $niveauAvant = DB::transactionLevel();
+    $requetes = [];
+    DB::listen(function ($requete) use (&$requetes, $niveauAvant): void {
+        if (DB::transactionLevel() > $niveauAvant) {
+            $requetes[] = $requete->sql;
+        }
+    });
+
+    verrouAssertRefuse($geste, $ligne, $provision, $message);
+
+    expect($compteurs())->toBe($avant);
+    expect(array_values(array_filter($requetes, fn (string $sql): bool => str_contains($sql, 'sequences'))))->toBe([]);
+}
+
+/**
+ * Exécute $changement UNE fois, juste après la première requête de la prochaine transaction du geste (celle
+ * qui verrouille l'exercice) : l'état que le geste a lu avant d'ouvrir sa transaction change alors, comme sous
+ * l'effet d'un autre utilisateur, avant que ses verrous ne soient posés. À appeler AVANT le geste.
+ */
+function verrouChangementApresLaPremiereRequeteDeLaTransaction(Closure $changement): void
+{
+    $niveauAvant = DB::transactionLevel();
+    $fait = false;
+
+    DB::listen(function () use (&$fait, $niveauAvant, $changement): void {
+        if ($fait || DB::transactionLevel() <= $niveauAvant) {
+            return;
+        }
+
+        $fait = true;
+        $changement();
+    });
+}
+
+/**
+ * Les classes de l'application que le constructeur de $classe demande, de proche en proche. Sert à prouver
+ * l'absence de cycle d'injection : RattachementExerciceService ne doit jamais atteindre TransactionExtourneService.
+ *
+ * @return list<class-string>
+ */
+function verrouDependancesDuConstructeur(string $classe, array &$vues = []): array
+{
+    $constructeur = (new ReflectionClass($classe))->getConstructor();
+
+    foreach ($constructeur?->getParameters() ?? [] as $parametre) {
+        $type = $parametre->getType();
+
+        if (! $type instanceof ReflectionNamedType || $type->isBuiltin() || ! str_starts_with($type->getName(), 'App\\')) {
+            continue;
+        }
+
+        if (! in_array($type->getName(), $vues, true)) {
+            $vues[] = $type->getName();
+            verrouDependancesDuConstructeur($type->getName(), $vues);
+        }
+    }
+
+    return $vues;
 }

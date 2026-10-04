@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use App\DataTransferObjects\ExtournePayload;
 use App\Enums\JournalComptable;
+use App\Enums\ModePaiement;
 use App\Enums\StatutExercice;
 use App\Enums\TypeTransaction;
 use App\Models\Association;
@@ -17,6 +19,7 @@ use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\Compta\ProvisionPDService;
 use App\Services\Rapports\BilanComptableBuilder;
 use App\Services\RapportService;
+use App\Services\TransactionExtourneService;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\DB;
 
@@ -413,3 +416,30 @@ test('Même garde que l’AC-3, côté charges — le 486 sort à l’actif en �
     expect($ccaSuivante['net_n_centimes'])->toBe(0);
     expect($ccaSuivante['net_n_1_centimes'])->toBe(9000);
 });
+
+test('D13 — annuler la pièce rattachée le 15/09/2026 laisse le 706B à zéro sur 2025-2026 et sur 2026-2027 ; le 31/08/2026, l’annulation est refusée et 2025-2026 reste à zéro', function () {
+    rattacherAvecEcritures($this->ligne);
+    $piece = Transaction::findOrFail($this->ligne->transaction_id);
+    $annuler = fn (string $date) => app(TransactionExtourneService::class)->extourner(
+        $piece,
+        ExtournePayload::fromOrigine($piece, ['date' => $date, 'mode_paiement' => ModePaiement::Virement]),
+    );
+
+    // Garde anti-test-vide : le rattachement a mis le 706B à zéro en 2025-2026 et à 175 € en 2026-2027.
+    expect(rattachementMontantAuCrAssociation(2025, $this->compte706))->toBe(0.0);
+    expect(rattachementMontantAuCrAssociation(2026, $this->compte706))->toBe(175.0);
+
+    // Datée le dernier jour de N, l'annulation retirerait une seconde fois les 175 € de 2025-2026 : elle est refusée,
+    // et le résultat n'a pas bougé.
+    expect(fn () => $annuler('2026-08-31'))->toThrow(RuntimeException::class, 'retirerait deux fois le même montant');
+    expect(rattachementMontantAuCrAssociation(2025, $this->compte706))->toBe(0.0);
+    expect(rattachementMontantAuCrAssociation(2026, $this->compte706))->toBe(175.0);
+
+    // Datée dans N+1, elle est juste : elle retire de 2026-2027 les 175 € que l'extourne du rattachement y avait mis.
+    $annuler('2026-09-15');
+
+    expect(rattachementMontantAuCrAssociation(2025, $this->compte706))->toBe(0.0);
+    expect(rattachementMontantAuCrAssociation(2026, $this->compte706))->toBe(0.0);
+    expect(rattachementMontantAuCrOperation(2025, $this->operation, $this->compte706))->toBe(0.0);
+    expect(rattachementMontantAuCrOperation(2026, $this->operation, $this->compte706))->toBe(0.0);
+})->skip(fn (): bool => DB::getDriverName() === 'sqlite', RATTACHEMENT_SQLITE_SKIP_RAISON);
