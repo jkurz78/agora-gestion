@@ -112,7 +112,7 @@ function serviceRattachementAssertRefusee(TransactionLigne $ligne, string $fragm
  *
  * @return array{origine: TransactionLigne, piece: Transaction} la ligne 6/7 et sa pièce
  */
-function serviceRattachementPieceAEnnuler(int $classe): array
+function serviceRattachementPieceAAnnuler(int $classe): array
 {
     $assocId = (int) TenantContext::currentId();
     $estProduit = $classe === 7;
@@ -167,7 +167,7 @@ function serviceRattachementAnnuler(Transaction $piece, string $dateAnnulation):
 }
 
 /**
- * Une pièce réellement annulée (voir serviceRattachementPieceAEnnuler() et
+ * Une pièce réellement annulée (voir serviceRattachementPieceAAnnuler() et
  * serviceRattachementAnnuler()).
  *
  * @return array{origine: TransactionLigne, miroir: TransactionLigne, extourne: Extourne} la ligne
@@ -175,7 +175,7 @@ function serviceRattachementAnnuler(Transaction $piece, string $dateAnnulation):
  */
 function serviceRattachementPieceAnnulee(int $classe, string $dateAnnulation): array
 {
-    ['origine' => $origine, 'piece' => $piece] = serviceRattachementPieceAEnnuler($classe);
+    ['origine' => $origine, 'piece' => $piece] = serviceRattachementPieceAAnnuler($classe);
     $extourne = serviceRattachementAnnuler($piece, $dateAnnulation);
 
     $miroir = TransactionLigne::where('transaction_id', $extourne->transaction_extourne_id)
@@ -749,7 +749,7 @@ describe('RattachementExerciceService : création', function () {
     });
 
     test('I1 — l’éligibilité est rejugée sur la pièce verrouillée : annulée (vraie annulation, ou date introuvable), ou passée en journal d’opérations diverses, entre-temps', function (string $cas, string $fragment) {
-        ['origine' => $ligne, 'piece' => $piece] = serviceRattachementPieceAEnnuler(7);
+        ['origine' => $ligne, 'piece' => $piece] = serviceRattachementPieceAAnnuler(7);
         $transactionsAvant = DB::table('transactions')->count();
 
         // Prémisse : avant le changement, la ligne est rattachable.

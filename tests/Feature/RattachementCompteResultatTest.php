@@ -353,8 +353,9 @@ test('AC-3 — le 487 sort au passif en « Produits constatés d’avance » au 
  * chacune ne garde que son propre cas. Le sens de l'écriture se décide CAS PAR CAS :
  * CasProvision::dotationDebiteLeResultat() dit, pour chaque cas, si la dotation débite ou
  * crédite le résultat. Une inversion de la seule CCA laisse les tests PCA verts (mesuré le
- * 2026-10-01) : sans la paire ci-dessous, ce fichier la laisserait passer, et seul
- * RattachementEcrituresTest la verrait, sur l'écriture et non sur les rapports.
+ * 2026-10-01) : sans la paire ci-dessous, ce fichier la laisserait passer ; seuls
+ * les tests d'écriture (RattachementEcrituresTest, et la création dans
+ * RattachementExerciceServiceTest) la verraient, sur l'écriture et non sur les rapports.
  * Ne pas supprimer les tests CCA parce qu'ils « répètent » les PCA.
  */
 

@@ -319,12 +319,12 @@ final class RattachementExerciceService
         $piece = Transaction::query()->whereKey((int) $ligne->transaction_id)->lockForUpdate()->first();
         $ligneVerrouillee = TransactionLigne::query()->whereKey((int) $ligne->id)->lockForUpdate()->first();
 
-        // TransactionService::update() recrée toutes les lignes d'une pièce : l'identifiant lu
-        // avant peut ne plus désigner qu'une ligne disparue.
         if ($piece === null) {
             throw new RuntimeException(self::MOTIF_PIECE_SUPPRIMEE_ENTRE_TEMPS);
         }
 
+        // TransactionService::update() recrée toutes les lignes d'une pièce : l'identifiant lu
+        // avant peut ne plus désigner qu'une ligne disparue.
         if ($ligneVerrouillee === null
             || (int) $ligneVerrouillee->transaction_id !== (int) $piece->id) {
             throw new RuntimeException(self::MOTIF_LIGNE_DISPARUE);
