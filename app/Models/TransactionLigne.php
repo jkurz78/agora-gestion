@@ -187,6 +187,19 @@ final class TransactionLigne extends Model
     }
 
     /**
+     * Jumelle d'estRattachee() qui lit SOUS VERROU : à utiliser dans une transaction, par
+     * les gardes qui écrivent ensuite (rattacher(), et les gardes d'écriture des Tasks 7 à 9).
+     * Une lecture verrouillante lit le dernier état validé quel que soit le cliché de la
+     * transaction, et son verrou d'index bloque l'insertion concurrente d'un rattachement
+     * de cette ligne jusqu'au commit. Mêmes réponses qu'estRattachee() : mêmes portées, et
+     * withoutGlobalScopes() sans argument pour la même raison.
+     */
+    public function estRattacheeSousVerrou(): bool
+    {
+        return $this->provisions()->withoutGlobalScopes()->lockForUpdate()->exists();
+    }
+
+    /**
      * Retourne le montant signé : debit - credit.
      * Positif pour une écriture débit, négatif pour une écriture crédit.
      */

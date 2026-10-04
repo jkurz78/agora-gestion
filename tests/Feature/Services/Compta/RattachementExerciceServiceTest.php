@@ -728,6 +728,87 @@ function serviceRattachementAssertRefusee(TransactionLigne $ligne, string $fragm
     expect(DB::table('transactions')->count())->toBe($transactionsAvant);
 }
 
+/**
+ * Une pièce réellement annulée par TransactionExtourneService, l'annulation étant datée
+ * de $dateAnnulation (la date comptable de la pièce miroir ; extournee_at, lui, vaut
+ * now(), soit le 2026-01-15 figé). La pièce d'origine est équilibrée : une ligne de
+ * produit au crédit et un 411 au débit (classe 7), ou une ligne de charge au débit et
+ * un 401 au crédit (classe 6).
+ *
+ * @return array{0: TransactionLigne, 1: TransactionLigne, 2: Extourne} la ligne 6/7 de la
+ *                                                                      pièce annulée, celle de l'annulation, et l'enregistrement
+ */
+function serviceRattachementPieceAnnulee(int $classe, string $dateAnnulation): array
+{
+    $assocId = (int) TenantContext::currentId();
+    $estProduit = $classe === 7;
+    $montant = $estProduit ? 175.0 : 90.0;
+    $compteResultat = ($estProduit ? Compte::factory()->recette() : Compte::factory()->depense())
+        ->create(['association_id' => $assocId, 'actif' => true]);
+    $compteTiers = Compte::where('numero_pcg', $estProduit ? '411' : '401')->firstOrFail();
+
+    $origine = Transaction::create([
+        'association_id' => $assocId,
+        'type' => $estProduit ? TypeTransaction::Recette : TypeTransaction::Depense,
+        'date' => '2026-04-08',
+        'libelle' => 'Pièce à annuler',
+        'montant_total' => $montant,
+        'mode_paiement' => ModePaiement::Virement,
+        'saisi_par' => auth()->id(),
+        'equilibree' => true,
+        'type_ecriture' => 'normale',
+        'journal' => $estProduit ? JournalComptable::Vente : JournalComptable::Achat,
+    ]);
+    $ligneResultat = TransactionLigne::create([
+        'transaction_id' => $origine->id,
+        'compte_id' => $compteResultat->id,
+        'debit' => $estProduit ? 0 : $montant,
+        'credit' => $estProduit ? $montant : 0,
+        'montant' => $montant,
+        'libelle' => 'Ligne d’origine',
+    ]);
+    TransactionLigne::create([
+        'transaction_id' => $origine->id,
+        'compte_id' => $compteTiers->id,
+        'debit' => $estProduit ? $montant : 0,
+        'credit' => $estProduit ? 0 : $montant,
+        'montant' => $montant,
+        'libelle' => 'Contrepartie',
+    ]);
+
+    $extourne = app(TransactionExtourneService::class)->extourner(
+        $origine,
+        ExtournePayload::fromOrigine($origine, ['date' => $dateAnnulation]),
+    );
+
+    $ligneMiroir = TransactionLigne::where('transaction_id', $extourne->transaction_extourne_id)
+        ->where('compte_id', $compteResultat->id)
+        ->sole();
+
+    return [$ligneResultat, $ligneMiroir, $extourne];
+}
+
+/**
+ * Exécute $changement au tout début de la transaction du service, une seule fois, puis
+ * rattache la ligne. Rend ce que rattacher() a rendu, ou lance ce qu'il a lancé.
+ */
+function serviceRattachementAvecChangementConcurrent(TransactionLigne $ligne, Closure $changement, User $auteur): Provision
+{
+    $niveauAvant = DB::transactionLevel();
+    $fait = false;
+
+    DB::listen(function ($requete) use (&$fait, $niveauAvant, $changement): void {
+        if ($fait || DB::transactionLevel() <= $niveauAvant || ! str_contains($requete->sql, 'association')) {
+            return;
+        }
+
+        $fait = true;
+        $changement();
+    });
+
+    return app(RattachementExerciceService::class)->rattacher($ligne, null, $auteur);
+}
+
 describe('RattachementExerciceService : éligibilité (motifDeRefus)', function () {
     test('une ligne de produit au crédit ou de charge au débit, ventilée sur une opération future, est rattachable', function (int $classe, float $montant) {
         $operation = Operation::factory()->create([
@@ -740,11 +821,31 @@ describe('RattachementExerciceService : éligibilité (motifDeRefus)', function 
         expect(app(RattachementExerciceService::class)->motifDeRefus($ligne))->toBeNull();
     })->with('rattachement_pca_cca');
 
-    test('une ligne dont la pièce a été supprimée n’est rattachée à aucune pièce', function () {
+    test('motifDeRefus() est une lecture simple : aucune de ses requêtes ne verrouille', function () {
+        $ligne = $this->ligneOrigine(7, 175.0);
+        $requetes = [];
+
+        DB::listen(function ($requete) use (&$requetes): void {
+            $requetes[] = $requete->sql;
+        });
+
+        expect(app(RattachementExerciceService::class)->motifDeRefus($ligne))->toBeNull();
+
+        // Garde anti-test-vide : le motif a bien lu la table des rattachements.
+        expect(array_filter($requetes, fn (string $sql) => str_contains($sql, 'provisions')))->not->toBeEmpty();
+
+        // C'est rattacher() qui verrouille, dans sa transaction ; l'écran et la détection
+        // appellent motifDeRefus() hors de toute écriture. (Sous SQLite « for update » n'existe pas.)
+        foreach ($requetes as $sql) {
+            expect($sql)->not->toContain('for update');
+        }
+    });
+
+    test('une ligne dont la pièce a été supprimée est refusée : la pièce n’existe plus', function () {
         $ligne = $this->ligneOrigine(7, 175.0);
         $ligne->transaction->delete();
 
-        serviceRattachementAssertRefusee($ligne, 'aucune pièce');
+        serviceRattachementAssertRefusee($ligne, 'La pièce de cette ligne a été supprimée.');
     });
 
     test('AC-11 — après un rattachement, la ligne 6/7 de la dotation et celle de l’extourne sont refusées comme écritures de rattachement', function (int $classe, float $montant) {
@@ -777,33 +878,26 @@ describe('RattachementExerciceService : éligibilité (motifDeRefus)', function 
         serviceRattachementAssertRefusee($ligne, 'inventaire');
     })->with('rattachement_pca_cca');
 
-    // D13 — trois conditions jointes par un OU : chacune est seule vraie dans son test,
-    // pour que la mutation de n'importe laquelle fasse tomber exactement le sien.
+    // D13 — la pièce annulée se juge sur la DATE COMPTABLE de l'annulation (celle de la
+    // pièce miroir), pas sur l'horodatage de l'action (extournee_at, = now()). Annulée
+    // dans N, rattacher l'origine retirerait deux fois le même montant ; annulée dans N+1
+    // (un remboursement après le 31/08), rattacher est juste et c'est le refus qui
+    // laisserait N faux. Une pièce qui EST une annulation ne se rattache jamais.
+    // Trois déclencheurs distincts, chacun seul vrai dans son test.
 
-    test('D13 — une ligne d’une pièce dont extournee_at est renseigné est refusée', function (int $classe, float $montant) {
-        $ligne = $this->ligneOrigine($classe, $montant);
-        Transaction::whereKey($ligne->transaction_id)->update(['extournee_at' => now()]);
-
-        // Les deux autres conditions sont fausses.
-        $piece = Transaction::find($ligne->transaction_id);
-        expect($piece->type_ecriture)->toBe('normale');
-        expect(Extourne::where('transaction_extourne_id', $piece->id)->exists())->toBeFalse();
-
-        serviceRattachementAssertRefusee($ligne, 'annulée');
-    })->with('rattachement_pca_cca');
-
-    test('D13 — une ligne d’une pièce dont type_ecriture vaut extourne est refusée', function (int $classe, float $montant) {
+    test('D13 — une pièce dont type_ecriture vaut extourne (une annulation) est refusée', function (int $classe, float $montant) {
         $ligne = $this->ligneOrigine($classe, $montant);
         Transaction::whereKey($ligne->transaction_id)->update(['type_ecriture' => 'extourne']);
 
+        // Les autres déclencheurs sont faux.
         $piece = Transaction::find($ligne->transaction_id);
         expect($piece->extournee_at)->toBeNull();
         expect(Extourne::where('transaction_extourne_id', $piece->id)->exists())->toBeFalse();
 
-        serviceRattachementAssertRefusee($ligne, 'annulée');
+        serviceRattachementAssertRefusee($ligne, 'annule une autre pièce');
     })->with('rattachement_pca_cca');
 
-    test('D13 — une ligne d’une pièce référencée comme extourne dans la table des extournes est refusée', function (int $classe, float $montant) {
+    test('D13 — une pièce référencée comme annulation dans la table des extournes est refusée', function (int $classe, float $montant) {
         $ligne = $this->ligneOrigine($classe, $montant);
         $pieceAnnulee = $this->ligneOrigine($classe, $montant);
 
@@ -817,58 +911,71 @@ describe('RattachementExerciceService : éligibilité (motifDeRefus)', function 
         expect($piece->extournee_at)->toBeNull();
         expect($piece->type_ecriture)->toBe('normale');
 
-        serviceRattachementAssertRefusee($ligne, 'annulée');
+        serviceRattachementAssertRefusee($ligne, 'annule une autre pièce');
     })->with('rattachement_pca_cca');
 
-    test('D13 — avec une vraie annulation, la ligne de la pièce annulée et celle de l’annulation sont refusées', function () {
-        $assocId = (int) TenantContext::currentId();
-        $compteProduit = Compte::factory()->recette()->create(['association_id' => $assocId, 'actif' => true]);
-        $compteClients = Compte::where('numero_pcg', '411')->firstOrFail();
+    test('D13 — la pièce annulée dans l’exercice N, jusqu’à son dernier jour inclus, est refusée', function (int $classe, string $dateAnnulation) {
+        [$ligneOrigine] = serviceRattachementPieceAnnulee($classe, $dateAnnulation);
 
-        $origine = Transaction::create([
-            'association_id' => $assocId,
-            'type' => TypeTransaction::Recette,
-            'date' => '2026-04-08',
-            'libelle' => 'Pièce à annuler',
-            'montant_total' => 175.0,
-            'mode_paiement' => ModePaiement::Virement,
-            'saisi_par' => auth()->id(),
-            'equilibree' => true,
-            'type_ecriture' => 'normale',
-            'journal' => JournalComptable::Vente,
-        ]);
-        $ligneProduit = TransactionLigne::create([
-            'transaction_id' => $origine->id,
-            'compte_id' => $compteProduit->id,
-            'debit' => 0,
-            'credit' => 175.0,
-            'montant' => 175.0,
-            'libelle' => 'Produit',
-        ]);
-        TransactionLigne::create([
-            'transaction_id' => $origine->id,
-            'compte_id' => $compteClients->id,
-            'debit' => 175.0,
-            'credit' => 0,
-            'montant' => 175.0,
-            'libelle' => 'Client',
-        ]);
+        serviceRattachementAssertRefusee($ligneOrigine, 'annulée dans le même exercice');
+    })->with([
+        'PCA annulée en cours d’exercice' => [7, '2026-04-20'],
+        'PCA annulée le dernier jour de N' => [7, '2026-08-31'],
+        'CCA annulée le dernier jour de N' => [6, '2026-08-31'],
+    ]);
 
-        $extourne = app(TransactionExtourneService::class)->extourner(
-            $origine,
-            ExtournePayload::fromOrigine($origine, ['date' => '2026-04-20']),
-        );
+    test('D13 — la pièce annulée dans l’exercice N+1 reste rattachable : motif nul, et rattacher() réussit', function (int $classe, string $dateAnnulation) {
+        [$ligneOrigine] = serviceRattachementPieceAnnulee($classe, $dateAnnulation);
+        $service = app(RattachementExerciceService::class);
 
-        $ligneMiroir = TransactionLigne::where('transaction_id', $extourne->transaction_extourne_id)
-            ->where('compte_id', $compteProduit->id)
-            ->sole();
+        // La prémisse : la pièce est bien annulée, extournee_at est posé (à now(), dans N).
+        $piece = Transaction::find($ligneOrigine->transaction_id);
+        expect($piece->extournee_at)->not->toBeNull();
+        expect($piece->extournee_at->toDateString())->toBe('2026-01-15');
 
-        // La prémisse : le miroir est bien une extourne, sur le même compte de produit.
+        expect($service->motifDeRefus($ligneOrigine->fresh()))->toBeNull();
+
+        $provision = $service->rattacher($ligneOrigine->fresh(), null, $this->user);
+
+        expect((int) $provision->exercice)->toBe(2025);
+        expect(Transaction::where('provision_id', $provision->id)->count())->toBe(2);
+    })->with([
+        'PCA annulée le premier jour de N+1' => [7, '2026-09-01'],
+        'CCA annulée le premier jour de N+1' => [6, '2026-09-01'],
+        'PCA annulée plus tard dans N+1' => [7, '2027-02-01'],
+    ]);
+
+    test('D13 — la ligne de l’annulation elle-même est refusée, quelle que soit la date de l’annulation', function (int $classe, string $dateAnnulation) {
+        [, $ligneMiroir] = serviceRattachementPieceAnnulee($classe, $dateAnnulation);
+
+        // La prémisse : le miroir est bien une annulation, sur le même compte de produit ou de charge.
         expect($ligneMiroir->transaction->type_ecriture)->toBe('extourne');
 
-        serviceRattachementAssertRefusee($ligneProduit, 'annulée');
-        serviceRattachementAssertRefusee($ligneMiroir, 'annulée');
-    });
+        serviceRattachementAssertRefusee($ligneMiroir, 'annule une autre pièce');
+    })->with([
+        'PCA annulée dans N' => [7, '2026-04-20'],
+        'PCA annulée dans N+1' => [7, '2026-09-01'],
+        'CCA annulée dans N+1' => [6, '2026-09-01'],
+    ]);
+
+    test('D13 — une pièce annulée dont la date d’annulation est introuvable est refusée par prudence', function (string $cas) {
+        if ($cas === 'sans enregistrement') {
+            // extournee_at est posé, mais aucun enregistrement d'annulation ne permet de dater.
+            $ligne = $this->ligneOrigine(7, 175.0);
+            Transaction::whereKey($ligne->transaction_id)->update(['extournee_at' => now()]);
+            expect(Extourne::count())->toBe(0);
+        } else {
+            // L'enregistrement existe, mais la pièce miroir a été supprimée.
+            [$ligne, $ligneMiroir] = serviceRattachementPieceAnnulee(7, '2026-09-01');
+            $ligneMiroir->transaction->delete();
+            expect(Extourne::count())->toBe(1);
+        }
+
+        serviceRattachementAssertRefusee($ligne, 'introuvable');
+    })->with([
+        'sans enregistrement d’annulation' => ['sans enregistrement'],
+        'pièce d’annulation supprimée' => ['miroir supprimé'],
+    ]);
 
     test('une ligne sur un compte de classe 4, ou sans compte, est refusée : seule une charge ou un produit se rattache', function (?string $numero, float $debit, float $credit) {
         $compte = $numero === null ? null : Compte::where('numero_pcg', $numero)->firstOrFail();
@@ -879,6 +986,23 @@ describe('RattachementExerciceService : éligibilité (motifDeRefus)', function 
         '411 au débit' => ['411', 175.0, 0.0],
         '401 au crédit' => ['401', 0.0, 175.0],
         'sans compte' => [null, 0.0, 175.0],
+    ]);
+
+    test('la contrepartie (411, 401) d’une écriture d’inventaire ou d’une pièce annulée reçoit le motif de classe, qui la décrit', function (string $cas) {
+        if ($cas === 'journal OD') {
+            $compte = Compte::where('numero_pcg', '411')->firstOrFail();
+            $ligne = serviceRattachementLigne($compte, 175.0, 0.0, TypeTransaction::Recette, JournalComptable::Od);
+        } else {
+            [$ligneProduit] = serviceRattachementPieceAnnulee(7, '2026-04-20');
+            $ligne = TransactionLigne::where('transaction_id', $ligneProduit->transaction_id)
+                ->where('id', '!=', $ligneProduit->id)
+                ->sole();
+        }
+
+        serviceRattachementAssertRefusee($ligne, 'charge ou de produit');
+    })->with([
+        'écriture d’inventaire' => ['journal OD'],
+        'pièce annulée' => ['pièce annulée'],
     ]);
 
     test('AC-5 — une ligne de sens inverse (709A au débit, 609 au crédit) est refusée, et rien n’est créé', function (string $numero, float $debit, float $credit, string $attendu) {
@@ -893,6 +1017,10 @@ describe('RattachementExerciceService : éligibilité (motifDeRefus)', function 
         );
 
         serviceRattachementAssertRefusee($ligne, $attendu);
+
+        // Le motif dit ce que ferait le rattachement : il ne reporterait pas l'effet, il l'amplifierait.
+        expect(app(RattachementExerciceService::class)->motifDeRefus($ligne->fresh()))
+            ->toContain('au lieu de le reporter sur l’exercice suivant');
     })->with([
         '709A (produit) au débit' => ['709A', 50.0, 0.0, 'sens inverse (709A au débit)'],
         '609 (charge) au crédit' => ['609', 0.0, 50.0, 'sens inverse (609 au crédit)'],
@@ -916,6 +1044,11 @@ describe('RattachementExerciceService : éligibilité (motifDeRefus)', function 
 
         expect(app(RattachementExerciceService::class)->motifDeRefus($ligne->fresh()))
             ->toBe(RattachementExerciceService::MOTIF_AFFECTATIONS);
+
+        // Le vocabulaire de l'écran (« ventiler »), pas le nom de la table.
+        expect(RattachementExerciceService::MOTIF_AFFECTATIONS)
+            ->toContain('ventilée entre plusieurs opérations')
+            ->not->toContain('affectations');
 
         serviceRattachementAssertRefusee($ligne, RattachementExerciceService::MOTIF_AFFECTATIONS);
     })->with([
@@ -1057,7 +1190,7 @@ describe('RattachementExerciceService : création', function () {
         'dernier jour de l’exercice 2025' => ['2026-08-31', 2025],
     ]);
 
-    test('les verrous sont pris dans l’ordre canonique : association, exercice N, exercice N+1, puis la ligne', function () {
+    test('les verrous sont pris dans l’ordre canonique — association, exercice N, exercice N+1, pièce, ligne — puis « déjà rattachée » est relu sous verrou, avant toute écriture', function () {
         $ligne = $this->ligneOrigine(7, 175.0);
         $niveauAvant = DB::transactionLevel();
         $requetes = [];
@@ -1070,22 +1203,41 @@ describe('RattachementExerciceService : création', function () {
 
         app(RattachementExerciceService::class)->rattacher($ligne, null, $this->user);
 
-        // Les quatre premières lectures de la transaction du service sont les verrous,
-        // avant toute écriture (l'écriture de rattachement vient ensuite).
-        $verrous = array_slice($requetes, 0, 4);
-        $tables = array_map(
-            fn ($requete) => preg_match('/from\s+[`"]?(\w+)[`"]?/i', $requete->sql, $m) === 1 ? $m[1] : '?',
-            $verrous,
-        );
+        // Seules comptent les requêtes qui précèdent la première écriture : les verrous
+        // sont posés avant que l'écriture de rattachement ne commence.
+        $premiereEcriture = collect($requetes)->search(fn ($requete) => str_starts_with(mb_strtolower($requete->sql), 'insert'));
+        expect($premiereEcriture)->toBeInt();
+        $avantEcriture = array_slice($requetes, 0, $premiereEcriture);
 
-        expect($tables)->toBe(['association', 'exercices', 'exercices', 'transaction_lignes']);
-        expect($verrous[1]->bindings)->toContain(2025);
-        expect($verrous[2]->bindings)->toContain(2026);
+        $table = fn ($requete): string => preg_match('/from\s+[`"]?(\w+)[`"]?/i', $requete->sql, $m) === 1 ? $m[1] : '?';
+        $indice = function (string $table_, ?int $annee = null) use ($avantEcriture, $table): int {
+            foreach ($avantEcriture as $i => $requete) {
+                if ($table($requete) === $table_ && ($annee === null || in_array($annee, $requete->bindings, true))) {
+                    return $i;
+                }
+            }
+
+            throw new RuntimeException("Aucun verrou sur {$table_}".($annee !== null ? " ({$annee})" : '').' avant la première écriture.');
+        };
+
+        $indices = [
+            'association' => $indice('association'),
+            'exercice N' => $indice('exercices', 2025),
+            'exercice N+1' => $indice('exercices', 2026),
+            'pièce' => $indice('transactions'),
+            'ligne' => $indice('transaction_lignes'),
+            // « Déjà rattachée », relu sous les verrous : après la ligne, avant l'écriture.
+            'recontrôle' => $indice('provisions'),
+        ];
+
+        // Strictement croissants : chaque verrou est pris après le précédent.
+        expect(array_values($indices))->toBe(collect($indices)->sort()->values()->all());
+        expect(count(array_unique($indices)))->toBe(6);
 
         // SQLite n'écrit pas « for update » : seul MySQL/MariaDB prouve que ces lectures verrouillent.
         if (DB::getDriverName() !== 'sqlite') {
-            foreach ($verrous as $verrou) {
-                expect($verrou->sql)->toContain('for update');
+            foreach ($indices as $i) {
+                expect($avantEcriture[$i]->sql)->toContain('for update');
             }
         }
     });
@@ -1121,6 +1273,143 @@ describe('RattachementExerciceService : création', function () {
         expect(DB::table('provisions')->count())->toBe(0);
         expect(DB::table('transactions')->count())->toBe($transactionsAvant);
     });
+
+    // I1 — la ligne et sa pièce sont verrouillées dans la transaction, puis JUGÉES dans cet
+    // état verrouillé : ni le montant ni l'éligibilité ne viennent de l'état lu avant. Un
+    // écrivain qui ne prend pas le verrou d'association (synchronisation HelloAsso, édition,
+    // annulation) peut avoir changé la ligne entre motifDeRefus() et le verrou. Chaque test
+    // fait ce changement DANS la transaction du service, sur sa toute première requête (le
+    // verrou d'association) : c'est exactement la fenêtre que le verrou de pièce et de ligne
+    // doit fermer.
+
+    test('I1 — le montant du rattachement est celui de la ligne verrouillée, pas celui lu avant', function () {
+        $ligne = $this->ligneOrigine(7, 175.0);
+
+        // La synchronisation HelloAsso (remboursement partiel) ramène la ligne à 100 €.
+        $provision = serviceRattachementAvecChangementConcurrent(
+            $ligne,
+            fn () => DB::table('transaction_lignes')->where('id', $ligne->id)->update(['credit' => 100, 'montant' => 100]),
+            $this->user,
+        );
+
+        expect((float) $provision->montant)->toBe(100.0);
+
+        $ecritures = Transaction::where('provision_id', $provision->id)->orderBy('date')->get();
+        expect($ecritures)->toHaveCount(2);
+        expect(impactSurLeResultat($ecritures[0]->load('lignes.compte')))->toBe(-100.0);
+        expect(impactSurLeResultat($ecritures[1]->load('lignes.compte')))->toBe(100.0);
+    });
+
+    test('I1 — une ligne recréée ou supprimée entre-temps est refusée lisiblement, pas par une erreur technique', function () {
+        $ligne = $this->ligneOrigine(7, 175.0);
+        $transactionsAvant = DB::table('transactions')->count();
+
+        // TransactionService::update() détruit et recrée toutes les lignes de la pièce.
+        expect(fn () => serviceRattachementAvecChangementConcurrent(
+            $ligne,
+            fn () => DB::table('transaction_lignes')->where('id', $ligne->id)->delete(),
+            $this->user,
+        ))->toThrow(RuntimeException::class, 'Cette ligne n’existe plus : sa pièce a été modifiée entre-temps. Rechargez la page.');
+
+        expect(DB::table('provisions')->count())->toBe(0);
+        expect(DB::table('transactions')->count())->toBe($transactionsAvant);
+    });
+
+    test('I1 — une pièce supprimée entre-temps est refusée lisiblement', function () {
+        $ligne = $this->ligneOrigine(7, 175.0);
+
+        expect(fn () => serviceRattachementAvecChangementConcurrent(
+            $ligne,
+            fn () => DB::table('transactions')->where('id', $ligne->transaction_id)->update(['deleted_at' => now()]),
+            $this->user,
+        ))->toThrow(RuntimeException::class, 'Cette ligne n’existe plus');
+
+        expect(DB::table('provisions')->count())->toBe(0);
+    });
+
+    test('I1 — une ligne passée à une autre pièce entre-temps est refusée lisiblement', function () {
+        $ligne = $this->ligneOrigine(7, 175.0);
+        $autrePiece = $this->ligneOrigine(7, 50.0);
+
+        expect(fn () => serviceRattachementAvecChangementConcurrent(
+            $ligne,
+            fn () => DB::table('transaction_lignes')->where('id', $ligne->id)->update(['transaction_id' => $autrePiece->transaction_id]),
+            $this->user,
+        ))->toThrow(RuntimeException::class, 'Cette ligne n’existe plus');
+
+        expect(DB::table('provisions')->count())->toBe(0);
+    });
+
+    test('I1 — l’éligibilité est rejugée sur la pièce verrouillée : annulée, ou passée en journal d’opérations diverses, entre-temps', function (array $changement, string $fragment) {
+        $ligne = $this->ligneOrigine(7, 175.0);
+        $transactionsAvant = DB::table('transactions')->count();
+
+        // Prémisse : avant le changement, la ligne est rattachable.
+        expect(app(RattachementExerciceService::class)->motifDeRefus($ligne))->toBeNull();
+
+        expect(fn () => serviceRattachementAvecChangementConcurrent(
+            $ligne,
+            fn () => DB::table('transactions')->where('id', $ligne->transaction_id)->update($changement),
+            $this->user,
+        ))->toThrow(RuntimeException::class, $fragment);
+
+        expect(DB::table('provisions')->count())->toBe(0);
+        expect(DB::table('transactions')->count())->toBe($transactionsAvant);
+    })->with([
+        'annulée (extournee_at posé)' => [['extournee_at' => '2026-02-01 10:00:00'], 'annulée'],
+        'passée en journal d’opérations diverses' => [['journal' => 'od'], 'inventaire'],
+    ]);
+
+    test('I1 — l’éligibilité est rejugée sur la ligne verrouillée : reclassée sur un compte de classe 4, ou passée de sens, entre-temps', function (string $changement, string $fragment) {
+        $ligne = $this->ligneOrigine(7, 175.0);
+        $transactionsAvant = DB::table('transactions')->count();
+
+        // Prémisse : avant le changement, la ligne est rattachable (et ses relations sont chargées).
+        expect(app(RattachementExerciceService::class)->motifDeRefus($ligne))->toBeNull();
+
+        $modification = $changement === 'compte'
+            ? ['compte_id' => Compte::where('numero_pcg', '411')->firstOrFail()->id]
+            : ['credit' => 0, 'debit' => 175];
+
+        expect(fn () => serviceRattachementAvecChangementConcurrent(
+            $ligne,
+            fn () => DB::table('transaction_lignes')->where('id', $ligne->id)->update($modification),
+            $this->user,
+        ))->toThrow(RuntimeException::class, $fragment);
+
+        expect(DB::table('provisions')->count())->toBe(0);
+        expect(DB::table('transactions')->count())->toBe($transactionsAvant);
+    })->with([
+        'reclassée sur un 411' => ['compte', 'charge ou de produit'],
+        'passée au débit (sens inverse)' => ['sens', 'sens inverse'],
+    ]);
+
+    test('I1 — une pièce redatée dans un autre exercice entre-temps est refusée lisiblement', function () {
+        $ligne = $this->ligneOrigine(7, 175.0);
+
+        // Les exercices verrouillés sont ceux de l'ancienne date : le rattachement ne peut
+        // pas se poursuivre sous des verrous qui ne sont plus les bons.
+        expect(fn () => serviceRattachementAvecChangementConcurrent(
+            $ligne,
+            fn () => DB::table('transactions')->where('id', $ligne->transaction_id)->update(['date' => '2025-04-08']),
+            $this->user,
+        ))->toThrow(RuntimeException::class, 'La date de la pièce a changé');
+
+        expect(DB::table('provisions')->count())->toBe(0);
+    });
+
+    test('les notes vides ou blanches deviennent nulles, les autres sont rognées', function (?string $notes, ?string $attendu) {
+        $ligne = $this->ligneOrigine(7, 175.0);
+
+        $provision = app(RattachementExerciceService::class)->rattacher($ligne, $notes, $this->user);
+
+        expect($provision->fresh()->notes)->toBe($attendu);
+    })->with([
+        'nulles' => [null, null],
+        'vides' => ['', null],
+        'blanches' => ["  \n ", null],
+        'rognées' => ['  Prestation de septembre ', 'Prestation de septembre'],
+    ]);
 
     test('le recontrôle « déjà rattachée » a lieu dans la transaction, après le verrou de la ligne : jamais deux rattachements', function () {
         $ligne = $this->ligneOrigine(7, 175.0);

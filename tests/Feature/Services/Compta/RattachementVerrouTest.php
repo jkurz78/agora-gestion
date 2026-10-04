@@ -157,3 +157,83 @@ describe('TransactionLigne::estRattachee()', function () {
         expect(TransactionLigne::withTrashed()->whereKey($ligne->id)->exists())->toBeFalse();
     });
 });
+
+describe('TransactionLigne::estRattacheeSousVerrou()', function () {
+    test('répond comme estRattachee() : fausse sans rattachement, vraie avec, fausse après son retrait', function (int $classe) {
+        $ligne = $this->ligneOrigine($classe);
+
+        expect($ligne->estRattacheeSousVerrou())->toBeFalse()
+            ->and($ligne->estRattachee())->toBeFalse();
+
+        $provision = verrouRattacher($ligne);
+
+        expect($ligne->fresh()->estRattacheeSousVerrou())->toBeTrue()
+            ->and($ligne->fresh()->estRattachee())->toBeTrue();
+
+        $provision->delete();
+
+        expect($ligne->fresh()->estRattacheeSousVerrou())->toBeFalse()
+            ->and($ligne->fresh()->estRattachee())->toBeFalse();
+    })->with([
+        'charge (classe 6, CCA)' => [6],
+        'produit (classe 7, PCA)' => [7],
+    ]);
+
+    test('ne vaut que pour la ligne que le rattachement porte', function () {
+        $rattachee = $this->ligneOrigine(7);
+        $compte = Compte::factory()->recette()->create(['association_id' => TenantContext::currentId(), 'actif' => true]);
+        $soeur = TransactionLigne::create([
+            'transaction_id' => $rattachee->transaction_id,
+            'compte_id' => $compte->id,
+            'debit' => 0,
+            'credit' => 50,
+            'montant' => 50,
+            'libelle' => 'Ligne sœur',
+        ]);
+
+        verrouRattacher($rattachee);
+
+        expect($rattachee->fresh()->estRattacheeSousVerrou())->toBeTrue()
+            ->and($soeur->fresh()->estRattacheeSousVerrou())->toBeFalse();
+    });
+
+    test('reste vraie hors contexte d\'association, comme estRattachee()', function () {
+        $ligne = $this->ligneOrigine(7);
+        verrouRattacher($ligne);
+        $ligne = $ligne->fresh();
+
+        TenantContext::clear();
+
+        expect(Provision::count())->toBe(0)
+            ->and($ligne->estRattacheeSousVerrou())->toBeTrue();
+    });
+
+    test('lit sous verrou : la requête sur provisions porte « for update » (MySQL/MariaDB)', function () {
+        $ligne = $this->ligneOrigine(7);
+        verrouRattacher($ligne);
+        $ligne = $ligne->fresh();
+
+        $requetes = [];
+        DB::listen(function ($requete) use (&$requetes): void {
+            $requetes[] = $requete->sql;
+        });
+
+        $ligne->estRattacheeSousVerrou();
+
+        $surProvisions = array_values(array_filter($requetes, fn (string $sql) => str_contains($sql, 'provisions')));
+        expect($surProvisions)->toHaveCount(1);
+
+        // SQLite n'écrit pas « for update » ; seuls MySQL et MariaDB prouvent le verrou.
+        if (DB::getDriverName() !== 'sqlite') {
+            expect($surProvisions[0])->toContain('for update');
+        }
+
+        // La lecture ordinaire, elle, ne verrouille pas : c'est ce qui distingue les deux méthodes.
+        $requetes = [];
+        $ligne->estRattachee();
+
+        $ordinaires = array_values(array_filter($requetes, fn (string $sql) => str_contains($sql, 'provisions')));
+        expect($ordinaires)->toHaveCount(1)
+            ->and($ordinaires[0])->not->toContain('for update');
+    });
+});
