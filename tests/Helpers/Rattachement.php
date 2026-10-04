@@ -15,10 +15,10 @@ use Illuminate\Support\Facades\DB;
 |
 | Pest charge tests/Helpers pour toute exécution, d'un seul fichier comme de la suite
 | complète. RattachementEcrituresTest (le générateur et ProvisionPDService) et
-| RattachementExerciceServiceTest (le service) s'en servent tous deux, ainsi que
-| RattachementVerrouTest pour l'inspection des verrous : déclarées dans l'un d'eux, ces
-| fonctions manqueraient aux autres lancés seuls, et déclarées dans plusieurs, elles se
-| redéclareraient en suite complète.
+| RattachementExerciceServiceTest (le service) s'en servent tous deux, ainsi que les fichiers du
+| verrou (RattachementGelGardesTest et RattachementVerrou*Test) pour l'inspection des verrous et
+| l'interception de la transaction d'un geste : déclarées dans l'un d'eux, ces fonctions manqueraient
+| aux autres lancés seuls, et déclarées dans plusieurs, elles se redéclareraient en suite complète.
 */
 
 /**
@@ -124,4 +124,24 @@ function rattachementIndiceDeLaPremiere(array $requetes, string $table, ?int $an
     throw new RuntimeException(
         "Aucune requête sur {$table}".($annee !== null ? " ({$annee})" : '').' parmi les '.count($requetes).' requêtes examinées.'
     );
+}
+
+/**
+ * Exécute $changement UNE fois, juste après la première requête de la prochaine transaction du geste (celle
+ * qui verrouille l'exercice) : l'état que le geste a lu avant d'ouvrir sa transaction change alors, comme sous
+ * l'effet d'un autre utilisateur, avant que ses verrous ne soient posés. À appeler AVANT le geste.
+ */
+function verrouChangementApresLaPremiereRequeteDeLaTransaction(Closure $changement): void
+{
+    $niveauAvant = DB::transactionLevel();
+    $fait = false;
+
+    DB::listen(function () use (&$fait, $niveauAvant, $changement): void {
+        if ($fait || DB::transactionLevel() <= $niveauAvant) {
+            return;
+        }
+
+        $fait = true;
+        $changement();
+    });
 }

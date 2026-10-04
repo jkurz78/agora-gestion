@@ -38,7 +38,7 @@ use Livewire\Livewire;
 | Verrou d'une pièce rattachée à l'exercice : l'annulation par extourne (Task 8b)
 |--------------------------------------------------------------------------
 |
-| Famille de sites du verrou de RattachementVerrouTest, à part parce qu'elle seule dépend d'une DATE
+| Famille de sites du verrou (les autres : RattachementVerrou*Test), à part parce qu'elle seule dépend d'une DATE
 | (spec § 7, D13) : l'annulation d'une pièce rattachée à N est refusée si elle est datée au plus tard
 | le dernier jour de N (elle retirerait deux fois le même montant de N), permise après (elle est juste,
 | et sans elle la pièce ne pourrait plus jamais être annulée une fois N clôturé). Une écriture de

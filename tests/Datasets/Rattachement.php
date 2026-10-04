@@ -18,7 +18,7 @@ dataset('rattachement_pca_cca', [
 
 /*
 | [classe du compte de résultat] seule : pour les tests qui ne dépendent pas du montant (le
-| verrou, RattachementVerrouTest).
+| verrou : RattachementGelGardesTest et RattachementVerrou*Test).
 */
 
 dataset('rattachement_classes', [

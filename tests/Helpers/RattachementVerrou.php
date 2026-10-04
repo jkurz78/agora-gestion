@@ -434,28 +434,9 @@ function verrouAssertExtourneRefusee(Closure $geste, TransactionLigne $ligne, Pr
 }
 
 /**
- * Exécute $changement UNE fois, juste après la première requête de la prochaine transaction du geste (celle
- * qui verrouille l'exercice) : l'état que le geste a lu avant d'ouvrir sa transaction change alors, comme sous
- * l'effet d'un autre utilisateur, avant que ses verrous ne soient posés. À appeler AVANT le geste.
- */
-function verrouChangementApresLaPremiereRequeteDeLaTransaction(Closure $changement): void
-{
-    $niveauAvant = DB::transactionLevel();
-    $fait = false;
-
-    DB::listen(function () use (&$fait, $niveauAvant, $changement): void {
-        if ($fait || DB::transactionLevel() <= $niveauAvant) {
-            return;
-        }
-
-        $fait = true;
-        $changement();
-    });
-}
-
-/**
  * Les classes de l'application que le constructeur de $classe demande, de proche en proche. Sert à prouver
- * l'absence de cycle d'injection : RattachementExerciceService ne doit jamais atteindre TransactionExtourneService.
+ * l'absence de cycle d'injection : GelRattachement n'atteint ni ProvisionPDService, ni EcritureGenerator, ni aucun
+ * des gestes qu'il protège ; RattachementExerciceService n'atteint jamais TransactionExtourneService.
  *
  * @return list<class-string>
  */

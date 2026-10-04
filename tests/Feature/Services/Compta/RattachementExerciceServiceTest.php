@@ -156,22 +156,14 @@ function serviceRattachementPieceAnnulee(object $test, int $classe, string $date
 }
 
 /**
- * Exécute $changement au tout début de la transaction du service, une seule fois, puis
- * rattache la ligne. Rend ce que rattacher() a rendu, ou lance ce qu'il a lancé.
+ * Pose $changement au tout début de la transaction du service (voir
+ * verrouChangementApresLaPremiereRequeteDeLaTransaction(), dans tests/Helpers/Rattachement.php : la
+ * première requête de rattacher() est le verrou de l'association), une seule fois, puis rattache la
+ * ligne. Rend ce que rattacher() a rendu, ou lance ce qu'il a lancé.
  */
 function serviceRattachementAvecChangementConcurrent(TransactionLigne $ligne, Closure $changement, User $auteur): Provision
 {
-    $niveauAvant = DB::transactionLevel();
-    $fait = false;
-
-    DB::listen(function ($requete) use (&$fait, $niveauAvant, $changement): void {
-        if ($fait || DB::transactionLevel() <= $niveauAvant || ! str_contains($requete->sql, 'association')) {
-            return;
-        }
-
-        $fait = true;
-        $changement();
-    });
+    verrouChangementApresLaPremiereRequeteDeLaTransaction($changement);
 
     return app(RattachementExerciceService::class)->rattacher($ligne, null, $auteur);
 }
