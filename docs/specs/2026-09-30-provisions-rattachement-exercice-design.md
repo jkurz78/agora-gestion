@@ -335,7 +335,17 @@ rattachement, dont l'écriture ne recopie que la ligne d'origine. Deux gardes au
 renseigné) ne se modifient, ne se suppriment et ne s'annulent **que par le retrait du
 rattachement** (§ 6.4). Par tout autre chemin, elles survivraient au retrait, détachées :
 `provision_id` est en `nullOnDelete`, et le retrait ignore les écritures supprimées logiquement.
-`verrouillerPieceNonGelee()` les refuse avec leur propre message.
+Elles sont refusées avec leur propre message **par les deux gardes** : `verrouillerPieceNonGelee()`
+pour les gestes sur la pièce, et `assertLigneNonGelee()` pour les gestes sur une ligne — sans quoi
+la ligne de charge de la dotation d'une CCA (pièce typée dépense) se reclassait, laissant dotation
+et extourne sur deux comptes différents.
+
+**L'annulation par extourne a sa propre garde, datée** : `verrouillerPieceExtournable()`, même
+préfixe de verrous, prise **avant** la numérotation de la pièce d'annulation. Elle ne refuse que si
+l'annulation est datée au plus tard le dernier jour de N (D13). Le message nomme la sortie
+possible : dater l'annulation après N quand la date se saisit (fenêtre d'annulation) ; retirer
+d'abord le rattachement, ou attendre N+1, quand elle est imposée — l'annulation d'une **facture**
+passe par ce site à la date du jour.
 
 Sites à garder :
 
