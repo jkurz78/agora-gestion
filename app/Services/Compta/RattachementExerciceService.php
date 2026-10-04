@@ -27,10 +27,10 @@ use RuntimeException;
  * propose rien que motifDeRefus() refuse. Ce que le service accepte n'est pas pour
  * autant tout ce que la détection propose.
  *
- * L'ouverture de la PÉRIODE se contrôle à part : sous verrou dans rattacher() (exercices
- * N et N+1), et par période à l'écran (Task 11). Une ligne éligible dont l'exercice, ou
- * le suivant, est clôturé est donc refusée par rattacher() sans que motifDeRefus() l'ait
- * écartée.
+ * L'ouverture de la PÉRIODE se contrôle à part : sous verrou dans rattacher() et
+ * retirer() (exercices N et N+1), et par période à l'écran (Task 11). Une ligne éligible
+ * dont l'exercice, ou le suivant, est clôturé est donc refusée par rattacher() sans que
+ * motifDeRefus() l'ait écartée.
  *
  * Référence : docs/specs/2026-09-30-provisions-rattachement-exercice-design.md
  * (D4, D9, D13, D14 pour les gardes ; § 5 pour les verrous d'exercice ; § 7 pour
@@ -55,6 +55,10 @@ final class RattachementExerciceService
     private const MOTIF_PIECE_SUPPRIMEE_ENTRE_TEMPS = 'La pièce de cette ligne a été supprimée entre-temps. Rechargez la page.';
 
     private const MOTIF_PIECE_REDATEE = 'La date de la pièce a changé entre-temps : elle n’appartient plus au même exercice. Rechargez la page.';
+
+    private const MOTIF_DEJA_RETIRE = 'Ce rattachement a déjà été retiré. Rechargez la page.';
+
+    private const MOTIF_RETRAIT_SAISIE_LIBRE = 'Ce rattachement est une saisie libre : son retrait n’est pas encore pris en charge.';
 
     public function __construct(
         private readonly ExerciceService $exerciceService,
@@ -297,14 +301,111 @@ final class RattachementExerciceService
     }
 
     /**
-     * Verrouille la pièce puis la ligne, dans cet ordre, et rend leur état verrouillé : celui
-     * sur lequel l'éligibilité se rejuge et le montant se calcule. À appeler dans une
+     * Retire le rattachement : supprime ses deux écritures (dotation et extourne), puis
+     * supprime PHYSIQUEMENT sa ligne de `provisions`, ce qui libère la ligne d'origine. Le
+     * modèle n'a pas de suppression logique : une ligne de `provisions` existe si et seulement
+     * si la ligne d'origine est verrouillée (spec § 6.4). Il ne reste aucune trace en base ;
+     * la trace est le journal applicatif.
+     *
+     * Ne retire que les rattachements adossés à une ligne d'origine (CCA, PCA) : la saisie
+     * libre (FNP, PAR) est du lot 2.
+     *
+     * Les verrous suivent l'ordre de rattacher() : association et exercice N (le même appel
+     * qu'à la création), exercice N+1, pièce, ligne, puis le rattachement EN DERNIER. C'est
+     * l'ordre dans lequel rattacher() lit `provisions` (après la pièce et la ligne), et celui
+     * que suivront les gardes d'écriture des Tasks 7 à 9 : un retrait qui verrouillerait le
+     * rattachement d'abord s'inter-bloquerait avec eux. L'exercice est celui du
+     * rattachement (`$provision->exercice`), qui est celui de ses écritures, et non la date
+     * de la pièce : la pièce a pu être supprimée ou redatée depuis.
+     *
+     * retirer() ne rejuge PAS la pièce ni la ligne comme le fait rattacher() (verrouillerEtRelire() :
+     * pièce supprimée, ligne disparue, pièce redatée). Ces refus-là protègent une création ; le
+     * retrait est la sortie, et c'est précisément le cas d'une origine supprimée qu'il doit
+     * nettoyer. Il les verrouille donc supprimées logiquement comprises : sa seule raison de
+     * les verrouiller est de s'exclure avec ce qui les écrit.
+     *
+     * Appelable plusieurs fois sur la même instance : le rattachement est relu sous verrou, et
+     * un rattachement déjà retiré (ici, ou par un autre utilisateur) est un refus lisible.
+     *
+     * @throws RuntimeException rattachement en saisie libre ; rattachement déjà retiré, ou d'une
+     *                          autre association ; ExerciceCloturedException (une RuntimeException)
+     *                          si l'exercice N ou N+1 est clôturé
+     */
+    public function retirer(Provision $provision): void
+    {
+        if (! $provision->estAdossee()) {
+            throw new RuntimeException(self::MOTIF_RETRAIT_SAISIE_LIBRE);
+        }
+
+        // Ces trois colonnes ne changent jamais après la création : lues sur l'instance reçue,
+        // elles désignent aussi ce que la transaction va verrouiller.
+        $exercice = (int) $provision->exercice;
+        $provisionId = (int) $provision->id;
+        $ligneId = (int) $provision->transaction_ligne_id;
+
+        // Lecture simple, hors transaction, comme rattacher() lit $ligne->transaction_id : elle
+        // ne sert qu'à savoir QUELLE pièce verrouiller, et ne peut pas être périmée. Une ligne
+        // ne change jamais de pièce : TransactionService::update() en recrée de nouvelles, sous
+        // d'autres identifiants, et aucun chemin ne réécrit transaction_lignes.transaction_id. Tant
+        // que le rattachement existe, la clé étrangère RESTRICT interdit en outre de supprimer
+        // physiquement la ligne. Supprimée logiquement, elle reste lisible (withTrashed() lève le
+        // seul filtre de suppression logique, pas le scope tenant). Absente, c'est que le
+        // rattachement a été retiré entre-temps : rien à verrouiller côté pièce, et le
+        // rattachement, introuvable sous verrou, donne le refus « déjà retiré ».
+        $pieceId = TransactionLigne::withTrashed()->whereKey($ligneId)->value('transaction_id');
+        $pieceId = $pieceId !== null ? (int) $pieceId : null;
+
+        // 3 tentatives, comme rattacher() : un inter-blocage est rejoué, tout est relu sous verrou.
+        $montant = DB::transaction(function () use ($exercice, $provisionId, $ligneId, $pieceId): float {
+            // Ordre canonique de rattacher() : association, exercice source, exercice cible.
+            // La dotation vit dans N, l'extourne dans N+1 : les deux doivent être ouverts.
+            $this->exerciceService->assertOuvertPourEcriture($exercice);
+            $this->exerciceService->assertOuvertVerrouille($exercice + 1);
+
+            $this->verrouillerPieceEtLigne($pieceId, $ligneId, true);
+
+            // Le rattachement en dernier. Sous le scope tenant, volontairement : une instance
+            // d'une autre association n'est pas trouvée, au lieu d'être supprimée alors que ses
+            // écritures, que supprimer() ne voit pas hors de son association, resteraient.
+            // estRattacheeSousVerrou() lève au contraire tous les scopes : c'est une garde, que le
+            // scope fail-closed rendrait passante. Ici on détruit : ne rien trouver est un refus.
+            $verrouille = Provision::query()->whereKey($provisionId)->lockForUpdate()->first();
+
+            if ($verrouille === null) {
+                throw new RuntimeException(self::MOTIF_DEJA_RETIRE);
+            }
+
+            // Les écritures d'abord : transactions.provision_id étant en nullOnDelete, supprimer le
+            // rattachement le premier laisserait les écritures orphelines, hors de portée de supprimer().
+            $this->provisionPD->supprimer($verrouille);
+            $verrouille->delete();
+
+            return round((float) $verrouille->montant, 2);
+        }, 3);
+
+        // Après le commit, rien ne doit plus pouvoir lever : un retrait validé ne doit pas
+        // remonter comme une erreur. Pas de cas ici : il se lit sur la ligne d'origine, qui a pu
+        // être supprimée.
+        Log::info('[Rattachement] écriture de rattachement retirée', [
+            'provision_id' => $provisionId,
+            'transaction_ligne_id' => $ligneId,
+            'exercice' => $exercice,
+            'montant' => $montant,
+        ]);
+    }
+
+    /**
+     * Verrouille la pièce puis la ligne (verrouillerPieceEtLigne()), et rend leur état verrouillé :
+     * celui sur lequel l'éligibilité se rejuge et le montant se calcule. À appeler dans une
      * transaction, après les verrous d'exercice ; ils tiennent jusqu'au commit.
      *
      * L'ordre est celui de TransactionService::update() (exercice, pièce, puis suppression des
-     * lignes). Parmi les écritures qui touchent la pièce ou la ligne, seul rattacher() prend le
-     * verrou d'association : les autres (édition, annulation, synchronisation HelloAsso) ne
-     * s'excluent que par ces deux verrous.
+     * lignes). Parmi les écritures qui touchent la pièce ou la ligne, seuls rattacher() et
+     * retirer() prennent le verrou d'association : les autres (édition, annulation,
+     * synchronisation HelloAsso) ne s'excluent que par ces deux verrous.
+     *
+     * Les refus ci-dessous sont ceux d'une CRÉATION : retirer() n'en reprend aucun, pour qu'un
+     * rattachement dont l'origine a disparu reste retirable.
      *
      * @param  int  $exercice  l'exercice N dont les verrous viennent d'être pris : la date de la
      *                         pièce relue sous verrou ne doit pas l'avoir quitté
@@ -316,8 +417,11 @@ final class RattachementExerciceService
      */
     private function verrouillerEtRelire(TransactionLigne $ligne, int $exercice): array
     {
-        $piece = Transaction::query()->whereKey((int) $ligne->transaction_id)->lockForUpdate()->first();
-        $ligneVerrouillee = TransactionLigne::query()->whereKey((int) $ligne->id)->lockForUpdate()->first();
+        ['piece' => $piece, 'ligne' => $ligneVerrouillee] = $this->verrouillerPieceEtLigne(
+            (int) $ligne->transaction_id,
+            (int) $ligne->id,
+            false,
+        );
 
         if ($piece === null) {
             throw new RuntimeException(self::MOTIF_PIECE_SUPPRIMEE_ENTRE_TEMPS);
@@ -336,5 +440,33 @@ final class RattachementExerciceService
         }
 
         return ['piece' => $piece, 'ligne' => $ligneVerrouillee];
+    }
+
+    /**
+     * Le seul verrouillage de la pièce puis de la ligne, dans cet ordre, partagé par
+     * rattacher() (qui juge ensuite ce qu'il a verrouillé) et retirer() (qui n'en juge rien).
+     * Ne refuse jamais : une pièce ou une ligne introuvable est rendue nulle, et c'est à
+     * l'appelant d'en décider.
+     *
+     * @param  int|null  $pieceId  nul : rien à verrouiller côté pièce (retirer() sur une ligne
+     *                             que la base ne peut plus avoir perdue)
+     * @param  bool  $inclureSupprimees  vrai : lire aussi les pièces et lignes supprimées
+     *                                   logiquement (withTrashed()). Le scope tenant reste appliqué.
+     * @return array{piece: ?Transaction, ligne: ?TransactionLigne}
+     */
+    private function verrouillerPieceEtLigne(?int $pieceId, int $ligneId, bool $inclureSupprimees): array
+    {
+        $pieces = Transaction::query();
+        $lignes = TransactionLigne::query();
+
+        if ($inclureSupprimees) {
+            $pieces->withTrashed();
+            $lignes->withTrashed();
+        }
+
+        $piece = $pieceId !== null ? $pieces->whereKey($pieceId)->lockForUpdate()->first() : null;
+        $ligne = $lignes->whereKey($ligneId)->lockForUpdate()->first();
+
+        return ['piece' => $piece, 'ligne' => $ligne];
     }
 }

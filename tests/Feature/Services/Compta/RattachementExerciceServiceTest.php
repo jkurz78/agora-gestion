@@ -22,6 +22,7 @@ use App\Models\User;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\Compta\RattachementExerciceService;
 use App\Services\TransactionExtourneService;
+use App\Services\TransactionService;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -204,6 +205,96 @@ function serviceRattachementAvecChangementConcurrent(TransactionLigne $ligne, Cl
     });
 
     return app(RattachementExerciceService::class)->rattacher($ligne, null, $auteur);
+}
+
+// ── Helpers du retrait ───────────────────────────────────────────────────────
+
+/** Rattache la ligne au nom de l'utilisateur connecté du test. */
+function serviceRattachementRattachee(TransactionLigne $ligne): Provision
+{
+    return app(RattachementExerciceService::class)->rattacher($ligne, null, auth()->user());
+}
+
+/**
+ * Les identifiants des écritures d'un rattachement, comptés sans aucun filtre (ni suppression
+ * logique ni association). À relever AVANT un retrait : la clé étrangère
+ * `transactions.provision_id` étant en `nullOnDelete`, une écriture qui survivrait à la
+ * suppression du rattachement perdrait son `provision_id`, et plus aucune requête par
+ * `provision_id` ne la retrouverait.
+ *
+ * @return list<int>
+ */
+function serviceRattachementEcritureIds(Provision $provision): array
+{
+    return DB::table('transactions')
+        ->where('provision_id', (int) $provision->id)
+        ->pluck('id')
+        ->map(fn ($id): int => (int) $id)
+        ->all();
+}
+
+/**
+ * Ce qu'un rattachement possède en base : sa ligne de provisions, ses écritures et leurs
+ * lignes, comptés par identifiant et sans aucun filtre. Un rattachement posé vaut
+ * 1 / 2 / 4 ; un retrait réussi le ramène à 0 / 0 / 0 ; un retrait refusé le laisse tel quel.
+ *
+ * @param  list<int>  $ecritureIds  relevés par serviceRattachementEcritureIds() avant le retrait
+ * @return array{provision: int, ecritures: int, lignes: int}
+ */
+function serviceRattachementEtat(Provision $provision, array $ecritureIds): array
+{
+    return [
+        'provision' => DB::table('provisions')->where('id', (int) $provision->id)->count(),
+        'ecritures' => DB::table('transactions')->whereIn('id', $ecritureIds)->count(),
+        'lignes' => DB::table('transaction_lignes')->whereIn('transaction_id', $ecritureIds)->count(),
+    ];
+}
+
+/**
+ * Exécute $action et rend les requêtes de sa transaction qui précèdent la première écriture
+ * (insert, update ou delete) : les verrous, dans l'ordre où ils ont été pris.
+ *
+ * @return list<object>
+ */
+function serviceRattachementRequetesAvantEcriture(Closure $action): array
+{
+    $niveauAvant = DB::transactionLevel();
+    $requetes = [];
+
+    DB::listen(function ($requete) use (&$requetes, $niveauAvant): void {
+        if (DB::transactionLevel() > $niveauAvant) {
+            $requetes[] = $requete;
+        }
+    });
+
+    $action();
+
+    $premiereEcriture = collect($requetes)->search(
+        fn ($requete) => preg_match('/^\s*(insert|update|delete)\b/i', $requete->sql) === 1
+    );
+    expect($premiereEcriture)->toBeInt();
+
+    return array_slice($requetes, 0, $premiereEcriture);
+}
+
+/**
+ * L'indice de la première requête qui lit $table (et, si $annee est donné, la porte dans ses
+ * paramètres). Lève si aucune ne le fait : un verrou absent ne doit pas passer pour un verrou
+ * tardif.
+ *
+ * @param  list<object>  $requetes
+ */
+function serviceRattachementIndiceDeLaPremiere(array $requetes, string $table, ?int $annee = null): int
+{
+    foreach ($requetes as $i => $requete) {
+        $cible = preg_match('/from\s+[`"]?(\w+)[`"]?/i', $requete->sql, $m) === 1 ? $m[1] : '?';
+
+        if ($cible === $table && ($annee === null || in_array($annee, $requete->bindings, true))) {
+            return $i;
+        }
+    }
+
+    throw new RuntimeException("Aucun verrou sur {$table}".($annee !== null ? " ({$annee})" : '').' avant la première écriture.');
 }
 
 describe('RattachementExerciceService : éligibilité (motifDeRefus)', function () {
@@ -900,4 +991,421 @@ describe('RattachementExerciceService : création', function () {
         expect(DB::table('provisions')->count())->toBe(0);
         expect(Transaction::whereNotNull('provision_id')->count())->toBe(0);
     });
+});
+
+describe('RattachementExerciceService : retrait', function () {
+    // Le retrait supprime les deux écritures, supprime PHYSIQUEMENT la ligne de provisions
+    // (le modèle n'a pas de suppression logique : une ligne de provisions existe si et
+    // seulement si la ligne d'origine est verrouillée), et ne touche à rien d'autre. Chaque
+    // test compte ce que le rattachement possède en base (serviceRattachementEtat) : un état
+    // posé vaut 1 / 2 / 4 (rattachement, écritures, lignes d'écriture), un retrait réussi le
+    // ramène à 0 / 0 / 0, un retrait refusé le laisse tel quel.
+
+    test('retirer() supprime les deux écritures et leurs lignes, supprime physiquement le rattachement et libère la ligne d’origine', function (int $classe, float $montant) {
+        $ligne = $this->ligneOrigine($classe, $montant);
+        $provision = serviceRattachementRattachee($ligne);
+        $ecritureIds = serviceRattachementEcritureIds($provision);
+
+        // Un autre rattachement, qui ne doit pas être touché : le retrait vise le sien seul.
+        $autreLigne = $this->ligneOrigine($classe, $montant);
+        $autre = serviceRattachementRattachee($autreLigne);
+        $autreEcritureIds = serviceRattachementEcritureIds($autre);
+
+        // Prémisse (anti-test-vide) : tout est là, la ligne est verrouillée des deux façons.
+        expect(serviceRattachementEtat($provision, $ecritureIds))->toBe(['provision' => 1, 'ecritures' => 2, 'lignes' => 4]);
+        expect($ligne->fresh()->estRattachee())->toBeTrue();
+        expect($ligne->fresh()->estRattacheeSousVerrou())->toBeTrue();
+
+        app(RattachementExerciceService::class)->retirer($provision);
+
+        // Compté par identifiant et sans filtre : une écriture qui survivrait (son provision_id
+        // passé à NULL par la clé étrangère) ou une simple suppression logique se verraient ici.
+        expect(serviceRattachementEtat($provision, $ecritureIds))->toBe(['provision' => 0, 'ecritures' => 0, 'lignes' => 0]);
+        expect(DB::table('provisions')->where('id', $provision->id)->exists())->toBeFalse();
+
+        expect($ligne->fresh()->estRattachee())->toBeFalse();
+        expect($ligne->fresh()->estRattacheeSousVerrou())->toBeFalse();
+
+        // L'origine est intacte : la pièce, sa ligne, son montant.
+        expect(Transaction::whereKey($ligne->transaction_id)->exists())->toBeTrue();
+        expect((float) TransactionLigne::findOrFail($ligne->id)->montant)->toBe($montant);
+
+        // L'autre rattachement est intact.
+        expect(serviceRattachementEtat($autre, $autreEcritureIds))->toBe(['provision' => 1, 'ecritures' => 2, 'lignes' => 4]);
+        expect($autreLigne->fresh()->estRattachee())->toBeTrue();
+    })->with('rattachement_pca_cca');
+
+    test('AC-9 — le retrait est refusé si N est clôturé, ou si N+1 est clôturé, et rien n’a bougé', function (int $anneeCloturee, string $libelle) {
+        $ligne = $this->ligneOrigine(7, 175.0);
+        $provision = serviceRattachementRattachee($ligne);
+        $ecritureIds = serviceRattachementEcritureIds($provision);
+
+        // La clôture vient APRÈS le rattachement : à la création, N et N+1 doivent être ouverts.
+        Exercice::create(['annee' => $anneeCloturee, 'statut' => StatutExercice::Cloture]);
+
+        expect(fn () => app(RattachementExerciceService::class)->retirer($provision))
+            ->toThrow(ExerciceCloturedException::class, $libelle);
+
+        expect(serviceRattachementEtat($provision, $ecritureIds))->toBe(['provision' => 1, 'ecritures' => 2, 'lignes' => 4]);
+        expect($ligne->fresh()->estRattachee())->toBeTrue();
+    })->with([
+        'N (2025-2026) clôturé' => [2025, '2025-2026'],
+        'N+1 (2026-2027) clôturé' => [2026, '2026-2027'],
+    ]);
+
+    test('seuls N et N+1 comptent : la clôture de l’exercice précédent ou du suivant n’empêche pas le retrait', function () {
+        $ligne = $this->ligneOrigine(7, 175.0);
+        $provision = serviceRattachementRattachee($ligne);
+        $ecritureIds = serviceRattachementEcritureIds($provision);
+
+        Exercice::create(['annee' => 2024, 'statut' => StatutExercice::Cloture]);
+        Exercice::create(['annee' => 2027, 'statut' => StatutExercice::Cloture]);
+
+        app(RattachementExerciceService::class)->retirer($provision);
+
+        expect(serviceRattachementEtat($provision, $ecritureIds))->toBe(['provision' => 0, 'ecritures' => 0, 'lignes' => 0]);
+    });
+
+    test('les exercices contrôlés sont ceux du rattachement, pas la date que porte la pièce d’origine aujourd’hui', function () {
+        $ligne = $this->ligneOrigine(7, 175.0);
+        $provision = serviceRattachementRattachee($ligne);
+        $ecritureIds = serviceRattachementEcritureIds($provision);
+
+        // Les écritures du rattachement vivent dans 2025 (dotation) et 2026 (extourne), quoi qu'il
+        // arrive ensuite à la pièce : on la redate (ce qu'un autre chemin d'écriture aurait pu faire)
+        // dans l'exercice 2024, dont ni N ni N+1 ne seraient clôturés. Seule la clôture de 2026 le dit.
+        DB::table('transactions')->where('id', $ligne->transaction_id)->update(['date' => '2025-04-08']);
+        Exercice::create(['annee' => 2026, 'statut' => StatutExercice::Cloture]);
+
+        expect(fn () => app(RattachementExerciceService::class)->retirer($provision))
+            ->toThrow(ExerciceCloturedException::class, '2026-2027');
+
+        expect(serviceRattachementEtat($provision, $ecritureIds))->toBe(['provision' => 1, 'ecritures' => 2, 'lignes' => 4]);
+    });
+
+    test('AC-10 — un rattachement retiré peut être repassé sur la même ligne : un seul rattachement, deux nouvelles écritures', function (int $classe, float $montant) {
+        $ligne = $this->ligneOrigine($classe, $montant);
+        $service = app(RattachementExerciceService::class);
+
+        $premier = $service->rattacher($ligne, null, $this->user);
+        $anciennesEcritures = serviceRattachementEcritureIds($premier);
+        $service->retirer($premier);
+
+        // Redevenue éligible : plus de « déjà rattachée ».
+        expect($service->motifDeRefus($ligne->fresh()))->toBeNull();
+
+        $second = $service->rattacher($ligne->fresh(), null, $this->user);
+
+        expect((int) $second->id)->not->toBe((int) $premier->id);
+        expect((int) $second->transaction_ligne_id)->toBe((int) $ligne->id);
+        expect(DB::table('provisions')->count())->toBe(1);
+
+        $nouvellesEcritures = serviceRattachementEcritureIds($second);
+        expect($nouvellesEcritures)->toHaveCount(2);
+        expect(array_intersect($anciennesEcritures, $nouvellesEcritures))->toBe([]);
+
+        // Rien d'autre ne subsiste de la première fois : deux écritures de rattachement, pas quatre.
+        expect(DB::table('transactions')->whereNotNull('provision_id')->count())->toBe(2);
+
+        $dotation = Transaction::where('provision_id', $second->id)->where('type_ecriture', 'normale')->sole();
+        expect(impactSurLeResultat($dotation->load('lignes.compte')))->toBe($classe === 7 ? -$montant : $montant);
+        expect($ligne->fresh()->estRattachee())->toBeTrue();
+    })->with('rattachement_pca_cca');
+
+    test('AC-10 — après un retrait, TransactionService::update() sur la pièce d’origine réussit ; avant, il échoue sans rien changer', function (int $classe, float $montant) {
+        $ligne = $this->ligneOrigine($classe, $montant);
+        $provision = serviceRattachementRattachee($ligne);
+        $ecritureIds = serviceRattachementEcritureIds($provision);
+
+        // Le geste réel : corriger le libellé de la pièce. update() détruit puis recrée toutes
+        // les lignes de la pièce (forceDelete), ce que la clé étrangère refuse tant qu'un
+        // rattachement les référence.
+        $donnees = [
+            'type' => $classe === 7 ? 'recette' : 'depense',
+            'date' => '2026-04-08',
+            'libelle' => 'Pièce corrigée',
+            'montant_total' => number_format($montant, 2, '.', ''),
+            'mode_paiement' => null,
+            'tiers_id' => null,
+            'compte_id' => null,
+        ];
+        $lignes = [[
+            'id' => (int) $ligne->id,
+            'compte_id' => (int) $ligne->compte_id,
+            'montant' => $montant,
+            'operation_id' => null,
+            'seance' => null,
+            'notes' => null,
+        ]];
+        $corriger = fn (): Transaction => app(TransactionService::class)->update(
+            Transaction::findOrFail($ligne->transaction_id),
+            $donnees,
+            $lignes,
+        );
+
+        // Témoin : AVANT le retrait, update() échoue — aujourd'hui sur l'erreur de clé étrangère
+        // de la base. La Task 8 en fera un refus lisible (AC-8) et resserrera cette assertion ;
+        // ici on ne fige pas le type d'exception, seulement l'échec et l'absence d'effet.
+        // Pas de toThrow(Throwable::class) : Pest ne reconnaît que des classes, et prendrait
+        // l'interface pour un fragment de message attendu.
+        $echec = null;
+
+        try {
+            $corriger();
+        } catch (Throwable $e) {
+            $echec = $e;
+        }
+
+        expect($echec)->toBeInstanceOf(Throwable::class);
+
+        expect(Transaction::findOrFail($ligne->transaction_id)->libelle)->toBe('Pièce d’origine');
+        expect(TransactionLigne::find($ligne->id))->not->toBeNull();
+        expect(serviceRattachementEtat($provision, $ecritureIds))->toBe(['provision' => 1, 'ecritures' => 2, 'lignes' => 4]);
+
+        app(RattachementExerciceService::class)->retirer($provision);
+
+        // APRÈS le retrait, le même geste réussit : c'est le test qui aurait attrapé la
+        // contradiction entre la suppression logique du rattachement et la clé étrangère.
+        $piece = $corriger();
+
+        expect($piece->libelle)->toBe('Pièce corrigée');
+        expect(Transaction::findOrFail($ligne->transaction_id)->libelle)->toBe('Pièce corrigée');
+        // update() a recréé la ligne : elle existe toujours, avec un autre identifiant.
+        expect(TransactionLigne::where('transaction_id', $ligne->transaction_id)->count())->toBe(1);
+        expect(TransactionLigne::find($ligne->id))->toBeNull();
+    })->with('rattachement_pca_cca');
+
+    test('retirer() deux fois de suite : la seconde lève « déjà retiré » et ne touche à rien', function () {
+        $ligne = $this->ligneOrigine(7, 175.0);
+        $service = app(RattachementExerciceService::class);
+        $provision = serviceRattachementRattachee($ligne);
+        $ecritureIds = serviceRattachementEcritureIds($provision);
+
+        $service->retirer($provision);
+
+        // Même instance, périmée : sa ligne n'existe plus en base. Seul le verrou posé sur le
+        // rattachement, relu sous verrou, le voit.
+        expect(fn () => $service->retirer($provision))
+            ->toThrow(RuntimeException::class, 'Ce rattachement a déjà été retiré. Rechargez la page.');
+
+        expect(serviceRattachementEtat($provision, $ecritureIds))->toBe(['provision' => 0, 'ecritures' => 0, 'lignes' => 0]);
+    });
+
+    test('un rattachement d’une autre association est traité comme déjà retiré : rien n’est supprimé, ni lui ni ses écritures', function () {
+        $ligne = $this->ligneOrigine(7, 175.0);
+        $provision = serviceRattachementRattachee($ligne);
+        $ecritureIds = serviceRattachementEcritureIds($provision);
+        $associationDuRattachement = TenantContext::current();
+
+        // L'instance est celle d'une autre association : sans le scope tenant sur le verrou, le
+        // retrait supprimerait la ligne de provisions, tandis que ses écritures (que l'autre
+        // association ne voit pas) resteraient, orphelines.
+        TenantContext::clear();
+        TenantContext::boot(Association::factory()->create());
+
+        expect(fn () => app(RattachementExerciceService::class)->retirer($provision))
+            ->toThrow(RuntimeException::class, 'Ce rattachement a déjà été retiré. Rechargez la page.');
+
+        TenantContext::clear();
+        TenantContext::boot($associationDuRattachement);
+
+        expect(serviceRattachementEtat($provision, $ecritureIds))->toBe(['provision' => 1, 'ecritures' => 2, 'lignes' => 4]);
+        expect($ligne->fresh()->estRattachee())->toBeTrue();
+    });
+
+    test('un rattachement dont l’origine a été supprimée logiquement reste retirable : c’est la seule sortie', function (bool $pieceSupprimee, bool $ligneSupprimee) {
+        $ligne = $this->ligneOrigine(7, 175.0);
+        $provision = serviceRattachementRattachee($ligne);
+        $ecritureIds = serviceRattachementEcritureIds($provision);
+        $pieceId = (int) $ligne->transaction_id;
+
+        // Suppression LOGIQUE (SoftDeletes) : la FK `restrictOnDelete` interdit la suppression
+        // physique tant que le rattachement existe, et c'est justement le rattachement qu'on retire.
+        if ($pieceSupprimee) {
+            Transaction::findOrFail($pieceId)->delete();
+        }
+        if ($ligneSupprimee) {
+            $ligne->delete();
+        }
+
+        // Prémisses : l'origine est bien masquée par ses suppressions logiques, et toujours là en base.
+        expect(Transaction::find($pieceId) === null)->toBe($pieceSupprimee);
+        expect(TransactionLigne::find($ligne->id) === null)->toBe($ligneSupprimee);
+        expect(Transaction::withTrashed()->find($pieceId))->not->toBeNull();
+        expect(TransactionLigne::withTrashed()->find($ligne->id))->not->toBeNull();
+        expect(serviceRattachementEtat($provision, $ecritureIds))->toBe(['provision' => 1, 'ecritures' => 2, 'lignes' => 4]);
+
+        app(RattachementExerciceService::class)->retirer($provision);
+
+        expect(serviceRattachementEtat($provision, $ecritureIds))->toBe(['provision' => 0, 'ecritures' => 0, 'lignes' => 0]);
+
+        // L'origine n'est ni ressuscitée ni purgée, et la ligne n'est plus verrouillée.
+        expect(Transaction::withTrashed()->find($pieceId)->trashed())->toBe($pieceSupprimee);
+        expect(TransactionLigne::withTrashed()->find($ligne->id)->trashed())->toBe($ligneSupprimee);
+        expect(TransactionLigne::withTrashed()->find($ligne->id)->estRattachee())->toBeFalse();
+    })->with([
+        'pièce supprimée' => [true, false],
+        'ligne supprimée' => [false, true],
+        'pièce et ligne supprimées' => [true, true],
+    ]);
+
+    test('un rattachement qui ne s’appuie sur aucune ligne d’origine (saisie libre) n’est pas retirable : refus lisible, rien ne bouge', function () {
+        $compte = Compte::factory()->recette()->create(['association_id' => TenantContext::currentId(), 'actif' => true]);
+        $libre = Provision::create([
+            'association_id' => (int) TenantContext::currentId(),
+            'exercice' => 2025,
+            'compte_id' => $compte->id,
+            'libelle' => 'Produit à recevoir',
+            'montant' => 100,
+            'saisi_par' => auth()->id(),
+        ]);
+
+        // Prémisse : c'est bien une saisie libre, sans ligne d'origine.
+        expect($libre->estAdossee())->toBeFalse();
+
+        expect(fn () => app(RattachementExerciceService::class)->retirer($libre))
+            ->toThrow(RuntimeException::class, 'Ce rattachement est une saisie libre : son retrait n’est pas encore pris en charge.');
+
+        expect(DB::table('provisions')->where('id', $libre->id)->exists())->toBeTrue();
+    });
+
+    test('les verrous du retrait sont pris dans l’ordre canonique — association, exercice N, exercice N+1, pièce, ligne, rattachement — avant toute suppression', function () {
+        $ligne = $this->ligneOrigine(7, 175.0);
+        $provision = serviceRattachementRattachee($ligne);
+
+        $avantEcriture = serviceRattachementRequetesAvantEcriture(
+            fn () => app(RattachementExerciceService::class)->retirer($provision)
+        );
+
+        $indices = [
+            'association' => serviceRattachementIndiceDeLaPremiere($avantEcriture, 'association'),
+            'exercice N' => serviceRattachementIndiceDeLaPremiere($avantEcriture, 'exercices', 2025),
+            'exercice N+1' => serviceRattachementIndiceDeLaPremiere($avantEcriture, 'exercices', 2026),
+            'pièce' => serviceRattachementIndiceDeLaPremiere($avantEcriture, 'transactions'),
+            'ligne' => serviceRattachementIndiceDeLaPremiere($avantEcriture, 'transaction_lignes'),
+            // Le rattachement en dernier, comme rattacher() et les gardes des Tasks 7 à 9, qui
+            // lisent `provisions` après la pièce et la ligne : le verrouiller d'abord
+            // s'inter-bloquerait avec elles.
+            'rattachement' => serviceRattachementIndiceDeLaPremiere($avantEcriture, 'provisions'),
+        ];
+
+        // Strictement croissants : chaque verrou est pris après le précédent.
+        expect(array_values($indices))->toBe(collect($indices)->sort()->values()->all());
+        expect(count(array_unique($indices)))->toBe(6);
+
+        // Une lecture verrouillante DIRECTE du rattachement, pas un EXISTS.
+        expect(mb_strtolower($avantEcriture[$indices['rattachement']]->sql))->not->toContain('exists');
+
+        // SQLite n'écrit pas « for update » : seul MySQL/MariaDB prouve que ces lectures verrouillent.
+        if (DB::getDriverName() !== 'sqlite') {
+            foreach ($indices as $i) {
+                expect($avantEcriture[$i]->sql)->toContain('for update');
+            }
+        }
+    });
+
+    test('pour une origine supprimée logiquement, la pièce et la ligne sont verrouillées quand même, dans l’ordre, avant le rattachement : leurs lectures ne filtrent pas sur deleted_at', function () {
+        $ligne = $this->ligneOrigine(7, 175.0);
+        $provision = serviceRattachementRattachee($ligne);
+        $pieceId = (int) $ligne->transaction_id;
+        Transaction::findOrFail($pieceId)->delete();
+        $ligne->delete();
+
+        $avantEcriture = serviceRattachementRequetesAvantEcriture(
+            fn () => app(RattachementExerciceService::class)->retirer($provision)
+        );
+
+        $indices = [
+            'pièce' => serviceRattachementIndiceDeLaPremiere($avantEcriture, 'transactions'),
+            'ligne' => serviceRattachementIndiceDeLaPremiere($avantEcriture, 'transaction_lignes'),
+            'rattachement' => serviceRattachementIndiceDeLaPremiere($avantEcriture, 'provisions'),
+        ];
+
+        // Même ordre qu'avec une origine intacte. Une pièce que la lecture hors transaction n'aurait
+        // pas retrouvée (ligne supprimée logiquement) ne serait pas verrouillée du tout : la première
+        // lecture de `transactions` serait alors celle des écritures, après le rattachement.
+        expect(array_values($indices))->toBe(collect($indices)->sort()->values()->all());
+        expect(count(array_unique($indices)))->toBe(3);
+
+        // Chaque lecture vise la pièce ou la ligne d'origine (leur identifiant est le premier
+        // paramètre, celui de whereKey()), et ne filtre pas sur deleted_at : une lecture qui exclut
+        // les suppressions logiques ne trouverait rien à verrouiller, et le retrait se ferait sans
+        // l'exclusion avec ce qui écrit la pièce ou la ligne.
+        foreach (['pièce' => $pieceId, 'ligne' => (int) $ligne->id] as $cle => $id) {
+            $requete = $avantEcriture[$indices[$cle]];
+
+            expect($requete->bindings[0] ?? null)->toBe($id);
+            expect($requete->sql)->not->toContain('deleted_at');
+
+            if (DB::getDriverName() !== 'sqlite') {
+                expect($requete->sql)->toContain('for update');
+            }
+        }
+    });
+
+    test('le retrait est journalisé APRÈS le commit : rattachement, ligne d’origine, exercice et montant', function () {
+        $ligne = $this->ligneOrigine(7, 175.0);
+        $provision = serviceRattachementRattachee($ligne);
+
+        $niveauAuLog = null;
+        $spy = Log::spy();
+        $spy->shouldReceive('info')->andReturnUsing(function () use (&$niveauAuLog): void {
+            $niveauAuLog = DB::transactionLevel();
+        });
+        $niveauAvant = DB::transactionLevel();
+
+        app(RattachementExerciceService::class)->retirer($provision);
+
+        $attendu = [
+            'provision_id' => (int) $provision->id,
+            'transaction_ligne_id' => (int) $ligne->id,
+            'exercice' => 2025,
+            'montant' => 175.0,
+        ];
+        ksort($attendu);
+
+        $spy->shouldHaveReceived('info')
+            ->with('[Rattachement] écriture de rattachement retirée', Mockery::on(function ($contexte) use ($attendu) {
+                ksort($contexte);
+
+                return $contexte === $attendu;
+            }))
+            ->once();
+
+        // Hors de la transaction du service : un retrait validé ne doit pas pouvoir être
+        // journalisé puis annulé, ni échouer parce que le journal échoue.
+        expect($niveauAuLog)->toBe($niveauAvant);
+    });
+
+    test('un retrait refusé n’est pas journalisé', function (string $cas) {
+        $ligne = $this->ligneOrigine(7, 175.0);
+        $service = app(RattachementExerciceService::class);
+        $provision = serviceRattachementRattachee($ligne);
+
+        if ($cas === 'exercice clôturé') {
+            Exercice::create(['annee' => 2026, 'statut' => StatutExercice::Cloture]);
+        } elseif ($cas === 'déjà retiré') {
+            $service->retirer($provision);
+        } else {
+            $compte = Compte::factory()->recette()->create(['association_id' => TenantContext::currentId(), 'actif' => true]);
+            $provision = Provision::create([
+                'association_id' => (int) TenantContext::currentId(),
+                'exercice' => 2025,
+                'compte_id' => $compte->id,
+                'libelle' => 'Produit à recevoir',
+                'montant' => 100,
+                'saisi_par' => auth()->id(),
+            ]);
+        }
+
+        $spy = Log::spy();
+
+        expect(fn () => $service->retirer($provision))->toThrow(RuntimeException::class);
+
+        $spy->shouldNotHaveReceived('info', ['[Rattachement] écriture de rattachement retirée', Mockery::any()]);
+    })->with([
+        'exercice clôturé' => ['exercice clôturé'],
+        'déjà retiré' => ['déjà retiré'],
+        'saisie libre' => ['saisie libre'],
+    ]);
 });
