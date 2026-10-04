@@ -45,7 +45,7 @@ final class RattachementExerciceService
 
     private const MOTIF_ANNULATION = 'Cette pièce annule une autre pièce : elle ne peut pas être rattachée à l’exercice suivant.';
 
-    private const MOTIF_ANNULEE_MEME_EXERCICE = 'Cette pièce a été annulée avant la fin de son exercice : la rattacher retirerait deux fois le même montant. '
+    private const MOTIF_ANNULEE_AU_PLUS_TARD_EN_N = 'Cette pièce a été annulée avant la fin de son exercice : la rattacher retirerait deux fois le même montant. '
         .'S’il existe une pièce qui la remplace, rattachez celle-là.';
 
     private const MOTIF_ANNULEE_DATE_INTROUVABLE = 'Cette pièce a été annulée, mais la date de son annulation est introuvable : par prudence, elle ne peut pas être rattachée.';
@@ -80,8 +80,12 @@ final class RattachementExerciceService
     }
 
     /**
-     * @param  bool  $sousVerrou  vrai dans la transaction de rattacher() : « déjà rattachée »
-     *                            se lit alors par une lecture verrouillante
+     * Juge la ligne d'après la pièce donnée : la liste ordonnée des gardes d'éligibilité, un
+     * motif de refus ou null. Appelée sur l'état lu (motifDeRefus) comme sur l'état verrouillé
+     * (rattacher).
+     *
+     * @param  bool  $sousVerrou  vrai dans la transaction de rattacher() : les affectations et
+     *                            « déjà rattachée » se lisent alors par des lectures verrouillantes
      */
     private function juger(TransactionLigne $ligne, ?Transaction $transaction, bool $sousVerrou): ?string
     {
@@ -109,30 +113,11 @@ final class RattachementExerciceService
                 .'seule une ligne d’une pièce d’achat, de vente ou de banque peut être rattachée à l’exercice suivant.';
         }
 
-        // D13 : une annulation ne se rattache jamais ; une pièce annulée se juge sur la date
-        // COMPTABLE de son annulation, c'est-à-dire celle de la pièce miroir. extournee_at
-        // n'est que l'horodatage du geste (now()) : il dit qu'une annulation existe, pas où
-        // elle tombe. Annulée dans N, rattacher l'origine retirerait deux fois le même
-        // montant ; annulée après N, rattacher est juste, et c'est le refus qui laisserait
-        // N faux.
-        if ($transaction->type_ecriture === 'extourne'
-            || Extourne::where('transaction_extourne_id', (int) $transaction->id)->exists()) {
-            return self::MOTIF_ANNULATION;
-        }
+        // D13 : annulation, ou pièce annulée.
+        $motifAnnulation = $this->motifAnnulation($transaction);
 
-        if ($transaction->extournee_at !== null) {
-            $miroir = $transaction->extourneeVers?->extourne;
-
-            // La date est introuvable : on ne devine pas, on refuse.
-            if ($miroir === null) {
-                return self::MOTIF_ANNULEE_DATE_INTROUVABLE;
-            }
-
-            $finDeN = $this->exerciceService->dateRange($this->exerciceService->anneeForDate($transaction->date))['end'];
-
-            if ($miroir->date->toDateString() <= $finDeN->toDateString()) {
-                return self::MOTIF_ANNULEE_MEME_EXERCICE;
-            }
+        if ($motifAnnulation !== null) {
+            return $motifAnnulation;
         }
 
         $debit = (float) $ligne->debit;
@@ -153,13 +138,48 @@ final class RattachementExerciceService
         // d'opération propre à hériter. Sous verrou, la lecture est verrouillante : c'est la
         // seule donnée de l'éligibilité que ni le verrou de la pièce ni celui de la ligne
         // ne protègent (affecterLigne() n'écrit que dans transaction_ligne_affectations), et
-        // une affectation validée pendant l'attente du verrou serait invisible du cliché.
-        if ($sousVerrou ? $ligne->affectations()->lockForUpdate()->exists() : $ligne->affectations()->exists()) {
+        // une affectation validée pendant l'attente du verrou serait invisible du cliché. Lecture
+        // verrouillante directe, comme estRattacheeSousVerrou() : pas de FOR UPDATE dans un EXISTS.
+        if ($sousVerrou ? $ligne->affectations()->lockForUpdate()->value('id') !== null : $ligne->affectations()->exists()) {
             return self::MOTIF_AFFECTATIONS;
         }
 
         if ($sousVerrou ? $ligne->estRattacheeSousVerrou() : $ligne->estRattachee()) {
             return self::MOTIF_DEJA_RATTACHEE;
+        }
+
+        return null;
+    }
+
+    /**
+     * D13 : une annulation ne se rattache jamais ; une pièce annulée se juge sur la date
+     * COMPTABLE de son annulation, c'est-à-dire celle de la pièce miroir. extournee_at n'est
+     * que l'horodatage du geste (now()) : il dit qu'une annulation existe, pas où elle tombe.
+     * Annulée au plus tard le dernier jour de N, rattacher l'origine retirerait deux fois le
+     * même montant ; annulée après, rattacher est juste, et c'est le refus qui laisserait N faux.
+     */
+    private function motifAnnulation(Transaction $transaction): ?string
+    {
+        if ($transaction->type_ecriture === 'extourne'
+            || Extourne::where('transaction_extourne_id', (int) $transaction->id)->exists()) {
+            return self::MOTIF_ANNULATION;
+        }
+
+        if ($transaction->extournee_at === null) {
+            return null;
+        }
+
+        $miroir = $transaction->extourneeVers?->extourne;
+
+        // La date est introuvable : on ne devine pas, on refuse.
+        if ($miroir === null) {
+            return self::MOTIF_ANNULEE_DATE_INTROUVABLE;
+        }
+
+        $finDeN = $this->exerciceService->dateRange($this->exerciceService->anneeForDate($transaction->date))['end'];
+
+        if ($miroir->date->toDateString() <= $finDeN->toDateString()) {
+            return self::MOTIF_ANNULEE_AU_PLUS_TARD_EN_N;
         }
 
         return null;
@@ -213,7 +233,10 @@ final class RattachementExerciceService
         $exercice = $this->exerciceService->anneeForDate($transaction->date);
         $notes = $notes !== null && trim($notes) !== '' ? trim($notes) : null;
 
-        [$provision, $cas] = DB::transaction(function () use ($ligne, $transaction, $exercice, $notes, $auteur): array {
+        // 3 tentatives : un inter-blocage est rejoué (la synchronisation HelloAsso modifie la ligne
+        // avant la pièce ; extourner() numérote avant d'écrire la pièce). Sans danger : tout est
+        // relu sous verrou à chaque tentative.
+        [$provision, $cas] = DB::transaction(function () use ($ligne, $exercice, $notes, $auteur): array {
             // Ordre canonique de cloturer() et du § 5 : association, exercice source,
             // exercice cible, puis écritures. La dotation vit dans N, l'extourne dans
             // N+1 : les deux doivent être ouverts. Un exercice absent n'est pas clôturé
@@ -221,35 +244,13 @@ final class RattachementExerciceService
             $this->exerciceService->assertOuvertPourEcriture($exercice);
             $this->exerciceService->assertOuvertVerrouille($exercice + 1);
 
-            // Puis la pièce, puis la ligne : l'ordre de TransactionService::update() (exercice,
-            // pièce, puis suppression des lignes). Le verrou d'association ne sérialise que les
-            // autres rattacher() ; les écritures qui touchent la pièce ou la ligne sans le
-            // prendre (édition, annulation, synchronisation HelloAsso) ne s'excluent que par ces
-            // deux verrous. Ils tiennent jusqu'au commit.
-            $pieceVerrouillee = Transaction::query()->whereKey((int) $transaction->id)->lockForUpdate()->first();
-            $ligneVerrouillee = TransactionLigne::query()->whereKey((int) $ligne->id)->lockForUpdate()->first();
-
-            // Pièce supprimée, ou ligne disparue ou passée à une autre pièce (TransactionService::update()
-            // a recréé les lignes) : refus lisible, pas une erreur technique.
-            if ($pieceVerrouillee === null) {
-                throw new RuntimeException(self::MOTIF_PIECE_SUPPRIMEE_ENTRE_TEMPS);
-            }
-
-            if ($ligneVerrouillee === null
-                || (int) $ligneVerrouillee->transaction_id !== (int) $pieceVerrouillee->id) {
-                throw new RuntimeException(self::MOTIF_LIGNE_DISPARUE);
-            }
-
-            // Les exercices verrouillés plus haut sont ceux de l'ancienne date de la pièce.
-            if ($this->exerciceService->anneeForDate($pieceVerrouillee->date) !== $exercice) {
-                throw new RuntimeException(self::MOTIF_PIECE_REDATEE);
-            }
+            ['piece' => $piece, 'ligne' => $ligneVerrouillee] = $this->verrouillerEtRelire($ligne, $exercice);
 
             // L'éligibilité est jugée sur l'état verrouillé, pas sur celui lu avant : ce que
-            // motifDeRefus() a conclu hors transaction a pu être dépassé entre-temps. « Déjà
-            // rattachée » se lit par une lecture verrouillante, qui voit le dernier état
-            // validé quel que soit le cliché de la transaction.
-            $motif = $this->juger($ligneVerrouillee, $pieceVerrouillee, true);
+            // motifDeRefus() a conclu hors transaction a pu être dépassé entre-temps. Les
+            // affectations et « déjà rattachée » se lisent par des lectures verrouillantes, qui
+            // voient le dernier état validé quel que soit le cliché de la transaction.
+            $motif = $this->juger($ligneVerrouillee, $piece, true);
 
             if ($motif !== null) {
                 throw new RuntimeException($motif);
@@ -269,14 +270,21 @@ final class RattachementExerciceService
                 'saisi_par' => (int) $auteur->id,
             ]);
 
+            // L'écriture porte la ligne jugée sous verrou : sans cela, generer() relirait
+            // $provision->ligne hors verrou, dans un cliché qui peut précéder le verrou, et
+            // écrirait un libellé, un compte ou une opération périmés.
+            $provision->setRelation('ligne', $ligneVerrouillee);
+
             // Calculé avant le commit : un compte sans cas fait échouer la transaction entière.
             $cas = $provision->cas()->value;
 
             $this->provisionPD->generer($provision);
 
             return [$provision, $cas];
-        });
+        }, 3);
 
+        // Après le commit, rien ne doit plus pouvoir lever : un rattachement validé ne doit pas
+        // remonter comme une erreur.
         Log::info('[Rattachement] écriture de rattachement créée', [
             'provision_id' => (int) $provision->id,
             'transaction_ligne_id' => (int) $ligne->id,
@@ -286,5 +294,47 @@ final class RattachementExerciceService
         ]);
 
         return $provision;
+    }
+
+    /**
+     * Verrouille la pièce puis la ligne, dans cet ordre, et rend leur état verrouillé : celui
+     * sur lequel l'éligibilité se rejuge et le montant se calcule. À appeler dans une
+     * transaction, après les verrous d'exercice ; ils tiennent jusqu'au commit.
+     *
+     * L'ordre est celui de TransactionService::update() (exercice, pièce, puis suppression des
+     * lignes). Parmi les écritures qui touchent la pièce ou la ligne, seul rattacher() prend le
+     * verrou d'association : les autres (édition, annulation, synchronisation HelloAsso) ne
+     * s'excluent que par ces deux verrous.
+     *
+     * @param  int  $exercice  l'exercice N dont les verrous viennent d'être pris : la date de la
+     *                         pièce relue sous verrou ne doit pas l'avoir quitté
+     * @return array{piece: Transaction, ligne: TransactionLigne}
+     *
+     * @throws RuntimeException pièce supprimée, ligne disparue ou passée à une autre pièce,
+     *                          pièce redatée dans un autre exercice : refus lisible, pas une
+     *                          erreur technique
+     */
+    private function verrouillerEtRelire(TransactionLigne $ligne, int $exercice): array
+    {
+        $piece = Transaction::query()->whereKey((int) $ligne->transaction_id)->lockForUpdate()->first();
+        $ligneVerrouillee = TransactionLigne::query()->whereKey((int) $ligne->id)->lockForUpdate()->first();
+
+        // TransactionService::update() recrée toutes les lignes d'une pièce : l'identifiant lu
+        // avant peut ne plus désigner qu'une ligne disparue.
+        if ($piece === null) {
+            throw new RuntimeException(self::MOTIF_PIECE_SUPPRIMEE_ENTRE_TEMPS);
+        }
+
+        if ($ligneVerrouillee === null
+            || (int) $ligneVerrouillee->transaction_id !== (int) $piece->id) {
+            throw new RuntimeException(self::MOTIF_LIGNE_DISPARUE);
+        }
+
+        // Les exercices verrouillés plus haut sont ceux de l'ancienne date de la pièce.
+        if ($this->exerciceService->anneeForDate($piece->date) !== $exercice) {
+            throw new RuntimeException(self::MOTIF_PIECE_REDATEE);
+        }
+
+        return ['piece' => $piece, 'ligne' => $ligneVerrouillee];
     }
 }

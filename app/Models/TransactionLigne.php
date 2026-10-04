@@ -189,14 +189,17 @@ final class TransactionLigne extends Model
     /**
      * Jumelle d'estRattachee() qui lit SOUS VERROU : à utiliser dans une transaction, par
      * les gardes qui écrivent ensuite (rattacher(), et les gardes d'écriture des Tasks 7 à 9).
-     * Une lecture verrouillante lit le dernier état validé quel que soit le cliché de la
-     * transaction, et son verrou d'index bloque l'insertion concurrente d'un rattachement
-     * de cette ligne jusqu'au commit. Mêmes réponses qu'estRattachee() : mêmes portées, et
-     * withoutGlobalScopes() sans argument pour la même raison.
+     * C'est une lecture verrouillante DIRECTE (SELECT … FOR UPDATE), et non un EXISTS : on ne
+     * s'en remet pas au comportement du moteur sur un FOR UPDATE placé dans une sous-requête.
+     * Elle lit le dernier état validé quel que soit le cliché de la transaction et verrouille
+     * le rattachement trouvé ; sans rattachement trouvé, InnoDB verrouille l'intervalle de
+     * l'index, ce qui bloque l'insertion concurrente d'un rattachement de cette ligne jusqu'au
+     * commit. Mêmes réponses qu'estRattachee() : mêmes portées, et withoutGlobalScopes() sans
+     * argument pour la même raison.
      */
     public function estRattacheeSousVerrou(): bool
     {
-        return $this->provisions()->withoutGlobalScopes()->lockForUpdate()->exists();
+        return $this->provisions()->withoutGlobalScopes()->lockForUpdate()->value('id') !== null;
     }
 
     /**

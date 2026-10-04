@@ -208,7 +208,7 @@ describe('TransactionLigne::estRattacheeSousVerrou()', function () {
             ->and($ligne->estRattacheeSousVerrou())->toBeTrue();
     });
 
-    test('lit sous verrou : la requête sur provisions porte « for update » (MySQL/MariaDB)', function () {
+    test('lit sous verrou, en lecture directe : « for update » sur provisions, sans EXISTS (MySQL/MariaDB)', function () {
         $ligne = $this->ligneOrigine(7);
         verrouRattacher($ligne);
         $ligne = $ligne->fresh();
@@ -222,6 +222,10 @@ describe('TransactionLigne::estRattacheeSousVerrou()', function () {
 
         $surProvisions = array_values(array_filter($requetes, fn (string $sql) => str_contains($sql, 'provisions')));
         expect($surProvisions)->toHaveCount(1);
+
+        // Une lecture verrouillante DIRECTE, pas un EXISTS : le FOR UPDATE ne tient pas à une
+        // sous-requête, dont rien ne prouve que le moteur la verrouille.
+        expect(mb_strtolower($surProvisions[0]))->not->toContain('exists');
 
         // SQLite n'écrit pas « for update » ; seuls MySQL et MariaDB prouvent le verrou.
         if (DB::getDriverName() !== 'sqlite') {
