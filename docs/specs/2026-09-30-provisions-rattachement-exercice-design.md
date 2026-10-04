@@ -407,7 +407,8 @@ endroits (D9).
 7. **AC‑7** — Un test **par site** du verrou du § 7 : `update()`, `affecterLigne()`,
    `supprimerAffectations()`, `delete()`, `annuler()`, extourne, `reclasser()`, `removeLigne()`,
    et modification du montant par la synchronisation HelloAsso. Chacun doit tuer une garde précise
-   — retirer n'importe laquelle fait tomber exactement un test.
+   — retirer n'importe laquelle fait tomber les tests de son site, et ceux-là seulement : une garde
+   ne doit jamais être masquée par celle d'un autre site.
 8. **AC‑8** — `update()` sur une transaction porteuse rend un **refus métier lisible**, jamais une
    erreur SQL de contrainte de clé étrangère.
 9. **AC‑9** — Création, modification et retrait sont refusés si N **ou** N+1 est clôturé.
