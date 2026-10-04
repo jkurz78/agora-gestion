@@ -130,7 +130,7 @@ Deux conséquences supplémentaires :
 | D10 | Livraison en deux lots : CCA/PCA d'abord, FNP/PAR ensuite | Le premier couvre le besoin mesuré et n'exige aucun nouveau compte. Le second demande de seeder 408 et 418. |
 | D11 | Vocabulaire comptable à l'écran : « écritures de rattachement », « charge / produit constaté d'avance » | CCA/PCA/FNP/PAR sont des comptes de régularisation (classe 48), pas des provisions (15/29/39/49/59). Les noms **physiques** `provisions` / `Provision` sont conservés — même arbitrage que `code_cerfa`, relibellé « Compte comptable » sans renommer la colonne. |
 | D12 | Le rattachement est **tout ou rien** : le montant est celui de l'origine, jamais saisi | Aucun cas mesuré n'appelle un décalage partiel — l'opération 8 démarre entièrement dans l'exercice suivant. Supprime d'un coup le plafond, le cumul par origine, le verrou de concurrence et la notion de reste à décaler. |
-| D13 | Une ligne d'une pièce **extournée**, ou d'une **extourne**, est refusée | Ajoutée le 2026-10-03. Rattacher le produit d'une recette déjà annulée le retirerait deux fois de N (−175 au lieu de 0). Même test que `ReclassementLigneService` : `extournee_at`, `type_ecriture = 'extourne'`, ou présence dans `extournes`. C'est la réciproque du verrou du § 7, qui refuse d'extourner une pièce rattachée. |
+| D13 | Une ligne d'une **extourne** est refusée ; une ligne d'une pièce **extournée** l'est seulement si l'annulation est datée **dans N** | Ajoutée le 2026-10-03, affinée le même jour. Annulation datée dans N : rattacher l'origine la retirerait deux fois de N (−175 au lieu de 0). Annulation datée dans N+1 — un remboursement après la clôture — : le rattachement est **juste** (N = 0, N+1 = +175 − 175 = 0), et c'est le refus qui laisserait N faux (+175). La date qui compte est la **date comptable de la pièce miroir** (`extourneeVers()->extourne->date`), pas `extournee_at`, simple horodatage de l'action. Date introuvable → refus par prudence. Réciproque : le verrou du § 7 ne refuse l'extourne d'une pièce rattachée que si elle est datée dans N. |
 | D14 | Une ligne du **journal OD** est refusée | Ajoutée le 2026-10-03. Une écriture d'inventaire ne se rattache pas : seule une pièce d'achat, de vente ou de banque a un exercice de rattachement à corriger. Dans le code, les seules OD portant une ligne 6/7 sont les dotations aux amortissements (681 au débit), que D9 laisserait passer, et dont l'annulation par `DotationService` contourne les gardes de `TransactionService`. Une condition sur une colonne, reprise telle quelle par la détection. |
 
 ## 4. Modèle de données
@@ -223,7 +223,7 @@ postérieur à la fin de l'exercice. **Une seule requête** — la ventilation e
 - ligne de **sens inverse** — classe 6 au crédit, classe 7 au débit (D9) ;
 - ligne **porteuse d'affectations** (D4). Elle n'a pas d'opération propre à hériter ; elle est
   listée comme **écartée, avec son motif**, jamais omise en silence ;
-- ligne d'une pièce **extournée** ou d'une **extourne** (D13) ;
+- ligne d'une **extourne**, ou d'une pièce dont l'**annulation est datée dans N** (D13) ;
 - ligne du **journal OD** (D14) ;
 - ligne appartenant à une transaction de rattachement : `transactions.provision_id IS NOT NULL`.
   Sans cette exclusion, l'extourne de notre PCA — un crédit sur 706B en N+1 — se présenterait
@@ -332,7 +332,7 @@ Sites à garder :
 | [`TransactionService::affecterLigne()`](../../app/Services/TransactionService.php#L935) | Modifier les affectations d'une ligne rattachée. |
 | [`TransactionService::supprimerAffectations()`](../../app/Services/TransactionService.php#L983) | Les supprimer. |
 | `TransactionService::delete()` / `annuler()` | Supprimer ou annuler la transaction porteuse. |
-| Extourne de la transaction porteuse | Symétrique du refus que `ReclassementLigneService` oppose déjà à une transaction extournée. |
+| Extourne de la transaction porteuse | **Datée dans N** seulement (D13) : elle retirerait deux fois le montant de N. Datée dans N+1 ou après, elle est juste et reste permise — sinon, N une fois clôturé, la pièce ne pourrait plus jamais être annulée, et un remboursement deviendrait impossible par extourne. |
 | [`ReclassementLigneService::reclasser()`](../../app/Services/Compta/ReclassementLigneService.php#L46) | Reclasser la ligne — même grammaire que la garde du reçu fiscal. |
 | [`TransactionForm::removeLigne()`](../../app/Livewire/TransactionForm.php#L407) | Retirer la ligne. |
 | Synchronisation HelloAsso | **Modifier le montant** d'une ligne rattachée. Le refus est journalisé et ne fait pas échouer la synchronisation des autres commandes. Les libellés restent synchronisés. |
@@ -428,9 +428,10 @@ endroits (D9).
     à la racine de `tests/Feature/` et deux revues ciblées l'avaient manqué. Plus
     `pest -c phpunit.mariadb.xml` dans le conteneur sur le périmètre : la détection fait des
     jointures et un `GROUP BY`, la production tourne sur MariaDB.
-17. **AC‑17** — Une ligne d'une pièce extournée, une ligne d'extourne (D13) et une ligne du
-    journal OD (D14) sont refusées aux trois endroits — détection, recherche libre, appel direct —
-    avec un motif lisible.
+17. **AC‑17** — Une ligne d'extourne, une ligne d'une pièce dont l'annulation est datée dans N
+    (D13) et une ligne du journal OD (D14) sont refusées aux trois endroits — détection, recherche
+    libre, appel direct — avec un motif lisible. Une pièce dont l'annulation est datée dans N+1
+    reste rattachable, et le verrou du § 7 laisse l'annuler en N+1 une fois rattachée.
 
 ## 11. Lots
 
