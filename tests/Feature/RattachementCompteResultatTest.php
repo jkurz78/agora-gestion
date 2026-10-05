@@ -15,12 +15,15 @@ use App\Models\Provision;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Services\BudgetService;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\Compta\ProvisionPDService;
 use App\Services\Rapports\BilanComptableBuilder;
+use App\Services\Rapports\FluxTresorerieBuilder;
 use App\Services\RapportService;
 use App\Services\TransactionExtourneService;
 use App\Tenant\TenantContext;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
 /*
@@ -62,13 +65,17 @@ use Illuminate\Support\Facades\DB;
  * non redondant avec lui : ici on lit les RAPPORTS (comptes de résultat, bilan), là-bas
  * on calcule l'impact sur l'ÉCRITURE.
  *
- * AC-2 (mutation) : inverser le sens dans le générateur doit faire tomber ces tests.
+ * AC-2 (mutation) : inverser le sens dans le schéma d'écriture doit faire tomber ces tests.
  * Pas de test permanent, c'est une expérience à rejouer à la main : copier le worktree
  * sous .worktrees/ (cp -cR), retirer le fichier .git de la copie pour qu'aucune commande
- * git n'atteigne le vrai dépôt, vérifier d'abord que la copie NON mutée passe, puis
- * inverser `$resultatAuDebit` dans EcritureGenerator::pourRattachement() et relancer.
- * Attendu : sous MySQL/MariaDB les quatre tests tombent ; sous SQLite les deux AC-3
- * tombent et les deux AC-1 sont sautés. Exécutions consignées (sens global : toute
+ * git n'atteigne le vrai dépôt (sans lui, git remonte au dépôt principal), vérifier d'abord
+ * que la copie NON mutée passe, puis inverser `$resultatAuDebit` dans
+ * SchemaRattachement::ecriture() — la source unique du sens, que
+ * EcritureGenerator::pourRattachement() écrit — et relancer. (Avant la source unique, ce
+ * calcul vivait dans le générateur : les exécutions du 2026-10-01 et du 2026-10-03 ci-dessous
+ * l'y inversaient, avec le même effet.)
+ * Attendu : sous MySQL/MariaDB les quatre tests AC-1 et AC-3 tombent ; sous SQLite les deux
+ * AC-3 tombent et les deux AC-1 sont sautés. Exécutions consignées (sens global : toute
  * l'expression de `$resultatAuDebit` niée) :
  *  - 2026-10-01, MySQL 8.4, sens global : 4 tests sur 4 tombent ; SQLite : les 2 AC-3.
  *  - 2026-10-03, MariaDB 11.4, sens global : 4 sur 4 tombent (350 au lieu de 0 ; 35000 au
@@ -84,10 +91,23 @@ use Illuminate\Support\Facades\DB;
  *    les 2 AC-1 tombent au CR opération 2025 (175 et 90 au lieu de 0), les 2 AC-3 passent
  *    (le bilan ignore l'opération). Sous SQLite ce fichier passe : c'est
  *    RattachementEcrituresTest qui tombe (PCA et CCA).
+ *  - 2026-10-05 (Task 13, après la source unique et les tests de l'étape « effets de bord »),
+ *    MariaDB 11.4, sens global inversé dans SchemaRattachement::ecriture() : 7 tests sur 8
+ *    tombent dans CE fichier, aux mêmes valeurs qu'au 2026-10-03 (350, 35000, 180, −500 au
+ *    lieu de 0, 0, 0, 17500) — les quatre tests AC-1 et AC-3, plus D13 (350), le budget (350) et le
+ *    pont de trésorerie. Reste vert : le flux de trésorerie identique, dont c'est le rôle de
+ *    ne pas bouger. Dans RattachementClotureRecapTest, les 2 tests du résultat du wizard
+ *    tombent. Sous SQLite : les 2 AC-3 dans ce fichier, 6 tests dans RattachementEcrituresTest.
+ *    Même jour, extourne seule inversée : mêmes 4 valeurs qu'au 2026-10-03 (−175, −17500, −90,
+ *    9000), plus D13 et le budget (−175). Même jour, D8 retiré : tombent sous MariaDB les 2
+ *    AC-1, D13 et le budget (175 au lieu de 0, à l'opération) ; sous SQLite, 2 tests de
+ *    RattachementEcrituresTest.
+ *
+ * § 8 de la spec, en fin de fichier : le réalisé du budget (BudgetService), le flux de
+ * trésorerie identique, et le pont du résultat à la trésorerie.
  */
-const RATTACHEMENT_SQLITE_SKIP_RAISON = 'La dotation est datée du dernier jour de l’exercice (31/08/2026) : '
-    .'SQLite compare « 2026-08-31 00:00:00 » à la borne « 2026-08-31 » et l’exclut du whereBetween '
-    .'du compte de résultat, MySQL et MariaDB l’incluent. À exécuter sous phpunit.mysql.xml.';
+// RATTACHEMENT_SQLITE_SKIP_RAISON (la raison de sauter ces tests sous SQLite) est déclarée dans
+// tests/Helpers/Rattachement.php, où RattachementClotureRecapTest la lit aussi.
 
 beforeEach(function () {
     // Le tenant par défaut est posé par le bootstrap global de tests/Pest.php.
@@ -442,4 +462,88 @@ test('D13 — annuler la pièce rattachée le 15/09/2026 laisse le 706B à zéro
     expect(rattachementMontantAuCrAssociation(2026, $this->compte706))->toBe(0.0);
     expect(rattachementMontantAuCrOperation(2025, $this->operation, $this->compte706))->toBe(0.0);
     expect(rattachementMontantAuCrOperation(2026, $this->operation, $this->compte706))->toBe(0.0);
+})->skip(fn (): bool => DB::getDriverName() === 'sqlite', RATTACHEMENT_SQLITE_SKIP_RAISON);
+
+/*
+ * § 8 de la spec : ce que le rattachement NE doit PAS déplacer, et ce qu'il doit déplacer ailleurs
+ * que dans le compte de résultat. Même parcours que ci-dessus (de la provision aux rapports), même
+ * cas des 175 € et des 90 €.
+ */
+
+test('Budget — le réalisé du 706B vaut 175 avant, tombe à 0 sur 2025-2026 après le rattachement et vaut 175 sur 2026-2027, au compte comme à l’opération', function () {
+    // BudgetService mémoïse par instance : une instance neuve à chaque lecture, sinon « après » relirait « avant ».
+    $budget = fn (): BudgetService => app(BudgetService::class);
+    $compte = (int) $this->compte706->id;
+    $operation = (int) $this->operation->id;
+
+    // Avant : le produit pèse sur 2025-2026, à la fois sur le compte et sur son opération. Rien en 2026-2027.
+    expect($budget()->realise($compte, 2025))->toBe(175.0);
+    expect($budget()->realise($compte, 2026))->toBe(0.0);
+    expect($budget()->realiseParCompteEtOperation(2025)[$compte][$operation])->toBe(175.0);
+    expect($budget()->realiseParCompteEtOperation(2026)[$compte][$operation] ?? null)->toBeNull();
+
+    rattacherAvecEcritures($this->ligne);
+
+    // Après : l'effet recherché. 706B tombe à 0 sur 2025-2026, 175 sur 2026-2027, et l'opération (D8) le suit.
+    expect($budget()->realise($compte, 2025))->toBe(0.0);
+    expect($budget()->realise($compte, 2026))->toBe(175.0);
+    expect($budget()->realiseParCompteEtOperation(2025)[$compte][$operation])->toBe(0.0);
+    expect($budget()->realiseParCompteEtOperation(2026)[$compte][$operation])->toBe(175.0);
+})->skip(fn (): bool => DB::getDriverName() === 'sqlite', RATTACHEMENT_SQLITE_SKIP_RAISON);
+
+test('Trésorerie — le flux de l’exercice est identique, à l’euro près, avant et après un rattachement PCA et CCA : 486 et 487 sont de classe 4, aucun compte de classe 5 n’est touché', function () {
+    $compte616 = Compte::factory()->numero('616')->create([
+        'association_id' => $this->association->id,
+        'intitule' => 'Assurances',
+    ]);
+    $ligneCca = rattachementPieceDepensee($compte616, 90.0, $this->operation);
+
+    $flux = fn (int $exercice): array => app(FluxTresorerieBuilder::class)->fluxTresorerie($exercice);
+    $avant = [2025 => $flux(2025), 2026 => $flux(2026)];
+
+    // Garde anti-test-vide : 175 € encaissés et 90 € payés en caisse, le 08/04/2026, dans l'exercice 2025.
+    expect($avant[2025]['synthese']['total_recettes'])->toBe(175.0);
+    expect($avant[2025]['synthese']['total_depenses'])->toBe(90.0);
+    expect($avant[2025]['synthese']['variation'])->toBe(85.0);
+    expect($avant[2026]['synthese']['variation'])->toBe(0.0);
+
+    rattacherAvecEcritures($this->ligne);
+    rattacherAvecEcritures($ligneCca);
+
+    // Tout le rapport, sauf le pont du résultat — qui, lui, lit le RÉSULTAT et le suit (test suivant) : le
+    // solde d'ouverture, les recettes et dépenses, la variation, la décomposition (banque, caisse, à remettre),
+    // le rapprochement, la ventilation mensuelle et la liste des écritures non pointées.
+    foreach ([2025, 2026] as $exercice) {
+        expect(Arr::except($flux($exercice), 'synthese.pont_resultat'))
+            ->toBe(Arr::except($avant[$exercice], 'synthese.pont_resultat'));
+    }
+});
+
+test('Trésorerie — le pont du résultat à la trésorerie suit le résultat : la variation ne bouge pas, le résultat de 2025-2026 perd 175 € et 2026-2027 les retrouve', function () {
+    $synthese = fn (int $exercice): array => app(FluxTresorerieBuilder::class)->fluxTresorerie($exercice)['synthese'];
+
+    $avant = [2025 => $synthese(2025), 2026 => $synthese(2026)];
+    expect($avant[2025]['pont_resultat']['resultat'])->toBe(175.0);
+    expect($avant[2026]['pont_resultat']['resultat'])->toBe(0.0);
+
+    rattacherAvecEcritures($this->ligne);
+
+    $apres = [2025 => $synthese(2025), 2026 => $synthese(2026)];
+
+    expect($apres[2025]['pont_resultat']['resultat'])->toBe(0.0);
+    expect($apres[2026]['pont_resultat']['resultat'])->toBe(175.0);
+
+    foreach ([2025, 2026] as $exercice) {
+        // L'argent n'a pas bougé...
+        expect($apres[$exercice]['variation'])->toBe($avant[$exercice]['variation']);
+        // ... et le pont boucle toujours dessus : la somme de ses lignes est la variation de trésorerie.
+        expect(round(array_sum($apres[$exercice]['pont_resultat']), 2))->toBe($apres[$exercice]['variation']);
+        // 487 n'est ni une créance (411), ni une dette (401), ni une immobilisation, ni une dotation : il n'a pas
+        // de ligne nommée au pont, et c'est la ligne « autres » qui absorbe ce que le résultat a perdu ou regagné.
+        $deltaResultat = round($apres[$exercice]['pont_resultat']['resultat'] - $avant[$exercice]['pont_resultat']['resultat'], 2);
+        $deltaAutres = round($apres[$exercice]['pont_resultat']['autres'] - $avant[$exercice]['pont_resultat']['autres'], 2);
+        expect($deltaAutres)->toBe(-$deltaResultat);
+        expect($apres[$exercice]['pont_resultat']['creances'])->toBe($avant[$exercice]['pont_resultat']['creances']);
+        expect($apres[$exercice]['pont_resultat']['dettes'])->toBe($avant[$exercice]['pont_resultat']['dettes']);
+    }
 })->skip(fn (): bool => DB::getDriverName() === 'sqlite', RATTACHEMENT_SQLITE_SKIP_RAISON);

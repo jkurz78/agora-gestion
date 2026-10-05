@@ -169,6 +169,37 @@ it('garde le même total : la somme des impacts signés, affichée en pied de ta
     $composant->assertSee('-85,00');
 });
 
+it('annonce un impact net déjà compris dans le résultat : le résultat du wizard passe de 175 à 0 pour une PCA, de −90 à 0 pour une CCA', function (int $classe, float $montant, float $avant): void {
+    // Le résultat de l'exercice que lit le wizard (CompteResultatBuilder::totauxResultat) avant le rattachement :
+    // le produit de 175 € (ou la charge de 90 €) pèse sur 2025-2026.
+    $ligne = $this->ligneOrigine($classe, $montant);
+    $lire = fn (): array => Livewire::test(ClotureWizard::class)->set('step', 2)->viewData('summary');
+
+    expect($lire()['resultat'])->toBe($avant);
+    expect($lire()['nbProvisions'])->toBe(0);
+
+    app(RattachementExerciceService::class)->rattacher($ligne, null, auth()->user());
+
+    // Après : la dotation, datée du dernier jour de N, a sorti le montant du résultat.
+    $apres = $lire();
+
+    expect($apres['resultat'])->toBe(0.0);
+    expect($apres['nbProvisions'])->toBe(1);
+    // « Impact net sur le résultat (déjà compris dans le résultat ci-dessus) » : l'affirmation de l'étape 2.
+    // Le résultat d'après est celui d'avant PLUS l'impact net affiché, et rien d'autre : l'ajouter une seconde
+    // fois au résultat le compterait deux fois.
+    expect($apres['totalProvisions'])->toBe(round(-$avant, 2));
+    expect($apres['resultat'])->toBe(round($avant + $apres['totalProvisions'], 2));
+
+    Livewire::test(ClotureWizard::class)->set('step', 2)
+        ->assertSee('Impact net sur le résultat')
+        ->assertSee('(déjà compris dans le résultat ci-dessus)')
+        ->assertSee('Résultat : EXCÉDENT');
+})->with([
+    'PCA : un produit de 175 € retiré de N, le résultat passe de 175 à 0' => [7, 175.0, 175.0],
+    'CCA : une charge de 90 € retirée de N, le résultat passe de −90 à 0' => [6, 90.0, -90.0],
+])->skip(fn (): bool => DB::getDriverName() === 'sqlite', RATTACHEMENT_SQLITE_SKIP_RAISON);
+
 it('n’affiche « Compte supprimé » que pour un compte réellement supprimé', function (): void {
     $compte = Compte::factory()->depense()->create(['association_id' => TenantContext::currentId()]);
     Provision::create([

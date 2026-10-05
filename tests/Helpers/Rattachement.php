@@ -8,6 +8,24 @@ use App\Models\TransactionLigne;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * Pourquoi sauter, sous SQLite, un test qui lit un RAPPORT après un rattachement.
+ *
+ * La dotation est datée du DERNIER jour de l'exercice (31/08/2026), et SQLite stocke les colonnes `date`
+ * castées en « 2026-08-31 00:00:00 » : un whereBetween dont la borne est « 2026-08-31 » compare une chaîne
+ * plus courte, qui trie avant, et exclut la dotation. Tout rapport qui borne ses lignes ainsi est faux sous
+ * SQLite et juste sous MySQL et MariaDB : le compte de résultat, le réalisé du budget (BudgetService), le
+ * résultat que lit le wizard de clôture (CompteResultatBuilder::totauxResultat) et le pont du résultat du
+ * flux de trésorerie. Seul l'environnement de test diverge de la production.
+ *
+ * Déclarée ici, et non dans un fichier de test : un fichier qui l'emploierait seul, sans l'autre, ne la
+ * trouverait pas. Voir l'en-tête de tests/Feature/RattachementCompteResultatTest.php.
+ */
+const RATTACHEMENT_SQLITE_SKIP_RAISON = 'La dotation est datée du dernier jour de l’exercice (31/08/2026) : '
+    .'SQLite compare « 2026-08-31 00:00:00 » à la borne « 2026-08-31 » et l’exclut du whereBetween '
+    .'des rapports (compte de résultat, réalisé du budget, résultat du wizard de clôture, pont du flux de trésorerie), '
+    .'MySQL et MariaDB l’incluent. À exécuter sous phpunit.mysql.xml ou phpunit.mariadb.xml.';
+
 /*
 |--------------------------------------------------------------------------
 | Helpers partagés des tests du rattachement à l'exercice (CCA/PCA)
