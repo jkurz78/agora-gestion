@@ -71,9 +71,14 @@ describe('RattachementExerciceService : motifPeriodeFermee', function () {
         // ... mais explique que les deux comptent : la dotation vit dans N, l'extourne dans N+1.
         expect($motif)->toContain('2025-2026')->toContain('2026-2027');
         expect($motif)->toContain('dans deux exercices');
+        // L'extourne s'appelle extourne (« annulation » a un autre sens, D13), et le message ne pousse pas vers
+        // un geste lourd : il dit seulement ce qui le permettrait.
+        expect($motif)->toContain('son extourne au début de 2026-2027');
+        expect($motif)->toContain('il faut que les deux soient ouverts ; seule une réouverture de l’exercice clôturé le permettrait.');
+        expect($motif)->not->toContain('Réouvrez')->not->toContain('annulation');
     });
 
-    test('N+1 clôturé, N ouvert : le motif désigne 2026-2027, celui où l’annulation s’écrit', function () {
+    test('N+1 clôturé, N ouvert : le motif désigne 2026-2027, celui où l’extourne s’écrit', function () {
         Exercice::create(['annee' => 2025, 'statut' => StatutExercice::Ouvert]);
         Exercice::create(['annee' => 2026, 'statut' => StatutExercice::Cloture]);
 
@@ -92,6 +97,7 @@ describe('RattachementExerciceService : motifPeriodeFermee', function () {
         $motif = app(RattachementExerciceService::class)->motifPeriodeFermee(2025);
 
         expect($motif)->toContain('Les exercices 2025-2026 et 2026-2027 sont clôturés');
+        expect($motif)->toContain('seule une réouverture des exercices clôturés le permettrait.');
     });
 
     test('seuls N et N+1 comptent : un exercice antérieur ou postérieur clôturé n’y change rien', function () {

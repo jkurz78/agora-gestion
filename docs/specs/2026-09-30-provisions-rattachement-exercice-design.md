@@ -255,8 +255,8 @@ date de saisie, action **« Retirer »**.
 Héritées et en lecture seule : compte, opération, séance, tiers, **montant**, date de pièce. Cas
 déduit, écrit en clair :
 
-> **Produit constaté d'avance** — les 175,00 € encaissés le 08/04/2026 seront retirés du résultat
-> 2025‑2026 et reconnus sur 2026‑2027.
+> **Produit constaté d'avance** — les 175,00 € comptabilisés en produit le 08/04/2026 seront retirés du
+> résultat 2025‑2026 et reconnus sur 2026‑2027.
 
 Saisis : notes, pièce jointe. Le montant n'est pas saisissable (D12) — le rattachement porte la
 ligne entière.

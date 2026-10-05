@@ -208,9 +208,9 @@ final class RattachementExerciceService
                 : 'L’exercice '.$labels[0].' est clôturé')
             .' : on ne peut ni constater ni retirer de rattachement. '
             .'Un rattachement s’écrit dans deux exercices — l’écriture de rattachement à la fin de '
-            .$this->exerciceService->label($exercice).', son annulation au début de '
-            .$this->exerciceService->label($suivant).' — et il faut que les deux soient ouverts. '
-            .($pluriel ? 'Réouvrez les exercices clôturés pour continuer.' : 'Réouvrez l’exercice clôturé pour continuer.');
+            .$this->exerciceService->label($exercice).', son extourne au début de '
+            .$this->exerciceService->label($suivant).' — et il faut que les deux soient ouverts ; '
+            .'seule une réouverture '.($pluriel ? 'des exercices clôturés' : 'de l’exercice clôturé').' le permettrait.';
     }
 
     /**

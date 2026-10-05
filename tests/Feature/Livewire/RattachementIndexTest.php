@@ -419,18 +419,18 @@ describe('Modale « Constater d’avance »', function () {
         $modale = $composant->viewData('modale');
         expect($modale['refus'])->toBeNull();
         expect($modale['cas'])->toBe(CasProvision::ProduitConstateDavance);
-        expect($modale['phrase'])->toBe("les 175,00 € encaissés le 08/04/2026 seront retirés du résultat 2025\u{2011}2026 et reconnus sur 2026\u{2011}2027.");
+        expect($modale['phrase'])->toBe("les 175,00 € comptabilisés en produit le 08/04/2026 seront retirés du résultat 2025\u{2011}2026 et reconnus sur 2026\u{2011}2027.");
 
         expect(ecranRole($composant, 'modale-phrase'))
-            ->toBe("Produit constaté d’avance — les 175,00 € encaissés le 08/04/2026 seront retirés du résultat 2025\u{2011}2026 et reconnus sur 2026\u{2011}2027.");
+            ->toBe("Produit constaté d’avance — les 175,00 € comptabilisés en produit le 08/04/2026 seront retirés du résultat 2025\u{2011}2026 et reconnus sur 2026\u{2011}2027.");
     });
 
-    test('pour une charge, la phrase dit « dépensés » et le cas « Charge constatée d’avance »', function () {
+    test('pour une charge, la phrase dit « comptabilisés en charge » et le cas « Charge constatée d’avance »', function () {
         $ligne = ecranLigne(['classe' => 6, 'montant' => 90.0, 'operation' => ecranOperation()]);
         $composant = Livewire::test(ProvisionIndex::class)->call('ouvrir', $ligne->id);
 
         expect(ecranRole($composant, 'modale-phrase'))
-            ->toBe("Charge constatée d’avance — les 90,00 € dépensés le 08/04/2026 seront retirés du résultat 2025\u{2011}2026 et reconnus sur 2026\u{2011}2027.");
+            ->toBe("Charge constatée d’avance — les 90,00 € comptabilisés en charge le 08/04/2026 seront retirés du résultat 2025\u{2011}2026 et reconnus sur 2026\u{2011}2027.");
     });
 
     test('ce qui est hérité est en lecture seule : compte, opération, séance, tiers, montant, date de pièce', function () {
@@ -523,6 +523,20 @@ describe('Modale « Constater d’avance »', function () {
 
         expect($apercu['dotation']['libelle'])->toBe('Rattachement — produit constaté d’avance : Parcours thérapeutiques — Claire Durand');
         expect($apercu['extourne']['libelle'])->toBe('Extourne — produit constaté d’avance : Parcours thérapeutiques — Claire Durand');
+    });
+
+    test('l’aperçu titre la seconde écriture « Extourne », le mot de son libellé — « annulation » a un autre sens (D13)', function () {
+        ['ligne' => $ligne] = ecranCasReel();
+        $composant = Livewire::test(ProvisionIndex::class)->call('ouvrir', $ligne->id);
+        $apercu = collect($composant->viewData('modale')['apercu'])->keyBy('cle');
+
+        expect($apercu['dotation']['titre'])->toBe('Écriture de rattachement, à la fin de l’exercice');
+        expect($apercu['extourne']['titre'])->toBe('Extourne, au début de l’exercice suivant');
+
+        $titre = fn (string $cle): string => ecranTexte(ecranNoeud($composant, sprintf('//*[@data-ecriture="%s"]/div[1]', $cle)));
+        expect($titre('dotation'))->toBe('Écriture de rattachement, à la fin de l’exercice — 31/08/2026');
+        expect($titre('extourne'))->toBe('Extourne, au début de l’exercice suivant — 01/09/2026');
+        expect(ecranTexte(ecranNoeud($composant, '//*[@data-role="apercu"]')))->not->toContain('nnulation');
     });
 
     test('fermer la modale ne crée rien', function () {

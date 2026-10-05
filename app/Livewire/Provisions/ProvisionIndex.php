@@ -6,6 +6,7 @@ namespace App\Livewire\Provisions;
 
 use App\Enums\CasProvision;
 use App\Enums\Espace;
+use App\Enums\RoleAssociation;
 use App\Models\Compte;
 use App\Models\Operation;
 use App\Models\Provision;
@@ -89,7 +90,7 @@ final class ProvisionIndex extends Component
 
     public function getPeutEcrireProperty(): bool
     {
-        return Auth::user()?->currentRoleEnum()?->canWrite(Espace::Compta) ?? false;
+        return RoleAssociation::tryFrom(Auth::user()?->currentRole() ?? '')?->canWrite(Espace::Compta) ?? false;
     }
 
     // ── Modale ───────────────────────────────────────────────────────────────
@@ -452,14 +453,18 @@ final class ProvisionIndex extends Component
         return $modale;
     }
 
-    /** « les 175,00 € encaissés le 08/04/2026 seront retirés du résultat 2025‑2026 et reconnus sur 2026‑2027. » (spec § 6.3) */
+    /**
+     * « les 175,00 € comptabilisés en produit le 08/04/2026 seront retirés du résultat 2025‑2026 et reconnus sur
+     * 2026‑2027. » (spec § 6.3). « Comptabilisés », pas « encaissés » ni « dépensés » : la date est celle de la
+     * pièce, qui peut n'être pas réglée.
+     */
     private function phrase(CasProvision $cas, float $montant, CarbonInterface $date, string $exercice, string $suivant): string
     {
         // Le trait d'union insécable : une année ne se coupe pas en fin de ligne.
         $insecable = fn (string $label): string => str_replace('-', "\u{2011}", $label);
 
         return 'les '.number_format($montant, 2, ',', "\u{202F}").' € '
-            .($cas->classe() === 7 ? 'encaissés' : 'dépensés').' le '.$date->format('d/m/Y')
+            .'comptabilisés en '.($cas->classe() === 7 ? 'produit' : 'charge').' le '.$date->format('d/m/Y')
             .' seront retirés du résultat '.$insecable($exercice).' et reconnus sur '.$insecable($suivant).'.';
     }
 
@@ -498,7 +503,7 @@ final class ProvisionIndex extends Component
 
             $apercu[] = [
                 'cle' => $extourne ? 'extourne' : 'dotation',
-                'titre' => $extourne ? 'Annulation, au début de l’exercice suivant' : 'Écriture de rattachement, à la fin de l’exercice',
+                'titre' => $extourne ? 'Extourne, au début de l’exercice suivant' : 'Écriture de rattachement, à la fin de l’exercice',
                 'date' => $ecriture['date'],
                 'libelle' => $ecriture['libelle'],
                 'lignes' => $lignes,
