@@ -19,8 +19,9 @@ use Illuminate\Support\Facades\DB;
  *
  * Est CANDIDATE toute ligne de charge (classe 6, au débit) ou de produit (classe 7, au crédit) d'une pièce de
  * l'exercice, ventilée sur une opération dont le `date_debut` tombe APRÈS la fin de l'exercice : l'argent a été
- * dépensé ou encaissé dans N pour une activité qui n'existe que dans N+1. UNE seule requête, qui lit la
- * ventilation sur `transaction_lignes.operation_id`.
+ * dépensé ou encaissé dans N pour une activité qui n'existe que dans N+1. UNE seule requête. La ventilation se
+ * lit sur `transaction_lignes.operation_id` et, pour une ligne ventilée par affectations, sur chacune de ses
+ * affectations (voir plus bas).
  *
  * ── Ce que la requête reproduit ─────────────────────────────────────────────
  *
@@ -43,9 +44,16 @@ use Illuminate\Support\Facades\DB;
  * ── Les lignes ventilées par affectations (D4) ──────────────────────────────
  *
  * Elles ne sont pas exclues mais ÉCARTÉES : rendues à part, avec leur motif (celui du service), jamais omises en
- * silence. LIMITE : la requête joint l'opération sur `transaction_lignes.operation_id`, comme le dit la spec ; une
- * ligne dont la ventilation ne vit QUE dans ses affectations (`operation_id` nul, cas de la subvention du § 2.4)
- * n'est pas atteinte et n'est donc pas écartée ici — la recherche libre, qui juge par motifDeRefus(), la refuse.
+ * silence. Même critère que pour les candidates, appliqué à la ventilation : une ligne à affectations est écartée
+ * si son opération propre OU au moins l'une des opérations de ses affectations démarre après l'exercice (et non
+ * supprimée, et de l'association). Une subvention ventilée sur des opérations toutes terminées avant la fin de
+ * l'exercice n'a rien à décaler : elle n'apparaît ni parmi les candidates ni parmi les écartées. Les `eligibles`
+ * restent les lignes SANS affectation dont l'opération propre démarre après l'exercice.
+ *
+ * Une ligne ventilée par affectations n'a généralement pas d'opération propre (`operation_id` nul) : l'opération
+ * se joint donc par une jointure GAUCHE, et ses colonnes (operation_id, operation_nom, operation_debut,
+ * operation_fin) sont NULLES pour une écartée sans opération propre. Une écartée qui a une opération propre, même
+ * passée, rend celle-ci. L'écran affiche la ventilation lui-même, au besoin.
  *
  * ── Les bornes : des intervalles semi-ouverts ───────────────────────────────
  *
@@ -58,15 +66,17 @@ use Illuminate\Support\Facades\DB;
  * ── Isolation par association ───────────────────────────────────────────────
  *
  * `transaction_lignes` n'a pas de colonne d'association : l'isolation tient à un filtre PAR TABLE jointe
- * (pièce, compte, opération, et tiers et annulations dans leurs sous-requêtes), tous sur
- * TenantContext::currentId(). Hors contexte, la requête ne rend rien (fermé par défaut). Un test par filtre.
+ * (pièce, compte, opération propre, et tiers, annulations et opérations de ventilation dans leurs jointures
+ * gauches ou sous-requêtes), tous sur TenantContext::currentId(). Les jointures gauches (opération propre, tiers)
+ * portent leurs conditions d'association et de suppression dans le ON : une ligne étrangère ne joint rien. Hors
+ * contexte, la requête ne rend rien (fermé par défaut). Un test par filtre.
  *
  * ── Ce que rend chaque ligne ────────────────────────────────────────────────
  *
  * transaction_ligne_id, transaction_id, piece_date (CarbonImmutable), numero_piece, piece_libelle, ligne_libelle,
  * tiers_id et tiers_nom (le tiers de la PIÈCE, D3 ; nuls s'il n'y en a pas ou s'il est d'une autre association),
  * numero_pcg, compte_intitule, classe, operation_id, operation_nom, operation_debut et operation_fin
- * (CarbonImmutable ; la seconde peut être nulle), montant (le plus grand du débit et du crédit, celui que le
+ * (CarbonImmutable ; nulles sans opération propre, la dernière aussi sans date de fin), montant (le plus grand du débit et du crédit, celui que le
  * rattachement reprend, D12) et nb_affectations. Les écartées portent en plus `motif`.
  *
  * Le nom du tiers est le libellé de liste de Tiers::sqlLibelleListe() (« Prénom NOM », ou « Raison sociale
@@ -98,7 +108,14 @@ final class CandidatsRattachementQuery
         $lignes = DB::table('transaction_lignes as tl')
             ->join('transactions as t', 't.id', '=', 'tl.transaction_id')
             ->join('comptes as c', 'c.id', '=', 'tl.compte_id')
-            ->join('operations as o', 'o.id', '=', 'tl.operation_id')
+            // Jointure gauche : une ligne ventilée par affectations n'a généralement pas d'opération propre. Le filtre
+            // d'association et la suppression logique sont dans le ON : une opération étrangère ou supprimée ne joint
+            // rien, ni son nom ni ses dates ne sortent, et la ligne ne devient pas candidate par elle.
+            ->leftJoin('operations as o', function ($jointure) use ($associationId): void {
+                $jointure->on('o.id', '=', 'tl.operation_id')
+                    ->where('o.association_id', '=', $associationId)
+                    ->whereNull('o.deleted_at');
+            })
             // Jointure d'affichage : un tiers d'une autre association n'est ni nommé ni rendu.
             ->leftJoin('tiers as ti', function ($jointure) use ($associationId): void {
                 $jointure->on('ti.id', '=', 't.tiers_id')->where('ti.association_id', '=', $associationId);
@@ -128,19 +145,31 @@ final class CandidatsRattachementQuery
                     ->whereColumn('a.transaction_ligne_id', 'tl.id'),
                 'nb_affectations',
             )
-            // L'isolation : un filtre par table jointe.
+            // L'isolation : un filtre par table jointe (ici la pièce et le compte ; l'opération propre et le tiers dans leur
+            // ON, les opérations de ventilation dans leur EXISTS).
             ->where('t.association_id', $associationId)
             ->where('c.association_id', $associationId)
-            ->where('o.association_id', $associationId)
             // Ce que les modèles ne voient pas.
             ->whereNull('tl.deleted_at')
             ->whereNull('t.deleted_at')
             ->whereNull('c.deleted_at')
-            ->whereNull('o.deleted_at')
-            // La pièce est de l'exercice, l'opération démarre après lui : intervalles semi-ouverts.
+            // La pièce est de l'exercice : intervalle semi-ouvert.
             ->where('t.date', '>=', $debut)
             ->where('t.date', '<', $debutSuivant)
-            ->where('o.date_debut', '>=', $debutSuivant)
+            // La ventilation démarre après l'exercice : l'opération propre de la ligne, OU, pour une ligne ventilée
+            // par affectations, au moins une opération de sa ventilation (même critère, appliqué à chacune).
+            ->where(function (Builder $future) use ($associationId, $debutSuivant): void {
+                $future->where('o.date_debut', '>=', $debutSuivant)
+                    ->orWhereExists(function (Builder $ventilation) use ($associationId, $debutSuivant): void {
+                        $ventilation->selectRaw('1')
+                            ->from('transaction_ligne_affectations as a')
+                            ->join('operations as ao', 'ao.id', '=', 'a.operation_id')
+                            ->whereColumn('a.transaction_ligne_id', 'tl.id')
+                            ->where('ao.association_id', $associationId)
+                            ->whereNull('ao.deleted_at')
+                            ->where('ao.date_debut', '>=', $debutSuivant);
+                    });
+            })
             // Une écriture de rattachement n'est jamais candidate.
             ->whereNull('t.provision_id')
             // D9 : une classe 7 se rattache au crédit, une classe 6 au débit. Ce bloc porte aussi la garde de
@@ -228,9 +257,9 @@ final class CandidatsRattachementQuery
             'numero_pcg' => $ligne->numero_pcg,
             'compte_intitule' => $ligne->compte_intitule,
             'classe' => (int) $ligne->classe,
-            'operation_id' => (int) $ligne->operation_id,
+            'operation_id' => $ligne->operation_id !== null ? (int) $ligne->operation_id : null,
             'operation_nom' => $ligne->operation_nom,
-            'operation_debut' => CarbonImmutable::parse((string) $ligne->operation_debut)->startOfDay(),
+            'operation_debut' => $ligne->operation_debut !== null ? CarbonImmutable::parse((string) $ligne->operation_debut)->startOfDay() : null,
             'operation_fin' => $ligne->operation_fin !== null ? CarbonImmutable::parse((string) $ligne->operation_fin)->startOfDay() : null,
             'montant' => round((float) $ligne->montant, 2),
             'nb_affectations' => (int) $ligne->nb_affectations,

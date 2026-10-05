@@ -21,11 +21,12 @@ use RuntimeException;
  * Rattachement d'un produit ou d'une charge à l'exercice suivant (CCA/PCA).
  *
  * Toutes les gardes d'éligibilité de la LIGNE vivent dans motifDeRefus() : le service
- * s'y réfère, et l'écran (Task 11) comme la requête de détection (Task 10) devront s'y
- * référer aussi. La détection reproduira ces gardes en SQL, plus celle qui lui est
- * propre (une opération postérieure à l'exercice) : un test devra vérifier qu'elle ne
- * propose rien que motifDeRefus() refuse. Ce que le service accepte n'est pas pour
- * autant tout ce que la détection propose.
+ * s'y réfère, et l'écran (Task 11) devra s'y référer aussi. La détection
+ * (CandidatsRattachementQuery) reproduit ces gardes en SQL, plus celle qui lui est
+ * propre (une opération postérieure à l'exercice) : son test d'accord
+ * (CandidatsRattachementQueryTest) vérifie, dans les deux sens, qu'elle ne propose rien
+ * que motifDeRefus() refuse et n'oublie rien qu'il accepte. Ce que le service accepte
+ * n'est pas pour autant tout ce que la détection propose.
  *
  * L'ouverture de la PÉRIODE se contrôle à part : sous verrou dans rattacher() et
  * retirer() (exercices N et N+1), et par période à l'écran (Task 11). Une ligne éligible
@@ -43,7 +44,7 @@ use RuntimeException;
  */
 final class RattachementExerciceService
 {
-    /** Formulation unique du refus, qui sera partagée avec la détection (Task 10). */
+    /** Formulation unique du refus, partagée avec la détection (CandidatsRattachementQuery), qui la rend en motif des lignes écartées. */
     public const MOTIF_AFFECTATIONS = 'Cette ligne est ventilée sur des opérations : son rattachement n’est pas encore pris en charge.';
 
     private const MOTIF_DEJA_RATTACHEE = 'Cette ligne est déjà rattachée à l’exercice suivant : retirez son rattachement avant de le refaire.';

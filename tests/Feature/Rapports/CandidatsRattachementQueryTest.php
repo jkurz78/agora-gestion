@@ -235,18 +235,42 @@ function candidatsRattacher(TransactionLigne $ligne): Provision
     return app(RattachementExerciceService::class)->rattacher($ligne->fresh(), null, auth()->user());
 }
 
-/** Affecte la ligne sur deux opérations qui démarrent après l'exercice (la ventilation vit alors dans les affectations). */
-function candidatsAffecter(TransactionLigne $ligne): void
+/**
+ * Affecte la ligne sur des opérations (la ventilation vit alors dans les affectations), le montant coupé en parts
+ * égales, la dernière prenant le reliquat. Sans liste : sur deux nouvelles opérations qui démarrent après
+ * l'exercice. Un identifiant nul donne une affectation sans opération.
+ *
+ * @param  list<int|null>|null  $operationIds
+ */
+function candidatsAffecter(TransactionLigne $ligne, ?array $operationIds = null): void
 {
-    $moitie = round((float) $ligne->montant / 2, 2);
+    $operationIds ??= [(int) candidatsOperation()->id, (int) candidatsOperation()->id];
+    $parts = count($operationIds);
+    $reste = round((float) $ligne->montant, 2);
 
-    foreach ([$moitie, round((float) $ligne->montant - $moitie, 2)] as $part) {
+    foreach (array_values($operationIds) as $i => $operationId) {
+        $montant = $i === $parts - 1 ? $reste : round((float) $ligne->montant / $parts, 2);
+        $reste = round($reste - $montant, 2);
+
         TransactionLigneAffectation::create([
             'transaction_ligne_id' => $ligne->id,
-            'operation_id' => candidatsOperation()->id,
-            'montant' => $part,
+            'operation_id' => $operationId,
+            'montant' => $montant,
         ]);
     }
+}
+
+/** Une opération d'une AUTRE association, insérée sans passer par aucun scope. Rend son identifiant. */
+function candidatsOperationEtrangere(string $debut = '2026-09-18'): int
+{
+    $autre = Association::factory()->create();
+
+    return (int) DB::table('operations')->insertGetId([
+        'association_id' => $autre->id,
+        'nom' => 'Opération étrangère',
+        'date_debut' => $debut,
+        'date_fin' => '2027-06-18',
+    ]);
 }
 
 /**
@@ -772,17 +796,95 @@ describe('CandidatsRattachementQuery : les lignes ventilées sur des opérations
             ->and($ecartee->operation_nom)->toBe('EquiThe FE sept 2026');
     })->with('rattachement_pca_cca');
 
-    test('LIMITE CONNUE — une ligne dont la ventilation ne vit que dans ses affectations (operation_id nul) n’est atteinte ni comme candidate ni comme écartée', function () {
-        // Le cas de la subvention du § 2.4 : tl.operation_id est nul, la ventilation est dans les affectations. La
-        // requête joint l'opération sur tl.operation_id (§ 6.1) : cette ligne ne l'atteint pas. Le service, lui, la
-        // refuse pour ses affectations : c'est la recherche libre qui la montre avec son motif. Étendre la détection
-        // (atteindre aussi les opérations des affectations) fera tomber ce test, volontairement.
+    test('AC-6 — une ligne à affectations SANS opération propre, dont une opération de ventilation démarre après l’exercice, est écartée avec le motif ; ses colonnes d’opération sont nulles', function (int $classe, float $montant) {
+        $passee = candidatsOperation('2025-10-01', '2026-03-31', 'Opération passée');
+        $future = candidatsOperation();
+        $ventilee = $this->ligneOrigine($classe, $montant);
+        candidatsAffecter($ventilee, [(int) $passee->id, (int) $future->id]);
+        // Le contrôle : la ligne simple sur l'opération future est proposée.
+        $simple = candidatsLigne($this, $classe, $future, $montant);
+
+        $resultat = candidatsDetecter();
+
+        // La prémisse : la ligne n'a pas d'opération propre, et le service la refuse pour ses affectations.
+        expect($ventilee->operation_id)->toBeNull()
+            ->and(app(RattachementExerciceService::class)->motifDeRefus($ventilee->fresh()))->toBe(RattachementExerciceService::MOTIF_AFFECTATIONS);
+
+        expect($resultat['eligibles']->pluck('transaction_ligne_id')->all())->toBe([(int) $simple->id])
+            ->and($resultat['ecartees'])->toHaveCount(1);
+
+        $ecartee = $resultat['ecartees']->sole();
+
+        expect($ecartee->transaction_ligne_id)->toBe((int) $ventilee->id)
+            ->and($ecartee->motif)->toBe(RattachementExerciceService::MOTIF_AFFECTATIONS)
+            ->and($ecartee->nb_affectations)->toBe(2)
+            ->and($ecartee->montant)->toBe($montant)
+            ->and($ecartee->operation_id)->toBeNull()
+            ->and($ecartee->operation_nom)->toBeNull()
+            ->and($ecartee->operation_debut)->toBeNull()
+            ->and($ecartee->operation_fin)->toBeNull();
+    })->with('rattachement_pca_cca');
+
+    test('la subvention — ventilée sur des opérations toutes terminées avant la fin de l’exercice — n’est ni proposée ni écartée : elle n’a rien à décaler', function () {
+        $subvention = $this->ligneOrigine(7, 20000.0);
+        candidatsAffecter($subvention, [
+            (int) candidatsOperation('2025-10-01', '2026-03-31')->id,
+            (int) candidatsOperation('2025-11-01', '2026-06-30')->id,
+            (int) candidatsOperation('2026-01-01', '2026-08-31')->id,
+        ]);
+        // Le contrôle : une ligne à affectations dont une opération est future, elle, est écartée.
+        $controle = $this->ligneOrigine(7, 175.0);
+        candidatsAffecter($controle);
+
+        expect(app(RattachementExerciceService::class)->motifDeRefus($subvention->fresh()))->toBe(RattachementExerciceService::MOTIF_AFFECTATIONS)
+            ->and(candidatsIdsEligibles())->toBe([])
+            ->and(candidatsIdsEcartees())->toBe([(int) $controle->id]);
+    });
+
+    test('bornes de la ventilation — une opération de ventilation qui démarre le premier jour de l’exercice suivant compte, la veille non, quel que soit le stockage', function (string $debut, bool $attendu, string $stockage) {
+        $operation = candidatsOperation('2026-03-01', '2026-06-30');
         $ligne = $this->ligneOrigine(7, 175.0);
+        candidatsAffecter($ligne, [(int) $operation->id]);
+        candidatsAssertStockage(candidatsDaterOperation($operation, $debut, $stockage), $debut, $stockage);
+
+        expect(in_array((int) $ligne->id, candidatsIdsEcartees(), true))->toBe($attendu)
+            ->and(candidatsIdsEligibles())->toBe([]);
+    })->with([
+        'le lendemain du dernier jour' => ['2026-09-01', true],
+        'le dernier jour de l’exercice' => ['2026-08-31', false],
+        'l’avant-veille' => ['2026-08-30', false],
+        'le surlendemain' => ['2026-09-02', true],
+    ])->with(['stockage Eloquent' => ['eloquent'], 'stockage brut' => ['brut']]);
+
+    test('une opération de ventilation supprimée ne rend pas la ligne écartée', function () {
+        $operation = candidatsOperation();
+        $ligne = $this->ligneOrigine(7, 175.0);
+        candidatsAffecter($ligne, [(int) $operation->id]);
+        expect(candidatsIdsEcartees())->toBe([(int) $ligne->id]);
+
+        $operation->delete();
+
+        expect(candidatsIdsEcartees())->toBe([])
+            ->and(candidatsIdsEligibles())->toBe([]);
+    });
+
+    test('une affectation sans opération ne rend pas la ligne écartée', function () {
+        $ligne = $this->ligneOrigine(7, 175.0);
+        candidatsAffecter($ligne, [null, (int) candidatsOperation('2025-10-01', '2026-03-31')->id]);
+
+        expect(candidatsIdsEcartees())->toBe([])
+            ->and(candidatsIdsEligibles())->toBe([]);
+    });
+
+    test('une ligne à affectations dont l’opération propre est passée, mais dont une opération de ventilation est future, est écartée avec son opération propre', function () {
+        $ligne = $this->ligneOrigine(7, 175.0, operationId: (int) candidatsOperation('2025-10-01', '2026-03-31', 'Opération propre passée')->id);
         candidatsAffecter($ligne);
 
-        expect(app(RattachementExerciceService::class)->motifDeRefus($ligne->fresh()))->toBe(RattachementExerciceService::MOTIF_AFFECTATIONS)
-            ->and(candidatsIdsEligibles())->toBe([])
-            ->and(candidatsIdsEcartees())->toBe([]);
+        $ecartee = candidatsDetecter()['ecartees']->sole();
+
+        expect($ecartee->transaction_ligne_id)->toBe((int) $ligne->id)
+            ->and($ecartee->operation_nom)->toBe('Opération propre passée')
+            ->and($ecartee->operation_debut->toDateString())->toBe('2025-10-01');
     });
 
     test('une ligne à affectations qui satisfait une autre exclusion n’est pas écartée « pour affectations » : elle est exclue, sans bruit', function () {
@@ -834,6 +936,31 @@ describe('CandidatsRattachementQuery : isolation des associations (AC-12)', func
         expect(DB::table('transaction_lignes')->where('id', $ligneId)->exists())->toBeTrue()
             ->and(candidatsIdsEligibles())->toBe([])
             ->and(candidatsIdsEcartees())->toBe([]);
+    });
+
+    test('une opération de ventilation d’une autre association ne rend pas la ligne écartée : seule celle de notre association compte', function () {
+        $etrangere = candidatsOperationEtrangere();
+        $notre = candidatsOperation();
+        $controle = $this->ligneOrigine(7, 175.0);
+        candidatsAffecter($controle, [(int) $notre->id]);
+        $ligne = $this->ligneOrigine(7, 90.0);
+        candidatsAffecter($ligne, [$etrangere]);
+
+        expect(DB::table('transaction_ligne_affectations')->where('transaction_ligne_id', $ligne->id)->value('operation_id'))->toBe($etrangere)
+            ->and(candidatsIdsEcartees())->toBe([(int) $controle->id])
+            ->and(candidatsIdsEligibles())->toBe([]);
+    });
+
+    test('l’opération propre d’une autre association n’est ni rendue ni lue : la ligne écartée par sa ventilation n’en expose pas le nom', function () {
+        $ligne = $this->ligneOrigine(7, 175.0, operationId: candidatsOperationEtrangere());
+        candidatsAffecter($ligne);
+
+        $ecartee = candidatsDetecter()['ecartees']->sole();
+
+        expect($ecartee->transaction_ligne_id)->toBe((int) $ligne->id)
+            ->and($ecartee->operation_id)->toBeNull()
+            ->and($ecartee->operation_nom)->toBeNull()
+            ->and($ecartee->operation_debut)->toBeNull();
     });
 
     test('une ligne à affectations d’une autre association n’est pas écartée chez nous', function () {
@@ -969,6 +1096,18 @@ function candidatsJeuDeFormes(TestCase $test): void
     candidatsAffecter($test->ligneOrigine(6, 90.0, operationId: (int) $future->id));
     candidatsAffecter($test->ligneOrigine(7, 60.0));
 
+    // Ventilées par affectations SANS opération propre : une opération future parmi des passées, toutes passées (la
+    // subvention), une seule future mais supprimée, une affectation sans opération ; avec une opération propre passée.
+    $passee = candidatsOperation('2025-10-01', '2026-03-31', 'Opération passée');
+    $autrePassee = candidatsOperation('2025-11-01', '2026-08-31', 'Autre opération passée');
+    $supprimee = candidatsOperation('2026-09-18', '2027-06-18', 'Opération supprimée');
+    candidatsAffecter($test->ligneOrigine(7, 70.0), [(int) $passee->id, (int) $future->id]);
+    candidatsAffecter($test->ligneOrigine(7, 20000.0), [(int) $passee->id, (int) $autrePassee->id]);
+    candidatsAffecter($test->ligneOrigine(6, 80.0), [(int) $supprimee->id]);
+    $supprimee->delete();
+    candidatsAffecter($test->ligneOrigine(7, 81.0), [null, (int) $passee->id]);
+    candidatsAffecter($test->ligneOrigine(7, 82.0, operationId: (int) $dansExercice->id), [(int) $future->id]);
+
     // Supprimées : la pièce, la ligne, le compte, l'opération
     $test->ligneOrigine(7, 51.0, operationId: (int) $future->id)->transaction->delete();
     $test->ligneOrigine(7, 52.0, operationId: (int) $future->id)->delete();
@@ -985,14 +1124,19 @@ function candidatsJeuDeFormes(TestCase $test): void
     $ventileeN1 = $test->ligneOrigine(7, 64.0, operationId: (int) $futureN1->id);
     candidatsDaterPiece($ventileeN1, '2026-11-20', 'eloquent');
     candidatsAffecter($ventileeN1);
+    $ventileeSansOperationN1 = $test->ligneOrigine(6, 65.0);
+    candidatsDaterPiece($ventileeSansOperationN1, '2026-12-05', 'eloquent');
+    candidatsAffecter($ventileeSansOperationN1, [(int) $futureN1->id, (int) $passee->id]);
 }
 
 /**
  * Pour chaque ligne de l'association, ce que le service en dit (motifDeRefus()) et ce que la détection en dit.
- * Rend, par identifiant de ligne : le motif du service, et si la ligne est dans l'exercice et sur une opération
- * qui démarre après lui (la condition propre à la détection).
+ * Rend, par identifiant de ligne : le motif du service, si la ligne est dans l'exercice et sur une opération propre
+ * qui démarre après lui (`candidates`, ce que la détection propose) et si, de plus, l'une des opérations de sa
+ * ventilation démarre après lui (`ecartables`, ce qu'elle écarte). Les opérations se lisent par les modèles,
+ * c'est-à-dire sous les scopes d'association et de suppression logique : une autre route que la requête.
  *
- * @return array{motifs: array<int, ?string>, candidates: list<int>, eligibles: list<int>, ecartees: array<int, ?string>}
+ * @return array{motifs: array<int, ?string>, candidates: list<int>, ecartables: list<int>, eligibles: list<int>, ecartees: array<int, ?string>}
  */
 function candidatsAccord(TestCase $test, int $exercice): array
 {
@@ -1002,20 +1146,28 @@ function candidatsAccord(TestCase $test, int $exercice): array
     $exerciceService = app(ExerciceService::class);
     $debutSuivant = $exerciceService->dateRange($exercice + 1)['start'];
 
+    $estFuture = fn (?Operation $operation): bool => $operation !== null && $operation->date_debut !== null && $operation->date_debut->gte($debutSuivant);
+
     $motifs = [];
     $candidates = [];
+    $ecartables = [];
 
     foreach (TransactionLigne::query()->get() as $ligne) {
         $motifs[(int) $ligne->id] = $service->motifDeRefus($ligne);
 
         $piece = $ligne->transaction;
-        $operation = $ligne->operation;
-
         $dansExercice = $piece !== null && $exerciceService->anneeForDate($piece->date) === $exercice;
-        $surOperationFuture = $operation !== null && $operation->date_debut !== null && $operation->date_debut->gte($debutSuivant);
+        $propreFuture = $estFuture($ligne->operation);
+        $ventilationFuture = $ligne->affectations->contains(
+            fn (TransactionLigneAffectation $affectation): bool => $affectation->operation_id !== null && $estFuture(Operation::find($affectation->operation_id)),
+        );
 
-        if ($dansExercice && $surOperationFuture) {
+        if ($dansExercice && $propreFuture) {
             $candidates[] = (int) $ligne->id;
+        }
+
+        if ($dansExercice && ($propreFuture || $ventilationFuture)) {
+            $ecartables[] = (int) $ligne->id;
         }
     }
 
@@ -1024,6 +1176,7 @@ function candidatsAccord(TestCase $test, int $exercice): array
     return [
         'motifs' => $motifs,
         'candidates' => $candidates,
+        'ecartables' => $ecartables,
         'eligibles' => $resultat['eligibles']->pluck('transaction_ligne_id')->map(fn ($id): int => (int) $id)->all(),
         'ecartees' => $resultat['ecartees']->pluck('motif', 'transaction_ligne_id')->all(),
     ];
@@ -1057,7 +1210,7 @@ describe('CandidatsRattachementQuery : accord avec motifDeRefus(), dans les deux
         expect($accord['eligibles'])->toEqualCanonicalizing($attendues);
     })->with(['exercice 2025' => [2025], 'exercice 2026' => [2026]]);
 
-    test('toute ligne écartée l’est pour le motif que le service donne, et toute ligne que le service refuse pour ses affectations est écartée', function (int $exercice) {
+    test('toute ligne écartée l’est pour le motif que le service donne, et toute ligne que le service refuse pour ses affectations, de l’exercice et ventilée sur une opération future (propre ou de ventilation), est écartée', function (int $exercice) {
         $accord = candidatsAccord($this, $exercice);
 
         // Garde anti-test-vide : il y a des écartées.
@@ -1068,7 +1221,7 @@ describe('CandidatsRattachementQuery : accord avec motifDeRefus(), dans les deux
         }
 
         $attendues = array_values(array_filter(
-            $accord['candidates'],
+            $accord['ecartables'],
             fn (int $id): bool => $accord['motifs'][$id] === RattachementExerciceService::MOTIF_AFFECTATIONS,
         ));
 
