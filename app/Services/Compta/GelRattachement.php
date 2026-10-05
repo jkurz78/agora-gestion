@@ -24,6 +24,12 @@ use RuntimeException;
  * formule le sien (motifExtournePrecoce()). Une écriture de rattachement est refusée par les trois, avec
  * MOTIF_ECRITURE_DE_RATTACHEMENT.
  *
+ * Un seul site CONSERVE au lieu de refuser : la synchronisation HelloAsso, qui tourne en tâche de fond sur toute
+ * une liste de commandes et ne peut en faire échouer une. Elle dispose des jumelles de ces gardes qui rendent un
+ * booléen au lieu de lever : ligneGeleeSousVerrou() (jumelle d'assertLigneNonGelee()) et verrouillerPieceSansRefus()
+ * (jumelle de verrouillerPieceNonGelee()). Mêmes verrous, dans le même ordre, mêmes lectures : une seule
+ * implémentation, et non une copie du gel dans la synchronisation.
+ *
  * Classe à part du service de rattachement (RattachementExerciceService), volontairement : elle ne dépend
  * que d'ExerciceService et de VerrouLotsCanoniques, qui n'ont eux-mêmes aucune dépendance. Les gestes
  * protégés (TransactionService, TransactionExtourneService, ReclassementLigneService, la ventilation et la
@@ -40,12 +46,12 @@ final class GelRattachement
     /**
      * Le message unique du verrou (spec § 7), destiné à TOUS les sites qui refusent d'écrire sur
      * une pièce dont une ligne est rattachée : reclassement, retrait de ligne, édition, suppression,
-     * annulation, ventilation, synchronisation HelloAsso. Posé aujourd'hui sur le reclassement, le
-     * retrait de ligne, l'édition, la suppression, l'annulation et la ventilation ; reste la
-     * synchronisation HelloAsso (Task 9). Il nomme le constat, l'écran où se défait le rattachement et la sortie : le retirer,
+     * annulation, ventilation. Posé sur le reclassement, le retrait de ligne, l'édition, la suppression,
+     * l'annulation et la ventilation. Il nomme le constat, l'écran où se défait le rattachement et la sortie : le retirer,
      * corriger, le repasser. Un site qui en formulerait un autre rendrait le refus illisible d'un écran
      * à l'autre. Seule l'annulation par extourne a le sien (motifExtournePrecoce()) : elle n'est refusée
-     * que selon sa date, et sa sortie n'est pas « corriger, puis repasser ».
+     * que selon sa date, et sa sortie n'est pas « corriger, puis repasser ». La synchronisation HelloAsso ne
+     * refuse pas, donc ne l'affiche pas : elle conserve et journalise (ligneGeleeSousVerrou()).
      */
     public const MOTIF_PIECE_GELEE = 'Cette pièce porte un rattachement à l’exercice suivant : pour la modifier, retirez d’abord le rattachement '
         .'depuis Exercices > Écritures de rattachement, corrigez, puis repassez-le.';
@@ -74,8 +80,8 @@ final class GelRattachement
      * unique MOTIF_PIECE_GELEE, si cette ligne porte un rattachement, et par MOTIF_ECRITURE_DE_RATTACHEMENT
      * si la ligne appartient à une écriture de rattachement (dotation ou extourne générée). Les gestes
      * qui réécrivent la pièce entière appellent verrouillerPieceNonGelee(). Sites : le reclassement
-     * (Task 7) ; la ventilation, affecterLigne() et supprimerAffectations() (Task 8c) ; la
-     * synchronisation HelloAsso (Task 9).
+     * (Task 7) ; la ventilation, affecterLigne() et supprimerAffectations() (Task 8c). La synchronisation
+     * HelloAsso (Task 9) en appelle la jumelle ligneGeleeSousVerrou(), qui rend le constat sans lever.
      *
      * À appeler DANS la transaction de l'appelant, APRÈS ses verrous d'exercice : les verrous
      * pris ici tiennent jusqu'à son commit, et c'est ce qui rend la lecture vraie au moment d'écrire.
@@ -117,10 +123,34 @@ final class GelRattachement
      */
     public function assertLigneNonGelee(TransactionLigne $ligne): void
     {
+        $motif = $this->motifDeLigneGeleeSousVerrou($ligne);
+
+        if ($motif !== null) {
+            throw new RuntimeException($motif);
+        }
+    }
+
+    /**
+     * Jumelle d'assertLigneNonGelee() pour qui CONSERVE au lieu de refuser (la synchronisation HelloAsso, qui ne peut
+     * faire échouer ses autres commandes) : mêmes verrous, dans le même ordre, même décision, mais rend vrai au lieu de
+     * lever. Vrai pour une ligne qui porte un rattachement comme pour toute ligne d'une écriture de rattachement. Ne lève
+     * jamais pour ce motif ; à appeler dans la transaction de l'appelant, après ses verrous de pièce (voir
+     * assertLigneNonGelee() pour l'ordre et le REFUS PAR DÉFAUT : la décision ne dépend que de l'identifiant de la ligne).
+     */
+    public function ligneGeleeSousVerrou(TransactionLigne $ligne): bool
+    {
+        return $this->motifDeLigneGeleeSousVerrou($ligne) !== null;
+    }
+
+    /**
+     * Le constat commun d'assertLigneNonGelee() et de ligneGeleeSousVerrou() : le motif du gel de cette ligne, ou null.
+     */
+    private function motifDeLigneGeleeSousVerrou(TransactionLigne $ligne): ?string
+    {
         // Avant tout verrou : une écriture de rattachement n'est l'origine d'aucun rattachement, il n'y a
         // rien d'autre à lire ni à exclure. Voir la justification de la lecture sans verrou, plus haut.
         if (Transaction::withoutGlobalScopes()->whereKey((int) $ligne->transaction_id)->value('provision_id') !== null) {
-            throw new RuntimeException(self::MOTIF_ECRITURE_DE_RATTACHEMENT);
+            return self::MOTIF_ECRITURE_DE_RATTACHEMENT;
         }
 
         // Tous scopes levés (suppression logique ET scope tenant) : cette lecture n'en tire aucune
@@ -128,9 +158,7 @@ final class GelRattachement
         // d'association laisserait rattacher() s'intercaler.
         TransactionLigne::withoutGlobalScopes()->whereKey((int) $ligne->id)->lockForUpdate()->value('id');
 
-        if ($ligne->estRattacheeSousVerrou()) {
-            throw new RuntimeException(self::MOTIF_PIECE_GELEE);
-        }
+        return $ligne->estRattacheeSousVerrou() ? self::MOTIF_PIECE_GELEE : null;
     }
 
     /**
@@ -221,6 +249,31 @@ final class GelRattachement
         }
 
         return $verrouillee;
+    }
+
+    /**
+     * Jumelle de verrouillerPieceNonGelee() pour qui CONSERVE au lieu de refuser (la synchronisation HelloAsso, qui
+     * ne peut faire échouer ses autres commandes) : même préfixe de verrous, dans le même ordre (les lots 401/411, la
+     * pièce, ses lignes, leurs rattachements : voir verrouillerPieceEtRattachements()), mais ne lève pas pour le gel.
+     * Rend la pièce verrouillée, relue sous verrou (l'appelant poursuit avec elle, non avec l'instance reçue), et si elle
+     * est GELÉE : l'une de ses lignes porte un rattachement, ou elle est elle-même une écriture de rattachement.
+     *
+     * À appeler EN TÊTE de la transaction de l'appelant, avant toute écriture et tout autre verrou : les verrous
+     * tiennent jusqu'à son commit, et c'est ce qui rend le constat vrai jusque-là, rattacher() et retirer() prenant la
+     * pièce avant la ligne. Le constat est lu SOUS VERROU (lectures verrouillantes, qui voient le dernier état validé
+     * quel que soit le cliché de la transaction), et non par etatDeGel() : cette lecture simple peut être périmée.
+     *
+     * REFUSE PAR DÉFAUT, comme les gardes : la pièce, ses lignes et leurs rattachements sont lus tous scopes levés.
+     *
+     * @return array{piece: Transaction, gelee: bool}
+     *
+     * @throws ModelNotFoundException la pièce n'existe plus en base (supprimée physiquement)
+     */
+    public function verrouillerPieceSansRefus(Transaction $piece): array
+    {
+        ['piece' => $verrouillee, 'exercices' => $exercices, 'ecriture' => $ecriture] = $this->verrouillerPieceEtRattachements($piece, refuserUneEcriture: false);
+
+        return ['piece' => $verrouillee, 'gelee' => $ecriture || $exercices !== []];
     }
 
     /**
@@ -324,12 +377,16 @@ final class GelRattachement
      * que l'appelant tient la pièce, aucun rattachement de ses lignes ne peut être créé ni retiré :
      * rattacher() et retirer() l'attendent.
      *
-     * @return array{piece: Transaction, exercices: list<int>}
+     * @param  bool  $refuserUneEcriture  vrai : une écriture de rattachement est refusée (les gardes) ; faux : elle est
+     *                                    rendue avec `ecriture` vrai, sans que ses lignes ni ses rattachements soient
+     *                                    lus (verrouillerPieceSansRefus())
+     * @return array{piece: Transaction, exercices: list<int>, ecriture: bool}
      *
      * @throws RuntimeException MOTIF_ECRITURE_DE_RATTACHEMENT si la pièce est une écriture de rattachement
+     *                          et que $refuserUneEcriture est vrai
      * @throws ModelNotFoundException la pièce n'existe plus en base (supprimée physiquement)
      */
-    private function verrouillerPieceEtRattachements(Transaction $piece): array
+    private function verrouillerPieceEtRattachements(Transaction $piece, bool $refuserUneEcriture = true): array
     {
         $pieceId = (int) $piece->id;
 
@@ -349,7 +406,11 @@ final class GelRattachement
         // l'instance reçue laisserait passer l'appelant dont la copie est périmée. Avant de verrouiller
         // les lignes : une écriture n'est l'origine d'aucun rattachement, il n'y a rien d'autre à lire.
         if ($verrouillee->provision_id !== null) {
-            throw new RuntimeException(self::MOTIF_ECRITURE_DE_RATTACHEMENT);
+            if ($refuserUneEcriture) {
+                throw new RuntimeException(self::MOTIF_ECRITURE_DE_RATTACHEMENT);
+            }
+
+            return ['piece' => $verrouillee, 'exercices' => [], 'ecriture' => true];
         }
 
         // Les lignes, supprimées logiquement comprises, dans l'ordre de leur identifiant : deux
@@ -375,6 +436,6 @@ final class GelRattachement
                 ->map(fn (mixed $exercice): int => (int) $exercice)
                 ->all();
 
-        return ['piece' => $verrouillee, 'exercices' => $exercices];
+        return ['piece' => $verrouillee, 'exercices' => $exercices, 'ecriture' => false];
     }
 }

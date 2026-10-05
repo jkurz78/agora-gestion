@@ -34,8 +34,10 @@ use Illuminate\Support\Facades\DB;
 | fichier éprouve ces deux gardes appelées directement ; les tests des SITES qui les appellent sont
 | un fichier par famille : RattachementVerrouTransactionTest.php (édition, suppression, annulation),
 | RattachementVerrouReclassementFormulaireTest.php (reclassement, retrait de ligne, ouverture gelée du
-| formulaire), RattachementVerrouVentilationTest.php (ventilation) et RattachementVerrouExtourneTest.php
-| (l'annulation par extourne, seule à dépendre d'une date). Ce fichier éprouve aussi le graphe d'injection du gel
+| formulaire), RattachementVerrouVentilationTest.php (ventilation), RattachementVerrouExtourneTest.php
+| (l'annulation par extourne, seule à dépendre d'une date) et RattachementVerrouSynchroTest.php (la synchronisation
+| HelloAsso, seul site qui CONSERVE au lieu de refuser : ce fichier éprouve ses deux jumelles sans refus,
+| ligneGeleeSousVerrou() et verrouillerPieceSansRefus()). Ce fichier éprouve aussi le graphe d'injection du gel
 | (pas de cycle, pas d'écriture comptable dans la chaîne de construction des gestes protégés) et le motif de
 | gel lu sans verrou pour prévenir l'écran, motifDeGel().
 |
@@ -643,6 +645,202 @@ describe('GelRattachement::verrouillerPieceNonGelee()', function () {
     });
 });
 
+describe('GelRattachement::ligneGeleeSousVerrou()', function () {
+    // La jumelle d'assertLigneNonGelee() pour qui CONSERVE au lieu de refuser (la synchronisation HelloAsso, Task 9) :
+    // même constat, rendu en booléen. Les tests des deux s'accordent aussi dans « motifDeGel() et etatDeGel() s'accordent… ».
+    test('rend vrai pour une ligne rattachée et faux pour une ligne libre, sans jamais lever : un rattachement sur sa sœur ou ailleurs ne la gèle pas', function (int $classe) {
+        $libre = $this->ligneOrigineEquilibree($classe);
+        $soeur = verrouSoeur($classe, $libre);
+        $provision = verrouRattacherAvecEcritures($this, $soeur);
+        verrouRattacherAvecEcritures($this, $this->ligneOrigineEquilibree($classe));
+        $gel = app(GelRattachement::class);
+
+        // Garde anti-test-vide : la sœur est bien rattachée, la ligne libre ne l'est pas.
+        expect($soeur->fresh()->estRattachee())->toBeTrue()
+            ->and($libre->fresh()->estRattachee())->toBeFalse();
+
+        expect(DB::transaction(fn () => $gel->ligneGeleeSousVerrou($soeur)))->toBeTrue()
+            ->and(DB::transaction(fn () => $gel->ligneGeleeSousVerrou($libre)))->toBeFalse();
+
+        // Le rattachement retiré, la ligne est libre.
+        app(RattachementExerciceService::class)->retirer($provision);
+        expect(DB::transaction(fn () => $gel->ligneGeleeSousVerrou($soeur->fresh())))->toBeFalse();
+    })->with('rattachement_classes');
+
+    test('rend vrai pour une ligne rattachée puis supprimée logiquement, et hors contexte d\'association : aucun scope ne la rend libre', function (int $classe) {
+        $ligne = $this->ligneOrigineEquilibree($classe);
+        verrouRattacherAvecEcritures($this, $ligne);
+        $libre = $this->ligneOrigineEquilibree($classe);
+        $ligne->delete();
+        $gel = app(GelRattachement::class);
+
+        // Prémisse : la ligne est masquée par sa suppression logique, mais son rattachement tient.
+        expect(TransactionLigne::find($ligne->id))->toBeNull();
+        expect(DB::transaction(fn () => $gel->ligneGeleeSousVerrou($ligne)))->toBeTrue();
+
+        $association = TenantContext::current();
+        TenantContext::clear();
+
+        expect(Provision::count())->toBe(0);
+        expect(DB::transaction(fn () => $gel->ligneGeleeSousVerrou($ligne)))->toBeTrue()
+            // Et le constat ne devient pas vrai pour tout ce qu'il ne voit pas : une ligne libre reste libre.
+            ->and(DB::transaction(fn () => $gel->ligneGeleeSousVerrou($libre)))->toBeFalse();
+
+        TenantContext::boot($association);
+    })->with('rattachement_classes');
+
+    test('rend vrai pour toute ligne d\'une écriture de rattachement, dotation ou extourne', function (int $classe, string $ecriture) {
+        ['ecriture' => $ligneDeLEcriture] = verrouEcritureDeRattachement($this, $classe, $ecriture);
+
+        expect($ligneDeLEcriture->estRattachee())->toBeFalse();
+        expect(DB::transaction(fn () => app(GelRattachement::class)->ligneGeleeSousVerrou($ligneDeLEcriture)))->toBeTrue();
+    })->with('rattachement_classes')->with([
+        'la dotation' => ['normale'],
+        'l\'extourne' => ['extourne'],
+    ]);
+
+    test('émet les mêmes lectures, dans le même ordre, que assertLigneNonGelee() : la ligne, tous scopes levés, puis ses rattachements, « for update » (MariaDB)', function () {
+        $ligne = $this->ligneOrigineEquilibree(7);
+        $gel = app(GelRattachement::class);
+
+        $sqlDe = fn (Closure $geste): array => array_map(
+            fn (object $r): string => $r->sql,
+            rattachementRequetesDeLaTransaction(fn () => DB::transaction($geste)),
+        );
+        $jumelle = $sqlDe(fn () => $gel->ligneGeleeSousVerrou($ligne));
+        $garde = $sqlDe(fn () => $gel->assertLigneNonGelee($ligne));
+
+        // Garde anti-test-vide : l'écriture, le verrou de la ligne, le verrou des rattachements.
+        expect($garde)->toHaveCount(3)
+            ->and($jumelle)->toBe($garde);
+
+        // Et les deux verrous posent un vrai verrou, sans scope ni EXISTS.
+        $requetes = rattachementRequetesDeLaTransaction(fn () => DB::transaction(fn () => $gel->ligneGeleeSousVerrou($ligne)));
+        foreach ([1, 2] as $i) {
+            verrouAssertSansScope($requetes[$i]);
+            expect(mb_strtolower($requetes[$i]->sql))->not->toContain('exists');
+
+            if (DB::getDriverName() !== 'sqlite') {
+                expect($requetes[$i]->sql)->toContain('for update');
+            }
+        }
+        expect($requetes[1]->sql)->toContain('transaction_lignes')
+            ->and($requetes[2]->sql)->toContain('provisions');
+    });
+});
+
+describe('GelRattachement::verrouillerPieceSansRefus()', function () {
+    // La jumelle de verrouillerPieceNonGelee() pour qui CONSERVE au lieu de refuser (la synchronisation HelloAsso, Task 9).
+    test('dit gelée une pièce dont une ligne est rattachée, même si ce n\'est pas la première, et libre une autre, sans jamais lever', function (int $classe) {
+        ['piece' => $piece] = verrouPieceDontLaSoeurEstRattachee($this, $classe);
+        verrouRattacherAvecEcritures($this, $this->ligneOrigineEquilibree($classe));
+        $libre = Transaction::findOrFail($this->ligneOrigineEquilibree($classe)->transaction_id);
+        $gel = app(GelRattachement::class);
+
+        $gelee = DB::transaction(fn () => $gel->verrouillerPieceSansRefus($piece));
+        $autre = DB::transaction(fn () => $gel->verrouillerPieceSansRefus($libre));
+
+        expect($gelee['gelee'])->toBeTrue()
+            ->and((int) $gelee['piece']->id)->toBe((int) $piece->id)
+            ->and($autre['gelee'])->toBeFalse()
+            ->and((int) $autre['piece']->id)->toBe((int) $libre->id);
+    })->with('rattachement_classes');
+
+    test('dit gelée une écriture de rattachement, dotation ou extourne, sans lever ni lire ses lignes', function (string $ecriture) {
+        ['piece' => $piece] = verrouEcritureDeRattachement($this, 7, $ecriture);
+        $gel = app(GelRattachement::class);
+
+        $requetes = rattachementRequetesDeLaTransaction(function () use ($gel, $piece, &$resultat): void {
+            $resultat = DB::transaction(fn () => $gel->verrouillerPieceSansRefus($piece));
+        });
+
+        expect($resultat['gelee'])->toBeTrue()
+            // Comme la garde : une écriture n'est l'origine d'aucun rattachement, rien d'autre à lire que ses lots et la pièce.
+            ->and(array_filter($requetes, fn (object $r): bool => str_contains($r->sql, 'provisions')))->toBe([]);
+    })->with([
+        'la dotation' => ['normale'],
+        'l\'extourne' => ['extourne'],
+    ]);
+
+    test('dit gelée quand la ligne rattachée, la pièce, ou les deux, sont supprimées logiquement, ou hors du contexte d\'association : aucun scope ne dégèle', function (string $cas) {
+        ['soeur' => $soeur, 'piece' => $piece] = verrouPieceDontLaSoeurEstRattachee($this, 7);
+        $libre = Transaction::findOrFail($this->ligneOrigineEquilibree(7)->transaction_id);
+        $association = TenantContext::current();
+
+        match ($cas) {
+            'ligne supprimée' => $soeur->delete(),
+            'pièce supprimée' => $piece->delete(),
+            default => TenantContext::clear(),
+        };
+
+        $gel = app(GelRattachement::class);
+
+        expect(DB::transaction(fn () => $gel->verrouillerPieceSansRefus($piece))['gelee'])->toBeTrue();
+
+        if ($cas === 'hors contexte') {
+            // Et le constat ne devient pas vrai pour tout ce qu'il ne voit pas : une pièce libre reste libre.
+            expect(DB::transaction(fn () => $gel->verrouillerPieceSansRefus($libre))['gelee'])->toBeFalse();
+            TenantContext::boot($association);
+        }
+    })->with([
+        'ligne supprimée' => ['ligne supprimée'],
+        'pièce supprimée' => ['pièce supprimée'],
+        'hors contexte' => ['hors contexte'],
+    ]);
+
+    test('émet les mêmes lectures, dans le même ordre, que verrouillerPieceNonGelee() : les lots, la pièce, ses lignes, leurs rattachements, « for update » (MariaDB)', function () {
+        ['piece' => $piece] = verrouPieceDontLaSoeurEstRattachee($this, 7);
+        $libre = Transaction::findOrFail($this->ligneOrigineEquilibree(7)->transaction_id);
+        $gel = app(GelRattachement::class);
+
+        // Sur une pièce libre, où la garde ne lève pas : la même suite de requêtes, mot pour mot.
+        $sqlDe = fn (Closure $geste): array => array_map(
+            fn (object $r): string => $r->sql,
+            rattachementRequetesDeLaTransaction(fn () => DB::transaction($geste)),
+        );
+        $jumelle = $sqlDe(fn () => $gel->verrouillerPieceSansRefus($libre));
+        $garde = $sqlDe(fn () => $gel->verrouillerPieceNonGelee($libre));
+        expect($garde)->not->toBeEmpty()
+            ->and($jumelle)->toBe($garde);
+
+        // Et sur une pièce gelée, où la garde lève au dernier verrou : la jumelle prend les mêmes verrous, dans le même ordre.
+        $requetes = rattachementRequetesDeLaTransaction(fn () => DB::transaction(fn () => $gel->verrouillerPieceSansRefus($piece)));
+        $indices = verrouIndicesDesVerrous($requetes);
+        expect(array_keys($indices))->toBe(['liste des lots', 'lots', 'pièce', 'lignes', 'rattachements'])
+            ->and(array_values($indices))->toBe(collect($indices)->sort()->values()->all())
+            ->and(array_key_last($requetes))->toBe($indices['rattachements']);
+
+        foreach (['pièce', 'lignes', 'rattachements'] as $nom) {
+            verrouAssertSansScope($requetes[$indices[$nom]]);
+        }
+
+        if (DB::getDriverName() !== 'sqlite') {
+            foreach (['lots', 'pièce', 'lignes', 'rattachements'] as $nom) {
+                expect($requetes[$indices[$nom]]->sql)->toContain('for update');
+            }
+        }
+    });
+
+    test('rend la pièce relue sous verrou, et lève une ModelNotFoundException quand elle n\'existe plus', function () {
+        $ligne = $this->ligneOrigineEquilibree(7);
+        $piece = Transaction::findOrFail($ligne->transaction_id);
+        $gel = app(GelRattachement::class);
+
+        DB::table('transactions')->where('id', $piece->id)->update(['libelle' => 'Libellé de la base']);
+        expect($piece->libelle)->not->toBe('Libellé de la base');
+
+        $rendue = DB::transaction(fn () => $gel->verrouillerPieceSansRefus($piece))['piece'];
+
+        expect($rendue->libelle)->toBe('Libellé de la base')
+            ->and($rendue)->not->toBe($piece);
+
+        DB::table('transaction_lignes')->where('transaction_id', $piece->id)->delete();
+        DB::table('transactions')->where('id', $piece->id)->delete();
+
+        expect(fn () => $gel->verrouillerPieceSansRefus($piece))->toThrow(ModelNotFoundException::class);
+    });
+});
+
 describe('GelRattachement::motifDeGel()', function () {
     // La lecture SANS verrou qui prévient l'écran : même question que les gardes, mêmes réponses, sans rien verrouiller.
     // Les gardes, elles, décident sous verrou ; ces tests n'éprouvent que ce que l'écran en lit.
@@ -750,10 +948,11 @@ describe('GelRattachement::motifDeGel()', function () {
             'écriture' => GelRattachement::MOTIF_ECRITURE_DE_RATTACHEMENT,
         };
 
-        // La pièce : le motif lu est le refus de la garde de pièce.
+        // La pièce : le motif lu est le refus de la garde de pièce, et sa jumelle sans refus dit « gelée » exactement alors.
         $refus = verrouMessageDuRefus(fn () => DB::transaction(fn () => $gel->verrouillerPieceNonGelee($piece)));
         expect($refus)->toBe($attenduMotif)
-            ->and($gel->motifDeGel((int) $piece->id))->toBe($refus);
+            ->and($gel->motifDeGel((int) $piece->id))->toBe($refus)
+            ->and(DB::transaction(fn () => $gel->verrouillerPieceSansRefus($piece))['gelee'])->toBe($refus !== null);
 
         // Les lignes (supprimées logiquement comprises) : celles que l'écran dit gelées sont celles que la garde de ligne refuse.
         $ligneIds = DB::table('transaction_lignes')->where('transaction_id', $piece->id)->orderBy('id')->pluck('id')->map(fn ($id): int => (int) $id)->all();
@@ -765,6 +964,12 @@ describe('GelRattachement::motifDeGel()', function () {
         expect($ligneIds)->not->toBeEmpty()
             ->and($gel->etatDeGel((int) $piece->id)['lignes'])->toBe($refusees)
             ->and($refusees !== [])->toBe($attendu !== 'aucun');
+
+        // Et la jumelle sans refus de la garde de ligne gèle exactement les mêmes lignes.
+        $gelees = array_values(array_filter($ligneIds, fn (int $id): bool => DB::transaction(
+            fn () => $gel->ligneGeleeSousVerrou(TransactionLigne::withoutGlobalScopes()->findOrFail($id))
+        )));
+        expect($gelees)->toBe($refusees);
 
         TenantContext::boot($association);
     })->with([
