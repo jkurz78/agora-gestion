@@ -246,7 +246,8 @@ construction avec l'exercice sélectionné, puisque les candidats en sont tirés
 
 ### 6.2 Zone « Rattachements de l'exercice »
 
-Cas, ligne d'origine cliquable vers sa transaction, compte, opération, montant, pièce jointe, auteur,
+Cas, numéro de pièce d'origine (sans lien : aucun lien direct vers une pièce n'existe dans
+l'application — précisé le 2026-10-05), compte, opération, montant, pièce jointe, auteur,
 date de saisie, action **« Retirer »**.
 
 ### 6.3 La modale
