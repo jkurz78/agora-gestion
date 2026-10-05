@@ -249,9 +249,9 @@ final class HelloAssoSyncService
                     // transaction de la commande, avant toute écriture et tout verrou de ligne, dans l'ordre
                     // d'update() (les lots, la pièce, ses lignes, leurs rattachements), qui prolonge celui de
                     // rattacher() (la pièce, la ligne, les rattachements).
-                    // Sans cela, la synchronisation prendrait la LIGNE avant la pièce (la pièce n'est écrite qu'à la
-                    // fin, pour son total, et pas du tout quand seul le montant change) : l'inverse de rattacher(),
-                    // donc un inter-blocage possible avec lui. La pièce rendue est relue sous verrou : on poursuit
+                    // Sans cela, la synchronisation prendrait la LIGNE avant la pièce (l'en-tête n'est réécrit que s'il
+                    // change ; quand seul le montant change, la pièce n'est écrite qu'à la fin, pour son total, après
+                    // les lignes) : l'inverse de rattacher(), donc un inter-blocage possible avec lui. La pièce rendue est relue sous verrou : on poursuit
                     // avec elle, non avec la lecture du début de transaction, qui peut précéder un autre commit.
                     //
                     // Contexte d'association : booté sur les deux chemins qui mènent ici (la commande

@@ -242,7 +242,11 @@ final class GelRattachement
      */
     public function verrouillerPieceNonGelee(Transaction $piece): Transaction
     {
-        ['piece' => $verrouillee, 'exercices' => $exercices] = $this->verrouillerPieceEtRattachements($piece);
+        ['piece' => $verrouillee, 'exercices' => $exercices, 'ecriture' => $ecriture] = $this->verrouillerPieceEtRattachements($piece);
+
+        if ($ecriture) {
+            throw new RuntimeException(self::MOTIF_ECRITURE_DE_RATTACHEMENT);
+        }
 
         if ($exercices !== []) {
             throw new RuntimeException(self::MOTIF_PIECE_GELEE);
@@ -271,7 +275,7 @@ final class GelRattachement
      */
     public function verrouillerPieceSansRefus(Transaction $piece): array
     {
-        ['piece' => $verrouillee, 'exercices' => $exercices, 'ecriture' => $ecriture] = $this->verrouillerPieceEtRattachements($piece, refuserUneEcriture: false);
+        ['piece' => $verrouillee, 'exercices' => $exercices, 'ecriture' => $ecriture] = $this->verrouillerPieceEtRattachements($piece);
 
         return ['piece' => $verrouillee, 'gelee' => $ecriture || $exercices !== []];
     }
@@ -306,7 +310,11 @@ final class GelRattachement
      */
     public function verrouillerPieceExtournable(Transaction $origine, CarbonInterface $dateAnnulation, bool $dateImposee = false): Transaction
     {
-        ['piece' => $verrouillee, 'exercices' => $exercices] = $this->verrouillerPieceEtRattachements($origine);
+        ['piece' => $verrouillee, 'exercices' => $exercices, 'ecriture' => $ecriture] = $this->verrouillerPieceEtRattachements($origine);
+
+        if ($ecriture) {
+            throw new RuntimeException(self::MOTIF_ECRITURE_DE_RATTACHEMENT);
+        }
 
         if ($exercices === []) {
             return $verrouillee;
@@ -352,10 +360,11 @@ final class GelRattachement
     }
 
     /**
-     * Le préfixe de verrous commun aux gardes de la pièce : verrouille, lit et rend ce qu'il faut pour
-     * en décider, sans décider lui-même, hormis le refus d'une écriture de rattachement, qui ne dépend
-     * d'aucune date. Rend la pièce verrouillée, et les exercices (N) de tous les rattachements de ses
-     * lignes, dans l'ordre où la base les rend : la liste vide dit que la pièce ne porte aucun rattachement.
+     * Le préfixe de verrous commun aux gardes de la pièce : verrouille et constate, sans décider ni refuser.
+     * Rend la pièce verrouillée, si elle est une écriture de rattachement (`ecriture`), et les exercices (N)
+     * de tous les rattachements de ses lignes, dans l'ordre où la base les rend : la liste vide dit que la
+     * pièce ne porte aucun rattachement. Chaque site tire ses conclusions : les gardes refusent une écriture
+     * de rattachement (MOTIF_ECRITURE_DE_RATTACHEMENT), la synchronisation HelloAsso la conserve.
      *
      * Ordre des verrous : les lots 401/411 de la pièce (VerrouLotsCanoniques), la pièce, ses lignes dans
      * l'ordre de leur identifiant, puis UNE lecture verrouillante directe des rattachements de ces lignes.
@@ -377,16 +386,14 @@ final class GelRattachement
      * que l'appelant tient la pièce, aucun rattachement de ses lignes ne peut être créé ni retiré :
      * rattacher() et retirer() l'attendent.
      *
-     * @param  bool  $refuserUneEcriture  vrai : une écriture de rattachement est refusée (les gardes) ; faux : elle est
-     *                                    rendue avec `ecriture` vrai, sans que ses lignes ni ses rattachements soient
-     *                                    lus (verrouillerPieceSansRefus())
+     * Une écriture de rattachement est rendue avec `ecriture` vrai et `exercices` vide, sans que ses lignes ni
+     * ses rattachements soient lus : elle n'est l'origine d'aucun rattachement.
+     *
      * @return array{piece: Transaction, exercices: list<int>, ecriture: bool}
      *
-     * @throws RuntimeException MOTIF_ECRITURE_DE_RATTACHEMENT si la pièce est une écriture de rattachement
-     *                          et que $refuserUneEcriture est vrai
      * @throws ModelNotFoundException la pièce n'existe plus en base (supprimée physiquement)
      */
-    private function verrouillerPieceEtRattachements(Transaction $piece, bool $refuserUneEcriture = true): array
+    private function verrouillerPieceEtRattachements(Transaction $piece): array
     {
         $pieceId = (int) $piece->id;
 
@@ -402,14 +409,11 @@ final class GelRattachement
         }
 
         // Une écriture de rattachement ne se réécrit pas ici, et ne s'annule pas davantage, quelle que
-        // soit la date : elle se défait avec son rattachement. Lu sur la pièce verrouillée : refuser sur
-        // l'instance reçue laisserait passer l'appelant dont la copie est périmée. Avant de verrouiller
-        // les lignes : une écriture n'est l'origine d'aucun rattachement, il n'y a rien d'autre à lire.
+        // soit la date : elle se défait avec son rattachement (les gardes la refusent sur ce constat).
+        // Lu sur la pièce verrouillée : se fier à l'instance reçue laisserait passer l'appelant dont la
+        // copie est périmée. Avant de verrouiller les lignes : une écriture n'est l'origine d'aucun
+        // rattachement, il n'y a rien d'autre à lire.
         if ($verrouillee->provision_id !== null) {
-            if ($refuserUneEcriture) {
-                throw new RuntimeException(self::MOTIF_ECRITURE_DE_RATTACHEMENT);
-            }
-
             return ['piece' => $verrouillee, 'exercices' => [], 'ecriture' => true];
         }
 

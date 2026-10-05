@@ -22,6 +22,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Tests\TestCase;
 
 /*
 |--------------------------------------------------------------------------
@@ -34,8 +35,8 @@ use Illuminate\Support\Facades\Log;
 | l'opération et la séance de sa ligne d'origine (D3, D8) et son montant (D12) : sur une ligne rattachée, la
 | synchronisation ne modifie donc NI le montant (montant, débit, crédit), NI le compte, NI l'opération, NI la
 | pièce qui la porte (transaction_id) ; sur une pièce gelée, elle ne modifie pas la date (la redater la ferait
-| changer d'exercice sous son rattachement). Elle synchronise tout le reste : les libellés (notes, palier, code
-| promo), la ligne sœur non rattachée, les autres champs de l'en-tête, les autres commandes du lot.
+| changer d'exercice sous son rattachement). Elle synchronise tout le reste : les libellés, notes, palier et code
+| promo ; la ligne sœur non rattachée ; les autres champs de l'en-tête ; les autres commandes du lot.
 |
 | Ces tests passent par le VRAI HelloAssoSyncService, sur des commandes simulées (aucun appel à l'API :
 | Http::preventStrayRequests()). Un test par conservation tue celle-là et pas une autre : retirer la
@@ -136,7 +137,7 @@ function synchroCommande(array $surcharges = []): array
 }
 
 /** Une passe de la synchronisation sur ces commandes, avec les paramètres relus (le mapping et le compte de repli peuvent avoir changé). */
-function synchroLancer(object $test, array ...$commandes): HelloAssoSyncResult
+function synchroLancer(TestCase $test, array ...$commandes): HelloAssoSyncResult
 {
     return (new HelloAssoSyncService($test->parametres->fresh()))->synchroniser($commandes, 2025);
 }
@@ -146,7 +147,7 @@ function synchroLancer(object $test, array ...$commandes): HelloAssoSyncResult
  *
  * @return array{0: TransactionLigne, 1: Provision}
  */
-function synchroRattacher(object $test, string $cle = 'parent', int $item = 95001): array
+function synchroRattacher(TestCase $test, string $cle = 'parent', int $item = 95001): array
 {
     $ligne = TransactionLigne::where('helloasso_item_id', $item)->where('helloasso_line_key', $cle)->sole();
 
