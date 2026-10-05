@@ -426,8 +426,8 @@ Extourne  01/09/2026  OD   487  D 175,00          /  706B C 175,00 (op. 8)
 **Second cas, le refus** : `transaction_lignes#84` (741, 20 000 € au crédit, trois affectations)
 doit être **refusée** à la recherche libre et au service sur appel direct, avec un motif lisible.
 C'est le test qui prouve que D4 ne laisse pas passer une ligne sans opération propre. À la
-détection, elle **n'apparaît pas** : ses trois opérations se terminent avant le 31/08/2026, elle
-n'a rien à décaler (§ 6.1). Une ligne ventilée sur une opération future, elle, y est écartée avec
+détection, elle **n'apparaît pas** : aucune de ses trois opérations ne démarre après le 31/08/2026
+(elles s'y terminent même toutes), elle n'a rien à décaler (§ 6.1). Une ligne ventilée sur une opération future, elle, y est écartée avec
 son motif.
 
 **Troisième cas, le refus de sens** : la ligne `709A` débitrice doit être refusée aux trois mêmes
