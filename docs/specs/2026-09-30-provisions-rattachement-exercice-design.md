@@ -1,7 +1,9 @@
 # Écritures de rattachement à l'exercice — CCA / PCA, puis FNP / PAR
 
 > **Date** : 2026-09-30, révisée le 2026-10-01 après revue externe
-> **Statut** : spec validée, plan à écrire
+> **Statut** : spec validée ; lot 1 (CCA / PCA) livré, lot 2 (FNP / PAR) à venir.
+> **Plan du lot 1** (exécuté) : `docs/superpowers/plans/2026-10-01-rattachement-exercice-lot1.md`, dans le dépôt
+> principal seulement : le dossier `docs/superpowers/` n'est pas versionné.
 > **Remplace** : [2026-06-18-provisions-partie-double.md](2026-06-18-provisions-partie-double.md)
 
 ## 1. Contexte

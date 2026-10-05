@@ -24,7 +24,7 @@ use Throwable;
  * Rattachement d'un produit ou d'une charge à l'exercice suivant (CCA/PCA).
  *
  * Toutes les gardes d'éligibilité de la LIGNE vivent dans motifDeRefus() : le service
- * s'y réfère, et l'écran (Task 11) devra s'y référer aussi. La détection
+ * s'y réfère, et l'écran aussi (ProvisionIndex::modale()). La détection
  * (CandidatsRattachementQuery) reproduit ces gardes en SQL, plus celle qui lui est
  * propre (une opération postérieure à l'exercice) : son test d'accord
  * (CandidatsRattachementQueryTest) vérifie, dans les deux sens, qu'elle ne propose rien
@@ -33,7 +33,7 @@ use Throwable;
  *
  * L'ouverture de la PÉRIODE se contrôle à part : sous verrou dans rattacher() et
  * retirer() (exercices N et N+1), et sans verrou par motifPeriodeFermee(), que l'écran lit pour
- * prévenir (Task 11). Une ligne éligible dont l'exercice, ou le suivant, est clôturé est donc
+ * prévenir (ProvisionIndex). Une ligne éligible dont l'exercice, ou le suivant, est clôturé est donc
  * refusée par rattacher() sans que motifDeRefus() l'ait écartée.
  *
  * Le VERROU d'une ligne rattachée (§ 7) n'est PAS ici : il vit dans GelRattachement, que les gestes qui
@@ -156,9 +156,9 @@ final class RattachementExerciceService
         // D4 : la ventilation vit dans les affectations, la ligne n'a pas
         // d'opération propre à hériter. Sous verrou, la lecture est verrouillante et directe, comme
         // estRattacheeSousVerrou() : pas de FOR UPDATE dans un EXISTS. La ventilation (affecterLigne(),
-        // supprimerAffectations()) prend le verrou de CETTE ligne avant de toucher à ses affectations (Task 8c),
-        // et rattacher() le prend aussi avant de juger : ils s'excluent déjà, et une ventilation en cours est
-        // attendue, non devancée. Cette lecture ne sert donc plus à l'attendre ; elle reste pour lire le
+        // supprimerAffectations() de TransactionService) prend le verrou de CETTE ligne avant de toucher à ses
+        // affectations, et rattacher() le prend aussi avant de juger : ils s'excluent déjà, et une ventilation en
+        // cours est attendue, non devancée. Cette lecture ne sert donc plus à l'attendre ; elle reste pour lire le
         // dernier état validé, quel que soit le cliché de la transaction, sans supposer que tout autre écrivain
         // d'affectations respecte le verrou de la ligne.
         if ($sousVerrou ? $ligne->affectations()->lockForUpdate()->value('id') !== null : $ligne->affectations()->exists()) {
@@ -391,8 +391,9 @@ final class RattachementExerciceService
      * Les verrous suivent l'ordre de rattacher() : association et exercice N (le même appel
      * qu'à la création), exercice N+1, pièce, ligne, puis le rattachement EN DERNIER. C'est
      * l'ordre dans lequel rattacher() lit `provisions` (après la pièce et la ligne), et celui
-     * que suivront les gardes d'écriture des Tasks 7 à 9 : un retrait qui verrouillerait le
-     * rattachement d'abord s'inter-bloquerait avec eux. L'exercice est celui du
+     * que suivent les gardes d'écriture de GelRattachement (reclassement, édition, suppression,
+     * annulation, extourne, ventilation, synchronisation HelloAsso) : un retrait qui verrouillerait
+     * le rattachement d'abord s'inter-bloquerait avec eux. L'exercice est celui du
      * rattachement (`$provision->exercice`), qui est celui de ses écritures, et non la date
      * de la pièce : la pièce a pu être supprimée ou redatée depuis.
      *
@@ -552,10 +553,14 @@ final class RattachementExerciceService
      * Ne refuse jamais : une pièce ou une ligne introuvable est rendue nulle, et c'est à
      * l'appelant d'en décider.
      *
-     * L'ordre est celui de TransactionService::update() (exercice, pièce, puis suppression des
-     * lignes). Parmi les écritures qui touchent la pièce ou la ligne, seuls rattacher() et
-     * retirer() prennent le verrou d'association : les autres (édition, annulation,
-     * synchronisation HelloAsso) ne s'excluent que par ces deux verrous.
+     * L'ordre est celui de TransactionService::update() : exercice, lots 401/411, pièce, lignes,
+     * rattachements (la garde de GelRattachement prend les quatre derniers). Seuls rattacher() et
+     * retirer() prennent en plus le verrou d'association. update(), delete(), annuler(), l'extourne,
+     * le reclassement et la ventilation partagent avec rattacher() le verrou exclusif sur la ligne
+     * d'exercice (celle de la date de la pièce ; pour l'extourne, celle de la date de l'annulation) :
+     * ils s'excluent par lui, puis par le verrou de la ligne ou celui de la pièce, selon le geste. La
+     * synchronisation HelloAsso ne prend pas celui de l'exercice : seules la pièce et la ligne
+     * l'excluent de rattacher().
      *
      * @param  int|null  $pieceId  nul : la lecture préalable n'a pas trouvé la ligne (retirer()),
      *                             donc aucune pièce à verrouiller ; la ligne, elle, est quand même

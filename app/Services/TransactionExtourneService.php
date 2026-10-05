@@ -68,8 +68,9 @@ final class TransactionExtourneService
 
         return DB::transaction(function () use ($origine, $payload, $anneeAnnulation): Extourne {
             // Les verrous d'abord, AVANT la numérotation du miroir (creerTransactionMiroir()) : rattacher()
-            // et retirer() tiennent la pièce puis numérotent leurs écritures. Une extourne qui numéroterait
-            // la première, puis demanderait la pièce, s'inter-bloquerait avec eux.
+            // tient la pièce puis numérote ses écritures (retirer() tient la pièce aussi, mais ne numérote
+            // rien). Une extourne qui numéroterait la première, puis demanderait la pièce, s'inter-bloquerait
+            // avec rattacher().
             //
             // Ordre : l'exercice de l'ANNULATION (celui de la date saisie, non celui de la pièce), puis la
             // garde du rattachement (les lots 401/411, la pièce, ses lignes, leurs rattachements), puis la

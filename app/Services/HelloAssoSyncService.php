@@ -805,8 +805,13 @@ final class HelloAssoSyncService
      * qui est conservé et ce que la commande annonçait. Rien n'est journalisé quand la commande n'annonce rien de
      * différent : la synchronisation repasse sur les mêmes commandes, un avertissement par passage serait du bruit.
      *
-     * Le gel est constaté SOUS VERROU par l'appelant (GelRattachement::ligneGeleeSousVerrou()), après le verrou de la
-     * pièce de la commande. Une ligne d'écriture de rattachement n'arrive jamais ici : ces lignes ne portent pas de
+     * Le gel est constaté SOUS VERROU par l'appelant (GelRattachement::ligneGeleeSousVerrou() : le verrou de la ligne,
+     * puis ses rattachements). Quand la commande retrouve sa pièce, celle-ci a été verrouillée en tête de la transaction
+     * (verrouillerPieceSansRefus()), avant la ligne. Quand elle n'en retrouve pas et en crée une, il n'y a pas de pièce
+     * à verrouiller avant : une ligne déjà connue, retrouvée par son helloasso_item_id, appartient alors à une AUTRE
+     * pièce, que rien n'a verrouillée avant elle (constaté, non corrigé ici).
+     *
+     * Une ligne d'écriture de rattachement n'arrive jamais ici : ces lignes ne portent pas de
      * helloasso_item_id, et la ligne à synchroniser est retrouvée par lui.
      *
      * @param  array<string, mixed>  $data

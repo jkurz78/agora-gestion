@@ -46,8 +46,7 @@ final class GelRattachement
     /**
      * Le message unique du verrou (spec § 7), destiné à TOUS les sites qui refusent d'écrire sur
      * une pièce dont une ligne est rattachée : reclassement, retrait de ligne, édition, suppression,
-     * annulation, ventilation. Posé sur le reclassement, le retrait de ligne, l'édition, la suppression,
-     * l'annulation et la ventilation. Il nomme le constat, l'écran où se défait le rattachement et la sortie : le retirer,
+     * annulation, ventilation. Il nomme le constat, l'écran où se défait le rattachement et la sortie : le retirer,
      * corriger, le repasser. Un site qui en formulerait un autre rendrait le refus illisible d'un écran
      * à l'autre. Seule l'annulation par extourne a le sien (motifExtournePrecoce()) : elle n'est refusée
      * que selon sa date, et sa sortie n'est pas « corriger, puis repasser ». La synchronisation HelloAsso ne
@@ -80,8 +79,9 @@ final class GelRattachement
      * unique MOTIF_PIECE_GELEE, si cette ligne porte un rattachement, et par MOTIF_ECRITURE_DE_RATTACHEMENT
      * si la ligne appartient à une écriture de rattachement (dotation ou extourne générée). Les gestes
      * qui réécrivent la pièce entière appellent verrouillerPieceNonGelee(). Sites : le reclassement
-     * (Task 7) ; la ventilation, affecterLigne() et supprimerAffectations() (Task 8c). La synchronisation
-     * HelloAsso (Task 9) en appelle la jumelle ligneGeleeSousVerrou(), qui rend le constat sans lever.
+     * (ReclassementLigneService) ; la ventilation, affecterLigne() et supprimerAffectations() de
+     * TransactionService. La synchronisation HelloAsso en appelle la jumelle ligneGeleeSousVerrou(),
+     * qui rend le constat sans lever.
      *
      * À appeler DANS la transaction de l'appelant, APRÈS ses verrous d'exercice : les verrous
      * pris ici tiennent jusqu'à son commit, et c'est ce qui rend la lecture vraie au moment d'écrire.
@@ -223,7 +223,7 @@ final class GelRattachement
      * si la pièce est elle-même une écriture de rattachement. Rend la pièce verrouillée, relue sous
      * verrou : l'appelant poursuit avec elle, et non avec l'instance qu'il avait reçue.
      *
-     * Sites : l'édition, la suppression et l'annulation de TransactionService (Task 8a). L'annulation par
+     * Sites : update(), delete() et annuler() de TransactionService. L'annulation par
      * extourne a sa variante datée, verrouillerPieceExtournable() (D13 : une annulation datée après N reste
      * permise) : cette garde-ci refuse sans condition de date.
      *
