@@ -222,7 +222,10 @@ postérieur à la fin de l'exercice. **Une seule requête** — la ventilation e
 
 - ligne de **sens inverse** — classe 6 au crédit, classe 7 au débit (D9) ;
 - ligne **porteuse d'affectations** (D4). Elle n'a pas d'opération propre à hériter ; elle est
-  listée comme **écartée, avec son motif**, jamais omise en silence ;
+  listée comme **écartée, avec son motif**, jamais omise en silence — **dès qu'elle aurait été
+  candidate** : son opération propre, ou au moins une opération de sa ventilation, démarre après N
+  (précisé le 2026-10-05, décision du propriétaire). Une ligne ventilée sur des opérations qui
+  tiennent toutes dans N n'a rien à décaler : elle n'est pas listée ;
 - ligne d'une **extourne**, ou d'une pièce dont l'**annulation est datée au plus tard le dernier jour de N** (D13) ;
 - ligne du **journal OD** (D14) ;
 - ligne appartenant à une transaction de rattachement : `transactions.provision_id IS NOT NULL`.
@@ -421,9 +424,11 @@ Extourne  01/09/2026  OD   487  D 175,00          /  706B C 175,00 (op. 8)
 | 2026‑2027 | 706B : **+175,00** | **+175,00** | 487 soldé |
 
 **Second cas, le refus** : `transaction_lignes#84` (741, 20 000 € au crédit, trois affectations)
-doit être **refusée** — à la détection, à la recherche libre et au service sur appel direct — avec
-un motif lisible. C'est le test qui prouve que D4 ne laisse pas passer une ligne sans opération
-propre.
+doit être **refusée** à la recherche libre et au service sur appel direct, avec un motif lisible.
+C'est le test qui prouve que D4 ne laisse pas passer une ligne sans opération propre. À la
+détection, elle **n'apparaît pas** : ses trois opérations se terminent avant le 31/08/2026, elle
+n'a rien à décaler (§ 6.1). Une ligne ventilée sur une opération future, elle, y est écartée avec
+son motif.
 
 **Troisième cas, le refus de sens** : la ligne `709A` débitrice doit être refusée aux trois mêmes
 endroits (D9).
@@ -440,8 +445,10 @@ endroits (D9).
    colonnes est refusé dans les deux sens : aucune renseignée, les deux renseignées.
 5. **AC‑5** — Une ligne **de sens inverse** est refusée aux trois endroits — détection, recherche
    libre, appel direct au service : la ligne `709A` débitrice du § 9.
-6. **AC‑6** — Une ligne **porteuse d'affectations** est refusée aux trois mêmes endroits, avec un
-   motif, et n'est **jamais** traitée au grain ligne : la ligne 84 du § 9.
+6. **AC‑6** — Une ligne **porteuse d'affectations** est refusée par la recherche libre et par le
+   service, avec un motif, et n'est **jamais** traitée au grain ligne : la ligne 84 du § 9. La
+   détection la liste comme écartée, avec ce motif, dès qu'une opération de sa ventilation (ou son
+   opération propre) démarre après N.
 7. **AC‑7** — Un test **par site** du verrou du § 7 : `update()`, `affecterLigne()`,
    `supprimerAffectations()`, `delete()`, `annuler()`, extourne, `reclasser()`, `removeLigne()`,
    et modification du montant par la synchronisation HelloAsso. Chacun doit tuer une garde précise
