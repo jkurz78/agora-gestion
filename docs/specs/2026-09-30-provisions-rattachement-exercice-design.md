@@ -398,7 +398,12 @@ vérifier.
 À confirmer plutôt qu'à modifier :
 
 - **Trésorerie** : neutre par construction — 486/487 sont en classe 4, aucun compte 512 n'est
-  touché, et `FluxTresorerieBuilder` n'appelle plus `ProvisionService`.
+  touché, et `FluxTresorerieBuilder` n'appelle plus `ProvisionService`. Vérifié par test
+  (2026-10-05) : le flux est identique avant et après un rattachement, **sauf le pont « du
+  résultat à la trésorerie »**, qui lit le résultat et bouge donc par construction (706B : 175 → 0
+  sur N). 486/487 n'y ont pas de ligne nommée : l'écart passe dans la ligne « autres », et le pont
+  reste bouclé sur la variation de trésorerie, inchangée. Une ligne « charges / produits constatés
+  d'avance » au pont serait un chantier à part.
 - **Budget** : le réalisé de 706B tombe à 0 sur 2025‑2026. C'est l'effet recherché.
 - **Statut de règlement et lettrage** : inchangés, le rattachement ne touche pas le 411.
 - **`compta:assert-pd-complete`** : les transactions portent `provision_id` et ne sont pas
