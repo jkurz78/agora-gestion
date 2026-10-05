@@ -23,7 +23,6 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\VirementInterne;
 use App\Services\Compta\ANouveau\PosteReporteResolver;
-use App\Services\ExerciceService;
 use App\Services\NumeroPieceService;
 use App\Support\MontantDecimal;
 use App\Tenant\TenantContext;
@@ -59,9 +58,6 @@ use Illuminate\Support\Str;
  */
 final class EcritureGenerator
 {
-    /** Longueur de la colonne `libelle` de `transactions` et de `transaction_lignes`. */
-    private const LIBELLE_LONGUEUR_MAX = 255;
-
     public function __construct(
         private readonly LettrageService $lettrageService,
         private readonly PosteReporteResolver $posteReporteResolver,
@@ -1971,6 +1967,11 @@ final class EcritureGenerator
      *
      * Le sens se lit sur le cas, jamais sur le signe du montant, qui est toujours
      * strictement positif : voir CasProvision::dotationDebiteLeResultat().
+     *
+     * Ce que l'écriture contient (sens, dates, libellé, net de la pièce) est calculé par
+     * SchemaRattachement, SANS écrire : c'est aussi ce que l'aperçu de l'écran affiche, pour
+     * qu'on ne puisse pas montrer une écriture et en écrire une autre. Ici, on ne fait que
+     * l'écrire (spec § 6.3).
      */
     private function pourRattachement(Provision $provision, bool $extourne): Transaction
     {
@@ -1997,49 +1998,22 @@ final class EcritureGenerator
             ->where('numero_pcg', $cas->compteContrepartie())
             ->firstOrFail();
 
-        // La dotation débite le résultat pour une PCA (on retire le produit) ;
-        // l'extourne inverse. Le compte de régularisation prend l'autre jambe.
-        $resultatAuDebit = $extourne
-            ? ! $cas->dotationDebiteLeResultat()
-            : $cas->dotationDebiteLeResultat();
+        // Le sens, les dates, le libellé et le net de la pièce viennent de SchemaRattachement, qui est
+        // aussi ce que l'aperçu de l'écran affiche : ce générateur ne recalcule rien de son côté.
+        $schema = app(SchemaRattachement::class)->ecriture(
+            $cas,
+            (string) $compteResultat->numero_pcg,
+            $montant,
+            (int) $provision->exercice,
+            $provision->libelleEffectif(),
+            $extourne,
+        );
 
-        $debitResultat = $resultatAuDebit ? $montant : 0.0;
-        $creditResultat = $resultatAuDebit ? 0.0 : $montant;
-
-        // `montant_total` est SIGNÉ : c'est le net de la ligne 6/7, un produit au crédit
-        // et une charge au débit, que `compta:check-integrity` (CHECK 3) compare au
-        // champ. La dotation d'une PCA ou d'une CCA retire un produit ou une charge : son
-        // net est négatif. Son extourne le rend : positive. À ne pas confondre avec une
-        // extourne ordinaire (TransactionExtourneService), qui nie le montant de la pièce
-        // extournée : celle-là est négative parce que son origine est positive. Ici c'est
-        // la dotation qui est négative, et son miroir `type_ecriture = 'extourne'` qui est
-        // positif. Avec une magnitude positive, chaque dotation serait signalée par le
-        // cron quotidien et `--fix` réécrirait le champ.
-        $montantTotal = $cas->classe() === 7
-            ? $creditResultat - $debitResultat
-            : $debitResultat - $creditResultat;
-
-        // Les dates viennent du réglage d'exercice de l'association, jamais d'un
-        // 1er septembre en dur : une association en exercice civil aurait des
-        // extournes datées de septembre, et un numéro de pièce rattaché au mauvais
-        // exercice puisqu'il se dérive de cette même date.
-        $exerciceService = app(ExerciceService::class);
-        $date = $extourne
-            ? $exerciceService->dateRange((int) $provision->exercice + 1)['start']
-            : $exerciceService->dateRange((int) $provision->exercice)['end'];
-        $date = Carbon::parse($date->toDateString());
-
-        // Le cas en toutes lettres, pas en sigle : ce libellé est lu au journal OD et au
-        // grand livre.
-        $libelle = ($extourne ? 'Extourne' : 'Rattachement').' — '.mb_strtolower($cas->label()).' : '
-            .$provision->libelleEffectif();
-
-        // Tronqué à la colonne : le préfixe en consomme une quarantaine, et MySQL refuse
-        // l'insertion d'un libellé plus long là où SQLite l'accepte en silence. On garde
-        // 255 caractères en tout, le « … » compris : donc 255 − 1 de texte.
-        if (mb_strlen($libelle) > self::LIBELLE_LONGUEUR_MAX) {
-            $libelle = mb_substr($libelle, 0, self::LIBELLE_LONGUEUR_MAX - 1).'…';
-        }
+        $debitResultat = $schema['lignes']['resultat']['debit'];
+        $creditResultat = $schema['lignes']['resultat']['credit'];
+        $montantTotal = $schema['montant_total'];
+        $libelle = $schema['libelle'];
+        $date = Carbon::parse($schema['date']->toDateString());
 
         return DB::transaction(function () use (
             $provision, $montant, $montantTotal, $libelle, $tenantId, $compteResultat,

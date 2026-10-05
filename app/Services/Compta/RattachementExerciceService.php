@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Compta;
 
 use App\Enums\JournalComptable;
+use App\Models\Exercice;
 use App\Models\Extourne;
 use App\Models\Provision;
 use App\Models\Transaction;
@@ -15,7 +16,9 @@ use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
+use Throwable;
 
 /**
  * Rattachement d'un produit ou d'une charge à l'exercice suivant (CCA/PCA).
@@ -29,9 +32,9 @@ use RuntimeException;
  * n'est pas pour autant tout ce que la détection propose.
  *
  * L'ouverture de la PÉRIODE se contrôle à part : sous verrou dans rattacher() et
- * retirer() (exercices N et N+1), et par période à l'écran (Task 11). Une ligne éligible
- * dont l'exercice, ou le suivant, est clôturé est donc refusée par rattacher() sans que
- * motifDeRefus() l'ait écartée.
+ * retirer() (exercices N et N+1), et sans verrou par motifPeriodeFermee(), que l'écran lit pour
+ * prévenir (Task 11). Une ligne éligible dont l'exercice, ou le suivant, est clôturé est donc
+ * refusée par rattacher() sans que motifDeRefus() l'ait écartée.
  *
  * Le VERROU d'une ligne rattachée (§ 7) n'est PAS ici : il vit dans GelRattachement, que les gestes qui
  * écrivent sur une pièce reçoivent sans atteindre ce service (ni ProvisionPDService, ni EcritureGenerator).
@@ -167,6 +170,47 @@ final class RattachementExerciceService
         }
 
         return null;
+    }
+
+    /**
+     * Rend le motif pour lequel l'exercice N n'accepte ni création ni retrait de rattachement, ou null :
+     * un rattachement s'écrit dans DEUX exercices, la dotation dans N et l'extourne dans N+1, et il suffit
+     * qu'un seul soit clôturé pour que ni l'un ni l'autre ne soit possible (spec § 5).
+     *
+     * Une lecture, SANS verrou : l'écran s'en sert pour PRÉVENIR (un bandeau, des boutons désactivés). L'autorité
+     * reste rattacher() et retirer(), qui contrôlent les deux exercices sous verrou dans leur transaction. Un
+     * exercice absent de la base n'est pas clôturé (l'extourne est générée même si N+1 n'existe pas encore).
+     *
+     * Le message n'a pas de jargon : il dit lequel est clôturé et pourquoi les deux comptent.
+     */
+    public function motifPeriodeFermee(int $exercice): ?string
+    {
+        $suivant = $exercice + 1;
+        $exercices = Exercice::query()
+            ->whereIn('annee', [$exercice, $suivant])
+            ->get()
+            ->keyBy(fn (Exercice $e): int => (int) $e->annee);
+
+        $clotures = array_values(array_filter(
+            [$exercice, $suivant],
+            fn (int $annee): bool => $exercices->get($annee)?->isCloture() === true,
+        ));
+
+        if ($clotures === []) {
+            return null;
+        }
+
+        $labels = array_map(fn (int $annee): string => $this->exerciceService->label($annee), $clotures);
+        $pluriel = count($clotures) > 1;
+
+        return ($pluriel
+                ? 'Les exercices '.implode(' et ', $labels).' sont clôturés'
+                : 'L’exercice '.$labels[0].' est clôturé')
+            .' : on ne peut ni constater ni retirer de rattachement. '
+            .'Un rattachement s’écrit dans deux exercices — l’écriture de rattachement à la fin de '
+            .$this->exerciceService->label($exercice).', son annulation au début de '
+            .$this->exerciceService->label($suivant).' — et il faut que les deux soient ouverts. '
+            .($pluriel ? 'Réouvrez les exercices clôturés pour continuer.' : 'Réouvrez l’exercice clôturé pour continuer.');
     }
 
     /**
@@ -358,6 +402,10 @@ final class RattachementExerciceService
      * nettoyer. Il les verrouille donc supprimées logiquement comprises : sa seule raison de
      * les verrouiller est de s'exclure avec ce qui les écrit.
      *
+     * Le dossier de la pièce jointe du rattachement (`provisions/{id}/`) est supprimé APRÈS le commit, au
+     * mieux : le fichier n'est pas une donnée comptable, et un disque qui échoue ne doit pas défaire un retrait
+     * déjà validé. L'échec est journalisé (avertissement, avec le dossier à nettoyer à la main).
+     *
      * Appelable plusieurs fois sur la même instance : le rattachement est relu sous verrou, et
      * un rattachement déjà retiré (ici, ou par un autre utilisateur) est un refus lisible.
      *
@@ -390,7 +438,7 @@ final class RattachementExerciceService
         $pieceId = $pieceId !== null ? (int) $pieceId : null;
 
         // 3 tentatives, comme rattacher() : un inter-blocage est rejoué, tout est relu sous verrou.
-        $montant = DB::transaction(function () use ($exercice, $provisionId, $ligneId, $pieceId): float {
+        [$montant, $dossier] = DB::transaction(function () use ($exercice, $provisionId, $ligneId, $pieceId): array {
             // Ordre canonique de rattacher() : association, exercice source, exercice cible.
             // La dotation vit dans N, l'extourne dans N+1 : les deux doivent être ouverts.
             $this->exerciceService->assertOuvertPourEcriture($exercice);
@@ -414,18 +462,45 @@ final class RattachementExerciceService
             $this->provisionPD->supprimer($verrouille);
             $verrouille->delete();
 
-            return round((float) $verrouille->montant, 2);
+            return [round((float) $verrouille->montant, 2), $verrouille->storagePath('provisions/'.$provisionId)];
         }, 3);
 
         // Après le commit, rien ne doit plus pouvoir lever : un retrait validé ne doit pas
         // remonter comme une erreur. Pas de cas ici : il se lit sur la ligne d'origine, qui a pu
         // être supprimée.
+        $this->supprimerDossierPieceJointe($provisionId, $dossier);
+
         Log::info('[Rattachement] écriture de rattachement retirée', [
             'provision_id' => $provisionId,
             'transaction_ligne_id' => $ligneId,
             'exercice' => $exercice,
             'montant' => $montant,
         ]);
+    }
+
+    /**
+     * Supprime le dossier de la pièce jointe d'un rattachement retiré, au mieux : jamais d'exception, un échec
+     * (le disque lève, ou répond qu'il n'a pas pu) est journalisé en avertissement. Un dossier absent n'est pas
+     * un échec : la plupart des rattachements n'ont pas de pièce jointe.
+     */
+    private function supprimerDossierPieceJointe(int $provisionId, string $dossier): void
+    {
+        $erreur = null;
+
+        try {
+            $supprime = Storage::disk('local')->deleteDirectory($dossier);
+        } catch (Throwable $e) {
+            $supprime = false;
+            $erreur = $e->getMessage();
+        }
+
+        if (! $supprime) {
+            Log::warning('[Rattachement] le dossier de la pièce jointe du rattachement retiré n’a pas pu être supprimé', [
+                'provision_id' => $provisionId,
+                'dossier' => $dossier,
+                'erreur' => $erreur,
+            ]);
+        }
     }
 
     /**
