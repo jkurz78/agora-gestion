@@ -5,13 +5,17 @@ declare(strict_types=1);
 use App\DataTransferObjects\ExtournePayload;
 use App\Enums\ModePaiement;
 use App\Models\Compte;
+use App\Models\CompteBancaire;
 use App\Models\Extourne;
 use App\Models\Operation;
 use App\Models\Provision;
+use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\TransactionLigneAffectation;
+use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\GelRattachement;
+use App\Services\Compta\Migrations\BancairesSeeder;
 use App\Services\Compta\RattachementExerciceService;
 use App\Services\Compta\ReclassementLigneService;
 use App\Services\TransactionExtourneService;
@@ -596,4 +600,46 @@ function verrouLignesVentilables(Testable $formulaire): array
     preg_match_all('/wire:click="ouvrirVentilation\((\d+)\)"/', $formulaire->html(), $trouves);
 
     return array_map('intval', $trouves[1]);
+}
+
+/**
+ * Une recette RÉGLÉE à l'encaissement (EcritureGenerator::pourRecetteComptant() : le 411 est lettré, c'est le règlement
+ * que l'écran lit pour offrir « Reclasser »), à deux lignes de produit dont la première est rattachée. Les comptes
+ * système (411) sont ceux du seeder : à poser avant l'appel (SystemeSeeder::seed()).
+ *
+ * @return array{rattachee: TransactionLigne, soeur: TransactionLigne, piece: Transaction, provision: Provision}
+ */
+function verrouPieceRegleeAvecRattachement(TestCase $test): array
+{
+    $assocId = (int) TenantContext::currentId();
+    $iban = 'FR7612345000012345678901234';
+
+    CompteBancaire::factory()->create(['association_id' => $assocId, 'iban' => $iban]);
+    BancairesSeeder::seed();
+    $banque = Compte::where('iban', $iban)->where('association_id', $assocId)->firstOrFail();
+
+    $compteA = Compte::factory()->recette()->create(['association_id' => $assocId, 'actif' => true]);
+    $compteB = Compte::factory()->recette()->create(['association_id' => $assocId, 'actif' => true]);
+
+    $piece = app(EcritureGenerator::class)->pourRecetteComptant(
+        tiers: Tiers::factory()->create(['association_id' => $assocId]),
+        ventilations: [['compte' => $compteA, 'montant' => 100.0], ['compte' => $compteB, 'montant' => 75.0]],
+        mode: ModePaiement::Virement,
+        compteTresorerie: $banque,
+        date: new DateTimeImmutable('2026-04-08'),
+        libelle: 'Recette réglée',
+    );
+
+    // EcritureGenerator ne pose pas le `montant` des lignes (tout est dans debit / credit) : le formulaire le lit.
+    $rattachee = $piece->lignes()->where('compte_id', $compteA->id)->sole();
+    $soeur = $piece->lignes()->where('compte_id', $compteB->id)->sole();
+    $rattachee->update(['montant' => 100.0]);
+    $soeur->update(['montant' => 75.0]);
+
+    return [
+        'rattachee' => $rattachee->fresh(),
+        'soeur' => $soeur->fresh(),
+        'piece' => $piece,
+        'provision' => verrouRattacherAvecEcritures($test, $rattachee->fresh()),
+    ];
 }

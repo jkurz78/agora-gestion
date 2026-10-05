@@ -167,11 +167,16 @@
                         // réglée, sans toucher au montant ni au règlement. Offert à qui peut
                         // écrire en compta, hors exercice clôturé (écran en consultation).
                         $peutReclasser = $isLockedByReglement && $this->canEdit && ! $exerciceCloture;
+                        // Pas offert sur une ligne gelée par un rattachement (le service la refuserait) : l'invitation
+                        // ci-dessous ne vaut que si au moins une ligne le propose encore.
+                        $uneLigneReclassable = collect($lignes)->contains(
+                            fn (array $l): bool => ! empty($l['id']) && ! in_array((int) $l['id'], $lignesGelees, true)
+                        );
                     @endphp
                     @if ($isLockedByReglement)
                         <div class="alert alert-warning small py-2 mb-3">
                             <i class="bi bi-lock"></i> Des règlements sont enregistrés : annulez-les avant de modifier la date, le tiers, le compte bancaire ou les montants.
-                            @if ($peutReclasser)
+                            @if ($peutReclasser && $uneLigneReclassable)
                                 Pour corriger le compte, l'opération ou la séance d'une ligne, utilisez « Reclasser » sur cette ligne.
                             @endif
                         </div>
@@ -471,7 +476,7 @@
                                                     @endif
                                                 </div>
                                             @endif
-                                            @if ($peutReclasser && ! empty($ligne['id']))
+                                            @if ($peutReclasser && ! empty($ligne['id']) && ! in_array((int) $ligne['id'], $lignesGelees, true))
                                                 <button type="button" class="btn btn-link btn-sm p-0 mt-1"
                                                         wire:click="ouvrirReclassement({{ (int) $ligne['id'] }})">
                                                     <i class="bi bi-arrow-left-right"></i> Reclasser

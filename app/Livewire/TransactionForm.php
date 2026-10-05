@@ -449,14 +449,11 @@ final class TransactionForm extends Component
 
         // Retour immédiat, pas la garde : retirer une ligne du formulaire ne touche pas la base,
         // la suppression réelle n'a lieu qu'à l'enregistrement (TransactionService::update(), que
-        // la Task 8 gardera). Une lecture simple, hors transaction, suffit donc à prévenir tout de
-        // suite. Seule la ligne rattachée est refusée ici, non ses lignes sœurs : l'enregistrement
-        // refusera de toute façon une pièce dont une ligne est rattachée (spec § 7).
-        $ligneId = $this->lignes[$index]['id'] ?? null;
-
-        if (! empty($ligneId) && TransactionLigne::find((int) $ligneId)?->estRattachee()) {
-            $this->addError('lignes', GelRattachement::MOTIF_PIECE_GELEE);
-
+        // la garde de la pièce protège). Une lecture simple, hors transaction, suffit donc à prévenir tout
+        // de suite. Une pièce gelée est en lecture seule (la vue ne propose déjà plus le retrait) : aucune de
+        // ses lignes ne se retire, la ligne sœur d'une ligne rattachée non plus. Même lecture que les autres
+        // refus de l'écran (etatDeGel(), source unique), relue à chaque appel.
+        if ($this->refuserSiGelee('lignes')) {
             return;
         }
 
@@ -1271,9 +1268,11 @@ final class TransactionForm extends Component
 
     /**
      * Refus préalable, côté serveur, d'un geste qui écrirait sur la pièce OUVERTE alors qu'elle est gelée par un
-     * rattachement (spec § 7) : relit le gel (GelRattachement::motifDeGel(), sans verrou), affiche son motif sous
-     * $cle et rend vrai. Relu à chaque appel, non lu sur $motifGel : le rattachement a pu être posé ou retiré depuis
-     * l'ouverture, et l'affichage suit. Une prévention : sous verrou, le service refuse de toute façon.
+     * rattachement (spec § 7) : relit le gel (GelRattachement::etatDeGel(), sans verrou, comme edit()), en pose les
+     * DEUX termes (le motif et les lignes sur lesquelles un geste sur une ligne serait refusé), affiche le motif
+     * sous $cle et rend vrai. Relu à chaque appel, non lu sur $motifGel : le rattachement a pu être posé ou retiré
+     * depuis l'ouverture, et l'affichage (lecture seule, « Ventiler », « Reclasser ») suit. Une prévention : sous
+     * verrou, le service refuse de toute façon.
      */
     private function refuserSiGelee(string $cle): bool
     {
@@ -1281,7 +1280,7 @@ final class TransactionForm extends Component
             return false;
         }
 
-        $this->motifGel = app(GelRattachement::class)->motifDeGel($this->transactionId);
+        ['motif' => $this->motifGel, 'lignes' => $this->lignesGelees] = app(GelRattachement::class)->etatDeGel($this->transactionId);
 
         if ($this->motifGel === null) {
             return false;

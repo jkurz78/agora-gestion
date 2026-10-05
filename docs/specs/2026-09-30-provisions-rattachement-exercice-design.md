@@ -325,10 +325,11 @@ exempter, `update()` reconstruisant toutes les lignes. Le refus nomme le rattach
 sortie : le retirer, corriger, le repasser.
 
 Précisé le 2026-10-04 : le gel de la pièce entière vaut pour les gestes qui **réécrivent la
-pièce** — `update()`, `delete()`, `annuler()`, extourne. Les gestes **sur une ligne** —
-reclasser, retirer du formulaire, ventiler, modifier le montant par la synchronisation — ne
-refusent que la ligne rattachée : reclasser une ligne sœur ne touche pas la cohérence du
-rattachement, dont l'écriture ne recopie que la ligne d'origine. Deux gardes au service :
+pièce** — `update()`, `delete()`, `annuler()`, extourne, et le retrait d'une ligne du formulaire
+(une pièce gelée s'y affiche en lecture seule : aucune de ses lignes ne se retire, la ligne sœur
+d'une ligne rattachée non plus). Les gestes **sur une ligne** — reclasser, ventiler, modifier le
+montant par la synchronisation — ne refusent que la ligne rattachée : reclasser une ligne sœur ne
+touche pas la cohérence du rattachement, dont l'écriture ne recopie que la ligne d'origine. Deux gardes au service :
 `verrouillerPieceNonGelee()` et `assertLigneNonGelee()`, qui refusent par défaut. Elles vivent dans
 `GelRattachement`, classe à part du service de rattachement : elle ne dépend d'aucune écriture
 comptable (ni `ProvisionPDService` ni `EcritureGenerator`), pour que les gestes qu'elle protège la
@@ -360,17 +361,18 @@ Sites à garder :
 | `TransactionService::delete()` / `annuler()` | Supprimer ou annuler la transaction porteuse. |
 | Extourne de la transaction porteuse | **Datée au plus tard le dernier jour de N** seulement (D13) : elle retirerait deux fois le montant de N. Datée dans N+1 ou après, elle est juste et reste permise — sinon, N une fois clôturé, la pièce ne pourrait plus jamais être annulée, et un remboursement deviendrait impossible par extourne. |
 | [`ReclassementLigneService::reclasser()`](../../app/Services/Compta/ReclassementLigneService.php#L46) | Reclasser la ligne — même grammaire que la garde du reçu fiscal. |
-| [`TransactionForm::removeLigne()`](../../app/Livewire/TransactionForm.php#L407) | Retirer la ligne. |
+| [`TransactionForm::removeLigne()`](../../app/Livewire/TransactionForm.php#L407) | Retirer une ligne du formulaire — de la pièce gelée entière, ligne sœur comprise (lecture seule). |
 | Synchronisation HelloAsso | **Modifier le montant** d'une ligne rattachée. Le refus est journalisé et ne fait pas échouer la synchronisation des autres commandes. Les libellés restent synchronisés. |
 
 **Le formulaire prévient, il ne garde pas.** `TransactionForm::edit()` ouvre une pièce dont une ligne est
 rattachée, ou qui est une écriture de rattachement, en **lecture seule**, comme un exercice clôturé : le motif en
 tête, aucun champ à saisir, ni « Ajouter une ligne » ni retrait de ligne, ni bouton d'enregistrement (« Fermer »
-à la place d'« Annuler »). Restent offerts les gestes sur une ligne là où ils aboutissent : « Ventiler » sur les
-lignes sœurs, ni sur la ligne rattachée ni sur aucune ligne d'une écriture de rattachement, que le service
-refuserait (`GelRattachement::etatDeGel()`, source unique de ce que l'écran sait du gel). Le justificatif reste
-consultable, mais ne se retire, ne se remplace ni ne s'envoie. `save()`, `deletePieceJointe()` et l'envoi d'un
-justificatif refusent en outre côté serveur après avoir relu le gel (`motifDeGel()`, lecture sans verrou) ;
+à la place d'« Annuler »). Restent offerts les gestes sur une ligne là où ils aboutissent : « Ventiler » et
+« Reclasser » (sur une pièce réglée) sur les lignes sœurs, ni sur la ligne rattachée ni sur aucune ligne d'une
+écriture de rattachement, que le service refuserait (`GelRattachement::etatDeGel()`, source unique de ce que l'écran
+sait du gel). Le justificatif reste consultable, mais ne se retire, ne se remplace ni ne s'envoie. `save()`,
+`removeLigne()`, `deletePieceJointe()` et l'envoi d'un justificatif refusent en outre côté serveur après avoir relu
+tout le gel (`etatDeGel()`, lecture sans verrou, qui remet aussi à jour les lignes gelées que la vue lit) ;
 l'autorité reste aux gardes du service, sous verrou.
 
 Le **reçu fiscal ne bloque pas** : un rattachement ne change ni le compte, ni le tiers, ni la date
