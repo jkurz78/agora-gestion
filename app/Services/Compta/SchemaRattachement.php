@@ -13,8 +13,10 @@ use Carbon\CarbonImmutable;
  * jour de N+1), calculées SANS rien écrire : le sens, les dates, le libellé et le net porté sur la pièce.
  *
  * C'est la SOURCE UNIQUE de ce que le rattachement écrit. EcritureGenerator::pourRattachement() l'écrit
- * en base, et l'aperçu de l'écran (la modale « Constater d'avance », spec § 6.3) l'affiche : ni l'un ni
- * l'autre ne recalcule le sens de son côté. C'est exactement le défaut qui a produit l'erreur de la spec de
+ * en base, et l'aperçu de l'écran (la modale « Constater d'avance », spec § 6.3) l'affiche : tous deux lisent
+ * les deux jambes que rend le schéma (numéro de compte, débit, crédit) et ne recalculent ni le sens ni le
+ * compte de la contrepartie de leur côté. Ils ne font qu'y relier les comptes de l'association (l'un pour
+ * écrire, l'autre pour afficher l'intitulé). C'est exactement le défaut qui a produit l'erreur de la spec de
  * juin — une écriture que personne n'avait regardée, calculée à part de ce qu'on en disait.
  *
  * Le schéma est celui du § 5 de la spec :

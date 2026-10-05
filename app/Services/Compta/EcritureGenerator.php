@@ -1992,16 +1992,11 @@ final class EcritureGenerator
             throw new \RuntimeException('Le compte de résultat du rattachement est introuvable dans cette association.');
         }
 
-        $cas = $provision->cas();
-
-        $compteContrepartie = Compte::where('association_id', $tenantId)
-            ->where('numero_pcg', $cas->compteContrepartie())
-            ->firstOrFail();
-
-        // Le sens, les dates, le libellé et le net de la pièce viennent de SchemaRattachement, qui est
-        // aussi ce que l'aperçu de l'écran affiche : ce générateur ne recalcule rien de son côté.
+        // Le sens, les dates, le libellé, le net de la pièce et les DEUX jambes (numéro de compte, débit,
+        // crédit) viennent de SchemaRattachement, qui est aussi ce que l'aperçu de l'écran affiche : ce
+        // générateur ne recalcule rien de son côté, pas même le compte ni le sens de la contrepartie.
         $schema = app(SchemaRattachement::class)->ecriture(
-            $cas,
+            $provision->cas(),
             (string) $compteResultat->numero_pcg,
             $montant,
             (int) $provision->exercice,
@@ -2009,15 +2004,20 @@ final class EcritureGenerator
             $extourne,
         );
 
-        $debitResultat = $schema['lignes']['resultat']['debit'];
-        $creditResultat = $schema['lignes']['resultat']['credit'];
+        ['resultat' => $jambeResultat, 'contrepartie' => $jambeContrepartie] = $schema['lignes'];
+
+        // La jambe de contrepartie rend un NUMÉRO : on le relie ici au compte de l'association courante.
+        $compteContrepartie = Compte::where('association_id', $tenantId)
+            ->where('numero_pcg', $jambeContrepartie['numero_pcg'])
+            ->firstOrFail();
+
         $montantTotal = $schema['montant_total'];
         $libelle = $schema['libelle'];
         $date = Carbon::parse($schema['date']->toDateString());
 
         return DB::transaction(function () use (
             $provision, $montant, $montantTotal, $libelle, $tenantId, $compteResultat,
-            $compteContrepartie, $debitResultat, $creditResultat, $date, $extourne
+            $compteContrepartie, $jambeResultat, $jambeContrepartie, $date, $extourne
         ): Transaction {
             // Pas de `tiers_id` sur l'écriture, volontairement. Le tiers de l'origine
             // (D3) sert à l'affichage — récapitulatif, détection — et ne se recopie
@@ -2059,8 +2059,8 @@ final class EcritureGenerator
             $ligneResultat = TransactionLigne::create([
                 'transaction_id' => $transaction->id,
                 'compte_id' => $compteResultat->id,
-                'debit' => $debitResultat,
-                'credit' => $creditResultat,
+                'debit' => $jambeResultat['debit'],
+                'credit' => $jambeResultat['credit'],
                 'operation_id' => $provision->operationEffectiveId(),
                 'seance' => $provision->seanceEffective(),
                 'tiers_id' => null,
@@ -2069,12 +2069,13 @@ final class EcritureGenerator
             ]);
             $ligneResultat->setRelation('compte', $compteResultat);
 
-            // Contrepartie de régularisation : l'autre jambe, aucune dimension analytique.
+            // Contrepartie de régularisation : l'autre jambe, aucune dimension analytique. Son sens est
+            // celui que le schéma rend, pas un miroir recalculé ici.
             $ligneContrepartie = TransactionLigne::create([
                 'transaction_id' => $transaction->id,
                 'compte_id' => $compteContrepartie->id,
-                'debit' => $creditResultat,
-                'credit' => $debitResultat,
+                'debit' => $jambeContrepartie['debit'],
+                'credit' => $jambeContrepartie['credit'],
                 'operation_id' => null,
                 'seance' => null,
                 'tiers_id' => null,

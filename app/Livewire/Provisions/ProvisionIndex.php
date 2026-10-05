@@ -470,23 +470,19 @@ final class ProvisionIndex extends Component
 
     /**
      * Les deux écritures, quatre lignes. Tout vient de SchemaRattachement ; le débit passe avant le crédit, comme
-     * on lit une écriture. Les intitulés des comptes sont lus ici, le schéma ne rendant que des numéros.
+     * on lit une écriture. Les intitulés des comptes sont lus ici, le schéma ne rendant que des numéros : ce sont
+     * les numéros qu'il rend, jamais ceux que l'écran supposerait.
      *
      * @return list<array{cle: string, titre: string, date: CarbonInterface, libelle: string, lignes: list<array{numero_pcg: string, intitule: ?string, debit: float, credit: float}>}>
      */
     private function apercu(CasProvision $cas, Provision $provision, ?Compte $compteResultat, float $montant, int $exercice): array
     {
         $schema = app(SchemaRattachement::class);
-        $contrepartie = Compte::query()->where('numero_pcg', $cas->compteContrepartie())->first();
-        $intitules = [
-            (string) $compteResultat?->numero_pcg => $compteResultat?->intitule,
-            $cas->compteContrepartie() => $contrepartie?->intitule,
-        ];
 
-        $apercu = [];
+        $ecritures = [];
 
         foreach ([false, true] as $extourne) {
-            $ecriture = $schema->ecriture(
+            $ecritures[$extourne ? 'extourne' : 'dotation'] = $schema->ecriture(
                 $cas,
                 (string) $compteResultat?->numero_pcg,
                 $montant,
@@ -494,7 +490,16 @@ final class ProvisionIndex extends Component
                 $provision->libelleEffectif(),
                 $extourne,
             );
+        }
 
+        // Le scope tenant de Compte borne la lecture à l'association courante.
+        $intitules = Compte::query()
+            ->whereIn('numero_pcg', collect($ecritures)->flatMap(fn (array $ecriture): array => array_column($ecriture['lignes'], 'numero_pcg'))->unique()->values()->all())
+            ->pluck('intitule', 'numero_pcg');
+
+        $apercu = [];
+
+        foreach ($ecritures as $cle => $ecriture) {
             $lignes = collect($ecriture['lignes'])
                 ->map(fn (array $jambe): array => $jambe + ['intitule' => $intitules[$jambe['numero_pcg']] ?? null])
                 ->sortByDesc('debit')
@@ -502,8 +507,8 @@ final class ProvisionIndex extends Component
                 ->all();
 
             $apercu[] = [
-                'cle' => $extourne ? 'extourne' : 'dotation',
-                'titre' => $extourne ? 'Extourne, au début de l’exercice suivant' : 'Écriture de rattachement, à la fin de l’exercice',
+                'cle' => $cle,
+                'titre' => $cle === 'extourne' ? 'Extourne, au début de l’exercice suivant' : 'Écriture de rattachement, à la fin de l’exercice',
                 'date' => $ecriture['date'],
                 'libelle' => $ecriture['libelle'],
                 'lignes' => $lignes,
