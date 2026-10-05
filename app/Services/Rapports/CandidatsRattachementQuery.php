@@ -31,7 +31,9 @@ use Illuminate\Support\Facades\DB;
  * de rattachement, ligne déjà rattachée. Deux lectures de la même règle peuvent diverger ; un test
  * (CandidatsRattachementQueryTest, « accord ») vérifie donc, sur un jeu de lignes de toutes les formes, qu'elle
  * ne propose rien que le service refuse, ET qu'elle ne laisse de côté rien que le service accepte dont
- * l'opération démarre après l'exercice. Toute garde ajoutée à motifDeRefus() doit l'être ici.
+ * l'opération démarre après l'exercice. Toute garde ajoutée à motifDeRefus() doit l'être ici ET dans le jeu de
+ * formes du test d'accord (candidatsJeuDeFormes()) : sans la forme de la nouvelle garde dans ce jeu, le test ne
+ * voit pas l'oubli.
  *
  * Sont lus comme le service les lit : les suppressions logiques (pièce, ligne, compte, opération, annulation),
  * l'isolation par association des annulations (Extourne est sous scope tenant) et la colonne `journal`, qui peut
@@ -76,8 +78,9 @@ use Illuminate\Support\Facades\DB;
  * transaction_ligne_id, transaction_id, piece_date (CarbonImmutable), numero_piece, piece_libelle, ligne_libelle,
  * tiers_id et tiers_nom (le tiers de la PIÈCE, D3 ; nuls s'il n'y en a pas ou s'il est d'une autre association),
  * numero_pcg, compte_intitule, classe, operation_id, operation_nom, operation_debut et operation_fin
- * (CarbonImmutable ; nulles sans opération propre, la dernière aussi sans date de fin), montant (le plus grand du débit et du crédit, celui que le
- * rattachement reprend, D12) et nb_affectations. Les écartées portent en plus `motif`.
+ * (CarbonImmutable ; nulles sans opération propre, la dernière aussi sans date de fin), montant (le plus grand
+ * du débit et du crédit, celui que le rattachement reprend, D12) et nb_affectations. Les écartées portent en
+ * plus `motif`.
  *
  * Le nom du tiers est le libellé de liste de Tiers::sqlLibelleListe() (« Prénom NOM », ou « Raison sociale
  * (Prénom NOM) ») : une jointure gauche simple, scopée, sans GROUP BY.

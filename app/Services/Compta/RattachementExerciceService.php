@@ -83,6 +83,9 @@ final class RattachementExerciceService
      * motif affiché change.
      *
      * Jugement sur l'état lu : rattacher() le refait sous verrou avant d'écrire.
+     *
+     * Garde ajoutée ici (ou dans juger()) ⇒ la reproduire dans CandidatsRattachementQuery ET ajouter sa forme
+     * à candidatsJeuDeFormes() (CandidatsRattachementQueryTest) : sans elle, le test d'accord ne voit pas l'oubli.
      */
     public function motifDeRefus(TransactionLigne $ligne): ?string
     {
@@ -93,6 +96,9 @@ final class RattachementExerciceService
      * Juge la ligne d'après la pièce donnée : la liste ordonnée des gardes d'éligibilité, un
      * motif de refus ou null. Appelée sur l'état lu (motifDeRefus) comme sur l'état verrouillé
      * (rattacher).
+     *
+     * Garde ajoutée ici ⇒ la reproduire dans CandidatsRattachementQuery ET ajouter sa forme à
+     * candidatsJeuDeFormes() (CandidatsRattachementQueryTest) : sans elle, le test d'accord ne voit pas l'oubli.
      *
      * @param  bool  $sousVerrou  vrai dans la transaction de rattacher() : les affectations et
      *                            « déjà rattachée » se lisent alors par des lectures verrouillantes
