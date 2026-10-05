@@ -49,18 +49,21 @@ it('lit le compte de chaque rattachement via son origine', function (): void {
     $recap = $this->service->provisionsExercice(2025)->keyBy('id');
 
     expect($recap[$pca->id]['compte_id'])->toBe((int) $pca->ligne->compte_id)
+        ->and($recap[$pca->id]['compte_numero'])->toBe($pca->ligne->compte->numero_pcg)
         ->and($recap[$pca->id]['compte_nom'])->toBe($pca->ligne->compte->intitule)
         ->and($recap[$cca->id]['compte_id'])->toBe((int) $cca->ligne->compte_id)
+        ->and($recap[$cca->id]['compte_numero'])->toBe($cca->ligne->compte->numero_pcg)
         ->and($recap[$cca->id]['compte_nom'])->toBe($cca->ligne->compte->intitule);
 });
 
-it('porte le cas de chaque rattachement sous la clé cas', function (): void {
+it('porte le cas de chaque rattachement, sa valeur sous cas et son étiquette en clair sous cas_libelle', function (): void {
     provisionServiceRattacher($this, 7, 175.0);
     provisionServiceRattacher($this, 6, 100.0);
 
-    $cas = $this->service->provisionsExercice(2025)->pluck('cas')->sort()->values()->all();
+    $recap = $this->service->provisionsExercice(2025);
 
-    expect($cas)->toBe(['cca', 'pca']);
+    expect($recap->pluck('cas')->sort()->values()->all())->toBe(['cca', 'pca'])
+        ->and($recap->pluck('cas_libelle')->sort()->values()->all())->toBe(['Charge constatée d’avance', 'Produit constaté d’avance']);
 });
 
 it('signe l’impact sur le résultat de N selon le cas', function (int $classe, float $attendu): void {
@@ -72,13 +75,6 @@ it('signe l’impact sur le résultat de N selon le cas', function (int $classe,
     'un CCA retire une charge : le résultat monte' => [6, 175.0],
 ]);
 
-it('le total est la somme des impacts signés', function (): void {
-    provisionServiceRattacher($this, 7, 175.0); // -175
-    provisionServiceRattacher($this, 6, 100.0); // +100
-
-    expect($this->service->totalProvisions(2025))->toBe(-75.0);
-});
-
 it('l’extourne de N+1 est l’image inverse du rattachement de N', function (): void {
     provisionServiceRattacher($this, 7, 175.0);
     provisionServiceRattacher($this, 6, 100.0);
@@ -87,14 +83,13 @@ it('l’extourne de N+1 est l’image inverse du rattachement de N', function ()
 
     expect($extournes['pca']['montant_signe'])->toBe(175.0)
         ->and($extournes['cca']['montant_signe'])->toBe(-100.0)
-        ->and($this->service->totalExtournes(2026))->toBe(75.0);
+        ->and($extournes->sum('montant_signe'))->toBe(75.0);
 });
 
 it('ne mélange pas les exercices', function (): void {
     provisionServiceRattacher($this, 7, 175.0);
 
     expect($this->service->provisionsExercice(2026))->toBeEmpty()
-        ->and($this->service->totalProvisions(2026))->toBe(0.0)
         ->and($this->service->extournesExercice(2025))->toBeEmpty();
 });
 
@@ -114,8 +109,9 @@ it('compte pour zéro un rattachement dont le compte a disparu, et le dit au jou
 
     expect($ligneRecap['montant_signe'])->toBe(0.0)
         ->and($ligneRecap['cas'])->toBe('')
-        ->and($ligneRecap['compte_nom'])->toBe('Compte supprimé')
-        ->and($this->service->totalProvisions(2025))->toBe(0.0);
+        ->and($ligneRecap['cas_libelle'])->toBe('')
+        ->and($ligneRecap['compte_numero'])->toBe('')
+        ->and($ligneRecap['compte_nom'])->toBe('Compte supprimé');
 
     Log::shouldHaveReceived('warning')
         ->withArgs(fn (string $message, array $contexte) => $contexte['provision_id'] === (int) $provision->id

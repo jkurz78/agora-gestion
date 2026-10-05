@@ -221,23 +221,34 @@
                 @if(($summary['nbProvisions'] ?? 0) > 0)
                 <div class="card mb-3">
                     <div class="card-header fw-bold">
-                        <i class="bi bi-journal-arrow-down me-1"></i> Provisions de fin d'exercice
+                        <i class="bi bi-journal-arrow-down me-1"></i> Écritures de rattachement à l'exercice
                     </div>
                     <div class="card-body">
                         <table class="table table-sm mb-0">
+                            <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
+                                <tr>
+                                    <th>Cas</th>
+                                    <th>Compte</th>
+                                    <th>Libellé</th>
+                                    <th class="text-end">Montant</th>
+                                    <th class="text-end">Impact sur le résultat</th>
+                                </tr>
+                            </thead>
                             <tbody>
                                 @foreach($summary['provisions'] as $p)
                                 <tr>
+                                    <td>{{ $p['cas_libelle'] !== '' ? $p['cas_libelle'] : '—' }}</td>
+                                    <td>{{ $p['compte_numero'] !== '' ? $p['compte_numero'].' — ' : '' }}{{ $p['compte_nom'] }}</td>
                                     <td>{{ $p['libelle'] }}</td>
-                                    <td>{{ $p['compte_nom'] }}</td>
-                                    <td class="text-end">{{ number_format($p['montant_signe'], 2, ',', ' ') }} €</td>
+                                    <td class="text-end">{{ number_format($p['montant'], 2, ',', ' ') }} €</td>
+                                    <td class="text-end">{{ ($p['montant_signe'] > 0 ? '+' : '').number_format($p['montant_signe'], 2, ',', ' ') }} €</td>
                                 </tr>
                                 @endforeach
                             </tbody>
                             <tfoot>
                                 <tr class="fw-bold">
-                                    <td colspan="2">Impact net provisions</td>
-                                    <td class="text-end">{{ number_format($summary['totalProvisions'], 2, ',', ' ') }} €</td>
+                                    <td colspan="4">Impact net sur le résultat <span class="fw-normal text-muted small">(déjà compris dans le résultat ci-dessus)</span></td>
+                                    <td class="text-end">{{ ($summary['totalProvisions'] > 0 ? '+' : '').number_format($summary['totalProvisions'], 2, ',', ' ') }} €</td>
                                 </tr>
                             </tfoot>
                         </table>
