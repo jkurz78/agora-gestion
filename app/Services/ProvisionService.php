@@ -43,22 +43,6 @@ final class ProvisionService
     }
 
     /**
-     * Extournes = rattachements de N−1, impact signé inversé.
-     *
-     * @return Collection<int, LigneRecap>
-     */
-    public function extournesExercice(int $annee): Collection
-    {
-        return $this->mapper(
-            Provision::forExercice($annee - 1)
-                ->avecCompteResultat()
-                ->orderBy('id')
-                ->get(),
-            fn (Provision $p) => -$this->impactResultat($p),
-        );
-    }
-
-    /**
      * Transforme une collection de Provision en payload (compte/famille), en préchargeant
      * les familles en un seul aller (N+1 fix — même pattern que Famille::pourComptes).
      *
