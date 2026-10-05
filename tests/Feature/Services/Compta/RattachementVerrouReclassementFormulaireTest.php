@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\ModePaiement;
 use App\Enums\StatutOperation;
 use App\Livewire\TransactionForm;
+use App\Models\Association;
 use App\Models\Operation;
 use App\Models\Tiers;
 use App\Models\Transaction;
@@ -22,6 +23,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
+use Tests\TestCase;
 
 /*
 |--------------------------------------------------------------------------
@@ -871,5 +873,114 @@ describe('TransactionForm : une pièce gelée s\'affiche en LECTURE SEULE, comme
 
         $gelee->assertSee('Visualiser la recette')->assertDontSee('Modifier la recette');
         $libre->assertSee('Modifier la recette')->assertDontSee('Visualiser la recette');
+    });
+});
+
+describe('TransactionForm : un identifiant de pièce forgé vers une autre association', function () {
+    // `transactionId` est une propriété publique : le client la réécrit (`$wire.set('transactionId', …)`). Les
+    // refus préalables (removeLigne, save, deletePieceJointe, envoi d'un justificatif) lisent le gel de cette
+    // pièce par GelRattachement::etatDeGel(), qui lève TOUS les scopes : sans résolution préalable de la pièce dans
+    // l'association courante, ils auraient rendu le motif de gel d'une pièce d'une autre association, et le
+    // formulaire en aurait sérialisé les identifiants de lignes vers le client.
+
+    /**
+     * Dans une AUTRE association que celle de l'utilisateur : une pièce gelée (sa ligne est rattachée) et
+     * l'écriture de rattachement qui en résulte (dotation). Rend leurs identifiants, ceux de leurs lignes, et le
+     * numéro de pièce de l'écriture, un texte que nul rendu de l'association courante ne peut porter.
+     *
+     * @return array{pieces: array{gelee: int, ecriture: int}, lignes: list<int>, numero: string}
+     */
+    $piecesDUneAutreAssociation = function (TestCase $test): array {
+        $courante = TenantContext::current();
+
+        TenantContext::clear();
+        TenantContext::boot(Association::factory()->create());
+        SystemeSeeder::seed();
+
+        $ligne = $test->ligneOrigineEquilibree(7);
+        $provision = verrouRattacherAvecEcritures($test, $ligne);
+        $ecriture = Transaction::where('provision_id', (int) $provision->id)->where('type_ecriture', 'normale')->sole();
+
+        $pieces = ['gelee' => (int) $ligne->transaction_id, 'ecriture' => (int) $ecriture->id];
+        $lignes = TransactionLigne::whereIn('transaction_id', array_values($pieces))->pluck('id')->map(fn ($id): int => (int) $id)->all();
+
+        TenantContext::clear();
+        TenantContext::boot($courante);
+
+        return ['pieces' => $pieces, 'lignes' => $lignes, 'numero' => (string) $ecriture->numero_piece];
+    };
+
+    test('refuse tout geste sur la pièce d\'une autre association comme une pièce introuvable : ni motif, ni lignes gelées', function (string $piece, string $geste) use ($piecesDUneAutreAssociation) {
+        Storage::fake('local');
+        $autre = $piecesDUneAutreAssociation($this);
+
+        // Garde anti-test-vide : la pièce existe, et elle est bien gelée pour qui la lirait sans scope.
+        $etat = app(GelRattachement::class)->etatDeGel($autre['pieces'][$piece]);
+        expect($etat['motif'])->not->toBeNull()
+            ->and($etat['lignes'])->not->toBeEmpty()
+            ->and($autre['numero'])->not->toBe('');
+
+        // L'utilisateur est dans l'association courante, où cette pièce n'existe pas.
+        expect(Transaction::find($autre['pieces'][$piece]))->toBeNull();
+
+        $formulaire = Livewire::test(TransactionForm::class)->set('transactionId', $autre['pieces'][$piece]);
+
+        $requetes = [];
+        DB::listen(function ($requete) use (&$requetes): void {
+            $requetes[] = $requete->sql;
+        });
+
+        $gestes = [
+            'removeLigne' => fn () => $formulaire->call('removeLigne', 0),
+            'save' => fn () => $formulaire->call('save'),
+            'deletePieceJointe' => fn () => $formulaire->call('deletePieceJointe'),
+            'updatedPieceJointe' => fn () => $formulaire->set('pieceJointe', UploadedFile::fake()->create('justificatif.pdf', 20, 'application/pdf')),
+        ];
+
+        $introuvable = false;
+
+        try {
+            $gestes[$geste]();
+        } catch (ModelNotFoundException) {
+            $introuvable = true;
+        }
+
+        // Ce qui fuirait d'abord, si le geste était accepté : le gel de l'autre association n'a même pas été LU
+        // (etatDeGel() lit les lignes et les rattachements), et ni son motif ni ses lignes ne sont au composant,
+        // donc sérialisés vers le client, ni dans son rendu.
+        foreach ($requetes as $sql) {
+            expect($sql)->not->toContain('provisions')->not->toContain('transaction_lignes');
+        }
+
+        $formulaire->assertSet('motifGel', null)->assertSet('lignesGelees', []);
+        expect($formulaire->html())
+            ->not->toContain(GelRattachement::MOTIF_PIECE_GELEE)
+            ->not->toContain(GelRattachement::MOTIF_ECRITURE_DE_RATTACHEMENT)
+            ->not->toContain($autre['numero']);
+
+        // Et le geste est refusé comme celui d'une pièce introuvable, l'exception d'Eloquent.
+        expect($introuvable)->toBeTrue();
+    })->with([
+        'la pièce gelée, retrait de ligne' => ['gelee', 'removeLigne'],
+        'la pièce gelée, enregistrement' => ['gelee', 'save'],
+        'la pièce gelée, suppression du justificatif' => ['gelee', 'deletePieceJointe'],
+        'la pièce gelée, envoi d\'un justificatif' => ['gelee', 'updatedPieceJointe'],
+        'l\'écriture de rattachement, retrait de ligne' => ['ecriture', 'removeLigne'],
+        'l\'écriture de rattachement, enregistrement' => ['ecriture', 'save'],
+        'l\'écriture de rattachement, suppression du justificatif' => ['ecriture', 'deletePieceJointe'],
+        'l\'écriture de rattachement, envoi d\'un justificatif' => ['ecriture', 'updatedPieceJointe'],
+    ]);
+
+    test('la pièce gelée de l\'association courante, elle, est toujours refusée par son motif : la résolution ne masque pas le refus', function () {
+        $ligne = $this->ligneOrigineEquilibree(7);
+        verrouRattacherAvecEcritures($this, $ligne);
+
+        $formulaire = Livewire::test(TransactionForm::class)->call('edit', (int) $ligne->transaction_id)
+            ->set('transactionId', (int) $ligne->transaction_id)
+            ->call('removeLigne', 0)
+            ->assertHasErrors('lignes')
+            ->assertSet('motifGel', GelRattachement::MOTIF_PIECE_GELEE);
+
+        expect($formulaire->get('lignesGelees'))->toBe([(int) $ligne->id]);
     });
 });

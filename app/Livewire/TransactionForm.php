@@ -1280,6 +1280,13 @@ final class TransactionForm extends Component
             return false;
         }
 
+        // La pièce se résout d'abord SOUS le scope tenant, comme edit() : `$transactionId` est une propriété
+        // publique, que le client réécrit (`$wire.set`). etatDeGel() lève TOUS les scopes et suppose la pièce déjà
+        // résolue dans l'association : sans cette lecture, l'identifiant d'une pièce d'une autre association rendrait
+        // son motif de gel, et `$lignesGelees`, sérialisée vers le client, les identifiants de ses lignes.
+        // Introuvable : l'exception d'Eloquent, avant que `$motifGel` et `$lignesGelees` ne soient touchés.
+        Transaction::findOrFail($this->transactionId);
+
         ['motif' => $this->motifGel, 'lignes' => $this->lignesGelees] = app(GelRattachement::class)->etatDeGel($this->transactionId);
 
         if ($this->motifGel === null) {
