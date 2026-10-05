@@ -709,6 +709,20 @@ final class TransactionService
      */
     public function updateExtourneMiroir(Transaction $transaction, array $data): Transaction
     {
+        // Défense en profondeur : TransactionForm::save() refuse déjà une pièce gelée, mais ce service ne s'en remet
+        // pas à son seul appelant. La seule pièce de type extourne qui puisse être gelée est l'extourne d'un
+        // rattachement (`provision_id`) : une pièce d'annulation ne peut pas être rattachée
+        // (RattachementExerciceService::motifAnnulation() la refuse).
+        //
+        // Lecture SANS verrou, volontairement : `provision_id` est posé à la création de l'écriture et ne change
+        // jamais (retirer() supprime physiquement les écritures), il n'y a donc rien à exclure ni à relire sous
+        // verrou. Et pas de verrou de plus : cette méthode n'en prenait aucun avant la garde, en ajouter un
+        // changerait l'ordre des verrous d'un chemin qui n'en suit aucun. Lu sur la base, non sur l'instance reçue,
+        // et tous scopes levés comme les gardes du gel : la décision ne dépend que de l'identifiant.
+        if (Transaction::withoutGlobalScopes()->whereKey((int) $transaction->id)->value('provision_id') !== null) {
+            throw new \RuntimeException(GelRattachement::MOTIF_ECRITURE_DE_RATTACHEMENT);
+        }
+
         $this->exerciceService->assertOuvert(
             $this->exerciceService->anneeForDate(CarbonImmutable::parse($data['date']))
         );

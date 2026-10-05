@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\ModePaiement;
 use App\Enums\StatutFacture;
+use App\Enums\StatutReglement;
 use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
@@ -368,5 +369,71 @@ describe('TransactionService::update() : il poursuit sur la pièce que la garde 
             ->toThrow(RuntimeException::class, 'La date ne peut pas être modifiée sur une transaction rapprochée.');
 
         expect(Transaction::findOrFail($piece->id)->date->toDateString())->toBe('2026-04-08');
+    });
+});
+
+describe('TransactionService::updateExtourneMiroir() : l\'extourne d\'un rattachement ne s\'y réécrit pas', function () {
+    // Défense en profondeur : TransactionForm::save() refuse déjà une pièce gelée (refuserSiGelee()) avant d'appeler
+    // ce service, mais le service ne doit pas s'en remettre à son seul appelant. La seule pièce de type extourne qui
+    // puisse être gelée est celle d'un rattachement (`provision_id`) : une pièce d'annulation ne peut pas être
+    // rattachée (RattachementExerciceService::motifAnnulation()).
+
+    /** Les données d'édition d'un miroir : son libellé change, le reste est repris tel quel. */
+    $donnees = fn (Transaction $piece): array => [
+        'date' => $piece->date->toDateString(),
+        'libelle' => 'Libellé corrigé',
+        'mode_paiement' => $piece->mode_paiement,
+        'compte_id' => $piece->compte_id,
+        'notes' => null,
+        'reference' => null,
+    ];
+
+    test('refuse une écriture de rattachement, dotation ou extourne : son propre message, et rien n\'a bougé', function (string $ecriture) use ($donnees) {
+        ['ligne' => $ligne, 'provision' => $provision, 'piece' => $piece] = verrouEcritureDeRattachement($this, 7, $ecriture);
+
+        verrouAssertRefuse(
+            fn () => app(TransactionService::class)->updateExtourneMiroir($piece, $donnees($piece)),
+            $ligne,
+            $provision,
+            VERROU_MESSAGE_ECRITURE,
+        );
+    })->with([
+        'l\'extourne' => ['extourne'],
+        'la dotation' => ['normale'],
+    ]);
+
+    test('refuse l\'extourne d\'un rattachement même par une instance périmée qui ne porte plus son rattachement : la garde lit la base', function () use ($donnees) {
+        ['ligne' => $ligne, 'provision' => $provision, 'piece' => $piece] = verrouEcritureDeRattachement($this, 7, 'extourne');
+
+        // L'instance de l'appelant, lue avant : elle ne sait rien du rattachement. La base, elle, le porte.
+        $piece->setRawAttributes(array_merge($piece->getAttributes(), ['provision_id' => null]), true);
+        expect($piece->provision_id)->toBeNull()
+            ->and((int) DB::table('transactions')->where('id', $piece->id)->value('provision_id'))->toBe((int) $provision->id);
+
+        verrouAssertRefuse(
+            fn () => app(TransactionService::class)->updateExtourneMiroir($piece, $donnees($piece)),
+            $ligne,
+            $provision,
+            VERROU_MESSAGE_ECRITURE,
+        );
+    });
+
+    test('accepte le miroir d\'une annulation, même celle d\'une pièce rattachée : la garde ne vise que l\'extourne d\'un rattachement', function () use ($donnees) {
+        ['piece' => $piece] = verrouPieceRattacheeAExtourner($this, 7);
+
+        // Une annulation datée après N est permise (D13) : sa pièce miroir est de type extourne, sans rattachement.
+        $miroir = verrouExtourner($piece, '2026-09-05')()->extourne;
+        expect($miroir->type_ecriture)->toBe('extourne')
+            ->and($miroir->provision_id)->toBeNull();
+
+        // Le miroir est « pointé » dès sa création (remboursement par virement) : il en est détaché ici pour que
+        // ce soit la garde du rattachement, et non le verrou du pointage, que ce test éprouve.
+        DB::table('transactions')->where('id', $miroir->id)->update(['statut_reglement' => StatutReglement::EnAttente->value]);
+        $miroir = $miroir->fresh();
+        expect($miroir->isLockedByRapprochement())->toBeFalse();
+
+        app(TransactionService::class)->updateExtourneMiroir($miroir, $donnees($miroir));
+
+        expect($miroir->fresh()->libelle)->toBe('Libellé corrigé');
     });
 });
