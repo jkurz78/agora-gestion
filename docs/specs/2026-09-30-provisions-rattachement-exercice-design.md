@@ -1,7 +1,9 @@
 # Écritures de rattachement à l'exercice — CCA / PCA, puis FNP / PAR
 
 > **Date** : 2026-09-30, révisée le 2026-10-01 après revue externe
-> **Statut** : spec validée, plan à écrire
+> **Statut** : spec validée ; lot 1 (CCA / PCA) livré, lot 2 (FNP / PAR) à venir.
+> **Plan du lot 1** (exécuté) : `docs/superpowers/plans/2026-10-01-rattachement-exercice-lot1.md`, dans le dépôt
+> principal seulement : le dossier `docs/superpowers/` n'est pas versionné.
 > **Remplace** : [2026-06-18-provisions-partie-double.md](2026-06-18-provisions-partie-double.md)
 
 ## 1. Contexte
@@ -130,6 +132,8 @@ Deux conséquences supplémentaires :
 | D10 | Livraison en deux lots : CCA/PCA d'abord, FNP/PAR ensuite | Le premier couvre le besoin mesuré et n'exige aucun nouveau compte. Le second demande de seeder 408 et 418. |
 | D11 | Vocabulaire comptable à l'écran : « écritures de rattachement », « charge / produit constaté d'avance » | CCA/PCA/FNP/PAR sont des comptes de régularisation (classe 48), pas des provisions (15/29/39/49/59). Les noms **physiques** `provisions` / `Provision` sont conservés — même arbitrage que `code_cerfa`, relibellé « Compte comptable » sans renommer la colonne. |
 | D12 | Le rattachement est **tout ou rien** : le montant est celui de l'origine, jamais saisi | Aucun cas mesuré n'appelle un décalage partiel — l'opération 8 démarre entièrement dans l'exercice suivant. Supprime d'un coup le plafond, le cumul par origine, le verrou de concurrence et la notion de reste à décaler. |
+| D13 | Une ligne d'une **extourne** est refusée ; une ligne d'une pièce **extournée** l'est seulement si l'annulation est datée **au plus tard le dernier jour de N** | Ajoutée le 2026-10-03, affinée le même jour. Annulation datée dans N : rattacher l'origine la retirerait deux fois de N (−175 au lieu de 0). Annulation datée dans N+1 — un remboursement après la clôture — : le rattachement est **juste** (N = 0, N+1 = +175 − 175 = 0), et c'est le refus qui laisserait N faux (+175). La date qui compte est la **date comptable de la pièce miroir** (`extourneeVers()->extourne->date`), pas `extournee_at`, simple horodatage de l'action. Date introuvable, ou antérieure à N (rien n'interdit de dater une annulation avant sa pièce) → refus par prudence. Réciproque : le verrou du § 7 ne refuse l'extourne d'une pièce rattachée que si elle est datée au plus tard le dernier jour de N. |
+| D14 | Une ligne du **journal OD** est refusée | Ajoutée le 2026-10-03. Une écriture d'inventaire ne se rattache pas : seule une pièce d'achat, de vente ou de banque a un exercice de rattachement à corriger. Dans le code, les seules OD portant une ligne 6/7 sont les dotations aux amortissements (681 au débit), que D9 laisserait passer, et dont l'annulation par `DotationService` contourne les gardes de `TransactionService`. Une condition sur une colonne, reprise telle quelle par la détection. |
 
 ## 4. Modèle de données
 
@@ -146,6 +150,7 @@ sans reprise de données.
 | `notes`, `piece_jointe_*`, `saisi_par` | conservées | Inchangées. |
 | `type` | **supprimée** | Remplacée par le cas déduit. |
 | `date` | **supprimée** | Dérivable de `exercice` ; la date qui fait foi est celle de l'écriture, immuable. |
+| `deleted_at` | **supprimée** | Le retrait est physique (§ 6.4) ; le modèle `Provision` n'a plus de suppression logique. |
 
 **Invariant** : exactement **une** de ces deux colonnes est renseignée —
 `transaction_ligne_id` (lot 1) ou `compte_id` (lot 2).
@@ -219,7 +224,12 @@ postérieur à la fin de l'exercice. **Une seule requête** — la ventilation e
 
 - ligne de **sens inverse** — classe 6 au crédit, classe 7 au débit (D9) ;
 - ligne **porteuse d'affectations** (D4). Elle n'a pas d'opération propre à hériter ; elle est
-  listée comme **écartée, avec son motif**, jamais omise en silence ;
+  listée comme **écartée, avec son motif**, jamais omise en silence — **dès qu'elle aurait été
+  candidate** : son opération propre, ou au moins une opération de sa ventilation, démarre après N
+  (précisé le 2026-10-05, décision du propriétaire). Une ligne ventilée sur des opérations qui
+  tiennent toutes dans N n'a rien à décaler : elle n'est pas listée ;
+- ligne d'une **extourne**, ou d'une pièce dont l'**annulation est datée au plus tard le dernier jour de N** (D13) ;
+- ligne du **journal OD** (D14) ;
 - ligne appartenant à une transaction de rattachement : `transactions.provision_id IS NOT NULL`.
   Sans cette exclusion, l'extourne de notre PCA — un crédit sur 706B en N+1 — se présenterait
   elle-même comme candidate à la recherche libre. La règle de sens écarte déjà la dotation, qui
@@ -238,7 +248,8 @@ construction avec l'exercice sélectionné, puisque les candidats en sont tirés
 
 ### 6.2 Zone « Rattachements de l'exercice »
 
-Cas, ligne d'origine cliquable vers sa transaction, compte, opération, montant, pièce jointe, auteur,
+Cas, numéro de pièce d'origine (sans lien : aucun lien direct vers une pièce n'existe dans
+l'application — précisé le 2026-10-05), compte, opération, montant, pièce jointe, auteur,
 date de saisie, action **« Retirer »**.
 
 ### 6.3 La modale
@@ -246,8 +257,8 @@ date de saisie, action **« Retirer »**.
 Héritées et en lecture seule : compte, opération, séance, tiers, **montant**, date de pièce. Cas
 déduit, écrit en clair :
 
-> **Produit constaté d'avance** — les 175,00 € encaissés le 08/04/2026 seront retirés du résultat
-> 2025‑2026 et reconnus sur 2026‑2027.
+> **Produit constaté d'avance** — les 175,00 € comptabilisés en produit le 08/04/2026 seront retirés du
+> résultat 2025‑2026 et reconnus sur 2026‑2027.
 
 Saisis : notes, pièce jointe. Le montant n'est pas saisissable (D12) — le rattachement porte la
 ligne entière.
@@ -260,14 +271,16 @@ jamais été regardée. C'est la seule barrière qui ne dépende ni d'un test ni
 
 Supprime les deux écritures et libère le verrou. Refusé si N ou N+1 est clôturé.
 
-**Le retrait supprime physiquement la ligne de `provisions`** (`forceDelete`), il ne la
-soft-delete pas. Un seul invariant en découle, et il est vrai des deux côtés :
+**Le retrait supprime physiquement la ligne de `provisions`.** Le modèle `Provision` n'a plus de
+suppression logique et la colonne `deleted_at` a disparu (révisé le 2026-10-03, voir plus bas).
+Un seul invariant en découle, et il est vrai des deux côtés :
 
 > une ligne de `provisions` existe ⟺ la ligne d'origine est verrouillée.
 
-Révisé le 2026-10-01, pendant l'exécution. Le soft-delete créait une **contradiction entre
-l'application et la base** : `TransactionLigne::estRattachee()` lit `provisions()->exists()`, qui
-exclut les lignes soft-deletées, tandis que la FK `restrictOnDelete()` les compte. Après un
+Révisé une première fois le 2026-10-01, pendant l'exécution. Le soft-delete créait une
+**contradiction entre l'application et la base** : `TransactionLigne::estRattachee()` lisait alors
+`provisions()->exists()`, qui excluait les lignes soft-deletées, tandis que la FK
+`restrictOnDelete()` les compte. Après un
 retrait, l'application considérait la ligne libre et la base continuait de bloquer le
 `forceDelete()` des lignes que fait `TransactionService::update()` — soit précisément l'erreur SQL
 brute que l'AC‑8 interdit, sur le chemin même que le § 7 recommande (« retirez-le, corrigez,
@@ -286,6 +299,20 @@ la provision, la ligne d'origine, l'exercice, et — automatiquement, via `App\S
 l'`association_id` et l'`user_id`. Si un historique consultable à l'écran devient nécessaire, il
 appellera une table d'audit dédiée, pas un `deleted_at` détourné.
 
+**Révisé le 2026-10-03 : `SoftDeletes` retiré du modèle.** La première révision faisait retirer par
+`forceDelete()` mais laissait au modèle sa suppression logique : un `delete()` venu d'un autre
+chemin aurait produit un rattachement soft-deleté, toujours compté par la FK, donc une ligne
+**verrouillée pour toujours** — et invisible à l'écran, qui lit sous le scope par défaut, si bien
+que la sortie annoncée par le refus (« retirez-le ») devenait introuvable. Le plan en tirait trois
+définitions divergentes de « ligne rattachée ». L'état est désormais impossible : `delete()` est
+physique, la colonne est supprimée par la migration de refonte, jamais déployée avant ce choix.
+
+`estRattachee()` lit `provisions()->withoutGlobalScopes()->exists()` : elle compte exactement ce
+que compte la FK. Lever **tous** les scopes globaux reste nécessaire sans soft-delete, parce que
+`TenantScope` est *fail-closed* en lecture (`WHERE 1 = 0` hors contexte booté) — ce qui, pour un
+verrou, le rendrait *fail-open*. La contrainte de relation n'est pas un scope : seule la ligne
+interrogée est lue.
+
 ### 6.5 Wizard de clôture
 
 Le récap de l'étape 2 est conservé. [`ProvisionService::mapper()`](../../app/Services/ProvisionService.php)
@@ -303,6 +330,33 @@ Une ligne rattachée gèle **sa transaction entière** : il n'existe aucun chemi
 exempter, `update()` reconstruisant toutes les lignes. Le refus nomme le rattachement et la
 sortie : le retirer, corriger, le repasser.
 
+Précisé le 2026-10-04 : le gel de la pièce entière vaut pour les gestes qui **réécrivent la
+pièce** — `update()`, `delete()`, `annuler()`, extourne, et le retrait d'une ligne du formulaire
+(une pièce gelée s'y affiche en lecture seule : aucune de ses lignes ne se retire, la ligne sœur
+d'une ligne rattachée non plus). Les gestes **sur une ligne** — reclasser, ventiler, modifier le
+montant par la synchronisation — ne refusent que la ligne rattachée : reclasser une ligne sœur ne
+touche pas la cohérence du rattachement, dont l'écriture ne recopie que la ligne d'origine. Deux gardes au service :
+`verrouillerPieceNonGelee()` et `assertLigneNonGelee()`, qui refusent par défaut. Elles vivent dans
+`GelRattachement`, classe à part du service de rattachement : elle ne dépend d'aucune écriture
+comptable (ni `ProvisionPDService` ni `EcritureGenerator`), pour que les gestes qu'elle protège la
+reçoivent sans cycle d'injection possible.
+
+**Les écritures de rattachement elles-mêmes** (dotation et extourne, `transactions.provision_id`
+renseigné) ne se modifient, ne se suppriment et ne s'annulent **que par le retrait du
+rattachement** (§ 6.4). Par tout autre chemin, elles survivraient au retrait, détachées :
+`provision_id` est en `nullOnDelete`, et le retrait ignore les écritures supprimées logiquement.
+Elles sont refusées avec leur propre message **par les deux gardes** : `verrouillerPieceNonGelee()`
+pour les gestes sur la pièce, et `assertLigneNonGelee()` pour les gestes sur une ligne — sans quoi
+la ligne de charge de la dotation d'une CCA (pièce typée dépense) se reclassait, laissant dotation
+et extourne sur deux comptes différents.
+
+**L'annulation par extourne a sa propre garde, datée** : `verrouillerPieceExtournable()`, même
+préfixe de verrous, prise **avant** la numérotation de la pièce d'annulation. Elle ne refuse que si
+l'annulation est datée au plus tard le dernier jour de N (D13). Le message nomme la sortie
+possible : dater l'annulation après N quand la date se saisit (fenêtre d'annulation) ; retirer
+d'abord le rattachement, ou attendre N+1, quand elle est imposée — l'annulation d'une **facture**
+passe par ce site à la date du jour.
+
 Sites à garder :
 
 | Site | Geste refusé |
@@ -311,10 +365,21 @@ Sites à garder :
 | [`TransactionService::affecterLigne()`](../../app/Services/TransactionService.php#L935) | Modifier les affectations d'une ligne rattachée. |
 | [`TransactionService::supprimerAffectations()`](../../app/Services/TransactionService.php#L983) | Les supprimer. |
 | `TransactionService::delete()` / `annuler()` | Supprimer ou annuler la transaction porteuse. |
-| Extourne de la transaction porteuse | Symétrique du refus que `ReclassementLigneService` oppose déjà à une transaction extournée. |
+| Extourne de la transaction porteuse | **Datée au plus tard le dernier jour de N** seulement (D13) : elle retirerait deux fois le montant de N. Datée dans N+1 ou après, elle est juste et reste permise — sinon, N une fois clôturé, la pièce ne pourrait plus jamais être annulée, et un remboursement deviendrait impossible par extourne. |
 | [`ReclassementLigneService::reclasser()`](../../app/Services/Compta/ReclassementLigneService.php#L46) | Reclasser la ligne — même grammaire que la garde du reçu fiscal. |
-| [`TransactionForm::removeLigne()`](../../app/Livewire/TransactionForm.php#L407) | Retirer la ligne. |
-| Synchronisation HelloAsso | **Modifier le montant** d'une ligne rattachée. Le refus est journalisé et ne fait pas échouer la synchronisation des autres commandes. Les libellés restent synchronisés. |
+| [`TransactionForm::removeLigne()`](../../app/Livewire/TransactionForm.php#L407) | Retirer une ligne du formulaire — de la pièce gelée entière, ligne sœur comprise (lecture seule). |
+| Synchronisation HelloAsso | **Modifier ce dont le rattachement dépend** : le montant (débit, crédit), le **compte** et l'**opération** d'une ligne rattachée — l'écriture les recopie (D3, D8), comme pour le reclassement —, la déplacer vers une autre pièce, et **redater** une pièce gelée (elle changerait d'exercice sous son rattachement). La synchro **conserve** ces valeurs au lieu de refuser : la conservation est journalisée (warning, seulement quand la commande annonce une valeur différente) et ne fait pas échouer la synchronisation des autres commandes. Les libellés, notes, mode de paiement et le reste restent synchronisés ; une ligne sœur suit la synchro normale. Révisé le 2026-10-05 : le montant seul ne suffisait pas. |
+
+**Le formulaire prévient, il ne garde pas.** `TransactionForm::edit()` ouvre une pièce dont une ligne est
+rattachée, ou qui est une écriture de rattachement, en **lecture seule**, comme un exercice clôturé : le motif en
+tête, aucun champ à saisir, ni « Ajouter une ligne » ni retrait de ligne, ni bouton d'enregistrement (« Fermer »
+à la place d'« Annuler »). Restent offerts les gestes sur une ligne là où ils aboutissent : « Ventiler » et
+« Reclasser » (sur une pièce réglée) sur les lignes sœurs, ni sur la ligne rattachée ni sur aucune ligne d'une
+écriture de rattachement, que le service refuserait (`GelRattachement::etatDeGel()`, source unique de ce que l'écran
+sait du gel). Le justificatif reste consultable, mais ne se retire, ne se remplace ni ne s'envoie. `save()`,
+`removeLigne()`, `deletePieceJointe()` et l'envoi d'un justificatif refusent en outre côté serveur après avoir relu
+tout le gel (`etatDeGel()`, lecture sans verrou, qui remet aussi à jour les lignes gelées que la vue lit) ;
+l'autorité reste aux gardes du service, sous verrou.
 
 Le **reçu fiscal ne bloque pas** : un rattachement ne change ni le compte, ni le tiers, ni la date
 du don, seulement l'exercice de reconnaissance du produit.
@@ -335,7 +400,12 @@ vérifier.
 À confirmer plutôt qu'à modifier :
 
 - **Trésorerie** : neutre par construction — 486/487 sont en classe 4, aucun compte 512 n'est
-  touché, et `FluxTresorerieBuilder` n'appelle plus `ProvisionService`.
+  touché, et `FluxTresorerieBuilder` n'appelle plus `ProvisionService`. Vérifié par test
+  (2026-10-05) : le flux est identique avant et après un rattachement, **sauf le pont « du
+  résultat à la trésorerie »**, qui lit le résultat et bouge donc par construction (706B : 175 → 0
+  sur N). 486/487 n'y ont pas de ligne nommée : l'écart passe dans la ligne « autres », et le pont
+  reste bouclé sur la variation de trésorerie, inchangée. Une ligne « charges / produits constatés
+  d'avance » au pont serait un chantier à part.
 - **Budget** : le réalisé de 706B tombe à 0 sur 2025‑2026. C'est l'effet recherché.
 - **Statut de règlement et lettrage** : inchangés, le rattachement ne touche pas le 411.
 - **`compta:assert-pd-complete`** : les transactions portent `provision_id` et ne sont pas
@@ -362,9 +432,11 @@ Extourne  01/09/2026  OD   487  D 175,00          /  706B C 175,00 (op. 8)
 | 2026‑2027 | 706B : **+175,00** | **+175,00** | 487 soldé |
 
 **Second cas, le refus** : `transaction_lignes#84` (741, 20 000 € au crédit, trois affectations)
-doit être **refusée** — à la détection, à la recherche libre et au service sur appel direct — avec
-un motif lisible. C'est le test qui prouve que D4 ne laisse pas passer une ligne sans opération
-propre.
+doit être **refusée** à la recherche libre et au service sur appel direct, avec un motif lisible.
+C'est le test qui prouve que D4 ne laisse pas passer une ligne sans opération propre. À la
+détection, elle **n'apparaît pas** : aucune de ses trois opérations ne démarre après le 31/08/2026
+(elles s'y terminent même toutes), elle n'a rien à décaler (§ 6.1). Une ligne ventilée sur une opération future, elle, y est écartée avec
+son motif.
 
 **Troisième cas, le refus de sens** : la ligne `709A` débitrice doit être refusée aux trois mêmes
 endroits (D9).
@@ -381,12 +453,15 @@ endroits (D9).
    colonnes est refusé dans les deux sens : aucune renseignée, les deux renseignées.
 5. **AC‑5** — Une ligne **de sens inverse** est refusée aux trois endroits — détection, recherche
    libre, appel direct au service : la ligne `709A` débitrice du § 9.
-6. **AC‑6** — Une ligne **porteuse d'affectations** est refusée aux trois mêmes endroits, avec un
-   motif, et n'est **jamais** traitée au grain ligne : la ligne 84 du § 9.
+6. **AC‑6** — Une ligne **porteuse d'affectations** est refusée par la recherche libre et par le
+   service, avec un motif, et n'est **jamais** traitée au grain ligne : la ligne 84 du § 9. La
+   détection la liste comme écartée, avec ce motif, dès qu'une opération de sa ventilation (ou son
+   opération propre) démarre après N.
 7. **AC‑7** — Un test **par site** du verrou du § 7 : `update()`, `affecterLigne()`,
    `supprimerAffectations()`, `delete()`, `annuler()`, extourne, `reclasser()`, `removeLigne()`,
    et modification du montant par la synchronisation HelloAsso. Chacun doit tuer une garde précise
-   — retirer n'importe laquelle fait tomber exactement un test.
+   — retirer n'importe laquelle fait tomber les tests de son site, et ceux-là seulement : une garde
+   ne doit jamais être masquée par celle d'un autre site.
 8. **AC‑8** — `update()` sur une transaction porteuse rend un **refus métier lisible**, jamais une
    erreur SQL de contrainte de clé étrangère.
 9. **AC‑9** — Création, modification et retrait sont refusés si N **ou** N+1 est clôturé.
@@ -405,8 +480,12 @@ endroits (D9).
 15. **AC‑15** — Aucune écriture de rattachement ne porte de débit ou de crédit négatif.
 16. **AC‑16** — Suite **complète** verte — pas un sous-ensemble : le garde du lot budget 2a vivait
     à la racine de `tests/Feature/` et deux revues ciblées l'avaient manqué. Plus
-    `pest -c phpunit.mysql.xml` dans le conteneur sur le périmètre : la détection fait des
+    `pest -c phpunit.mariadb.xml` dans le conteneur sur le périmètre : la détection fait des
     jointures et un `GROUP BY`, la production tourne sur MariaDB.
+17. **AC‑17** — Une ligne d'extourne, une ligne d'une pièce dont l'annulation est datée au plus
+    tard le dernier jour de N (D13) et une ligne du journal OD (D14) sont refusées aux trois endroits — détection, recherche
+    libre, appel direct — avec un motif lisible. Une pièce dont l'annulation est datée dans N+1
+    reste rattachable, et le verrou du § 7 laisse l'annuler en N+1 une fois rattachée.
 
 ## 11. Lots
 

@@ -1,0 +1,47 @@
+<?php
+
+declare(strict_types=1);
+
+/*
+|--------------------------------------------------------------------------
+| Datasets partagés des tests du rattachement à l'exercice (CCA/PCA)
+|--------------------------------------------------------------------------
+|
+| [classe du compte de résultat, montant de la ligne d'origine] : PCA sur un produit,
+| CCA sur une charge. Utilisé par RattachementEcrituresTest et RattachementExerciceServiceTest.
+*/
+
+dataset('rattachement_pca_cca', [
+    'PCA' => [7, 175.0],
+    'CCA' => [6, 90.0],
+]);
+
+/*
+| [classe du compte de résultat] seule : pour les tests qui ne dépendent pas du montant (le
+| verrou : RattachementGelGardesTest et RattachementVerrou*Test).
+*/
+
+dataset('rattachement_classes', [
+    'charge (classe 6, CCA)' => [6],
+    'produit (classe 7, PCA)' => [7],
+]);
+
+/*
+| Les gestes de TransactionService qui réécrivent une pièce (Task 8a) : verrouGeste() les traduit.
+*/
+
+dataset('rattachement_gestes', [
+    'update()' => ['update'],
+    'delete()' => ['delete'],
+    'annuler()' => ['annuler'],
+]);
+
+/*
+| Les gestes de TransactionService qui écrivent les affectations d'une ligne (Task 8c) : verrouVentiler()
+| les traduit.
+*/
+
+dataset('rattachement_gestes_ventilation', [
+    'affecterLigne()' => ['affecter'],
+    'supprimerAffectations()' => ['supprimer'],
+]);

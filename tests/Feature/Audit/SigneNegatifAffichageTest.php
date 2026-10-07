@@ -11,25 +11,20 @@ declare(strict_types=1);
  *   - Le formatage est fait par number_format() direct dans les vues.
  *   - Ce test vérifie que number_format gère correctement le signe négatif.
  *
- * Partie 2 : tri data-sort colonnes montants
- *   - La vue provision-index.blade.php est la seule qui cumule : (a) data-sort sur
- *     colonne montant, (b) tri JS côté client.
- *   - Le test vérifie que data-sort émet des valeurs numériques brutes (pas du texte
- *     formaté "−80,00 €") et que leur ordre numérique est [-100, -10, 50, 200].
+ * Partie 2 : tri numérique des colonnes montants
+ *   - Le test d'émission des data-sort par la vue provision-index.blade.php a été
+ *     retiré avec la refonte du rattachement à l'exercice (les montants de
+ *     rattachement sont strictement positifs, et l'écran est réécrit).
  *
  * @see docs/audit/2026-04-30-signe-negatif.md §2.5
  */
 
 use App\Enums\StatutExercice;
-use App\Enums\TypeTransaction;
-use App\Livewire\Provisions\ProvisionIndex;
 use App\Models\Association;
 use App\Models\Compte;
 use App\Models\Exercice;
-use App\Models\Provision;
 use App\Models\User;
 use App\Tenant\TenantContext;
-use Livewire\Livewire;
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -81,67 +76,6 @@ it('format_montant_affiche_signe_negatif_correctement', function () {
 
     // Milliers : -1 500,00 €
     expect(number_format(-1500.0, 2, ',', ' ').' €')->toBe('-1 500,00 €');
-});
-
-// ── Test 2 : data-sort sur colonne montant est numérique (pas du texte formaté) ─
-
-it('data_sort_sur_colonnes_montants_est_numerique', function () {
-    // Dataset : [+50, -100, +200, -10] — ordre numérique attendu : -100, -10, 50, 200
-
-    $montants = [50.0, -100.0, 200.0, -10.0];
-
-    foreach ($montants as $montant) {
-        Provision::create([
-            'association_id' => $this->association->id,
-            'exercice' => 2025,
-            'type' => TypeTransaction::Depense,
-            'compte_id' => $this->sc->id,
-            'libelle' => 'Prov '.abs($montant).(($montant < 0) ? ' neg' : ' pos'),
-            'montant' => $montant,
-            'saisi_par' => $this->user->id,
-            'date' => '2025-10-01',
-        ]);
-    }
-
-    $html = Livewire::test(ProvisionIndex::class)
-        ->assertOk()
-        ->html();
-
-    // Parser les data-sort de la colonne montant (index td[3] de chaque tr[wire:key])
-    // Le HTML contient des <td class="text-end" data-sort="..."> pour les montants.
-    // Extraire toutes les valeurs data-sort associées à la colonne montant.
-    preg_match_all('/data-sort="([^"]+)"/', $html, $matches);
-    $allDataSort = $matches[1];
-
-    // Les valeurs data-sort des montants doivent être des nombres bruts parsables
-    // (pas "-80,00 €", pas "-80,00", mais "-80.00" ou "-80" — point décimal anglais).
-    // Le cast decimal:2 Laravel émet "50.00", "-100.00", "200.00", "-10.00".
-
-    $expectedRaw = ['50.00', '-100.00', '200.00', '-10.00'];
-
-    // Chaque valeur numérique brute doit être présente dans les data-sort
-    foreach ($expectedRaw as $expected) {
-        expect($allDataSort)->toContain($expected);
-    }
-
-    // Vérifier qu'aucune valeur data-sort de montant n'est du texte formaté avec virgule ou €
-    $formattedDataSort = array_filter($allDataSort, function (string $val): bool {
-        // Les valeurs qui sont des montants formatés contiendraient ',' ou '€'
-        return str_contains($val, ',') || str_contains($val, '€');
-    });
-
-    // Aucune valeur data-sort ne doit contenir de texte formaté
-    expect(array_values($formattedDataSort))->toBeEmpty();
-
-    // Vérifier que les valeurs data-sort numériques sont bien triables numériquement :
-    // parseFloat('-100.00') < parseFloat('-10.00') < parseFloat('50.00') < parseFloat('200.00')
-    $numericValues = array_map('floatval', $expectedRaw);
-    $sorted = $numericValues;
-    sort($sorted);
-
-    expect($sorted)->toBe([-100.0, -10.0, 50.0, 200.0],
-        'L\'ordre numérique doit être -100, -10, 50, 200 — pas lexicographique.'
-    );
 });
 
 // ── Test 3 : tri JS est numérique pour colonne montant (pas lexicographique) ───

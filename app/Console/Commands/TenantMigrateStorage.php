@@ -200,7 +200,7 @@ final class TenantMigrateStorage extends Command
         // ─── 9. Provision pièce jointe ──────────────────────────────────────────
         // Legacy : storage/app/private/provisions/{pid}/{fname}
         // Nouveau : storage/app/private/associations/{aid}/provisions/{pid}/{fname}
-        Provision::withTrashed()->where('association_id', $aid)
+        Provision::where('association_id', $aid)
             ->whereNotNull('piece_jointe_path')
             ->each(function (Provision $provision) use ($aid, $force, $reverse, &$stats) {
                 $pid = $provision->id;

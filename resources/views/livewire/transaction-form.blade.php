@@ -12,10 +12,17 @@
                     'pour_inscriptions' => 'inscription',
                     default             => null,
                 };
+                // Lecture seule : rien ne s'enregistrera. Un exercice clôturé, ou une pièce gelée par un rattachement
+                // (spec § 7). Ne vaut PAS pour les gestes sur UNE ligne (« Ventiler », « Reclasser »), que le gel laisse
+                // ouverts sur les lignes sœurs : ceux-là gardent leurs propres conditions.
+                $lectureSeule = $exerciceCloture || $motifGel !== null;
+                // Les lignes se retirent et s'ajoutent : ni verrouillées par la pièce (rapprochement, remise, facture,
+                // HelloAsso, immobilisation, miroir d'annulation), ni en lecture seule.
+                $lignesModifiables = ! $isLocked && ! $isLockedByFacture && ! $isLockedByHelloAsso && ! $isLockedByImmobilisation && ! $isExtourneMiroir && ! $lectureSeule;
             @endphp
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
-                    @if($exerciceCloture)
+                    @if($lectureSeule)
                         Visualiser {{ $formEntityLabel ? ($formEntityLabel === 'cotisation' || $formEntityLabel === 'inscription' ? 'la ' : 'le ') . $formEntityLabel : ($sensTresorerie === 'depense' ? 'la dépense' : 'la recette') }}
                     @elseif($formEntityLabel)
                         {{ $transactionId ? 'Modifier le ' : ($formEntityLabel === 'cotisation' || $formEntityLabel === 'inscription' ? 'Nouvelle ' : 'Nouveau ') }}{{ $formEntityLabel }}
@@ -110,7 +117,15 @@
                 </div>
                 @endif
 
-                <form wire:submit="save">
+                <form wire:submit="save" @if ($lectureSeule) data-lecture-seule @endif>
+                    @if ($motifGel !== null)
+                        {{-- Pièce gelée par un rattachement à l'exercice suivant : le motif dès l'ouverture, avant toute saisie.
+                             Le formulaire est en lecture seule ($lectureSeule) ; la ventilation d'une ligne, elle, reste
+                             ouverte (« Ventiler » : le service ne refuse que la ligne rattachée). --}}
+                        <div class="alert alert-warning small py-2 mb-3" role="alert">
+                            <i class="bi bi-lock"></i> {{ $motifGel }}
+                        </div>
+                    @endif
                     @if ($isExtourneMiroir)
                         <div class="alert alert-info small py-2 mb-3">
                             <i class="bi bi-arrow-repeat"></i> Transaction de remboursement — les montants et catégories sont figés. Vous pouvez renseigner le mode de paiement, le compte bancaire et la date.
@@ -152,11 +167,16 @@
                         // réglée, sans toucher au montant ni au règlement. Offert à qui peut
                         // écrire en compta, hors exercice clôturé (écran en consultation).
                         $peutReclasser = $isLockedByReglement && $this->canEdit && ! $exerciceCloture;
+                        // Pas offert sur une ligne gelée par un rattachement (le service la refuserait) : l'invitation
+                        // ci-dessous ne vaut que si au moins une ligne le propose encore.
+                        $uneLigneReclassable = collect($lignes)->contains(
+                            fn (array $l): bool => ! empty($l['id']) && ! in_array((int) $l['id'], $lignesGelees, true)
+                        );
                     @endphp
                     @if ($isLockedByReglement)
                         <div class="alert alert-warning small py-2 mb-3">
                             <i class="bi bi-lock"></i> Des règlements sont enregistrés : annulez-les avant de modifier la date, le tiers, le compte bancaire ou les montants.
-                            @if ($peutReclasser)
+                            @if ($peutReclasser && $uneLigneReclassable)
                                 Pour corriger le compte, l'opération ou la séance d'une ligne, utilisez « Reclasser » sur cette ligne.
                             @endif
                         </div>
@@ -167,7 +187,7 @@
                                 Date <span class="text-danger">*</span>
                                 @if ($isLocked || $isLockedByHelloAsso || $isLockedByImmobilisation || $isLockedByReglement) <i class="bi bi-lock text-warning" title="Champ verrouillé"></i> @endif
                             </label>
-                            <x-date-input name="date" wire:model.live="date" :value="$date" :disabled="$isLocked || $isLockedByHelloAsso || $isLockedByImmobilisation || $isLockedByReglement || $exerciceCloture" />
+                            <x-date-input name="date" wire:model.live="date" :value="$date" :disabled="$isLocked || $isLockedByHelloAsso || $isLockedByImmobilisation || $isLockedByReglement || $lectureSeule" />
                             {{-- d-block : Bootstrap masque .invalid-feedback tant qu'un frère
                                  précédent ne porte pas .is-invalid. Le composant x-date-input
                                  enveloppe son champ dans un .input-group wire:ignore et ne pose
@@ -181,22 +201,22 @@
                             <label for="reference" class="form-label">Référence</label>
                             <input type="text" wire:model="reference" id="reference"
                                    class="form-control @error('reference') is-invalid @enderror"
-                                   {{ $exerciceCloture ? 'disabled' : '' }}>
+                                   {{ $lectureSeule ? 'disabled' : '' }}>
                             @error('reference') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
                         <div class="col-md-3">
                             <label for="libelle" class="form-label">Libellé</label>
                             <input type="text" wire:model="libelle" id="libelle"
                                    class="form-control @error('libelle') is-invalid @enderror"
-                                   {{ $exerciceCloture ? 'disabled' : '' }}>
+                                   {{ $lectureSeule ? 'disabled' : '' }}>
                             @error('libelle') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
                         <div class="col-md-2">
                             <label class="form-label">
                                 Tiers <span class="text-danger">*</span>
-                                @if ($isLockedByHelloAsso || $isLockedByImmobilisation || $isExtourneMiroir) <i class="bi bi-lock text-warning" title="Champ verrouillé"></i> @endif
+                                @if ($isLockedByHelloAsso || $isLockedByImmobilisation || $isExtourneMiroir || $motifGel !== null) <i class="bi bi-lock text-warning" title="Champ verrouillé"></i> @endif
                             </label>
-                            @if ($isLockedByHelloAsso || $isLockedByImmobilisation || $isExtourneMiroir || $isLockedByReglement)
+                            @if ($isLockedByHelloAsso || $isLockedByImmobilisation || $isExtourneMiroir || $isLockedByReglement || $motifGel !== null)
                                 <input type="text" value="{{ \App\Models\Tiers::find($tiers_id)?->displayName() ?? '—' }}"
                                        class="form-control bg-light" disabled>
                             @else
@@ -236,13 +256,13 @@
                                 <div class="form-check">
                                     <input class="form-check-input" type="radio" wire:model.live="paiementRecu"
                                            id="paiement_recu_oui" value="1"
-                                           {{ $exerciceCloture ? 'disabled' : '' }}>
+                                           {{ $lectureSeule ? 'disabled' : '' }}>
                                     <label class="form-check-label" for="paiement_recu_oui">Oui</label>
                                 </div>
                                 <div class="form-check">
                                     <input class="form-check-input" type="radio" wire:model.live="paiementRecu"
                                            id="paiement_recu_non" value="0"
-                                           {{ $exerciceCloture ? 'disabled' : '' }}>
+                                           {{ $lectureSeule ? 'disabled' : '' }}>
                                     <label class="form-check-label" for="paiement_recu_non">Non</label>
                                 </div>
                             </div>
@@ -253,7 +273,7 @@
                             <label for="mode_paiement" class="form-label">Mode paiement <span class="text-danger">*</span></label>
                             <select wire:model="mode_paiement" id="mode_paiement"
                                     class="form-select @error('mode_paiement') is-invalid @enderror"
-                                    {{ $exerciceCloture || $isLockedByHelloAsso ? 'disabled' : '' }}>
+                                    {{ $lectureSeule || $isLockedByHelloAsso ? 'disabled' : '' }}>
                                 <option value="">-- Choisir --</option>
                                 @foreach ($modesPaiement as $mode)
                                     <option value="{{ $mode->value }}">{{ $mode->label() }}</option>
@@ -265,7 +285,7 @@
                         @if (($type === 'recette' || $type === 'depense') && $paiementRecu && ! $isLockedByReglement)
                         <div class="col-md-2">
                             <label for="dateReglement" class="form-label">Date du règlement <span class="text-danger">*</span></label>
-                            <x-date-input name="dateReglement" wire:model.live="dateReglement" :value="$dateReglement" :disabled="$exerciceCloture" />
+                            <x-date-input name="dateReglement" wire:model.live="dateReglement" :value="$dateReglement" :disabled="$lectureSeule" />
                             {{-- d-block : même raison que le champ Date — x-date-input ne pose
                                  pas .is-invalid, sans quoi Bootstrap masque le message. --}}
                             @error('dateReglement') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
@@ -282,7 +302,7 @@
                                        class="form-control bg-light" disabled>
                             @else
                                 <select wire:model="compte_id" id="compte_id" class="form-select"
-                                        {{ $exerciceCloture ? 'disabled' : '' }}>
+                                        {{ $lectureSeule ? 'disabled' : '' }}>
                                     <option value="">-- Aucun --</option>
                                     @foreach ($comptes as $compte)
                                         <option value="{{ $compte->id }}">{{ $compte->nom }}</option>
@@ -313,11 +333,13 @@
                         <div class="{{ $ocrMode ? 'col-md-8' : 'col-12' }}">
                             <label for="notes" class="form-label">Notes</label>
                             <input type="text" wire:model="notes" id="notes" class="form-control"
-                                   {{ $exerciceCloture ? 'disabled' : '' }}>
+                                   {{ $lectureSeule ? 'disabled' : '' }}>
                         </div>
 
-                        {{-- Pièce jointe (dépenses uniquement, hors OCR mode qui l'affiche au-dessus) --}}
-                        @if (! $exerciceCloture && ! $ocrMode)
+                        {{-- Pièce jointe (dépenses uniquement, hors OCR mode qui l'affiche au-dessus).
+                             Pièce gelée : le justificatif existant reste consultable, ni son retrait ni son remplacement
+                             ni un nouvel envoi ne sont offerts. --}}
+                        @if (! $exerciceCloture && ! $ocrMode && ($motifGel === null || $existingPieceJointeNom))
                         <div class="col-12">
                             <label class="form-label"><i class="bi bi-paperclip"></i> Justificatif</label>
 
@@ -327,18 +349,20 @@
                                     <a href="{{ $existingPieceJointeUrl }}" target="_blank" class="btn btn-sm btn-outline-primary" title="Consulter">
                                         <i class="bi bi-eye"></i>
                                     </a>
-                                    @if ($this->canEdit)
+                                    @if ($this->canEdit && $motifGel === null)
                                     <button type="button" wire:click="deletePieceJointe" wire:confirm="Supprimer le justificatif ?"
                                             class="btn btn-sm btn-outline-danger" title="Supprimer">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                     @endif
+                                    @if ($motifGel === null)
                                     <x-zone-depot>
                                         <label class="btn btn-sm btn-outline-secondary mb-0" title="Remplacer">
                                             <i class="bi bi-arrow-repeat"></i> Remplacer
                                             <input type="file" wire:model="pieceJointe" accept=".pdf,.jpg,.jpeg,.png" class="d-none">
                                         </label>
                                     </x-zone-depot>
+                                    @endif
                                 </div>
                             @else
                                 <div class="d-flex align-items-center gap-2" x-data="{ tempUrl: null }">
@@ -414,7 +438,7 @@
                                 @forelse ($lignes as $index => $ligne)
                                     <tr wire:key="ligne-{{ $index }}">
                                         <td style="min-width:220px">
-                                            @if ($isLockedByFacture || $isLockedByImmobilisation || $isExtourneMiroir)
+                                            @if ($isLockedByFacture || $isLockedByImmobilisation || $isExtourneMiroir || $motifGel !== null)
                                                 {{-- Même rendu que le chip CompteAutocomplete : famille + intitulé --}}
                                                 @php
                                                     $compteLigne = \App\Models\Compte::find($ligne['compte_id']);
@@ -452,7 +476,7 @@
                                                     @endif
                                                 </div>
                                             @endif
-                                            @if ($peutReclasser && ! empty($ligne['id']))
+                                            @if ($peutReclasser && ! empty($ligne['id']) && ! in_array((int) $ligne['id'], $lignesGelees, true))
                                                 <button type="button" class="btn btn-link btn-sm p-0 mt-1"
                                                         wire:click="ouvrirReclassement({{ (int) $ligne['id'] }})">
                                                     <i class="bi bi-arrow-left-right"></i> Reclasser
@@ -462,7 +486,7 @@
                                         <td>
                                             <select wire:model.live="lignes.{{ $index }}.operation_id"
                                                     class="form-select form-select-sm"
-                                                    {{ $exerciceCloture || $isLockedByFacture || $isLockedByImmobilisation || $isExtourneMiroir ? 'disabled' : '' }}>
+                                                    {{ $lectureSeule || $isLockedByFacture || $isLockedByImmobilisation || $isExtourneMiroir ? 'disabled' : '' }}>
                                                 <option value="">-- Aucune --</option>
                                                 @php $selectedOp = $ligne['operation_id'] !== '' ? ($operationsAffichees[(int) $ligne['operation_id']] ?? null) : null; @endphp
                                                 @if ($selectedOp !== null && ! $operations->contains('id', (int) $selectedOp->id))
@@ -484,7 +508,7 @@
                                             @if ($nbSeances)
                                                 <select wire:model="lignes.{{ $index }}.seance"
                                                         class="form-select form-select-sm"
-                                                        {{ $exerciceCloture || $isLockedByFacture || $isLockedByImmobilisation || $isExtourneMiroir ? 'disabled' : '' }}>
+                                                        {{ $lectureSeule || $isLockedByFacture || $isLockedByImmobilisation || $isExtourneMiroir ? 'disabled' : '' }}>
                                                     <option value="">--</option>
                                                     @for ($s = 1; $s <= $nbSeances; $s++)
                                                         <option value="{{ $s }}">{{ $s }}</option>
@@ -499,7 +523,7 @@
                                                 <input type="number" wire:model.live="lignes.{{ $index }}.montant"
                                                        step="0.01" min="0.01"
                                                        class="form-control form-control-sm @error('lignes.' . $index . '.montant') is-invalid @enderror"
-                                                       {{ $exerciceCloture ? 'disabled' : '' }}>
+                                                       {{ $lectureSeule ? 'disabled' : '' }}>
                                                 @error('lignes.' . $index . '.montant')
                                                     <div class="invalid-feedback">{{ $message }}</div>
                                                 @enderror
@@ -509,9 +533,9 @@
                                             <div class="d-flex align-items-center gap-1">
                                                 <input type="text" wire:model="lignes.{{ $index }}.notes"
                                                        class="form-control form-control-sm"
-                                                       {{ $exerciceCloture ? 'disabled' : '' }}>
+                                                       {{ $lectureSeule ? 'disabled' : '' }}>
                                                 {{-- PJ niveau ligne --}}
-                                                @if (! $exerciceCloture)
+                                                @if (! $lectureSeule)
                                                     @if (! empty($lignes[$index]['piece_jointe_upload']))
                                                         <span class="badge bg-info text-nowrap"
                                                               data-tooltip="{{ $lignes[$index]['piece_jointe_upload']->getClientOriginalName() }}">
@@ -584,13 +608,14 @@
                                             @error("lignes.{$index}.piece_jointe_upload") <div class="text-danger small">{{ $message }}</div> @enderror
                                         </td>
                                         <td class="text-center">
-                                            @if (! $isLocked && ! $isLockedByFacture && ! $isLockedByHelloAsso && ! $isLockedByImmobilisation && ! $isExtourneMiroir && ! $exerciceCloture)
+                                            @if ($lignesModifiables)
                                                 <button type="button" wire:click="removeLigne({{ $index }})"
                                                         class="btn btn-sm btn-outline-danger">
                                                     <i class="bi bi-trash"></i>
                                                 </button>
                                             @endif
-                                            @if (($isLocked || $isLockedByImmobilisation) && ! $isLockedByFacture && ! $exerciceCloture && ($ligne['id'] ?? null) !== null)
+                                            {{-- Sur une pièce gelée par un rattachement, la ventilation d'une ligne sœur reste ouverte (spec § 7). Elle n'est pas offerte là où le service la refuserait ($lignesGelees : la ligne rattachée, ou toute ligne d'une écriture de rattachement). --}}
+                                            @if (($isLocked || $isLockedByImmobilisation || $motifGel !== null) && ! $isLockedByFacture && ! $exerciceCloture && ($ligne['id'] ?? null) !== null && ! in_array((int) $ligne['id'], $lignesGelees, true))
                                                 <button type="button"
                                                         wire:click="ouvrirVentilation({{ $ligne['id'] }})"
                                                         class="btn btn-sm btn-outline-warning ms-1">
@@ -718,14 +743,14 @@
                     @endif
 
                     <div class="d-flex gap-2">
-                        @if (! $isLocked && ! $isLockedByFacture && ! $isLockedByHelloAsso && ! $isLockedByImmobilisation && ! $isExtourneMiroir && ! $exerciceCloture && $this->canEdit)
+                        @if ($lignesModifiables && $this->canEdit)
                             <button type="button" wire:click="addLigne" class="btn btn-sm btn-outline-secondary">
                                 <i class="bi bi-plus-lg"></i> Ajouter une ligne
                             </button>
                         @endif
                         <div class="ms-auto">
-                            <button type="button" wire:click="resetForm" class="btn btn-secondary">{{ $exerciceCloture || ! $this->canEdit ? 'Fermer' : 'Annuler' }}</button>
-                            @if (! $exerciceCloture && $this->canEdit)
+                            <button type="button" wire:click="resetForm" class="btn btn-secondary">{{ $lectureSeule || ! $this->canEdit ? 'Fermer' : 'Annuler' }}</button>
+                            @if (! $lectureSeule && $this->canEdit)
                             <button type="submit" class="btn btn-success"
                                     {{ $isLockedByImmobilisation ? 'disabled' : '' }}
                                     @if ($isLockedByImmobilisation) title="Cette transaction est pilotée par la fiche d’immobilisation : ventilez sans modifier la comptabilité." @elseif ($isLocked || $isLockedByFacture) title="Certains champs sont verrouillés (facture validée ou rapprochement)." @endif>

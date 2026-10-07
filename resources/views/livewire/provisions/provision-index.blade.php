@@ -1,318 +1,453 @@
+@php
+    $euros = fn (float $montant): string => number_format($montant, 2, ',', "\u{202F}");
+    // Le nombre tel que le tri client le lit : un point, deux décimales.
+    $nombre = fn (float $montant): string => number_format($montant, 2, '.', '');
+    $fermee = $motifPeriodeFermee !== null;
+    // Les boutons qui écrivent : désactivés par la période fermée ou par le rôle. Le service reste l'autorité.
+    $peutAgir = $peutEcrire && ! $fermee;
+    $pourquoiInactif = $fermee ? 'Période clôturée' : 'Réservé aux utilisateurs qui peuvent écrire en comptabilité';
+@endphp
+
 <div>
-    {{-- Flash message --}}
-    @if($flashMessage)
-        <div class="alert alert-{{ $flashType }} alert-dismissible fade show">
+    <style>
+        th[data-tri] { cursor: pointer; user-select: none; white-space: nowrap; }
+        th[data-tri]::after { content: ' \2195'; opacity: .45; font-size: .75rem; }
+        th[data-tri][aria-sort="ascending"]::after { content: ' \25B2'; opacity: 1; }
+        th[data-tri][aria-sort="descending"]::after { content: ' \25BC'; opacity: 1; }
+    </style>
+
+    <div class="d-flex flex-wrap justify-content-between align-items-baseline gap-2 mb-2">
+        <h4 class="fw-bold mb-0">Écritures de rattachement</h4>
+        <div class="small text-muted" data-role="exercice">
+            Exercice <strong>{{ $exerciceLabel }}</strong>
+            · <a href="{{ route('exercices.changer') }}" data-role="changer-exercice">changer d’exercice</a>
+        </div>
+    </div>
+
+    <p class="text-muted mb-3" data-role="introduction">
+        Un produit encaissé ou une charge payée pendant l’exercice peut en réalité concerner le suivant — un parcours
+        qui ne démarre qu’en septembre, par exemple. Cet écran le retire du résultat de l’exercice {{ $exerciceLabel }}
+        et le reconnaît au début du suivant, par deux écritures qui se compensent.
+    </p>
+
+    @if ($fermee)
+        <div class="alert alert-warning" data-role="periode-fermee">
+            <i class="bi bi-lock me-1"></i> {{ $motifPeriodeFermee }}
+        </div>
+    @endif
+
+    @if ($flashMessage !== '')
+        <div class="alert alert-{{ in_array($flashType, ['success', 'warning', 'danger'], true) ? $flashType : 'info' }} alert-dismissible fade show"
+             data-role="message" data-type="{{ $flashType }}">
             {{ $flashMessage }}
             <button type="button" class="btn-close" data-bs-dismiss="alert" wire:click="$set('flashMessage', '')"></button>
         </div>
     @endif
 
-    {{-- Title --}}
-    <h5 class="fw-bold mb-3">Écritures de provisions — {{ $exerciceLabel }}</h5>
+    {{-- ═══ À rattacher ═══ --}}
+    <section data-zone="a-rattacher" class="mb-4">
+        <h5 class="fw-bold">À rattacher</h5>
+        <p class="small text-muted mb-2">
+            Les charges et les produits de l’exercice affectés à une opération qui ne démarre qu’après sa fin.
+        </p>
 
-    {{-- Exercice clôturé alert --}}
-    @if($isCloture)
-        <div class="alert alert-warning d-flex align-items-center gap-2 mb-3">
-            <i class="bi bi-lock-fill"></i>
-            <span>Cet exercice est <strong>clôturé</strong>. Les modifications ne sont pas autorisées.</span>
-        </div>
-    @endif
-
-    {{-- Toolbar --}}
-    <div class="mb-3 d-flex flex-wrap gap-2 align-items-center justify-content-between">
-        <div></div>
-        @if(!$isCloture)
-            <button class="btn btn-primary btn-sm" wire:click="openCreate">
-                <i class="bi bi-plus-lg"></i> Ajouter une provision
-            </button>
-        @endif
-    </div>
-
-    {{-- Table --}}
-    <div class="table-responsive">
-        <table class="table table-sm table-striped table-hover" id="provTable" wire:ignore.self>
-            <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
-                <tr>
-                    <th class="sortable" data-col="0" style="cursor:pointer;user-select:none">Libellé <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
-                    <th class="sortable" data-col="1" style="cursor:pointer;user-select:none">Compte <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
-                    <th class="sortable" data-col="2" style="cursor:pointer;user-select:none">Type <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
-                    <th class="sortable text-end" data-col="3" style="cursor:pointer;user-select:none">Montant <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
-                    <th class="sortable" data-col="4" style="cursor:pointer;user-select:none">Tiers <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
-                    <th class="sortable" data-col="5" style="cursor:pointer;user-select:none">Opération <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
-                    <th class="sortable text-center" data-col="6" style="cursor:pointer;user-select:none">Séance <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
-                    <th class="text-center" style="width:40px">PJ</th>
-                    <th style="width:90px" class="text-center">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse ($provisions as $provision)
-                    <tr wire:key="prov-{{ $provision->id }}">
-                        <td>{{ $provision->libelle }}</td>
-                        <td>{{ $provision->compte?->intitule ?? '—' }}</td>
-                        <td>
-                            @if($provision->type === \App\Enums\TypeTransaction::Depense)
-                                <span class="badge bg-danger">Dépense</span>
-                            @else
-                                <span class="badge bg-success">Recette</span>
-                            @endif
-                        </td>
-                        <td class="text-end" data-sort="{{ $provision->montant }}">
-                            {{ number_format((float) $provision->montant, 2, ',', ' ') }} €
-                        </td>
-                        <td>{{ $provision->tiers?->displayName() ?? '—' }}</td>
-                        <td>{{ $provision->operation?->nom ?? '—' }}</td>
-                        <td class="text-center">{{ $provision->seance ?? '—' }}</td>
-                        <td class="text-center">
-                            @if($provision->hasPieceJointe())
-                                <i class="bi bi-paperclip" title="{{ $provision->piece_jointe_nom }}"></i>
-                            @else
-                                <span class="text-muted">—</span>
-                            @endif
-                        </td>
-                        <td class="text-center">
-                            <div class="d-flex gap-1 justify-content-center">
-                                <button class="btn btn-sm btn-outline-primary"
-                                        wire:click="openEdit({{ $provision->id }})"
-                                        style="padding:.15rem .35rem;font-size:.75rem"
-                                        title="Modifier"
-                                        @if($isCloture) disabled @endif>
-                                    <i class="bi bi-pencil"></i>
-                                </button>
-                                <button class="btn btn-sm btn-outline-danger"
-                                        wire:click="delete({{ $provision->id }})"
-                                        wire:confirm="Supprimer cette provision ?"
-                                        style="padding:.15rem .35rem;font-size:.75rem"
-                                        title="Supprimer"
-                                        @if($isCloture) disabled @endif>
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="9" class="text-muted">Aucune écriture de provision enregistrée pour cet exercice.</td>
-                    </tr>
-                @endforelse
-            </tbody>
-            <tfoot>
-                <tr class="fw-semibold">
-                    <td colspan="3">Totaux</td>
-                    <td class="text-end" colspan="6">
-                        <span class="text-danger me-3">Charges : {{ number_format($totalDepenses, 2, ',', ' ') }} €</span>
-                        <span class="text-success">Produits : {{ number_format($totalRecettes, 2, ',', ' ') }} €</span>
-                    </td>
-                </tr>
-            </tfoot>
-        </table>
-    </div>
-
-    {{-- ═══════════════════════════════════════════════════════════
-         MODAL CREATE/EDIT
-         ═══════════════════════════════════════════════════════════ --}}
-    @if($showModal)
-        <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
-             style="background:rgba(0,0,0,.4);z-index:2000"
-             wire:click.self="$set('showModal', false)">
-            <div class="bg-white rounded p-4 shadow" style="width:600px;max-width:95vw;max-height:90vh;overflow-y:auto">
-                <h5 class="fw-bold mb-3">
-                    {{ $editingId ? 'Modifier la provision' : 'Ajouter une provision' }}
-                </h5>
-
-                {{-- Libellé --}}
-                <div class="mb-3">
-                    <label class="form-label small">Libellé <span class="text-danger">*</span></label>
-                    <input type="text" wire:model="libelle"
-                           class="form-control form-control-sm @error('libelle') is-invalid @enderror"
-                           maxlength="255">
-                    @error('libelle') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                </div>
-
-                {{-- Compte + Type --}}
-                <div class="row g-2 mb-3">
-                    <div class="col-md-8">
-                        <label class="form-label small">Compte <span class="text-danger">*</span></label>
-                        <select wire:model="compte_id"
-                                class="form-select form-select-sm @error('compte_id') is-invalid @enderror">
-                            <option value="">— Choisir —</option>
-                            @include('partials.select-compte-options', ['groupes' => $groupesComptes])
-                        </select>
-                        @error('compte_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label small">Type <span class="text-danger">*</span></label>
-                        <select wire:model="type"
-                                class="form-select form-select-sm @error('type') is-invalid @enderror">
-                            <option value="">— Choisir —</option>
-                            <option value="depense">Dépense (charge)</option>
-                            <option value="recette">Recette (produit)</option>
-                        </select>
-                        @error('type') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                    </div>
-                </div>
-
-                {{-- Montant --}}
-                <div class="mb-3">
-                    <label class="form-label small">Montant <span class="text-danger">*</span></label>
-                    <div class="input-group input-group-sm">
-                        <input type="number" wire:model="montant" step="0.01"
-                               class="form-control form-control-sm @error('montant') is-invalid @enderror">
-                        <span class="input-group-text">€</span>
-                    </div>
-                    @error('montant') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                </div>
-
-                {{-- Tiers --}}
-                <div class="mb-3">
-                    <label class="form-label small">Tiers</label>
-                    <livewire:tiers-autocomplete wire:model="tiers_id" filtre="tous" :key="'prov-tiers-'.($editingId ?? 'new').'-'.($tiers_id ?? '0')" />
-                    @error('tiers_id') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
-                </div>
-
-                {{-- Opération --}}
-                <div class="mb-3">
-                    <label class="form-label small">Opération</label>
-                    <select wire:model.live="operation_id"
-                            class="form-select form-select-sm @error('operation_id') is-invalid @enderror">
-                        <option value="">— Aucune —</option>
-                        @foreach ($operations as $op)
-                            <option value="{{ $op->id }}">{{ $op->nom }}</option>
+        @if ($candidats->isEmpty())
+            <div class="alert alert-info mb-0" data-role="vide">
+                <i class="bi bi-info-circle"></i> Aucune ligne à rattacher : aucune charge ni aucun produit de l’exercice
+                {{ $exerciceLabel }} n’est affecté à une opération qui démarre après sa fin.
+            </div>
+        @else
+            <div class="table-responsive">
+                <table class="table table-sm table-striped table-hover align-middle mb-0" data-triable>
+                    <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
+                        <tr>
+                            <th data-tri>Date</th>
+                            <th data-tri>Pièce</th>
+                            <th data-tri>Compte</th>
+                            <th data-tri>Libellé</th>
+                            <th data-tri>Tiers</th>
+                            <th data-tri>Opération</th>
+                            <th data-tri class="text-end">Montant</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody style="color:#555">
+                        @foreach ($candidats as $c)
+                            <tr wire:key="candidat-{{ $c->transaction_ligne_id }}" data-ligne-id="{{ $c->transaction_ligne_id }}">
+                                <td class="small text-nowrap" data-col="date" data-sort="{{ $c->piece_date->format('Y-m-d') }}">{{ $c->piece_date->format('d/m/Y') }}</td>
+                                <td class="small text-nowrap" data-col="piece">{{ $c->numero_piece }}</td>
+                                <td class="small" data-col="compte" data-sort="{{ $c->numero_pcg }}">
+                                    <span class="fw-semibold">{{ $c->numero_pcg }}</span>
+                                    <span class="text-muted">{{ $c->compte_intitule }}</span>
+                                </td>
+                                <td class="small" data-col="libelle">{{ filled($c->ligne_libelle) ? $c->ligne_libelle : $c->piece_libelle }}</td>
+                                <td class="small" data-col="tiers">{{ $c->tiers_nom }}</td>
+                                <td class="small" data-col="operation" data-sort="{{ $c->operation_nom }}">
+                                    {{ $c->operation_nom }}
+                                    @if ($c->operation_debut)
+                                        <div class="text-muted text-nowrap">
+                                            @if ($c->operation_fin)
+                                                du {{ $c->operation_debut->format('d/m/Y') }} au {{ $c->operation_fin->format('d/m/Y') }}
+                                            @else
+                                                à partir du {{ $c->operation_debut->format('d/m/Y') }}
+                                            @endif
+                                        </div>
+                                    @endif
+                                </td>
+                                <td class="text-end small text-nowrap fw-semibold" data-col="montant" data-sort="{{ $nombre($c->montant) }}">{{ $euros($c->montant) }}&nbsp;€</td>
+                                <td class="text-end">
+                                    <button type="button" class="btn btn-sm btn-outline-primary text-nowrap"
+                                            data-action="constater" data-ligne-id="{{ $c->transaction_ligne_id }}"
+                                            wire:click="ouvrir({{ $c->transaction_ligne_id }})"
+                                            @disabled(! $peutAgir) @if (! $peutAgir) title="{{ $pourquoiInactif }}" @endif>
+                                        <i class="bi bi-calendar-plus"></i> Constater d’avance
+                                    </button>
+                                </td>
+                            </tr>
                         @endforeach
-                    </select>
-                    @error('operation_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                </div>
+                    </tbody>
+                </table>
+            </div>
+        @endif
+    </section>
 
-                {{-- Séance (visible uniquement si opération sélectionnée) --}}
-                @if($operation_id !== '')
-                    <div class="mb-3">
-                        <label class="form-label small">Séance n°</label>
-                        <input type="number" wire:model="seance" min="1"
-                               class="form-control form-control-sm @error('seance') is-invalid @enderror">
-                        @error('seance') <div class="invalid-feedback">{{ $message }}</div> @enderror
+    {{-- ═══ Recherche libre ═══ --}}
+    <section data-zone="recherche" class="mb-4">
+        <h5 class="fw-bold">Rechercher une autre ligne</h5>
+        <p class="small text-muted mb-2">
+            Le décalage porté par une opération n’est pas le seul : cherchez une ligne de charge ou de produit de
+            l’exercice par son numéro de pièce, son libellé ou son montant.
+        </p>
+        <input type="search" class="form-control form-control-sm mb-2" style="max-width:420px"
+               placeholder="Numéro de pièce, libellé ou montant…" autocomplete="off"
+               data-role="recherche" wire:model.live.debounce.300ms="recherche">
+
+        @if (trim($recherche) !== '')
+            @if ($resultatsRecherche->isEmpty())
+                <div class="small text-muted" data-role="recherche-vide">
+                    Aucune ligne de charge ou de produit de l’exercice {{ $exerciceLabel }} ne correspond.
+                </div>
+            @else
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped table-hover align-middle mb-0" data-triable>
+                        <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
+                            <tr>
+                                <th data-tri>Date</th>
+                                <th data-tri>Pièce</th>
+                                <th data-tri>Compte</th>
+                                <th data-tri>Libellé</th>
+                                <th data-tri class="text-end">Montant</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody style="color:#555">
+                            @foreach ($resultatsRecherche as $ligne)
+                                @php $montantLigne = round(max((float) $ligne->debit, (float) $ligne->credit), 2); @endphp
+                                <tr wire:key="resultat-{{ $ligne->id }}" data-ligne-id="{{ $ligne->id }}">
+                                    <td class="small text-nowrap" data-col="date" data-sort="{{ $ligne->transaction->date->format('Y-m-d') }}">{{ $ligne->transaction->date->format('d/m/Y') }}</td>
+                                    <td class="small text-nowrap" data-col="piece">{{ $ligne->transaction->numero_piece }}</td>
+                                    <td class="small" data-col="compte" data-sort="{{ $ligne->compte->numero_pcg }}">
+                                        <span class="fw-semibold">{{ $ligne->compte->numero_pcg }}</span>
+                                        <span class="text-muted">{{ $ligne->compte->intitule }}</span>
+                                    </td>
+                                    <td class="small" data-col="libelle">{{ filled($ligne->libelle) ? $ligne->libelle : $ligne->transaction->libelle }}</td>
+                                    <td class="text-end small text-nowrap fw-semibold" data-col="montant" data-sort="{{ $nombre($montantLigne) }}">{{ $euros($montantLigne) }}&nbsp;€</td>
+                                    <td class="text-end">
+                                        <button type="button" class="btn btn-sm btn-outline-primary text-nowrap"
+                                                data-action="constater" data-ligne-id="{{ $ligne->id }}"
+                                                wire:click="ouvrir({{ $ligne->id }})"
+                                                @disabled(! $peutAgir) @if (! $peutAgir) title="{{ $pourquoiInactif }}" @endif>
+                                            <i class="bi bi-calendar-plus"></i> Constater d’avance
+                                        </button>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                @if ($rechercheTronquee)
+                    <div class="small text-muted mt-1" data-role="recherche-tronquee">
+                        Seules les 20 premières lignes sont affichées : précisez votre recherche.
                     </div>
                 @endif
+            @endif
+        @endif
+    </section>
 
-                {{-- Notes --}}
-                <div class="mb-3">
-                    <label class="form-label small">Notes</label>
-                    <textarea wire:model="notes" rows="3"
-                              class="form-control form-control-sm @error('notes') is-invalid @enderror"
-                              maxlength="2000"></textarea>
-                    @error('notes') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                </div>
+    {{-- ═══ Lignes écartées ═══ --}}
+    @if ($ecartees->isNotEmpty())
+        <section data-zone="ecartees" class="mb-4">
+            <h5 class="fw-bold">Lignes écartées</h5>
+            <p class="small text-muted mb-2">
+                Ces lignes concernent l’exercice suivant, mais ne peuvent pas être rattachées. Le motif dit pourquoi.
+            </p>
+            <div class="table-responsive">
+                <table class="table table-sm table-striped table-hover align-middle mb-0" data-triable>
+                    <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
+                        <tr>
+                            <th data-tri>Date</th>
+                            <th data-tri>Pièce</th>
+                            <th data-tri>Compte</th>
+                            <th data-tri>Libellé</th>
+                            <th>Opérations</th>
+                            <th data-tri class="text-end">Montant</th>
+                            <th>Motif</th>
+                        </tr>
+                    </thead>
+                    <tbody style="color:#555">
+                        @foreach ($ecartees as $e)
+                            <tr wire:key="ecartee-{{ $e->transaction_ligne_id }}" data-ligne-id="{{ $e->transaction_ligne_id }}">
+                                <td class="small text-nowrap" data-col="date" data-sort="{{ $e->piece_date->format('Y-m-d') }}">{{ $e->piece_date->format('d/m/Y') }}</td>
+                                <td class="small text-nowrap" data-col="piece">{{ $e->numero_piece }}</td>
+                                <td class="small" data-col="compte" data-sort="{{ $e->numero_pcg }}">
+                                    <span class="fw-semibold">{{ $e->numero_pcg }}</span>
+                                    <span class="text-muted">{{ $e->compte_intitule }}</span>
+                                </td>
+                                <td class="small" data-col="libelle">{{ filled($e->ligne_libelle) ? $e->ligne_libelle : $e->piece_libelle }}</td>
+                                <td class="small" data-col="operation">
+                                    @if ($e->operation_nom)
+                                        <div>{{ $e->operation_nom }}</div>
+                                    @endif
+                                    @foreach ($ventilationsDesEcartees->get($e->transaction_ligne_id, collect()) as $operation)
+                                        <div>
+                                            {{ $operation->nom }}
+                                            <span class="text-muted text-nowrap">(à partir du {{ \Carbon\CarbonImmutable::parse($operation->date_debut)->format('d/m/Y') }})</span>
+                                        </div>
+                                    @endforeach
+                                </td>
+                                <td class="text-end small text-nowrap fw-semibold" data-col="montant" data-sort="{{ $nombre($e->montant) }}">{{ $euros($e->montant) }}&nbsp;€</td>
+                                <td class="small" data-col="motif">{{ $e->motif }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    @endif
 
-                {{-- Pièce jointe --}}
-                <div class="mb-3">
-                    <label class="form-label small">Pièce jointe</label>
-                    <x-zone-depot>
-                        <input type="file" wire:model="piece_jointe"
-                               class="form-control form-control-sm @error('piece_jointe') is-invalid @enderror">
-                    </x-zone-depot>
-                    @error('piece_jointe') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                    @if($editingId && \App\Models\Provision::find($editingId)?->hasPieceJointe())
-                        <div class="form-text text-muted">
-                            <i class="bi bi-paperclip"></i>
-                            Fichier existant : {{ \App\Models\Provision::find($editingId)->piece_jointe_nom }}
-                            (laisser vide pour conserver)
-                        </div>
-                    @endif
-                </div>
+    {{-- ═══ Rattachements de l'exercice ═══ --}}
+    <section data-zone="rattachements" class="mb-4">
+        <h5 class="fw-bold">Rattachements de l’exercice</h5>
 
-                {{-- Actions --}}
-                <div class="d-flex gap-2 justify-content-end mt-4">
-                    <button type="button" class="btn btn-sm btn-outline-secondary"
-                            wire:click="$set('showModal', false)">Annuler</button>
-                    <button type="button" class="btn btn-sm btn-primary" wire:click="save">
-                        <i class="bi bi-check-lg"></i> Enregistrer
-                    </button>
+        @if ($rattachements->isEmpty())
+            <div class="alert alert-info mb-0" data-role="vide">
+                <i class="bi bi-info-circle"></i> Aucun rattachement sur l’exercice {{ $exerciceLabel }}.
+            </div>
+        @else
+            <div class="table-responsive">
+                <table class="table table-sm table-striped table-hover align-middle mb-0" data-triable>
+                    <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
+                        <tr>
+                            <th data-tri>Cas</th>
+                            <th data-tri>Origine</th>
+                            <th data-tri>Compte</th>
+                            <th data-tri>Libellé</th>
+                            <th data-tri>Opération</th>
+                            <th data-tri class="text-end">Montant</th>
+                            <th>Pièce jointe</th>
+                            <th data-tri>Saisi par</th>
+                            <th data-tri>Saisi le</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody style="color:#555">
+                        @foreach ($rattachements as $p)
+                            @php
+                                $compteResultat = $p->compteResultat();
+                                $operationId = $p->operationEffectiveId();
+                                $operation = $operationId !== null ? $operationsDesRattachements->get($operationId) : null;
+                            @endphp
+                            <tr wire:key="rattachement-{{ $p->id }}" data-provision-id="{{ $p->id }}">
+                                <td class="small" data-col="cas">{{ $compteResultat !== null ? $p->cas()->label() : '—' }}</td>
+                                {{-- Le numéro de la pièce d'origine : il n'existe pas de lien direct vers une pièce. --}}
+                                <td class="small text-nowrap" data-col="origine">{{ $p->ligne?->transaction?->numero_piece ?? '—' }}</td>
+                                <td class="small" data-col="compte" data-sort="{{ $compteResultat?->numero_pcg }}">
+                                    @if ($compteResultat)
+                                        <span class="fw-semibold">{{ $compteResultat->numero_pcg }}</span>
+                                        <span class="text-muted">{{ $compteResultat->intitule }}</span>
+                                    @else
+                                        —
+                                    @endif
+                                </td>
+                                <td class="small" data-col="libelle">{{ $p->libelleEffectif() }}</td>
+                                <td class="small" data-col="operation">{{ $operation?->nom ?? '—' }}</td>
+                                <td class="text-end small text-nowrap fw-semibold" data-col="montant" data-sort="{{ $nombre((float) $p->montant) }}">{{ $euros((float) $p->montant) }}&nbsp;€</td>
+                                <td class="small" data-col="piece-jointe">
+                                    @if ($p->hasPieceJointe())
+                                        <button type="button" class="btn btn-link btn-sm p-0 text-start"
+                                                data-action="telecharger" wire:click="telechargerPieceJointe({{ $p->id }})">
+                                            <i class="bi bi-paperclip"></i> {{ $p->piece_jointe_nom }}
+                                        </button>
+                                    @else
+                                        <span class="text-muted">—</span>
+                                    @endif
+                                </td>
+                                <td class="small" data-col="auteur">{{ $p->saisiPar?->nom ?? '—' }}</td>
+                                <td class="small text-nowrap" data-col="saisie" data-sort="{{ $p->created_at?->format('Y-m-d H:i:s') }}">{{ $p->created_at?->format('d/m/Y') }}</td>
+                                <td class="text-end">
+                                    <button type="button" class="btn btn-sm btn-outline-danger text-nowrap"
+                                            data-action="retirer" data-provision-id="{{ $p->id }}"
+                                            wire:click="retirer({{ $p->id }})"
+                                            wire:confirm="Retirer ce rattachement ? Ses deux écritures seront supprimées et la ligne d’origine redeviendra modifiable."
+                                            @disabled(! $peutAgir) @if (! $peutAgir) title="{{ $pourquoiInactif }}" @endif>
+                                        <i class="bi bi-x-circle"></i> Retirer
+                                    </button>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+    </section>
+
+    {{-- ═══ La modale « Constater d'avance » ═══ --}}
+    @if ($modale !== null)
+        <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5)"
+             data-bs-backdrop="static" data-bs-keyboard="false" wire:key="modale-rattachement" data-role="modale">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Constater d’avance</h5>
+                        <button type="button" class="btn-close" wire:click="fermer" aria-label="Fermer"></button>
+                    </div>
+
+                    <div class="modal-body">
+                        @if ($modale['refus'] !== null)
+                            <div class="alert alert-warning" data-role="modale-refus">
+                                <i class="bi bi-exclamation-triangle me-1"></i> {{ $modale['refus'] }}
+                            </div>
+                        @endif
+
+                        @if ($modale['ligne'] !== null)
+                            @if ($modale['phrase'] !== null)
+                                <div class="alert alert-info" data-role="modale-phrase">
+                                    <strong>{{ $modale['cas']->label() }}</strong> — {{ $modale['phrase'] }}
+                                </div>
+                            @endif
+
+                            {{-- Ce que la ligne d'origine apporte : en lecture seule, le rattachement porte la ligne entière. --}}
+                            <dl class="row small mb-3" data-role="modale-origine">
+                                <dt class="col-sm-3">Compte</dt>
+                                <dd class="col-sm-9" data-champ="compte">
+                                    @if ($modale['compte'])
+                                        <span class="fw-semibold">{{ $modale['compte']->numero_pcg }}</span> {{ $modale['compte']->intitule }}
+                                    @else
+                                        —
+                                    @endif
+                                </dd>
+                                <dt class="col-sm-3">Opération</dt>
+                                <dd class="col-sm-9" data-champ="operation">
+                                    @if ($modale['operation'])
+                                        {{ $modale['operation']->nom }}
+                                        @if ($modale['operation']->date_debut)
+                                            <span class="text-muted">
+                                                ({{ $modale['operation']->date_fin
+                                                    ? 'du '.$modale['operation']->date_debut->format('d/m/Y').' au '.$modale['operation']->date_fin->format('d/m/Y')
+                                                    : 'à partir du '.$modale['operation']->date_debut->format('d/m/Y') }})
+                                            </span>
+                                        @endif
+                                    @else
+                                        —
+                                    @endif
+                                </dd>
+                                <dt class="col-sm-3">Séance</dt>
+                                <dd class="col-sm-9" data-champ="seance">{{ $modale['seance'] ?? '—' }}</dd>
+                                <dt class="col-sm-3">Tiers</dt>
+                                <dd class="col-sm-9" data-champ="tiers">{{ $modale['tiers'] ?? '—' }}</dd>
+                                <dt class="col-sm-3">Montant</dt>
+                                <dd class="col-sm-9 fw-semibold" data-champ="montant">{{ $euros($modale['montant']) }}&nbsp;€</dd>
+                                <dt class="col-sm-3">Date de la pièce</dt>
+                                <dd class="col-sm-9" data-champ="date-piece">
+                                    {{ $modale['datePiece']?->format('d/m/Y') ?? '—' }}
+                                    @if ($modale['numeroPiece'])
+                                        <span class="text-muted">· pièce {{ $modale['numeroPiece'] }}</span>
+                                    @endif
+                                </dd>
+                            </dl>
+                        @endif
+
+                        @if ($modale['apercu'] !== null)
+                            <div class="mb-3" data-role="apercu">
+                                <div class="fw-semibold mb-2">Les deux écritures qui seront passées</div>
+                                @foreach ($modale['apercu'] as $ecriture)
+                                    <div class="mb-3" data-ecriture="{{ $ecriture['cle'] }}">
+                                        <div class="small fw-semibold">
+                                            {{ $ecriture['titre'] }} — {{ $ecriture['date']->format('d/m/Y') }}
+                                        </div>
+                                        <div class="small text-muted mb-1">{{ $ecriture['libelle'] }}</div>
+                                        <table class="table table-sm mb-0">
+                                            <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
+                                                <tr>
+                                                    <th>Compte</th>
+                                                    <th class="text-end">Débit</th>
+                                                    <th class="text-end">Crédit</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach ($ecriture['lignes'] as $jambe)
+                                                    <tr data-date="{{ $ecriture['date']->format('Y-m-d') }}" data-compte="{{ $jambe['numero_pcg'] }}"
+                                                        data-debit="{{ $nombre($jambe['debit']) }}" data-credit="{{ $nombre($jambe['credit']) }}">
+                                                        <td class="small">
+                                                            <span class="fw-semibold">{{ $jambe['numero_pcg'] }}</span>
+                                                            <span class="text-muted">{{ $jambe['intitule'] }}</span>
+                                                        </td>
+                                                        {{-- Le côté inutilisé reste vide : c'est la présentation d'une écriture. --}}
+                                                        <td class="text-end small text-nowrap">@if ($jambe['debit'] > 0){{ $euros($jambe['debit']) }}&nbsp;€@endif</td>
+                                                        <td class="text-end small text-nowrap">@if ($jambe['credit'] > 0){{ $euros($jambe['credit']) }}&nbsp;€@endif</td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                @endforeach
+                            </div>
+
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <label class="form-label small mb-1">Notes</label>
+                                    <textarea class="form-control form-control-sm @error('notes') is-invalid @enderror"
+                                              rows="2" wire:model="notes"></textarea>
+                                    @error('notes') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label small mb-1"><i class="bi bi-paperclip"></i> Justificatif</label>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <x-zone-depot>
+                                            <label class="btn btn-sm btn-outline-secondary mb-0">
+                                                <i class="bi bi-paperclip"></i> Joindre un justificatif
+                                                <input type="file" wire:model="pieceJointe" accept=".pdf,.jpg,.jpeg,.png" class="d-none">
+                                            </label>
+                                        </x-zone-depot>
+                                        @if ($pieceJointe)
+                                            <span class="small text-success"><i class="bi bi-check-circle"></i> {{ $pieceJointe->getClientOriginalName() }}</span>
+                                        @endif
+                                        <div wire:loading wire:target="pieceJointe" class="spinner-border spinner-border-sm text-primary"></div>
+                                    </div>
+                                    @error('pieceJointe') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
+                                </div>
+                            </div>
+                        @endif
+
+                        @if ($erreurModale !== '')
+                            <div class="alert alert-danger mt-3 mb-0" data-role="modale-erreur">
+                                <i class="bi bi-x-octagon me-1"></i> {{ $erreurModale }}
+                            </div>
+                        @endif
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" wire:click="fermer">{{ $modale['apercu'] !== null ? 'Annuler' : 'Fermer' }}</button>
+                        @if ($modale['apercu'] !== null)
+                            <button type="button" class="btn btn-primary" data-action="valider" wire:click="confirmer"
+                                    wire:loading.attr="disabled" wire:target="confirmer,pieceJointe"
+                                    @disabled(! $peutAgir) @if (! $peutAgir) title="{{ $pourquoiInactif }}" @endif>
+                                <i class="bi bi-check-lg"></i> Constater le rattachement
+                            </button>
+                        @endif
+                    </div>
                 </div>
             </div>
         </div>
     @endif
-
-    {{-- ═══════════════════════════════════════════════════════════
-         JS: SORTING (côté client)
-         ═══════════════════════════════════════════════════════════ --}}
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const table = document.getElementById('provTable');
-            if (!table) return;
-
-            const sortHeaders = table.querySelectorAll('th.sortable');
-            let currentCol = null;
-            let ascending = true;
-
-            // Comparer deux valeurs data-sort : numérique si les deux sont des nombres,
-            // lexicographique (localeCompare fr) sinon. Nécessaire pour les colonnes
-            // montants qui contiennent des valeurs comme "-100.00" ou "50.00" —
-            // localeCompare traite ces chaînes comme du texte et produit un ordre incorrect
-            // (ex. "9" > "150" lexicographiquement alors que 9 < 150 numériquement).
-            function compareVals(aVal, bVal) {
-                const aNum = parseFloat(aVal);
-                const bNum = parseFloat(bVal);
-                if (!isNaN(aNum) && !isNaN(bNum)) {
-                    return aNum - bNum;
-                }
-                return aVal.localeCompare(bVal, 'fr');
-            }
-
-            sortHeaders.forEach(function (th) {
-                th.addEventListener('click', function () {
-                    const col = parseInt(this.dataset.col);
-                    if (currentCol === col) {
-                        ascending = !ascending;
-                    } else {
-                        currentCol = col;
-                        ascending = true;
-                    }
-
-                    const tbody = table.querySelector('tbody');
-                    const rows = Array.from(tbody.querySelectorAll('tr[wire\\:key]'));
-
-                    rows.sort(function (a, b) {
-                        const aCell = a.children[col];
-                        const bCell = b.children[col];
-                        if (!aCell || !bCell) return 0;
-                        const aVal = (aCell.dataset.sort || aCell.textContent || '').trim().toLowerCase();
-                        const bVal = (bCell.dataset.sort || bCell.textContent || '').trim().toLowerCase();
-                        const result = compareVals(aVal, bVal);
-                        return ascending ? result : -result;
-                    });
-
-                    rows.forEach(function (row) { tbody.appendChild(row); });
-
-                    sortHeaders.forEach(function (h) {
-                        const icon = h.querySelector('i');
-                        if (icon) icon.className = 'bi bi-arrow-down-up';
-                    });
-                    const icon = th.querySelector('i');
-                    if (icon) {
-                        icon.className = ascending ? 'bi bi-arrow-down' : 'bi bi-arrow-up';
-                    }
-                });
-            });
-
-            function reApplySort() {
-                if (currentCol === null) return;
-                const tbody = table.querySelector('tbody');
-                const rows = Array.from(tbody.querySelectorAll('tr[wire\\:key]'));
-                rows.sort(function (a, b) {
-                    const aCell = a.children[currentCol];
-                    const bCell = b.children[currentCol];
-                    if (!aCell || !bCell) return 0;
-                    const aVal = (aCell.dataset.sort || aCell.textContent || '').trim().toLowerCase();
-                    const bVal = (bCell.dataset.sort || bCell.textContent || '').trim().toLowerCase();
-                    const result = compareVals(aVal, bVal);
-                    return ascending ? result : -result;
-                });
-                rows.forEach(function (row) { tbody.appendChild(row); });
-            }
-
-            Livewire.hook('morph.updated', ({ el }) => {
-                if (el.id === 'provTable' || el.closest('#provTable')) {
-                    requestAnimationFrame(reApplySort);
-                }
-            });
-        });
-    </script>
 </div>

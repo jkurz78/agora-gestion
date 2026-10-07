@@ -15,7 +15,6 @@ declare(strict_types=1);
 use App\Enums\RoleSysteme;
 use App\Enums\StatutExercice;
 use App\Enums\StatutRapprochement;
-use App\Enums\TypeTransaction;
 use App\Livewire\Dashboard;
 use App\Livewire\Exercices\ClotureWizard;
 use App\Livewire\RapportCompteResultat;
@@ -331,24 +330,25 @@ it('rapport_export_controller_synthese_compte_resultat_avec_negatifs', function 
 
 // ── Test 10 (test croisé) ─────────────────────────────────────────────────────
 
-it('compte_resultat_avec_transactions_negatives_ET_provisions_PCA', function () {
+it('compte_resultat_avec_transactions_negatives_ET_rattachement_libre_PAR_sans_ecriture', function () {
     // (a) Tx recette -50 € (future extourne Slice 1)
     $this->makeAuditTransaction('recette', -50.0, $this->sc, $this->compte, 2025);
 
-    // (b) Enregistrement `provisions` legacy à montant négatif (PCA), créé
-    // directement sans passer par ProvisionPDService : aucune écriture 681/781
-    // n'existe pour cette provision. En partie double, seules les écritures
-    // du grand livre alimentent le compte de résultat — ce record n'a donc
-    // aucun effet sur le résultat, et ne provoque plus de double comptage.
+    // (b) Enregistrement `provisions` créé directement, sans passer par le
+    // service de rattachement : aucune écriture de dotation n'existe pour lui.
+    // Libre (compte_id) et de classe 7 : c'est un produit à recevoir (PAR).
+    // En partie double, seules les écritures du grand livre alimentent le
+    // compte de résultat — ce record n'a donc aucun effet sur le résultat, et
+    // ne provoque pas de double comptage. (Le montant d'un rattachement est
+    // strictement positif depuis le lot rattachement ; l'ancien montant négatif
+    // des PCA n'existe plus.)
     Provision::factory()->create([
         'association_id' => $this->association->id,
         'exercice' => 2025,
-        'type' => TypeTransaction::Recette,
         'compte_id' => $this->sc->id,
-        'libelle' => 'PCA Test',
-        'montant' => -30.0,
+        'libelle' => 'Rattachement Test',
+        'montant' => 30.0,
         'saisi_par' => $this->user->id,
-        'date' => '2026-08-31',
     ]);
 
     // Vérifier que le builder retourne les produits avec le négatif tx inclus
@@ -368,7 +368,7 @@ it('compte_resultat_avec_transactions_negatives_ET_provisions_PCA', function () 
 
     $component->assertViewHas('totalProduitsN', -50.0);
 
-    // resultatCourant = produits - charges = -50 - 0 = -50 : la provision
-    // legacy sans écriture PD n'est pas comptée en sus.
+    // resultatCourant = produits - charges = -50 - 0 = -50 : le rattachement
+    // sans écriture n'est pas compté en sus.
     $component->assertViewHas('resultatCourant', -50.0);
 });

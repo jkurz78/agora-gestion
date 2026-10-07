@@ -608,7 +608,7 @@ $activeGroup = match(true) {
                             <li class="nav-item">
                                 <a href="{{ route('exercices.provisions') }}"
                                    class="nav-link {{ request()->routeIs('exercices.provisions') ? 'active' : '' }}">
-                                    <i class="bi bi-journal-arrow-down me-1"></i> Écritures de provisions
+                                    <i class="bi bi-journal-arrow-down me-1"></i> Écritures de rattachement
                                 </a>
                             </li>
 

@@ -30,10 +30,12 @@ use RuntimeException;
  *
  * Les colonnes `debit`, `credit` et `montant` ne sont JAMAIS réécrites : une
  * ligne produite par EcritureGenerator porte son montant dans `debit` / `credit`
- * (avec `montant = 0`), et une contre-écriture au débit (gratuité 709A) reste
- * au débit même sur une recette. Recalculer depuis `montant` mettrait
- * l'écriture à zéro ; recalculer depuis le type de la pièce retournerait la
- * contre-écriture. Changer de compte de produit ne change pas le sens.
+ * (le plus souvent avec `montant = 0` ; les rattachements à l'exercice y posent la
+ * magnitude, sans que cela change rien : debit / credit font foi), et une
+ * contre-écriture au débit (gratuité 709A) reste au débit même sur une
+ * recette. Recalculer depuis `montant` mettrait l'écriture à zéro ; recalculer
+ * depuis le type de la pièce retournerait la contre-écriture. Changer de
+ * compte de produit ne change pas le sens.
  */
 final class ReclassementLigneService
 {
@@ -41,7 +43,10 @@ final class ReclassementLigneService
 
     private const MOTIF_MAX = 255;
 
-    public function __construct(private readonly ExerciceService $exerciceService) {}
+    public function __construct(
+        private readonly ExerciceService $exerciceService,
+        private readonly GelRattachement $gel,
+    ) {}
 
     public function reclasser(
         TransactionLigne $ligne,
@@ -123,6 +128,13 @@ final class ReclassementLigneService
                 ->exists()) {
                 throw new RuntimeException('Un reçu fiscal a été émis pour cette ligne — annulez-le avant de la reclasser.');
             }
+
+            // Une ligne rattachée à l'exercice suivant ne se reclasse pas : l'écriture de dotation
+            // recopie son compte et son opération, et reclasser ici la laisserait sur l'ancien
+            // compte, donc le compte de résultat divergerait. Même grammaire que le reçu fiscal : le
+            // refus nomme la sortie. La garde (verrou de la ligne, rattachements lus sous verrou,
+            // refus par défaut) vit dans GelRattachement.
+            $this->gel->assertLigneNonGelee($ligne);
 
             $comptePrecedent = $compteActuel->numero_pcg;
 

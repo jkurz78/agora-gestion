@@ -54,7 +54,6 @@ it('affiche le compte des provisions dans le récapitulatif', function () {
         'exercice' => 2025,
         'compte_id' => $compte->id,
         'saisi_par' => $this->user->id,
-        'date' => '2026-08-31',
         'libelle' => 'Provision clôture',
     ]);
 

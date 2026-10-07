@@ -160,6 +160,52 @@ final class TransactionLigne extends Model
     }
 
     /**
+     * Les rattachements de cette ligne, sous le scope tenant : bon pour afficher,
+     * pas pour verrouiller — le verrou se lit par estRattacheeSousVerrou() et par
+     * les gardes de GelRattachement.
+     *
+     * @return HasMany<Provision, $this>
+     */
+    public function provisions(): HasMany
+    {
+        return $this->hasMany(Provision::class, 'transaction_ligne_id');
+    }
+
+    /**
+     * Vrai dès qu'une ligne de provisions référence cette ligne-ci. C'est un fait de
+     * la ligne ; le gel qu'il entraîne porte sur sa transaction entière pour les
+     * gestes qui réécrivent la pièce (spec § 7) — question que
+     * GelRattachement::verrouillerPieceNonGelee() pose pour toutes ses lignes
+     * en une seule lecture.
+     *
+     * Compte exactement ce que compte la FK restrictOnDelete(), d'où
+     * withoutGlobalScopes() SANS argument, délibérément : la FK ignore tout scope,
+     * présent ou futur, et hors contexte TenantScope (WHERE 1 = 0) ferait paraître
+     * la ligne libre. La contrainte de relation n'est pas un scope : seule cette
+     * ligne est lue.
+     */
+    public function estRattachee(): bool
+    {
+        return $this->provisions()->withoutGlobalScopes()->exists();
+    }
+
+    /**
+     * Jumelle d'estRattachee() qui lit SOUS VERROU : à utiliser dans une transaction, par
+     * les gardes qui écrivent ensuite (rattacher(), assertLigneNonGelee() de GelRattachement).
+     * C'est une lecture verrouillante DIRECTE (SELECT … FOR UPDATE), et non un EXISTS : on ne
+     * s'en remet pas au comportement du moteur sur un FOR UPDATE placé dans une sous-requête.
+     * Elle lit le dernier état validé quel que soit le cliché de la transaction et verrouille
+     * le rattachement trouvé ; sans rattachement trouvé, InnoDB verrouille l'intervalle de
+     * l'index, ce qui bloque l'insertion concurrente d'un rattachement de cette ligne jusqu'au
+     * commit. Mêmes réponses qu'estRattachee() : mêmes portées, et withoutGlobalScopes() sans
+     * argument pour la même raison.
+     */
+    public function estRattacheeSousVerrou(): bool
+    {
+        return $this->provisions()->withoutGlobalScopes()->lockForUpdate()->value('id') !== null;
+    }
+
+    /**
      * Retourne le montant signé : debit - credit.
      * Positif pour une écriture débit, négatif pour une écriture crédit.
      */

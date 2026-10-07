@@ -13,6 +13,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Mail\Mailable;
 use Illuminate\Support\Facades\Cache;
 use Tests\Support\LigneDonHelper;
+use Tests\Support\LigneOrigineHelper;
 use Tests\TestCase;
 
 /*
@@ -43,6 +44,7 @@ use Tests\TestCase;
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
     ->use(LigneDonHelper::class)
+    ->use(LigneOrigineHelper::class)
     ->beforeEach(function () {
         // Freeze time to a stable mid-exercice date (exercice 2025 = Sept 2025 → Aug 2026).
         // This eliminates date-dependent test fragility: factory dates, ExerciceService::current(),

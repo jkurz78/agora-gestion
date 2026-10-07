@@ -2,114 +2,123 @@
 
 declare(strict_types=1);
 
-use App\Enums\TypeTransaction;
+use App\Enums\StatutExercice;
+use App\Models\Association;
 use App\Models\Compte;
+use App\Models\Exercice;
 use App\Models\Provision;
 use App\Models\User;
 use App\Services\ProvisionService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(RefreshDatabase::class);
+use App\Tenant\TenantContext;
+use Illuminate\Support\Facades\Log;
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
-    $this->compteLoyer = Compte::factory()->depense()->create(['intitule' => 'Loyer']);
-    $this->compteSubvention = Compte::factory()->create(['intitule' => 'Subventions']);
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
+    $this->actingAs($this->user);
+
+    Exercice::create(['association_id' => $this->association->id, 'annee' => 2025, 'statut' => StatutExercice::Ouvert]);
+    Exercice::create(['association_id' => $this->association->id, 'annee' => 2026, 'statut' => StatutExercice::Ouvert]);
+    session(['exercice_actif' => 2025]);
+
     $this->service = app(ProvisionService::class);
 });
 
-it('returns provisions grouped by account for exercice N', function () {
-    Provision::factory()->create([
+/**
+ * Rattache à l'exercice 2025 une ligne d'origine de la classe donnée, pour son montant.
+ */
+function provisionServiceRattacher(object $test, int $classe, float $montant): Provision
+{
+    $ligne = $test->ligneOrigine($classe, $montant);
+
+    return Provision::create([
         'exercice' => 2025,
-        'type' => TypeTransaction::Depense,
-        'compte_id' => $this->compteLoyer->id,
-        'libelle' => 'FNP Loyer',
-        'montant' => 500.00,
-        'saisi_par' => $this->user->id,
-        'date' => '2026-08-31',
+        'transaction_ligne_id' => $ligne->id,
+        'montant' => $montant,
+        'saisi_par' => auth()->id(),
     ]);
+}
 
-    Provision::factory()->create([
-        'exercice' => 2025,
-        'type' => TypeTransaction::Recette,
-        'compte_id' => $this->compteSubvention->id,
-        'libelle' => 'PCA Subventions',
-        'montant' => -5000.00,
-        'saisi_par' => $this->user->id,
-        'date' => '2026-08-31',
-    ]);
+it('lit le compte de chaque rattachement via son origine', function (): void {
+    $pca = provisionServiceRattacher($this, 7, 175.0);
+    $cca = provisionServiceRattacher($this, 6, 100.0);
 
-    $result = $this->service->provisionsExercice(2025);
+    $recap = $this->service->provisionsExercice(2025)->keyBy('id');
 
-    expect($result)->toHaveCount(2)
-        ->and($result->first())->toHaveKeys(['compte_id', 'compte_nom', 'famille_nom']);
+    expect($recap[$pca->id]['compte_id'])->toBe((int) $pca->ligne->compte_id)
+        ->and($recap[$pca->id]['compte_numero'])->toBe($pca->ligne->compte->numero_pcg)
+        ->and($recap[$pca->id]['compte_nom'])->toBe($pca->ligne->compte->intitule)
+        ->and($recap[$cca->id]['compte_id'])->toBe((int) $cca->ligne->compte_id)
+        ->and($recap[$cca->id]['compte_numero'])->toBe($cca->ligne->compte->numero_pcg)
+        ->and($recap[$cca->id]['compte_nom'])->toBe($cca->ligne->compte->intitule);
 });
 
-it('returns extournes as inverted provisions from N-1', function () {
-    Provision::factory()->create([
-        'exercice' => 2024,
-        'type' => TypeTransaction::Depense,
-        'compte_id' => $this->compteLoyer->id,
-        'libelle' => 'FNP Loyer',
-        'montant' => 500.00,
-        'saisi_par' => $this->user->id,
-        'date' => '2025-08-31',
-    ]);
+it('porte le cas de chaque rattachement, sa valeur sous cas et son étiquette en clair sous cas_libelle', function (): void {
+    provisionServiceRattacher($this, 7, 175.0);
+    provisionServiceRattacher($this, 6, 100.0);
 
-    $extournes = $this->service->extournesExercice(2025);
+    $recap = $this->service->provisionsExercice(2025);
 
-    expect($extournes)->toHaveCount(1);
-    // Original montantSigne = +500 (depense), extourne = -500
-    expect($extournes->first()['montant_signe'])->toBe(-500.0);
+    expect($recap->pluck('cas')->sort()->values()->all())->toBe(['cca', 'pca'])
+        ->and($recap->pluck('cas_libelle')->sort()->values()->all())->toBe(['Charge constatée d’avance', 'Produit constaté d’avance']);
 });
 
-it('computes total provisions for exercice', function () {
-    Provision::factory()->create([
+it('signe l’impact sur le résultat de N selon le cas', function (int $classe, float $attendu): void {
+    provisionServiceRattacher($this, $classe, 175.0);
+
+    expect($this->service->provisionsExercice(2025)->first()['montant_signe'])->toBe($attendu);
+})->with([
+    'un PCA retire un produit : le résultat baisse' => [7, -175.0],
+    'un CCA retire une charge : le résultat monte' => [6, 175.0],
+]);
+
+it('ne mélange pas les exercices', function (): void {
+    provisionServiceRattacher($this, 7, 175.0);
+
+    expect($this->service->provisionsExercice(2026))->toBeEmpty();
+});
+
+it('compte pour zéro un rattachement dont le compte a disparu, et le dit au journal', function (): void {
+    Log::spy();
+
+    $compte = Compte::factory()->depense()->create(['association_id' => $this->association->id]);
+    $provision = Provision::create([
         'exercice' => 2025,
-        'type' => TypeTransaction::Depense,
-        'montant' => 500.00,
-        'compte_id' => $this->compteLoyer->id,
-        'saisi_par' => $this->user->id,
-        'date' => '2026-08-31',
+        'compte_id' => $compte->id,
+        'montant' => 50.0,
+        'saisi_par' => auth()->id(),
     ]);
-    Provision::factory()->create([
+    $compte->delete(); // suppression logique
+
+    $ligneRecap = $this->service->provisionsExercice(2025)->first();
+
+    expect($ligneRecap['montant_signe'])->toBe(0.0)
+        ->and($ligneRecap['cas'])->toBe('')
+        ->and($ligneRecap['cas_libelle'])->toBe('')
+        ->and($ligneRecap['compte_numero'])->toBe('')
+        ->and($ligneRecap['compte_nom'])->toBe('Compte supprimé');
+
+    Log::shouldHaveReceived('warning')
+        ->withArgs(fn (string $message, array $contexte) => $contexte['provision_id'] === (int) $provision->id
+            && $contexte['compte_id'] === (int) $compte->id)
+        ->atLeast()->once();
+});
+
+it('donne au récapitulatif le libellé effectif : celui de l’origine, à défaut l’intitulé du compte', function (): void {
+    $ligne = $this->ligneOrigine(7, 175.0);
+    $ligne->update(['libelle' => null]);
+    $provision = Provision::create([
         'exercice' => 2025,
-        'type' => TypeTransaction::Recette,
-        'montant' => -3000.00,
-        'compte_id' => $this->compteSubvention->id,
-        'saisi_par' => $this->user->id,
-        'date' => '2026-08-31',
+        'transaction_ligne_id' => $ligne->id,
+        'montant' => 175.0,
+        'saisi_par' => auth()->id(),
     ]);
 
-    // FNP +500 + PCA -3000 = -2500
-    expect($this->service->totalProvisions(2025))->toBe(-2500.0);
-});
+    $recap = $this->service->provisionsExercice(2025)->keyBy('id');
 
-it('computes total extournes for exercice', function () {
-    Provision::factory()->create([
-        'exercice' => 2024,
-        'type' => TypeTransaction::Depense,
-        'montant' => 500.00,
-        'compte_id' => $this->compteLoyer->id,
-        'saisi_par' => $this->user->id,
-        'date' => '2025-08-31',
-    ]);
-    Provision::factory()->create([
-        'exercice' => 2024,
-        'type' => TypeTransaction::Recette,
-        'montant' => -3000.00,
-        'compte_id' => $this->compteSubvention->id,
-        'saisi_par' => $this->user->id,
-        'date' => '2025-08-31',
-    ]);
-
-    // Inversion: -500 + 3000 = +2500
-    expect($this->service->totalExtournes(2025))->toBe(2500.0);
-});
-
-it('returns empty collection when no provisions exist', function () {
-    expect($this->service->provisionsExercice(2025))->toHaveCount(0);
-    expect($this->service->extournesExercice(2025))->toHaveCount(0);
-    expect($this->service->totalProvisions(2025))->toBe(0.0);
-    expect($this->service->totalExtournes(2025))->toBe(0.0);
+    // Même repli que le libellé des écritures générées : jamais une ligne blanche.
+    expect($recap[$provision->id]['libelle'])->toBe($ligne->compte->intitule);
 });

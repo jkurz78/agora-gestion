@@ -15,6 +15,14 @@ final class ExtournePayload
         public readonly string $libelle,
         public readonly ModePaiement $modePaiement,
         public readonly ?string $notes = null,
+        /**
+         * Vrai quand la date n'a pas été choisie : c'est celle du jour, que l'appelant impose parce que
+         * personne ne la saisit (annulation d'une facture). Un refus qui tient à la date ne doit alors pas
+         * proposer de « dater l'annulation » autrement (GelRattachement::verrouillerPieceExtournable()).
+         * Faux pour toute date donnée, même égale à celle du jour : la fenêtre d'annulation la pré-remplit
+         * et l'utilisateur peut la changer.
+         */
+        public readonly bool $dateImposee = false,
     ) {}
 
     /**
@@ -24,6 +32,8 @@ final class ExtournePayload
      */
     public static function fromOrigine(Transaction $origine, array $overrides = []): self
     {
+        // Sans date donnée, c'est « aujourd'hui », imposé par l'appelant : voir $dateImposee.
+        $dateImposee = ($overrides['date'] ?? null) === null;
         $date = $overrides['date'] ?? Carbon::now();
         if (! $date instanceof Carbon) {
             $date = Carbon::parse($date);
@@ -43,6 +53,7 @@ final class ExtournePayload
             libelle: $libelle,
             modePaiement: $modePaiement,
             notes: $notes,
+            dateImposee: $dateImposee,
         );
     }
 }

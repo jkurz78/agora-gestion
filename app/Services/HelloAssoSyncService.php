@@ -20,6 +20,7 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\VirementInterne;
 use App\Observers\AdhesionTransactionLigneObserver;
+use App\Services\Compta\GelRattachement;
 use App\Services\Compta\TransactionConverter;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
@@ -244,12 +245,32 @@ final class HelloAssoSyncService
                 }
 
                 if ($existing) {
+                    // Rattachement à l'exercice suivant (CCA/PCA, spec § 7) : la pièce se verrouille EN TÊTE de la
+                    // transaction de la commande, avant toute écriture et tout verrou de ligne, dans l'ordre
+                    // d'update() (les lots, la pièce, ses lignes, leurs rattachements), qui prolonge celui de
+                    // rattacher() (la pièce, la ligne, les rattachements).
+                    // Sans cela, la synchronisation prendrait la LIGNE avant la pièce (l'en-tête n'est réécrit que s'il
+                    // change ; quand seul le montant change, la pièce n'est écrite qu'à la fin, pour son total, après
+                    // les lignes) : l'inverse de rattacher(), donc un inter-blocage possible avec lui. La pièce rendue est relue sous verrou : on poursuit
+                    // avec elle, non avec la lecture du début de transaction, qui peut précéder un autre commit.
+                    //
+                    // Contexte d'association : booté sur les deux chemins qui mènent ici (la commande
+                    // helloasso:sync boote chaque tenant avant syncTenant(), l'écran de synchronisation passe par
+                    // BootTenantConfig), et nécessaire de toute façon à cette méthode, dont les lectures de tiers,
+                    // de pièces et de formulaires sont sous scope fail-closed. La garde, elle, lit sans scope.
+                    ['piece' => $existing, 'gelee' => $pieceGelee] = app(GelRattachement::class)->verrouillerPieceSansRefus($existing);
+
                     $data = [
                         'date' => $orderDate,
                         'mode_paiement' => $modePaiement,
                         'libelle' => $this->buildLibelle($order),
                         'helloasso_form_slug' => $order['formSlug'] ?? null,
                     ];
+
+                    if ($pieceGelee) {
+                        $data = $this->conserverLaDateDUnePieceGelee($existing, $data, $orderDate, (int) $order['id']);
+                    }
+
                     if (empty($existing->reference)) {
                         $data['reference'] = $this->buildReference($order);
                     }
@@ -744,7 +765,10 @@ final class HelloAssoSyncService
         ];
 
         if ($existingLigne) {
-            if ($existingLigne->estReclassee()) {
+            if (app(GelRattachement::class)->ligneGeleeSousVerrou($existingLigne)) {
+                // Ligne rattachée à l'exercice suivant : voir conserverUneLigneRattachee().
+                $data = $this->conserverUneLigneRattachee($existingLigne, $data);
+            } elseif ($existingLigne->estReclassee()) {
                 // Imputation corrigée à la main : la synchronisation met tout à
                 // jour SAUF le compte et l'opération. Sans ça, la correction
                 // disparaîtrait au passage suivant, sans aucun signal — et le
@@ -769,6 +793,99 @@ final class HelloAssoSyncService
             ]);
             $result['lignes_created']++;
         }
+    }
+
+    /**
+     * Ce que la synchronisation conserve sur une ligne RATTACHÉE à l'exercice suivant (CCA/PCA, spec § 7, D3, D8, D12) :
+     * l'écriture de rattachement en recopie le compte, l'opération et la séance, et le montant ; la ligne ne bouge pas
+     * de pièce non plus. Sont donc retirés de $data : transaction_id, compte_id, operation_id, montant, debit, credit.
+     * Tout le reste se synchronise, comme pour toute ligne : les libellés (notes), le palier, le code promo.
+     *
+     * Conserver ne fait JAMAIS échouer la commande, ni les autres du lot : pas d'exception, un Log::warning qui dit ce
+     * qui est conservé et ce que la commande annonçait. Rien n'est journalisé quand la commande n'annonce rien de
+     * différent : la synchronisation repasse sur les mêmes commandes, un avertissement par passage serait du bruit.
+     *
+     * Le gel est constaté SOUS VERROU par l'appelant (GelRattachement::ligneGeleeSousVerrou() : le verrou de la ligne,
+     * puis ses rattachements). Quand la commande retrouve sa pièce, celle-ci a été verrouillée en tête de la transaction
+     * (verrouillerPieceSansRefus()), avant la ligne. Quand elle n'en retrouve pas et en crée une, il n'y a pas de pièce
+     * à verrouiller avant : une ligne déjà connue, retrouvée par son helloasso_item_id, appartient alors à une AUTRE
+     * pièce, que rien n'a verrouillée avant elle (constaté, non corrigé ici).
+     *
+     * Une ligne d'écriture de rattachement n'arrive jamais ici : ces lignes ne portent pas de
+     * helloasso_item_id, et la ligne à synchroniser est retrouvée par lui.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function conserverUneLigneRattachee(TransactionLigne $ligne, array $data): array
+    {
+        $conserve = [];
+        $recu = [];
+
+        foreach (['transaction_id', 'compte_id', 'operation_id', 'montant', 'debit', 'credit'] as $champ) {
+            $enBase = $this->valeurComparable($champ, $ligne->getAttribute($champ));
+            $annoncee = $this->valeurComparable($champ, $data[$champ]);
+
+            if ($enBase !== $annoncee) {
+                $conserve[$champ] = $enBase;
+                $recu[$champ] = $annoncee;
+            }
+
+            unset($data[$champ]);
+        }
+
+        if ($conserve !== []) {
+            Log::warning('[HelloAsso] ligne rattachée à l’exercice suivant : valeurs comptables conservées', [
+                'ligne_id' => (int) $ligne->id,
+                'transaction_id' => (int) $ligne->transaction_id,
+                'helloasso_item_id' => (int) $ligne->helloasso_item_id,
+                'helloasso_line_key' => $ligne->helloasso_line_key,
+                'conserve' => $conserve,
+                'recu' => $recu,
+            ]);
+        }
+
+        return $data;
+    }
+
+    /**
+     * Ce que la synchronisation conserve sur une PIÈCE gelée par un rattachement : sa date. Une pièce redatée dans
+     * un autre exercice changerait d'exercice sous le rattachement de sa ligne, dont les écritures sont datées du
+     * dernier jour de N et du premier de N+1. Les autres champs de l'en-tête se synchronisent. Même discipline que
+     * conserverUneLigneRattachee() : ni exception, ni bruit quand la date annoncée est celle de la pièce.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function conserverLaDateDUnePieceGelee(Transaction $piece, array $data, string $dateAnnoncee, int $commandeId): array
+    {
+        unset($data['date']);
+
+        $dateEnBase = $piece->date->toDateString();
+
+        if ($dateEnBase !== $dateAnnoncee) {
+            Log::warning('[HelloAsso] pièce gelée par un rattachement à l’exercice suivant : date conservée', [
+                'transaction_id' => (int) $piece->id,
+                'helloasso_order_id' => $commandeId,
+                'conserve' => $dateEnBase,
+                'recu' => $dateAnnoncee,
+            ]);
+        }
+
+        return $data;
+    }
+
+    /**
+     * La valeur d'un champ comptable de ligne sous une forme comparable (et lisible dans le journal) : un montant
+     * arrondi au centime, un identifiant en entier, nul conservé nul.
+     */
+    private function valeurComparable(string $champ, mixed $valeur): float|int|null
+    {
+        if ($valeur === null) {
+            return null;
+        }
+
+        return in_array($champ, ['montant', 'debit', 'credit'], true) ? round((float) $valeur, 2) : (int) $valeur;
     }
 
     /**

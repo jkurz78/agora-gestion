@@ -208,9 +208,10 @@ final class ClotureWizard extends Component
         // Réconciliation : solde rapprochement + non pointées = solde comptable actuel
         $ecartReconciliation = round($totalSoldeReel - $totalSoldeRapprochement - $montantNetNonPointeesTx, 2);
 
-        $provisionService = app(ProvisionService::class);
-        $provisions = $provisionService->provisionsExercice($this->annee);
-        $totalProvisions = $provisionService->totalProvisions($this->annee);
+        // Une seule lecture des rattachements : le total se calcule sur la collection déjà
+        // chargée, il ne relit pas les mêmes lignes.
+        $provisions = app(ProvisionService::class)->provisionsExercice($this->annee);
+        $totalProvisions = round((float) $provisions->sum('montant_signe'), 2);
 
         return [
             'comptesData' => $comptesData,

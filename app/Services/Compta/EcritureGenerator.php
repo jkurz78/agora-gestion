@@ -23,7 +23,6 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\VirementInterne;
 use App\Services\Compta\ANouveau\PosteReporteResolver;
-use App\Services\ExerciceService;
 use App\Services\NumeroPieceService;
 use App\Support\MontantDecimal;
 use App\Tenant\TenantContext;
@@ -1858,147 +1857,36 @@ final class EcritureGenerator
         });
     }
 
+    /**
+     * Dotation d'un rattachement à l'exercice, datée du dernier jour de N.
+     *
+     * Schéma PCG, aligné sur la spec du 2026-09-30 (§ 5) :
+     *   PCA  7xx D / 487 C      CCA  486 D / 6xx C
+     *   PAR  418 D / 7xx C      FNP  6xx D / 408 C
+     *
+     * 681 et 781 ne sont PAS employés : ce sont les comptes des dotations et
+     * reprises aux amortissements et provisions, pas ceux de la régularisation.
+     *
+     * L'opération et la séance ne sont portées que par la ligne de classe 6/7
+     * (D8) : c'est la seule que lisent les rapports.
+     */
     public function pourProvisionDotation(Provision $provision): Transaction
     {
-        $montant = (float) $provision->montant;
-        $libelle = 'Dotation : '.$provision->libelle;
-        $isDepense = $provision->type === TypeTransaction::Depense;
-        $tenantId = (int) TenantContext::currentId();
-
-        $compteDebit = Compte::where('association_id', $tenantId)
-            ->where('numero_pcg', $isDepense ? '681' : '487')
-            ->firstOrFail();
-
-        $compteCredit = Compte::where('association_id', $tenantId)
-            ->where('numero_pcg', $isDepense ? '486' : '781')
-            ->firstOrFail();
-
-        return DB::transaction(function () use ($provision, $montant, $libelle, $isDepense, $tenantId, $compteDebit, $compteCredit): Transaction {
-            $numeroPiece = app(NumeroPieceService::class)->assign(Carbon::parse($provision->date));
-
-            $transaction = Transaction::create([
-                'association_id' => $tenantId,
-                'type' => $isDepense ? TypeTransaction::Depense : TypeTransaction::Recette,
-                'date' => $provision->date->format('Y-m-d'),
-                'libelle' => $libelle,
-                'montant_total' => $montant,
-                'mode_paiement' => null,
-                'saisi_par' => Auth::id(),
-                'equilibree' => true,
-                'type_ecriture' => 'normale',
-                'journal' => JournalComptable::Od,
-                'numero_piece' => $numeroPiece,
-                'provision_id' => $provision->id,
-            ]);
-
-            $ligneDebit = TransactionLigne::create([
-                'transaction_id' => $transaction->id,
-                'compte_id' => $compteDebit->id,
-                'debit' => $montant,
-                'credit' => 0,
-                'tiers_id' => null,
-                'libelle' => $libelle,
-                'montant' => 0,
-            ]);
-            $ligneDebit->setRelation('compte', $compteDebit);
-
-            $ligneCredit = TransactionLigne::create([
-                'transaction_id' => $transaction->id,
-                'compte_id' => $compteCredit->id,
-                'debit' => 0,
-                'credit' => $montant,
-                'tiers_id' => null,
-                'libelle' => $libelle,
-                'montant' => 0,
-            ]);
-            $ligneCredit->setRelation('compte', $compteCredit);
-
-            $lignes = collect([$ligneDebit, $ligneCredit]);
-            $this->assertEquilibre($lignes);
-            $this->assertTenantCoherence($lignes);
-
-            return $transaction->load('lignes.compte');
-        });
+        return $this->pourRattachement($provision, extourne: false);
     }
 
+    /** Extourne du rattachement : le miroir exact de la dotation, datée du premier jour de N+1. */
     public function pourProvisionExtourne(Provision $provision): Transaction
     {
-        $montant = (float) $provision->montant;
-        $libelle = 'Extourne : '.$provision->libelle;
-        $isDepense = $provision->type === TypeTransaction::Depense;
-        $tenantId = (int) TenantContext::currentId();
-
-        $compteDebit = Compte::where('association_id', $tenantId)
-            ->where('numero_pcg', $isDepense ? '486' : '681')
-            ->firstOrFail();
-
-        $compteCredit = Compte::where('association_id', $tenantId)
-            ->where('numero_pcg', $isDepense ? '781' : '487')
-            ->firstOrFail();
-
-        // Premier jour de l'exercice suivant, lu dans le paramétrage de
-        // l'association et non fixé au 1er septembre : le mois de début
-        // d'exercice est un réglage, et une association en exercice civil
-        // voyait ses extournes datées de septembre — une écriture comptable
-        // au mauvais mois, dont le numéro de pièce héritait ensuite du mauvais
-        // exercice puisqu'il se dérive de cette même date.
-        $dateExtourne = Carbon::instance(
-            app(ExerciceService::class)->dateRange($provision->exercice + 1)['start']->toDateTime(),
-        );
-
-        return DB::transaction(function () use ($provision, $montant, $libelle, $isDepense, $tenantId, $compteDebit, $compteCredit, $dateExtourne): Transaction {
-            $numeroPiece = app(NumeroPieceService::class)->assign($dateExtourne);
-
-            $transaction = Transaction::create([
-                'association_id' => $tenantId,
-                'type' => $isDepense ? TypeTransaction::Recette : TypeTransaction::Depense,
-                'date' => $dateExtourne->format('Y-m-d'),
-                'libelle' => $libelle,
-                'montant_total' => $montant,
-                'mode_paiement' => null,
-                'saisi_par' => Auth::id(),
-                'equilibree' => true,
-                'type_ecriture' => 'extourne',
-                'journal' => JournalComptable::Od,
-                'numero_piece' => $numeroPiece,
-                'provision_id' => $provision->id,
-            ]);
-
-            $ligneDebit = TransactionLigne::create([
-                'transaction_id' => $transaction->id,
-                'compte_id' => $compteDebit->id,
-                'debit' => $montant,
-                'credit' => 0,
-                'tiers_id' => null,
-                'libelle' => $libelle,
-                'montant' => 0,
-            ]);
-            $ligneDebit->setRelation('compte', $compteDebit);
-
-            $ligneCredit = TransactionLigne::create([
-                'transaction_id' => $transaction->id,
-                'compte_id' => $compteCredit->id,
-                'debit' => 0,
-                'credit' => $montant,
-                'tiers_id' => null,
-                'libelle' => $libelle,
-                'montant' => 0,
-            ]);
-            $ligneCredit->setRelation('compte', $compteCredit);
-
-            $lignes = collect([$ligneDebit, $ligneCredit]);
-            $this->assertEquilibre($lignes);
-            $this->assertTenantCoherence($lignes);
-
-            return $transaction->load('lignes.compte');
-        });
+        return $this->pourRattachement($provision, extourne: true);
     }
 
     /**
      * Dotation aux amortissements d'une immobilisation : 6811 D / 281X C.
      *
-     * type = Depense et journal = Od, comme pourProvisionDotation : c'est une
-     * opération d'inventaire, pas un mouvement de trésorerie.
+     * type = Depense et journal = Od, comme les écritures de rattachement (voir
+     * pourRattachement()) : c'est une opération d'inventaire, ni une recette ni une
+     * dépense, et le type ne sert qu'à la tenir hors des écrans de travail.
      *
      * La date est imposée par l'appelant (dernier jour de l'exercice cible) et
      * n'est jamais dérivée de now().
@@ -2071,6 +1959,142 @@ final class EcritureGenerator
     // =========================================================================
     // Méthodes privées
     // =========================================================================
+
+    /**
+     * Écriture de rattachement à l'exercice : la dotation (extourne = false) ou son
+     * miroir (extourne = true). Les deux ne diffèrent que par la date, le sens, le
+     * signe de `montant_total`, le type d'écriture et le libellé.
+     *
+     * Le sens se lit sur le cas, jamais sur le signe du montant, qui est toujours
+     * strictement positif : voir CasProvision::dotationDebiteLeResultat().
+     *
+     * Ce que l'écriture contient (sens, dates, libellé, net de la pièce) est calculé par
+     * SchemaRattachement, SANS écrire : c'est aussi ce que l'aperçu de l'écran affiche, pour
+     * qu'on ne puisse pas montrer une écriture et en écrire une autre. Ici, on ne fait que
+     * l'écrire (spec § 6.3).
+     */
+    private function pourRattachement(Provision $provision, bool $extourne): Transaction
+    {
+        $tenantId = (int) TenantContext::currentId();
+        $montant = round((float) $provision->montant, 2);
+
+        if ($montant <= 0.0) {
+            throw new \RuntimeException('Un rattachement porte un montant strictement positif.');
+        }
+
+        // Le compte est résolu, et son appartenance vérifiée, avant d'en déduire le cas.
+        // Relations non chargées, le compte est introuvable sous le scope de
+        // l'association courante (null). Relations chargées dans une autre association,
+        // il existe mais n'est pas le nôtre : seule la comparaison explicite le refuse.
+        $compteResultat = $provision->compteResultat();
+
+        if ($compteResultat === null || (int) $compteResultat->association_id !== $tenantId) {
+            throw new \RuntimeException('Le compte de résultat du rattachement est introuvable dans cette association.');
+        }
+
+        // Le sens, les dates, le libellé, le net de la pièce et les DEUX jambes (numéro de compte, débit,
+        // crédit) viennent de SchemaRattachement, qui est aussi ce que l'aperçu de l'écran affiche : ce
+        // générateur ne recalcule rien de son côté, pas même le compte ni le sens de la contrepartie.
+        $schema = app(SchemaRattachement::class)->ecriture(
+            $provision->cas(),
+            (string) $compteResultat->numero_pcg,
+            $montant,
+            (int) $provision->exercice,
+            $provision->libelleEffectif(),
+            $extourne,
+        );
+
+        ['resultat' => $jambeResultat, 'contrepartie' => $jambeContrepartie] = $schema['lignes'];
+
+        // La jambe de contrepartie rend un NUMÉRO : on le relie ici au compte de l'association courante.
+        $compteContrepartie = Compte::where('association_id', $tenantId)
+            ->where('numero_pcg', $jambeContrepartie['numero_pcg'])
+            ->firstOrFail();
+
+        $montantTotal = $schema['montant_total'];
+        $libelle = $schema['libelle'];
+        $date = Carbon::parse($schema['date']->toDateString());
+
+        return DB::transaction(function () use (
+            $provision, $montant, $montantTotal, $libelle, $tenantId, $compteResultat,
+            $compteContrepartie, $jambeResultat, $jambeContrepartie, $date, $extourne
+        ): Transaction {
+            // Pas de `tiers_id` sur l'écriture, volontairement. Le tiers de l'origine
+            // (D3) sert à l'affichage — récapitulatif, détection — et ne se recopie
+            // pas ici : poser `transactions.tiers_id` ferait apparaître cette écriture
+            // d'inventaire sur la fiche du tiers (TiersTransactionService ne filtre
+            // aucun journal) et dans ses totaux. Ce n'est pas un oubli.
+            // `type` = Depense pour la dotation ET pour l'extourne, quel que soit le cas.
+            // Une écriture d'inventaire n'est ni une recette ni une dépense : le type ne
+            // sert plus qu'à la tenir hors des écrans de travail, et c'est le choix de
+            // pourDotationAmortissement(). Le compte de résultat lit la classe et
+            // debit/credit, CHECK 3 lit `montant_total` (signé, voir plus haut),
+            // scopeOperationnel() exclut l'OD ; seule la branche recette de la liste
+            // universelle inclut le journal OD, et elle ne retient que les recettes. Typées
+            // selon leur impact sur le résultat (« recette » quand il monte), une
+            // écriture sur deux s'y affichait avec un badge et une couleur qui disaient
+            // l'inverse de ce qu'elle fait. Ne pas « harmoniser » sur le sens.
+            $transaction = Transaction::create([
+                'association_id' => $tenantId,
+                'type' => TypeTransaction::Depense,
+                'date' => $date->format('Y-m-d'),
+                'libelle' => $libelle,
+                'montant_total' => $montantTotal,
+                'mode_paiement' => null,
+                'saisi_par' => Auth::id(),
+                'equilibree' => true,
+                'type_ecriture' => $extourne ? 'extourne' : 'normale',
+                'journal' => JournalComptable::Od,
+                'numero_piece' => app(NumeroPieceService::class)->assign($date),
+                'provision_id' => $provision->id,
+            ]);
+
+            // `montant` porte la magnitude sur les deux lignes, comme le fait
+            // pourDotationAmortissement() sur sa ligne de charge. Les rapports lisent
+            // debit/credit ; les écrans qui somment `montant` d'une opération
+            // (OperationDetail) excluent le journal OD — c'est ce filtre, et non la
+            // valeur de `montant`, qui garde leurs totaux justes (verrouillé par test).
+            //
+            // Ligne de résultat : porte l'opération et la séance (D8).
+            $ligneResultat = TransactionLigne::create([
+                'transaction_id' => $transaction->id,
+                'compte_id' => $compteResultat->id,
+                'debit' => $jambeResultat['debit'],
+                'credit' => $jambeResultat['credit'],
+                'operation_id' => $provision->operationEffectiveId(),
+                'seance' => $provision->seanceEffective(),
+                'tiers_id' => null,
+                'libelle' => $libelle,
+                'montant' => $montant,
+            ]);
+            $ligneResultat->setRelation('compte', $compteResultat);
+
+            // Contrepartie de régularisation : l'autre jambe, aucune dimension analytique. Son sens est
+            // celui que le schéma rend, pas un miroir recalculé ici.
+            $ligneContrepartie = TransactionLigne::create([
+                'transaction_id' => $transaction->id,
+                'compte_id' => $compteContrepartie->id,
+                'debit' => $jambeContrepartie['debit'],
+                'credit' => $jambeContrepartie['credit'],
+                'operation_id' => null,
+                'seance' => null,
+                'tiers_id' => null,
+                'libelle' => $libelle,
+                'montant' => $montant,
+            ]);
+            $ligneContrepartie->setRelation('compte', $compteContrepartie);
+
+            $lignes = collect([$ligneResultat, $ligneContrepartie]);
+            $this->assertEquilibre($lignes);
+            $this->assertTenantCoherence($lignes);
+
+            // Les lignes sont en mémoire, avec leur compte : on les rattache sans les
+            // relire, comme les autres méthodes pour*() de ce service.
+            $transaction->setRelation('lignes', $lignes);
+
+            return $transaction;
+        });
+    }
 
     /**
      * Re-bind les relations compte sur une collection de lignes après rechargement DB.

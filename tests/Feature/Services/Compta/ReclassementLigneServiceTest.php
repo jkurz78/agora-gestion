@@ -32,7 +32,7 @@ use Tests\Support\CreatesPartieDoubleContext;
  * clôturé, motif obligatoire.
  *
  * Attention aux montants : les lignes produites par EcritureGenerator portent
- * leur montant dans `debit` / `credit` et ont `montant = 0`. Le service ne doit
+ * leur montant dans `debit` / `credit` et ont le plus souvent `montant = 0`. Le service ne doit
  * donc JAMAIS recalculer le débit ou le crédit depuis `montant` (cela mettrait
  * l'écriture à zéro), ni depuis le type de la pièce (cela retournerait une
  * contre-écriture, comme une gratuité 709A au débit).

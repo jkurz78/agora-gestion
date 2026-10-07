@@ -170,12 +170,16 @@ final class ComptaCheckIntegrityCommand extends Command
 
         // Requête agrégée : toutes les TX où montant_total ≠ net débit/crédit des
         // ventilations. On mesure sur debit/credit — la vérité en partie double —
-        // et non sur `transaction_lignes.montant` : les OD (dotations et extournes
-        // de provisions, compensations) posent montant = 0 sur leurs lignes, ce qui
-        // faisait sonner ce contrôle sur des écritures parfaitement équilibrées.
+        // et non sur `transaction_lignes.montant` : cette colonne n'a pas la même
+        // convention d'une OD à l'autre (0 pour les compensations, 0 sur la jambe de
+        // crédit pour les dotations d'amortissement, la magnitude sur les deux lignes
+        // pour les rattachements à l'exercice), ce qui faisait sonner ce contrôle sur
+        // des écritures parfaitement équilibrées.
         // Sens : une charge (classe 6) est au débit, un produit (classe 7) au
-        // crédit ; les miroirs d'extourne inversent les deux et portent un
-        // montant_total négatif, que cette convention retrouve telle quelle.
+        // crédit ; les miroirs d'extourne ordinaire (qui nient le montant de la pièce
+        // extournée) inversent les deux et portent un montant_total négatif. À
+        // l'inverse, le miroir d'une dotation de rattachement, elle-même négative, est
+        // positif : cette convention retrouve les deux telles quelles.
         $divergences = DB::select('
             SELECT t.id, t.montant_total, COALESCE(s.sum_lignes, 0) as sum_lignes
             FROM transactions t

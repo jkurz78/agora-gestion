@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\JournalComptable;
 use App\Enums\StatutOperation;
 use App\Enums\UsageComptable;
 use App\Models\EncadrementPrevision;
@@ -54,13 +55,24 @@ final class OperationDetail extends Component
 
         // Financial summary (same logic as old GestionOperations)
         //
+        // Les écritures d'inventaire (journal OD : rattachement à l'exercice, dotations)
+        // ne sont ni des recettes ni des dépenses de l'opération. Leur ligne de
+        // résultat porte bien l'opération — c'est ce que lit le compte de résultat par
+        // opération — mais l'écran la compterait dans les dépenses : tout rattachement
+        // est typé « dépense », ses deux écritures (dotation et extourne) tombent donc du
+        // même côté et s'additionnent. Sans ce filtre, une PCA de 175 € encaissés donnait
+        // recettes 175 / dépenses 350 / solde −175, et une CCA de 90 € payés des dépenses
+        // de 270 au lieu de 90. On exclut l'OD des trois totaux, comme
+        // Transaction::scopeOperationnel() : la règle vaut quel que soit le type.
+        $horsOd = fn ($q) => $q->where('journal', '!=', JournalComptable::Od->value);
+
         // IMPORTANT — ne pas toucher $totalDepenses (tâche 13, chantier 709A).
         // Une gratuité (709A) n'apparaît QUE côté recette : la synchro HelloAsso
         // ne pose jamais de contre-ligne de gratuité sur une dépense. Appliquer
         // Σcredit − Σdebit ici rendrait les dépenses négatives (une dépense est
         // portée au débit d'un compte de classe 6, donc credit − debit < 0).
         $totalDepenses = (float) $operation->transactionLignes()
-            ->whereHas('transaction', fn ($q) => $q->where('type', 'depense'))
+            ->whereHas('transaction', fn ($q) => $horsOd($q->where('type', 'depense')))
             ->sum('montant');
         // Depuis le chantier 709A, une commande remisée pose DEUX lignes de
         // classe 7 : le produit brut au crédit (706A/751) et la gratuité au
@@ -71,12 +83,12 @@ final class OperationDetail extends Component
         // lignes sans compte lié (legacy, pas encore compte-first) gardent
         // `montant` pour ne rien changer à leur comportement historique.
         $totalRecettes = (float) $operation->transactionLignes()
-            ->whereHas('transaction', fn ($q) => $q->where('type', 'recette'))
+            ->whereHas('transaction', fn ($q) => $horsOd($q->where('type', 'recette')))
             ->whereDoesntHave('compte.usages', fn ($q) => $q->where('usage', UsageComptable::Don->value))
             ->leftJoin('comptes as tl_cpt', 'tl_cpt.id', '=', 'transaction_lignes.compte_id')
             ->sum(DB::raw('CASE WHEN tl_cpt.classe IN (6, 7) THEN (transaction_lignes.credit - transaction_lignes.debit) ELSE transaction_lignes.montant END'));
         $totalDons = (float) $operation->transactionLignes()
-            ->whereHas('transaction', fn ($q) => $q->where('type', 'recette'))
+            ->whereHas('transaction', fn ($q) => $horsOd($q->where('type', 'recette')))
             ->whereHas('compte.usages', fn ($q) => $q->where('usage', UsageComptable::Don->value))
             ->sum('montant');
         $solde = ($totalRecettes + $totalDons) - $totalDepenses;
