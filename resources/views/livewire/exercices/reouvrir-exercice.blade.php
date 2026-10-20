@@ -6,6 +6,12 @@
         </div>
     @endif
 
+    @error('reouverture')
+        <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle me-1"></i>{{ $message }}
+        </div>
+    @enderror
+
     @if ($exercice)
         <div class="alert alert-danger mb-4">
             <h5 class="alert-heading">

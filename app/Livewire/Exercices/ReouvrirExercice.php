@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Exercices;
 
+use App\Exceptions\Compta\ANouveauInvalideException;
 use App\Services\ExerciceService;
 use Illuminate\View\View;
 use Livewire\Component;
@@ -36,7 +37,13 @@ final class ReouvrirExercice extends Component
             return;
         }
 
-        $exerciceService->reouvrir($exercice, auth()->user(), $this->commentaire);
+        try {
+            $exerciceService->reouvrir($exercice, auth()->user(), $this->commentaire);
+        } catch (ANouveauInvalideException $exception) {
+            $this->addError('reouverture', $exception->getMessage());
+
+            return;
+        }
 
         session()->flash('success', "L'exercice {$exercice->label()} a été réouvert.");
         $this->redirect(route('exercices.reouvrir'));

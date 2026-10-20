@@ -16,7 +16,10 @@ final class RemiseBancairePdfController extends Controller
 {
     public function __invoke(RemiseBancaire $remise): Response
     {
-        $remise->load(['compteCible', 'transactions.tiers']);
+        // operationnel() écarte l'écriture de dépôt en banque (T4, journal banque) qui
+        // porte elle aussi remise_id : sans ce filtre, le bordereau la listait parmi
+        // les pièces et son sous-total doublait. Même filtre que RemiseBancaireShow.
+        $remise->load(['compteCible', 'transactions' => fn ($query) => $query->operationnel()->with('tiers')]);
 
         // Association resolved from TenantContext (booted by ResolveTenant middleware)
         $association = CurrentAssociation::get();

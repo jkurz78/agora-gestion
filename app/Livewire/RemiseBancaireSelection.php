@@ -10,9 +10,11 @@ use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Models\RemiseBancaire;
 use App\Models\Transaction;
+use App\Services\ReglementOperationService;
 use App\Services\RemiseBancaireService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
@@ -48,7 +50,7 @@ final class RemiseBancaireSelection extends Component
             return;
         }
 
-        $visibleIds = $this->buildBaseQuery()->pluck('id')->all();
+        $visibleIds = $this->candidats()->pluck('id')->all();
         $allSelected = collect($visibleIds)->every(fn ($id) => in_array((int) $id, $this->selectedTransactionIds, true));
 
         $this->selectedTransactionIds = $allSelected ? [] : array_map('intval', $visibleIds);
@@ -86,10 +88,7 @@ final class RemiseBancaireSelection extends Component
     public function render(): View
     {
         // Base query — no text filters — used for filter options and toggleAll
-        $allTransactions = $this->buildBaseQuery()
-            ->with(['tiers', 'lignes.operation'])
-            ->orderByDesc('date')
-            ->get();
+        $allTransactions = $this->candidats(['tiers', 'lignes.operation']);
 
         // Operations for filter dropdown (from the full unfiltered set)
         $operations = $allTransactions
@@ -138,13 +137,38 @@ final class RemiseBancaireSelection extends Component
     }
 
     /**
+     * Transactions remisables avec ce mode : celles qui le portent, et celles qui ne
+     * portent aucun mode mais dont l'encaissement l'a (règlement saisi depuis un
+     * poste tiers — voir ReglementOperationService::modeEncaissement()).
+     *
+     * @param  list<string>  $with
+     * @return Collection<int, Transaction>
+     */
+    private function candidats(array $with = []): Collection
+    {
+        $mode = $this->remise->mode_paiement;
+        $reglements = app(ReglementOperationService::class);
+
+        return $this->buildBaseQuery()
+            ->with($with)
+            ->orderByDesc('date')
+            ->get()
+            ->filter(fn (Transaction $tx): bool => $tx->mode_paiement === $mode
+                || $reglements->modeEncaissement($tx) === $mode)
+            ->values();
+    }
+
+    /**
      * @return Builder<Transaction>
      */
     private function buildBaseQuery(): Builder
     {
         return Transaction::query()
             ->operationnel()
-            ->where('mode_paiement', $this->remise->mode_paiement->value)
+            ->where(function (Builder $q): void {
+                $q->where('mode_paiement', $this->remise->mode_paiement->value)
+                    ->orWhereNull('mode_paiement');
+            })
             ->whereNull('extournee_at')
             ->whereIn('statut_reglement', [
                 StatutReglement::EnMain->value,

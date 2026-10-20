@@ -126,9 +126,10 @@ final class RemiseBancaireService
             foreach ($transactionIds as $txId) {
                 $tx = Transaction::findOrFail($txId);
 
-                if ($tx->mode_paiement !== $remise->mode_paiement) {
+                $modeEncaissement = $this->reglementService->modeEncaissement($tx);
+                if ($modeEncaissement !== $remise->mode_paiement) {
                     throw new \RuntimeException(
-                        "La transaction #{$txId} n'a pas le bon mode de paiement ({$tx->mode_paiement?->label()})."
+                        "La transaction #{$txId} n'a pas le bon mode de paiement ({$modeEncaissement?->label()})."
                     );
                 }
 

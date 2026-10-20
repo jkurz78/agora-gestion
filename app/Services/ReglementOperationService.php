@@ -482,6 +482,19 @@ final class ReglementOperationService
     }
 
     /**
+     * Mode de paiement réel d'une T1 : celui qu'elle porte, sinon celui de sa T2.
+     *
+     * Un règlement saisi depuis un poste tiers (PosteTiersReglementService::regler)
+     * ne pose son mode que sur la T2, y compris quand la T1 est une créance de N
+     * reportée en à-nouveau et réglée en N+1. La remise bancaire raisonne sur la T1 :
+     * sans ce repli, ce chèque ou ces espèces n'y apparaîtraient jamais.
+     */
+    public function modeEncaissement(Transaction $t1): ?ModePaiement
+    {
+        return $t1->mode_paiement ?? $this->trouverT2($t1)?->mode_paiement;
+    }
+
+    /**
      * Trouve la T2 (encaissement ou règlement) liée à une T1, via la ligne tiers lettrée.
      *
      * Unifie trouverEncaissementT2 (411) et trouverReglementT2 (401). Agnostique au type :

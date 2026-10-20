@@ -143,11 +143,20 @@ final class ANouveauService
 
             $transaction = $generation->transaction()->lockForUpdate()->first();
             if ($transaction !== null) {
+                $this->refuserSiReportDejaLettre($transaction, $source);
+
                 $transaction->lignes()->get()->each(
                     static fn (TransactionLigne $ligne): bool => $ligne->delete()
                 );
                 $transaction->delete();
             }
+
+            // Les origines tiennent les lignes racines de N par des clés étrangères
+            // restrictives : laissées en place, elles empêchent à jamais de modifier
+            // une créance ou une dette de l'exercice rouvert (sa mise à jour recrée
+            // ses lignes). Une génération invalidée ne reporte plus rien ; son
+            // invalidation reste tracée sur la génération elle-même.
+            $generation->origines()->delete();
 
             $generation->update([
                 'statut' => StatutANouveau::Invalidee,
@@ -156,6 +165,45 @@ final class ANouveauService
                 'motif_invalidation' => trim($motif),
             ]);
         });
+    }
+
+    /**
+     * Un à-nouveau lettré a été soldé par un règlement de l'exercice suivant.
+     * Supprimer l'à-nouveau laisserait ce règlement lettré avec une ligne disparue,
+     * et la créance ou la dette d'origine redeviendrait ouverte en N alors qu'elle
+     * est payée en N+1.
+     */
+    private function refuserSiReportDejaLettre(Transaction $transaction, Exercice $source): void
+    {
+        $codes = $transaction->lignes()
+            ->whereNotNull('lettrage_code')
+            ->get(['compte_id', 'lettrage_code']);
+
+        if ($codes->isEmpty()) {
+            return;
+        }
+
+        $pieces = TransactionLigne::query()
+            ->where('transaction_id', '!=', (int) $transaction->id)
+            ->where(function ($query) use ($codes): void {
+                foreach ($codes as $ligne) {
+                    $query->orWhere(fn ($q) => $q
+                        ->where('compte_id', (int) $ligne->compte_id)
+                        ->where('lettrage_code', $ligne->lettrage_code));
+                }
+            })
+            ->with('transaction:id,numero_piece')
+            ->get()
+            ->map(fn (TransactionLigne $ligne): string => $ligne->transaction?->numero_piece ?? '#'.$ligne->transaction_id)
+            ->unique()
+            ->sort()
+            ->implode(', ');
+
+        throw new ANouveauInvalideException(
+            "L'exercice {$source->label()} ne peut pas être rouvert : des règlements saisis sur l'exercice suivant "
+            ."soldent des créances ou des dettes reportées (pièces {$pieces}). "
+            .'Annulez d’abord ces règlements, puis rouvrez l’exercice.'
+        );
     }
 
     private function verifierActeur(User $acteur): void

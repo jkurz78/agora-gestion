@@ -173,7 +173,9 @@ it('invalide la generation et soft-delete la piece et ses lignes', function (): 
         ->and($generation->motif_invalidation)->toBe('Réouverture exceptionnelle')
         ->and(Transaction::withTrashed()->findOrFail($transactionId)->trashed())->toBeTrue()
         ->and($lignesSupprimees->every(fn (TransactionLigne $ligne): bool => $ligne->trashed()))->toBeTrue()
-        ->and($generation->origines()->count())->toBe(1);
+        // Filiation libérée : elle tenait les lignes racines de N par des clés
+        // restrictives et rendait leur créance ou dette immodifiable après réouverture.
+        ->and($generation->origines()->count())->toBe(0);
 
     $nouvelleGeneration = $service->persister(
         app(ANouveauPreviewBuilder::class)->build(2025),
