@@ -432,6 +432,16 @@ it('le bouton Aujourd\'hui remplace la date par celle du jour et est utilisée �
     expect($tx->date->format('Y-m-d'))->toBe($aujourdhui);
 });
 
+it('la date de la modale Comptabiliser passe par le sélecteur jj/mm/aaaa, relié à sa propriété', function () {
+    // Le sélecteur suit comptabiliserDate : la date de la séance posée à
+    // l'ouverture et le bouton « Aujourd'hui » s'y affichent (cf. ChampsDateTest).
+    $html = Livewire::test(ReglementTable::class, ['operation' => $this->operation])->html();
+
+    expect($html)
+        ->toMatch('/<input type="hidden"\s+x-ref="hidden"\s+name="comptabiliserDate"[^>]*wire:model.live="comptabiliserDate"/')
+        ->toContain("propriete: 'comptabiliserDate'");
+});
+
 /**
  * Opération dont le type porte un compte de produit (classe 7) — prérequis de
  * la comptabilisation — avec une séance datée du 2025-11-03.

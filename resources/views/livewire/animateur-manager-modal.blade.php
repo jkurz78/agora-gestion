@@ -171,7 +171,7 @@
                             <div class="row mb-3 g-2">
                                 <div class="col-md-3">
                                     <label class="form-label" style="font-size:12px">Date <span class="text-danger">*</span></label>
-                                    <input type="date" class="form-control form-control-sm" wire:model.live="modalDate">
+                                    <x-date-input name="modalDate" size="sm" wire:model.live="modalDate" :value="$modalDate" />
                                     <x-exercice-destination :date="$modalDate" />
                                 </div>
                                 <div class="col-md-3">

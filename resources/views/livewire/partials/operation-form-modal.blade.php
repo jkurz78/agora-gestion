@@ -32,15 +32,14 @@
         <div class="row mb-3">
             <div class="col-6">
                 <label class="form-label small fw-semibold">Date debut <span class="text-danger">*</span></label>
-                <input type="date" class="form-control form-control-sm @error('formDateDebut') is-invalid @enderror"
-                       wire:model="formDateDebut">
-                @error('formDateDebut') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                <x-date-input name="formDateDebut" size="sm" wire:model="formDateDebut" :value="$formDateDebut" />
+                {{-- d-block : x-date-input ne pose jamais .is-invalid sur son champ. --}}
+                @error('formDateDebut') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
             </div>
             <div class="col-6">
                 <label class="form-label small fw-semibold">Date fin <span class="text-danger">*</span></label>
-                <input type="date" class="form-control form-control-sm @error('formDateFin') is-invalid @enderror"
-                       wire:model="formDateFin">
-                @error('formDateFin') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                <x-date-input name="formDateFin" size="sm" wire:model="formDateFin" :value="$formDateFin" />
+                @error('formDateFin') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
             </div>
         </div>
 

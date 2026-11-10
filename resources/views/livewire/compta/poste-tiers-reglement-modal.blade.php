@@ -38,10 +38,12 @@
 
                 <div class="mb-3">
                     <label for="poste-tiers-reglement-date" class="form-label">Date du règlement</label>
-                    <input id="poste-tiers-reglement-date" type="date"
-                           class="form-control @error('dateReglement') is-invalid @enderror"
-                           wire:model="dateReglement">
-                    @error('dateReglement') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                    {{-- Nom propre à la modale : l'événement set-date vise les sélecteurs par nom,
+                         et la fiche transaction qui embarque cette modale a déjà un « dateReglement ». --}}
+                    <x-date-input id="poste-tiers-reglement-date" name="posteTiersReglementDate"
+                                  wire:model="dateReglement" :value="$dateReglement" />
+                    {{-- d-block : x-date-input ne pose jamais .is-invalid sur son champ. --}}
+                    @error('dateReglement') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
                 </div>
 
                 <div class="mb-3">

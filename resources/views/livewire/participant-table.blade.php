@@ -500,9 +500,11 @@
                 {{-- Expiration date --}}
                 <div class="mb-3">
                     <label class="form-label small text-muted">Date d'expiration</label>
-                    <div class="input-group input-group-sm">
-                        <input type="date" class="form-control form-control-sm" wire:model="tokenExpireAt">
-                        <button class="btn btn-outline-primary" type="button" wire:click="genererTokenAvecDate" title="Regénérer avec cette date">
+                    <div class="d-flex gap-2">
+                        <div class="flex-grow-1">
+                            <x-date-input name="tokenExpireAt" size="sm" wire:model="tokenExpireAt" :value="$tokenExpireAt" />
+                        </div>
+                        <button class="btn btn-sm btn-outline-primary" type="button" wire:click="genererTokenAvecDate" title="Regénérer avec cette date">
                             <i class="bi bi-arrow-clockwise"></i>
                         </button>
                     </div>

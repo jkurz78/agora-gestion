@@ -613,14 +613,20 @@ describe('TransactionForm : une pièce gelée s\'affiche en LECTURE SEULE, comme
         $dateReglement = Carbon::parse($gelee->get('dateReglement'))->format('d/m/Y');
         // Le champ rendu pour une date désactivée (composant x-date-input), sur plusieurs lignes.
         $champDate = fn (string $valeur): string => '/<input type="text"\s+value="'.preg_quote($valeur, '/').'"\s+class="form-control bg-light" disabled>/';
+        // Sélecteurs de date du formulaire lui-même. La modale « Règlement tiers », composant imbriqué rendu
+        // dans le même HTML, porte le sien (id poste-tiers-reglement-date) : il n'appartient pas à la pièce.
+        $selecteursDuFormulaire = fn (string $html): int => (int) preg_match_all(
+            '/class="input-group" wire:ignore(?!\s+id="poste-tiers-reglement-date")/',
+            $html,
+        );
 
         // La date de la pièce (08/04/2026) et celle du règlement : des champs désactivés, non des sélecteurs de date.
         expect(preg_match($champDate('08/04/2026'), $gelee->html()))->toBe(1)
             ->and(preg_match($champDate($dateReglement), $gelee->html()))->toBe(1)
-            ->and($gelee->html())->not->toContain('class="input-group" wire:ignore');
+            ->and($selecteursDuFormulaire($gelee->html()))->toBe(0);
         expect(preg_match($champDate('08/04/2026'), $libre->html()))->toBe(0)
             ->and(preg_match($champDate($dateReglement), $libre->html()))->toBe(0)
-            ->and(substr_count($libre->html(), 'class="input-group" wire:ignore'))->toBe(2);
+            ->and($selecteursDuFormulaire($libre->html()))->toBe(2);
     });
 
     test('ne propose ni le tiers ni le compte de la ligne à la saisie : leur sélecteur est remplacé par leur valeur', function () {

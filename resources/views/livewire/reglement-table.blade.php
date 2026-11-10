@@ -356,7 +356,7 @@
                     @enderror
                     <div class="mb-3">
                         <label class="form-label small mb-1">Compte bancaire cible</label>
-                        <select wire:model="comptabiliserCompteId" class="form-select form-select-sm">
+                        <select wire:model="comptabiliserCompteId" class="form-select">
                             @foreach($comptesBancaires as $compte)
                                 <option value="{{ $compte->id }}">{{ $compte->nom }}</option>
                             @endforeach
@@ -364,8 +364,10 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label small mb-1">Date des transactions</label>
-                        <div class="input-group input-group-sm">
-                            <input type="date" wire:model.live="comptabiliserDate" class="form-control form-control-sm @error('comptabiliserDate') is-invalid @enderror">
+                        <div class="d-flex gap-2">
+                            <div class="flex-grow-1">
+                                <x-date-input name="comptabiliserDate" wire:model.live="comptabiliserDate" :value="$comptabiliserDate" />
+                            </div>
                             <button type="button" class="btn btn-outline-secondary" wire:click="setComptabiliserDateAujourdhui" title="Utiliser la date du jour">
                                 Aujourd'hui
                             </button>

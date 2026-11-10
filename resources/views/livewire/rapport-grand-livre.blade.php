@@ -19,22 +19,14 @@
             <div class="row g-3 align-items-end">
                 <div class="col-md-2">
                     <label for="grandLivreDateDebut" class="form-label gl-filter-label">Du</label>
-                    <input
-                        type="date"
-                        id="grandLivreDateDebut"
-                        class="form-control form-control-sm"
-                        wire:model.live="dateDebut"
-                    >
+                    <x-date-input id="grandLivreDateDebut" name="dateDebut" size="sm"
+                                  wire:model.live="dateDebut" :value="$dateDebut" />
                 </div>
 
                 <div class="col-md-2">
                     <label for="grandLivreDateFin" class="form-label gl-filter-label">Au</label>
-                    <input
-                        type="date"
-                        id="grandLivreDateFin"
-                        class="form-control form-control-sm"
-                        wire:model.live="dateFin"
-                    >
+                    <x-date-input id="grandLivreDateFin" name="dateFin" size="sm"
+                                  wire:model.live="dateFin" :value="$dateFin" />
                 </div>
 
                 <div class="col-md-6">

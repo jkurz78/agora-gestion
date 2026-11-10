@@ -59,9 +59,9 @@
                             <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <label for="extourne-date" class="form-label">Date de l'extourne</label>
-                                    <input type="date" class="form-control @error('date') is-invalid @enderror"
-                                           id="extourne-date" wire:model="date">
-                                    @error('date') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                    <x-date-input id="extourne-date" name="dateExtourne" wire:model="date" :value="$date" />
+                                    {{-- d-block : x-date-input ne pose jamais .is-invalid sur son champ. --}}
+                                    @error('date') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="extourne-mode-paiement" class="form-label">Mode de paiement</label>

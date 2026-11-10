@@ -37,8 +37,9 @@
     <div class="row">
         <div class="col-md-6 mb-3">
             <label class="form-label">Date du solde</label>
-            <input type="date" wire:model="banqueDateSoldeInitial" class="form-control @error('banqueDateSoldeInitial') is-invalid @enderror">
-            @error('banqueDateSoldeInitial') <div class="invalid-feedback">{{ $message }}</div> @enderror
+            <x-date-input name="banqueDateSoldeInitial" wire:model="banqueDateSoldeInitial" :value="$banqueDateSoldeInitial" />
+            {{-- d-block : x-date-input ne pose jamais .is-invalid sur son champ. --}}
+            @error('banqueDateSoldeInitial') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
         </div>
         <div class="col-md-6 mb-3">
             <label class="form-label">Montant (€)</label>

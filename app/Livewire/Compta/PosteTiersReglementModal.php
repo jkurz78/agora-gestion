@@ -55,9 +55,8 @@ final class PosteTiersReglementModal extends Component
         $this->ligneId = $ligneId;
         $this->montant = number_format($poste->soldeCentimes / 100, 2, ',', ' ');
         $this->dateReglement = $this->dateBorneDansExercice($aujourdhui, $periode['start'], $periode['end']);
-        $this->mode = '';
-        $this->compteBancaireId = null;
         $this->sensTresorerie = $poste->numeroCompte === '401' ? 'depense' : 'recette';
+        $this->preremplirDepuisOrigine($poste->transactionOrigineId);
         $this->titre = 'Règlement tiers';
         $this->posteOrigine = implode(' — ', array_filter([
             $poste->numeroPiece,
@@ -66,6 +65,30 @@ final class PosteTiersReglementModal extends Component
         ]));
 
         $this->dispatch('poste-tiers-reglement-modal-open');
+    }
+
+    /**
+     * Reprend le mode de paiement prévu sur la pièce d'origine (par exemple
+     * celui choisi sur la séance avant comptabilisation) et, si ce mode exige
+     * une banque, celle de la pièce quand elle reste sélectionnable — à défaut
+     * la proposition habituelle. Tout reste modifiable dans la modale.
+     */
+    private function preremplirDepuisOrigine(int $transactionOrigineId): void
+    {
+        $origine = Transaction::query()->find($transactionOrigineId);
+        $mode = $origine?->mode_paiement;
+
+        $this->mode = $mode instanceof ModePaiement ? $mode->value : '';
+        $this->compteBancaireId = null;
+
+        if (! $this->compteBancaireRequis()) {
+            return;
+        }
+
+        $compteOrigine = $origine?->compte_id !== null ? (int) $origine->compte_id : null;
+        $this->compteBancaireId = $compteOrigine !== null && $this->compteBancaireSelectionnable($compteOrigine)
+            ? $compteOrigine
+            : $this->compteBancairePropose();
     }
 
     public function enregistrer(): void

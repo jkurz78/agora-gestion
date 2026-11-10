@@ -20,22 +20,14 @@
             <div class="row g-3 align-items-end">
                 <div class="col-md-2">
                     <label for="journauxDateDebut" class="form-label jx-filter-label">Du</label>
-                    <input
-                        type="date"
-                        id="journauxDateDebut"
-                        class="form-control form-control-sm"
-                        wire:model.live="dateDebut"
-                    >
+                    <x-date-input id="journauxDateDebut" name="dateDebut" size="sm"
+                                  wire:model.live="dateDebut" :value="$dateDebut" />
                 </div>
 
                 <div class="col-md-2">
                     <label for="journauxDateFin" class="form-label jx-filter-label">Au</label>
-                    <input
-                        type="date"
-                        id="journauxDateFin"
-                        class="form-control form-control-sm"
-                        wire:model.live="dateFin"
-                    >
+                    <x-date-input id="journauxDateFin" name="dateFin" size="sm"
+                                  wire:model.live="dateFin" :value="$dateFin" />
                 </div>
 
                 <div class="col-md-6">
