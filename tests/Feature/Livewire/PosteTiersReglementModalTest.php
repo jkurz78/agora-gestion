@@ -100,6 +100,85 @@ test('ouvrir préremplit le solde et la date du jour dans les bornes de l exerci
         ));
 });
 
+test('ouvrir reprend le mode de paiement prévu sur la transaction d origine', function (): void {
+    [$transaction, $ligne] = creerPosteOuvertPourModaleReglement($this);
+    $transaction->update(['mode_paiement' => ModePaiement::Cheque]);
+
+    Livewire::test(PosteTiersReglementModal::class, ['exercice' => 2025])
+        ->dispatch('poste-tiers-reglement:ouvrir', ligneId: (int) $ligne->id, exercice: 2025)
+        ->assertSet('mode', ModePaiement::Cheque->value)
+        // Chèque reçu : porté en 5112, aucune banque à choisir.
+        ->assertSet('compteBancaireId', null)
+        ->assertDontSee('Compte bancaire');
+});
+
+test('ouvrir reprend aussi la banque prévue quand le mode d origine en exige une', function (): void {
+    [$transaction, $ligne] = creerPosteOuvertPourModaleReglement($this);
+    $compteParDefaut = CompteBancaire::factory()->create([
+        'association_id' => (int) $this->association->id,
+        'nom' => 'Banque par défaut',
+    ]);
+    $this->association->update(['facture_compte_bancaire_id' => (int) $compteParDefaut->id]);
+    $banquePrevue = CompteBancaire::factory()->create([
+        'association_id' => (int) $this->association->id,
+        'nom' => 'Banque choisie à la comptabilisation',
+    ]);
+    $transaction->update([
+        'mode_paiement' => ModePaiement::Virement,
+        'compte_id' => (int) $banquePrevue->id,
+    ]);
+
+    Livewire::test(PosteTiersReglementModal::class, ['exercice' => 2025])
+        ->dispatch('poste-tiers-reglement:ouvrir', ligneId: (int) $ligne->id, exercice: 2025)
+        ->assertSet('mode', ModePaiement::Virement->value)
+        ->assertSet('compteBancaireId', (int) $banquePrevue->id)
+        ->assertSee('Compte bancaire');
+});
+
+test('ouvrir propose la banque habituelle quand celle d origine n est pas sélectionnable', function (): void {
+    [$transaction, $ligne] = creerPosteOuvertPourModaleReglement($this);
+    $compteParDefaut = CompteBancaire::factory()->create([
+        'association_id' => (int) $this->association->id,
+        'nom' => 'Banque par défaut',
+    ]);
+    $this->association->update(['facture_compte_bancaire_id' => (int) $compteParDefaut->id]);
+    $compteAutomatise = CompteBancaire::factory()->create([
+        'association_id' => (int) $this->association->id,
+        'nom' => 'HelloAsso',
+        'saisie_automatisee' => true,
+    ]);
+    $transaction->update([
+        'mode_paiement' => ModePaiement::Cb,
+        'compte_id' => (int) $compteAutomatise->id,
+    ]);
+
+    Livewire::test(PosteTiersReglementModal::class, ['exercice' => 2025])
+        ->dispatch('poste-tiers-reglement:ouvrir', ligneId: (int) $ligne->id, exercice: 2025)
+        ->assertSet('mode', ModePaiement::Cb->value)
+        ->assertSet('compteBancaireId', (int) $compteParDefaut->id);
+});
+
+test('ouvrir laisse le mode vide quand la transaction d origine n en porte pas', function (): void {
+    [, $ligne] = creerPosteOuvertPourModaleReglement($this);
+
+    Livewire::test(PosteTiersReglementModal::class, ['exercice' => 2025])
+        ->dispatch('poste-tiers-reglement:ouvrir', ligneId: (int) $ligne->id, exercice: 2025)
+        ->assertSet('mode', '')
+        ->assertSet('compteBancaireId', null);
+});
+
+test('la date du règlement passe par le sélecteur jj/mm/aaaa, relié à sa propriété', function (): void {
+    // Le sélecteur suit dateReglement : la date posée à l'ouverture s'y affiche
+    // (cf. ChampsDateTest). Son nom lui est propre : la fiche transaction qui
+    // embarque la modale a déjà un sélecteur « dateReglement ».
+    $html = Livewire::test(PosteTiersReglementModal::class, ['exercice' => 2025])->html();
+
+    expect($html)
+        ->toMatch('/<input type="hidden"\s+x-ref="hidden"\s+name="posteTiersReglementDate"[^>]*wire:model="dateReglement"/')
+        ->toContain("propriete: 'dateReglement'")
+        ->not->toContain('name="dateReglement"');
+});
+
 test('le compte bancaire est masqué tant que le mode ne nécessite pas de banque', function (): void {
     [, $ligne] = creerPosteOuvertPourModaleReglement($this);
 

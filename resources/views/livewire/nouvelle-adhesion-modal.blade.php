@@ -120,17 +120,12 @@
                             <div class="row g-2 mb-3">
                                 <div class="col-md-6">
                                     <label class="form-label fw-semibold" for="nouvelle-date-debut">Date de début</label>
-                                    <input id="nouvelle-date-debut"
-                                           type="date"
-                                           class="form-control form-control-sm"
-                                           wire:model.live="dateDebut">
+                                    <x-date-input id="nouvelle-date-debut" name="dateDebut" size="sm"
+                                                  wire:model.live="dateDebut" :value="$dateDebut" />
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label fw-semibold">Date de fin (calculée)</label>
-                                    <input type="date"
-                                           class="form-control form-control-sm bg-light"
-                                           value="{{ $this->dateFinCalculee }}"
-                                           readonly>
+                                    <x-date-input :value="$this->dateFinCalculee" size="sm" :disabled="true" />
                                 </div>
                             </div>
                         @elseif($selectedFormule && $selectedFormule->isModeIllimite())
@@ -162,12 +157,11 @@
                             <div class="row g-2 mb-3">
                                 <div class="col-md-6">
                                     <label class="form-label fw-semibold" for="nouvelle-date-paiement">Date du paiement</label>
-                                    <input id="nouvelle-date-paiement"
-                                           type="date"
-                                           class="form-control form-control-sm @error('datePaiement') is-invalid @enderror"
-                                           wire:model="datePaiement">
+                                    <x-date-input id="nouvelle-date-paiement" name="datePaiement" size="sm"
+                                                  wire:model="datePaiement" :value="$datePaiement" />
+                                    {{-- d-block : x-date-input ne pose jamais .is-invalid sur son champ. --}}
                                     @error('datePaiement')
-                                        <div class="invalid-feedback">{{ $message }}</div>
+                                        <div class="invalid-feedback d-block">{{ $message }}</div>
                                     @enderror
                                 </div>
                                 <div class="col-md-6">

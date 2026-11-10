@@ -304,8 +304,7 @@
                 <div class="card-body">
                     <div class="mb-3">
                         <label for="facture-date" class="form-label">Date</label>
-                        <input type="date" id="facture-date" class="form-control"
-                               wire:model="date">
+                        <x-date-input id="facture-date" name="date" wire:model="date" :value="$date" />
                     </div>
 
                     <div class="mb-3">

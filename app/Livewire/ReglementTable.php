@@ -10,7 +10,6 @@ use App\Enums\ModePaiement;
 use App\Enums\RoleAssociation;
 use App\Enums\TypeDocumentPrevisionnel;
 use App\Exceptions\ExerciceCloturedException;
-use App\Livewire\Concerns\MontantValidation;
 use App\Mail\DocumentMail;
 use App\Models\CompteBancaire;
 use App\Models\DocumentPrevisionnel;
@@ -137,40 +136,64 @@ final class ReglementTable extends Component
         );
     }
 
-    public function updateMontant(int $participantId, int $seanceId, string $montant): void
+    /**
+     * Renvoie le montant prévu réellement enregistré, au format de la case : la case est
+     * éditée côté navigateur et, sur une saisie refusée, montrerait sinon une valeur que
+     * la base n'a pas — et « → Prévu » recopierait l'ancienne sans que rien ne bouge.
+     */
+    public function updateMontant(int $participantId, int $seanceId, string $montant): string
     {
-        if (! $this->canEdit) {
-            return;
-        }
-
         $seance = Seance::where('operation_id', $this->operation->id)->findOrFail($seanceId);
+
+        if (! $this->canEdit) {
+            return $this->montantPrevuAffiche($participantId, (int) $seance->id);
+        }
 
         $existing = Reglement::where('participant_id', $participantId)
             ->where('seance_id', $seance->id)
             ->first();
 
         if ($existing?->estComptabilise()) {
-            return;
+            return $this->montantPrevuAffiche($participantId, (int) $seance->id);
         }
 
-        $parsed = (float) str_replace(',', '.', $montant);
+        // On valide la saisie elle-même, pas son cast : (float) 'abc' vaut 0 et passerait pour un 0 € voulu.
+        $saisie = str_replace([' ', "\u{00A0}", "\u{202F}", ','], ['', '', '', '.'], trim($montant));
 
+        // 0 € est un prévu légitime (séance prépayée, offerte) : seul le négatif est refusé.
+        // Pas de MontantValidation::RULE (gt:0) ici, faite pour les montants d'une écriture.
         $validator = Validator::make(
-            ['montant' => $parsed],
-            ['montant' => ['required', 'numeric', MontantValidation::RULE]],
-            MontantValidation::messages(['montant'])
+            ['montant' => $saisie],
+            ['montant' => ['required', 'numeric', 'min:0']],
+            [
+                'montant.required' => 'Le montant prévu doit être un nombre.',
+                'montant.numeric' => 'Le montant prévu doit être un nombre.',
+                'montant.min' => 'Le montant prévu ne peut pas être négatif.',
+            ]
         );
 
         if ($validator->fails()) {
             $this->addError('montant', $validator->errors()->first('montant'));
 
-            return;
+            return $this->montantPrevuAffiche($participantId, (int) $seance->id);
         }
 
         Reglement::updateOrCreate(
             ['participant_id' => $participantId, 'seance_id' => $seance->id],
-            ['montant_prevu' => $parsed]
+            ['montant_prevu' => (float) $saisie]
         );
+
+        return $this->montantPrevuAffiche($participantId, (int) $seance->id);
+    }
+
+    /** Le montant prévu enregistré, formaté comme dans la case (0,00 sans règlement). */
+    private function montantPrevuAffiche(int $participantId, int $seanceId): string
+    {
+        $prevu = Reglement::where('participant_id', $participantId)
+            ->where('seance_id', $seanceId)
+            ->value('montant_prevu');
+
+        return number_format((float) ($prevu ?? 0), 2, ',', '');
     }
 
     public function copierLigne(int $participantId): void

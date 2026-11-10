@@ -57,7 +57,7 @@
                 </div>
                 <div class="col-md-6">
                     <label for="rescritDate" class="form-label">Date du rescrit</label>
-                    <input type="date" id="rescritDate" class="form-control" wire:model="rescritFiscalDate">
+                    <x-date-input id="rescritDate" name="rescritFiscalDate" wire:model="rescritFiscalDate" :value="$rescritFiscalDate" />
                     @error('rescritFiscalDate') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
                 </div>
             </div>

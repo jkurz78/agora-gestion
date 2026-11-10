@@ -178,15 +178,14 @@
 
                             <div class="col-md-4">
                                 <label class="form-label">Date d'achat</label>
-                                <input type="date" class="form-control @error('date_achat') is-invalid @enderror"
-                                       wire:model.live="date_achat">
-                                @error('date_achat') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                <x-date-input name="date_achat" wire:model.live="date_achat" :value="$date_achat" />
+                                {{-- d-block : x-date-input ne pose jamais .is-invalid sur son champ. --}}
+                                @error('date_achat') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label">Mise en service</label>
-                                <input type="date" class="form-control @error('date_mise_en_service') is-invalid @enderror"
-                                       wire:model="date_mise_en_service">
-                                @error('date_mise_en_service') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                <x-date-input name="date_mise_en_service" wire:model="date_mise_en_service" :value="$date_mise_en_service" />
+                                @error('date_mise_en_service') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
                             </div>
                             <div class="col-md-4">
                                 @include('livewire.immobilisations.partials._duree-selector')

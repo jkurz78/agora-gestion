@@ -26,11 +26,12 @@
             @if ($rapprochement->isEnCours())
                 <div class="d-flex align-items-center gap-2 mt-1">
                     <label class="text-muted small mb-0">Relevé du</label>
-                    <input type="date"
-                           wire:change="updateDateFin($event.target.value)"
-                           value="{{ $rapprochement->date_fin->format('Y-m-d') }}"
-                           class="form-control form-control-sm" style="width:auto"
-                           {{ $exerciceCloture || ! $this->canEdit ? 'disabled' : '' }}>
+                    <div style="width:10.5rem">
+                        <x-date-input name="dateFinReleve" size="sm"
+                                      wire:change="updateDateFin($event.target.value)"
+                                      :value="$rapprochement->date_fin->format('Y-m-d')"
+                                      :disabled="$exerciceCloture || ! $this->canEdit" />
+                    </div>
                     <span class="badge bg-warning text-dark ms-1"><i class="bi bi-pencil"></i> En cours</span>
                 </div>
                 @error('date_fin') <div class="text-danger small mt-1">{{ $message }}</div> @enderror

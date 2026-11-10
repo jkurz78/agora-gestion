@@ -130,8 +130,8 @@
                                     @break
 
                                 @case('date')
-                                    <input type="date" class="form-control form-control-sm"
-                                           wire:model="valeurs.{{ $qid }}">
+                                    <x-date-input name="valeurs_{{ $qid }}" size="sm"
+                                                  wire:model="valeurs.{{ $qid }}" :value="$valeurs[$qid] ?? ''" />
                                     @break
 
                                 @case('choix_multiple')

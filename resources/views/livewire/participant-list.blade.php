@@ -103,10 +103,11 @@
 
                     <div class="mb-3">
                         <label for="dateInscription" class="form-label">Date d'inscription <span class="text-danger">*</span></label>
-                        <input type="date" wire:model="dateInscription" id="dateInscription"
-                               class="form-control @error('dateInscription') is-invalid @enderror">
+                        <x-date-input id="dateInscription" name="dateInscription"
+                                      wire:model="dateInscription" :value="$dateInscription" />
+                        {{-- d-block : x-date-input ne pose jamais .is-invalid sur son champ. --}}
                         @error('dateInscription')
-                            <div class="invalid-feedback">{{ $message }}</div>
+                            <div class="invalid-feedback d-block">{{ $message }}</div>
                         @enderror
                     </div>
 

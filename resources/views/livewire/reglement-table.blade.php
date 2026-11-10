@@ -38,6 +38,10 @@
             $grandTotalRealise = array_sum($totalRealiseParSeance);
         @endphp
 
+        @error('montant')
+            <div class="alert alert-danger py-1 px-2 small mb-2">{{ $message }}</div>
+        @enderror
+
         <div class="table-responsive">
             <table class="table table-sm table-bordered mb-0" style="font-size:12px;table-layout:fixed;width:{{ 160 + 55 + ($seances->count() * 130) + 100 }}px">
                 <colgroup>
@@ -150,7 +154,7 @@
                                                 </template>
                                                 <template x-if="editing">
                                                     <input type="text" x-ref="input" x-model="value"
-                                                           @blur="editing=false; $wire.call('updateMontant', {{ $participant->id }}, {{ $seance->id }}, value)"
+                                                           @blur="editing=false; $wire.call('updateMontant', {{ $participant->id }}, {{ $seance->id }}, value).then(m => { if (typeof m === 'string') value = m })"
                                                            @keydown.enter="$refs.input.blur()"
                                                            @keydown.escape="editing=false"
                                                            style="width:55px;border:1px solid #0d6efd;border-radius:3px;padding:1px 4px;font-size:12px;text-align:right;outline:none">
@@ -356,7 +360,7 @@
                     @enderror
                     <div class="mb-3">
                         <label class="form-label small mb-1">Compte bancaire cible</label>
-                        <select wire:model="comptabiliserCompteId" class="form-select form-select-sm">
+                        <select wire:model="comptabiliserCompteId" class="form-select">
                             @foreach($comptesBancaires as $compte)
                                 <option value="{{ $compte->id }}">{{ $compte->nom }}</option>
                             @endforeach
@@ -364,8 +368,10 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label small mb-1">Date des transactions</label>
-                        <div class="input-group input-group-sm">
-                            <input type="date" wire:model.live="comptabiliserDate" class="form-control form-control-sm @error('comptabiliserDate') is-invalid @enderror">
+                        <div class="d-flex gap-2">
+                            <div class="flex-grow-1">
+                                <x-date-input name="comptabiliserDate" wire:model.live="comptabiliserDate" :value="$comptabiliserDate" />
+                            </div>
                             <button type="button" class="btn btn-outline-secondary" wire:click="setComptabiliserDateAujourdhui" title="Utiliser la date du jour">
                                 Aujourd'hui
                             </button>

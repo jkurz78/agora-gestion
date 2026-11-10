@@ -252,15 +252,17 @@
                         @if ($choixValidation === 'abandon')
                             <div class="mb-3">
                                 <label for="dateDon" class="form-label">Date du don <span class="text-danger">*</span></label>
-                                <div class="input-group">
-                                    <input type="date" id="dateDon" wire:model="dateDon"
-                                           class="form-control @error('dateDon') is-invalid @enderror">
+                                <div class="d-flex gap-2">
+                                    <div class="flex-grow-1">
+                                        <x-date-input id="dateDon" name="dateDon" wire:model="dateDon" :value="$dateDon" />
+                                    </div>
                                     <button type="button" wire:click="setDateDonToday"
                                             class="btn btn-outline-secondary">Aujourd'hui</button>
-                                    @error('dateDon')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
                                 </div>
+                                {{-- d-block : x-date-input ne pose jamais .is-invalid sur son champ. --}}
+                                @error('dateDon')
+                                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                                @enderror
                             </div>
                         @endif
                     @endif
@@ -302,20 +304,21 @@
                         {{-- Date de comptabilisation --}}
                         <div class="col-md-4">
                             <label for="dateComptabilisation" class="form-label">Date de comptabilisation <span class="text-danger">*</span></label>
-                            <div class="input-group">
-                                <input type="date"
-                                       id="dateComptabilisation"
-                                       wire:model="dateComptabilisation"
-                                       class="form-control @error('dateComptabilisation') is-invalid @enderror">
+                            <div class="d-flex gap-2">
+                                <div class="flex-grow-1">
+                                    <x-date-input id="dateComptabilisation" name="dateComptabilisation"
+                                                  wire:model="dateComptabilisation" :value="$dateComptabilisation" />
+                                </div>
                                 <button type="button"
                                         class="btn btn-outline-secondary"
                                         wire:click="setDateToday">
                                     Aujourd'hui
                                 </button>
-                                @error('dateComptabilisation')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
                             </div>
+                            {{-- d-block : x-date-input ne pose jamais .is-invalid sur son champ. --}}
+                            @error('dateComptabilisation')
+                                <div class="invalid-feedback d-block">{{ $message }}</div>
+                            @enderror
                         </div>
                     </div>
 

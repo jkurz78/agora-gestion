@@ -80,12 +80,9 @@
                         </div>
                         <div class="col-md-6">
                             <label for="devis-date-emission" class="form-label">Date d'émission</label>
-                            <input type="date"
-                                   id="devis-date-emission"
-                                   class="form-control"
-                                   wire:model="dateEmission"
-                                   @disabled($this->estVerrouille())
-                                   @if($this->estVerrouille()) title="Ce devis est verrouillé" @endif>
+                            <x-date-input id="devis-date-emission" name="dateEmission"
+                                          wire:model="dateEmission" :value="$dateEmission"
+                                          :disabled="$this->estVerrouille()" />
                         </div>
                         <div class="col-md-6">
                             <label for="devis-date-validite" class="form-label">
@@ -94,12 +91,9 @@
                                     <span class="badge bg-warning text-dark ms-1">Expiré</span>
                                 @endif
                             </label>
-                            <input type="date"
-                                   id="devis-date-validite"
-                                   class="form-control"
-                                   wire:model="dateValidite"
-                                   @disabled($this->estVerrouille())
-                                   @if($this->estVerrouille()) title="Ce devis est verrouillé" @endif>
+                            <x-date-input id="devis-date-validite" name="dateValidite"
+                                          wire:model="dateValidite" :value="$dateValidite"
+                                          :disabled="$this->estVerrouille()" />
                         </div>
                     </div>
                 </div>
