@@ -229,6 +229,87 @@ it('can copy line from first seance', function () {
     expect(Reglement::where('seance_id', $s3->id)->first()->montant_prevu)->toBe('25.00');
 });
 
+it('accepte un montant prévu à 0 €, pour une séance prépayée ou offerte', function () {
+    $seance = Seance::create(['operation_id' => $this->operation->id, 'numero' => 1]);
+    $participant = Participant::create([
+        'tiers_id' => Tiers::factory()->create()->id,
+        'operation_id' => $this->operation->id,
+        'date_inscription' => now(),
+    ]);
+    Reglement::create([
+        'participant_id' => $participant->id,
+        'seance_id' => $seance->id,
+        'montant_prevu' => 22.50,
+    ]);
+
+    Livewire::test(ReglementTable::class, ['operation' => $this->operation])
+        ->call('updateMontant', $participant->id, $seance->id, '0')
+        ->assertHasNoErrors()
+        ->assertReturned('0,00');
+
+    expect(Reglement::sole()->montant_prevu)->toBe('0.00');
+});
+
+it('refuse un montant prévu illisible, sans l\'écraser par 0, et le dit', function (string $saisie, string $message) {
+    $seance = Seance::create(['operation_id' => $this->operation->id, 'numero' => 1]);
+    $participant = Participant::create([
+        'tiers_id' => Tiers::factory()->create()->id,
+        'operation_id' => $this->operation->id,
+        'date_inscription' => now(),
+    ]);
+    Reglement::create([
+        'participant_id' => $participant->id,
+        'seance_id' => $seance->id,
+        'montant_prevu' => 22.50,
+    ]);
+
+    $composant = Livewire::test(ReglementTable::class, ['operation' => $this->operation])
+        ->call('updateMontant', $participant->id, $seance->id, $saisie)
+        ->assertHasErrors(['montant'])
+        // Le refus était silencieux, et la case gardait la saisie refusée : elle affichait
+        // une valeur que la base n'avait pas. Elle reçoit désormais la valeur enregistrée.
+        ->assertSee($message)
+        ->assertReturned('22,50');
+
+    expect(Reglement::sole()->montant_prevu)->toBe('22.50');
+
+    // La saisie suivante, valide, efface le message.
+    $composant->call('updateMontant', $participant->id, $seance->id, '20')
+        ->assertHasNoErrors()
+        ->assertDontSee($message);
+})->with([
+    'texte' => ['abc', 'Le montant prévu doit être un nombre.'],
+    'vide' => ['', 'Le montant prévu doit être un nombre.'],
+    'négatif' => ['-5', 'Le montant prévu ne peut pas être négatif.'],
+]);
+
+it('recopie à nouveau la 1re séance après l\'avoir modifiée, jusqu\'à 0 €', function () {
+    $s1 = Seance::create(['operation_id' => $this->operation->id, 'numero' => 1]);
+    $s2 = Seance::create(['operation_id' => $this->operation->id, 'numero' => 2]);
+    $participant = Participant::create([
+        'tiers_id' => Tiers::factory()->create()->id,
+        'operation_id' => $this->operation->id,
+        'date_inscription' => now(),
+    ]);
+    Reglement::create([
+        'participant_id' => $participant->id,
+        'seance_id' => $s1->id,
+        'montant_prevu' => 22.50,
+    ]);
+
+    $composant = Livewire::test(ReglementTable::class, ['operation' => $this->operation])
+        ->call('copierLigne', $participant->id);
+    expect(Reglement::where('seance_id', $s2->id)->sole()->montant_prevu)->toBe('22.50');
+
+    $composant->call('updateMontant', $participant->id, $s1->id, '15')
+        ->call('copierLigne', $participant->id);
+    expect(Reglement::where('seance_id', $s2->id)->sole()->montant_prevu)->toBe('15.00');
+
+    $composant->call('updateMontant', $participant->id, $s1->id, '0')
+        ->call('copierLigne', $participant->id);
+    expect(Reglement::where('seance_id', $s2->id)->sole()->montant_prevu)->toBe('0.00');
+});
+
 /** Lie une transaction au règlement, comme le fait la comptabilisation. */
 function comptabiliserReglementTableTest(Reglement $reglement): Transaction
 {

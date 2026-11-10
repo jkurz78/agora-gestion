@@ -7,13 +7,14 @@ declare(strict_types=1);
  *
  * ReglementTable expose `updateMontant()` pour l'édition inline du montant prévu
  * d'un règlement. Cette méthode acceptait jusqu'ici n'importe quelle valeur float,
- * y compris des négatifs. Le patch Step 6 ajoute une validation `MontantValidation::RULE`
- * avant la persistance.
+ * y compris des négatifs. Le patch Step 6 y a ajouté une validation avant la
+ * persistance. Elle refuse le négatif mais accepte 0 € (`min:0`), prévu légitime
+ * d'une séance prépayée ou offerte — et non `MontantValidation::RULE` (`gt:0`),
+ * qui vaut pour les montants d'une écriture.
  *
  * @see docs/audit/2026-04-30-signe-negatif.md §2.4
  */
 
-use App\Livewire\Concerns\MontantValidation;
 use App\Livewire\ReglementTable;
 use App\Models\Association;
 use App\Models\Operation;
@@ -67,7 +68,7 @@ it('reglement_table_refuse_montant_negatif_sur_updateMontant', function (): void
     $component->assertHasErrors(['montant']);
 
     expect($component->errors()->first('montant'))
-        ->toBe(MontantValidation::MESSAGE);
+        ->toBe('Le montant prévu ne peut pas être négatif.');
 });
 
 it('reglement_table_accepte_montant_positif_sur_updateMontant', function (): void {
