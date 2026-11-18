@@ -426,34 +426,8 @@ final class AdhesionService
         $formule = FormuleAdhesion::findOrFail($dto->formuleId);
 
         return DB::transaction(function () use ($dto, $createur, $formule): Adhesion {
-            // 1. Calcul dates / exercice. L'exercice est la saison d'adhésion : dérivé
-            // de la date de début dans tous les modes (information, pas clé — D2).
-            if ($formule->aDatesFixes()) {
-                // Durée avec dates HelloAsso explicites (Custom)
-                $dateDebut = Carbon::parse($formule->helloasso_start_date);
-                $dateFin = $formule->helloasso_end_date !== null
-                    ? Carbon::parse($formule->helloasso_end_date)
-                    : null;
-                $exercice = $this->exerciceFromDate($dateDebut);
-            } elseif ($formule->isModeDuree() && $formule->duree_jours !== null) {
-                // Durée en jours (branche avant duree_mois)
-                $dateDebut = $dto->dateDebut ?? Carbon::today();
-                $dateFin = $dateDebut->copy()->addDays((int) $formule->duree_jours)->subDay();
-                $exercice = $this->exerciceFromDate($dateDebut);
-            } elseif ($formule->isModeDuree()) {
-                $dateDebut = $dto->dateDebut ?? Carbon::today();
-                $dateFin = $dateDebut->copy()->addMonths((int) $formule->duree_mois)->subDay();
-                $exercice = $this->exerciceFromDate($dateDebut);
-            } elseif ($formule->isModeIllimite()) {
-                $dateDebut = $dto->dateDebut ?? Carbon::today();
-                $dateFin = null;
-                $exercice = $this->exerciceFromDate($dateDebut);
-            } else {
-                $exercice = $dto->exercice ?? $this->exerciceFromDate(Carbon::today());
-                $exerciceMoisDebut = TenantContext::current()?->exercice_mois_debut ?? 9;
-                $dateDebut = Carbon::create($exercice, $exerciceMoisDebut, 1);
-                $dateFin = $dateDebut->copy()->addYear()->subDay();
-            }
+            // 1. Calcul dates / exercice.
+            [$exercice, $dateDebut, $dateFin] = $this->calculerPeriode($formule, $dto->exercice, $dto->dateDebut);
 
             // 2. Validation doublon (mode exercice) ou recouvrement (durée, illimité)
             $this->guardAgainstOverlap(
@@ -492,6 +466,110 @@ final class AdhesionService
     }
 
     /**
+     * Corrige une adhésion offerte (sans transaction) : formule, période, motif.
+     * Elle reste offerte : sans transaction ni montant. Une adhésion payée se corrige
+     * par sa transaction, jamais ici. La période est recalculée comme à la saisie.
+     */
+    public function modifierOfferte(Adhesion $adhesion, int $formuleId, ?int $exercice, ?Carbon $dateDebut, ?string $notes): Adhesion
+    {
+        if (! $adhesion->estGratuite()) {
+            throw new DomainException('Seule une adhésion offerte se modifie ici. Une cotisation se corrige depuis sa transaction.');
+        }
+
+        $formule = FormuleAdhesion::findOrFail($formuleId);
+
+        return DB::transaction(function () use ($adhesion, $formule, $exercice, $dateDebut, $notes): Adhesion {
+            [$exercice, $dateDebut, $dateFin] = $this->calculerPeriode($formule, $exercice, $dateDebut);
+
+            $this->guardAgainstOverlap(
+                tiersId: (int) $adhesion->tiers_id,
+                parExercice: $this->estParExercice($formule),
+                exercice: $exercice,
+                dateDebut: $dateDebut,
+                dateFin: $dateFin,
+                saufAdhesionId: (int) $adhesion->id,
+            );
+
+            try {
+                $adhesion->update([
+                    'formule_adhesion_id' => (int) $formule->id,
+                    'exercice' => $exercice,
+                    'date_debut' => $dateDebut?->toDateString(),
+                    'date_fin' => $dateFin?->toDateString(),
+                    'notes' => $notes,
+                    // SNAPSHOT, comme à la saisie
+                    'deductible_fiscal' => $formule->deductible_fiscal,
+                    'mode' => $formule->mode,
+                    'duree_mois' => $formule->duree_mois,
+                    'label_formule' => $formule->nom,
+                ]);
+            } catch (UniqueConstraintViolationException) {
+                throw new DomainException('Ce tiers a déjà une adhésion sur cette période.');
+            }
+
+            Log::info('adhesion.offerte.modifiee', ['adhesion_id' => (int) $adhesion->id]);
+
+            return $adhesion;
+        });
+    }
+
+    /** Supprime une adhésion offerte (suppression réversible). Une cotisation suit sa transaction. */
+    public function supprimerOfferte(Adhesion $adhesion): void
+    {
+        if (! $adhesion->estGratuite()) {
+            throw new DomainException('Seule une adhésion offerte se supprime ici. Une cotisation se supprime avec sa transaction.');
+        }
+
+        $adhesion->delete();
+
+        Log::info('adhesion.offerte.supprimee', ['adhesion_id' => (int) $adhesion->id]);
+    }
+
+    /**
+     * Période d'une adhésion selon sa formule. L'exercice est la saison d'adhésion :
+     * dérivé de la date de début dans tous les modes (information, pas clé — D2).
+     *
+     * @return array{0: int, 1: ?Carbon, 2: ?Carbon} [exercice, date de début, date de fin]
+     */
+    private function calculerPeriode(FormuleAdhesion $formule, ?int $exercice, ?Carbon $dateDebut): array
+    {
+        if ($formule->aDatesFixes()) {
+            // Durée avec dates HelloAsso explicites (Custom)
+            $debut = Carbon::parse($formule->helloasso_start_date);
+            $fin = $formule->helloasso_end_date !== null
+                ? Carbon::parse($formule->helloasso_end_date)
+                : null;
+
+            return [$this->exerciceFromDate($debut), $debut, $fin];
+        }
+
+        if ($formule->isModeDuree() && $formule->duree_jours !== null) {
+            // Durée en jours (branche avant duree_mois)
+            $debut = $dateDebut ?? Carbon::today();
+
+            return [$this->exerciceFromDate($debut), $debut, $debut->copy()->addDays((int) $formule->duree_jours)->subDay()];
+        }
+
+        if ($formule->isModeDuree()) {
+            $debut = $dateDebut ?? Carbon::today();
+
+            return [$this->exerciceFromDate($debut), $debut, $debut->copy()->addMonths((int) $formule->duree_mois)->subDay()];
+        }
+
+        if ($formule->isModeIllimite()) {
+            $debut = $dateDebut ?? Carbon::today();
+
+            return [$this->exerciceFromDate($debut), $debut, null];
+        }
+
+        $exercice ??= $this->exerciceFromDate(Carbon::today());
+        $exerciceMoisDebut = TenantContext::current()?->exercice_mois_debut ?? 9;
+        $debut = Carbon::create($exercice, $exerciceMoisDebut, 1);
+
+        return [$exercice, $debut, $debut->copy()->addYear()->subDay()];
+    }
+
+    /**
      * Même règle que findExistingAdhesion : la garde suit le MODE de la formule, pas la
      * nullité de l'exercice — sinon elle refuserait une seconde adhésion légitime sur
      * une même saison pour une formule en durée. Une adhésion « par exercice » est en
@@ -499,21 +577,22 @@ final class AdhesionService
      * quelle formule.
      *
      * Les cas qui échappent à la garde (formule sans date de fin, illimité) sont rattrapés
-     * par la clé unique, traduite par creerAdhesion().
+     * par la clé unique, traduite par creerAdhesion() et modifierOfferte().
+     *
+     * Une adhésion supprimée ne bloque pas : la clé unique l'ignore depuis le 2026-10-03
+     * (adhesion_key), et aucun écran ne sait la restaurer. La refuser empêchait de
+     * ressaisir une saison après suppression.
+     *
+     * $saufAdhesionId : l'adhésion en cours de modification, qui ne se bloque pas elle-même.
      */
-    private function guardAgainstOverlap(int $tiersId, bool $parExercice, int $exercice, ?Carbon $dateDebut, ?Carbon $dateFin): void
+    private function guardAgainstOverlap(int $tiersId, bool $parExercice, int $exercice, ?Carbon $dateDebut, ?Carbon $dateFin, ?int $saufAdhesionId = null): void
     {
         if ($parExercice) {
-            $existante = Adhesion::withTrashed()
+            $existante = Adhesion::query()
                 ->where('tiers_id', $tiersId)
                 ->where('exercice', $exercice)
+                ->when($saufAdhesionId !== null, fn ($q) => $q->where('id', '!=', $saufAdhesionId))
                 ->first();
-
-            if ($existante !== null && $existante->trashed()) {
-                throw new DomainException(
-                    "Ce tiers a une adhésion annulée sur l'exercice {$exercice}-".($exercice + 1).". Restaurez-la depuis la fiche tiers avant d'en créer une nouvelle."
-                );
-            }
 
             if ($existante !== null) {
                 throw new DomainException(
@@ -530,6 +609,7 @@ final class AdhesionService
 
         $chevauche = Adhesion::query()
             ->where('tiers_id', $tiersId)
+            ->when($saufAdhesionId !== null, fn ($q) => $q->where('id', '!=', $saufAdhesionId))
             ->whereNotNull('date_debut')
             ->whereNotNull('date_fin')
             ->where(function ($q) use ($dateDebut, $dateFin): void {

@@ -7,6 +7,37 @@
         </div>
     @endif
 
+    @if($actionError !== null)
+        <div class="alert alert-danger alert-dismissible fade show py-2 small mb-2" role="alert">
+            <i class="bi bi-exclamation-triangle me-1"></i>{{ $actionError }}
+            <button type="button" class="btn-close" wire:click="dismissActionError" aria-label="Fermer"></button>
+        </div>
+    @endif
+
+    {{-- Modale de confirmation : suppression d'une adhésion offerte --}}
+    @if($adhesionASupprimerId !== null)
+        <div class="modal fade show d-block" tabindex="-1" style="z-index:2060;background-color:rgba(0,0,0,.5)">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Supprimer cette adhésion offerte ?</h5>
+                        <button type="button" class="btn-close" wire:click="annulerSuppression"></button>
+                    </div>
+                    <div class="modal-body">
+                        Le tiers ne sera plus compté comme adhérent sur cette période.
+                        Vous pourrez lui offrir de nouveau une adhésion ensuite.
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" wire:click="annulerSuppression">Annuler</button>
+                        <button type="button" class="btn btn-danger" wire:click="confirmerSuppression">
+                            <i class="bi bi-trash me-1"></i>Supprimer
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
     {{-- Modale avertissement doublon HelloAsso --}}
     @if($showHelloAssoWarning)
         <div class="modal fade show d-block" tabindex="-1" style="z-index:2060;background-color:rgba(0,0,0,.5)">
@@ -125,8 +156,21 @@
                                     <span class="text-muted">—</span>
                                 @endif
                             </td>
-                            <td class="text-end">
-                                @if(! $adhesion->estGratuite() && $adhesion->transaction_id)
+                            <td class="text-end text-nowrap">
+                                @if($adhesion->estGratuite() && $peutModifier)
+                                    <button type="button"
+                                            wire:click="$dispatch('modifier-adhesion-offerte', { adhesionId: {{ $adhesion->id }} })"
+                                            class="btn btn-sm btn-outline-primary"
+                                            title="Modifier l'adhésion offerte">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button type="button"
+                                            wire:click="demanderSuppression({{ $adhesion->id }})"
+                                            class="btn btn-sm btn-outline-danger"
+                                            title="Supprimer l'adhésion offerte">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                @elseif(! $adhesion->estGratuite() && $adhesion->transaction_id)
                                     <a href="{{ route('tiers.transactions', $adhesion->tiers_id) }}?edit={{ $adhesion->transaction_id }}"
                                        target="_blank"
                                        class="btn btn-sm btn-outline-primary"

@@ -269,7 +269,10 @@ it('crée une adhésion mode illimite (permanente)', function (): void {
     expect($adhesion->exercice)->toBe(2025);
 });
 
-it('refuse une adhésion si une adhésion soft-deleted existe pour le même exercice', function (): void {
+it('accepte une adhésion sur un exercice dont l\'adhésion a été supprimée', function (): void {
+    // Jusqu'au 2026-11-18, la garde refusait en renvoyant à une restauration
+    // qu'aucun écran ne propose. La clé unique ignore les lignes supprimées depuis
+    // le 2026-10-03 : rien n'empêche plus de ressaisir la saison.
     $formule = FormuleAdhesion::factory()->create([
         'compte_id' => $this->sc->id,
     ]);
@@ -294,6 +297,9 @@ it('refuse une adhésion si une adhésion soft-deleted existe pour le même exer
         reference: null,
     );
 
-    expect(fn () => app(AdhesionService::class)->creerDepuisWizard($dto, $this->user))
-        ->toThrow(DomainException::class, 'annulée');
+    $nouvelle = app(AdhesionService::class)->creerDepuisWizard($dto, $this->user);
+
+    expect($nouvelle->exercice)->toBe(2025)
+        ->and((int) $nouvelle->id)->not->toBe((int) $existante->id)
+        ->and($existante->fresh()->trashed())->toBeTrue();
 });

@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\Espace;
 use App\Enums\ModePaiement;
+use App\Enums\RoleAssociation;
 use App\Models\Adhesion;
 use App\Models\CompteBancaire;
 use App\Models\FormuleAdhesion;
+use App\Models\Tiers;
 use App\Services\Adhesion\NouvelleAdhesionDTO;
 use App\Services\AdhesionService;
 use App\Services\ExerciceService;
@@ -17,6 +20,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use InvalidArgumentException;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -48,14 +52,45 @@ final class NouvelleAdhesionModal extends Component
 
     public ?string $errorMessage = null;
 
+    /** Renseigné en mode modification d'une adhésion offerte ; null en création. */
+    #[Locked]
+    public ?int $adhesionId = null;
+
     #[On('nouvelle-adhesion')]
     public function open(bool $gratuite = false): void
     {
-        $this->reset(['tiersId', 'formuleId', 'exercice', 'dateDebut', 'notes', 'datePaiement', 'modePaiement', 'compteId', 'reference', 'errorMessage']);
+        $this->reset(['adhesionId', 'tiersId', 'formuleId', 'exercice', 'dateDebut', 'notes', 'datePaiement', 'modePaiement', 'compteId', 'reference', 'errorMessage']);
         $this->gratuite = $gratuite;
         $this->montant = 0.0;
         $this->exercice = app(ExerciceService::class)->current();
         $this->datePaiement = Carbon::today()->toDateString();
+        $this->visible = true;
+    }
+
+    /**
+     * Mode modification : seule une adhésion offerte s'ouvre ici. Le tiers ne change
+     * pas et elle reste offerte ; formule, période et motif sont repris.
+     */
+    #[On('modifier-adhesion-offerte')]
+    public function ouvrirModification(int $adhesionId): void
+    {
+        $this->exigerEcriture();
+
+        $adhesion = Adhesion::findOrFail($adhesionId);
+        if (! $adhesion->estGratuite()) {
+            return;
+        }
+
+        $this->reset(['tiersId', 'formuleId', 'exercice', 'dateDebut', 'notes', 'datePaiement', 'modePaiement', 'compteId', 'reference', 'errorMessage']);
+        $this->resetValidation();
+        $this->adhesionId = (int) $adhesion->id;
+        $this->gratuite = true;
+        $this->montant = 0.0;
+        $this->tiersId = (int) $adhesion->tiers_id;
+        $this->formuleId = $adhesion->formule_adhesion_id !== null ? (int) $adhesion->formule_adhesion_id : null;
+        $this->exercice = $adhesion->exercice;
+        $this->dateDebut = $adhesion->date_debut?->toDateString();
+        $this->notes = $adhesion->notes;
         $this->visible = true;
     }
 
@@ -122,6 +157,13 @@ final class NouvelleAdhesionModal extends Component
     public function submit(AdhesionService $service): void
     {
         $this->errorMessage = null;
+
+        if ($this->adhesionId !== null) {
+            $this->enregistrerModification($service);
+
+            return;
+        }
+
         $rules = [
             'tiersId' => ['required', 'integer'],
             'formuleId' => ['required', 'integer'],
@@ -163,16 +205,64 @@ final class NouvelleAdhesionModal extends Component
         $this->visible = false;
     }
 
+    private function enregistrerModification(AdhesionService $service): void
+    {
+        $this->exigerEcriture();
+        $this->validate([
+            'formuleId' => ['required', 'integer'],
+            'notes' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $adhesion = Adhesion::findOrFail($this->adhesionId);
+        $formule = FormuleAdhesion::findOrFail($this->formuleId);
+
+        // Une formule permanente garde sa date de début en modification (à la création,
+        // c'est aujourd'hui) ; une formule à dates fixes impose les siennes.
+        $avecDateDebut = ($formule->isModeDuree() && ! $formule->aDatesFixes()) || $formule->isModeIllimite();
+
+        try {
+            $service->modifierOfferte(
+                $adhesion,
+                (int) $formule->id,
+                $formule->isModeExercice() ? $this->exercice : null,
+                $avecDateDebut && $this->dateDebut !== null ? Carbon::parse($this->dateDebut) : null,
+                $this->notes,
+            );
+        } catch (DomainException $e) {
+            $this->errorMessage = $e->getMessage();
+
+            return;
+        }
+
+        session()->flash('success', 'Adhésion modifiée.');
+        $this->dispatch('adhesion-modifiee');
+        $this->visible = false;
+    }
+
+    private function exigerEcriture(): void
+    {
+        $role = RoleAssociation::tryFrom(auth()->user()?->currentRole() ?? '');
+        if (! ($role?->canWrite(Espace::Gestion) ?? false)) {
+            abort(403);
+        }
+    }
+
     public function render(): View
     {
+        // En modification, la formule déjà portée reste proposée même désactivée depuis :
+        // sinon la liste s'afficherait vide et forcerait un changement de formule.
+        $formuleActuelleId = $this->adhesionId !== null ? $this->formuleId : null;
+        $proposees = fn ($q) => $q->where('actif', true)
+            ->when($formuleActuelleId !== null, fn ($q) => $q->orWhere('id', $formuleActuelleId));
+
         $formulesManuelles = FormuleAdhesion::query()
-            ->where('actif', true)
+            ->where($proposees)
             ->where('est_helloasso', false)
             ->orderBy('nom')
             ->get();
 
         $formulesHelloAsso = FormuleAdhesion::query()
-            ->where('actif', true)
+            ->where($proposees)
             ->where('est_helloasso', true)
             ->orderBy('nom')
             ->get();
@@ -180,6 +270,15 @@ final class NouvelleAdhesionModal extends Component
         $formules = $formulesManuelles->merge($formulesHelloAsso);
 
         $availableYears = app(ExerciceService::class)->openYears();
+        // Une adhésion offerte n'a pas d'écriture comptable : son exercice reste proposé
+        // en modification même clôturé, pour pouvoir corriger le motif sans la déplacer.
+        if ($this->adhesionId !== null && $this->exercice !== null && ! in_array($this->exercice, $availableYears, true)) {
+            $availableYears[] = $this->exercice;
+            rsort($availableYears);
+        }
+        $tiersNom = $this->adhesionId !== null && $this->tiersId !== null
+            ? Tiers::find($this->tiersId)?->displayName()
+            : null;
         // Saisie manuelle : exclut les comptes alimentés par intégration externe
         // (HelloAsso etc.) — les adhésions HelloAsso passent par la sync, pas le wizard.
         $comptes = CompteBancaire::saisieManuelle()
@@ -196,6 +295,6 @@ final class NouvelleAdhesionModal extends Component
             ->pluck('notes')
             ->all();
 
-        return view('livewire.nouvelle-adhesion-modal', compact('formules', 'formulesManuelles', 'formulesHelloAsso', 'availableYears', 'comptes', 'modesPaiement', 'notesSuggestions'));
+        return view('livewire.nouvelle-adhesion-modal', compact('formules', 'formulesManuelles', 'formulesHelloAsso', 'availableYears', 'comptes', 'modesPaiement', 'notesSuggestions', 'tiersNom'));
     }
 }

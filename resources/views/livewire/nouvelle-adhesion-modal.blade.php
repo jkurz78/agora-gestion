@@ -6,8 +6,12 @@
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">
-                            <i class="bi {{ $gratuite ? 'bi-gift' : 'bi-plus-circle' }} me-2"></i>
-                            {{ $gratuite ? 'Offrir une adhésion' : 'Nouvelle adhésion' }}
+                            @if($adhesionId !== null)
+                                <i class="bi bi-pencil me-2"></i>Modifier l'adhésion offerte
+                            @else
+                                <i class="bi {{ $gratuite ? 'bi-gift' : 'bi-plus-circle' }} me-2"></i>
+                                {{ $gratuite ? 'Offrir une adhésion' : 'Nouvelle adhésion' }}
+                            @endif
                         </h5>
                         <button type="button" class="btn-close" wire:click="close"></button>
                     </div>
@@ -21,13 +25,17 @@
                         {{-- Tiers --}}
                         <div class="mb-3">
                             <label class="form-label fw-semibold">Adhérent</label>
-                            <livewire:tiers-autocomplete
-                                wire:model="tiersId"
-                                :key="'nouvelle-adhesion-tiers-'.($visible ? '1' : '0')"
-                                context="adhesion" />
-                            @error('tiersId')
-                                <div class="invalid-feedback d-block">{{ $message }}</div>
-                            @enderror
+                            @if($adhesionId !== null)
+                                <div class="form-control form-control-sm bg-light">{{ $tiersNom }}</div>
+                            @else
+                                <livewire:tiers-autocomplete
+                                    wire:model="tiersId"
+                                    :key="'nouvelle-adhesion-tiers-'.($visible ? '1' : '0')"
+                                    context="adhesion" />
+                                @error('tiersId')
+                                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                                @enderror
+                            @endif
                         </div>
 
                         {{-- Formule --}}
@@ -128,6 +136,13 @@
                                     <x-date-input :value="$this->dateFinCalculee" size="sm" :disabled="true" />
                                 </div>
                             </div>
+                        @elseif($selectedFormule && $selectedFormule->isModeIllimite() && $adhesionId !== null)
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold" for="nouvelle-date-debut">Date de début</label>
+                                <x-date-input id="nouvelle-date-debut" name="dateDebut" size="sm"
+                                              wire:model="dateDebut" :value="$dateDebut" />
+                                <div class="form-text"><i class="bi bi-infinity me-1"></i>Adhésion permanente — pas d'expiration.</div>
+                            </div>
                         @elseif($selectedFormule && $selectedFormule->isModeIllimite())
                             <div class="alert alert-info py-2 small mb-3">
                                 <i class="bi bi-infinity me-1"></i>
@@ -135,7 +150,8 @@
                             </div>
                         @endif
 
-                        {{-- Montant --}}
+                        {{-- Montant (une adhésion offerte reste offerte : pas de montant en modification) --}}
+                        @if($adhesionId === null)
                         <div class="mb-3">
                             <label class="form-label fw-semibold" for="nouvelle-montant">Montant (€)</label>
                             <input id="nouvelle-montant"
@@ -149,6 +165,7 @@
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
+                        @endif
 
                         {{-- Bloc paiement (visible uniquement si montant > 0) --}}
                         @if($montant > 0)
@@ -228,7 +245,7 @@
                             Annuler
                         </button>
                         <button type="button" class="btn btn-primary btn-sm" wire:click="submit">
-                            <i class="bi bi-check-lg me-1"></i>Créer l'adhésion
+                            <i class="bi bi-check-lg me-1"></i>{{ $adhesionId !== null ? 'Enregistrer' : "Créer l'adhésion" }}
                         </button>
                     </div>
                 </div>

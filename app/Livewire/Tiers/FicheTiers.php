@@ -11,6 +11,7 @@ use App\Services\Tiers\TiersDocumentsTimelineService;
 use App\Services\Tiers\TiersDonsTimelineService;
 use App\Services\Tiers\TiersOperationsTimelineService;
 use Illuminate\View\View;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
@@ -25,6 +26,10 @@ final class FicheTiers extends Component
     {
         $this->tiers = $tiers;
     }
+
+    /** L'onglet Adhésion a supprimé une adhésion : le compteur (et l'onglet) suivent. */
+    #[On('adhesion-supprimee')]
+    public function rafraichirCompteurs(): void {}
 
     public function render(): View
     {
