@@ -7,9 +7,22 @@ use App\Models\User;
 use App\Providers\AppServiceProvider;
 use App\Tenant\TenantContext;
 
+// config/version.php est versionné : ces tests le suppriment ou le réécrivent pour simuler
+// son absence. On garde son contenu pour le remettre après chaque test — sinon chaque
+// passage de la suite supprime le fichier de la copie de travail, ou en change la date.
+beforeEach(function (): void {
+    $this->versionOrigine = file_exists(config_path('version.php'))
+        ? file_get_contents(config_path('version.php'))
+        : null;
+});
+
 afterEach(function (): void {
     TenantContext::clear();
-    @unlink(config_path('version.php'));
+    if ($this->versionOrigine !== null) {
+        file_put_contents(config_path('version.php'), $this->versionOrigine);
+    } else {
+        @unlink(config_path('version.php'));
+    }
 });
 
 it('AppServiceProvider::boot() génère config/version.php si le fichier est absent', function (): void {

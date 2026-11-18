@@ -4,8 +4,21 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Artisan;
 
+// config/version.php est versionné : ces tests le suppriment ou le réécrivent pour simuler
+// son absence. On garde son contenu pour le remettre après chaque test — sinon chaque
+// passage de la suite supprime le fichier de la copie de travail, ou en change la date.
+beforeEach(function (): void {
+    $this->versionOrigine = file_exists(config_path('version.php'))
+        ? file_get_contents(config_path('version.php'))
+        : null;
+});
+
 afterEach(function (): void {
-    @unlink(config_path('version.php'));
+    if ($this->versionOrigine !== null) {
+        file_put_contents(config_path('version.php'), $this->versionOrigine);
+    } else {
+        @unlink(config_path('version.php'));
+    }
 });
 
 it('crée config/version.php avec les clés tag et date', function (): void {
