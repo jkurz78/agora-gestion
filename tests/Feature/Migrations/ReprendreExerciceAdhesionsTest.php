@@ -142,9 +142,11 @@ it('up() exécute la reprise', function (): void {
     expect(DB::table('adhesions')->where('id', $id)->value('exercice'))->toBe(2026);
 });
 
-it('AC-10 · la reprise ne déplace pas le filtre de communication « Adhérents / Exercice en cours »', function (): void {
-    // Le filtre lit les TRANSACTIONS, jamais la table adhesions : compléter
-    // adhesions.exercice ne doit pas changer la liste d'une convocation d'AG.
+it('AC-10 · la reprise ne déplace pas les adhérents payés du filtre de communication, et y fait entrer l\'adhésion offerte', function (): void {
+    // Pour une adhésion payée, le filtre lit les TRANSACTIONS : compléter
+    // adhesions.exercice ne la déplace pas. Une adhésion offerte, sans règlement, est
+    // retenue sur sa saison (depuis le 2026-11-18) : la reprise, en la renseignant,
+    // la fait entrer dans la liste de l'exercice.
     $association = Association::factory()->create(['email_from' => 'test@asso.fr']);
     $admin = User::factory()->create();
     $admin->associations()->attach($association->id, ['role' => 'admin', 'joined_at' => now()]);
@@ -157,7 +159,7 @@ it('AC-10 · la reprise ne déplace pas le filtre de communication « Adhérents
     TransactionLigne::withoutEvents(fn () => TransactionLigne::factory()->create(['transaction_id' => $tx->id, 'compte_id' => $cotisation->id, 'montant' => 30, 'credit' => 30]));
     adhesionHistorique($association->id, $membre->id, null, '2025-09-01', '2026-08-31', ['transaction_id' => $tx->id]);
 
-    // Adhérent sans règlement : son adhésion à exercice nul ne le fait pas entrer dans le filtre.
+    // Adhésion offerte : tant que sa saison est inconnue, le filtre de l'exercice ne la retient pas.
     $offert = Tiers::factory()->create(['association_id' => $association->id, 'nom' => 'Offert']);
     adhesionHistorique($association->id, $offert->id, null, '2025-09-01', '2026-08-31');
 
@@ -166,6 +168,9 @@ it('AC-10 · la reprise ne déplace pas le filtre de communication « Adhérents
         ->set('filtreAdherents', 'exercice')
         ->viewData('tiersList')
         ->pluck('nom')
+        ->map(fn (string $nom): string => mb_strtoupper($nom))
+        ->sort()
+        ->values()
         ->all();
 
     $avant = $noms();
@@ -173,6 +178,6 @@ it('AC-10 · la reprise ne déplace pas le filtre de communication « Adhérents
     $apres = $noms();
 
     expect(Adhesion::whereNull('exercice')->count())->toBe(0)
-        ->and($avant)->toBe($apres)
-        ->and($apres)->toHaveCount(1);
+        ->and($avant)->toBe(['MEMBRE'])
+        ->and($apres)->toBe(['MEMBRE', 'OFFERT']);
 });

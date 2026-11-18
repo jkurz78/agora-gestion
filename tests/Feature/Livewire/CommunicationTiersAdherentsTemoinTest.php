@@ -18,13 +18,16 @@ use Livewire\Livewire;
  *
  * Le filtre « Adhérents / Exercice en cours » de la communication est le chemin
  * recommandé pour une convocation d'assemblée générale, et il donne aujourd'hui la
- * bonne liste. Il ne lit PAS la table adhesions : il interroge les transactions
- * (une recette, dans l'exercice visé par sa date, dont une ligne pointe un compte
- * d'usage « cotisation »).
+ * bonne liste. Pour une adhésion payée, il ne lit PAS la table adhesions : il
+ * interroge les transactions (une recette, dans l'exercice visé par sa date, dont
+ * une ligne pointe un compte d'usage « cotisation »).
  *
- * Ce test fige son comportement. Il doit rester vert, à l'identique, avant et
- * après le correctif de complétude de l'exercice — et après toute évolution de
- * adhesions.exercice. S'il tombe, le correctif a touché ce qui marchait.
+ * Seule exception, ajoutée le 2026-11-18 : une adhésion offerte n'a pas de
+ * transaction, elle est retenue sur sa saison (adhesions.exercice). Voir
+ * CommunicationTiersAdherentsOffertsTest.
+ *
+ * Ce test fige son comportement. Il doit rester vert, à l'identique, après toute
+ * évolution de adhesions.exercice. S'il tombe, le correctif a touché ce qui marchait.
  */
 
 beforeEach(function (): void {
@@ -98,7 +101,7 @@ it('AC-10 · le filtre « exercice en cours » rend exactement les tiers ayant r
     temoinReglement($suivant, $this->cotisation, '2026-09-05');
     Adhesion::factory()->create(['association_id' => $this->association->id, 'tiers_id' => $suivant->id, 'exercice' => null, 'date_debut' => '2026-09-01', 'date_fin' => '2027-08-31']);
 
-    // Adhésion sans aucun règlement (offerte) : le filtre ne la voit pas, c'est connu et hors scope.
+    // Adhésion sans aucun règlement (offerte) sur la saison 2025-2026 : retenue sur sa saison.
     $offerte = temoinTiers('Offerte');
     Adhesion::factory()->create(['association_id' => $this->association->id, 'tiers_id' => $offerte->id, 'exercice' => 2025]);
 
@@ -110,6 +113,6 @@ it('AC-10 · le filtre « exercice en cours » rend exactement les tiers ayant r
 
     temoinTiers('Inconnu');
 
-    expect(temoinFiltre('exercice'))->toBe(['DEBUT', 'FIN', 'MILIEU'])
-        ->and(temoinFiltre('tous'))->toBe(['DEBUT', 'FIN', 'MILIEU', 'SUIVANT']);
+    expect(temoinFiltre('exercice'))->toBe(['DEBUT', 'FIN', 'MILIEU', 'OFFERTE'])
+        ->and(temoinFiltre('tous'))->toBe(['DEBUT', 'FIN', 'MILIEU', 'OFFERTE', 'SUIVANT']);
 });

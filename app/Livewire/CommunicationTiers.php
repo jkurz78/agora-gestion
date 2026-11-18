@@ -204,14 +204,23 @@ final class CommunicationTiers extends Component
             $cotCompteIds = Compte::forUsage(UsageComptable::Cotisation)->pluck('id');
             $ex = $this->filtreAdherents === 'exercice' ? $exercice : null;
 
+            // Adhérent = a réglé une cotisation (exercice jugé sur la date du règlement),
+            // OU a une adhésion offerte : sans règlement, son exercice est sa saison.
             $filters[] = function (Builder $q) use ($cotCompteIds, $ex): void {
-                $q->whereHas('transactions', function (Builder $tq) use ($cotCompteIds, $ex): void {
-                    $tq->where('type', 'recette');
-                    if ($ex !== null) {
-                        $tq->forExercice($ex);
-                    }
-                    $tq->whereHas('lignes', function (Builder $lq) use ($cotCompteIds): void {
-                        $lq->whereIn('compte_id', $cotCompteIds);
+                $q->where(function (Builder $w) use ($cotCompteIds, $ex): void {
+                    $w->whereHas('transactions', function (Builder $tq) use ($cotCompteIds, $ex): void {
+                        $tq->where('type', 'recette');
+                        if ($ex !== null) {
+                            $tq->forExercice($ex);
+                        }
+                        $tq->whereHas('lignes', function (Builder $lq) use ($cotCompteIds): void {
+                            $lq->whereIn('compte_id', $cotCompteIds);
+                        });
+                    })->orWhereHas('adhesions', function (Builder $aq) use ($ex): void {
+                        $aq->whereNull('transaction_id');
+                        if ($ex !== null) {
+                            $aq->forExercice($ex);
+                        }
                     });
                 });
             };

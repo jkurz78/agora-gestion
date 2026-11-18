@@ -232,6 +232,9 @@ migration doit néanmoins les **laisser telles quelles et les compter**, jamais 
   ([#L283](../../app/Services/AdhesionService.php#L283)) produit une adhésion **sans transaction** :
   le filtre de communication, qui lit les transactions, ne la verrait pas. Aucune n'existe en
   production aujourd'hui. À traiter le jour où une adhésion sera offerte.
+  → **Traité le 2026-11-18** (première adhésion offerte, au président) : le filtre retient aussi
+  une adhésion sans transaction, sur sa saison (`adhesions.exercice`). Les adhésions payées restent
+  jugées sur la date du règlement ; l'attendu du témoin AC‑10 inclut désormais l'adhésion offerte.
 - **Les formules homonymes.** La synchro crée sa formule sans regarder les noms existants : rien
   n'empêche une formule manuelle au libellé identique. Le risque est la confusion dans la liste
   déroulante, pas la collision de données — la synchro retrouve la sienne par
