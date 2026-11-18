@@ -539,8 +539,7 @@ x-on:click.window="
                 </div>
                 <div wire:key="tinymce-{{ $emailSubTab }}-{{ $tplData['is_default'] ? 'ro' : 'rw' }}"
                      wire:ignore
-                     x-data="tinymceEditor('{{ $emailSubTab }}', {{ $tplData['is_default'] ? 'true' : 'false' }})"
-                     x-init="init()">
+                     x-data="tinymceEditor('{{ $emailSubTab }}', {{ $tplData['is_default'] ? 'true' : 'false' }})">
                     <textarea x-ref="editor">{!! $tplData['corps'] !!}</textarea>
                 </div>
 
@@ -793,7 +792,7 @@ x-on:click.window="
                         menubar: readonly ? false : 'edit insert format table',
                         statusbar: !readonly,
                         promotion: false,
-                        plugins: 'link lists noneditable table image media code',
+                        plugins: 'link lists table image media code',
                         toolbar: readonly
                             ? false
                             : [

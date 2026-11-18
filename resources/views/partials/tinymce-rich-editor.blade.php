@@ -28,7 +28,7 @@
     window.__qgEditorCfg[{{ Js::from($id) }}] = {!! json_encode($editorConfig, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) !!};
 </script>
 
-<div wire:ignore x-data="qgRichEditor()" x-init="init()" data-editor-id="{{ $id }}">
+<div wire:ignore x-data="qgRichEditor()" data-editor-id="{{ $id }}">
     <textarea x-ref="editor" id="{{ $id }}" rows="10" style="width:100%">{!! $content !!}</textarea>
 </div>
 
@@ -71,7 +71,6 @@
                     var editorId = this.$el.getAttribute('data-editor-id');
                     this.cfg = (window.__qgEditorCfg || {})[editorId] || {};
                     this.$nextTick(function () { this.setup(); }.bind(this));
-                    this.$cleanup(function () { this.destroy(); }.bind(this));
                 },
 
                 setup() {
@@ -160,7 +159,7 @@
                         menubar: 'edit insert format table',
                         statusbar: true,
                         promotion: false,
-                        plugins: 'lists link noneditable table image media code fullscreen',
+                        plugins: 'lists link table image media code fullscreen',
                         toolbar: [
                             'undo redo | blocks fontfamily fontsize | bold italic underline strikethrough forecolor backcolor',
                             'alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | table image media link | variablesBtn'

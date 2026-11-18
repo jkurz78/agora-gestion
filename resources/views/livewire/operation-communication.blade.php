@@ -81,8 +81,7 @@
             <div class="mb-3">
                 <label class="form-label small fw-semibold">Corps</label>
                 <div wire:ignore
-                     x-data="messageTinymce()"
-                     x-init="init()">
+                     x-data="messageTinymce()">
                     <textarea x-ref="editor">{!! $corps !!}</textarea>
                 </div>
 
@@ -628,7 +627,6 @@
 
             init() {
                 this.$nextTick(() => this.setup());
-                this.$cleanup(() => this.destroy());
             },
 
             setup() {
@@ -665,7 +663,7 @@
                     menubar: 'edit insert format table',
                     statusbar: true,
                     promotion: false,
-                    plugins: 'lists link noneditable table image media code fullscreen',
+                    plugins: 'lists link table image media code fullscreen',
                     toolbar: [
                         'undo redo | blocks fontfamily fontsize | bold italic underline strikethrough forecolor backcolor',
                         'alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | table image media link | variablesButton insertElementButton | code fullscreen',

@@ -336,8 +336,7 @@
                     <div class="mb-3">
                         <label class="form-label small fw-semibold">Corps</label>
                         <div wire:ignore
-                             x-data="tiersCommunicationTinymce()"
-                             x-init="init()">
+                             x-data="tiersCommunicationTinymce()">
                             <textarea x-ref="editor">{!! $corps !!}</textarea>
                         </div>
                     </div>
@@ -719,7 +718,6 @@
 
             init() {
                 this.$nextTick(() => this.setup());
-                this.$cleanup(() => this.destroy());
             },
 
             setup() {
